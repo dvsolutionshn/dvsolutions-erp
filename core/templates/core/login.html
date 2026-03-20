@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - {{ empresa.nombre }}</title>
+
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(135deg,#1e2a38,#2f3e50);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+}
+
+.login-card{
+    background:white;
+    padding:40px;
+    width:400px;
+    border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    text-align:center;
+}
+
+.logo{
+    margin-bottom:20px;
+}
+
+.logo img{
+    max-height:80px;
+}
+
+h2{
+    margin-bottom:20px;
+    font-weight:500;
+    color:#1e2a38;
+}
+
+input{
+    width:100%;
+    padding:10px;
+    margin-bottom:15px;
+    border:1px solid #ddd;
+    border-radius:6px;
+    font-size:14px;
+}
+
+input:focus{
+    border-color:#6c63ff;
+    outline:none;
+    box-shadow:0 0 0 2px rgba(108,99,255,0.15);
+}
+
+button{
+    width:100%;
+    background:#6c63ff;
+    color:white;
+    border:none;
+    padding:10px;
+    border-radius:6px;
+    font-weight:500;
+    cursor:pointer;
+    transition:.2s;
+}
+
+button:hover{
+    background:#574fd6;
+}
+
+.error{
+    color:red;
+    font-size:13px;
+    margin-bottom:15px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="login-card">
+
+    <div class="logo">
+        {% if empresa.logo %}
+            <img src="{{ empresa.logo.url }}" alt="Logo">
+        {% else %}
+            <h3>{{ empresa.nombre }}</h3>
+        {% endif %}
+    </div>
+
+    <h2>Iniciar Sesión</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="error">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <input type="text" name="username" placeholder="Usuario" required>
+        <input type="password" name="password" placeholder="Contraseña" required>
+
+        <button type="submit">Ingresar</button>
+    </form>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,120 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Cuentas por Cobrar - {{ empresa.nombre }}</title>
+
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI",Arial;
+    background:#f4f6f9;
+}
+
+/* TOPBAR */
+.topbar{
+    background:#1e2a38;
+    color:white;
+    padding:15px 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.topbar a{
+    color:white;
+    text-decoration:none;
+}
+
+/* CONTENIDO */
+.container{
+    max-width:1200px;
+    margin:40px auto;
+    background:white;
+    padding:25px;
+    border-radius:10px;
+}
+
+h2{
+    margin-bottom:20px;
+}
+
+/* TABLA */
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td{
+    padding:10px;
+    border-bottom:1px solid #eee;
+    text-align:right;
+}
+
+th{
+    background:#f8f9fa;
+}
+
+th:first-child, td:first-child{
+    text-align:left;
+}
+
+/* COLORES */
+.badge-rojo{color:#721c24;}
+.badge-naranja{color:#856404;}
+.badge-verde{color:#155724;}
+</style>
+</head>
+
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+    <h2>💰 Cuentas por Cobrar - {{ empresa.nombre }}</h2>
+    <a href="/{{ empresa.slug }}/dashboard/facturacion/">← Volver</a>
+</div>
+
+<div class="container">
+
+<table>
+
+<thead>
+<tr>
+<th>Cliente</th>
+<th>0-30 días</th>
+<th>31-60</th>
+<th>61-90</th>
+<th>+90</th>
+<th>Total</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for cliente, valores in data.items %}
+<tr>
+
+<td>{{ cliente }}</td>
+
+<td class="badge-verde">L {{ valores.0_30|intcomma }}</td>
+<td class="badge-naranja">L {{ valores.31_60|intcomma }}</td>
+<td class="badge-naranja">L {{ valores.61_90|intcomma }}</td>
+<td class="badge-rojo">L {{ valores.90_mas|intcomma }}</td>
+
+<td><strong>L {{ valores.total|intcomma }}</strong></td>
+
+</tr>
+{% empty %}
+<tr>
+<td colspan="6">Sin saldos pendientes</td>
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</body>
+</html>

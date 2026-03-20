@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ modulo.nombre }} - {{ empresa.nombre }}</title>
+</head>
+<body>
+
+    <h1>{{ modulo.nombre }}</h1>
+    <p>Empresa: {{ empresa.nombre }}</p>
+
+    {% if modulo.codigo == "facturacion" %}
+        <h2>Módulo de Facturación</h2>
+        <p>Aquí construiremos la facturación real.</p>
+    {% else %}
+        <p>aqui es la cagada.</p>
+    {% endif %}
+
+    <br>
+    <a href="/{{ empresa.slug }}/dashboard/">Volver al Dashboard</a>
+
+</body>
+</html>

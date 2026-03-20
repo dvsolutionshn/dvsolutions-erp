@@ -1,0 +1,319 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Factura - {{ empresa.nombre }}</title>
+
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:#f1f3f5;
+}
+
+.topbar{
+    background:#1e2a38;
+    color:white;
+    padding:15px 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.container{
+    max-width:1300px;
+    margin:40px auto;
+    padding:0 25px;
+}
+
+.card{
+    background:white;
+    border-radius:10px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.06);
+    padding:25px;
+    margin-bottom:25px;
+}
+
+label{
+    font-size:13px;
+    font-weight:600;
+    color:#555;
+}
+
+input,select{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid #ddd;
+    border-radius:6px;
+    font-size:14px;
+}
+
+/* líneas */
+.linea{
+    display:grid;
+    grid-template-columns:2fr 1fr 1fr auto 1fr 1fr 1fr auto;
+    gap:12px;
+    align-items:end;
+    padding:15px 0;
+    border-bottom:1px solid #eee;
+}
+
+/* comentario oculto */
+.comentario-box textarea{
+    width:100%;
+    margin-top:5px;
+    height:60px;
+    border-radius:6px;
+}
+
+/* botones */
+button{
+    border:none;
+    padding:8px 12px;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+.add-btn{ background:#20c997;color:white; }
+.delete-btn{ background:#dc3545;color:white; }
+.btn-comentario{ background:#6c63ff;color:white; }
+
+.footer-bar{
+    display:flex;
+    justify-content:space-between;
+}
+
+.totales{
+    text-align:right;
+}
+
+.btn-guardar{
+    background: linear-gradient(135deg,#1e2a38,#6c63ff);
+    color:white;
+    padding:12px 22px;
+    border:none;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,0.15);
+    transition:all .2s ease;
+}
+
+.btn-guardar:hover{
+    transform:translateY(-1px);
+    box-shadow:0 6px 15px rgba(0,0,0,0.2);
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const productos = {
+        {% for p in productos %}
+            "{{ p.id }}": {{ p.precio|default:0 }},
+        {% endfor %}
+    };
+
+    const impuestos = {
+        {% for imp in impuestos %}
+            "{{ imp.id }}": {{ imp.porcentaje|default:0 }},
+        {% endfor %}
+    };
+
+    const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
+    const container = document.getElementById("lineas-container");
+
+    function recalcularLinea(linea){
+        const cantidad=linea.querySelector(".cantidad");
+        const precio=linea.querySelector(".precio");
+        const subtotal=linea.querySelector(".subtotal");
+        const impuestoSelect=linea.querySelector(".impuesto");
+        const impuestoMonto=linea.querySelector(".impuesto_monto");
+
+        const subtotalCalc=(parseFloat(cantidad.value)||0)*(parseFloat(precio.value)||0);
+        subtotal.value=subtotalCalc.toFixed(2);
+
+        let porcentaje=impuestos[impuestoSelect.value]||0;
+        const impuestoCalc=subtotalCalc*(porcentaje/100);
+
+        impuestoMonto.value=impuestoCalc.toFixed(2);
+        recalcularTotales();
+    }
+
+    function recalcularTotales(){
+        let subtotal=0, impuesto=0;
+
+        document.querySelectorAll(".subtotal").forEach(e=> subtotal+=parseFloat(e.value)||0);
+        document.querySelectorAll(".impuesto_monto").forEach(e=> impuesto+=parseFloat(e.value)||0);
+
+        document.getElementById("subtotal_general").innerText=subtotal.toFixed(2);
+        document.getElementById("impuesto_general").innerText=impuesto.toFixed(2);
+        document.getElementById("total_general").innerText=(subtotal+impuesto).toFixed(2);
+    }
+
+    function activarEventos(linea){
+        linea.querySelector(".producto").addEventListener("change",function(){
+            let precio=productos[this.value]||0;
+            linea.querySelector(".precio").value=precio;
+            recalcularLinea(linea);
+        });
+
+        linea.querySelector(".cantidad").addEventListener("input",()=>recalcularLinea(linea));
+        linea.querySelector(".precio").addEventListener("input",()=>recalcularLinea(linea));
+        linea.querySelector(".impuesto").addEventListener("change",()=>recalcularLinea(linea));
+    }
+
+    document.querySelectorAll(".linea").forEach(l=>{
+        activarEventos(l);
+        recalcularLinea(l);
+    });
+
+    // agregar línea
+    document.getElementById("agregar-linea").addEventListener("click",function(){
+        let formCount=parseInt(totalFormsInput.value);
+        let nueva=document.querySelector(".linea").cloneNode(true);
+
+        nueva.querySelectorAll("input,select,textarea").forEach(el=>{
+            if(el.name){
+                el.name=el.name.replace(/-\d+-/,"-"+formCount+"-");
+                el.id="id_"+el.name;
+            }
+            if(el.type!=="hidden") el.value="";
+        });
+
+        container.appendChild(nueva);
+        totalFormsInput.value=formCount+1;
+        activarEventos(nueva);
+    });
+
+    // eliminar línea
+    document.addEventListener("click",function(e){
+        if(e.target.classList.contains("btn-eliminar")){
+            e.target.closest(".linea").remove();
+        }
+    });
+
+    // mostrar comentario
+    document.addEventListener("click",function(e){
+        if(e.target.classList.contains("btn-comentario")){
+            const linea = e.target.closest(".linea");
+            const box = linea.querySelector(".comentario-box");
+
+            box.style.display = (box.style.display === "none") ? "block" : "none";
+        }
+    });
+
+    // tipo cambio dinámico
+    const moneda=document.getElementById("id_moneda");
+    const tipo=document.getElementById("id_tipo_cambio");
+
+    if(moneda && tipo){
+        const cont=tipo.closest("p");
+
+        function toggle(){
+            if(moneda.value==="USD"){
+                cont.style.display="block";
+            }else{
+                cont.style.display="none";
+                tipo.value=1;
+            }
+        }
+
+        toggle();
+        moneda.addEventListener("change",toggle);
+    }
+
+});
+</script>
+</head>
+
+<body>
+
+<div class="topbar">
+    <h2>Factura</h2>
+    <a href="/{{ empresa.slug }}/dashboard/facturacion/">← Volver</a>
+</div>
+
+<div class="container">
+
+<form method="post">
+{% csrf_token %}
+
+<div class="card">
+    {{ form.as_p }}
+</div>
+
+<div class="card">
+    <h3>Líneas</h3>
+    {{ formset.management_form }}
+
+    <div id="lineas-container">
+    {% for form_linea in formset %}
+        <div class="linea">
+
+            {{ form_linea.id }}
+
+            <div>
+                <label>Producto</label>
+                {{ form_linea.producto|add_class:"producto" }}
+            </div>
+
+            <div>
+                <label>Cantidad</label>
+                {{ form_linea.cantidad|add_class:"cantidad" }}
+            </div>
+
+            <div>
+                <label>Precio</label>
+                {{ form_linea.precio_unitario|add_class:"precio" }}
+            </div>
+
+            <div>
+                <button type="button" class="btn-comentario">💬</button>
+                <div class="comentario-box" style="display:none;">
+                    {{ form_linea.comentario }}
+                </div>
+            </div>
+
+            <div>
+                <label>Subtotal</label>
+                <input class="subtotal" readonly>
+            </div>
+
+            <div>
+                <label>Impuesto</label>
+                {{ form_linea.impuesto|add_class:"impuesto" }}
+            </div>
+
+            <div>
+                <label>Monto</label>
+                <input class="impuesto_monto" readonly>
+            </div>
+
+            <div>
+                <button type="button" class="delete-btn btn-eliminar">X</button>
+            </div>
+
+        </div>
+    {% endfor %}
+    </div>
+
+    <button type="button" id="agregar-linea" class="add-btn">+ Agregar Línea</button>
+</div>
+
+<div class="card footer-bar">
+    <button type="submit" class="btn-guardar">💾 Guardar Factura</button>
+
+    <div class="totales">
+        <p>Subtotal: L. <span id="subtotal_general">0.00</span></p>
+        <p>Impuesto: L. <span id="impuesto_general">0.00</span></p>
+        <p><strong>Total: L. <span id="total_general">0.00</span></strong></p>
+    </div>
+</div>
+
+</form>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,63 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Editar Factura - {{ empresa.nombre }}</title>
+</head>
+<body>
+
+<h2>Editar Factura</h2>
+
+<p><strong>Número:</strong> {{ factura.numero_factura|default:"Sin número" }}</p>
+<p><strong>Estado actual:</strong> {{ factura.estado }}</p>
+
+<form method="post">
+    {% csrf_token %}
+
+    {{ form.as_p }}
+
+    <h3>Líneas</h3>
+
+    {{ formset.management_form }}
+
+    <div id="lineas-container">
+
+        {% for form_linea in formset %}
+        <div class="linea" style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+
+            <!-- 🔥 ESTO ES FUNDAMENTAL -->
+            {{ form_linea.id }}
+
+            <p>
+                Producto:<br>
+                {{ form_linea.producto|add_class:"producto" }}
+            </p>
+
+            <p>
+                Cantidad:<br>
+                {{ form_linea.cantidad|add_class:"cantidad" }}
+            </p>
+
+            <p>
+                Precio Unitario:<br>
+                {{ form_linea.precio_unitario|add_class:"precio" }}
+            </p>
+
+            <p>
+                Impuesto:<br>
+                {{ form_linea.impuesto|add_class:"impuesto" }}
+            </p>
+
+        </div>
+        {% endfor %}
+
+    </div>
+
+    <button type="submit">Guardar Cambios</button>
+</form>
+
+<br>
+<a href="/{{ empresa.slug }}/dashboard/facturacion/">Volver</a>
+
+</body>
+</html>

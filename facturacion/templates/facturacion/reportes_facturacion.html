@@ -1,0 +1,250 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Reportes - {{ empresa.nombre }}</title>
+
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI", Arial;
+    background:#f4f6f9;
+}
+
+.topbar{
+    background:#1e2a38;
+    color:white;
+    padding:15px 30px;
+    display:flex;
+    justify-content:space-between;
+}
+
+.topbar a{
+    color:white;
+    text-decoration:none;
+}
+
+.container{
+    max-width:1400px;
+    margin:40px auto;
+    background:white;
+    padding:25px;
+    border-radius:10px;
+}
+
+/* BOTONES */
+.btn{
+    padding:8px 15px;
+    border-radius:6px;
+    text-decoration:none;
+    font-size:14px;
+    display:inline-block;
+    margin-bottom:15px;
+}
+
+.btn-primary{
+    background:#6c63ff;
+    color:white;
+}
+
+.btn-success{
+    background:#28a745;
+    color:white;
+}
+
+.btn-secondary{
+    background:#6c757d;
+    color:white;
+}
+
+/* FILTROS */
+form{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+}
+
+select, input{
+    padding:8px;
+    border-radius:6px;
+    border:1px solid #ccc;
+}
+
+/* TABLA */
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td{
+    padding:10px;
+    border-bottom:1px solid #eee;
+    font-size:13px;
+}
+
+th{
+    background:#f8f9fa;
+}
+
+.monto{
+    text-align:right;
+    font-weight:600;
+}
+
+/* ESTADOS */
+.pagado{color:#28a745;}
+.parcial{color:#ffc107;}
+.pendiente{color:#dc3545;}
+
+/* FOOTER */
+tfoot td{
+    background:#f1f3f5;
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+<h2>📊 Reportes - {{ empresa.nombre }}</h2>
+<a href="/{{ empresa.slug }}/dashboard/facturacion/">← Volver</a>
+</div>
+
+<div class="container">
+
+<!-- BOTÓN EXPORTAR -->
+<a href="/{{ empresa.slug }}/dashboard/facturacion/reportes/excel/?{{ request.GET.urlencode }}" class="btn btn-success">
+📥 Exportar Excel
+</a>
+
+<!-- FILTROS -->
+<form method="GET">
+
+<select name="cliente">
+<option value="">Cliente</option>
+{% for c in clientes %}
+<option value="{{ c.id }}" {% if request.GET.cliente == c.id|stringformat:"s" %}selected{% endif %}>
+{{ c.nombre }}
+</option>
+{% endfor %}
+</select>
+
+<select name="estado_pago">
+<option value="">Estado</option>
+<option value="pendiente" {% if request.GET.estado_pago == "pendiente" %}selected{% endif %}>Pendiente</option>
+<option value="parcial" {% if request.GET.estado_pago == "parcial" %}selected{% endif %}>Parcial</option>
+<option value="pagado" {% if request.GET.estado_pago == "pagado" %}selected{% endif %}>Pagado</option>
+</select>
+
+<input type="date" name="fecha_desde" value="{{ request.GET.fecha_desde }}">
+<input type="date" name="fecha_hasta" value="{{ request.GET.fecha_hasta }}">
+
+<select name="impuesto">
+<option value="">Impuesto</option>
+<option value="15" {% if request.GET.impuesto == "15" %}selected{% endif %}>ISV 15%</option>
+<option value="18" {% if request.GET.impuesto == "18" %}selected{% endif %}>ISV 18%</option>
+<option value="0" {% if request.GET.impuesto == "0" %}selected{% endif %}>Exento</option>
+</select>
+
+<button type="submit" class="btn btn-primary">Filtrar</button>
+
+<a href="/{{ empresa.slug }}/dashboard/facturacion/reportes/" class="btn btn-secondary">
+Limpiar
+</a>
+
+</form>
+
+<!-- TABLA -->
+<table>
+
+<thead>
+<tr>
+<th>Cliente</th>
+<th>Fecha</th>
+<th>Número</th>
+<th>Vencimiento</th>
+
+<th>Base 15%</th>
+<th>ISV 15%</th>
+
+<th>Base 18%</th>
+<th>ISV 18%</th>
+
+<th>Exento</th>
+<th>Exonerado</th>
+
+<th>Total</th>
+<th>Saldo</th>
+<th>Estado</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for f in facturas %}
+{% with r=f.resumen_fiscal %}
+<tr>
+
+<td>{{ f.cliente.nombre }}</td>
+<td>{{ f.fecha_emision }}</td>
+<td>{{ f.numero_factura }}</td>
+<td>{{ f.fecha_vencimiento|default:"-" }}</td>
+
+<td class="monto">L {{ r.base_15|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ r.isv_15|floatformat:2|intcomma }}</td>
+
+<td class="monto">L {{ r.base_18|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ r.isv_18|floatformat:2|intcomma }}</td>
+
+<td class="monto">L {{ r.base_exento|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ r.base_exonerado|floatformat:2|intcomma }}</td>
+
+<td class="monto">L {{ f.total|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ f.saldo_pendiente|floatformat:2|intcomma }}</td>
+
+<td>
+{% if f.estado_pago == "pagado" %}
+<span class="pagado">Pagado</span>
+{% elif f.estado_pago == "parcial" %}
+<span class="parcial">Parcial</span>
+{% else %}
+<span class="pendiente">Pendiente</span>
+{% endif %}
+</td>
+
+</tr>
+{% endwith %}
+{% empty %}
+<tr><td colspan="13">Sin resultados</td></tr>
+{% endfor %}
+
+</tbody>
+
+<tfoot>
+<tr>
+<td colspan="4">TOTAL</td>
+
+<td class="monto">L {{ total_base_15|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ total_isv_15|floatformat:2|intcomma }}</td>
+
+<td class="monto">L {{ total_base_18|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ total_isv_18|floatformat:2|intcomma }}</td>
+
+<td class="monto">L {{ total_exento|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ total_exonerado|floatformat:2|intcomma }}</td>
+
+<td class="monto">L {{ totales.total|floatformat:2|intcomma }}</td>
+<td class="monto">L {{ total_saldo|floatformat:2|intcomma }}</td>
+
+<td></td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+
+</body>
+</html>

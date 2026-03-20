@@ -1,0 +1,209 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registrar Pago</title>
+
+    <style>
+
+        body{
+            margin:0;
+            font-family:"Segoe UI",Roboto,Arial,sans-serif;
+            background:#f4f6f9;
+        }
+
+        .container{
+            max-width:600px;
+            margin:50px auto;
+            background:white;
+            padding:30px;
+            border-radius:12px;
+            box-shadow:0 5px 15px rgba(0,0,0,0.08);
+        }
+
+        h2{
+            margin-bottom:20px;
+        }
+
+        .info{
+            background:#f8f9fb;
+            padding:15px;
+            border-radius:8px;
+            margin-bottom:20px;
+        }
+
+        .info p{
+            margin:5px 0;
+            font-size:15px;
+        }
+
+        .form-group{
+            margin-bottom:15px;
+        }
+
+        label{
+            display:block;
+            margin-bottom:5px;
+            font-weight:500;
+        }
+
+        input{
+            width:100%;
+            padding:10px;
+            border-radius:6px;
+            border:1px solid #ccc;
+        }
+
+        input:focus{
+            outline:none;
+            border-color:#6c63ff;
+        }
+
+        /* =========================
+           SELECT PREMIUM
+        ========================= */
+
+        .select-wrapper{
+            position: relative;
+        }
+
+        .select-wrapper select{
+            width:100%;
+            padding:12px 40px 12px 12px;
+            border-radius:8px;
+            border:1px solid #dcdcdc;
+            font-size:14px;
+            background:white;
+            appearance:none;
+            cursor:pointer;
+            transition: all 0.2s ease;
+        }
+
+        .select-wrapper select:hover{
+            border-color:#6c63ff;
+        }
+
+        .select-wrapper select:focus{
+            outline:none;
+            border-color:#6c63ff;
+            box-shadow:0 0 0 2px rgba(108,99,255,0.2);
+        }
+
+        .select-wrapper::after{
+            content:"▼";
+            position:absolute;
+            right:12px;
+            top:50%;
+            transform:translateY(-50%);
+            font-size:12px;
+            color:#777;
+            pointer-events:none;
+        }
+
+        /* BOTÓN PRINCIPAL */
+        button{
+            width:100%;
+            padding:12px;
+            background:#6c63ff;
+            color:white;
+            border:none;
+            border-radius:8px;
+            font-size:15px;
+            cursor:pointer;
+        }
+
+        button:hover{
+            background:#5a52d6;
+        }
+
+        /* BOTÓN PAGAR TODO */
+        .btn-total{
+            margin-top:8px;
+            background:#28a745;
+            color:white;
+            border:none;
+            padding:8px 12px;
+            border-radius:6px;
+            cursor:pointer;
+            font-size:13px;
+        }
+
+        .btn-total:hover{
+            background:#218838;
+        }
+
+        input[type="date"]{
+            font-family: inherit;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>Registrar Pago</h2>
+
+    <div class="info">
+        <p><strong>Factura:</strong> {{ factura.numero_factura }}</p>
+        <p><strong>Total:</strong> L {{ factura.total|intcomma }}</p>
+        <p><strong>Saldo:</strong> L {{ factura.saldo_pendiente|intcomma }}</p>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+
+    <div class="form-group">
+        <label>Fecha de Pago</label>
+        <input type="date" name="fecha" value="{{ today }}">
+    </div>
+
+        <!-- MONTO -->
+        <div class="form-group">
+            <label>Monto</label>
+            <input type="number" step="0.01" name="monto" id="monto" required>
+
+            <button type="button" class="btn-total" onclick="pagarTodo()">
+                💰 Pagar todo
+            </button>
+        </div>
+
+        <!-- METODO -->
+        <div class="form-group">
+            <label>Método de Pago</label>
+
+            <div class="select-wrapper">
+                <select name="metodo" required>
+                    <option value="" disabled selected>Seleccione método</option>
+                    <option value="efectivo">💵 Efectivo</option>
+                    <option value="transferencia">🏦 Transferencia</option>
+                    <option value="tarjeta">💳 Tarjeta</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- REFERENCIA -->
+        <div class="form-group">
+            <label>Referencia</label>
+            <input type="text" name="referencia">
+        </div>
+
+        <button type="submit">Guardar Pago</button>
+
+    </form>
+
+</div>
+
+<!-- SCRIPT PAGAR TODO -->
+<script>
+function pagarTodo(){
+    let saldo = "{{ factura.saldo_pendiente }}";
+    document.getElementById("monto").value = saldo;
+}
+</script>
+
+</body>
+</html>

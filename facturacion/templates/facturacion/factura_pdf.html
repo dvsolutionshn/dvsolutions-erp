@@ -1,0 +1,318 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<style>
+
+@page {
+    size: A4;
+    margin: 25px;
+}
+
+body {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 13px;
+    color: #2b2b2b;
+}
+
+/* BARRA SUPERIOR */
+.top-line {
+    height: 6px;
+    background: linear-gradient(to right, #0A1F44, #1e3a8a);
+    margin-bottom: 25px;
+}
+
+/* HEADER */
+.header {
+    display: table;
+    width: 100%;
+}
+
+.header-left {
+    display: table-cell;
+    width: 60%;
+    vertical-align: top;
+}
+
+.header-right {
+    display: table-cell;
+    width: 40%;
+    text-align: right;
+    vertical-align: top;
+}
+
+.logo {
+    max-width: 180px;
+    max-height: 90px;
+    display: block;
+}
+
+.empresa-nombre {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0A1F44;
+}
+
+.empresa-info {
+    font-size: 12px;
+    color: #555;
+    margin-top: 5px;
+    line-height: 1.6;
+}
+
+.factura-titulo {
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #0A1F44;
+}
+
+.factura-numero {
+    font-size: 15px;
+    margin-top: 4px;
+}
+
+.fecha {
+    font-size: 12px;
+    color: #666;
+}
+
+/* CLIENTE */
+.section {
+    margin-top: 30px;
+}
+
+.section-title {
+    font-weight: bold;
+    font-size: 13px;
+    color: #0A1F44;
+    margin-bottom: 5px;
+}
+
+/* TABLA */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th {
+    background: #f3f6fb;
+    padding: 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    border-bottom: 2px solid #dcdcdc;
+}
+
+td {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* 🔥 comentario PDF FIX */
+.comentario {
+    font-size: 11px;
+    color: #555;
+    line-height: 1.4;
+    margin-top: 3px;
+}
+
+/* TOTALES */
+.totales-wrapper {
+    width: 420px;
+    margin-top: 25px;
+    float: right;
+}
+
+.total-final {
+    font-weight: bold;
+    font-size: 15px;
+    border-top: 2px solid #000;
+    background: #f5f5f5;
+}
+
+.total-letras {
+    margin-top: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* BLOQUE FISCAL */
+.legal-section {
+    margin-top: 70px;
+}
+
+.legal-box {
+    background: #f8f9fb;
+    border-left: 4px solid #0A1F44;
+    padding: 15px;
+    font-size: 11px;
+    color: #444;
+}
+
+.legal-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #0A1F44;
+    text-transform: uppercase;
+}
+
+.exijala {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #555;
+}
+
+.bottom-line {
+    margin-top: 40px;
+    height: 6px;
+    background: linear-gradient(to right, #0A1F44, #1e3a8a, #0A1F44);
+}
+
+.clearfix {
+    clear: both;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="top-line"></div>
+
+<div class="header">
+
+    <div class="header-left">
+        
+        {% if logo_url %}
+            <img src="{{ logo_url }}" class="logo">
+        {% endif %}
+
+        <div class="empresa-nombre">{{ empresa.nombre }}</div>
+
+        <div class="empresa-info">
+            RTN: {{ empresa.rtn }}<br>
+            {% if empresa.direccion %}{{ empresa.direccion }}<br>{% endif %}
+            {% if empresa.telefono %}Tel: {{ empresa.telefono }}{% endif %}
+        </div>
+    </div>
+
+    <div class="header-right">
+        <div class="factura-titulo">FACTURA</div>
+        <div class="factura-numero">
+            {{ factura.numero_factura }}
+        </div>
+        <div class="fecha">
+            {{ factura.fecha_emision }}<br>
+            Vence: {{ factura.fecha_vencimiento|default:"-" }}
+        </div>
+    </div>
+
+</div>
+
+<div class="section">
+    <div class="section-title">Datos del Cliente</div>
+    {{ factura.cliente.nombre }}<br>
+    RTN: {{ factura.cliente.rtn }}
+</div>
+
+<table>
+<tr>
+    <th>Descripción</th>
+    <th class="text-center">Cant.</th>
+    <th class="text-right">Precio</th>
+    <th class="text-right">Impuesto</th>
+    <th class="text-right">Total</th>
+</tr>
+
+{% for linea in factura.lineas.all %}
+<tr>
+    <td>
+        <strong>{{ linea.producto.nombre }}</strong>
+
+        {% if linea.comentario %}
+            <br>
+            <span class="comentario">
+                {{ linea.comentario|linebreaksbr }}
+            </span>
+        {% endif %}
+    </td>
+
+    <td class="text-center">{{ linea.cantidad|floatformat:2|intcomma }}</td>
+
+    <td class="text-right">
+        {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+        {{ linea.precio_unitario|floatformat:2|intcomma }}
+    </td>
+
+    <td class="text-right">
+        {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+        {{ linea.impuesto_monto|floatformat:2|intcomma }}
+    </td>
+
+    <td class="text-right">
+        {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+        {{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}
+    </td>
+</tr>
+{% endfor %}
+</table>
+
+<div class="totales-wrapper">
+
+<table class="totales">
+
+<tr><td>Gravado 15%</td><td class="text-right">L. {{ resumen.base_15|floatformat:2|intcomma }}</td></tr>
+<tr><td>Gravado 18%</td><td class="text-right">L. {{ resumen.base_18|floatformat:2|intcomma }}</td></tr>
+<tr><td>Exento</td><td class="text-right">L. {{ resumen.base_exento|floatformat:2|intcomma }}</td></tr>
+<tr><td>Exonerado</td><td class="text-right">L. {{ resumen.base_exonerado|floatformat:2|intcomma }}</td></tr>
+<tr><td>I.S.V. 15%</td><td class="text-right">L. {{ resumen.isv_15|floatformat:2|intcomma }}</td></tr>
+<tr><td>I.S.V. 18%</td><td class="text-right">L. {{ resumen.isv_18|floatformat:2|intcomma }}</td></tr>
+
+<tr class="total-final">
+<td>TOTAL A PAGAR</td>
+<td class="text-right">
+{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+{{ factura.total|floatformat:2|intcomma }}
+</td>
+</tr>
+
+</table>
+
+<div class="total-letras">
+SON: {{ factura.total_en_letras }}
+</div>
+
+</div>
+
+<div class="clearfix"></div>
+
+<div class="legal-section">
+    <div class="legal-box">
+        <div class="legal-title">Información Fiscal Autorizada</div>
+        CAI: {{ factura.cai.numero_cai }}<br>
+        Rango autorizado: {{ factura.cai.rango_inicial }} al {{ factura.cai.rango_final }}<br>
+        Fecha límite de emisión: {{ factura.cai.fecha_limite }}
+    </div>
+
+    <div class="exijala">
+        La factura es beneficio de todos. “EXÍJALA”
+    </div>
+</div>
+
+<div class="bottom-line"></div>
+
+</body>
+</html>

@@ -1,0 +1,254 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Factura - {{ factura.numero_factura }}</title>
+
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:#f1f3f5;
+}
+
+.topbar{
+    background:#1e2a38;
+    color:white;
+    padding:15px 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.container{
+    max-width:1300px;
+    margin:40px auto;
+    padding:0 25px;
+}
+
+.card{
+    background:white;
+    border-radius:10px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.06);
+    padding:25px;
+    margin-bottom:25px;
+}
+
+.section-title{
+    font-weight:600;
+    margin-bottom:15px;
+    color:#1e2a38;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+}
+
+th{
+    background:#f8f9fa;
+    padding:10px;
+    font-size:13px;
+    text-align:left;
+}
+
+td{
+    padding:8px 10px;
+    border-bottom:1px solid #eee;
+    font-size:14px;
+    vertical-align:top;
+}
+
+/* 🔥 columnas alineadas PERFECTO */
+th:nth-child(1), td:nth-child(1){ width:45%; }
+th:nth-child(2), td:nth-child(2){ width:10%; text-align:center; }
+th:nth-child(3), td:nth-child(3){ width:15%; text-align:right; }
+th:nth-child(4), td:nth-child(4){ width:10%; text-align:right; }
+th:nth-child(5), td:nth-child(5){ width:10%; text-align:center; }
+th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
+
+/* producto */
+.producto-nombre{
+    font-weight:500;
+}
+
+/* comentario bonito */
+.comentario-linea{
+    margin-top:5px;
+    padding-left:10px;
+    border-left:3px solid #e0e0e0;
+
+    font-size:12px;
+    color:#666;
+    line-height:1.4;
+
+    white-space:pre-wrap;
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+}
+
+.totales{
+    width:450px;
+    margin-left:auto;
+}
+
+.total-final{
+    font-size:18px;
+    font-weight:600;
+}
+
+.badge{
+    padding:5px 10px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.borrador{background:#ffeeba;color:#856404;}
+.emitida{background:#d4edda;color:#155724;}
+.anulada{background:#f8d7da;color:#721c24;}
+
+.pendiente{background:#f8d7da;color:#721c24;}
+.pagada{background:#d4edda;color:#155724;}
+
+.btn{
+    background:#6c63ff;
+    color:white;
+    padding:8px 15px;
+    border-radius:6px;
+    text-decoration:none;
+    font-size:14px;
+    display:inline-block;
+}
+
+.btn:hover{
+    background:#574fd6;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+    <h2>Factura {{ factura.numero_factura }}</h2>
+    <a href="/{{ empresa.slug }}/dashboard/facturacion/">← Volver</a>
+</div>
+
+<div class="container">
+
+<div class="card">
+    <div class="section-title">Información General</div>
+    <p><strong>Empresa:</strong> {{ empresa.nombre }}</p>
+    <p><strong>CAI:</strong> {{ factura.cai.numero_cai }}</p>
+    <p><strong>Fecha:</strong> {{ factura.fecha_emision }}</p>
+    <p><strong>Fecha de vencimiento:</strong> {{ factura.fecha_vencimiento|default:"-" }}</p>
+    <p><strong>Vendedor:</strong> {{ factura.vendedor.username|default:"-" }}</p>
+    <p><strong>Moneda:</strong> {{ factura.get_moneda_display }}</p>
+
+    <p>
+        <strong>Estado:</strong>
+        {% if factura.estado == "borrador" %}
+            <span class="badge borrador">BORRADOR</span>
+        {% elif factura.estado == "emitida" %}
+            <span class="badge emitida">EMITIDA</span>
+        {% else %}
+            <span class="badge anulada">ANULADA</span>
+        {% endif %}
+    </p>
+</div>
+
+<div class="card">
+    <div class="section-title">Cliente</div>
+    <p><strong>Nombre:</strong> {{ factura.cliente.nombre }}</p>
+    <p><strong>RTN:</strong> {{ factura.cliente.rtn }}</p>
+</div>
+
+<div class="card">
+    <div class="section-title">Detalle de Productos</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Descripción</th>
+                <th>Cant.</th>
+                <th>Precio</th>
+                <th>Impuesto</th>
+                <th>%</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for linea in factura.lineas.all %}
+            <tr>
+                <td>
+                    <div class="producto-nombre">
+                        {{ linea.producto.nombre }}
+                    </div>
+
+                    {% if linea.comentario %}
+                        <div class="comentario-linea">
+                            {{ linea.comentario }}
+                        </div>
+                    {% endif %}
+                </td>
+
+                <td>{{ linea.cantidad }}</td>
+
+                <td>
+                    {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                    {{ linea.precio_unitario|floatformat:2|intcomma }}
+                </td>
+
+                <td>
+                    {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                    {{ linea.impuesto_monto|floatformat:2|intcomma }}
+                </td>
+
+                <td>{{ linea.impuesto.porcentaje }}%</td>
+
+                <td>
+                    {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                    {{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div class="section-title">Resumen Fiscal</div>
+
+    <table class="totales">
+        <tr><td>Gravado 15%</td><td align="right">L. {{ resumen.base_15|floatformat:2|intcomma }}</td></tr>
+        <tr><td>Gravado 18%</td><td align="right">L. {{ resumen.base_18|floatformat:2|intcomma }}</td></tr>
+        <tr><td>Exento</td><td align="right">L. {{ resumen.base_exento|floatformat:2|intcomma }}</td></tr>
+        <tr><td>Exonerado</td><td align="right">L. {{ resumen.base_exonerado|floatformat:2|intcomma }}</td></tr>
+        <tr><td>I.S.V. 15%</td><td align="right">L. {{ resumen.isv_15|floatformat:2|intcomma }}</td></tr>
+        <tr><td>I.S.V. 18%</td><td align="right">L. {{ resumen.isv_18|floatformat:2|intcomma }}</td></tr>
+
+        <tr class="total-final">
+            <td><strong>TOTAL A PAGAR</strong></td>
+            <td align="right">
+                <strong>
+                {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                {{ factura.total|floatformat:2|intcomma }}
+                </strong>
+            </td>
+        </tr>
+    </table>
+
+    <br>
+    <strong>{{ factura.total_en_letras }}</strong>
+</div>
+
+<div class="card">
+    <a class="btn" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}">
+        Descargar PDF Profesional
+    </a>
+</div>
+
+</div>
+</body>
+</html>

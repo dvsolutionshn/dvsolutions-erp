@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dashboard - {{ empresa.nombre }}</title>
+
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(135deg,#1e2a38,#2c3e50);
+    color:white;
+}
+
+.topbar{
+    background:#16202c;
+    padding:15px 40px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.topbar h2{
+    margin:0;
+    font-weight:600;
+}
+
+.topbar a{
+    color:#ffb3b3;
+    text-decoration:none;
+    font-weight:500;
+}
+
+.container{
+    max-width:1200px;
+    margin:80px auto;
+    padding:0 30px;
+    text-align:center;
+}
+
+.container h1{
+    font-size:34px;
+    margin-bottom:10px;
+}
+
+.container p{
+    color:#cfd8dc;
+    margin-bottom:60px;
+}
+
+.modules{
+    display:flex;
+    justify-content:center;
+}
+
+.module-card{
+    background:white;
+    color:#1e2a38;
+    width:320px;
+    padding:30px;
+    border-radius:12px;
+    box-shadow:0 15px 35px rgba(0,0,0,0.25);
+    transition:0.3s;
+}
+
+.module-card:hover{
+    transform:translateY(-5px);
+}
+
+.module-card h3{
+    margin-top:10px;
+}
+
+.module-card p{
+    color:#555;
+    font-size:14px;
+}
+
+.module-card a{
+    display:inline-block;
+    margin-top:20px;
+    background:#6c63ff;
+    color:white;
+    padding:10px 18px;
+    border-radius:6px;
+    text-decoration:none;
+}
+
+.footer{
+    text-align:center;
+    margin-top:120px;
+    font-size:13px;
+    color:#aaa;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+    <h2>{{ empresa.nombre }}</h2>
+    <div>
+        Usuario: {{ request.user.username }} |
+        <a href="/{{ empresa.slug }}/logout/">Cerrar sesión</a>
+    </div>
+</div>
+
+<div class="container">
+    <h1>Panel Principal</h1>
+    <p>Seleccione un módulo para comenzar</p>
+
+    <div class="modules">
+        <div class="module-card">
+            <h3>📄 Facturación</h3>
+            <p>Gestione facturas, clientes y control fiscal.</p>
+            <a href="/{{ empresa.slug }}/dashboard/facturacion/">
+                Ingresar
+            </a>
+        </div>
+    </div>
+
+    <div class="footer">
+        DV Solutions ERP © 2026
+    </div>
+</div>
+
+</body>
+</html>
