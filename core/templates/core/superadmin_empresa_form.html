@@ -1,0 +1,62 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Gestiona la identidad de la empresa y define los modulos que esta podra usar dentro del ERP.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_empresas' %}" class="erp-action-link">Volver a Empresas</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="erp-form-shell">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="erp-field-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <section class="erp-form-card">
+        <h3>Perfil empresarial</h3>
+        <p>Este formulario queda reservado para tu operacion interna y no se expone a los clientes finales.</p>
+        <div class="erp-form-grid">
+            {% for field in form %}
+                {% if field.name != 'modulos_activos' %}
+                <div class="erp-field {% if field.name == 'direccion' or field.name == 'slogan' or field.name == 'observaciones_comerciales' %}erp-field-span-full{% endif %}">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {{ field.errors }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+
+<section class="erp-form-card">
+    <h3>Estado comercial y licencia</h3>
+    <p>Aqui defines si la empresa esta en prueba, activa, suspendida o vencida, y las fechas de control del servicio.</p>
+    <div class="erp-soft-panel">
+        <div class="erp-inline-actions">
+            <span class="erp-badge neutral">Prueba: acceso comercial temporal</span>
+            <span class="erp-badge success">Activa: operacion normal</span>
+            <span class="erp-badge warning">Suspendida: acceso detenido por gestion interna</span>
+            <span class="erp-badge danger">Vencida: servicio fuera de fecha</span>
+        </div>
+    </div>
+</section>
+
+<section class="erp-form-card">
+    <h3>Modulos habilitados</h3>
+    <p>Marca solo lo que quieres vender o activar para esta empresa.</p>
+    <div class="erp-soft-panel">
+            {{ form.modulos_activos }}
+            {{ form.modulos_activos.errors }}
+        </div>
+    </section>
+
+    <div class="erp-form-actions">
+        <a href="{% url 'superadmin_empresas' %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Empresa</button>
+    </div>
+</form>
+{% endblock %}

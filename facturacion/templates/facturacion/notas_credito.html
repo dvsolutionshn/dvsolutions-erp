@@ -1,0 +1,83 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Notas de Crédito - {{ empresa.nombre }}</title>
+<style>
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f3f5;}
+.topbar{background:#1e2a38;color:white;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;}
+.topbar a{color:white;text-decoration:none;}
+.container{max-width:1300px;margin:40px auto;padding:0 25px;}
+.card{background:white;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.06);padding:25px;}
+.btn{background:#6c63ff;color:white;padding:8px 15px;border-radius:6px;text-decoration:none;display:inline-block;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;}
+th{background:#f8f9fa;padding:10px;font-size:13px;text-align:left;}
+td{padding:8px 10px;border-bottom:1px solid #eee;font-size:14px;}
+.monto{text-align:right;font-weight:600;}
+.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+.borrador{background:#ffeeba;color:#856404;}
+.emitida{background:#d4edda;color:#155724;}
+.anulada{background:#f8d7da;color:#721c24;}
+.actions a{margin-right:10px;text-decoration:none;color:#6c63ff;font-weight:500;}
+.messages{margin-bottom:20px;}
+.message{padding:12px;border-radius:8px;margin-bottom:8px;background:#e7f3ff;color:#084298;}
+</style>
+</head>
+<body>
+<div class="topbar">
+    <h2>Notas de Crédito - {{ empresa.nombre }}</h2>
+    <a href="{% url 'facturacion_dashboard' empresa.slug %}">Volver al módulo</a>
+</div>
+<div class="container">
+<div class="card">
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+        <div class="message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+<a class="btn" href="{% url 'crear_nota_credito' empresa.slug %}">+ Nueva Nota de Crédito</a>
+<table>
+<thead>
+<tr>
+<th>Número</th>
+<th>Factura origen</th>
+<th>Cliente</th>
+<th>Fecha</th>
+<th>Estado</th>
+<th>Total</th>
+<th>Acciones</th>
+</tr>
+</thead>
+<tbody>
+{% for nota in notas_credito %}
+<tr>
+<td>{{ nota.numero_nota|default:"Sin número" }}</td>
+<td>{{ nota.factura_origen.numero_factura|default:nota.factura_origen.id }}</td>
+<td>{{ nota.cliente.nombre }}</td>
+<td>{{ nota.fecha_emision }}</td>
+<td>
+{% if nota.estado == "borrador" %}
+<span class="badge borrador">BORRADOR</span>
+{% elif nota.estado == "emitida" %}
+<span class="badge emitida">EMITIDA</span>
+{% else %}
+<span class="badge anulada">ANULADA</span>
+{% endif %}
+</td>
+<td class="monto">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ nota.total|floatformat:2|intcomma }}</td>
+<td class="actions">
+<a href="{% url 'ver_nota_credito' empresa.slug nota.id %}">Ver</a>
+<a href="{% url 'editar_nota_credito' empresa.slug nota.id %}">Editar</a>
+</td>
+</tr>
+{% empty %}
+<tr><td colspan="7">No hay notas de crédito registradas.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</body>
+</html>

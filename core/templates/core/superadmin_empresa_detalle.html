@@ -1,0 +1,258 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}{{ empresa_obj.nombre }}{% endblock %}
+{% block header_title %}{{ empresa_obj.nombre }}{% endblock %}
+{% block header_description %}Ficha ejecutiva de la empresa para revisar plan, modulos, usuarios y estado operativo sin saltar entre varias pantallas.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_empresas' %}" class="erp-action-link">Volver a Empresas</a>
+<a href="{% url 'superadmin_empresa_edit' empresa_obj.id %}" class="erp-action-link">Editar Empresa</a>
+{% if empresa_obj.estado_licencia_resuelto != 'suspendida' %}
+<form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa_obj.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit" class="erp-action-link">Suspender</button>
+</form>
+{% endif %}
+{% if empresa_obj.estado_licencia_resuelto == 'suspendida' %}
+<form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa_obj.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit" class="erp-action-link">Activar</button>
+</form>
+{% endif %}
+<a href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa_obj.id %}" class="erp-action-link">Renovar</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        {% if empresa_obj.logo %}
+        <img src="{{ empresa_obj.logo.url }}" alt="{{ empresa_obj.nombre }}" style="width:86px;height:86px;object-fit:contain;border-radius:20px;border:1px solid var(--line);background:#fff;padding:8px;margin-bottom:12px;">
+        {% endif %}
+        <div class="erp-kpi-label">Empresa</div>
+        <p class="erp-stat-value" style="font-size:26px;">{{ empresa_obj.nombre }}</p>
+        <p class="erp-card-muted">RTN {{ empresa_obj.rtn }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Plan Comercial</div>
+        <p class="erp-stat-value" style="font-size:26px;">{{ empresa_obj.plan_comercial.nombre|default:"Sin plan" }}</p>
+        <p class="erp-card-muted">Precio mensual: {% if empresa_obj.plan_comercial %}L. {{ empresa_obj.plan_comercial.precio_mensual }}{% else %}No definido{% endif %}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Licencia</div>
+        <p class="erp-stat-value" style="font-size:26px;">{{ empresa_obj.estado_licencia_resuelto|capfirst }}</p>
+        <p class="erp-card-muted">Estado configurado para el servicio comercial de esta empresa.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Modulos</div>
+        <p class="erp-stat-value">{{ modulos_empresa|length }}</p>
+        <p class="erp-card-muted">Cantidad total de modulos actualmente habilitados.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Usuarios</div>
+        <p class="erp-stat-value">{{ usuarios_empresa|length }}</p>
+        <p class="erp-card-muted">Usuarios operativos vinculados a esta empresa.</p>
+    </article>
+</section>
+
+<section class="erp-info-grid">
+    <article class="erp-info-item">
+        <div class="erp-info-label">Estado</div>
+        <div class="erp-info-value">{% if empresa_obj.activa %}Activa{% else %}Inactiva{% endif %}</div>
+    </article>
+    <article class="erp-info-item">
+        <div class="erp-info-label">Correo</div>
+        <div class="erp-info-value">{{ empresa_obj.correo|default:"No definido" }}</div>
+    </article>
+    <article class="erp-info-item">
+        <div class="erp-info-label">Telefono</div>
+        <div class="erp-info-value">{{ empresa_obj.telefono|default:"No definido" }}</div>
+    </article>
+    <article class="erp-info-item">
+        <div class="erp-info-label">Ubicacion</div>
+        <div class="erp-info-value">{{ empresa_obj.ciudad|default:"-" }}, {{ empresa_obj.departamento|default:"-" }}</div>
+    </article>
+    <article class="erp-info-item">
+        <div class="erp-info-label">Inicio del servicio</div>
+        <div class="erp-info-value">{{ empresa_obj.fecha_inicio_plan|date:"F j, Y"|default:"No definido" }}</div>
+    </article>
+    <article class="erp-info-item">
+        <div class="erp-info-label">Vencimiento del servicio</div>
+        <div class="erp-info-value">{{ empresa_obj.fecha_vencimiento_plan|date:"F j, Y"|default:"No definido" }}</div>
+    </article>
+    <article class="erp-info-item">
+        <div class="erp-info-label">Estado operativo real</div>
+        <div class="erp-info-value">
+            {% if empresa_obj.licencia_operativa_flag %}
+                <span class="erp-badge success">Operativa</span>
+            {% else %}
+                <span class="erp-badge danger">Bloqueada</span>
+            {% endif %}
+        </div>
+    </article>
+    <article class="erp-info-item">
+        <div class="erp-info-label">Dias al vencimiento</div>
+        <div class="erp-info-value">
+            {% if empresa_obj.dias_restantes_plan is None %}
+                Sin fecha
+            {% else %}
+                {{ empresa_obj.dias_restantes_plan }}
+            {% endif %}
+        </div>
+    </article>
+</section>
+
+{% if empresa_obj.observaciones_comerciales %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">Observaciones comerciales</h3>
+    <p class="erp-card-muted">{{ empresa_obj.observaciones_comerciales }}</p>
+</section>
+{% endif %}
+
+<section class="erp-card">
+    <h3 class="erp-panel-title">Modulos habilitados</h3>
+    <div class="erp-inline-actions">
+        {% for modulo in modulos_empresa %}
+            <span class="erp-badge neutral">{{ modulo.nombre }}</span>
+        {% empty %}
+            <span class="erp-badge neutral">Sin modulos activos</span>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Licencia comercial</h3>
+            <p class="erp-card-muted">Aqui controlas prueba, renovaciones, suspensiones y vencimiento sin tocar la base de datos del cliente.</p>
+        </div>
+        <div class="erp-inline-actions">
+            {% if empresa_obj.estado_licencia_resuelto != 'suspendida' %}
+            <form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa_obj.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="erp-btn-secondary">Suspender</button>
+            </form>
+            {% endif %}
+            {% if empresa_obj.estado_licencia_resuelto == 'suspendida' %}
+            <form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa_obj.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="erp-btn-secondary">Activar</button>
+            </form>
+            {% endif %}
+            <a href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa_obj.id %}" class="erp-btn-secondary">Renovar</a>
+        </div>
+    </div>
+    <div class="erp-soft-panel" style="margin-bottom:16px;">
+        <strong>Como funciona:</strong>
+        <div>`Plan` = lo que contrataste.</div>
+        <div>`Licencia` = si hoy puede operar o no, y hasta cuando.</div>
+        <div>`Renovar` registra pago y extiende tiempo.</div>
+        <div>`Suspender` bloquea temporalmente sin borrar datos.</div>
+        <div>`Activar` solo reactiva una empresa suspendida que aun conserva vigencia.</div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Plan</th>
+                    <th>Meses</th>
+                    <th>Monto</th>
+                    <th>Metodo</th>
+                    <th>Referencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pago in pagos_licencia %}
+                <tr>
+                    <td>{{ pago.fecha_pago|date:"F j, Y" }}</td>
+                    <td>{{ pago.plan_comercial.nombre|default:"Sin plan" }}</td>
+                    <td>{{ pago.cantidad_meses }}</td>
+                    <td>L. {{ pago.monto }}</td>
+                    <td>{{ pago.get_metodo_display }}</td>
+                    <td>{{ pago.referencia|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">Todavia no hay pagos de licencia registrados para esta empresa.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Mapa de modulos de la empresa</h3>
+            <p class="erp-card-muted">Aqui ves todos los modulos del ERP y desde donde se activan para esta empresa.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Modulo</th>
+                    <th>Incluido en plan</th>
+                    <th>Activado manualmente</th>
+                    <th>Estado final</th>
+                    <th>Origen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in matriz_modulos %}
+                <tr>
+                    <td>{{ item.modulo.nombre }}</td>
+                    <td>{% if item.incluido_plan %}<span class="erp-badge success">Si</span>{% else %}<span class="erp-badge neutral">No</span>{% endif %}</td>
+                    <td>{% if item.activo_manual %}<span class="erp-badge info">Si</span>{% else %}<span class="erp-badge neutral">No</span>{% endif %}</td>
+                    <td>{% if item.activo_total %}<span class="erp-badge success">Activo</span>{% else %}<span class="erp-badge danger">Inactivo</span>{% endif %}</td>
+                    <td>{{ item.origen }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Usuarios de la empresa</h3>
+            <p class="erp-card-muted">Aqui puedes ver rapidamente quien pertenece a la empresa y que rol cumple hoy.</p>
+        </div>
+        <a href="{% url 'superadmin_usuario_create' %}" class="erp-btn-secondary">Nuevo Usuario</a>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios_empresa %}
+                <tr>
+                    <td>{{ usuario.username }}<br><small>{{ usuario.email|default:"Sin correo" }}</small></td>
+                    <td>{{ usuario.rol_sistema.nombre|default:"Sin rol" }}</td>
+                    <td>
+                        {% if usuario.is_superuser %}
+                            <span class="erp-badge info">Superadmin</span>
+                        {% elif usuario.es_administrador_empresa %}
+                            <span class="erp-badge warning">Admin empresa</span>
+                        {% else %}
+                            <span class="erp-badge neutral">Operativo</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="erp-badge {% if usuario.is_active %}success{% else %}danger{% endif %}">{% if usuario.is_active %}Activo{% else %}Inactivo{% endif %}</span></td>
+                    <td class="actions"><a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar usuario</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="erp-empty">Esta empresa todavia no tiene usuarios asignados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

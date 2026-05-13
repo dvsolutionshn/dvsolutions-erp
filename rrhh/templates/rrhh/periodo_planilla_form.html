@@ -1,0 +1,60 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Planilla{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Define el periodo de pago, frecuencia y si deseas incluir el calculo del 14avo proporcional.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'planillas_rrhh' empresa.slug %}" class="erp-action-link">Volver a Planillas</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card rrhh-period-form">
+    <form method="post" class="erp-form-shell" autocomplete="off">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="erp-message">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="erp-form-grid two">
+            <div class="erp-field">
+                <label for="{{ form.nombre.id_for_label }}">Nombre de la planilla</label>
+                {{ form.nombre }}
+                {% for error in form.nombre.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.frecuencia.id_for_label }}">Frecuencia</label>
+                {{ form.frecuencia }}
+                {% for error in form.frecuencia.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.fecha_inicio.id_for_label }}">Fecha inicio</label>
+                {{ form.fecha_inicio }}
+                {% for error in form.fecha_inicio.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.fecha_fin.id_for_label }}">Fecha fin</label>
+                {{ form.fecha_fin }}
+                {% for error in form.fecha_fin.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.fecha_pago.id_for_label }}">Fecha de pago</label>
+                {{ form.fecha_pago }}
+                {% for error in form.fecha_pago.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field rrhh-check-field">
+                <label>Opciones</label>
+                <label class="rrhh-inline-check">{{ form.incluir_14avo }} Incluir 14avo proporcional</label>
+                <div class="erp-field-help">Activalo solo cuando esta planilla pague decimo cuarto proporcional.</div>
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.estado.id_for_label }}">Estado</label>
+                {{ form.estado }}
+                {% for error in form.estado.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+        <div class="erp-form-actions">
+            <a class="erp-btn-secondary" href="{% url 'planillas_rrhh' empresa.slug %}">Cancelar</a>
+            <button class="erp-btn" type="submit">Guardar Planilla</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

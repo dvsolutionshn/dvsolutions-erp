@@ -1,0 +1,31 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bancos{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Define la cuenta contable que usara cada tipo de movimiento bancario o de tarjeta.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'clasificaciones_bancarias' empresa.slug %}" class="erp-action-link">Volver a Clasificaciones</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+    <section class="erp-form-card">
+        <div class="erp-form-grid">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    <div class="erp-form-actions">
+        <a href="{% url 'clasificaciones_bancarias' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Clasificacion</button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,254 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Reporte de Impuestos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Reporte de Impuestos{% endblock %}
+{% block header_description %}Control fiscal del ISV facturado, notas de credito y neto del periodo para mantener la lectura tributaria ordenada.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'exportar_reporte_impuestos_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
+<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros</h3>
+            <p class="erp-card-muted">Consulta el periodo fiscal por fecha de emision del documento.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a href="{% url 'reporte_impuestos' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">ISV facturado</div><p class="erp-stat-value">L. {{ ventas.impuesto }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">ISV notas credito</div><p class="erp-stat-value">L. {{ creditos.impuesto }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">ISV compras</div><p class="erp-stat-value">L. {{ compras_resumen.impuesto }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">ISV a pagar</div><p class="erp-stat-value">L. {{ isv_a_pagar }}</p></article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Resumen fiscal del periodo</h3>
+            <p class="erp-card-muted">Las notas de credito restan del ISV de ventas para ver el neto fiscal.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Concepto</th>
+                    <th>Docs</th>
+                    <th>Base 15%</th>
+                    <th>ISV 15%</th>
+                    <th>Base 18%</th>
+                    <th>ISV 18%</th>
+                    <th>Exento</th>
+                    <th>Exonerado</th>
+                    <th>ISV Total</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Facturas emitidas</td>
+                    <td>{{ ventas.documentos }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.base_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.isv_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.base_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.isv_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.base_exento }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.base_exonerado }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ ventas.total }}</span></td>
+                </tr>
+                <tr>
+                    <td>Notas de credito</td>
+                    <td>{{ creditos.documentos }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.base_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.isv_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.base_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.isv_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.base_exento }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.base_exonerado }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ creditos.total }}</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Neto fiscal</strong></td>
+                    <td>-</td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.base_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.isv_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.base_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.isv_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.base_exento }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.base_exonerado }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ neto.total }}</span></td>
+                </tr>
+                <tr>
+                    <td>Compras acreditables</td>
+                    <td>{{ compras_resumen.documentos }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.base_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.isv_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.base_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.isv_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.base_exento }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.base_exonerado }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compras_resumen.total }}</span></td>
+                </tr>
+                <tr>
+                    <td><strong>ISV estimado a pagar</strong></td>
+                    <td colspan="7">ISV neto de ventas menos ISV acreditable de compras.</td>
+                    <td class="amount"><strong class="erp-money">L. {{ isv_a_pagar }}</strong></td>
+                    <td>-</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Nota de alcance</h3>
+            <p class="erp-card-muted">El ISV acreditable proviene del Libro de Compras Fiscal. Las compras de inventario siguen trabajando CXP e inventario; este libro cubre el control tributario compra por compra.</p>
+        </div>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Compras fiscales acreditables</h3>
+            <p class="erp-card-muted">Registros del libro de compras usados para reducir el ISV del periodo.</p>
+        </div>
+        <a class="erp-btn-secondary" href="{% url 'libro_compras_fiscal' empresa.slug %}">Abrir Libro de Compras</a>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Factura</th>
+                    <th>Proveedor</th>
+                    <th>Base 15%</th>
+                    <th>ISV 15%</th>
+                    <th>Base 18%</th>
+                    <th>ISV 18%</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for compra in compras %}
+                <tr>
+                    <td>{{ compra.fecha_documento|date:"F j, Y" }}</td>
+                    <td>{{ compra.numero_factura }}</td>
+                    <td>{{ compra.proveedor_nombre }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ compra.base_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compra.isv_15 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compra.base_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compra.isv_18 }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ compra.total }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty">No hay compras fiscales registradas con estos filtros.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Facturas emitidas</h3>
+            <p class="erp-card-muted">Documentos de venta incluidos en el periodo.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Numero</th>
+                    <th>Cliente</th>
+                    <th>Subtotal</th>
+                    <th>ISV</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturas %}
+                <tr>
+                    <td>{{ factura.fecha_emision|date:"F j, Y" }}</td>
+                    <td>{{ factura.numero_factura|default:"Sin numero" }}</td>
+                    <td>{{ factura.cliente.nombre }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ factura.subtotal }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ factura.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ factura.total }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">No hay facturas emitidas con estos filtros.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Notas de credito emitidas</h3>
+            <p class="erp-card-muted">Documentos que disminuyen ventas e impuesto del periodo.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Nota</th>
+                    <th>Factura origen</th>
+                    <th>Cliente</th>
+                    <th>Subtotal</th>
+                    <th>ISV</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nota in notas_credito %}
+                <tr>
+                    <td>{{ nota.fecha_emision|date:"F j, Y" }}</td>
+                    <td>{{ nota.numero_nota|default:"Sin numero" }}</td>
+                    <td>{{ nota.factura_origen.numero_factura|default:"-" }}</td>
+                    <td>{{ nota.cliente.nombre }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ nota.subtotal }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ nota.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ nota.total }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="erp-empty">No hay notas de credito emitidas con estos filtros.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

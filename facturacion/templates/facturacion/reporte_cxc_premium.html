@@ -1,0 +1,242 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Cuentas por Cobrar - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Cobranza Ejecutiva{% endblock %}
+{% block header_title %}Cuentas por Cobrar{% endblock %}
+{% block header_description %}Lectura institucional de antigüedad de cartera para una gestión de cobranza más precisa y ejecutiva.{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-cxc-kpis{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px;
+}
+.erp-cxc-table{
+    min-width:980px;
+}
+.erp-client-link{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    font-weight:700;
+    color:#102338;
+}
+.erp-client-link:hover{
+    color:var(--primary-2);
+}
+.erp-client-sub{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+}
+.erp-inline-view{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--primary);
+    font-size:12px;
+    font-weight:700;
+    box-shadow:var(--shadow-soft);
+}
+.erp-autocomplete{position:relative;}
+.erp-suggestion-list{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:20;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-soft);padding:8px;display:none;max-height:240px;overflow:auto;}
+.erp-suggestion-item{width:100%;border:none;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;cursor:pointer;color:var(--primary);}
+.erp-suggestion-item:hover{background:#f4f8fc;}
+.erp-search-toolbar{margin:18px 0 20px;display:flex;gap:12px;align-items:end;flex-wrap:wrap;}
+.erp-search-toolbar .erp-field{min-width:320px;flex:1 1 320px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-cxc-kpis">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Clientes con saldo</div>
+        <div class="erp-stat-value">{{ resumen.clientes_con_saldo }}</div>
+        <p class="erp-card-muted">Clientes con cuentas pendientes por gestionar.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Facturas pendientes</div>
+        <div class="erp-stat-value">{{ resumen.facturas_pendientes }}</div>
+        <p class="erp-card-muted">Documentos emitidos con saldo abierto.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cartera total</div>
+        <div class="erp-stat-value erp-money">L. {{ resumen.total_cartera|floatformat:2|intcomma }}</div>
+        <p class="erp-card-muted">Saldo consolidado de la gestion de cobranza.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Antigüedad de cartera</h3>
+            <div class="erp-card-muted">Haz clic en un cliente para ver sus facturas pendientes y navegar directamente al detalle.</div>
+        </div>
+        {% if cliente_seleccionado %}
+        <a class="erp-btn-secondary" href="{% url 'reporte_cxc' empresa.slug %}">Limpiar selección</a>
+        {% endif %}
+    </div>
+    <form method="get" class="erp-search-toolbar">
+        <div class="erp-field">
+            <label for="q">Buscar cliente</label>
+            <div class="erp-autocomplete">
+                <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Escribe el nombre del cliente" autocomplete="off">
+                <div id="cxc-sugerencias" class="erp-suggestion-list"></div>
+            </div>
+        </div>
+        <div class="erp-actions-right">
+            <button class="erp-btn" type="submit">Buscar</button>
+            <a class="erp-btn-secondary" href="{% url 'reporte_cxc' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+    <div class="erp-table-wrap">
+        <table class="erp-table erp-cxc-table">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>0-30 días</th>
+                    <th>31-60</th>
+                    <th>61-90</th>
+                    <th>+90 días</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in data %}
+                <tr>
+                    <td>
+                        <a class="erp-client-link" href="{% url 'reporte_cxc' empresa.slug %}?cliente={{ item.cliente.id }}">{{ item.cliente.nombre }}</a>
+                        <div class="erp-client-sub">{% if cliente_seleccionado and cliente_seleccionado.id == item.cliente.id %}Cliente seleccionado{% else %}Ver detalle de facturas pendientes{% endif %}</div>
+                    </td>
+                    <td class="amount"><span class="erp-money">L. {{ item.0_30|floatformat:2|intcomma }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ item.31_60|floatformat:2|intcomma }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ item.61_90|floatformat:2|intcomma }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ item.90_mas|floatformat:2|intcomma }}</span></td>
+                    <td class="amount"><strong class="erp-money">L. {{ item.total|floatformat:2|intcomma }}</strong></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="erp-empty">Sin saldos pendientes</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% if cliente_seleccionado %}
+<section class="erp-cxc-kpis">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cliente seleccionado</div>
+        <div class="erp-stat-value">{{ cliente_seleccionado.nombre }}</div>
+        <p class="erp-card-muted">Vista enfocada en la cobranza activa del cliente.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Facturas abiertas</div>
+        <div class="erp-stat-value">{{ cliente_resumen.facturas|default:0 }}</div>
+        <p class="erp-card-muted">Documentos pendientes para este cliente.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Saldo del cliente</div>
+        <div class="erp-stat-value erp-money">L. {{ cliente_resumen.saldo_total|default:0|floatformat:2|intcomma }}</div>
+        <p class="erp-card-muted">Saldo total abierto del cliente seleccionado.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Facturas vencidas</div>
+        <div class="erp-stat-value">{{ cliente_resumen.vencidas|default:0 }}</div>
+        <p class="erp-card-muted">Proxima fecha clave: {{ cliente_resumen.proxima_fecha|default:"-" }}</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Facturas Pendientes de {{ cliente_seleccionado.nombre }}</h3>
+            <div class="erp-card-muted">Detalle de documentos con saldo abierto para este cliente.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table" style="min-width:980px;">
+            <thead>
+                <tr>
+                    <th>Factura</th>
+                    <th>Fecha</th>
+                    <th>Vencimiento</th>
+                    <th>Estado Pago</th>
+                    <th>Total</th>
+                    <th>Saldo</th>
+                    <th>Accion</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for factura in facturas_pendientes_cliente %}
+                <tr>
+                    <td>
+                        <strong>{{ factura.numero_factura|default:"Sin numero" }}</strong>
+                        <div class="erp-client-sub">Emitida {{ factura.fecha_emision }}</div>
+                    </td>
+                    <td>{{ factura.fecha_emision }}</td>
+                    <td>{{ factura.fecha_vencimiento|default:"-" }}</td>
+                    <td>
+                        {% if factura.estado_pago == "pagado" %}
+                        <span class="erp-badge success">Pagada</span>
+                        {% elif factura.estado_pago == "parcial" %}
+                        <span class="erp-badge warning">Parcial</span>
+                        {% else %}
+                        <span class="erp-badge danger">Pendiente</span>
+                        {% endif %}
+                    </td>
+                    <td class="amount"><span class="erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</span></td>
+                    <td class="amount"><strong class="erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</strong></td>
+                    <td>
+                        <a class="erp-inline-view" href="{% url 'ver_factura' empresa.slug factura.id %}">Ver Factura</a>
+                        {% if factura.estado != "anulada" and factura.saldo_pendiente > 0 %}
+                        <a class="erp-inline-view" style="margin-left:8px;" href="{% url 'registrar_pago' empresa.slug factura.id %}">Registrar Pago</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="erp-empty">Este cliente no tiene facturas pendientes.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("cxc-sugerencias");
+    const sugerencias = [{% for cliente_nombre in clientes_sugeridos %}"{{ cliente_nombre|escapejs }}",{% endfor %}];
+    if(!input || !panel){ return; }
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const uniques = [...new Set(sugerencias.filter(Boolean))];
+        const matches = (term ? uniques.filter(item => item.toLowerCase().includes(term)) : uniques).slice(0, 8);
+        panel.innerHTML = "";
+        if(!matches.length){ panel.style.display = "none"; return; }
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){ input.value = item; panel.style.display = "none"; });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", () => window.setTimeout(() => panel.style.display = "none", 120));
+});
+</script>
+{% endblock %}

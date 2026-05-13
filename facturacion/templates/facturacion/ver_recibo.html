@@ -1,0 +1,40 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Recibo {{ recibo.numero_recibo }}</title>
+<style>
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f3f5;}
+.topbar{background:#1e2a38;color:white;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;}
+.topbar a{color:white;text-decoration:none;}
+.container{max-width:1100px;margin:40px auto;padding:0 25px;}
+.card{background:white;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.06);padding:25px;margin-bottom:20px;}
+.section-title{font-weight:600;margin-bottom:15px;color:#1e2a38;}
+.btn{background:#6c63ff;color:white;padding:8px 15px;border-radius:6px;text-decoration:none;font-size:14px;display:inline-block;}
+</style>
+</head>
+<body>
+<div class="topbar">
+    <h2>Recibo {{ recibo.numero_recibo }}</h2>
+    <a href="{% url 'recibos_dashboard' empresa.slug %}">Volver</a>
+</div>
+<div class="container">
+    <div class="card">
+        <div class="section-title">Información General</div>
+        <p><strong>Empresa:</strong> {{ empresa.nombre }}</p>
+        <p><strong>Recibo:</strong> {{ recibo.numero_recibo }}</p>
+        <p><strong>Fecha:</strong> {{ recibo.fecha }}</p>
+        <p><strong>Cliente:</strong> {{ recibo.cliente.nombre }}</p>
+        <p><strong>Factura:</strong> {{ recibo.factura.numero_factura|default:recibo.factura.id }}</p>
+        <p><strong>Método:</strong> {{ recibo.get_metodo_display }}</p>
+        <p><strong>Referencia:</strong> {{ recibo.referencia|default:"-" }}</p>
+        <p><strong>Monto:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</p>
+    </div>
+
+    <div class="card">
+        <a class="btn" href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">Descargar PDF</a>
+        <a class="btn" href="{% url 'ver_factura' empresa.slug recibo.factura.id %}">Ver Factura</a>
+    </div>
+</div>
+</body>
+</html>

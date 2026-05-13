@@ -1,0 +1,65 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ asiento.numero|default:"Asiento" }}{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}{{ asiento.numero|default:"Asiento en borrador" }}{% endblock %}
+{% block header_description %}Detalle ejecutivo del asiento contable, con lectura de partidas y balance en una sola vista.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'asientos_contables' empresa.slug %}" class="erp-action-link">Volver a Asientos</a>
+<form method="post" action="{% url 'duplicar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button class="erp-action-link" type="submit">Duplicar</button>
+</form>
+{% if asiento.estado == "borrador" and erp_access.contabilizar_asientos %}
+<a href="{% url 'contabilizar_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Contabilizar</a>
+{% endif %}
+{% if asiento.estado == "contabilizado" %}
+<form method="post" action="{% url 'reversar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button class="erp-action-link" type="submit">Reversar</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Fecha</div><p class="erp-stat-value" style="font-size:24px;">{{ asiento.fecha|date:"F j, Y" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Estado</div><p class="erp-stat-value" style="font-size:24px;">{{ asiento.get_estado_display }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debe</div><p class="erp-stat-value">L. {{ asiento.total_debe }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Haber</div><p class="erp-stat-value">L. {{ asiento.total_haber }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Balance</div><p class="erp-stat-value">{% if asiento.esta_balanceado %}OK{% else %}Revisar{% endif %}</p></article>
+</section>
+
+<section class="erp-info-grid">
+    <article class="erp-info-item"><div class="erp-info-label">Descripcion</div><div class="erp-info-value">{{ asiento.descripcion }}</div></article>
+    <article class="erp-info-item"><div class="erp-info-label">Referencia</div><div class="erp-info-value">{{ asiento.referencia|default:"-" }}</div></article>
+    <article class="erp-info-item"><div class="erp-info-label">Origen</div><div class="erp-info-value">{{ asiento.origen_modulo|default:"Manual" }}</div></article>
+    <article class="erp-info-item"><div class="erp-info-label">Creado por</div><div class="erp-info-value">{{ asiento.creado_por.username|default:"-" }}</div></article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Cuenta</th>
+                    <th>Detalle</th>
+                    <th>Debe</th>
+                    <th>Haber</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in asiento.lineas.all %}
+                <tr>
+                    <td>{{ linea.cuenta.codigo }} - {{ linea.cuenta.nombre }}</td>
+                    <td>{{ linea.detalle|default:"-" }}</td>
+                    <td>L. {{ linea.debe }}</td>
+                    <td>L. {{ linea.haber }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

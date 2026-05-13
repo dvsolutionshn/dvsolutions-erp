@@ -1,0 +1,216 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Facturas - {{ empresa.nombre }}</title>
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:#f1f3f5;
+}
+.topbar{
+    background:#1e2a38;
+    color:white;
+    padding:15px 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+.topbar a{
+    color:white;
+    text-decoration:none;
+}
+.container{
+    max-width:1300px;
+    margin:40px auto;
+    padding:0 25px;
+}
+.card{
+    background:white;
+    border-radius:10px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.06);
+    padding:25px;
+}
+.btn{
+    background:#6c63ff;
+    color:white;
+    padding:8px 15px;
+    border-radius:6px;
+    text-decoration:none;
+    display:inline-block;
+    margin-bottom:20px;
+}
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+th{
+    background:#f8f9fa;
+    padding:10px;
+    font-size:13px;
+    text-align:left;
+}
+td{
+    padding:8px 10px;
+    border-bottom:1px solid #eee;
+    font-size:14px;
+}
+.monto{
+    font-weight:600;
+    text-align:right;
+}
+.badge{
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+}
+.borrador{background:#ffeeba;color:#856404;}
+.emitida{background:#d4edda;color:#155724;}
+.anulada{background:#f8d7da;color:#721c24;}
+.moneda-usd{background:#d1ecf1;color:#0c5460;}
+.moneda-hnl{background:#d4edda;color:#155724;}
+.pagado{background:#d4edda;color:#155724;}
+.parcial{background:#fff3cd;color:#856404;}
+.pendiente{background:#f8d7da;color:#721c24;}
+.actions a{
+    margin-right:10px;
+    text-decoration:none;
+    color:#6c63ff;
+    font-weight:500;
+}
+.actions form{
+    display:inline;
+}
+.inline-action{
+    border:none;
+    background:none;
+    color:#6c63ff;
+    font-weight:500;
+    cursor:pointer;
+    padding:0;
+    margin-right:10px;
+    font:inherit;
+}
+.delete-action{
+    border:none;
+    background:none;
+    color:#dc3545;
+    font-weight:500;
+    cursor:pointer;
+    padding:0;
+    font:inherit;
+}
+.messages{
+    margin-bottom:20px;
+}
+.message{
+    padding:12px;
+    border-radius:8px;
+    margin-bottom:8px;
+    background:#e7f3ff;
+    color:#084298;
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+    <h2>Facturas - {{ empresa.nombre }}</h2>
+    <a href="{% url 'facturacion_dashboard' empresa.slug %}">Volver al módulo</a>
+</div>
+
+<div class="container">
+<div class="card">
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+        <div class="message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<a class="btn" href="{% url 'crear_factura' empresa.slug %}">
+    + Nueva Factura
+</a>
+
+<table>
+<thead>
+<tr>
+<th>Número</th>
+<th>Cliente</th>
+<th>Fecha</th>
+<th>Moneda</th>
+<th>Estado</th>
+<th>Pago</th>
+<th>Total</th>
+<th>Acciones</th>
+</tr>
+</thead>
+<tbody>
+{% for factura in facturas %}
+<tr>
+<td>{{ factura.numero_factura|default:"Sin número" }}</td>
+<td>{{ factura.cliente.nombre }}</td>
+<td>{{ factura.fecha_emision }}</td>
+<td>
+{% if factura.moneda == "USD" %}
+    <span class="badge moneda-usd">USD</span>
+{% else %}
+    <span class="badge moneda-hnl">Lempiras</span>
+{% endif %}
+</td>
+<td>
+{% if factura.estado == "borrador" %}
+    <span class="badge borrador">BORRADOR</span>
+{% elif factura.estado == "emitida" %}
+    <span class="badge emitida">EMITIDA</span>
+{% else %}
+    <span class="badge anulada">ANULADA</span>
+{% endif %}
+</td>
+<td>
+{% if factura.estado_pago == "pagado" %}
+    <span class="badge pagado">Pagada</span>
+{% elif factura.estado_pago == "parcial" %}
+    <span class="badge parcial">Parcial</span>
+{% else %}
+    <span class="badge pendiente">Pendiente</span>
+{% endif %}
+</td>
+<td class="monto">
+{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+{{ factura.total|floatformat:2|intcomma }}
+</td>
+<td class="actions">
+<a href="{% url 'ver_factura' empresa.slug factura.id %}">Ver</a>
+<a href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
+<form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}">
+    {% csrf_token %}
+    <button type="submit" class="inline-action">Duplicar</button>
+</form>
+<form method="post" action="{% url 'generar_nota_credito_desde_factura' empresa.slug factura.id %}">
+    {% csrf_token %}
+    <button type="submit" class="inline-action">Nota de Crédito</button>
+</form>
+{% if factura.estado == "borrador" and not factura.numero_factura %}
+<form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}">
+    {% csrf_token %}
+    <button type="submit" class="delete-action" onclick="return confirm('¿Seguro que desea eliminar este borrador?');">
+        Eliminar
+    </button>
+</form>
+{% endif %}
+</td>
+</tr>
+{% empty %}
+<tr>
+<td colspan="8">No hay facturas registradas.</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</body>
+</html>

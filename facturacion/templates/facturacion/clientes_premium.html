@@ -1,0 +1,217 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Clientes - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Catalogo Comercial{% endblock %}
+{% block header_title %}Clientes{% endblock %}
+{% block header_description %}Gestiona la base de clientes con una experiencia sobria, uniforme y lista para crecer junto al ERP.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_cliente_facturacion' empresa.slug %}">Nuevo Cliente</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-client-table{
+    min-width:980px;
+}
+.erp-autocomplete{
+    position:relative;
+}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:20;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow-soft);
+    padding:8px;
+    display:none;
+    max-height:260px;
+    overflow:auto;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{
+    background:#f4f8fc;
+}
+.erp-client-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+}
+.erp-delete-link{
+    border:none;
+    background:linear-gradient(135deg,#fff5f5 0%,#ffe5e5 100%);
+    color:#b42318;
+    padding:8px 14px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:12px;
+    cursor:pointer;
+    transition:all .18s ease;
+    box-shadow:0 8px 18px rgba(180,35,24,.08);
+}
+.erp-delete-link:hover{
+    background:linear-gradient(135deg,#ffe9e9 0%,#ffd6d6 100%);
+    color:#912018;
+    transform:translateY(-1px);
+    box-shadow:0 12px 22px rgba(180,35,24,.12);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-list-kpis">
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Clientes</div>
+            <div class="erp-stat-value">{{ resumen.total }}</div>
+            <p class="erp-card-muted">Base comercial total registrada.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Activos</div>
+            <div class="erp-stat-value">{{ resumen.activos }}</div>
+            <p class="erp-card-muted">Clientes disponibles para operar.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Inactivos</div>
+            <div class="erp-stat-value">{{ resumen.inactivos }}</div>
+            <p class="erp-card-muted">Registros fuera de operacion actual.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Con RTN</div>
+            <div class="erp-stat-value">{{ resumen.con_rtn }}</div>
+            <p class="erp-card-muted">Clientes listos para exigencia fiscal.</p>
+        </article>
+    </section>
+
+    <section class="erp-card erp-list-filter-card">
+        <div class="erp-list-toolbar">
+            <div>
+                <h3 class="erp-panel-title" style="margin:0;">Relacion de Clientes</h3>
+                <p>Consulta rapidamente el catalogo comercial y mantelo listo para facturacion y CRM.</p>
+            </div>
+        </div>
+        <form method="get" class="erp-list-filter-grid">
+            <div class="erp-filter-field">
+                <label for="q">Buscar cliente</label>
+                <div class="erp-autocomplete">
+                    <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Escribe nombre, RTN o ciudad" autocomplete="off">
+                    <div id="clientes-sugerencias" class="erp-suggestion-list"></div>
+                </div>
+            </div>
+            <div class="erp-list-filter-actions" style="grid-column:1 / -1;">
+                <button class="erp-btn" type="submit">Buscar</button>
+                <a class="erp-btn-secondary" href="{% url 'clientes_facturacion' empresa.slug %}">Limpiar</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-client-table erp-list-table">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>RTN</th>
+                        <th>Ciudad</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for cliente in clientes %}
+                    <tr>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ cliente.nombre }}</div>
+                                <div class="erp-doc-subtext">{{ cliente.direccion|default:"Sin direccion registrada"|truncatechars:52 }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ cliente.rtn|default:"-" }}</div>
+                                <div class="erp-doc-subtext">{% if cliente.rtn %}Registro tributario disponible{% else %}Pendiente de RTN{% endif %}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ cliente.ciudad|default:"-" }}</div>
+                                <div class="erp-doc-subtext">Ubicacion comercial</div>
+                            </div>
+                        </td>
+                        <td>{% if cliente.activo %}<span class="erp-badge success">Activo</span>{% else %}<span class="erp-badge danger">Inactivo</span>{% endif %}</td>
+                        <td class="actions">
+                            <div class="erp-client-actions">
+                            <a class="erp-pill-link" href="{% url 'editar_cliente_facturacion' empresa.slug cliente.id %}">Editar</a>
+                            <form method="post" action="{% url 'eliminar_cliente_facturacion' empresa.slug cliente.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button class="erp-delete-link" type="submit" onclick="return confirm('Seguro que deseas eliminar este cliente?');">Eliminar</button>
+                            </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="erp-empty">No hay clientes registrados.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("clientes-sugerencias");
+    const sugerencias = [{% for cliente_nombre in clientes_sugeridos %}"{{ cliente_nombre|escapejs }}",{% endfor %}];
+
+    if(!input || !panel){
+        return;
+    }
+
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const matches = term
+            ? sugerencias.filter(item => item.toLowerCase().includes(term)).slice(0, 8)
+            : sugerencias.slice(0, 8);
+
+        panel.innerHTML = "";
+        if(!matches.length){
+            panel.style.display = "none";
+            return;
+        }
+
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){
+                input.value = item;
+                panel.style.display = "none";
+            });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", function(){
+        window.setTimeout(() => panel.style.display = "none", 120);
+    });
+});
+</script>
+{% endblock %}

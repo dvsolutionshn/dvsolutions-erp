@@ -1,0 +1,66 @@
+{% load humanize %}
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@page{size:letter;margin:16mm}
+body{font-family:Arial,sans-serif;color:#0f2742}
+.header{border-bottom:3px solid #0f2742;padding-bottom:12px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{width:82px;max-height:82px;object-fit:contain}
+.logo-placeholder{width:70px;height:70px;border:2px solid #0f2742;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:24px}
+.muted{color:#64748b;font-size:12px}
+.employee-box{border:1px solid #d9e2ec;border-radius:14px;padding:12px;margin:12px 0;background:#f8fafc}
+.employee-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}
+.label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#64748b;font-weight:bold}
+.value{font-weight:bold;margin-top:3px}
+table{width:100%;border-collapse:collapse;margin-top:14px}
+th,td{border:1px solid #d9e2ec;padding:8px;text-align:left}
+th{background:#0f2742;color:white}
+.right{text-align:right}
+.total{font-size:18px;font-weight:bold}
+</style>
+</head>
+<body>
+<div class="header">
+<div class="brand">
+{% if empresa.logo %}
+<img class="logo" src="{{ empresa.logo.url }}" alt="{{ empresa.nombre }}">
+{% else %}
+<div class="logo-placeholder">{{ empresa.nombre|slice:":1" }}</div>
+{% endif %}
+<div>
+<h1>Voucher de Pago</h1>
+<div>{{ empresa.nombre }} | RTN {{ empresa.rtn }}</div>
+<div class="muted">{{ detalle.periodo.nombre }} | Fecha de pago {{ detalle.periodo.fecha_pago }}</div>
+</div>
+</div>
+</div>
+<div class="employee-box">
+<div class="employee-grid">
+<div><div class="label">Empleado</div><div class="value">{{ detalle.empleado.nombre_completo }}</div></div>
+<div><div class="label">Puesto / Departamento</div><div class="value">{{ detalle.empleado.puesto|default:"-" }} {{ detalle.empleado.departamento|default:"" }}</div></div>
+<div><div class="label">Cuenta acreditada</div><div class="value">{{ detalle.empleado.banco|default:"No definido" }}</div></div>
+<div><div class="label">Numero de cuenta</div><div class="value">{{ detalle.empleado.cuenta_bancaria|default:"No definido" }}</div></div>
+</div>
+</div>
+<table>
+<tr><th>Concepto</th><th class="right">Monto</th></tr>
+<tr><td>Salario base</td><td class="right">L. {{ detalle.salario_base|floatformat:2|intcomma }}</td></tr>
+<tr><td>Horas extra</td><td class="right">L. {{ detalle.monto_horas_extra|floatformat:2|intcomma }}</td></tr>
+<tr><td>Bonos</td><td class="right">L. {{ detalle.bonos|floatformat:2|intcomma }}</td></tr>
+<tr><td>Comisiones</td><td class="right">L. {{ detalle.comisiones|floatformat:2|intcomma }}</td></tr>
+<tr><td>14avo proporcional</td><td class="right">L. {{ detalle.decimo_cuarto|floatformat:2|intcomma }}</td></tr>
+<tr><th>Total devengado</th><th class="right">L. {{ detalle.total_devengado|floatformat:2|intcomma }}</th></tr>
+<tr><td>IHSS</td><td class="right">L. {{ detalle.ihss|floatformat:2|intcomma }}</td></tr>
+<tr><td>RAP</td><td class="right">L. {{ detalle.rap|floatformat:2|intcomma }}</td></tr>
+<tr><td>ISR</td><td class="right">L. {{ detalle.isr|floatformat:2|intcomma }}</td></tr>
+<tr><td>Prestamos</td><td class="right">L. {{ detalle.prestamos|floatformat:2|intcomma }}</td></tr>
+<tr><td>Otras deducciones</td><td class="right">L. {{ detalle.otras_deducciones|floatformat:2|intcomma }}</td></tr>
+<tr><th>Total deducciones</th><th class="right">L. {{ detalle.total_deducciones|floatformat:2|intcomma }}</th></tr>
+<tr><td class="total">Neto a pagar</td><td class="right total">L. {{ detalle.neto_pagar|floatformat:2|intcomma }}</td></tr>
+</table>
+<p class="muted">Documento generado automaticamente por DV Solutions ERP.</p>
+</body>
+</html>

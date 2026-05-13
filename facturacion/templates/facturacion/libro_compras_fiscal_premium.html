@@ -1,0 +1,145 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Libro de Compras - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Fiscal{% endblock %}
+{% block header_title %}Libro de Compras Fiscal{% endblock %}
+{% block header_description %}Registra compra por compra, controla el ISV acreditable y evita duplicar facturas recibidas en meses diferentes.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_registro_compra_fiscal' empresa.slug %}">Nueva Compra Fiscal</a>
+<a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras Inventario</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Documentos</div><div class="erp-stat-value">{{ resumen.documentos }}</div><p class="erp-card-muted">Compras fiscales activas en el filtro.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">ISV acreditable</div><div class="erp-stat-value">L. {{ resumen.isv_total|floatformat:2|intcomma }}</div><p class="erp-card-muted">ISV 15% + ISV 18%.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Base 15%</div><div class="erp-stat-value">L. {{ resumen.base_15|floatformat:2|intcomma }}</div><p class="erp-card-muted">Base gravada al 15%.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Total compras</div><div class="erp-stat-value">L. {{ resumen.total|floatformat:2|intcomma }}</div><p class="erp-card-muted">Total documental registrado.</p></article>
+</section>
+
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Importar desde Excel</h3>
+            <p class="erp-card-muted">El sistema busca la hoja COMPRAS, lee las columnas del libro y omite facturas duplicadas contra meses anteriores.</p>
+        </div>
+    </div>
+    <form method="post" action="{% url 'importar_libro_compras_fiscal' empresa.slug %}" enctype="multipart/form-data" class="erp-filters">
+        {% csrf_token %}
+        <div class="erp-filter-field">
+            <label for="{{ importar_form.archivo.id_for_label }}">Archivo Excel</label>
+            {{ importar_form.archivo }}
+        </div>
+        <div class="erp-filter-field">
+            <label for="{{ importar_form.periodo_anio.id_for_label }}">Anio</label>
+            {{ importar_form.periodo_anio }}
+        </div>
+        <div class="erp-filter-field">
+            <label for="{{ importar_form.periodo_mes.id_for_label }}">Mes</label>
+            {{ importar_form.periodo_mes }}
+        </div>
+        <div class="erp-filter-actions">
+            <button class="erp-btn" type="submit">Importar Libro</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros</h3>
+            <p class="erp-card-muted">Busca por proveedor, RTN, CAI o numero de factura.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="q">Buscar</label>
+            <input id="q" name="q" value="{{ filtros.q }}" placeholder="Proveedor, factura, RTN o CAI" autocomplete="off">
+        </div>
+        <div class="erp-filter-field">
+            <label for="anio">Anio</label>
+            <input id="anio" name="anio" type="number" min="2000" max="2100" value="{{ filtros.anio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="mes">Mes</label>
+            <input id="mes" name="mes" type="number" min="1" max="12" value="{{ filtros.mes }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button class="erp-btn-secondary" type="submit">Filtrar</button>
+            <a class="erp-btn-secondary" href="{% url 'libro_compras_fiscal' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Compras fiscales registradas</h3>
+            <p class="erp-card-muted">Cada factura queda registrada una sola vez por empresa para proteger el credito fiscal.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Factura</th>
+                    <th>Periodo</th>
+                    <th>Base 15%</th>
+                    <th>ISV 15%</th>
+                    <th>Base 18%</th>
+                    <th>ISV 18%</th>
+                    <th>Exento</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th>Accion</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for registro in registros %}
+                <tr>
+                    <td>{{ registro.fecha_documento }}</td>
+                    <td>
+                        <strong>{{ registro.proveedor_nombre }}</strong>
+                        <div class="erp-card-muted">{{ registro.proveedor_rtn|default:"Sin RTN" }}</div>
+                    </td>
+                    <td>
+                        {{ registro.numero_factura }}
+                        <div class="erp-card-muted">{{ registro.cai|default:"Sin CAI"|truncatechars:42 }}</div>
+                    </td>
+                    <td>{{ registro.periodo_mes }}/{{ registro.periodo_anio }}</td>
+                    <td class="amount">L. {{ registro.base_15|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ registro.isv_15|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ registro.base_18|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ registro.isv_18|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ registro.exento|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ registro.total|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if registro.estado == "anulada" %}
+                        <span class="erp-badge danger">Anulada</span>
+                        {% else %}
+                        <span class="erp-badge success">Registrada</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if registro.estado != "anulada" %}
+                        <form method="post" action="{% url 'anular_registro_compra_fiscal' empresa.slug registro.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button class="erp-chip-btn danger" type="submit" onclick="return confirm('Seguro que deseas anular este registro fiscal?');">Anular</button>
+                        </form>
+                        {% else %}
+                        <span class="erp-card-muted">Cerrado</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="12" class="erp-empty">Todavia no hay compras fiscales registradas con estos filtros.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

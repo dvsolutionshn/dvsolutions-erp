@@ -1,0 +1,64 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo|default:"Nuevo CAI" }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Fiscal{% endblock %}
+{% block header_title %}{{ titulo|default:"Nuevo CAI" }}{% endblock %}
+{% block header_description %}Administra el rango fiscal con una experiencia mas ordenada y acorde al perfil institucional del ERP.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'cai_facturacion' empresa.slug %}">Volver a CAI</a>
+{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-shell">
+    <article class="erp-form-card">
+        <h3>Configuracion del CAI</h3>
+        <p>Registra el rango autorizado, sus fechas y parametros operativos para mantener la trazabilidad fiscal de la empresa.</p>
+    </article>
+
+    <form method="post" class="erp-form-shell">
+        {% csrf_token %}
+
+        <section class="erp-form-card">
+            <div class="erp-form-grid three">
+                {% for field in form %}
+                <div class="erp-field">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {% if field.errors %}<ul class="erp-field-errors">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="erp-form-card">
+            <div class="erp-form-actions">
+                <div class="erp-field-help">Cada documento conserva su historico fiscal. Puedes manejar un CAI para facturas y otro separado para notas de credito.</div>
+                <div class="erp-actions-right">
+                    <a class="erp-btn-secondary" href="{% url 'cai_facturacion' empresa.slug %}">Cancelar</a>
+                    <button type="submit" class="erp-btn">{{ texto_boton|default:"Guardar CAI" }}</button>
+                </div>
+            </div>
+        </section>
+    </form>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    ["#id_fecha_activacion", "#id_fecha_limite"].forEach(function(selector){
+        const input = document.querySelector(selector);
+        if (input) {
+            flatpickr(input, {
+                dateFormat: "d/m/Y",
+                allowInput: true
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

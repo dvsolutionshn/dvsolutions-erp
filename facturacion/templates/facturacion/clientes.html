@@ -1,0 +1,138 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Clientes - {{ empresa.nombre }}</title>
+<style>
+body{
+    margin:0;
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:#f1f3f5;
+}
+.topbar{
+    background:#1e2a38;
+    color:white;
+    padding:15px 30px;
+    display:flex;
+    justify-content:space-between;
+}
+.topbar a{
+    color:white;
+    text-decoration:none;
+}
+.container{
+    max-width:1200px;
+    margin:40px auto;
+    padding:0 25px;
+}
+.card{
+    background:white;
+    border-radius:10px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.06);
+    padding:25px;
+}
+.btn{
+    background:#6c63ff;
+    color:white;
+    padding:8px 15px;
+    border-radius:6px;
+    text-decoration:none;
+    display:inline-block;
+    margin-bottom:20px;
+}
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+th{
+    background:#f8f9fa;
+    padding:10px;
+    text-align:left;
+    font-size:13px;
+}
+td{
+    padding:10px;
+    border-bottom:1px solid #eee;
+    font-size:14px;
+}
+.badge{
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+}
+.activo{background:#d4edda;color:#155724;}
+.inactivo{background:#f8d7da;color:#721c24;}
+.actions a{
+    color:#6c63ff;
+    text-decoration:none;
+    font-weight:500;
+}
+.messages{
+    margin-bottom:20px;
+}
+.message{
+    padding:12px;
+    border-radius:8px;
+    margin-bottom:8px;
+    background:#e7f3ff;
+    color:#084298;
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+    <h2>Clientes</h2>
+    <a href="{% url 'facturacion_dashboard' empresa.slug %}">Volver a Facturación</a>
+</div>
+
+<div class="container">
+<div class="card">
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <div class="message">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <a class="btn" href="{% url 'crear_cliente_facturacion' empresa.slug %}">+ Nuevo Cliente</a>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>RTN</th>
+                <th>Ciudad</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr>
+                <td>{{ cliente.nombre }}</td>
+                <td>{{ cliente.rtn|default:"-" }}</td>
+                <td>{{ cliente.ciudad|default:"-" }}</td>
+                <td>
+                    {% if cliente.activo %}
+                        <span class="badge activo">Activo</span>
+                    {% else %}
+                        <span class="badge inactivo">Inactivo</span>
+                    {% endif %}
+                </td>
+                <td class="actions">
+                    <a href="{% url 'editar_cliente_facturacion' empresa.slug cliente.id %}">Editar</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">No hay clientes registrados.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</div>
+</body>
+</html>

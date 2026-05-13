@@ -1,0 +1,77 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}{{ empleado.nombre_completo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Expediente{% endblock %}
+{% block header_title %}{{ empleado.nombre_completo }}{% endblock %}
+{% block header_description %}Ficha integral del colaborador para planilla, vacaciones, banco y comunicacion operativa.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'editar_empleado_rrhh' empresa.slug empleado.id %}">Editar</a>
+<a class="erp-action-link" href="{% url 'empleados_rrhh' empresa.slug %}">Volver</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-card erp-document-shell">
+        <div class="erp-document-header">
+            <div class="erp-document-profile">
+                {% if empleado.foto %}
+                <img src="{{ empleado.foto.url }}" alt="{{ empleado.nombre_completo }}" class="erp-employee-photo">
+                {% else %}
+                <div class="erp-employee-photo erp-employee-photo-placeholder">{{ empleado.nombres|slice:":1" }}{{ empleado.apellidos|slice:":1" }}</div>
+                {% endif %}
+                <div>
+                    <div class="erp-kpi-label">Expediente laboral</div>
+                    <h3 style="margin:8px 0 6px;">{{ empleado.nombre_completo }}</h3>
+                    <p class="erp-card-muted">{{ empleado.puesto|default:"Sin puesto" }} · {{ empleado.departamento|default:"Sin departamento" }}</p>
+                    <div class="erp-actions-cluster" style="margin-top:12px;">
+                        <span class="erp-badge {% if empleado.estado == 'activo' %}success{% else %}warning{% endif %}">{{ empleado.get_estado_display }}</span>
+                        <span class="erp-badge info">{{ empleado.tipo_salario|capfirst }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="erp-document-kpis">
+                <article class="erp-document-kpi">
+                    <div class="erp-kpi-label">Salario mensual</div>
+                    <strong>L. {{ empleado.salario_mensual|floatformat:2|intcomma }}</strong>
+                </article>
+                <article class="erp-document-kpi">
+                    <div class="erp-kpi-label">Antiguedad</div>
+                    <strong>{{ empleado.anios_antiguedad }} ano(s)</strong>
+                </article>
+                <article class="erp-document-kpi">
+                    <div class="erp-kpi-label">Vacaciones</div>
+                    <strong>{{ empleado.dias_vacaciones_disponibles }} dias</strong>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-info-grid">
+        <article class="erp-info-item"><div class="erp-info-label">Codigo</div><div class="erp-info-value">{{ empleado.codigo|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Identidad</div><div class="erp-info-value">{{ empleado.identidad|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">RTN</div><div class="erp-info-value">{{ empleado.rtn|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Ingreso</div><div class="erp-info-value">{{ empleado.fecha_ingreso|date:"d/m/Y" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Nacimiento</div><div class="erp-info-value">{{ empleado.fecha_nacimiento|date:"d/m/Y"|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Salida</div><div class="erp-info-value">{{ empleado.fecha_salida|date:"d/m/Y"|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Correo</div><div class="erp-info-value">{{ empleado.correo|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Telefono</div><div class="erp-info-value">{{ empleado.telefono|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Banco</div><div class="erp-info-value">{{ empleado.banco|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Cuenta</div><div class="erp-info-value">{{ empleado.cuenta_bancaria|default:"-" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Deducciones</div><div class="erp-info-value">IHSS: {{ empleado.aplica_ihss|yesno:"Si,No" }} · RAP: {{ empleado.aplica_rap|yesno:"Si,No" }} · ISR: {{ empleado.aplica_isr|yesno:"Si,No" }}</div></article>
+        <article class="erp-info-item"><div class="erp-info-label">Direccion</div><div class="erp-info-value">{{ empleado.direccion|default:"-" }}</div></article>
+    </section>
+
+    {% if empleado.observacion %}
+    <section class="erp-card">
+        <div class="erp-card-header">
+            <div>
+                <h3>Observaciones</h3>
+                <p>Notas internas del expediente del colaborador.</p>
+            </div>
+        </div>
+        <p style="margin:0; color:var(--text); line-height:1.8;">{{ empleado.observacion }}</p>
+    </section>
+    {% endif %}
+</section>
+{% endblock %}

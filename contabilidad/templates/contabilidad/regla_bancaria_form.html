@@ -1,0 +1,40 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bancos{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Define patrones para que el ERP clasifique movimientos bancarios automaticamente antes de contabilizar.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reglas_bancarias' empresa.slug %}" class="erp-action-link">Volver a Reglas</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <form method="post" class="erp-form-shell">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="erp-message-stack">
+            {% for error in form.non_field_errors %}<div class="erp-message">{{ error }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="erp-form-grid two">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="erp-form-actions" style="margin-top:22px;">
+            <div class="erp-field-help">Las reglas solo afectan movimientos pendientes sin clasificacion.</div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'reglas_bancarias' empresa.slug %}">Cancelar</a>
+                <button type="submit" class="erp-btn">Guardar Regla</button>
+            </div>
+        </div>
+    </form>
+</section>
+{% endblock %}

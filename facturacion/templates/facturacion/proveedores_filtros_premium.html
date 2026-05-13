@@ -1,0 +1,198 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Proveedores - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Abastecimiento{% endblock %}
+{% block header_title %}Proveedores{% endblock %}
+{% block header_description %}Gestiona el directorio de abastecimiento con una lectura mas clara, uniforme y preparada para compras y cuentas por pagar.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_proveedor_facturacion' empresa.slug %}">Nuevo Proveedor</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-provider-table{
+    min-width:1100px;
+}
+.erp-autocomplete{
+    position:relative;
+}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:20;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow-soft);
+    padding:8px;
+    display:none;
+    max-height:240px;
+    overflow:auto;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{
+    background:#f4f8fc;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-list-kpis">
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Proveedores</div>
+            <div class="erp-stat-value">{{ resumen.total }}</div>
+            <p class="erp-card-muted">Directorio total disponible para abastecimiento.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Activos</div>
+            <div class="erp-stat-value">{{ resumen.activos }}</div>
+            <p class="erp-card-muted">Listos para nuevas compras y registros fiscales.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Inactivos</div>
+            <div class="erp-stat-value">{{ resumen.inactivos }}</div>
+            <p class="erp-card-muted">Conservados para historial y reactivacion futura.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Con RTN</div>
+            <div class="erp-stat-value">{{ resumen.con_rtn }}</div>
+            <p class="erp-card-muted">Proveedores con identificacion fiscal registrada.</p>
+        </article>
+    </section>
+
+    <section class="erp-card erp-list-filter-card">
+        <div class="erp-list-toolbar">
+            <div>
+                <h3 class="erp-panel-title" style="margin:0;">Directorio de Proveedores</h3>
+                <p>Consolida datos de contacto, condicion de pago y estado operativo para mantener compras mas limpias y consistentes.</p>
+            </div>
+        </div>
+        <form method="get" class="erp-list-filter-grid">
+            <div class="erp-filter-field">
+                <label for="q">Buscar proveedor</label>
+                <div class="erp-autocomplete">
+                    <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Proveedor, RTN, contacto o ciudad" autocomplete="off">
+                    <div id="proveedores-listado-sugerencias" class="erp-suggestion-list"></div>
+                </div>
+            </div>
+            <div class="erp-filter-field">
+                <label for="estado">Estado</label>
+                <select id="estado" name="estado">
+                    <option value="">Todos</option>
+                    <option value="activos" {% if estado == "activos" %}selected{% endif %}>Activos</option>
+                    <option value="inactivos" {% if estado == "inactivos" %}selected{% endif %}>Inactivos</option>
+                </select>
+            </div>
+            <div class="erp-list-filter-actions" style="grid-column:1 / -1;">
+                <button class="erp-btn" type="submit">Filtrar</button>
+                <a class="erp-btn-secondary" href="{% url 'proveedores_facturacion' empresa.slug %}">Limpiar</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-provider-table erp-list-table">
+                <thead>
+                    <tr>
+                        <th>Proveedor</th>
+                        <th>Contacto</th>
+                        <th>Condicion</th>
+                        <th>Ciudad</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for proveedor in proveedores %}
+                    <tr>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ proveedor.nombre }}</div>
+                                <div class="erp-doc-subtext">RTN: {{ proveedor.rtn|default:"-" }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ proveedor.contacto|default:"-" }}</div>
+                                <div class="erp-doc-subtext">{{ proveedor.telefono|default:proveedor.correo|default:"Sin contacto registrado" }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ proveedor.get_condicion_pago_display }}</div>
+                                <div class="erp-doc-subtext">{{ proveedor.dias_credito }} dias de credito</div>
+                            </div>
+                        </td>
+                        <td>{{ proveedor.ciudad|default:"-" }}</td>
+                        <td>
+                            {% if proveedor.activo %}
+                            <span class="erp-badge success">Activo</span>
+                            {% else %}
+                            <span class="erp-badge danger">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <div class="erp-actions-cluster">
+                                <a class="erp-pill-link" href="{% url 'ver_proveedor_facturacion' empresa.slug proveedor.id %}">Ver</a>
+                                <a class="erp-pill-link" href="{% url 'editar_proveedor_facturacion' empresa.slug proveedor.id %}">Editar</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="erp-empty">No hay proveedores registrados todavia.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("proveedores-listado-sugerencias");
+    const sugerencias = [{% for proveedor in proveedores %}"{{ proveedor.nombre|escapejs }}"{% if proveedor.rtn %},"{{ proveedor.rtn|escapejs }}"{% endif %}{% if proveedor.ciudad %},"{{ proveedor.ciudad|escapejs }}"{% endif %},{% endfor %}];
+    if(!input || !panel){
+        return;
+    }
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const uniques = [...new Set(sugerencias.filter(Boolean))];
+        const matches = (term ? uniques.filter(item => item.toLowerCase().includes(term)) : uniques).slice(0, 8);
+        panel.innerHTML = "";
+        if(!matches.length){
+            panel.style.display = "none";
+            return;
+        }
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){
+                input.value = item;
+                panel.style.display = "none";
+            });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", () => window.setTimeout(() => panel.style.display = "none", 120));
+});
+</script>
+{% endblock %}

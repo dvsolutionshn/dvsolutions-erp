@@ -1,0 +1,59 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Enlazar Debito a Compra - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bancos{% endblock %}
+{% block header_title %}Enlazar Debito a Compra{% endblock %}
+{% block header_description %}Convierte una salida bancaria importada en pago de proveedor y asiento contable automatico.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'movimientos_bancarios' empresa.slug %}" class="erp-action-link">Volver a Movimientos</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Debito</div>
+        <p class="erp-stat-value erp-money">L. {{ movimiento.debito|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ movimiento.fecha }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cuenta</div>
+        <p class="erp-stat-value">{{ movimiento.cuenta_financiera.nombre }}</p>
+        <p class="erp-card-muted">{{ movimiento.descripcion }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Referencia</div>
+        <p class="erp-stat-value">{{ movimiento.referencia|default:"Sin referencia" }}</p>
+        <p class="erp-card-muted">Se copiara al pago del proveedor.</p>
+    </article>
+</section>
+
+<section class="erp-form-card">
+    <form method="post" class="erp-form-shell">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="erp-message-stack">
+            {% for error in form.non_field_errors %}<div class="erp-message">{{ error }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="erp-form-grid">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="erp-form-actions" style="margin-top:22px;">
+            <div class="erp-field-help">El monto del debito debe caber dentro del saldo pendiente de la compra seleccionada.</div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'movimientos_bancarios' empresa.slug %}">Cancelar</a>
+                <button type="submit" class="erp-btn">Registrar Pago y Contabilizar</button>
+            </div>
+        </div>
+    </form>
+</section>
+{% endblock %}

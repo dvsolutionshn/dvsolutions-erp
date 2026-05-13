@@ -1,0 +1,85 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Proveedores - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Abastecimiento{% endblock %}
+{% block header_title %}Proveedores{% endblock %}
+{% block header_description %}Catálogo de proveedores para abastecimiento, compras y evolución hacia cuentas por pagar.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_proveedor_facturacion' empresa.slug %}">Nuevo Proveedor</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Proveedores</div>
+        <div class="erp-stat-value">{{ resumen.total }}</div>
+        <p class="erp-card-muted">Registros disponibles para abastecimiento.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Activos</div>
+        <div class="erp-stat-value">{{ resumen.activos }}</div>
+        <p class="erp-card-muted">Listos para usarse en compras nuevas.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Inactivos</div>
+        <div class="erp-stat-value">{{ resumen.inactivos }}</div>
+        <p class="erp-card-muted">Conservados en historial, fuera de operación actual.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Con RTN</div>
+        <div class="erp-stat-value">{{ resumen.con_rtn }}</div>
+        <p class="erp-card-muted">Proveedores con identificación fiscal registrada.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Directorio de proveedores</h3>
+            <div class="erp-card-muted">Mantén aquí la base de abastecimiento para compras más limpias y consistentes.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Proveedor</th>
+                    <th>Contacto</th>
+                    <th>Ciudad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for proveedor in proveedores %}
+                <tr>
+                    <td>
+                        <strong><a class="erp-inline-link" href="{% url 'ver_proveedor_facturacion' empresa.slug proveedor.id %}">{{ proveedor.nombre }}</a></strong>
+                        <div class="erp-card-muted">RTN: {{ proveedor.rtn|default:"-" }}</div>
+                    </td>
+                    <td>
+                        {{ proveedor.contacto|default:"-" }}
+                        <div class="erp-card-muted">{{ proveedor.telefono|default:proveedor.correo|default:"Sin contacto" }}</div>
+                    </td>
+                    <td>{{ proveedor.ciudad|default:"-" }}</td>
+                    <td>
+                        {% if proveedor.activo %}
+                        <span class="erp-badge success">Activo</span>
+                        {% else %}
+                        <span class="erp-badge danger">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a class="erp-inline-link" href="{% url 'ver_proveedor_facturacion' empresa.slug proveedor.id %}">Ver</a>
+                        <span class="erp-card-muted"> · </span>
+                        <a class="erp-inline-link" href="{% url 'editar_proveedor_facturacion' empresa.slug proveedor.id %}">Editar</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="erp-empty">No hay proveedores registrados todavía.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

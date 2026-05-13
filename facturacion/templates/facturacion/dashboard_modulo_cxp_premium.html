@@ -1,0 +1,52 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Facturacion - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Modulo Financiero{% endblock %}
+{% block header_title %}Facturacion{% endblock %}
+{% block header_description %}Gestion comercial, fiscal y operativa con una interfaz refinada, coherente y preparada para una institucion de alto nivel.{% endblock %}
+
+{% block content %}
+<div style="display:none;">Facturación</div>
+<div style="display:none;">Notas de Crédito</div>
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Operacion</div>
+        <div class="erp-stat-value">360</div>
+        <p class="erp-card-muted">Facturacion, ajustes, cobranza, abastecimiento y reportes dentro de un mismo entorno corporativo.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Fiscal</div>
+        <div class="erp-stat-value">CAI</div>
+        <p class="erp-card-muted">Control documental y trazabilidad historica listos para crecimiento regulado.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Tesoreria</div>
+        <div class="erp-stat-value">CxC / CxP</div>
+        <p class="erp-card-muted">Seguimiento fino de saldos, recibos, pagos a proveedores y comportamiento financiero.</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    {% if erp_access.facturas %}<a class="erp-card erp-module-card" href="{% url 'facturas_dashboard' empresa.slug %}"><div class="erp-kpi-label">Operacion</div><h3>Facturacion</h3><p>Crear, emitir, revisar y administrar facturas con maxima claridad operativa.</p></a>{% endif %}
+    {% if erp_access.facturas %}<a class="erp-card erp-module-card" href="{% url 'configuracion_facturacion' empresa.slug %}"><div class="erp-kpi-label">Empresa</div><h3>Configuracion</h3><p>Personaliza plantilla PDF, colores, leyendas y datos visibles por empresa.</p></a>{% endif %}
+    {% if erp_access.clientes %}<a class="erp-card erp-module-card" href="{% url 'clientes_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catalogo</div><h3>Clientes</h3><p>Gestion de clientes y datos fiscales bajo un estandar visual institucional.</p></a>{% endif %}
+    {% if erp_access.productos %}<a class="erp-card erp-module-card" href="{% url 'productos_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catalogo</div><h3>Productos</h3><p>Base comercial lista para evolucionar hacia inventario y control de costos.</p></a>{% endif %}
+    {% if erp_access.usa_inventario_farmaceutico %}<a class="erp-card erp-module-card" href="{% url 'categorias_farmaceuticas' empresa.slug %}"><div class="erp-kpi-label">Farmacia</div><h3>Categorias Farmaceuticas</h3><p>Clasifica medicamentos, insumos, refrigerados y productos controlados por empresa.</p></a>{% endif %}
+    {% if erp_access.proveedores %}<a class="erp-card erp-module-card" href="{% url 'proveedores_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catalogo</div><h3>Proveedores</h3><p>Base de abastecimiento para compras, contactos y crecimiento hacia cuentas por pagar.</p></a>{% endif %}
+    {% if erp_access.inventario %}<a class="erp-card erp-module-card" href="{% url 'inventario_facturacion' empresa.slug %}"><div class="erp-kpi-label">Inventario</div><h3>Inventario</h3><p>Existencias, ajustes y movimientos iniciales conectados con facturacion.</p></a>{% endif %}
+    {% if erp_access.usa_inventario_farmaceutico %}<a class="erp-card erp-module-card" href="{% url 'inventario_farmaceutico' empresa.slug %}"><div class="erp-kpi-label">Farmacia</div><h3>Inventario Farmaceutico</h3><p>Lotes, vencimientos, bodegas internas y ventas controladas desde vitrina.</p></a>{% endif %}
+    {% if erp_access.usa_bodegas_internas %}<a class="erp-card erp-module-card" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}"><div class="erp-kpi-label">Operacion Rapida</div><h3>Transferencia Rapida</h3><p>Mueve producto a bodega provisional o vitrina con el menor numero de pasos.</p></a>{% endif %}
+    {% if erp_access.compras %}<a class="erp-card erp-module-card" href="{% url 'compras_dashboard' empresa.slug %}"><div class="erp-kpi-label">Abastecimiento</div><h3>Compras</h3><p>Documentos de compra conectados con el ingreso real de existencias al inventario.</p></a>{% endif %}
+    {% if erp_access.cai %}<a class="erp-card erp-module-card" href="{% url 'cai_facturacion' empresa.slug %}"><div class="erp-kpi-label">Fiscal</div><h3>CAI</h3><p>Administracion fina de rangos fiscales y correlativos con trazabilidad historica.</p></a>{% endif %}
+    {% if erp_access.impuestos %}<a class="erp-card erp-module-card" href="{% url 'impuestos_facturacion' empresa.slug %}"><div class="erp-kpi-label">Fiscal</div><h3>Impuestos</h3><p>Configuracion tributaria lista para facturacion, ajustes y evolucion contable.</p></a>{% endif %}
+    {% if erp_access.notas_credito %}<a class="erp-card erp-module-card" href="{% url 'notas_credito_dashboard' empresa.slug %}"><div class="erp-kpi-label">Ajustes</div><h3>Notas de Credito</h3><p>Documentos de ajuste conectados con factura origen y saldo disponible real.</p></a>{% endif %}
+    {% if erp_access.recibos %}<a class="erp-card erp-module-card" href="{% url 'recibos_dashboard' empresa.slug %}"><div class="erp-kpi-label">Cobranza</div><h3>Recibos</h3><p>Comprobantes de pago formales vinculados con facturas y clientes.</p></a>{% endif %}
+    {% if erp_access.usa_cierre_caja %}<a class="erp-card erp-module-card" href="{% url 'cierres_caja' empresa.slug %}"><div class="erp-kpi-label">Caja</div><h3>Cierres de Caja</h3><p>Cierres diarios por cajero para controlar efectivo, tarjetas y transferencias por turno.</p></a>{% endif %}
+    {% if erp_access.usa_cierre_caja %}<a class="erp-card erp-module-card" href="{% url 'resumen_diario_caja' empresa.slug %}"><div class="erp-kpi-label">Gerencia</div><h3>Resumen Diario</h3><p>Vista ejecutiva de cobros por cajero, metodo, banco y diferencia de cierres.</p></a>{% endif %}
+    {% if erp_access.egresos %}<a class="erp-card erp-module-card" href="{% url 'egresos_dashboard' empresa.slug %}"><div class="erp-kpi-label">Pagos</div><h3>Egresos</h3><p>Comprobantes formales de pagos a proveedores enlazados con compras y cuentas por pagar.</p></a>{% endif %}
+    {% if erp_access.reportes %}<a class="erp-card erp-module-card" href="{% url 'reportes_facturacion' empresa.slug %}"><div class="erp-kpi-label">Analitica</div><h3>Reportes</h3><p>Lectura ejecutiva de ventas, impuestos y desempeno financiero.</p></a>{% endif %}
+    {% if erp_access.usa_reporte_bancos %}<a class="erp-card erp-module-card" href="{% url 'reporte_ingresos_bancos' empresa.slug %}"><div class="erp-kpi-label">Tesoreria</div><h3>Ingresos por Banco</h3><p>Control de transferencias, POS y cajas por factura para cierres y conciliacion diaria.</p></a>{% endif %}
+    {% if erp_access.cxc %}<a class="erp-card erp-module-card" href="{% url 'reporte_cxc' empresa.slug %}"><div class="erp-kpi-label">Cobranza</div><h3>Cuentas por Cobrar</h3><p>Seguimiento a saldos pendientes y antiguedad de cartera por cliente.</p></a>{% endif %}
+    {% if erp_access.cxp %}<a class="erp-card erp-module-card" href="{% url 'reporte_cxp' empresa.slug %}"><div class="erp-kpi-label">Pagos</div><h3>Cuentas por Pagar</h3><p>Seguimiento ejecutivo de compras aplicadas, saldos pendientes y pagos a proveedores.</p></a>{% endif %}
+</section>
+{% endblock %}

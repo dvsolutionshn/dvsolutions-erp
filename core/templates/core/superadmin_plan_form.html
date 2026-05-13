@@ -1,0 +1,41 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Configura el alcance comercial del plan y deja definidos los modulos que estaran disponibles para las empresas que lo contraten.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_planes' %}" class="erp-action-link">Volver a Planes</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+    <section class="erp-form-card">
+        <h3>Configuracion del plan</h3>
+        <div class="erp-form-grid">
+            {% for field in form %}
+                {% if field.name != 'modulos' %}
+                <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {{ field.errors }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+    <section class="erp-form-card">
+        <h3>Modulos incluidos</h3>
+        <div class="erp-soft-panel">
+            {{ form.modulos }}
+            {{ form.modulos.errors }}
+        </div>
+    </section>
+    <div class="erp-form-actions">
+        <a href="{% url 'superadmin_planes' %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Plan</button>
+    </div>
+</form>
+{% endblock %}

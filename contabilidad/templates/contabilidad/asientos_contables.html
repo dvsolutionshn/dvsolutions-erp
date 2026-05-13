@@ -1,0 +1,89 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Asientos Contables{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}Asientos Contables{% endblock %}
+{% block header_description %}Gestiona borradores, contabilizacion y detalle de partidas con una lectura clara y profesional.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="erp-action-link">Nuevo Asiento</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Asientos</div><p class="erp-stat-value">{{ resumen.asientos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Contabilizados</div><p class="erp-stat-value">{{ resumen.contabilizados }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Borradores</div><p class="erp-stat-value">{{ resumen.borradores }}</p></article>
+</section>
+
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros de asientos</h3>
+            <p class="erp-card-muted">Busca por numero, descripcion, referencia u origen para auditoria rapida.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="q">Buscar</label>
+            <input id="q" name="q" value="{{ filtros.q }}" placeholder="ASI, factura, pago, referencia" autocomplete="off">
+        </div>
+        <div class="erp-filter-field">
+            <label for="estado">Estado</label>
+            <select id="estado" name="estado">
+                <option value="">Todos</option>
+                <option value="borrador" {% if filtros.estado == "borrador" %}selected{% endif %}>Borrador</option>
+                <option value="contabilizado" {% if filtros.estado == "contabilizado" %}selected{% endif %}>Contabilizado</option>
+                <option value="anulado" {% if filtros.estado == "anulado" %}selected{% endif %}>Anulado</option>
+            </select>
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input id="fecha_inicio" type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input id="fecha_fin" type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn-secondary">Filtrar</button>
+            <a class="erp-btn-secondary" href="{% url 'asientos_contables' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+</section>                                                                                                                                                   
+
+<section class="erp-card erp-table-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Numero</th>
+                    <th>Fecha</th>
+                    <th>Descripcion</th>
+                    <th>Referencia</th>
+                    <th>Estado</th>
+                    <th>Debe</th>
+                    <th>Haber</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asiento in asientos %}
+                <tr>
+                    <td>{{ asiento.numero|default:"Sin numero" }}</td>
+                    <td>{{ asiento.fecha|date:"F j, Y" }}</td>
+                    <td>{{ asiento.descripcion }}</td>
+                    <td>{{ asiento.referencia|default:"-" }}</td>
+                    <td><span class="erp-badge {% if asiento.estado == 'contabilizado' %}success{% elif asiento.estado == 'borrador' %}warning{% else %}danger{% endif %}">{{ asiento.get_estado_display }}</span></td>
+                    <td>L. {{ asiento.total_debe }}</td>
+                    <td>L. {{ asiento.total_haber }}</td>
+                    <td class="actions"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty">Todavia no hay asientos creados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

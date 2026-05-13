@@ -1,0 +1,253 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Compras - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Abastecimiento{% endblock %}
+{% block header_title %}Compras{% endblock %}
+{% block header_description %}Documentos de compra enlazados con inventario y cuentas por pagar para una trazabilidad mas clara y mejor conectada con el resto del ERP.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'reporte_cxp' empresa.slug %}">Ver CxP</a>
+<a class="erp-action-link" href="{% url 'libro_compras_fiscal' empresa.slug %}">Libro Compras</a>
+<a class="erp-action-link" href="{% url 'crear_compra' empresa.slug %}">Nueva Compra</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-purchase-table{
+    min-width:1220px;
+}
+.erp-autocomplete{
+    position:relative;
+}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:20;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow-soft);
+    padding:8px;
+    display:none;
+    max-height:240px;
+    overflow:auto;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{
+    background:#f4f8fc;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-list-kpis">
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Compras</div>
+            <div class="erp-stat-value">{{ resumen.total }}</div>
+            <p class="erp-card-muted">Documentos cargados dentro del circuito de abastecimiento.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Aplicadas</div>
+            <div class="erp-stat-value">{{ resumen.aplicadas }}</div>
+            <p class="erp-card-muted">Ya impactaron inventario y kardex institucional.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Borradores</div>
+            <div class="erp-stat-value">{{ resumen.borradores }}</div>
+            <p class="erp-card-muted">Pendientes de validacion y aplicacion operativa.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Monto</div>
+            <div class="erp-stat-value erp-money">L. {{ resumen.monto|floatformat:2|intcomma }}</div>
+            <p class="erp-card-muted">Valor consolidado de las compras registradas.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Saldo por pagar</div>
+            <div class="erp-stat-value erp-money">L. {{ resumen.saldo_total|floatformat:2|intcomma }}</div>
+            <p class="erp-card-muted">{{ resumen.por_pagar }} compras mantienen saldo abierto con proveedores.</p>
+        </article>
+    </section>
+
+    <section class="erp-card erp-list-filter-card">
+        <div class="erp-list-toolbar">
+            <div>
+                <h3 class="erp-panel-title" style="margin:0;">Documentos de Compra</h3>
+                <p>Filtra por proveedor, referencia, estado documental o estado de pago para revisar el flujo completo sin salir del modulo.</p>
+            </div>
+        </div>
+        <form method="get" class="erp-list-filter-grid">
+            <div class="erp-filter-field">
+                <label for="q">Buscar</label>
+                <div class="erp-autocomplete">
+                    <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Compra, proveedor o referencia" autocomplete="off">
+                    <div id="compras-sugerencias" class="erp-suggestion-list"></div>
+                </div>
+            </div>
+            <div class="erp-filter-field">
+                <label for="estado">Estado</label>
+                <select id="estado" name="estado">
+                    <option value="">Todos</option>
+                    <option value="borrador" {% if estado_filtro == "borrador" %}selected{% endif %}>Borrador</option>
+                    <option value="aplicada" {% if estado_filtro == "aplicada" %}selected{% endif %}>Aplicada</option>
+                    <option value="anulada" {% if estado_filtro == "anulada" %}selected{% endif %}>Anulada</option>
+                </select>
+            </div>
+            <div class="erp-filter-field">
+                <label for="pago">Pago</label>
+                <select id="pago" name="pago">
+                    <option value="">Todos</option>
+                    <option value="pendiente" {% if pago_filtro == "pendiente" %}selected{% endif %}>Pendiente</option>
+                    <option value="parcial" {% if pago_filtro == "parcial" %}selected{% endif %}>Parcial</option>
+                    <option value="pagado" {% if pago_filtro == "pagado" %}selected{% endif %}>Pagado</option>
+                </select>
+            </div>
+            <div class="erp-list-filter-actions" style="grid-column:1 / -1;">
+                <button class="erp-btn" type="submit">Filtrar</button>
+                <a class="erp-btn-secondary" href="{% url 'compras_dashboard' empresa.slug %}">Limpiar</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-purchase-table erp-list-table">
+                <thead>
+                    <tr>
+                        <th>Compra</th>
+                        <th>Proveedor</th>
+                        <th>Fecha</th>
+                        <th>Unidades</th>
+                        <th>Total</th>
+                        <th>Saldo</th>
+                        <th>Estado</th>
+                        <th>Pago</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for compra in compras %}
+                    <tr>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ compra.numero_compra }}</div>
+                                <div class="erp-doc-subtext">{{ compra.referencia_documento|default:"Sin referencia"|truncatechars:56 }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">
+                                    {% if compra.proveedor %}
+                                    <a class="erp-inline-link" href="{% url 'ver_proveedor_facturacion' empresa.slug compra.proveedor.id %}">{{ compra.proveedor_nombre }}</a>
+                                    {% else %}
+                                    {{ compra.proveedor_nombre }}
+                                    {% endif %}
+                                </div>
+                                <div class="erp-doc-subtext">{{ compra.observacion|default:"Sin observacion"|truncatechars:72 }}</div>
+                            </div>
+                        </td>
+                        <td>{{ compra.fecha_documento }}</td>
+                        <td class="amount">{{ compra.total_unidades|floatformat:2|intcomma }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ compra.total_documento|floatformat:2|intcomma }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ compra.saldo_pendiente|floatformat:2|intcomma }}</span></td>
+                        <td>
+                            {% if compra.estado == "aplicada" %}
+                            <span class="erp-badge success">Aplicada</span>
+                            {% elif compra.estado == "anulada" %}
+                            <span class="erp-badge danger">Anulada</span>
+                            {% else %}
+                            <span class="erp-badge warning">Borrador</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if compra.estado_pago == "pagado" %}
+                            <span class="erp-badge success">Pagada</span>
+                            {% elif compra.estado_pago == "parcial" %}
+                            <span class="erp-badge warning">Parcial</span>
+                            {% else %}
+                            <span class="erp-badge danger">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <div class="erp-actions-cluster">
+                                <a class="erp-pill-link" href="{% url 'ver_compra' empresa.slug compra.id %}">Ver</a>
+                                {% if compra.estado == "borrador" %}
+                                <a class="erp-pill-link" href="{% url 'editar_compra' empresa.slug compra.id %}">Editar</a>
+                                <form method="post" action="{% url 'aplicar_compra' empresa.slug compra.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button class="erp-pill-btn" type="submit" onclick="return confirm('Seguro que deseas aplicar esta compra al inventario?');">Aplicar</button>
+                                </form>
+                                <form method="post" action="{% url 'anular_compra' empresa.slug compra.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button class="erp-pill-btn danger" type="submit" onclick="return confirm('Seguro que deseas anular esta compra?');">Anular</button>
+                                </form>
+                                {% elif compra.estado == "aplicada" %}
+                                {% if compra.saldo_pendiente > 0 %}
+                                <a class="erp-pill-link" href="{% url 'registrar_pago_compra' empresa.slug compra.id %}">Pagar</a>
+                                {% endif %}
+                                <form method="post" action="{% url 'anular_compra' empresa.slug compra.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button class="erp-pill-btn danger" type="submit" onclick="return confirm('Seguro que deseas anular esta compra? Esto revertira el inventario.');">Anular</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="9" class="erp-empty">No hay compras registradas todavia.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("compras-sugerencias");
+    const sugerencias = [{% for compra in compras %}"{{ compra.numero_compra|escapejs }}","{{ compra.proveedor_nombre|escapejs }}"{% if compra.referencia_documento %},"{{ compra.referencia_documento|escapejs }}"{% endif %},{% endfor %}];
+    if(!input || !panel){
+        return;
+    }
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const uniques = [...new Set(sugerencias.filter(Boolean))];
+        const matches = (term ? uniques.filter(item => item.toLowerCase().includes(term)) : uniques).slice(0, 8);
+        panel.innerHTML = "";
+        if(!matches.length){
+            panel.style.display = "none";
+            return;
+        }
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){
+                input.value = item;
+                panel.style.display = "none";
+            });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", () => window.setTimeout(() => panel.style.display = "none", 120));
+});
+</script>
+{% endblock %}

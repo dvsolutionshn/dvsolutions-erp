@@ -1,0 +1,78 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Categorias Farmaceuticas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Catalogo Farmaceutico{% endblock %}
+{% block header_title %}Categorias Farmaceuticas{% endblock %}
+{% block header_description %}Define tipos de producto para clasificar inventario, ventas, alertas y controles especiales por empresa.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'productos_facturacion' empresa.slug %}">Volver a Productos</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <div class="erp-form-actions">
+        <div>
+            <h3 style="margin:0 0 8px;">{% if categoria %}Editar Categoria{% else %}Nueva Categoria{% endif %}</h3>
+            <p>Estas reglas ayudan a marcar productos que requieren receta, refrigeracion o control especial.</p>
+        </div>
+    </div>
+    <form method="post" class="erp-form-grid three" style="margin-top:18px;">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.errors %}<ul class="erp-field-errors">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="erp-form-actions" style="grid-column:1 / -1;">
+            <a class="erp-btn-secondary" href="{% url 'categorias_farmaceuticas' empresa.slug %}">Nuevo</a>
+            <button class="erp-btn" type="submit">Guardar Categoria</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Tipos configurados</h3>
+            <p>Catalogo por empresa para organizar productos de drogueria o farmacia.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Receta</th>
+                    <th>Refrigeracion</th>
+                    <th>Controlado</th>
+                    <th>Productos</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for categoria in categorias %}
+                <tr>
+                    <td>
+                        <strong>{{ categoria.nombre }}</strong>
+                        <div class="erp-card-muted">{{ categoria.descripcion|default:"Sin descripcion"|truncatechars:80 }}</div>
+                    </td>
+                    <td>{% if categoria.requiere_receta_default %}<span class="erp-badge warning">Si</span>{% else %}<span class="erp-badge neutral">No</span>{% endif %}</td>
+                    <td>{% if categoria.requiere_refrigeracion_default %}<span class="erp-badge info">Si</span>{% else %}<span class="erp-badge neutral">No</span>{% endif %}</td>
+                    <td>{% if categoria.producto_controlado_default %}<span class="erp-badge danger">Si</span>{% else %}<span class="erp-badge neutral">No</span>{% endif %}</td>
+                    <td>{{ categoria.productos.count }}</td>
+                    <td>{% if categoria.activa %}<span class="erp-badge success">Activa</span>{% else %}<span class="erp-badge danger">Inactiva</span>{% endif %}</td>
+                    <td><a class="erp-btn-secondary" href="{% url 'categorias_farmaceuticas' empresa.slug %}?editar={{ categoria.id }}">Editar</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="erp-empty-row">Todavia no hay categorias farmaceuticas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

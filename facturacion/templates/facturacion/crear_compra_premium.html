@@ -1,0 +1,402 @@
+{% extends "core/erp_base.html" %}
+{% load custom_filters %}
+{% load static %}
+
+{% block title %}{% if modo_edicion %}Editar compra{% else %}Nueva compra{% endif %} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Abastecimiento{% endblock %}
+{% block header_title %}{% if modo_edicion %}Editar compra{% else %}Nueva compra{% endif %}{% endblock %}
+{% block header_description %}{% if modo_edicion %}Ajusta el documento mientras siga en borrador, antes de aplicarlo al inventario.{% else %}Registra una compra con varias líneas y decide si aplicarla de inmediato al inventario o dejarla en borrador.{% endif %}{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Volver a compras</a>
+<a class="erp-action-link" href="{% url 'crear_proveedor_facturacion' empresa.slug %}?next={% if modo_edicion %}{% url 'editar_compra' empresa.slug compra.id %}{% else %}{% url 'crear_compra' empresa.slug %}{% endif %}" target="_blank" rel="noopener">Nuevo proveedor</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-autocomplete{position:relative;}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:25;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow-soft);
+    padding:8px;
+    display:none;
+    max-height:240px;
+    overflow:auto;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{background:#f4f8fc;}
+.erp-purchase-form{
+    display:grid;
+    grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr);
+    gap:22px;
+}
+.erp-purchase-summary-stack{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+.erp-purchase-line-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    margin-top:16px;
+    flex-wrap:wrap;
+}
+.erp-purchase-doc-item{
+    padding:12px 14px;
+    border:1px dashed var(--line);
+    border-radius:12px;
+    background:#fafcff;
+}
+.erp-purchase-doc-item .label{
+    display:block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:var(--muted);
+    margin-bottom:6px;
+}
+.erp-purchase-doc-item .value{
+    font-size:18px;
+    font-weight:700;
+    color:#102338;
+}
+@media (max-width: 1100px){
+    .erp-purchase-form{grid-template-columns:1fr;}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+
+    <div class="erp-purchase-form">
+        <section class="erp-compact-card">
+            <h3>Cabecera del documento</h3>
+            <p>Completa proveedor, referencia y condición de pago para dejar la compra lista y fácil de revisar.</p>
+            <div class="erp-compact-grid three-col" style="margin-top:16px;">
+                <div class="erp-field">
+                    {{ form.proveedor.label_tag }}
+                    <div class="erp-autocomplete">
+                        <input type="text" id="proveedor-search" class="erp-select-search" placeholder="Buscar proveedor por nombre" autocomplete="off">
+                        <div id="proveedores-sugerencias" class="erp-suggestion-list"></div>
+                    </div>
+                    <div style="display:none;">{{ form.proveedor }}</div>
+                    <p class="erp-field-help">Escribe y selecciona el proveedor sugerido para autocompletar su configuración.</p>
+                    {% if form.proveedor.errors %}<ul class="erp-field-errors">{% for error in form.proveedor.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">{{ form.proveedor_nombre.label_tag }}{{ form.proveedor_nombre }}{% if form.proveedor_nombre.errors %}<ul class="erp-field-errors">{% for error in form.proveedor_nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.referencia_documento.label_tag }}{{ form.referencia_documento }}{% if form.referencia_documento.errors %}<ul class="erp-field-errors">{% for error in form.referencia_documento.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.fecha_documento.label_tag }}{{ form.fecha_documento }}{% if form.fecha_documento.errors %}<ul class="erp-field-errors">{% for error in form.fecha_documento.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.condicion_pago.label_tag }}{{ form.condicion_pago }}{% if form.condicion_pago.errors %}<ul class="erp-field-errors">{% for error in form.condicion_pago.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.dias_credito.label_tag }}{{ form.dias_credito }}{% if form.dias_credito.errors %}<ul class="erp-field-errors">{% for error in form.dias_credito.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.fecha_vencimiento.label_tag }}{{ form.fecha_vencimiento }}{% if form.fecha_vencimiento.errors %}<ul class="erp-field-errors">{% for error in form.fecha_vencimiento.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.estado.label_tag }}{{ form.estado }}{% if form.estado.errors %}<ul class="erp-field-errors">{% for error in form.estado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field erp-field-span-full">{{ form.observacion.label_tag }}{{ form.observacion }}{% if form.observacion.errors %}<ul class="erp-field-errors">{% for error in form.observacion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            </div>
+        </section>
+
+        <aside class="erp-purchase-summary-stack">
+            <section class="erp-compact-card">
+                <h3>Resumen operativo</h3>
+                <p>La compra puede quedar en borrador o aplicarse al inventario cuando la información esté validada.</p>
+                <div class="erp-mini-grid" style="margin-top:16px;">
+                    <div class="erp-mini-stat"><div class="label">Proveedor</div><div class="value" id="resumen-proveedor">Sin seleccionar</div></div>
+                    <div class="erp-mini-stat"><div class="label">Condición</div><div class="value" id="resumen-condicion">-</div></div>
+                    <div class="erp-mini-stat"><div class="label">Fecha documento</div><div class="value" id="resumen-fecha">-</div></div>
+                    <div class="erp-mini-stat"><div class="label">Vencimiento</div><div class="value" id="resumen-vencimiento">-</div></div>
+                </div>
+            </section>
+            <section class="erp-compact-card">
+                <h3>Lectura rápida</h3>
+                <div class="erp-purchase-doc-item">
+                    <span class="label">Días de crédito</span>
+                    <div class="value" id="resumen-dias">0</div>
+                </div>
+                <div class="erp-soft-panel" style="margin-top:14px;">
+                    Si guardas como <strong>aplicada</strong>, el inventario sube de inmediato y el kardex registra el movimiento de compra.
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <section class="erp-form-card">
+        <div class="erp-form-actions" style="margin-bottom:16px;">
+            <div>
+                <h3 style="margin:0 0 8px;">Líneas de compra</h3>
+                <p>Detalla productos, cantidades y costo unitario para documentar bien la operación.</p>
+            </div>
+        </div>
+
+        {{ formset.management_form }}
+
+        <div class="erp-line-layout">
+            <div class="erp-line-header" style="grid-template-columns:2fr 1fr 1fr 1.6fr auto;">
+                <div>Producto</div>
+                <div>Cantidad</div>
+                <div>Costo unitario</div>
+                <div>Comentario</div>
+                <div></div>
+            </div>
+
+            <div id="lineas-container" class="erp-line-layout">
+            {% for form_linea in formset %}
+                <div class="tabla-row erp-line-row" style="grid-template-columns:2fr 1fr 1fr 1.6fr auto;">
+                    {{ form_linea.id }}
+                    <div style="display:none;">{{ form_linea.DELETE }}</div>
+                    <div>{{ form_linea.producto|add_class:"producto" }}</div>
+                    <div>{{ form_linea.cantidad|add_class:"cantidad" }}</div>
+                    <div>{{ form_linea.costo_unitario|add_class:"costo" }}</div>
+                    <div>{{ form_linea.comentario|add_class:"comentario" }}</div>
+                    <div class="erp-delete-cell"><button type="button" class="delete-btn erp-btn-danger btn-eliminar">X</button></div>
+                </div>
+            {% endfor %}
+            </div>
+
+            <div class="erp-purchase-line-footer">
+                <div class="erp-field-help">Agrega tantas líneas como necesites. Si una línea no aplica, puedes eliminarla antes de guardar.</div>
+                <button type="button" id="agregar-linea" class="erp-btn">Agregar línea</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-form-card">
+        <div class="erp-form-actions">
+            <div class="erp-field-help">Si guardas como aplicada, el inventario sube de inmediato y el kardex registra movimientos tipo compra.</div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'compras_dashboard' empresa.slug %}">Cancelar</a>
+                <button type="submit" class="erp-btn">{% if modo_edicion %}Guardar cambios{% else %}Guardar compra{% endif %}</button>
+            </div>
+        </div>
+    </section>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const proveedoresConfig = {{ proveedores_config|safe }};
+    const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
+    const container = document.getElementById("lineas-container");
+    const proveedorSelect = document.getElementById("id_proveedor");
+    const proveedorSearchInput = document.getElementById("proveedor-search");
+    const proveedorSuggestionsPanel = document.getElementById("proveedores-sugerencias");
+    const proveedorNombreInput = document.getElementById("id_proveedor_nombre");
+    const condicionPagoInput = document.getElementById("id_condicion_pago");
+    const diasCreditoInput = document.getElementById("id_dias_credito");
+    const fechaDocumentoInput = document.getElementById("id_fecha_documento");
+    const fechaVencimientoInput = document.getElementById("id_fecha_vencimiento");
+    const resumenProveedor = document.getElementById("resumen-proveedor");
+    const resumenCondicion = document.getElementById("resumen-condicion");
+    const resumenDias = document.getElementById("resumen-dias");
+    const resumenFecha = document.getElementById("resumen-fecha");
+    const resumenVencimiento = document.getElementById("resumen-vencimiento");
+
+    function sincronizarProveedor(){
+        if(!proveedorSelect || !proveedorNombreInput){ return; }
+        const option = proveedorSelect.options[proveedorSelect.selectedIndex];
+        if(option && option.value){
+            proveedorNombreInput.value = option.text.trim();
+            if(proveedorSearchInput){
+                proveedorSearchInput.value = option.text.trim();
+            }
+            const config = proveedoresConfig[option.value];
+            if(config){
+                condicionPagoInput.value = config.condicion_pago || "contado";
+                diasCreditoInput.value = config.dias_credito || 0;
+                calcularFechaVencimiento();
+            }
+        }
+        actualizarResumenCompra();
+    }
+
+    function sincronizarSelectDesdeBusquedaProveedor(){
+        if(!proveedorSelect || !proveedorSearchInput){ return; }
+        const buscado = (proveedorSearchInput.value || "").trim().toLowerCase();
+        let matched = false;
+        Array.from(proveedorSelect.options).forEach(option => {
+            if(option.value && option.text.trim().toLowerCase() === buscado){
+                proveedorSelect.value = option.value;
+                matched = true;
+            }
+        });
+        if(!matched && !buscado){
+            proveedorSelect.value = "";
+            proveedorNombreInput.value = "";
+        }
+        sincronizarProveedor();
+    }
+
+    function renderProveedorSuggestions(){
+        if(!proveedorSelect || !proveedorSearchInput || !proveedorSuggestionsPanel){ return; }
+        const term = (proveedorSearchInput.value || "").trim().toLowerCase();
+        const options = Array.from(proveedorSelect.options)
+            .filter(option => option.value)
+            .filter(option => !term || option.text.trim().toLowerCase().includes(term))
+            .slice(0, 8);
+
+        proveedorSuggestionsPanel.innerHTML = "";
+        if(!options.length){
+            proveedorSuggestionsPanel.style.display = "none";
+            return;
+        }
+
+        options.forEach(option => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = option.text.trim();
+            button.addEventListener("click", function(){
+                proveedorSearchInput.value = option.text.trim();
+                proveedorSelect.value = option.value;
+                sincronizarProveedor();
+                proveedorSuggestionsPanel.style.display = "none";
+            });
+            proveedorSuggestionsPanel.appendChild(button);
+        });
+        proveedorSuggestionsPanel.style.display = "block";
+    }
+
+    function sumarDias(fechaBase, dias){
+        const fecha = new Date(fechaBase + "T00:00:00");
+        fecha.setDate(fecha.getDate() + dias);
+        const year = fecha.getFullYear();
+        const month = String(fecha.getMonth() + 1).padStart(2, "0");
+        const day = String(fecha.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+
+    function calcularFechaVencimiento(){
+        if(!fechaDocumentoInput || !fechaVencimientoInput || !condicionPagoInput || !diasCreditoInput){ return; }
+        if(!fechaDocumentoInput.value){ return; }
+
+        if(condicionPagoInput.value === "contado"){
+            diasCreditoInput.value = 0;
+            fechaVencimientoInput.value = fechaDocumentoInput.value;
+            return;
+        }
+
+        const dias = parseInt(diasCreditoInput.value || "0", 10);
+        fechaVencimientoInput.value = sumarDias(fechaDocumentoInput.value, isNaN(dias) ? 0 : dias);
+    }
+
+    function actualizarResumenCompra(){
+        if(resumenProveedor){
+            resumenProveedor.textContent = proveedorNombreInput.value || "Sin seleccionar";
+        }
+        if(resumenCondicion && condicionPagoInput){
+            const option = condicionPagoInput.options[condicionPagoInput.selectedIndex];
+            resumenCondicion.textContent = option ? option.text.trim() : "-";
+        }
+        if(resumenDias && diasCreditoInput){
+            resumenDias.textContent = diasCreditoInput.value || "0";
+        }
+        if(resumenFecha && fechaDocumentoInput){
+            resumenFecha.textContent = fechaDocumentoInput.value || "-";
+        }
+        if(resumenVencimiento && fechaVencimientoInput){
+            resumenVencimiento.textContent = fechaVencimientoInput.value || "-";
+        }
+    }
+
+    if(proveedorSelect){
+        proveedorSelect.addEventListener("change", sincronizarProveedor);
+    }
+    if(proveedorSearchInput){
+        proveedorSearchInput.addEventListener("focus", renderProveedorSuggestions);
+        proveedorSearchInput.addEventListener("input", function(){
+            sincronizarSelectDesdeBusquedaProveedor();
+            renderProveedorSuggestions();
+        });
+        proveedorSearchInput.addEventListener("change", sincronizarSelectDesdeBusquedaProveedor);
+        proveedorSearchInput.addEventListener("blur", function(){
+            sincronizarSelectDesdeBusquedaProveedor();
+            window.setTimeout(() => {
+                if(proveedorSuggestionsPanel){
+                    proveedorSuggestionsPanel.style.display = "none";
+                }
+            }, 120);
+        });
+    }
+    if(condicionPagoInput){
+        condicionPagoInput.addEventListener("change", function(){ calcularFechaVencimiento(); actualizarResumenCompra(); });
+    }
+    if(diasCreditoInput){
+        diasCreditoInput.addEventListener("input", function(){ calcularFechaVencimiento(); actualizarResumenCompra(); });
+    }
+    if(fechaDocumentoInput){
+        fechaDocumentoInput.addEventListener("change", function(){ calcularFechaVencimiento(); actualizarResumenCompra(); });
+    }
+    if(proveedorNombreInput){
+        proveedorNombreInput.addEventListener("input", actualizarResumenCompra);
+    }
+    calcularFechaVencimiento();
+    sincronizarProveedor();
+    actualizarResumenCompra();
+
+    document.getElementById("agregar-linea").addEventListener("click", function(){
+        let formCount = parseInt(totalFormsInput.value);
+        let plantilla = document.querySelector(".tabla-row:not([data-deleted='1'])") || document.querySelector(".tabla-row");
+        if(!plantilla){ return; }
+
+        let nueva = plantilla.cloneNode(true);
+        delete nueva.dataset.deleted;
+        nueva.style.display = "";
+
+        nueva.querySelectorAll("input, select, textarea").forEach(el => {
+            if(el.name){
+                let name = el.name.replace(/lineas_compra-\d+-/, `lineas_compra-${formCount}-`);
+                let id = "id_" + name;
+                el.name = name;
+                el.id = id;
+            }
+
+            if(el.type === "checkbox"){
+                el.checked = false;
+            } else if(el.type !== "hidden"){
+                el.value = "";
+            }
+        });
+
+        let idField = nueva.querySelector("input[name$='-id']");
+        if(idField){ idField.remove(); }
+        let deleteField = nueva.querySelector("input[name$='-DELETE']");
+        if(deleteField){ deleteField.checked = false; }
+
+        container.appendChild(nueva);
+        totalFormsInput.value = document.querySelectorAll(".tabla-row").length;
+    });
+
+    document.addEventListener("click", function(e){
+        if(e.target.classList.contains("btn-eliminar")){
+            const fila = e.target.closest(".tabla-row");
+            const deleteField = fila.querySelector("input[name$='-DELETE']");
+            if(deleteField){
+                deleteField.checked = true;
+                fila.dataset.deleted = "1";
+                fila.style.display = "none";
+            } else {
+                fila.remove();
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

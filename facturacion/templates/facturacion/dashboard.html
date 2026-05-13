@@ -103,8 +103,81 @@ td{
     color:#6c63ff;
     font-weight:500;
 }
+
+.actions form{
+    display:inline;
+}
+
+.inline-action{
+    border:none;
+    background:none;
+    color:#6c63ff;
+    font-weight:500;
+    cursor:pointer;
+    padding:0;
+    margin-right:10px;
+    font:inherit;
+}
+
+.delete-action{
+    border:none;
+    background:none;
+    color:#dc3545;
+    font-weight:500;
+    cursor:pointer;
+    padding:0;
+    font:inherit;
+}
+
+.messages{
+    margin-bottom:20px;
+}
+
+.message{
+    padding:12px;
+    border-radius:8px;
+    margin-bottom:8px;
+    background:#e7f3ff;
+    color:#084298;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+}
+
+.module-card{
+    background:white;
+    border-radius:14px;
+    padding:25px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.06);
+    text-decoration:none;
+    color:#1e2a38;
+    min-height:130px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    transition:all .2s ease;
+}
+
+.module-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 22px rgba(0,0,0,0.10);
+}
+
+.module-card h3{
+    margin:0 0 10px;
+    font-size:22px;
+}
+
+.module-card p{
+    margin:0;
+    color:#64748b;
+    line-height:1.4;
+}
 </style>
-</head>
+</head> 
 
 <body>
 
@@ -116,8 +189,24 @@ td{
 <div class="container">
 <div class="card">
 
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+        <div class="message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <a class="btn" href="/{{ empresa.slug }}/dashboard/facturacion/crear/">
     + Nueva Factura
+</a>
+
+<a class="btn" href="{% url 'clientes_facturacion' empresa.slug %}">
+    Clientes
+</a>
+
+<a class="btn" href="{% url 'productos_facturacion' empresa.slug %}">
+    Productos
 </a>
 
 <a class="btn" href="/{{ empresa.slug }}/dashboard/facturacion/reportes/">
@@ -193,6 +282,20 @@ td{
 <td class="actions">
 <a href="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/">Ver</a>
 <a href="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/editar/">Editar</a>
+<form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}">
+    {% csrf_token %}
+    <button type="submit" class="inline-action">
+        Duplicar
+    </button>
+</form>
+{% if factura.estado == "borrador" and not factura.numero_factura %}
+<form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}">
+    {% csrf_token %}
+    <button type="submit" class="delete-action" onclick="return confirm('¿Seguro que desea eliminar este borrador?');">
+        Eliminar
+    </button>
+</form>
+{% endif %}
 </td>
 
 </tr>
@@ -211,3 +314,4 @@ td{
 
 </body>
 </html>
+

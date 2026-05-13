@@ -1,0 +1,617 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Panel Principal - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Centro de Control{% endblock %}
+{% block header_title %}Panel Principal{% endblock %}
+{% block header_description %}Una experiencia institucional, sobria y elegante para acceder a los modulos estrategicos del ERP.{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-dashboard-hero{
+    position:relative;
+    overflow:hidden;
+    display:grid;
+    grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);
+    gap:22px;
+    align-items:stretch;
+    padding:28px;
+}
+.erp-dashboard-hero::after{
+    content:"";
+    position:absolute;
+    right:-70px;
+    bottom:-90px;
+    width:280px;
+    height:280px;
+    border-radius:999px;
+    background:radial-gradient(circle, rgba(31,94,168,.12), rgba(31,94,168,0));
+    pointer-events:none;
+}
+.erp-dashboard-hero-copy h3{
+    margin:0 0 10px;
+    font-size:28px;
+    line-height:1.15;
+    color:#102338;
+}
+.erp-dashboard-hero-copy p{
+    margin:0;
+    max-width:760px;
+    color:var(--muted);
+    line-height:1.75;
+}
+.erp-dashboard-signals{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:14px;
+}
+.erp-dashboard-signal{
+    padding:16px 18px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:#fbfcfe;
+}
+.erp-dashboard-signal span{
+    display:block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.15em;
+    color:var(--muted);
+}
+.erp-dashboard-signal strong{
+    display:block;
+    margin-top:8px;
+    font-size:26px;
+    color:#102338;
+}
+.erp-dashboard-card-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:18px;
+    align-items:stretch;
+}
+.erp-dashboard-module{
+    position:relative;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    transition:transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+    animation:erpCardRise .48s ease both;
+}
+.erp-dashboard-module:nth-child(2){ animation-delay:.05s; }
+.erp-dashboard-module:nth-child(3){ animation-delay:.1s; }
+.erp-dashboard-module:nth-child(4){ animation-delay:.15s; }
+.erp-dashboard-module:nth-child(5){ animation-delay:.2s; }
+.erp-dashboard-module:nth-child(6){ animation-delay:.25s; }
+.erp-dashboard-module::before{
+    content:"";
+    position:absolute;
+    left:0;
+    top:0;
+    bottom:0;
+    width:4px;
+    background:linear-gradient(180deg, var(--primary), rgba(31,94,168,.12));
+}
+.erp-dashboard-module:hover{
+    transform:translateY(-4px);
+    border-color:#c8d7ea;
+    box-shadow:0 18px 40px rgba(12,34,56,.08);
+}
+.erp-dashboard-module h3{
+    margin:8px 0 10px;
+    font-size:22px;
+    color:#102338;
+}
+.erp-dashboard-module p{
+    margin:0 0 18px;
+    color:var(--muted);
+    line-height:1.7;
+}
+.erp-dashboard-module-action{
+    margin-top:auto;
+    padding-top:10px;
+}
+.erp-module-status{
+    display:inline-flex;
+    align-items:center;
+    padding:6px 10px;
+    border-radius:999px;
+    background:rgba(31,94,168,.09);
+    color:var(--primary);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+}
+.erp-dashboard-module .erp-btn{
+    width:100%;
+    justify-content:center;
+}
+.erp-module-status.upgrade{
+    background:rgba(23,166,161,.1);
+    color:#0f6f6a;
+}
+.erp-upsell-note{
+    margin-top:auto;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+.erp-upsell-trigger{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+    padding:11px 14px;
+    border-radius:12px;
+    border:1px solid rgba(41,104,242,.18);
+    background:linear-gradient(180deg, rgba(41,104,242,.1), rgba(41,104,242,.04));
+    color:var(--primary);
+    font-weight:700;
+    transition:.2s ease;
+}
+.erp-upsell-trigger:hover{
+    transform:translateY(-1px);
+    border-color:rgba(41,104,242,.28);
+    box-shadow:0 10px 24px rgba(18, 46, 89, .08);
+}
+.erp-plans-modal{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1150;
+    padding:24px;
+}
+.erp-plans-modal.is-open{
+    display:flex;
+}
+.erp-plans-backdrop{
+    position:absolute;
+    inset:0;
+    background:rgba(9, 20, 39, .58);
+    backdrop-filter:blur(6px);
+}
+.erp-plans-dialog{
+    position:relative;
+    z-index:1;
+    width:min(1120px, calc(100vw - 32px));
+    max-height:min(88vh, 980px);
+    overflow:auto;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:28px;
+    box-shadow:0 36px 80px rgba(8, 22, 45, .24);
+    padding:28px;
+}
+.erp-plans-head{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-start;
+    margin-bottom:22px;
+}
+.erp-plans-head h3{
+    margin:0;
+    font-size:32px;
+    line-height:1.1;
+}
+.erp-plans-head p{
+    margin:10px 0 0;
+    color:var(--muted);
+    line-height:1.7;
+    max-width:780px;
+}
+.erp-plans-close{
+    width:42px;
+    height:42px;
+    border:none;
+    border-radius:14px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--muted);
+    font-size:24px;
+    cursor:pointer;
+}
+.erp-plans-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:18px;
+}
+.erp-plan-card{
+    position:relative;
+    border:1px solid var(--line);
+    border-radius:22px;
+    background:linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    padding:22px;
+    box-shadow:var(--shadow-soft);
+}
+.erp-plan-card.featured{
+    border-color:rgba(41,104,242,.28);
+    box-shadow:0 20px 40px rgba(18, 46, 89, .1);
+}
+.erp-plan-kicker{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 11px;
+    border-radius:999px;
+    background:rgba(41,104,242,.08);
+    color:var(--primary);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+}
+.erp-plan-card h4{
+    margin:14px 0 8px;
+    font-size:28px;
+    line-height:1.1;
+}
+.erp-plan-price{
+    font-size:34px;
+    font-weight:800;
+    color:#102338;
+}
+.erp-plan-tax{
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:14px;
+}
+.erp-plan-list{
+    margin:0;
+    padding:0;
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+.erp-plan-list li{
+    position:relative;
+    padding-left:18px;
+    color:#20364f;
+    line-height:1.55;
+}
+.erp-plan-list li::before{
+    content:"•";
+    position:absolute;
+    left:0;
+    top:0;
+    color:var(--accent);
+    font-weight:800;
+}
+.erp-plans-footer{
+    margin-top:22px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(280px,360px);
+    gap:18px;
+}
+.erp-implementation-card,
+.erp-contact-card{
+    border:1px solid var(--line);
+    border-radius:20px;
+    background:#fbfcfe;
+    padding:20px;
+}
+.erp-implementation-card h4,
+.erp-contact-card h4{
+    margin:0 0 12px;
+    font-size:18px;
+}
+.erp-implementation-list{
+    margin:0;
+    padding:0;
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+.erp-implementation-list li{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    border-bottom:1px dashed var(--line);
+    padding-bottom:8px;
+}
+.erp-contact-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+}
+.erp-contact-actions .erp-btn,
+.erp-contact-actions .erp-btn-secondary{
+    min-height:42px;
+}
+@media (max-width: 920px){
+    .erp-plans-footer{
+        grid-template-columns:1fr;
+    }
+}
+@keyframes erpCardRise{
+    from{
+        opacity:0;
+        transform:translateY(14px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+@media (max-width: 980px){
+    .erp-dashboard-hero{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-dashboard-hero">
+    <div class="erp-dashboard-hero-copy">
+        <div class="erp-kpi-label">Operacion empresarial</div>
+        <h3>Todo el ecosistema del ERP concentrado en una vista mas viva, clara y lista para operar.</h3>
+        <p>Desde aqui cada equipo entra a su modulo de trabajo con una experiencia mas refinada, mas directa y con mejores señales visuales para navegar sin friccion.</p>
+    </div>
+    <div class="erp-dashboard-signals">
+        <div class="erp-dashboard-signal">
+            <span>Modulos activos</span>
+            <strong>{{ modulos.count }}</strong>
+        </div>
+        <div class="erp-dashboard-signal">
+            <span>Empresa</span>
+            <strong style="font-size:20px;">{{ empresa.nombre }}</strong>
+        </div>
+        <div class="erp-dashboard-signal">
+            <span>Usuario</span>
+            <strong style="font-size:20px;">{{ request.user.username }}</strong>
+        </div>
+    </div>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Modulos Activos</div>
+        <div class="erp-stat-value">{{ modulos.count }}</div>
+        <p class="erp-card-muted">Vision consolidada de las capacidades habilitadas para la empresa.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Empresa</div>
+        <div class="erp-stat-value" style="font-size:24px;">{{ empresa.nombre }}</div>
+        <p class="erp-card-muted">RTN {{ empresa.rtn|default:"No definido" }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Usuario</div>
+        <div class="erp-stat-value" style="font-size:24px;">{{ request.user.username }}</div>
+        <p class="erp-card-muted">Sesion activa para operar dentro del entorno corporativo.</p>
+    </article>
+</section>
+
+<section class="erp-card">
+    <h3 class="erp-panel-title">Modulos Disponibles</h3>
+    <div class="erp-dashboard-card-grid">
+        {% for modulo in modulos %}
+            {% if modulo.codigo == "facturacion" %}
+                {% if erp_access.modulo_facturacion %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-kpi-label">Modulo Financiero</div>
+                <h3>Facturacion</h3>
+                <p>Facturas, notas de credito, recibos, clientes, productos y control fiscal dentro de una misma operacion integrada.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
+            {% elif modulo.codigo == "contabilidad" %}
+                {% if erp_access.modulo_contabilidad %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-kpi-label">Modulo Financiero</div>
+                <h3>Contabilidad</h3>
+                <p>Catalogo contable, asientos, partidas y base financiera institucional conectada con el crecimiento del ERP.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/contabilidad/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
+            {% elif modulo.codigo == "rrhh" %}
+                {% if erp_access.modulo_rrhh %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-kpi-label">Talento</div>
+                <h3>Recursos Humanos</h3>
+                <p>Expedientes, planillas, deducciones, vacaciones, vouchers PDF y comunicacion con empleados.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/rrhh/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
+            {% elif modulo.codigo == "crm_marketing" %}
+                {% if erp_access.modulo_crm %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-kpi-label">Relacion Comercial</div>
+                <h3>CRM y Marketing</h3>
+                <p>Campanias, cumpleanos, WhatsApp Business, promociones y fechas de producto.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/crm/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
+            {% elif modulo.codigo == "agenda_citas" %}
+                {% if erp_access.modulo_citas %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-kpi-label">Agenda</div>
+                <h3>Citas</h3>
+                <p>Calendario de citas por cliente, producto o servicio, con recordatorios por WhatsApp.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/citas/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
+            {% else %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-kpi-label">Modulo Empresarial</div>
+                <h3>{{ modulo.nombre }}</h3>
+                <p>Espacio preparado para futuras capacidades del ERP con una linea visual unificada.</p>
+            </article>
+            {% endif %}
+        {% empty %}
+        <div class="erp-empty">No hay modulos activos configurados para esta empresa.</div>
+        {% endfor %}
+        {% if not erp_access.modulo_contabilidad %}
+        <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-kpi-label">Finanzas</div>
+            <div class="erp-module-status upgrade">Actualiza tu plan</div>
+            <h3>Contabilidad</h3>
+            <p>Asientos, diarios, catalogo contable y reportes financieros enlazados con la operacion completa del ERP.</p>
+            <div class="erp-upsell-note">
+                <span class="erp-card-muted">Disponible a partir del plan empresarial o como crecimiento estrategico de la operacion.</span>
+                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
+            </div>
+        </article>
+        {% endif %}
+        {% if not erp_access.modulo_rrhh %}
+        <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-kpi-label">Talento</div>
+            <div class="erp-module-status upgrade">Actualiza tu plan</div>
+            <h3>Recursos Humanos</h3>
+            <p>Gestion de colaboradores, expedientes, asistencia, nomina y estructura organizacional.</p>
+            <div class="erp-upsell-note">
+                <span class="erp-card-muted">Incluye planilla, vacaciones, deducciones y comprobantes para fortalecer la gestion del equipo.</span>
+                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
+            </div>
+        </article>
+        {% endif %}
+        {% if not erp_access.modulo_crm %}
+        <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-kpi-label">Clientes</div>
+            <div class="erp-module-status upgrade">Escala tu alcance</div>
+            <h3>CRM y Marketing</h3>
+            <p>Campanias, recordatorios y comunicacion con clientes por WhatsApp y correo.</p>
+            <div class="erp-upsell-note">
+                <span class="erp-card-muted">Podemos habilitarlo como expansion comercial del ERP segun el plan y la operacion del cliente.</span>
+                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
+            </div>
+        </article>
+        {% endif %}
+        {% if not erp_access.modulo_citas %}
+        <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-kpi-label">Agenda</div>
+            <div class="erp-module-status upgrade">Escala tu alcance</div>
+            <h3>Citas</h3>
+            <p>Calendario de citas por cliente con recordatorios y seguimiento operativo.</p>
+            <div class="erp-upsell-note">
+                <span class="erp-card-muted">Ideal para operaciones que necesitan agendar servicios, seguimientos o atencion comercial estructurada.</span>
+                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
+            </div>
+        </article>
+        {% endif %}
+    </div>
+</section>
+
+<div class="erp-plans-modal" id="erpPlansModal" aria-hidden="true">
+    <div class="erp-plans-backdrop" data-plans-close></div>
+    <div class="erp-plans-dialog" role="dialog" aria-modal="true" aria-labelledby="erpPlansTitle">
+        <div class="erp-plans-head">
+            <div>
+                <div class="erp-kpi-label">Escala tu operacion</div>
+                <h3 id="erpPlansTitle">Activa mas capacidades del ERP con el plan ideal para tu empresa</h3>
+                <p>Estos planes siguen la propuesta comercial de DV Solutions y te permiten crecer desde facturacion basica hasta una operacion empresarial completa con contabilidad, talento humano y control financiero centralizado.</p>
+            </div>
+            <button class="erp-plans-close" type="button" aria-label="Cerrar planes" data-plans-close>&times;</button>
+        </div>
+
+        <div class="erp-plans-grid">
+            <article class="erp-plan-card">
+                <div class="erp-plan-kicker">Plan base</div>
+                <h4>Plan Basico</h4>
+                <div class="erp-plan-price">$50 <span style="font-size:16px;font-weight:600;color:var(--muted);">mensuales</span></div>
+                <div class="erp-plan-tax">Mas ISV</div>
+                <ul class="erp-plan-list">
+                    <li>Facturacion con CAI</li>
+                    <li>Clientes y productos</li>
+                    <li>Cuentas por cobrar</li>
+                    <li>Reportes basicos</li>
+                </ul>
+            </article>
+
+            <article class="erp-plan-card featured">
+                <div class="erp-plan-kicker">Mas vendido</div>
+                <h4>Plan Profesional</h4>
+                <div class="erp-plan-price">$90 <span style="font-size:16px;font-weight:600;color:var(--muted);">mensuales</span></div>
+                <div class="erp-plan-tax">Mas ISV</div>
+                <ul class="erp-plan-list">
+                    <li>Todo lo del plan basico</li>
+                    <li>Inventario</li>
+                    <li>Compras</li>
+                    <li>Proveedores</li>
+                    <li>Cuentas por pagar</li>
+                    <li>Reportes avanzados</li>
+                </ul>
+            </article>
+
+            <article class="erp-plan-card">
+                <div class="erp-plan-kicker">Operacion integral</div>
+                <h4>Plan Empresarial</h4>
+                <div class="erp-plan-price">$150 <span style="font-size:16px;font-weight:600;color:var(--muted);">mensuales</span></div>
+                <div class="erp-plan-tax">Mas ISV</div>
+                <ul class="erp-plan-list">
+                    <li>Todo lo anterior</li>
+                    <li>Contabilidad integrada</li>
+                    <li>Estados financieros</li>
+                    <li>Bancos y conciliaciones</li>
+                    <li>Auditoria</li>
+                    <li>Recursos humanos y planilla</li>
+                </ul>
+            </article>
+        </div>
+
+        <div class="erp-plans-footer">
+            <article class="erp-implementation-card">
+                <h4>Implementacion inicial</h4>
+                <ul class="erp-implementation-list">
+                    <li><span>Empresa pequeña</span><strong>L 8,000 + ISV</strong></li>
+                    <li><span>Empresa mediana</span><strong>L 12,000 + ISV</strong></li>
+                    <li><span>Empresa grande</span><strong>L 18,000 + ISV</strong></li>
+                </ul>
+            </article>
+            <article class="erp-contact-card">
+                <h4>Convirtelo en modulo activo</h4>
+                <p class="erp-card-muted">Te ayudamos a activar el plan correcto y a parametrizar tu empresa segun su operacion real. Tambien podemos cotizar CRM, citas o personalizaciones especiales.</p>
+                <div class="erp-contact-actions">
+                    <a class="erp-btn" href="https://wa.me/50495711923" target="_blank" rel="noopener">Hablar por WhatsApp</a>
+                    <a class="erp-btn-secondary" href="mailto:dosolutionshn@gmail.com">Solicitar propuesta</a>
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const modal = document.getElementById("erpPlansModal");
+    const triggers = document.querySelectorAll("[data-open-plans]");
+    const closers = document.querySelectorAll("[data-plans-close]");
+
+    function setPlansOpen(open){
+        if(!modal){
+            return;
+        }
+        modal.classList.toggle("is-open", open);
+        modal.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("erp-plans-open", open);
+    }
+
+    triggers.forEach(trigger => {
+        trigger.addEventListener("click", function(event){
+            event.preventDefault();
+            setPlansOpen(true);
+        });
+    });
+
+    closers.forEach(closer => {
+        closer.addEventListener("click", function(){
+            setPlansOpen(false);
+        });
+    });
+
+    document.addEventListener("keydown", function(event){
+        if(event.key === "Escape"){
+            setPlansOpen(false);
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Periodos Contables - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}Periodos Contables{% endblock %}
+{% block header_description %}Controla el cierre mensual para proteger asientos y reportes cuando un mes ya fue revisado.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'crear_periodo_contable' empresa.slug %}" class="erp-action-link">Nuevo Periodo</a>
+<a href="{% url 'contabilidad_dashboard' empresa.slug %}" class="erp-action-link">Volver a Contabilidad</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Periodos</div><p class="erp-stat-value">{{ resumen.total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Abiertos</div><p class="erp-stat-value">{{ resumen.abiertos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cerrados</div><p class="erp-stat-value">{{ resumen.cerrados }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Asientos</div><p class="erp-stat-value">{{ resumen.asientos }}</p></article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Calendario contable</h3>
+            <p class="erp-card-muted">Un periodo cerrado bloquea nuevos asientos y contabilizaciones dentro de ese mes.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Periodo</th>
+                    <th>Rango</th>
+                    <th>Estado</th>
+                    <th>Cerrado por</th>
+                    <th>Fecha cierre</th>
+                    <th>Control cierre</th>
+                    <th>Observacion</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for periodo in periodos %}
+                <tr>
+                    <td><strong>{{ periodo.mes }}/{{ periodo.anio }}</strong></td>
+                    <td>{{ periodo.fecha_inicio }} - {{ periodo.fecha_fin }}</td>
+                    <td><span class="erp-badge {% if periodo.estado == 'cerrado' %}danger{% else %}success{% endif %}">{{ periodo.get_estado_display }}</span></td>
+                    <td>{{ periodo.cerrado_por.username|default:"-" }}</td>
+                    <td>{{ periodo.fecha_cierre|default:"-" }}</td>
+                    <td>
+                        {% if periodo.control_cierre.total %}
+                        <span class="erp-badge warning">{{ periodo.control_cierre.total }} pendiente(s)</span>
+                        <div class="erp-card-muted">{{ periodo.control_cierre.asientos_borrador }} asientos / {{ periodo.control_cierre.movimientos_bancarios }} bancos / {{ periodo.control_cierre.movimientos_sin_conciliar }} sin conciliar</div>
+                        {% else %}
+                        <span class="erp-badge success">Listo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ periodo.observacion|default:"-"|truncatechars:80 }}</td>
+                    <td class="actions">
+                        <a class="erp-link" href="{% url 'checklist_cierre_periodo' empresa.slug periodo.id %}">Checklist</a>
+                        <a class="erp-link" href="{% url 'editar_periodo_contable' empresa.slug periodo.id %}">Editar</a>
+                        {% if periodo.estado == "cerrado" %}
+                        <a class="erp-link" href="{% url 'abrir_periodo_contable' empresa.slug periodo.id %}">Abrir</a>
+                        {% else %}
+                        <a class="erp-link" href="{% url 'cerrar_periodo_contable' empresa.slug periodo.id %}">Cerrar</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty">Todavia no hay periodos contables creados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

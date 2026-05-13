@@ -1,0 +1,53 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Citas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Modulo de Citas{% endblock %}
+{% block header_title %}Calendario de Citas{% endblock %}
+{% block header_description %}Agenda citas por cliente, producto/servicio y responsable.{% endblock %}
+{% block topbar_actions %}
+{% if modo_agenda %}
+<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>
+{% else %}
+<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <form method="post" class="erp-form-shell">
+        {% csrf_token %}
+        <div class="erp-form-grid two">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="erp-form-actions"><button class="erp-btn" type="submit">Guardar Cita</button></div>
+    </form>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Cita</th><th>Cliente</th><th>Producto/Servicio</th><th>Fecha</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for cita in citas %}
+            <tr>
+                <td><strong>{{ cita.titulo }}</strong><small>{{ cita.responsable|default:"Sin responsable" }}</small></td>
+                <td>{{ cita.cliente.nombre }}</td>
+                <td>{{ cita.producto|default:"-" }}</td>
+                <td>{{ cita.fecha_hora|date:"d/m/Y H:i" }}</td>
+                <td>{{ cita.get_estado_display }}</td>
+                <td class="actions">{% if cita.whatsapp_url %}<a class="erp-link" target="_blank" href="{{ cita.whatsapp_url }}">Recordar WhatsApp</a>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="erp-empty">Aun no hay citas.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

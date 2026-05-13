@@ -1,0 +1,77 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Entrada {{ entrada.referencia }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Logistica{% endblock %}
+{% block header_title %}Entrada {{ entrada.referencia }}{% endblock %}
+{% block header_description %}Detalle del documento de ingreso y sus movimientos asociados en inventario.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'entradas_inventario_dashboard' empresa.slug %}">Volver a Entradas</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <div class="erp-info-grid">
+        <div class="erp-info-item"><div class="erp-info-label">Referencia</div><div class="erp-info-value">{{ entrada.referencia }}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Fecha</div><div class="erp-info-value">{{ entrada.fecha_documento }}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Estado</div><div class="erp-info-value">{% if entrada.estado == "aplicada" %}<span class="erp-badge success">Aplicada</span>{% else %}<span class="erp-badge warning">Borrador</span>{% endif %}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Unidades</div><div class="erp-info-value">{{ total_unidades|floatformat:2|intcomma }}</div></div>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Lineas del documento</h3>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Comentario</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for linea in entrada.lineas.all %}
+                <tr>
+                    <td>{{ linea.producto.nombre }}</td>
+                    <td class="amount">{{ linea.cantidad|floatformat:2|intcomma }}</td>
+                    <td>{{ linea.comentario|default:"-" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="erp-empty">Esta entrada no tiene lineas registradas.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% if movimientos %}
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Movimientos generados</h3>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Antes</th>
+                    <th>Despues</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.producto.nombre }}</td>
+                    <td class="amount">{{ movimiento.cantidad|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</td>
+                    <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

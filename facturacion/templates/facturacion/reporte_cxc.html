@@ -71,7 +71,7 @@ th:first-child, td:first-child{
 <!-- TOPBAR -->
 <div class="topbar">
     <h2>💰 Cuentas por Cobrar - {{ empresa.nombre }}</h2>
-    <a href="/{{ empresa.slug }}/dashboard/facturacion/">← Volver</a>
+    <a href="{% url 'facturacion_dashboard' empresa.slug %}">Volver al módulo</a>
 </div>
 
 <div class="container">

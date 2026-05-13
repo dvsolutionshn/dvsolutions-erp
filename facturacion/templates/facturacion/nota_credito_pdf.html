@@ -1,0 +1,130 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+@page { size: A4; margin: 22px; }
+body{ font-family: "Segoe UI", Arial, sans-serif; font-size:11px; color:#1f2937; }
+.topbar{ height:8px; background:linear-gradient(90deg,#0f2742,#c8a96a); margin-bottom:18px; border-radius:999px; }
+.header{ width:100%; border-bottom:1px solid #d9e1ec; padding-bottom:14px; }
+.left, .right{ display:inline-block; vertical-align:top; }
+.left{ width:58%; }
+.right{ width:41%; text-align:right; }
+.logo{ max-width:155px; max-height:78px; margin-bottom:8px; }
+.title{ font-size:22px; font-weight:700; color:#0f2742; margin:0 0 6px; }
+.muted{ color:#66758a; line-height:1.55; }
+.doc-box{ border:1px solid #cfd8e3; border-radius:14px; padding:14px; background:#f8fbff; }
+.doc-box .doc-title{ font-size:18px; font-weight:700; color:#0f2742; }
+.doc-box .doc-number{ font-size:15px; font-weight:700; margin-top:6px; }
+.grid{ margin-top:18px; width:100%; }
+.info-card{ display:inline-block; width:48.6%; vertical-align:top; margin-bottom:12px; border:1px solid #d9e1ec; border-radius:14px; padding:12px; background:#fff; }
+.label{ font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:#66758a; margin-bottom:6px; }
+.value{ font-size:13px; font-weight:600; color:#142033; }
+table{ width:100%; border-collapse:collapse; margin-top:18px; }
+th{ background:#f1f5f9; color:#41546d; font-size:10px; text-transform:uppercase; letter-spacing:.08em; padding:9px 8px; border-bottom:1px solid #d9e1ec; }
+td{ padding:9px 8px; border-bottom:1px solid #e7edf5; }
+.text-right{ text-align:right; }
+.comment{ margin-top:5px; font-size:9px; color:#66758a; }
+.summary{ margin-top:18px; }
+.summary-box{ width:42%; margin-left:auto; border:1px solid #d9e1ec; border-radius:14px; overflow:hidden; }
+.summary-row{ display:flex; justify-content:space-between; padding:9px 12px; border-bottom:1px solid #e7edf5; }
+.summary-row:last-child{ border-bottom:none; }
+.summary-row.total{ background:#0f2742; color:#fff; font-weight:700; font-size:13px; }
+.footer{ margin-top:20px; border-top:1px solid #d9e1ec; padding-top:10px; font-size:10px; color:#4a5c72; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="topbar"></div>
+
+<div class="header">
+    <div class="left">
+        {% if logo_url %}<img src="{{ logo_url }}" class="logo">{% endif %}
+        <div class="title">{{ empresa.nombre }}</div>
+        <div class="muted">
+            RTN: {{ empresa.rtn }}<br>
+            {{ empresa.direccion }}<br>
+            Tel: {{ empresa.telefono }}<br>
+            {{ empresa.correo }}
+        </div>
+    </div>
+    <div class="right">
+        <div class="doc-box">
+            <div class="doc-title">NOTA DE CREDITO</div>
+            <div class="doc-number">{{ nota.numero_nota|default:"Borrador" }}</div>
+            <div class="muted" style="margin-top:8px;">
+                Fecha: {{ nota.fecha_emision }}<br>
+                Factura origen: {{ nota.factura_origen.numero_factura|default:nota.factura_origen.id }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="info-card">
+        <div class="label">Cliente</div>
+        <div class="value">{{ nota.cliente.nombre }}</div>
+    </div>
+    <div class="info-card">
+        <div class="label">Estado</div>
+        <div class="value">{{ nota.get_estado_display }}</div>
+    </div>
+    <div class="info-card">
+        <div class="label">Motivo</div>
+        <div class="value">{{ nota.motivo|default:"-" }}</div>
+    </div>
+    <div class="info-card">
+        <div class="label">CAI</div>
+        <div class="value">{{ nota.cai_numero_historico|default:"Sin CAI asignado" }}</div>
+    </div>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Producto</th>
+            <th>Cant.</th>
+            <th class="text-right">Precio</th>
+            <th class="text-right">Desc.</th>
+            <th class="text-right">Impuesto</th>
+            <th class="text-right">Total</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for linea in nota.lineas.all %}
+        <tr>
+            <td>
+                <strong>{{ linea.producto.nombre }}</strong>
+                {% if linea.comentario %}<div class="comment">{{ linea.comentario }}</div>{% endif %}
+            </td>
+            <td>{{ linea.cantidad }}</td>
+            <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.precio_unitario|floatformat:2|intcomma }}</td>
+            <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</td>
+            <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</td>
+            <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div class="summary">
+    <div class="summary-box">
+        <div class="summary-row"><span>Descuento</span><strong>L. {{ resumen.descuento_total|floatformat:2|intcomma }}</strong></div>
+        <div class="summary-row"><span>Base 15%</span><strong>L. {{ resumen.base_15|floatformat:2|intcomma }}</strong></div>
+        <div class="summary-row"><span>Base 18%</span><strong>L. {{ resumen.base_18|floatformat:2|intcomma }}</strong></div>
+        <div class="summary-row"><span>ISV 15%</span><strong>L. {{ resumen.isv_15|floatformat:2|intcomma }}</strong></div>
+        <div class="summary-row"><span>ISV 18%</span><strong>L. {{ resumen.isv_18|floatformat:2|intcomma }}</strong></div>
+        <div class="summary-row total"><span>TOTAL</span><strong>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ nota.total|floatformat:2|intcomma }}</strong></div>
+    </div>
+</div>
+
+<div class="footer">
+    {% if nota.cai_numero_historico %}
+    CAI: {{ nota.cai_numero_historico }}<br>
+    Fecha limite: {{ nota.cai_fecha_limite_historico }}
+    {% else %}
+    Documento sin CAI historico asignado.
+    {% endif %}
+</div>
+</body>
+</html>

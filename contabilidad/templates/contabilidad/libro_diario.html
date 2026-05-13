@@ -1,0 +1,92 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Libro Diario - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Libro Diario{% endblock %}
+{% block header_description %}Consulta las partidas contabilizadas con trazabilidad por asiento, fecha, cuenta y origen del movimiento.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'mayor_cuenta' empresa.slug %}" class="erp-action-link">Mayor por Cuenta</a>
+<a href="{% url 'exportar_libro_diario_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
+<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros</h3>
+            <p class="erp-card-muted">Refina el libro por rango de fechas o cuenta contable.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="cuenta">Cuenta</label>
+            <select id="cuenta" name="cuenta">
+                <option value="">Todas las cuentas</option>
+                {% for cuenta in cuentas %}
+                <option value="{{ cuenta.id }}" {% if filtros.cuenta == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.codigo }} - {{ cuenta.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a href="{% url 'libro_diario' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Lineas</div><p class="erp-stat-value">{{ resumen.lineas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Partidas contabilizadas</h3>
+            <p class="erp-card-muted">Solo se incluyen asientos en estado contabilizado.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Asiento</th>
+                    <th>Cuenta</th>
+                    <th>Detalle</th>
+                    <th>Referencia</th>
+                    <th>Debe</th>
+                    <th>Haber</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in lineas %}
+                <tr>
+                    <td>{{ linea.asiento.fecha|date:"F j, Y" }}</td>
+                    <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug linea.asiento.id %}">{{ linea.asiento.numero|default:"Sin numero" }}</a></td>
+                    <td>{{ linea.cuenta.codigo }} - {{ linea.cuenta.nombre }}</td>
+                    <td>{{ linea.detalle|default:linea.asiento.descripcion }}</td>
+                    <td>{{ linea.asiento.referencia|default:"-" }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ linea.debe }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ linea.haber }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="erp-empty">No hay partidas contabilizadas con estos filtros.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

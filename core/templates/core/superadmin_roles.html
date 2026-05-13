@@ -1,0 +1,44 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}Roles{% endblock %}
+{% block header_title %}Roles del Sistema{% endblock %}
+{% block header_description %}Define exactamente que puede hacer cada empleado dentro del modulo de facturacion para vender acceso por perfil y no solo por usuario.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_rol_create' %}" class="erp-action-link">Nuevo Rol</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-table-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Rol</th>
+                    <th>Facturas</th>
+                    <th>Inventario</th>
+                    <th>Cobranza</th>
+                    <th>Pagos</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rol in roles %}
+                <tr>
+                    <td>{{ rol.nombre }}<br><small>{{ rol.codigo }}</small></td>
+                    <td>{% if rol.puede_facturas %}Si{% else %}No{% endif %}</td>
+                    <td>{% if rol.puede_inventario or rol.puede_compras %}Si{% else %}No{% endif %}</td>
+                    <td>{% if rol.puede_recibos or rol.puede_cxc %}Si{% else %}No{% endif %}</td>
+                    <td>{% if rol.puede_egresos or rol.puede_cxp %}Si{% else %}No{% endif %}</td>
+                    <td><span class="erp-badge {% if rol.activo %}success{% else %}danger{% endif %}">{% if rol.activo %}Activo{% else %}Inactivo{% endif %}</span></td>
+                    <td class="actions"><a class="erp-link" href="{% url 'superadmin_rol_edit' rol.id %}">Editar</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="erp-empty">Todavia no hay roles definidos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

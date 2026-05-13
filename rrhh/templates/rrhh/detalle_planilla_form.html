@@ -1,0 +1,90 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Editar detalle de planilla - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Planilla{% endblock %}
+{% block header_title %}Editar {{ detalle.empleado.nombre_completo }}{% endblock %}
+{% block header_description %}Ajusta valores por empleado: prestamos, deducciones, bonos, comisiones, horas extras y observaciones.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'ver_planilla' empresa.slug periodo.id %}">Volver a Planilla</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Empleado</div>
+        <p class="erp-stat-value">{{ detalle.empleado.nombre_completo }}</p>
+        <p>{{ detalle.empleado.puesto|default:"Sin puesto definido" }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Periodo</div>
+        <p class="erp-stat-value">{{ periodo.nombre }}</p>
+        <p>{{ periodo.fecha_inicio|date:"d/m/Y" }} - {{ periodo.fecha_fin|date:"d/m/Y" }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Devengado actual</div>
+        <p class="erp-stat-value">L. {{ detalle.total_devengado|floatformat:2|intcomma }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Neto actual</div>
+        <p class="erp-stat-value">L. {{ detalle.neto_pagar|floatformat:2|intcomma }}</p>
+    </article>
+</section>
+
+<section class="erp-form-card">
+    <form method="post" class="erp-form-shell" autocomplete="off">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="erp-message">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="erp-card-header">
+            <div>
+                <h3>Devengados</h3>
+                <p>El monto de horas extras se recalcula automaticamente al guardar.</p>
+            </div>
+        </div>
+        <div class="erp-form-grid three">
+            {% for field in form %}
+                {% if field.name == "dias_pagados" or field.name == "salario_base" or field.name == "horas_extra_diurnas" or field.name == "horas_extra_nocturnas" or field.name == "horas_extra_feriado" or field.name == "monto_horas_extra" or field.name == "bonos" or field.name == "comisiones" or field.name == "decimo_cuarto" %}
+                <div class="erp-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="erp-card-header">
+            <div>
+                <h3>Deducciones</h3>
+                <p>Aqui puedes ajustar prestamos, otras deducciones y deducciones legales si aplica.</p>
+            </div>
+        </div>
+        <div class="erp-form-grid three">
+            {% for field in form %}
+                {% if field.name == "ihss" or field.name == "rap" or field.name == "isr" or field.name == "prestamos" or field.name == "otras_deducciones" %}
+                <div class="erp-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="erp-field">
+            <label for="{{ form.observacion.id_for_label }}">{{ form.observacion.label }}</label>
+            {{ form.observacion }}
+            {% for error in form.observacion.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="erp-form-actions">
+            <a class="erp-btn-secondary" href="{% url 'ver_planilla' empresa.slug periodo.id %}">Cancelar</a>
+            <button class="erp-btn" type="submit">Guardar y Recalcular</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

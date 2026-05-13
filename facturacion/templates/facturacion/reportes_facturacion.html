@@ -1,4 +1,5 @@
 {% load humanize %}
+{% load custom_filters %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -109,7 +110,7 @@ tfoot td{
 
 <div class="topbar">
 <h2>📊 Reportes - {{ empresa.nombre }}</h2>
-<a href="/{{ empresa.slug }}/dashboard/facturacion/">← Volver</a>
+<a href="{% url 'facturacion_dashboard' empresa.slug %}">Volver al módulo</a>
 </div>
 
 <div class="container">
@@ -175,6 +176,8 @@ Limpiar
 <th>Exento</th>
 <th>Exonerado</th>
 
+<th>Descuento</th>
+
 <th>Total</th>
 <th>Saldo</th>
 <th>Estado</th>
@@ -201,6 +204,11 @@ Limpiar
 <td class="monto">L {{ r.base_exento|floatformat:2|intcomma }}</td>
 <td class="monto">L {{ r.base_exonerado|floatformat:2|intcomma }}</td>
 
+<!-- 🔥 DESCUENTO CORRECTO -->
+<td class="monto">
+L {{ f.lineas.all|sum_descuento|floatformat:2|intcomma }}
+</td>
+
 <td class="monto">L {{ f.total|floatformat:2|intcomma }}</td>
 <td class="monto">L {{ f.saldo_pendiente|floatformat:2|intcomma }}</td>
 
@@ -217,7 +225,7 @@ Limpiar
 </tr>
 {% endwith %}
 {% empty %}
-<tr><td colspan="13">Sin resultados</td></tr>
+<tr><td colspan="14">Sin resultados</td></tr>
 {% endfor %}
 
 </tbody>
@@ -234,6 +242,8 @@ Limpiar
 
 <td class="monto">L {{ total_exento|floatformat:2|intcomma }}</td>
 <td class="monto">L {{ total_exonerado|floatformat:2|intcomma }}</td>
+
+<td class="monto">L {{ total_descuento|floatformat:2|intcomma }}</td>
 
 <td class="monto">L {{ totales.total|floatformat:2|intcomma }}</td>
 <td class="monto">L {{ total_saldo|floatformat:2|intcomma }}</td>

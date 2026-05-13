@@ -1,0 +1,104 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Compra {{ compra.numero_compra }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Abastecimiento{% endblock %}
+{% block header_title %}Compra {{ compra.numero_compra }}{% endblock %}
+{% block header_description %}Detalle de la compra y movimientos de inventario asociados al documento.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Volver a Compras</a>
+{% if compra.estado == "borrador" %}
+<a class="erp-action-link" href="{% url 'editar_compra' empresa.slug compra.id %}">Editar Compra</a>
+<form method="post" action="{% url 'aplicar_compra' empresa.slug compra.id %}" style="display:inline;">{% csrf_token %}<button class="erp-action-link" type="submit" onclick="return confirm('Seguro que deseas aplicar esta compra al inventario?');">Aplicar Compra</button></form>
+<form method="post" action="{% url 'anular_compra' empresa.slug compra.id %}" style="display:inline;">{% csrf_token %}<button class="erp-action-link" type="submit" onclick="return confirm('Seguro que deseas anular esta compra?');">Anular Compra</button></form>
+{% elif compra.estado == "aplicada" %}
+<form method="post" action="{% url 'anular_compra' empresa.slug compra.id %}" style="display:inline;">{% csrf_token %}<button class="erp-action-link" type="submit" onclick="return confirm('Seguro que deseas anular esta compra? Esto revertira el inventario.');">Anular Compra</button></form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <div class="erp-info-grid">
+        <div class="erp-info-item"><div class="erp-info-label">Compra</div><div class="erp-info-value">{{ compra.numero_compra }}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Proveedor</div><div class="erp-info-value">{% if compra.proveedor %}<a class="erp-inline-link" href="{% url 'ver_proveedor_facturacion' empresa.slug compra.proveedor.id %}">{{ compra.proveedor_nombre }}</a>{% else %}{{ compra.proveedor_nombre }}{% endif %}{% if compra.proveedor and compra.proveedor.rtn %}<div class="erp-card-muted">RTN: {{ compra.proveedor.rtn }}</div>{% endif %}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Referencia</div><div class="erp-info-value">{{ compra.referencia_documento|default:"-" }}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Fecha</div><div class="erp-info-value">{{ compra.fecha_documento }}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Estado</div><div class="erp-info-value">{% if compra.estado == "aplicada" %}<span class="erp-badge success">Aplicada</span>{% elif compra.estado == "anulada" %}<span class="erp-badge danger">Anulada</span>{% else %}<span class="erp-badge warning">Borrador</span>{% endif %}</div></div>
+        <div class="erp-info-item"><div class="erp-info-label">Total</div><div class="erp-info-value">L. {{ compra.total_documento|floatformat:2|intcomma }}</div></div>
+    </div>
+</section>
+
+{% if compra.estado == "aplicada" %}
+<section class="erp-card">
+    <p class="erp-card-muted" style="margin:0;">Esta compra ya fue aplicada al inventario. Por seguridad, el documento queda bloqueado para edición directa.</p>
+</section>
+{% elif compra.estado == "anulada" %}
+<section class="erp-card">
+    <p class="erp-card-muted" style="margin:0;">Esta compra fue anulada. Si ya estaba aplicada, el inventario fue revertido y el documento queda cerrado.</p>
+</section>
+{% else %}
+<section class="erp-card">
+    <p class="erp-card-muted" style="margin:0;">Esta compra sigue en borrador. Puedes editarla o aplicarla cuando confirmes cantidades y costos.</p>
+</section>
+{% endif %}
+
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Lineas de compra</h3>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Costo Unitario</th>
+                    <th>Total</th>
+                    <th>Comentario</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for linea in compra.lineas.all %}
+                <tr>
+                    <td>{{ linea.producto.nombre }}</td>
+                    <td class="amount">{{ linea.cantidad|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ linea.costo_unitario|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ linea.total_linea|floatformat:2|intcomma }}</td>
+                    <td>{{ linea.comentario|default:"-" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="erp-empty">Esta compra no tiene líneas registradas.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% if movimientos %}
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Movimientos generados</h3>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Antes</th>
+                    <th>Despues</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.producto.nombre }}</td>
+                    <td class="amount">{{ movimiento.cantidad|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</td>
+                    <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

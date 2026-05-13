@@ -1,0 +1,51 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Registra un pago comercial y deja que el sistema extienda automaticamente la licencia de la empresa.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_empresa_detail' empresa_obj.id %}" class="erp-action-link">Volver a Empresa</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Empresa</div>
+        <p class="erp-stat-value" style="font-size:24px;">{{ empresa_obj.nombre }}</p>
+        <p class="erp-card-muted">Plan actual: {{ empresa_obj.plan_comercial.nombre|default:"Sin plan" }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Estado actual</div>
+        <p class="erp-stat-value" style="font-size:24px;">{{ empresa_obj.estado_licencia_resuelto|capfirst }}</p>
+        <p class="erp-card-muted">Vence: {{ empresa_obj.fecha_vencimiento_plan|date:"F j, Y"|default:"Sin fecha" }}</p>
+    </article>
+</section>
+
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="erp-field-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <section class="erp-form-card">
+        <h3>Pago de licencia</h3>
+        <p>Si registras un pago, la empresa pasa a estado activo y el sistema extiende su vencimiento automaticamente.</p>
+        <div class="erp-form-grid">
+            {% for field in form %}
+            <div class="erp-field {% if field.name == 'observacion' %}erp-field-span-full{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="erp-form-actions">
+        <a href="{% url 'superadmin_empresa_detail' empresa_obj.id %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Pago</button>
+    </div>
+</form>
+{% endblock %}

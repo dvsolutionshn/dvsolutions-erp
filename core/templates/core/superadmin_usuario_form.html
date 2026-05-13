@@ -1,0 +1,49 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Crea o actualiza usuarios internos, define su empresa y asigna roles operativos de forma controlada.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_usuarios' %}" class="erp-action-link">Volver a Usuarios</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="erp-field-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <section class="erp-form-card">
+        <h3>Cuenta y acceso</h3>
+        <p>Desde aqui controlas el usuario real del sistema sin abrir el admin tecnico de Django.</p>
+        <div class="erp-form-grid">
+            {% for field in form %}
+                {% if field.name != 'groups' %}
+                <div class="erp-field {% if field.name == 'username' or field.name == 'email' %}erp-field-span-full{% endif %}">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {{ field.errors }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="erp-form-card">
+        <h3>Roles</h3>
+        <p>Los roles usan grupos de Django para que tengas una base flexible y escalable a futuro.</p>
+        <div class="erp-soft-panel">
+            {{ form.groups }}
+            {{ form.groups.errors }}
+        </div>
+    </section>
+
+    <div class="erp-form-actions">
+        <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Usuario</button>
+    </div>
+</form>
+{% endblock %}

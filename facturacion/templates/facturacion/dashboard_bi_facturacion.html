@@ -1,0 +1,759 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Dashboard BI - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Business Intelligence{% endblock %}
+{% block header_title %}Dashboard BI de Facturación{% endblock %}
+{% block header_description %}Tablero ejecutivo construido desde la operación del ERP para leer ventas, cobranza, cartera y comportamiento comercial en una sola vista.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'reportes_facturacion' empresa.slug %}?{{ request.GET.urlencode }}">Volver a reportes</a>
+<a class="erp-action-link" href="/{{ empresa.slug }}/dashboard/facturacion/reportes/excel/?{{ request.GET.urlencode }}">Exportar Excel</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-bi-shell{
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
+.erp-bi-header{
+    display:grid;
+    grid-template-columns:minmax(0, 1.1fr) minmax(340px, .9fr);
+    gap:18px;
+}
+.erp-bi-header-copy h3{
+    margin:10px 0 8px;
+    font-size:36px;
+    line-height:1.08;
+    color:#102338;
+}
+.erp-bi-header-copy p{
+    margin:0;
+    color:var(--muted);
+    line-height:1.75;
+    max-width:760px;
+}
+.erp-bi-filter-strip{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:18px;
+}
+.erp-bi-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:#173a66;
+    font-size:12px;
+    font-weight:700;
+}
+.erp-bi-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:14px;
+}
+.erp-bi-kpi{
+    position:relative;
+    overflow:hidden;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:linear-gradient(180deg, #ffffff, #f9fbff);
+    padding:18px;
+}
+.erp-bi-kpi::before{
+    content:"";
+    position:absolute;
+    left:18px;
+    top:0;
+    width:120px;
+    height:5px;
+    border-radius:999px;
+    background:var(--accent, #2968f2);
+}
+.erp-bi-kpi-label{
+    display:block;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    font-size:11px;
+    color:#64748b;
+    margin-bottom:12px;
+}
+.erp-bi-kpi-value{
+    font-size:40px;
+    line-height:1;
+    font-weight:800;
+    color:#102338;
+}
+.erp-bi-kpi-meta{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:18px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+}
+.erp-bi-kpi-meta strong{
+    display:block;
+    color:#102338;
+    font-size:23px;
+}
+.erp-bi-kpi-meta span{
+    color:var(--muted);
+    font-size:13px;
+}
+.erp-bi-trend{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-top:12px;
+    font-weight:700;
+}
+.erp-bi-trend.up{ color:#16a34a; }
+.erp-bi-trend.down{ color:#dc2626; }
+.erp-bi-main-grid{
+    display:grid;
+    grid-template-columns:1.15fr .85fr;
+    gap:18px;
+}
+.erp-bi-panel{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+.erp-bi-card{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+    padding:18px;
+    box-shadow:var(--shadow-soft);
+}
+.erp-bi-card h4{
+    margin:0;
+    font-size:18px;
+    color:#102338;
+}
+.erp-bi-card p{
+    margin:6px 0 0;
+    color:var(--muted);
+    line-height:1.6;
+    font-size:13px;
+}
+.erp-bi-bars{
+    display:flex;
+    align-items:flex-end;
+    gap:14px;
+    min-height:280px;
+    padding-top:18px;
+}
+.erp-bi-bar-col{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+}
+.erp-bi-bar-top{
+    font-size:11px;
+    color:#102338;
+    font-weight:700;
+    text-align:center;
+}
+.erp-bi-bar-stack{
+    width:100%;
+    max-width:84px;
+    min-height:24px;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
+    gap:4px;
+}
+.erp-bi-bar-main,
+.erp-bi-bar-secondary{
+    width:100%;
+    border-radius:14px 14px 8px 8px;
+}
+.erp-bi-bar-main{
+    background:linear-gradient(180deg, #2968f2, #8bb5ff);
+    min-height:18px;
+}
+.erp-bi-bar-secondary{
+    background:linear-gradient(180deg, #14b8a6, #a7f3d0);
+    min-height:8px;
+}
+.erp-bi-bar-label{
+    text-align:center;
+    font-size:11px;
+    color:var(--muted);
+    line-height:1.4;
+}
+.erp-bi-donut-wrap{
+    display:grid;
+    grid-template-columns:180px minmax(0,1fr);
+    gap:18px;
+    align-items:center;
+    margin-top:12px;
+}
+.erp-bi-donut{
+    width:180px;
+    height:180px;
+    border-radius:999px;
+    position:relative;
+    margin:auto;
+}
+.erp-bi-donut::after{
+    content:"";
+    position:absolute;
+    inset:34px;
+    border-radius:999px;
+    background:#fff;
+    box-shadow:inset 0 0 0 1px #eef3fa;
+}
+.erp-bi-donut-center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    z-index:1;
+}
+.erp-bi-donut-center strong{
+    font-size:28px;
+    color:#102338;
+}
+.erp-bi-donut-center span{
+    font-size:12px;
+    color:var(--muted);
+}
+.erp-bi-legend{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+.erp-bi-legend-item{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:10px;
+    align-items:center;
+}
+.erp-bi-legend-dot{
+    width:12px;
+    height:12px;
+    border-radius:999px;
+}
+.erp-bi-legend-label{
+    color:#102338;
+    font-weight:700;
+}
+.erp-bi-legend-value{
+    color:#102338;
+    font-weight:800;
+}
+.erp-bi-ranking{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    margin-top:14px;
+}
+.erp-bi-ranking-row{
+    display:grid;
+    grid-template-columns:minmax(150px, 190px) minmax(0,1fr) auto;
+    gap:12px;
+    align-items:center;
+}
+.erp-bi-ranking-meta{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+.erp-bi-ranking-meta strong{
+    color:#102338;
+    font-size:13px;
+}
+.erp-bi-ranking-meta small{
+    color:var(--muted);
+    line-height:1.4;
+}
+.erp-bi-track{
+    height:10px;
+    border-radius:999px;
+    background:#edf3fb;
+    overflow:hidden;
+}
+.erp-bi-fill{
+    height:100%;
+    border-radius:999px;
+    background:linear-gradient(90deg, #2968f2, #4a8cf8);
+}
+.erp-bi-ranking-value{
+    text-align:right;
+    min-width:120px;
+    font-weight:800;
+    color:#102338;
+}
+.erp-bi-compact-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:18px;
+}
+.erp-bi-compare{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    margin-top:14px;
+}
+.erp-bi-compare-row{
+    display:grid;
+    grid-template-columns:110px minmax(0,1fr) auto;
+    gap:12px;
+    align-items:center;
+}
+.erp-bi-compare-label{
+    color:#102338;
+    font-weight:700;
+    font-size:12px;
+}
+.erp-bi-compare-bars{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+.erp-bi-mini-bar{
+    position:relative;
+    height:12px;
+    border-radius:999px;
+    background:#edf3fb;
+    overflow:hidden;
+}
+.erp-bi-mini-bar-fill{
+    position:absolute;
+    inset:0 auto 0 0;
+    border-radius:999px;
+}
+.erp-bi-mini-bar-fill.facturado{
+    background:linear-gradient(90deg, #2968f2, #7ca7ff);
+}
+.erp-bi-mini-bar-fill.cobrado{
+    background:linear-gradient(90deg, #14b8a6, #8de3d6);
+}
+.erp-bi-compare-value{
+    min-width:132px;
+    text-align:right;
+    color:#102338;
+    font-weight:800;
+    font-size:12px;
+    line-height:1.5;
+}
+.erp-bi-compare-legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-top:6px;
+}
+.erp-bi-compare-legend span{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    color:var(--muted);
+    font-size:12px;
+    font-weight:700;
+}
+.erp-bi-compare-legend i{
+    display:inline-block;
+    width:10px;
+    height:10px;
+    border-radius:999px;
+}
+.erp-bi-tax-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:14px;
+    margin-top:14px;
+}
+.erp-bi-tax-card{
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:14px;
+    background:#fbfdff;
+}
+.erp-bi-tax-card strong{
+    display:block;
+    color:#102338;
+    font-size:15px;
+}
+.erp-bi-tax-card span{
+    display:block;
+    margin-top:6px;
+    color:var(--muted);
+    font-size:12px;
+}
+.erp-bi-tax-progress{
+    margin-top:10px;
+    height:8px;
+    border-radius:999px;
+    background:#edf3fb;
+    overflow:hidden;
+}
+.erp-bi-tax-progress div{
+    height:100%;
+    border-radius:999px;
+}
+.erp-bi-highlight{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:linear-gradient(180deg, #ffffff, #f9fbff);
+    padding:16px 18px;
+}
+.erp-bi-highlight strong{
+    display:block;
+    font-size:28px;
+    color:#102338;
+}
+.erp-bi-highlight span{
+    color:var(--muted);
+    font-size:13px;
+}
+@media (max-width: 1180px){
+    .erp-bi-header,
+    .erp-bi-main-grid{
+        grid-template-columns:1fr;
+    }
+}
+@media (max-width: 760px){
+    .erp-bi-kpi-grid,
+    .erp-bi-compact-grid,
+    .erp-bi-donut-wrap,
+    .erp-bi-tax-grid{
+        grid-template-columns:1fr;
+    }
+    .erp-bi-ranking-row,
+    .erp-bi-compare-row{
+        grid-template-columns:1fr;
+    }
+    .erp-bi-ranking-value,
+    .erp-bi-compare-value{
+        text-align:left;
+        min-width:0;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-bi-shell">
+    <section class="erp-card erp-bi-header">
+        <div class="erp-bi-header-copy">
+            <div class="erp-kpi-label">Panel ejecutivo</div>
+            <h3>Lectura inteligente de la facturación en una sola vista.</h3>
+            <p>Monitorea ventas, cartera, ticket promedio, ritmo de cobro y liderazgo comercial con un tablero ejecutivo construido directamente desde la operación del ERP.</p>
+            <div class="erp-bi-filter-strip">
+                <span class="erp-bi-chip">Empresa: {{ empresa.nombre }}</span>
+                <span class="erp-bi-chip">Mes actual: {{ inicio_mes_actual|date:"M Y" }}</span>
+                <span class="erp-bi-chip">Documentos visibles: {{ facturas|length }}</span>
+                <span class="erp-bi-chip">Tasa de cobro: {{ kpis_bi.tasa_cobro|floatformat:1 }}%</span>
+            </div>
+        </div>
+        <div class="erp-bi-kpi-grid">
+            <article class="erp-bi-kpi" style="--accent:#2968f2;">
+                <span class="erp-bi-kpi-label">Facturación del mes</span>
+                <div class="erp-bi-kpi-value">L. {{ kpis_bi.total_actual|floatformat:0|intcomma }}</div>
+                <div class="erp-bi-trend {% if kpis_bi.variacion_total >= 0 %}up{% else %}down{% endif %}">
+                    <span>{% if kpis_bi.variacion_total >= 0 %}&#9650;{% else %}&#9660;{% endif %}</span>
+                    <span>{{ kpis_bi.variacion_total|floatformat:2 }}%</span>
+                </div>
+                <div class="erp-bi-kpi-meta">
+                    <div>
+                        <strong>L. {{ kpis_bi.total_actual|floatformat:0|intcomma }}</strong>
+                        <span>Mes actual</span>
+                    </div>
+                    <div>
+                        <strong>L. {{ kpis_bi.total_anterior|floatformat:0|intcomma }}</strong>
+                        <span>Mes anterior</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="erp-bi-kpi" style="--accent:#14b8a6;">
+                <span class="erp-bi-kpi-label">Documentos emitidos</span>
+                <div class="erp-bi-kpi-value">{{ kpis_bi.docs_actual }}</div>
+                <div class="erp-bi-trend {% if kpis_bi.variacion_docs >= 0 %}up{% else %}down{% endif %}">
+                    <span>{% if kpis_bi.variacion_docs >= 0 %}&#9650;{% else %}&#9660;{% endif %}</span>
+                    <span>{{ kpis_bi.variacion_docs|floatformat:2 }}%</span>
+                </div>
+                <div class="erp-bi-kpi-meta">
+                    <div>
+                        <strong>{{ kpis_bi.docs_actual }}</strong>
+                        <span>Mes actual</span>
+                    </div>
+                    <div>
+                        <strong>{{ kpis_bi.docs_anterior }}</strong>
+                        <span>Mes anterior</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="erp-bi-kpi" style="--accent:#f97316;">
+                <span class="erp-bi-kpi-label">Documentos cobrados</span>
+                <div class="erp-bi-kpi-value">{{ kpis_bi.docs_pagados_actual }}</div>
+                <div class="erp-bi-trend {% if kpis_bi.variacion_pagados >= 0 %}up{% else %}down{% endif %}">
+                    <span>{% if kpis_bi.variacion_pagados >= 0 %}&#9650;{% else %}&#9660;{% endif %}</span>
+                    <span>{{ kpis_bi.variacion_pagados|floatformat:2 }}%</span>
+                </div>
+                <div class="erp-bi-kpi-meta">
+                    <div>
+                        <strong>{{ kpis_bi.docs_pagados_actual }}</strong>
+                        <span>Mes actual</span>
+                    </div>
+                    <div>
+                        <strong>{{ kpis_bi.docs_pagados_anterior }}</strong>
+                        <span>Mes anterior</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="erp-bi-kpi" style="--accent:#8b5cf6;">
+                <span class="erp-bi-kpi-label">Ticket promedio</span>
+                <div class="erp-bi-kpi-value">L. {{ kpis_bi.ticket_promedio|floatformat:0|intcomma }}</div>
+                <div class="erp-bi-trend up">
+                    <span>&#9679;</span>
+                    <span>Saldo actual: L. {{ kpis_bi.saldo_total|floatformat:0|intcomma }}</span>
+                </div>
+                <div class="erp-bi-kpi-meta">
+                    <div>
+                        <strong>L. {{ kpis_bi.cobrado_total|floatformat:0|intcomma }}</strong>
+                        <span>Cobrado</span>
+                    </div>
+                    <div>
+                        <strong>{{ kpis_bi.tasa_cobro|floatformat:1 }}%</strong>
+                        <span>Conversión</span>
+                    </div>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section class="erp-bi-main-grid">
+        <section class="erp-bi-panel">
+            <article class="erp-bi-card">
+                <h4>Ventas y cartera por mes</h4>
+                <p>Compara el ritmo de facturación mensual con el saldo pendiente que deja cada periodo visible.</p>
+                <div class="erp-bi-bars">
+                    {% for item in bi_interno.ventas_mensuales %}
+                    <div class="erp-bi-bar-col">
+                        <div class="erp-bi-bar-top">L. {{ item.total|floatformat:0|intcomma }}</div>
+                        <div class="erp-bi-bar-stack">
+                            <div class="erp-bi-bar-main" style="height:{{ item.ancho|floatformat:0 }}%;"></div>
+                            <div class="erp-bi-bar-secondary" style="height:{% widthratio item.saldo item.total 100 %}%;"></div>
+                        </div>
+                        <div class="erp-bi-bar-label">{{ item.periodo|date:"M Y" }}<br>{{ item.documentos }} docs</div>
+                    </div>
+                    {% empty %}
+                    <div class="erp-bi-empty" style="width:100%;">Todavía no hay meses suficientes para construir la serie histórica.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="erp-bi-card">
+                <h4>Cobrado vs facturado</h4>
+                <p>Compara cada mes el volumen emitido contra el dinero efectivamente cobrado dentro de la misma ventana de análisis.</p>
+                <div class="erp-bi-compare-legend">
+                    <span><i style="background:#2968f2;"></i>Facturado</span>
+                    <span><i style="background:#14b8a6;"></i>Cobrado</span>
+                </div>
+                <div class="erp-bi-compare">
+                    {% for item in comparativo_cobro %}
+                    <div class="erp-bi-compare-row">
+                        <div class="erp-bi-compare-label">{{ item.periodo|date:"M Y" }}</div>
+                        <div class="erp-bi-compare-bars">
+                            <div class="erp-bi-mini-bar">
+                                <div class="erp-bi-mini-bar-fill facturado" style="width:{{ item.ancho_facturado|floatformat:0 }}%;"></div>
+                            </div>
+                            <div class="erp-bi-mini-bar">
+                                <div class="erp-bi-mini-bar-fill cobrado" style="width:{{ item.ancho_cobrado|floatformat:0 }}%;"></div>
+                            </div>
+                        </div>
+                        <div class="erp-bi-compare-value">
+                            F: L. {{ item.facturado|floatformat:0|intcomma }}<br>
+                            C: L. {{ item.cobrado|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="erp-bi-empty">Todavía no hay meses suficientes para comparar cobro contra facturación.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="erp-bi-card">
+                <h4>Rendimiento comercial</h4>
+                <p>Ranking de clientes con mayor ingreso y vendedores con mayor facturación dentro de la vista actual.</p>
+                <div class="erp-bi-compact-grid" style="margin-top:14px;">
+                    <div>
+                        <div class="erp-kpi-label">Clientes top</div>
+                        <div class="erp-bi-ranking">
+                            {% for item in bi_interno.top_clientes %}
+                            <div class="erp-bi-ranking-row">
+                                <div class="erp-bi-ranking-meta">
+                                    <strong>{{ item.nombre }}</strong>
+                                    <small>{{ item.documentos }} documento{{ item.documentos|pluralize }}</small>
+                                </div>
+                                <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                                <div class="erp-bi-ranking-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                            </div>
+                            {% empty %}
+                            <div class="erp-bi-empty">Sin clientes suficientes para construir el ranking.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="erp-kpi-label">Ventas por vendedor</div>
+                        <div class="erp-bi-ranking">
+                            {% for item in ventas_por_vendedor %}
+                            <div class="erp-bi-ranking-row">
+                                <div class="erp-bi-ranking-meta">
+                                    <strong>{{ item.nombre }}</strong>
+                                    <small>{{ item.documentos }} documento{{ item.documentos|pluralize }}</small>
+                                </div>
+                                <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                                <div class="erp-bi-ranking-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                            </div>
+                            {% empty %}
+                            <div class="erp-bi-empty">Sin vendedores suficientes para construir el ranking.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <section class="erp-bi-panel">
+            <article class="erp-bi-card">
+                <h4>Estado de cobranza</h4>
+                <p>Distribución económica del total visible según su estado de cobro.</p>
+                <div class="erp-bi-donut-wrap">
+                    <div class="erp-bi-donut" style="background:{{ estado_cobro_donut }};">
+                        <div class="erp-bi-donut-center">
+                            <strong>{{ facturas|length }}</strong>
+                            <span>documentos</span>
+                        </div>
+                    </div>
+                    <div class="erp-bi-legend">
+                        {% for item in estado_cobro_segmentos %}
+                        <div class="erp-bi-legend-item">
+                            <span class="erp-bi-legend-dot" style="background:{{ item.color }};"></span>
+                            <div>
+                                <div class="erp-bi-legend-label">{{ item.etiqueta }}</div>
+                                <small>{{ item.cantidad }} factura{{ item.cantidad|pluralize }}</small>
+                            </div>
+                            <div class="erp-bi-legend-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </article>
+
+            <article class="erp-bi-card">
+                <h4>Productos más vendidos</h4>
+                <p>Identifica qué productos están moviendo más ingreso dentro del periodo seleccionado.</p>
+                <div class="erp-bi-ranking">
+                    {% for item in bi_interno.top_productos %}
+                    <div class="erp-bi-ranking-row">
+                        <div class="erp-bi-ranking-meta">
+                            <strong>{{ item.nombre }}</strong>
+                            <small>{{ item.cantidad|floatformat:2 }} unidades</small>
+                        </div>
+                        <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                        <div class="erp-bi-ranking-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                    </div>
+                    {% empty %}
+                    <div class="erp-bi-empty">Sin líneas suficientes para construir el ranking de productos.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="erp-bi-card">
+                <h4>Ingresos por banco y caja</h4>
+                <p>Lectura financiera para identificar por qué cuentas está ingresando el dinero de la operación diaria.</p>
+                <div class="erp-bi-ranking">
+                    {% for item in ingresos_por_banco %}
+                    <div class="erp-bi-ranking-row">
+                        <div class="erp-bi-ranking-meta">
+                            <strong>{{ item.nombre }}</strong>
+                            <small>{{ item.tipo|title }} · {{ item.operaciones }} operación{{ item.operaciones|pluralize:"es" }}</small>
+                        </div>
+                        <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                        <div class="erp-bi-ranking-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                    </div>
+                    {% empty %}
+                    <div class="erp-bi-empty">Todavía no hay pagos asociados a cuentas financieras visibles.</div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="erp-bi-card">
+                <h4>Cobranza por cajero</h4>
+                <p>Lectura operativa de quién está registrando la mayor cantidad de ingresos en caja.</p>
+                <div class="erp-bi-ranking">
+                    {% for item in cobranza_por_cajero %}
+                    <div class="erp-bi-ranking-row">
+                        <div class="erp-bi-ranking-meta">
+                            <strong>{{ item.nombre }}</strong>
+                            <small>{{ item.operaciones }} operación{{ item.operaciones|pluralize:"es" }}</small>
+                        </div>
+                        <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                        <div class="erp-bi-ranking-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                    </div>
+                    {% empty %}
+                    <div class="erp-bi-empty">Todavía no hay pagos suficientes para consolidar la cobranza por cajero.</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+    </section>
+
+    <section class="erp-bi-compact-grid">
+        <article class="erp-bi-card">
+            <h4>Clientes con saldo vencido</h4>
+            <p>Prioriza la gestión de cobro viendo quiénes concentran la cartera más atrasada y cuántos días acumulan.</p>
+            <div class="erp-bi-ranking">
+                {% for item in clientes_con_saldo_vencido %}
+                <div class="erp-bi-ranking-row">
+                    <div class="erp-bi-ranking-meta">
+                        <strong>{{ item.nombre }}</strong>
+                        <small>{{ item.documentos }} documento{{ item.documentos|pluralize }} · {{ item.dias_vencido }} días vencido{{ item.dias_vencido|pluralize }}</small>
+                    </div>
+                    <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                    <div class="erp-bi-ranking-value">L. {{ item.saldo|floatformat:2|intcomma }}</div>
+                </div>
+                {% empty %}
+                <div class="erp-bi-empty">La cartera visible no tiene documentos vencidos en este momento.</div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="erp-bi-card">
+            <h4>Composición fiscal visible</h4>
+            <p>Resume rápidamente cómo está distribuida la facturación actual entre bases imponibles, exentos y componentes de ISV.</p>
+            <div class="erp-bi-highlight">
+                <strong>L. {{ total_impuestos_visual|floatformat:2|intcomma }}</strong>
+                <span>Volumen total representado por la mezcla fiscal de la vista actual.</span>
+            </div>
+            <div class="erp-bi-tax-grid">
+                {% for item in mezcla_impuestos %}
+                <div class="erp-bi-tax-card">
+                    <strong>{{ item.etiqueta }}</strong>
+                    <span>L. {{ item.total|floatformat:2|intcomma }} · {{ item.porcentaje|floatformat:1 }}%</span>
+                    <div class="erp-bi-tax-progress"><div style="width:{{ item.porcentaje|floatformat:0 }}%; background:{{ item.color }};"></div></div>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+</section>
+{% endblock %}

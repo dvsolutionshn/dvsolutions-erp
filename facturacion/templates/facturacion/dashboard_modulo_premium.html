@@ -1,0 +1,42 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Facturación - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Módulo Financiero{% endblock %}
+{% block header_title %}Facturación{% endblock %}
+{% block header_description %}Gestión comercial y fiscal con una interfaz coherente, operativa y lista para una ejecución de alto nivel.{% endblock %}
+
+{% block content %}
+<div style="display:none;">Facturación Notas de Crédito</div>
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Operación</div>
+        <div class="erp-stat-value">360</div>
+        <p class="erp-card-muted">Facturación, ajustes, cobranza y reportes integrados en un mismo entorno operativo.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Fiscal</div>
+        <div class="erp-stat-value">CAI</div>
+        <p class="erp-card-muted">Control documental y trazabilidad histórica listos para crecimiento regulado.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cobranza</div>
+        <div class="erp-stat-value">CxC</div>
+        <p class="erp-card-muted">Seguimiento fino de saldos, recibos y comportamiento real de pago.</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    <a class="erp-card erp-module-card" href="{% url 'facturas_dashboard' empresa.slug %}"><div class="erp-kpi-label">Operación</div><h3>Facturación</h3><p>Crear, emitir, revisar y administrar facturas con máxima claridad operativa.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'clientes_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catálogo</div><h3>Clientes</h3><p>Gestión de clientes y datos fiscales bajo un estándar visual institucional.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'productos_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catálogo</div><h3>Productos</h3><p>Base comercial lista para evolucionar hacia inventario y control de costos.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'proveedores_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catálogo</div><h3>Proveedores</h3><p>Base de abastecimiento para compras, contactos y crecimiento hacia cuentas por pagar.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'inventario_facturacion' empresa.slug %}"><div class="erp-kpi-label">Inventario</div><h3>Inventario</h3><p>Existencias, ajustes y movimientos iniciales conectados con facturación.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'compras_dashboard' empresa.slug %}"><div class="erp-kpi-label">Abastecimiento</div><h3>Compras</h3><p>Documentos de compra conectados con el ingreso real de existencias al inventario.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'cai_facturacion' empresa.slug %}"><div class="erp-kpi-label">Fiscal</div><h3>CAI</h3><p>Administración fina de rangos fiscales y correlativos con trazabilidad histórica.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'impuestos_facturacion' empresa.slug %}"><div class="erp-kpi-label">Fiscal</div><h3>Impuestos</h3><p>Configuración tributaria lista para facturación, ajustes y evolución contable.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'notas_credito_dashboard' empresa.slug %}"><div class="erp-kpi-label">Ajustes</div><h3>Notas de Crédito</h3><p>Documentos de ajuste conectados con factura origen y saldo disponible real.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'recibos_dashboard' empresa.slug %}"><div class="erp-kpi-label">Cobranza</div><h3>Recibos</h3><p>Comprobantes de pago formales vinculados con facturas y clientes.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'reportes_facturacion' empresa.slug %}"><div class="erp-kpi-label">Analítica</div><h3>Reportes</h3><p>Lectura ejecutiva de ventas, impuestos y desempeño financiero.</p></a>
+    <a class="erp-card erp-module-card" href="{% url 'reporte_cxc' empresa.slug %}"><div class="erp-kpi-label">Cobranza</div><h3>Cuentas por Cobrar</h3><p>Seguimiento a saldos pendientes y antigüedad de cartera por cliente.</p></a>
+</section>
+{% endblock %}

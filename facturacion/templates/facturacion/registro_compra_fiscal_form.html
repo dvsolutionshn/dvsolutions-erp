@@ -1,0 +1,110 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Crear Libro de Compras Nuevo - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Fiscal{% endblock %}
+{% block header_title %}Crear Libro de Compras Nuevo{% endblock %}
+{% block header_description %}Agrega una factura al libro mensual con captura horizontal rapida y calculo automatico de ISV y total.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'libro_compras_fiscal' empresa.slug %}">Volver al Libro</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-card">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="erp-alert danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {{ form.proveedor.as_hidden }}
+    {{ form.proveedor_rtn.as_hidden }}
+    {{ form.cai.as_hidden }}
+    {{ form.subtotal.as_hidden }}
+    {{ form.exonerado.as_hidden }}
+    {{ form.observacion.as_hidden }}
+
+    <section class="erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Linea del libro</h3>
+                <p class="erp-card-muted">Llena la factura en una sola linea. El sistema calcula automaticamente ISV 15%, ISV 18% y total factura.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap erp-ledger-entry-wrap">
+            <table class="erp-table erp-ledger-entry-table">
+                <thead>
+                    <tr>
+                        <th>Anio</th>
+                        <th>Mes</th>
+                        <th>Fecha</th>
+                        <th>Nombre proveedor</th>
+                        <th>Numero factura</th>
+                        <th>Sub total exento</th>
+                        <th>Sub total 15%</th>
+                        <th>Sub total 18%</th>
+                        <th>ISV 15%</th>
+                        <th>ISV 18%</th>
+                        <th>Total factura</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ form.periodo_anio }}{% for error in form.periodo_anio.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.periodo_mes }}{% for error in form.periodo_mes.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.fecha_documento }}{% for error in form.fecha_documento.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.proveedor_nombre }}{% for error in form.proveedor_nombre.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.numero_factura }}{% for error in form.numero_factura.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.exento }}{% for error in form.exento.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.base_15 }}{% for error in form.base_15.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.base_18 }}{% for error in form.base_18.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.isv_15 }}{% for error in form.isv_15.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.isv_18 }}{% for error in form.isv_18.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                        <td>{{ form.total }}{% for error in form.total.errors %}<small class="erp-error">{{ error }}</small>{% endfor %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="erp-actions-right">
+        <a class="erp-btn-secondary" href="{% url 'libro_compras_fiscal' empresa.slug %}">Cancelar</a>
+        <button class="erp-btn" type="submit">Guardar en Libro</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const fields = {
+        subtotal: document.querySelector(".js-compra-subtotal"),
+        base15: document.querySelector(".js-compra-base_15"),
+        isv15: document.querySelector(".js-compra-isv_15"),
+        base18: document.querySelector(".js-compra-base_18"),
+        isv18: document.querySelector(".js-compra-isv_18"),
+        exento: document.querySelector(".js-compra-exento"),
+        exonerado: document.querySelector(".js-compra-exonerado"),
+        total: document.querySelector(".js-compra-total")
+    };
+    function money(value){ return (Math.round(value * 100) / 100).toFixed(2); }
+    function numberOf(input){ return parseFloat((input && input.value) || "0") || 0; }
+    function recalc(){
+        const base15 = numberOf(fields.base15);
+        const base18 = numberOf(fields.base18);
+        const exento = numberOf(fields.exento);
+        const exonerado = numberOf(fields.exonerado);
+        const isv15 = base15 * 0.15;
+        const isv18 = base18 * 0.18;
+        const subtotal = exento + exonerado + base15 + base18;
+        if(fields.isv15){ fields.isv15.value = money(isv15); }
+        if(fields.isv18){ fields.isv18.value = money(isv18); }
+        if(fields.subtotal){ fields.subtotal.value = money(subtotal); }
+        if(fields.total){ fields.total.value = money(subtotal + isv15 + isv18); }
+    }
+    [fields.base15, fields.base18, fields.exento, fields.exonerado].forEach(function(input){
+        if(input){ input.addEventListener("input", recalc); }
+    });
+    recalc();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Configura la base del catalogo contable con una estructura clara y preparada para crecer por empresa.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-action-link">Volver al Catalogo</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+    <section class="erp-form-card">
+        <div class="erp-form-grid">
+            {% for field in form %}
+            <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    <div class="erp-form-actions">
+        <a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Cuenta</button>
+    </div>
+</form>
+{% endblock %}

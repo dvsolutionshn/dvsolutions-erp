@@ -1,0 +1,104 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Kardex - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Logistica{% endblock %}
+{% block header_title %}Kardex de Inventario{% endblock %}
+{% block header_description %}Consulta cronologica de entradas, salidas, devoluciones y ajustes con filtro operativo.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Volver a Inventario</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Movimientos</div>
+        <div class="erp-stat-value">{{ resumen.total_movimientos }}</div>
+        <p class="erp-card-muted">Registros encontrados con el filtro actual.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Entradas</div>
+        <div class="erp-stat-value">{{ resumen.entradas }}</div>
+        <p class="erp-card-muted">Incluye ajustes positivos y devoluciones.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Salidas</div>
+        <div class="erp-stat-value">{{ resumen.salidas }}</div>
+        <p class="erp-card-muted">Incluye facturas y ajustes negativos.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <form method="get" class="erp-filter-bar">
+        <div class="erp-field">
+            <label for="id_producto">Producto</label>
+            <select id="id_producto" name="producto">
+                <option value="">Todos los productos</option>
+                {% for producto in productos %}
+                <option value="{{ producto.id }}" {% if producto_id == producto.id|stringformat:"s" %}selected{% endif %}>{{ producto.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-field">
+            <label for="id_tipo">Tipo</label>
+            <select id="id_tipo" name="tipo">
+                <option value="">Todos los tipos</option>
+                {% for valor, etiqueta in tipos_movimiento %}
+                <option value="{{ valor }}" {% if tipo == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-field">
+            <label for="id_fecha_desde">Fecha desde</label>
+            <input id="id_fecha_desde" type="date" name="fecha_desde" value="{{ fecha_desde }}">
+        </div>
+        <div class="erp-field">
+            <label for="id_fecha_hasta">Fecha hasta</label>
+            <input id="id_fecha_hasta" type="date" name="fecha_hasta" value="{{ fecha_hasta }}">
+        </div>
+        <button type="submit" class="erp-btn">Filtrar</button>
+        <a class="erp-btn-secondary" href="{% url 'kardex_inventario' empresa.slug %}">Limpiar</a>
+    </form>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Movimientos</h3>
+            <div class="erp-card-muted">Ultimos 150 movimientos segun el filtro aplicado.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Producto</th>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                    <th>Antes</th>
+                    <th>Despues</th>
+                    <th>Referencia</th>
+                    <th>Observacion</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td>
+                    <td>{{ movimiento.producto.nombre }}</td>
+                    <td>{{ movimiento.get_tipo_display }}</td>
+                    <td class="amount">{{ movimiento.cantidad|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</td>
+                    <td>{{ movimiento.referencia|default:"-" }}</td>
+                    <td>{{ movimiento.observacion|default:"-"|truncatechars:80 }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="8" class="erp-empty">No hay movimientos registrados con el filtro actual.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

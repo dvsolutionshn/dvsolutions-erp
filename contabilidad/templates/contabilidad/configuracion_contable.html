@@ -1,0 +1,63 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Configuracion Contable - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}Configuracion Contable{% endblock %}
+{% block header_description %}Define las cuentas que usara esta empresa para generar asientos automaticos desde facturacion, compras, cobros y pagos.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'contabilidad_dashboard' empresa.slug %}" class="erp-action-link">Volver a Contabilidad</a>
+<a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-action-link">Catalogo de Cuentas</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cuentas disponibles</div>
+        <p class="erp-stat-value">{{ cuentas_disponibles }}</p>
+        <p class="erp-card-muted">Solo se muestran cuentas activas y que aceptan movimientos.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Uso automatico</div>
+        <p class="erp-stat-value">ERP</p>
+        <p class="erp-card-muted">Si dejas un campo vacio, el sistema usara o creara una cuenta base por defecto.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Empresa</div>
+        <p class="erp-stat-value">{{ empresa.nombre }}</p>
+        <p class="erp-card-muted">Esta configuracion no afecta a otras empresas.</p>
+    </article>
+</section>
+
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+    <section class="erp-form-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Cuentas para asientos automaticos</h3>
+                <p class="erp-card-muted">Selecciona las cuentas operativas que corresponden a esta empresa.</p>
+            </div>
+        </div>
+        <div class="erp-form-grid">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="erp-card">
+        <h3 class="erp-panel-title">Como se aplicara</h3>
+        <p class="erp-card-muted">Facturas usan clientes, ventas e ISV. Cobros usan caja o bancos contra clientes. Compras usan inventario contra proveedores. Pagos a proveedores usan proveedores contra caja o bancos. Notas de credito usan devoluciones, ISV y clientes.</p>
+    </section>
+
+    <div class="erp-form-actions">
+        <a href="{% url 'contabilidad_dashboard' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Configuracion</button>
+    </div>
+</form>
+{% endblock %}

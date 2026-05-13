@@ -1,0 +1,103 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}Licencias{% endblock %}
+{% block header_title %}Licencias Comerciales{% endblock %}
+{% block header_description %}Controla periodos de prueba, renovaciones y empresas suspendidas o vencidas desde una sola vista ejecutiva.{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Operativas</div>
+        <p class="erp-stat-value">{{ resumen.operativas }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">En prueba</div>
+        <p class="erp-stat-value">{{ resumen.prueba }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Suspendidas</div>
+        <p class="erp-stat-value">{{ resumen.suspendidas }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Vencidas</div>
+        <p class="erp-stat-value">{{ resumen.vencidas }}</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Estado por empresa</h3>
+            <p class="erp-card-muted">Usa esta vista para saber rapido a quien debes renovar, suspender o reactivar.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Empresa</th>
+                    <th>Plan</th>
+                    <th>Licencia</th>
+                    <th>Vencimiento</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for empresa in empresas %}
+                <tr>
+                    <td>{{ empresa.nombre }}</td>
+                    <td>{{ empresa.plan_comercial.nombre|default:"Sin plan" }}</td>
+                    <td>
+                        <span class="erp-badge {% if empresa.estado_licencia_resuelto == 'activa' %}success{% elif empresa.estado_licencia_resuelto == 'prueba' %}info{% elif empresa.estado_licencia_resuelto == 'suspendida' %}warning{% else %}danger{% endif %}">
+                            {{ empresa.estado_licencia_resuelto|capfirst }}
+                        </span>
+                    </td>
+                    <td>{{ empresa.fecha_vencimiento_plan|date:"F j, Y"|default:"Sin fecha" }}</td>
+                    <td class="actions">
+                        <a class="erp-link" href="{% url 'superadmin_empresa_detail' empresa.id %}">Ver empresa</a>
+                        <a class="erp-link" href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa.id %}">Registrar pago</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Pagos recientes de licencia</h3>
+            <p class="erp-card-muted">Historial comercial para seguimiento de renovaciones.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Empresa</th>
+                    <th>Fecha</th>
+                    <th>Plan</th>
+                    <th>Meses</th>
+                    <th>Monto</th>
+                    <th>Metodo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pago in pagos %}
+                <tr>
+                    <td>{{ pago.empresa.nombre }}</td>
+                    <td>{{ pago.fecha_pago|date:"F j, Y" }}</td>
+                    <td>{{ pago.plan_comercial.nombre|default:"Sin plan" }}</td>
+                    <td>{{ pago.cantidad_meses }}</td>
+                    <td>L. {{ pago.monto }}</td>
+                    <td>{{ pago.get_metodo_display }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">Todavia no hay pagos de licencia registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

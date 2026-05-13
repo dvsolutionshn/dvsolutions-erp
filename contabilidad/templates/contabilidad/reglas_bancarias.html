@@ -1,0 +1,48 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Reglas Bancarias - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bancos{% endblock %}
+{% block header_title %}Reglas Bancarias{% endblock %}
+{% block header_description %}Automatiza la clasificacion de estados de cuenta por texto en la descripcion bancaria.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'crear_regla_bancaria' empresa.slug %}" class="erp-action-link">Nueva Regla</a>
+<a href="{% url 'movimientos_bancarios' empresa.slug %}" class="erp-action-link">Ver Movimientos</a>
+<a href="{% url 'bancos_dashboard' empresa.slug %}" class="erp-action-link">Volver a Bancos</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Reglas</div><p class="erp-stat-value">{{ resumen.total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Activas</div><p class="erp-stat-value">{{ resumen.activas }}</p></article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Automatizacion bancaria</h3>
+            <p class="erp-card-muted">Ejemplo: si la descripcion contiene COMISION, clasificar como Comisiones Bancarias.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Prioridad</th><th>Regla</th><th>Texto</th><th>Tipo</th><th>Clasificacion</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for regla in reglas %}
+            <tr>
+                <td>{{ regla.prioridad }}</td>
+                <td><strong>{{ regla.nombre }}</strong></td>
+                <td>{{ regla.texto_busqueda }}</td>
+                <td>{{ regla.get_tipo_movimiento_display }}</td>
+                <td>{{ regla.clasificacion.nombre }}<div class="erp-card-muted">{{ regla.clasificacion.cuenta_contable.codigo }} - {{ regla.clasificacion.cuenta_contable.nombre }}</div></td>
+                <td>{% if regla.activa %}<span class="erp-badge success">Activa</span>{% else %}<span class="erp-badge danger">Inactiva</span>{% endif %}</td>
+                <td class="actions"><a class="erp-link" href="{% url 'editar_regla_bancaria' empresa.slug regla.id %}">Editar</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="erp-empty">Todavia no hay reglas bancarias.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

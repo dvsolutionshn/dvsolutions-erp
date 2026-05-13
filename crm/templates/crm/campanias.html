@@ -1,0 +1,34 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Campanias - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Marketing{% endblock %}
+{% block header_title %}Campanias{% endblock %}
+{% block header_description %}Promociones y comunicacion segmentada para clientes del ERP.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>
+<a class="erp-action-link" href="{% url 'crm_crear_campania' empresa.slug %}">Nueva Campania</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-table-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Campania</th><th>Audiencia</th><th>Estado</th><th>Plantilla</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for campania in campanias %}
+            <tr>
+                <td><strong>{{ campania.nombre }}</strong><small>{{ campania.fecha_programada|default:"Sin programacion" }}</small></td>
+                <td>{{ campania.get_audiencia_display }}</td>
+                <td><span class="badge">{{ campania.get_estado_display }}</span></td>
+                <td>{{ campania.plantilla|default:"Sin plantilla" }}</td>
+                <td class="actions"><a class="erp-link" href="{% url 'crm_ver_campania' empresa.slug campania.id %}">Ver</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="erp-empty">Aun no hay campanias.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

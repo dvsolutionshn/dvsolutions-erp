@@ -1,0 +1,136 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}{{ periodo.nombre }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Planilla{% endblock %}
+{% block header_title %}{{ periodo.nombre }}{% endblock %}
+{% block header_description %}Lectura integral de devengados, deducciones, netos y envio de voucher por colaborador.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'planillas_rrhh' empresa.slug %}">Volver</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-card erp-document-shell">
+        <div class="erp-document-header">
+            <div>
+                <div class="erp-kpi-label">Resumen de nomina</div>
+                <h3 style="margin:8px 0 6px;">{{ periodo.nombre }}</h3>
+                <p class="erp-card-muted">Periodo {{ periodo.fecha_inicio|date:"d/m/Y" }} al {{ periodo.fecha_fin|date:"d/m/Y" }} · Pago {{ periodo.fecha_pago|date:"d/m/Y" }}</p>
+                <div class="erp-actions-cluster" style="margin-top:14px;">
+                    <span class="erp-badge {% if periodo.estado == 'pagada' %}success{% elif periodo.estado == 'cerrada' %}info{% else %}warning{% endif %}">
+                        {{ periodo.get_estado_display }}
+                    </span>
+                    {% if config_crm.whatsapp_activo %}
+                    <span class="erp-badge info">WhatsApp API activo</span>
+                    {% else %}
+                    <span class="erp-badge warning">WhatsApp API pendiente</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="erp-document-kpis">
+                <article class="erp-document-kpi">
+                    <div class="erp-kpi-label">Devengado</div>
+                    <strong>L. {{ periodo.total_devengado|floatformat:2|intcomma }}</strong>
+                </article>
+                <article class="erp-document-kpi">
+                    <div class="erp-kpi-label">Deducciones</div>
+                    <strong>L. {{ periodo.total_deducciones|floatformat:2|intcomma }}</strong>
+                </article>
+                <article class="erp-document-kpi">
+                    <div class="erp-kpi-label">Neto</div>
+                    <strong>L. {{ periodo.total_neto|floatformat:2|intcomma }}</strong>
+                </article>
+            </div>
+        </div>
+        <div class="erp-document-actions">
+            <form method="post" action="{% url 'generar_planilla' empresa.slug periodo.id %}">
+                {% csrf_token %}
+                <button class="erp-btn" type="submit">Generar / Recalcular</button>
+            </form>
+            <a class="erp-btn-secondary" href="{% url 'movimientos_planilla' empresa.slug %}">Bonos y deducciones</a>
+            <a class="erp-btn-secondary" href="{% url 'vacaciones_rrhh' empresa.slug %}">Vacaciones</a>
+        </div>
+    </section>
+
+    <section class="erp-card">
+        <div class="erp-card-header">
+            <div>
+                <h3>Canales de entrega del voucher</h3>
+                <p>
+                    Desde aqui puedes operar PDF, correo, enlace manual y WhatsApp API. El envio API manda el resumen del pago en texto desde la configuracion CRM de la empresa.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-list-table">
+                <thead>
+                    <tr>
+                        <th>Empleado</th>
+                        <th>Cuenta acreditada</th>
+                        <th>Devengado</th>
+                        <th>Deducciones</th>
+                        <th>Neto</th>
+                        <th>Extras / bonos</th>
+                        <th>Deducciones clave</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detalle in detalles %}
+                    <tr>
+                        <td class="erp-doc-cell">
+                            <div class="erp-doc-title">{{ detalle.empleado.nombre_completo }}</div>
+                            <div class="erp-doc-subtext">{{ detalle.empleado.puesto|default:"Sin puesto" }} · {{ detalle.empleado.departamento|default:"Sin area" }}</div>
+                        </td>
+                        <td class="erp-doc-cell">
+                            <div class="erp-doc-title">{{ detalle.empleado.banco|default:"No definido" }}</div>
+                            <div class="erp-doc-subtext">{{ detalle.empleado.cuenta_bancaria|default:"Sin cuenta" }}</div>
+                        </td>
+                        <td class="amount">L. {{ detalle.total_devengado|floatformat:2|intcomma }}</td>
+                        <td class="amount">L. {{ detalle.total_deducciones|floatformat:2|intcomma }}</td>
+                        <td class="amount"><strong>L. {{ detalle.neto_pagar|floatformat:2|intcomma }}</strong></td>
+                        <td class="erp-doc-cell">
+                            <div class="erp-doc-subtext">Extras: L. {{ detalle.monto_horas_extra|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">Bonos: L. {{ detalle.bonos|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">Comisiones: L. {{ detalle.comisiones|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">14avo: L. {{ detalle.decimo_cuarto|floatformat:2|intcomma }}</div>
+                        </td>
+                        <td class="erp-doc-cell">
+                            <div class="erp-doc-subtext">IHSS: L. {{ detalle.ihss|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">RAP: L. {{ detalle.rap|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">ISR: L. {{ detalle.isr|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">Prestamos: L. {{ detalle.prestamos|floatformat:2|intcomma }}</div>
+                        </td>
+                        <td>
+                            <div class="erp-actions-cluster">
+                                {% if periodo.estado == "cerrada" or periodo.estado == "pagada" %}
+                                <span class="erp-pill-link disabled">Edicion bloqueada</span>
+                                {% else %}
+                                <a class="erp-pill-link" href="{% url 'editar_detalle_planilla' empresa.slug detalle.id %}">Editar</a>
+                                {% endif %}
+                                <a class="erp-pill-link" href="{% url 'voucher_planilla_pdf' empresa.slug detalle.id %}">PDF</a>
+                                <a class="erp-pill-link" href="{% url 'enviar_voucher_email' empresa.slug detalle.id %}">Correo</a>
+                                {% if detalle.whatsapp_url %}<a class="erp-pill-link" target="_blank" href="{{ detalle.whatsapp_url }}">WhatsApp</a>{% endif %}
+                                {% if detalle.empleado.telefono and config_crm.whatsapp_activo %}
+                                <form method="post" action="{% url 'enviar_voucher_whatsapp_api' empresa.slug detalle.id %}" class="erp-inline-form">
+                                    {% csrf_token %}
+                                    <button class="erp-pill-btn" type="submit">WhatsApp API</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="8" class="erp-empty">Genera la planilla para empezar a ver empleados y netos a pagar.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}

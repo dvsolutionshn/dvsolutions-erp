@@ -1,0 +1,1576 @@
+{% extends "core/erp_base.html" %}
+{% load custom_filters %}
+
+{% block title %}{% if modo_edicion %}Editar Factura{% else %}Crear Factura{% endif %} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Comercial{% endblock %}
+{% block header_title %}{% if modo_edicion %}Editar Factura{% else %}Crear Factura{% endif %}{% endblock %}
+{% block header_description %}Genera o ajusta facturas con una experiencia ejecutiva, ordenada y consistente con la nueva linea visual del ERP.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'facturas_dashboard' empresa.slug %}">Volver a Facturas</a>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<style>
+.erp-form-split{
+    display:grid;
+    grid-template-columns:minmax(0,1.7fr) minmax(360px,.95fr);
+    gap:20px;
+    align-items:start;
+}
+.erp-form-main{
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+    min-width:0;
+}
+.erp-form-side{
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+    min-width:0;
+}
+.erp-cabecera-card,
+.erp-cabecera-card .erp-form-grid,
+.erp-cabecera-card .erp-field,
+.erp-cabecera-card .erp-search-select{
+    overflow:visible;
+}
+.erp-cabecera-card .erp-field{
+    position:relative;
+}
+.erp-cabecera-card .erp-field:focus-within{
+    z-index:40;
+}
+.erp-line-tools{
+    display:flex;
+    justify-content:flex-start;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+}
+.erp-quick-links{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+.erp-note-toggle{
+    width:42px;
+    height:42px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--muted);
+    font-weight:700;
+    cursor:pointer;
+}
+.erp-comment-inline{
+    margin-top:8px;
+}
+.erp-comment-inline label{
+    display:block;
+    margin-bottom:6px;
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#6b7b8f;
+}
+.erp-comment-inline textarea{
+    min-height:58px;
+    resize:vertical;
+    font-size:.88rem;
+    line-height:1.45;
+}
+.erp-delete-cell{
+    display:flex;
+    justify-content:center;
+}
+.erp-note-toggle.is-open{
+    background:var(--primary-2);
+    color:#fff;
+    border-color:var(--primary-2);
+    box-shadow:none;
+}
+.erp-summary-stack{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+.erp-summary-stack p{
+    margin:0;
+    color:var(--muted);
+}
+.erp-search-select{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    position:relative;
+    min-width:0;
+}
+.erp-search-hint{
+    margin:0;
+    font-size:12px;
+    color:var(--muted);
+}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:0;
+    z-index:60;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 18px 34px rgba(15,39,66,.09);
+    padding:8px;
+    display:none;
+    max-height:240px;
+    overflow:auto;
+}
+.erp-line-row .erp-suggestion-list{
+    min-width:320px;
+    max-width:420px;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:11px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{
+    background:#f7f9fc;
+}
+.erp-native-select-hidden{
+    display:none;
+}
+.erp-manual-number-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 108px;
+    gap:12px;
+    align-items:end;
+}
+.erp-manual-prefix{
+    display:flex;
+    align-items:center;
+    min-height:48px;
+    padding:0 16px;
+    border-radius:10px;
+    background:#f8fafc;
+    border:1px solid #e3e8f0;
+    color:#94a3b8;
+    font-weight:700;
+    letter-spacing:.04em;
+    user-select:none;
+}
+.erp-manual-suffix input{
+    text-align:center;
+    font-weight:800;
+    letter-spacing:.08em;
+    font-size:1rem;
+}
+.erp-form-card > h3{
+    margin-bottom:6px;
+}
+.erp-form-card > p{
+    max-width:760px;
+}
+.erp-summary-totals{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.erp-summary-totals .erp-mini-stat{
+    padding:14px 16px;
+}
+.erp-summary-totals .erp-mini-stat .label{
+    font-size:10px;
+    letter-spacing:.12em;
+}
+.erp-summary-totals .erp-mini-stat .value{
+    font-size:1.55rem;
+}
+.erp-preview-wrap{
+    position:sticky;
+    top:18px;
+}
+.erp-preview-card{
+    overflow:hidden;
+}
+.erp-preview-stage{
+    margin-top:18px;
+    border:1px solid #d9e3ef;
+    border-radius:16px;
+    background:linear-gradient(180deg,#eef3f9 0%,#f7f9fc 100%);
+    padding:14px;
+}
+.erp-preview-sheet{
+    background:#fff;
+    border-radius:12px;
+    box-shadow:0 18px 36px rgba(15,39,66,.10);
+    overflow:hidden;
+    border:1px solid #dbe5f1;
+}
+.erp-preview-head{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 210px;
+    gap:16px;
+    padding:18px 18px 16px;
+    background:linear-gradient(135deg,#203956 0%,#334e71 55%,#506a8d 100%);
+    color:#fff;
+}
+.erp-preview-brand{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    min-width:0;
+}
+.erp-preview-logo{
+    width:58px;
+    height:58px;
+    border-radius:12px;
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    flex-shrink:0;
+}
+.erp-preview-logo img{
+    max-width:100%;
+    max-height:100%;
+    object-fit:contain;
+}
+.erp-preview-brand h4{
+    margin:0 0 6px;
+    font-size:1.1rem;
+    line-height:1.2;
+}
+.erp-preview-brand-meta{
+    font-size:.77rem;
+    opacity:.9;
+    line-height:1.55;
+}
+.erp-preview-docbox{
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:14px;
+    padding:12px 14px;
+    background:rgba(255,255,255,.10);
+}
+.erp-preview-kicker{
+    font-size:.62rem;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    opacity:.78;
+    margin-bottom:6px;
+}
+.erp-preview-docno{
+    margin:0 0 8px;
+    font-size:1.05rem;
+    line-height:1.25;
+    font-weight:800;
+}
+.erp-preview-docmeta{
+    font-size:.72rem;
+    line-height:1.55;
+    opacity:.92;
+}
+.erp-preview-body{
+    padding:14px 16px 16px;
+}
+.erp-preview-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+    margin-bottom:12px;
+}
+.erp-preview-panel{
+    border:1px solid #d8e2ef;
+    border-radius:12px;
+    padding:12px 13px;
+    min-width:0;
+}
+.erp-preview-panel-title{
+    font-size:.62rem;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:#73839a;
+    margin-bottom:8px;
+}
+.erp-preview-panel-body{
+    font-size:.79rem;
+    color:#1f334c;
+    line-height:1.55;
+}
+.erp-preview-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:.74rem;
+    margin-bottom:12px;
+}
+.erp-preview-table th{
+    background:#eef3f8;
+    color:#4b5e77;
+    text-transform:uppercase;
+    font-size:.58rem;
+    letter-spacing:.14em;
+    padding:7px 8px;
+    text-align:left;
+}
+.erp-preview-table td{
+    padding:7px 8px;
+    border-bottom:1px solid #e7edf5;
+    vertical-align:top;
+}
+.erp-preview-table td.is-num,
+.erp-preview-table th.is-num{
+    text-align:right;
+}
+.erp-preview-product{
+    display:block;
+    font-weight:700;
+    color:#0f2742;
+}
+.erp-preview-comment{
+    display:block;
+    margin-top:4px;
+    color:#5e728d;
+    font-size:.67rem;
+    line-height:1.45;
+    white-space:pre-wrap;
+}
+.erp-preview-bottom{
+    display:block;
+}
+.erp-preview-summary{
+    border:1px solid #d8e2ef;
+    border-radius:12px;
+    padding:12px 13px;
+}
+.erp-preview-summary table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:.74rem;
+}
+.erp-preview-summary td{
+    padding:5px 0;
+    border-bottom:1px solid #edf2f8;
+}
+.erp-preview-summary td:last-child{
+    text-align:right;
+    font-weight:700;
+    color:#173b68;
+}
+.erp-preview-summary tr.is-total td{
+    padding-top:8px;
+    border-top:2px solid #2f4a6c;
+    border-bottom:none;
+    font-weight:800;
+    color:#0f2742;
+}
+.erp-preview-footer{
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px solid #e6edf6;
+    color:#71839b;
+    font-size:.64rem;
+    line-height:1.5;
+}
+.erp-preview-empty{
+    color:#9aa8ba;
+    font-style:italic;
+}
+.erp-line-layout{
+    gap:12px;
+    overflow:visible;
+}
+#lineas-container{
+    overflow:visible;
+}
+.erp-line-row .erp-search-select{
+    gap:8px;
+}
+.erp-line-row{
+    overflow:visible;
+}
+.erp-line-row:focus-within{
+    z-index:35;
+}
+.erp-line-row .erp-select-search{
+    min-height:44px;
+    background-image:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
+}
+.erp-line-row .erp-select-search:focus,
+.erp-line-row select:focus,
+.erp-line-row textarea:focus,
+.erp-line-row input:focus{
+    outline:none;
+    border-color:#8ca8c7;
+    box-shadow:0 0 0 3px rgba(22,56,95,.08);
+    background:#fff;
+}
+.erp-line-row .erp-comment-pop{
+    top:54px;
+    width:340px;
+    max-width:min(340px, 76vw);
+    padding:14px;
+    border-radius:14px;
+    box-shadow:0 18px 34px rgba(15,39,66,.10);
+}
+.erp-line-row .erp-comment-pop::before{
+    top:-7px;
+    left:16px;
+    width:12px;
+    height:12px;
+}
+.erp-line-row .erp-comment-pop textarea{
+    min-height:110px;
+    border-radius:10px;
+}
+.erp-line-row .erp-comment-pop .erp-comment-title{
+    margin-bottom:8px;
+    color:#6b7b8f;
+}
+.erp-lines-card{
+    overflow:visible;
+}
+.erp-lines-footer{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-top:18px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+}
+.erp-lines-footer .erp-btn{
+    min-width:180px;
+}
+@media (max-width: 1100px){
+    .erp-form-split{
+        grid-template-columns:1fr;
+    }
+    .erp-preview-wrap{
+        position:static;
+    }
+}
+@media (max-width: 760px){
+    .erp-summary-totals{
+        grid-template-columns:1fr;
+    }
+    .erp-manual-number-grid{
+        grid-template-columns:1fr;
+    }
+    .erp-lines-footer{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .erp-preview-head,
+    .erp-preview-grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+
+    <section class="erp-form-card">
+        <div class="erp-form-actions">
+            <div>
+                <h3 style="margin:0 0 8px;">Cabecera de la factura</h3>
+                <p>Define cliente, fechas, moneda y condiciones generales del documento.</p>
+            </div>
+            <div class="erp-quick-links">
+                <a id="nuevo-cliente-link" class="erp-btn-secondary" href="{% url 'crear_cliente_facturacion' empresa.slug %}?next={% if modo_edicion %}{% url 'editar_factura' empresa.slug factura.id %}{% else %}{% url 'crear_factura' empresa.slug %}{% endif %}" target="_blank" rel="noopener">Nuevo Cliente</a>
+                <a id="nuevo-producto-link" class="erp-btn-secondary" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% if modo_edicion %}{% url 'editar_factura' empresa.slug factura.id %}{% else %}{% url 'crear_factura' empresa.slug %}{% endif %}" target="_blank" rel="noopener">Nuevo Producto</a>
+            </div>
+        </div>
+    </section>
+
+    {% if form.non_field_errors %}
+    <section class="erp-form-card" style="border-color:#fecaca;background:#fff7f7;">
+        <ul class="erp-field-errors" style="margin:0;">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <div class="erp-form-split">
+        <div class="erp-form-main">
+            <section class="erp-form-card erp-cabecera-card">
+                <h3>Informacion general</h3>
+                <div class="erp-form-grid three" style="margin-top:18px;">
+                    <div class="erp-field">
+                        {{ form.cliente.label_tag }}
+                        <div class="erp-search-select">
+                            <input
+                                type="text"
+                                id="cliente-search"
+                                class="erp-select-search"
+                                placeholder="Buscar cliente por nombre"
+                                autocomplete="off"
+                            >
+                            <div id="clientes-sugerencias" class="erp-suggestion-list"></div>
+                            {{ form.cliente|add_class:"erp-filter-select erp-native-select-hidden" }}
+                            <p class="erp-search-hint">Escribe y el ERP te sugerira clientes mientras vas afinando el nombre.</p>
+                        </div>
+                        {% if form.cliente.errors %}<ul class="erp-field-errors">{% for error in form.cliente.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                    </div>
+                    <div class="erp-field">{{ form.fecha_emision.label_tag }}{{ form.fecha_emision }}{% if form.fecha_emision.errors %}<ul class="erp-field-errors">{% for error in form.fecha_emision.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field">{{ form.fecha_vencimiento.label_tag }}{{ form.fecha_vencimiento }}{% if form.fecha_vencimiento.errors %}<ul class="erp-field-errors">{% for error in form.fecha_vencimiento.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field">{{ form.vendedor.label_tag }}{{ form.vendedor }}{% if form.vendedor.errors %}<ul class="erp-field-errors">{% for error in form.vendedor.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field">{{ form.moneda.label_tag }}{{ form.moneda }}{% if form.moneda.errors %}<ul class="erp-field-errors">{% for error in form.moneda.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field" id="tipo-cambio-wrapper">{{ form.tipo_cambio.label_tag }}{{ form.tipo_cambio }}{% if form.tipo_cambio.errors %}<ul class="erp-field-errors">{% for error in form.tipo_cambio.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field">{{ form.estado.label_tag }}{{ form.estado }}{% if form.estado.errors %}<ul class="erp-field-errors">{% for error in form.estado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    {% if form.numero_factura %}
+                    <div class="erp-field">
+                        {{ form.numero_factura }}
+                        {% if permite_gestion_fiscal_historica and form.numero_factura_sufijo %}
+                            <label for="{{ form.numero_factura_sufijo.id_for_label }}">Numero factura</label>
+                            <div class="erp-manual-number-grid">
+                                <div>
+                                    <div class="erp-manual-prefix">{{ numero_factura_prefijo_manual }}</div>
+                                    <div class="erp-field-help" id="numero-factura-ayuda">El ERP mantiene el prefijo del CAI y tu solo agregas los ultimos 3 digitos.</div>
+                                </div>
+                                <div class="erp-manual-suffix">
+                                    {{ form.numero_factura_sufijo }}
+                                </div>
+                            </div>
+                            {% if form.numero_factura_sufijo.errors %}<ul class="erp-field-errors">{% for error in form.numero_factura_sufijo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                            {% if form.numero_factura.errors %}<ul class="erp-field-errors">{% for error in form.numero_factura.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                        {% else %}
+                            {{ form.numero_factura.label_tag }}
+                            {{ form.numero_factura }}
+                            {% if form.numero_factura.help_text %}<div class="erp-field-help">{{ form.numero_factura.help_text }}</div>{% endif %}
+                            {% if form.numero_factura.errors %}<ul class="erp-field-errors">{% for error in form.numero_factura.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="erp-form-card">
+                <h3>Datos fiscales adicionales</h3>
+                <div class="erp-form-grid three" style="margin-top:18px;">
+                    <div class="erp-field">{{ form.orden_compra_exenta.label_tag }}{{ form.orden_compra_exenta }}{% if form.orden_compra_exenta.errors %}<ul class="erp-field-errors">{% for error in form.orden_compra_exenta.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field">{{ form.registro_exonerado.label_tag }}{{ form.registro_exonerado }}{% if form.registro_exonerado.errors %}<ul class="erp-field-errors">{% for error in form.registro_exonerado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field">{{ form.registro_sag.label_tag }}{{ form.registro_sag }}{% if form.registro_sag.errors %}<ul class="erp-field-errors">{% for error in form.registro_sag.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                </div>
+            </section>
+            <section class="erp-form-card erp-lines-card">
+                <div class="erp-line-tools">
+                    <div>
+                        <h3 style="margin:0 0 8px;">Lineas de facturacion</h3>
+                        <p>Agrega productos, descuentos y comentarios sin salir del flujo principal.</p>
+                    </div>
+                </div>
+
+                {{ formset.management_form }}
+
+                <div class="erp-line-layout">
+                    <div class="erp-line-header">
+                        <div>Producto</div>
+                        <div>Cantidad</div>
+                        <div>Precio</div>
+                        <div>% Desc</div>
+                        <div>Nota</div>
+                        <div>Subtotal</div>
+                        <div>Impuesto</div>
+                        <div>Monto</div>
+                        <div></div>
+                    </div>
+
+                    <div id="lineas-container" class="erp-line-layout">
+                    {% for form_linea in formset %}
+                        <div class="tabla-row erp-line-row">
+                            {{ form_linea.id }}
+                            <div style="display:none;">{{ form_linea.DELETE }}</div>
+                            <div>
+                                <div class="erp-search-select">
+                                    <input type="text" class="erp-select-search" placeholder="Buscar producto o escribir venta unica">
+                                    {{ form_linea.producto|add_class:"producto erp-filter-select erp-native-select-hidden" }}
+                                    {{ form_linea.descripcion_manual|add_class:"descripcion-manual" }}
+                                </div>
+                            </div>
+                            <div>{{ form_linea.cantidad|add_class:"cantidad" }}</div>
+                            <div>{{ form_linea.precio_unitario|add_class:"precio" }}</div>
+                            <div>{{ form_linea.descuento_porcentaje|add_class:"descuento" }}</div>
+                            <div class="erp-note-cell">
+                                <button type="button" class="btn-comentario erp-note-toggle" title="Agregar comentario">+</button>
+                                <div class="comentario-box erp-comment-box erp-comment-pop">
+                                    <span class="erp-comment-title">Agregar comentario</span>
+                                    {{ form_linea.comentario }}
+                                </div>
+                            </div>
+                            <div><input class="subtotal" readonly></div>
+                            <div>{{ form_linea.impuesto|add_class:"impuesto" }}</div>
+                            <div><input class="impuesto_monto" readonly></div>
+                            <div class="erp-delete-cell">
+                                <button type="button" class="delete-btn erp-btn-danger btn-eliminar">X</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    </div>
+                </div>
+
+                <div class="erp-lines-footer">
+                    <div class="erp-field-help">Agrega nuevas lineas al final para mantener el flujo de captura mas limpio y natural.</div>
+                    <button type="button" id="agregar-linea" class="erp-btn">Agregar Linea</button>
+                </div>
+            </section>
+
+            <section class="erp-form-card">
+                <div class="erp-form-actions">
+                    <div class="erp-field-help">Puedes guardar el documento como borrador o dejarlo listo para continuar el flujo comercial.</div>
+                    <div class="erp-actions-right">
+                        <a class="erp-btn-secondary" href="{% url 'facturas_dashboard' empresa.slug %}">Cancelar</a>
+                        <button type="submit" class="erp-btn">{% if modo_edicion %}Guardar Cambios{% else %}Guardar Factura{% endif %}</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <aside class="erp-form-side erp-preview-wrap">
+            <section class="erp-form-card">
+                <h3>Resumen del documento</h3>
+                <p>Los montos se actualizan automaticamente conforme agregas o quitas lineas.</p>
+                <div class="erp-summary-totals" style="margin-top:18px;">
+                    <div class="erp-mini-stat"><div class="label">Subtotal</div><div class="value"><span class="invoice-symbol">L.</span> <span id="subtotal_bruto_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Descuento</div><div class="value"><span class="invoice-symbol">L.</span> <span id="descuento_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Subtotal Antes De Impuesto</div><div class="value"><span class="invoice-symbol">L.</span> <span id="subtotal_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Impuesto</div><div class="value"><span class="invoice-symbol">L.</span> <span id="impuesto_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">ISV 15%</div><div class="value"><span class="invoice-symbol">L.</span> <span id="isv_15_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">ISV 18%</div><div class="value"><span class="invoice-symbol">L.</span> <span id="isv_18_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Base exenta</div><div class="value"><span class="invoice-symbol">L.</span> <span id="base_exenta_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Base exonerada</div><div class="value"><span class="invoice-symbol">L.</span> <span id="base_exonerada_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Total</div><div class="value"><span class="invoice-symbol">L.</span> <span id="total_general">0.00</span></div></div>
+                </div>
+            </section>
+
+            <section class="erp-form-card erp-preview-card">
+                <h3>Vista previa del PDF</h3>
+                <p>Mientras vas llenando la factura, la vista previa se queda fija a la derecha para que puedas trabajar sin subir la pagina.</p>
+                <div class="erp-preview-stage">
+                    <div class="erp-preview-sheet">
+                        <div class="erp-preview-head">
+                            <div class="erp-preview-brand">
+                                <div class="erp-preview-logo">
+                                    {% if empresa.logo %}
+                                    <img src="{{ empresa.logo.url }}" alt="{{ empresa.nombre }}">
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h4 id="preview-empresa-nombre">{{ empresa.nombre }}</h4>
+                                    <div class="erp-preview-brand-meta">
+                                        <div id="preview-empresa-rtn">{% if empresa.rtn %}RTN: {{ empresa.rtn }}{% else %}RTN pendiente de configuracion{% endif %}</div>
+                                        <div id="preview-cliente-canal">Documento comercial en preparacion</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="erp-preview-docbox">
+                                <div class="erp-preview-kicker">Documento fiscal</div>
+                                <div class="erp-preview-docno" id="preview-numero-factura">{% if form.numero_factura.value %}{{ form.numero_factura.value }}{% else %}Factura en borrador{% endif %}</div>
+                                <div class="erp-preview-docmeta">
+                                    <div><strong>Emision:</strong> <span id="preview-fecha-emision">--/--/----</span></div>
+                                    <div><strong>Vencimiento:</strong> <span id="preview-fecha-vencimiento">--/--/----</span></div>
+                                    <div><strong>Moneda:</strong> <span id="preview-moneda">Lempiras</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="erp-preview-body">
+                            <div class="erp-preview-grid">
+                                <div class="erp-preview-panel">
+                                    <div class="erp-preview-panel-title">Cliente</div>
+                                    <div class="erp-preview-panel-body" id="preview-cliente-bloque">
+                                        <strong id="preview-cliente-nombre">Cliente pendiente</strong><br>
+                                        <span id="preview-cliente-rtn">RTN: -</span><br>
+                                        <span id="preview-cliente-direccion" class="erp-preview-empty">Agrega el cliente para ver sus datos aqui.</span>
+                                    </div>
+                                </div>
+                                <div class="erp-preview-panel">
+                                    <div class="erp-preview-panel-title">Documento</div>
+                                    <div class="erp-preview-panel-body">
+                                        <div><strong>Estado:</strong> <span id="preview-estado">Borrador</span></div>
+                                        <div><strong>Vendedor:</strong> <span id="preview-vendedor">Sin asignar</span></div>
+                                        <div><strong>O/C Exenta:</strong> <span id="preview-orden-exenta">-</span></div>
+                                        <div><strong>Registro exonerado:</strong> <span id="preview-registro-exonerado">-</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <table class="erp-preview-table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto / Servicio</th>
+                                        <th class="is-num">Cant.</th>
+                                        <th class="is-num">Precio</th>
+                                        <th class="is-num">Imp.</th>
+                                        <th class="is-num">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="preview-lineas-body">
+                                    <tr>
+                                        <td colspan="5" class="erp-preview-empty">Agrega productos para ver la factura construyendose en vivo.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <div class="erp-preview-bottom">
+                                <div class="erp-preview-summary">
+                                    <div class="erp-preview-panel-title">Resumen fiscal</div>
+                                    <table>
+                                        <tr><td>Subtotal</td><td id="preview-subtotal">L. 0.00</td></tr>
+                                        <tr><td>Descuento</td><td id="preview-descuento">L. 0.00</td></tr>
+                                        <tr><td>Subtotal antes de impuesto</td><td id="preview-subtotal-neto">L. 0.00</td></tr>
+                                        <tr><td>Impuesto</td><td id="preview-impuesto">L. 0.00</td></tr>
+                                        <tr><td>ISV 15%</td><td id="preview-isv15">L. 0.00</td></tr>
+                                        <tr><td>ISV 18%</td><td id="preview-isv18">L. 0.00</td></tr>
+                                        <tr class="is-total"><td>Total</td><td id="preview-total">L. 0.00</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="erp-preview-footer">
+                                <div id="preview-registro-sag-linea">Registro SAG: -</div>
+                                <div id="preview-cai-linea">CAI y rango fiscal se definiran conforme la fecha de emision y la configuracion activa de la empresa.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </div>
+</form>
+{{ clientes_preview|json_script:"clientes-preview-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const productos = {
+        {% for p in productos %}
+            "{{ p.id }}": {
+                precio: {{ p.precio|default:0 }},
+                impuesto: "{% if p.impuesto_predeterminado_id %}{{ p.impuesto_predeterminado_id }}{% endif %}",
+                tipo: "{{ p.tipo_item }}",
+                unidad: "{{ p.unidad_medida }}"
+            },
+        {% endfor %}
+    };
+
+    const impuestos = {
+        {% for imp in impuestos %}
+            "{{ imp.id }}": {{ imp.porcentaje|default:0 }},
+        {% endfor %}
+    };
+
+    const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
+    const container = document.getElementById("lineas-container");
+    const formShell = document.querySelector(".erp-form-shell");
+    const clienteSearchInput = document.getElementById("cliente-search");
+    const clienteSuggestionsPanel = document.getElementById("clientes-sugerencias");
+    const clienteSelect = document.getElementById("id_cliente");
+    const nuevoClienteLink = document.getElementById("nuevo-cliente-link");
+    const nuevoProductoLink = document.getElementById("nuevo-producto-link");
+    const facturaDraftKey = "dvsolutions_factura_draft__{{ empresa.slug }}__{% if modo_edicion %}edit_{{ factura.id }}{% else %}new{% endif %}";
+    const clientesPreviewData = JSON.parse(document.getElementById("clientes-preview-data").textContent || "[]");
+    const clientesPreviewMap = {};
+    clientesPreviewData.forEach(cliente => {
+        clientesPreviewMap[String(cliente.id)] = cliente;
+    });
+
+    function obtenerSimboloMoneda(){
+        const moneda = document.getElementById("id_moneda");
+        return moneda && moneda.value === "USD" ? "$" : "L.";
+    }
+
+    function money(value){
+        const numero = parseFloat(value) || 0;
+        return `${obtenerSimboloMoneda()} ${numero.toFixed(2)}`;
+    }
+
+    function escapeHtml(value){
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function obtenerNumeroFacturaPreview(){
+        const hiddenNumero = document.getElementById("id_numero_factura");
+        const suffix = document.getElementById("id_numero_factura_sufijo");
+        const prefix = document.querySelector(".erp-manual-prefix");
+        if(suffix && prefix){
+            const sufijo = (suffix.value || "").trim();
+            return sufijo ? `${prefix.textContent.trim()}${sufijo.padStart(3, "0")}` : "Factura en borrador";
+        }
+        if(hiddenNumero && hiddenNumero.value){
+            return hiddenNumero.value;
+        }
+        return "Factura en borrador";
+    }
+
+    function actualizarPreviewFactura(){
+        const clienteId = clienteSelect ? clienteSelect.value : "";
+        const cliente = clientesPreviewMap[String(clienteId)] || null;
+        const clienteNombre = cliente?.nombre || "Cliente pendiente";
+        const clienteRtn = cliente?.rtn || "-";
+        const clienteDireccion = cliente?.direccion || "Agrega el cliente para ver sus datos aqui.";
+        const vendedorSelect = document.getElementById("id_vendedor");
+        const vendedorLabel = vendedorSelect && vendedorSelect.selectedOptions.length && vendedorSelect.value
+            ? vendedorSelect.selectedOptions[0].text.trim()
+            : "Sin asignar";
+        const estadoSelect = document.getElementById("id_estado");
+        const estadoLabel = estadoSelect && estadoSelect.selectedOptions.length
+            ? estadoSelect.selectedOptions[0].text.trim()
+            : "Borrador";
+        const monedaSelect = document.getElementById("id_moneda");
+        const monedaLabel = monedaSelect && monedaSelect.selectedOptions.length
+            ? monedaSelect.selectedOptions[0].text.trim()
+            : "Lempiras";
+        const fechaEmision = (document.getElementById("id_fecha_emision")?.value || "").trim() || "--/--/----";
+        const fechaVencimiento = (document.getElementById("id_fecha_vencimiento")?.value || "").trim() || "--/--/----";
+        const ordenExenta = (document.getElementById("id_orden_compra_exenta")?.value || "").trim() || "-";
+        const registroExonerado = (document.getElementById("id_registro_exonerado")?.value || "").trim() || "-";
+        const registroSag = (document.getElementById("id_registro_sag")?.value || "").trim() || "-";
+        const caiDetalle = (document.getElementById("numero-factura-ayuda")?.textContent || "").trim();
+
+        document.getElementById("preview-cliente-nombre").textContent = clienteNombre;
+        document.getElementById("preview-cliente-rtn").textContent = `RTN: ${clienteRtn}`;
+        document.getElementById("preview-cliente-direccion").textContent = clienteDireccion;
+        document.getElementById("preview-cliente-direccion").classList.toggle("erp-preview-empty", !cliente?.direccion);
+        document.getElementById("preview-cliente-canal").textContent = clienteId ? "Documento listo para revision comercial" : "Documento comercial en preparacion";
+        document.getElementById("preview-numero-factura").textContent = obtenerNumeroFacturaPreview();
+        document.getElementById("preview-fecha-emision").textContent = fechaEmision;
+        document.getElementById("preview-fecha-vencimiento").textContent = fechaVencimiento;
+        document.getElementById("preview-moneda").textContent = monedaLabel;
+        document.getElementById("preview-estado").textContent = estadoLabel;
+        document.getElementById("preview-vendedor").textContent = vendedorLabel;
+        document.getElementById("preview-orden-exenta").textContent = ordenExenta;
+        document.getElementById("preview-registro-exonerado").textContent = registroExonerado;
+        document.getElementById("preview-registro-sag-linea").textContent = `Registro SAG: ${registroSag}`;
+        document.getElementById("preview-cai-linea").textContent = caiDetalle || "CAI y rango fiscal se definiran conforme la fecha de emision y la configuracion activa de la empresa.";
+
+        const body = document.getElementById("preview-lineas-body");
+        const rows = [];
+
+        document.querySelectorAll(".tabla-row:not([data-deleted='1'])").forEach(linea => {
+            const productoSelect = linea.querySelector(".producto");
+            const descripcionManual = (linea.querySelector(".descripcion-manual")?.value || "").trim();
+            const productoLabel = productoSelect && productoSelect.selectedOptions.length && productoSelect.value
+                ? productoSelect.selectedOptions[0].text.trim()
+                : descripcionManual;
+            const cantidad = parseFloat(linea.querySelector(".cantidad")?.value || 0) || 0;
+            const precio = parseFloat(linea.querySelector(".precio")?.value || 0) || 0;
+            const subtotal = parseFloat(linea.querySelector(".subtotal")?.value || 0) || 0;
+            const impuestoMonto = parseFloat(linea.querySelector(".impuesto_monto")?.value || 0) || 0;
+            const comentario = (linea.querySelector("textarea, input[name$='-comentario']")?.value || "").trim();
+
+            if(!productoLabel && !cantidad && !precio && !comentario){
+                return;
+            }
+
+            rows.push(`
+                <tr>
+                    <td>
+                        <span class="erp-preview-product">${escapeHtml(productoLabel || "Linea en preparacion")}</span>
+                        ${comentario ? `<span class="erp-preview-comment">${escapeHtml(comentario)}</span>` : ""}
+                    </td>
+                    <td class="is-num">${cantidad ? cantidad.toFixed(2) : "-"}</td>
+                    <td class="is-num">${money(precio)}</td>
+                    <td class="is-num">${money(impuestoMonto)}</td>
+                    <td class="is-num">${money(subtotal + impuestoMonto)}</td>
+                </tr>
+            `);
+
+        });
+
+        body.innerHTML = rows.length ? rows.join("") : `
+            <tr>
+                <td colspan="5" class="erp-preview-empty">Agrega productos para ver la factura construyendose en vivo.</td>
+            </tr>
+        `;
+
+        document.getElementById("preview-subtotal").textContent = money(document.getElementById("subtotal_bruto_general")?.textContent);
+        document.getElementById("preview-descuento").textContent = money(document.getElementById("descuento_general")?.textContent);
+        document.getElementById("preview-subtotal-neto").textContent = money(document.getElementById("subtotal_general")?.textContent);
+        document.getElementById("preview-impuesto").textContent = money(document.getElementById("impuesto_general")?.textContent);
+        document.getElementById("preview-isv15").textContent = money(document.getElementById("isv_15_general")?.textContent);
+        document.getElementById("preview-isv18").textContent = money(document.getElementById("isv_18_general")?.textContent);
+        document.getElementById("preview-total").textContent = money(document.getElementById("total_general")?.textContent);
+    }
+
+    function syncClienteSearchFromSelect(){
+        if(!clienteSearchInput || !clienteSelect){
+            return;
+        }
+        const selectedOption = clienteSelect.options[clienteSelect.selectedIndex];
+        clienteSearchInput.value = selectedOption && selectedOption.value ? selectedOption.text : "";
+        actualizarPreviewFactura();
+    }
+
+    function syncClienteSelectFromSearch(){
+        if(!clienteSearchInput || !clienteSelect){
+            return;
+        }
+        const buscado = (clienteSearchInput.value || "").trim().toLowerCase();
+        let matched = false;
+
+        Array.from(clienteSelect.options).forEach(option => {
+            if(option.value && option.text.trim().toLowerCase() === buscado){
+                clienteSelect.value = option.value;
+                matched = true;
+            }
+        });
+
+        if(!matched && !buscado){
+            clienteSelect.value = "";
+        }
+        actualizarPreviewFactura();
+    }
+
+    function renderClienteSuggestions(){
+        if(!clienteSearchInput || !clienteSuggestionsPanel || !clienteSelect){
+            return;
+        }
+
+        const term = (clienteSearchInput.value || "").trim().toLowerCase();
+        const options = Array.from(clienteSelect.options)
+            .filter(option => option.value)
+            .filter(option => !term || option.text.trim().toLowerCase().includes(term))
+            .slice(0, 8);
+
+        clienteSuggestionsPanel.innerHTML = "";
+        if(!options.length){
+            clienteSuggestionsPanel.style.display = "none";
+            return;
+        }
+
+        options.forEach(option => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = option.text.trim();
+            button.addEventListener("click", function(){
+                clienteSearchInput.value = option.text.trim();
+                clienteSelect.value = option.value;
+                clienteSuggestionsPanel.style.display = "none";
+                actualizarPreviewFactura();
+            });
+            clienteSuggestionsPanel.appendChild(button);
+        });
+
+        clienteSuggestionsPanel.style.display = "block";
+    }
+
+    function initSearchableSelect(wrapper){
+        if(!wrapper || wrapper.dataset.searchInit === "1"){
+            return;
+        }
+
+        if(clienteSearchInput && wrapper.contains(clienteSearchInput)){
+            return;
+        }
+
+        const searchInput = wrapper.querySelector(".erp-select-search");
+        const select = wrapper.querySelector("select");
+        const descripcionManualInput = wrapper.querySelector(".descripcion-manual");
+
+        if(!searchInput || !select){
+            return;
+        }
+
+        wrapper.dataset.searchInit = "1";
+        wrapper._allOptions = Array.from(select.options).map(option => ({
+            value: option.value,
+            text: option.text,
+            disabled: option.disabled,
+        }));
+
+        const suggestionsPanel = document.createElement("div");
+        suggestionsPanel.className = "erp-suggestion-list";
+        wrapper.appendChild(suggestionsPanel);
+
+        function renderSuggestions(term){
+            const filtro = (term || "").trim().toLowerCase();
+            const visibles = wrapper._allOptions.filter((option, index) => {
+                if(index === 0){
+                    return false;
+                }
+                if(!filtro){
+                    return true;
+                }
+                return option.text.toLowerCase().includes(filtro);
+            }).slice(0, 8);
+
+            suggestionsPanel.innerHTML = "";
+
+            if(!visibles.length){
+                suggestionsPanel.style.display = "none";
+                return;
+            }
+
+            visibles.forEach(optionData => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "erp-suggestion-item";
+                button.textContent = optionData.text;
+                button.addEventListener("click", function(){
+                    select.value = optionData.value;
+                    searchInput.value = optionData.text;
+                    if(descripcionManualInput){
+                        descripcionManualInput.value = "";
+                    }
+                    suggestionsPanel.style.display = "none";
+                    select.dispatchEvent(new Event("change", { bubbles: true }));
+                });
+                suggestionsPanel.appendChild(button);
+            });
+
+            suggestionsPanel.style.display = "block";
+        }
+
+        function syncSearchWithSelection(){
+            const seleccionada = wrapper._allOptions.find(option => option.value === select.value);
+            if(seleccionada && seleccionada.value){
+                searchInput.value = seleccionada.text;
+                if(descripcionManualInput){
+                    descripcionManualInput.value = "";
+                }
+                return;
+            }
+            searchInput.value = descripcionManualInput ? (descripcionManualInput.value || "") : "";
+        }
+
+        searchInput.addEventListener("input", function(){
+            if(select.value){
+                select.value = "";
+            }
+            if(descripcionManualInput){
+                descripcionManualInput.value = this.value.trim();
+            }
+            renderSuggestions(this.value);
+            actualizarPreviewFactura();
+        });
+
+        searchInput.addEventListener("focus", function(){
+            renderSuggestions(this.value);
+        });
+
+        searchInput.addEventListener("keydown", function(e){
+            if(e.key === "ArrowDown"){
+                e.preventDefault();
+                select.focus();
+            }
+        });
+
+        searchInput.addEventListener("blur", function(){
+            window.setTimeout(() => {
+                suggestionsPanel.style.display = "none";
+                if(select.value){
+                    syncSearchWithSelection();
+                } else if(descripcionManualInput){
+                    descripcionManualInput.value = searchInput.value.trim();
+                }
+            }, 120);
+        });
+
+        select.addEventListener("change", function(){
+            if(this.value && descripcionManualInput){
+                descripcionManualInput.value = "";
+            }
+            syncSearchWithSelection();
+            suggestionsPanel.style.display = "none";
+            actualizarPreviewFactura();
+        });
+
+        syncSearchWithSelection();
+    }
+
+    function initSearchableSelects(scope){
+        scope.querySelectorAll(".erp-search-select").forEach(initSearchableSelect);
+    }
+
+    function recalcularLinea(linea){
+        const cantidad = linea.querySelector(".cantidad");
+        const precio = linea.querySelector(".precio");
+        const descuento = linea.querySelector(".descuento");
+        const subtotal = linea.querySelector(".subtotal");
+        const impuestoSelect = linea.querySelector(".impuesto");
+        const impuestoMonto = linea.querySelector(".impuesto_monto");
+
+        const cantidadVal = parseFloat(cantidad.value) || 0;
+        const precioVal = parseFloat(precio.value) || 0;
+        const descuentoVal = parseFloat(descuento.value) || 0;
+
+        const base = cantidadVal * precioVal;
+        const desc = base * (descuentoVal / 100);
+        const sub = base - desc;
+
+        subtotal.value = sub.toFixed(2);
+
+        let porcentaje = impuestos[impuestoSelect.value] || 0;
+        let imp = sub * (porcentaje / 100);
+
+        impuestoMonto.value = imp.toFixed(2);
+
+        recalcularTotales();
+    }
+
+    function recalcularTotales(){
+        let subtotal = 0;
+        let impuesto = 0;
+        let descuento = 0;
+        let subtotalBruto = 0;
+        let isv15 = 0;
+        let isv18 = 0;
+        let baseExenta = 0;
+        let baseExonerada = 0;
+
+        document.querySelectorAll(".tabla-row:not([data-deleted='1'])").forEach(l => {
+            let c = parseFloat(l.querySelector(".cantidad")?.value) || 0;
+            let p = parseFloat(l.querySelector(".precio")?.value) || 0;
+            let d = parseFloat(l.querySelector(".descuento")?.value) || 0;
+            let impuestoSelect = l.querySelector(".impuesto");
+            let porcentaje = parseFloat(impuestos[impuestoSelect?.value] || 0);
+
+            let base = c * p;
+            subtotalBruto += base;
+            let descuentoLinea = base * (d / 100);
+            let subtotalLinea = base - descuentoLinea;
+            descuento += descuentoLinea;
+
+            if (porcentaje === 15) {
+                isv15 += subtotalLinea * 0.15;
+            } else if (porcentaje === 18) {
+                isv18 += subtotalLinea * 0.18;
+            } else if (porcentaje === 0) {
+                baseExenta += subtotalLinea;
+            } else {
+                baseExonerada += subtotalLinea;
+            }
+        });
+
+        document.querySelectorAll(".tabla-row:not([data-deleted='1']) .subtotal").forEach(e => subtotal += parseFloat(e.value) || 0);
+        document.querySelectorAll(".tabla-row:not([data-deleted='1']) .impuesto_monto").forEach(e => impuesto += parseFloat(e.value) || 0);
+
+        document.getElementById("subtotal_bruto_general").innerText = subtotalBruto.toFixed(2);
+        document.getElementById("descuento_general").innerText = descuento.toFixed(2);
+        document.getElementById("subtotal_general").innerText = subtotal.toFixed(2);
+        document.getElementById("impuesto_general").innerText = impuesto.toFixed(2);
+        document.getElementById("isv_15_general").innerText = isv15.toFixed(2);
+        document.getElementById("isv_18_general").innerText = isv18.toFixed(2);
+        document.getElementById("base_exenta_general").innerText = baseExenta.toFixed(2);
+        document.getElementById("base_exonerada_general").innerText = baseExonerada.toFixed(2);
+        document.getElementById("total_general").innerText = (subtotal + impuesto).toFixed(2);
+        actualizarPreviewFactura();
+    }
+
+    function activarEventos(linea){
+        if(linea.dataset.eventsInit === "1"){
+            return;
+        }
+        linea.dataset.eventsInit = "1";
+
+        linea.querySelector(".producto").addEventListener("change", function(){
+            const datosProducto = productos[this.value] || {};
+            const descripcionManualInput = linea.querySelector(".descripcion-manual");
+            if(this.value && descripcionManualInput){
+                descripcionManualInput.value = "";
+            }
+            linea.querySelector(".precio").value = datosProducto.precio || 0;
+            const impuestoSelect = linea.querySelector(".impuesto");
+            if(impuestoSelect && datosProducto.impuesto){
+                impuestoSelect.value = datosProducto.impuesto;
+            }
+            recalcularLinea(linea);
+        });
+
+        linea.querySelector(".cantidad").addEventListener("input", () => recalcularLinea(linea));
+        linea.querySelector(".precio").addEventListener("input", () => recalcularLinea(linea));
+        linea.querySelector(".descuento").addEventListener("input", () => recalcularLinea(linea));
+        linea.querySelector(".impuesto").addEventListener("change", () => recalcularLinea(linea));
+        const comentarioInput = linea.querySelector("textarea, input[name$='-comentario']");
+        if(comentarioInput){
+            comentarioInput.addEventListener("input", actualizarPreviewFactura);
+        }
+        const searchInput = linea.querySelector(".erp-select-search");
+        if(searchInput){
+            searchInput.addEventListener("input", actualizarPreviewFactura);
+        }
+        const descripcionManualInput = linea.querySelector(".descripcion-manual");
+        if(descripcionManualInput){
+            descripcionManualInput.addEventListener("input", actualizarPreviewFactura);
+        }
+    }
+
+    function prepararFormsetAntesSubmit(){
+        const filas = document.querySelectorAll(".tabla-row");
+
+        filas.forEach((fila, index) => {
+            fila.querySelectorAll("input, select, textarea").forEach(el => {
+                if(el.name){
+                    el.name = el.name.replace(/lineas-\d+-/, `lineas-${index}-`);
+                    el.id = "id_" + el.name;
+                }
+            });
+        });
+
+        totalFormsInput.value = filas.length;
+    }
+
+    function agregarLineaFactura(){
+        let formCount = parseInt(totalFormsInput.value);
+        let plantilla = document.querySelector(".tabla-row:not([data-deleted='1'])") || document.querySelector(".tabla-row");
+        if(!plantilla){
+            return null;
+        }
+
+        let nueva = plantilla.cloneNode(true);
+        delete nueva.dataset.deleted;
+        delete nueva.dataset.eventsInit;
+        nueva.style.display = "";
+
+        nueva.querySelectorAll("input, select, textarea").forEach(el => {
+            if(el.name){
+                let name = el.name.replace(/lineas-\d+-/, `lineas-${formCount}-`);
+                let id = "id_" + name;
+
+                el.name = name;
+                el.id = id;
+            }
+
+            if(el.type === "checkbox"){
+                el.checked = false;
+            } else if(el.type === "hidden" && el.classList.contains("descripcion-manual")){
+                el.value = "";
+            } else if(el.type !== "hidden"){
+                el.value = "";
+            }
+        });
+
+        nueva.querySelectorAll(".erp-search-select").forEach(wrapper => {
+            delete wrapper.dataset.searchInit;
+            wrapper.querySelectorAll(".erp-suggestion-list").forEach(panel => panel.remove());
+            const searchInput = wrapper.querySelector(".erp-select-search");
+            if(searchInput){
+                searchInput.value = "";
+            }
+        });
+
+        let idField = nueva.querySelector("input[name$='-id']");
+        if(idField){
+            idField.remove();
+        }
+
+        let deleteField = nueva.querySelector("input[name$='-DELETE']");
+        if(deleteField){
+            deleteField.checked = false;
+        }
+
+        const comentarioBox = nueva.querySelector(".comentario-box");
+        if(comentarioBox){
+            comentarioBox.classList.remove("is-open");
+        }
+        const botonComentario = nueva.querySelector(".erp-note-toggle");
+        if(botonComentario){
+            botonComentario.classList.remove("is-open");
+        }
+
+        container.appendChild(nueva);
+        totalFormsInput.value = document.querySelectorAll(".tabla-row").length;
+        initSearchableSelects(nueva);
+        activarEventos(nueva);
+        recalcularLinea(nueva);
+        return nueva;
+    }
+
+    function guardarBorradorFactura(){
+        if(!formShell){
+            return;
+        }
+        prepararFormsetAntesSubmit();
+        const values = {};
+        formShell.querySelectorAll("input[name], select[name], textarea[name]").forEach(el => {
+            if(!el.name || el.name === "csrfmiddlewaretoken"){
+                return;
+            }
+            if(el.type === "checkbox"){
+                values[el.name] = !!el.checked;
+            } else {
+                values[el.name] = el.value;
+            }
+        });
+        localStorage.setItem(facturaDraftKey, JSON.stringify({
+            saved_at: Date.now(),
+            values: values,
+        }));
+    }
+
+    function restaurarBorradorFacturaSiAplica(){
+        const params = new URLSearchParams(window.location.search);
+        if(params.get("restore_draft") !== "1"){
+            return;
+        }
+        const raw = localStorage.getItem(facturaDraftKey);
+        if(!raw){
+            return;
+        }
+        try{
+            const payload = JSON.parse(raw);
+            const values = payload.values || {};
+            const totalGuardado = parseInt(values["lineas-TOTAL_FORMS"] || totalFormsInput?.value || "0", 10);
+            while(document.querySelectorAll(".tabla-row").length < totalGuardado){
+                agregarLineaFactura();
+            }
+
+            formShell.querySelectorAll("input[name], select[name], textarea[name]").forEach(el => {
+                if(!el.name || !(el.name in values)){
+                    return;
+                }
+                const value = values[el.name];
+                if(el.type === "checkbox"){
+                    el.checked = !!value;
+                } else {
+                    el.value = value;
+                }
+            });
+
+            syncClienteSearchFromSelect();
+            document.querySelectorAll(".tabla-row").forEach(linea => {
+                const selectProducto = linea.querySelector(".producto");
+                const descripcionManual = linea.querySelector(".descripcion-manual");
+                const searchInput = linea.querySelector(".erp-select-search");
+                if(searchInput){
+                    if(selectProducto && selectProducto.value && selectProducto.selectedOptions.length){
+                        searchInput.value = selectProducto.selectedOptions[0].text.trim();
+                    } else if(descripcionManual){
+                        searchInput.value = descripcionManual.value || "";
+                    }
+                }
+                recalcularLinea(linea);
+            });
+            toggleTipoCambio();
+            actualizarPreviewFactura();
+            params.delete("restore_draft");
+            const cleanUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+        } catch (error){
+            console.warn("No se pudo restaurar el borrador de la factura.", error);
+        }
+    }
+
+    function prepararAccesosRapidosConBorrador(){
+        const returnUrl = `${window.location.pathname}?restore_draft=1`;
+        [nuevoClienteLink, nuevoProductoLink].forEach(link => {
+            if(!link){
+                return;
+            }
+            try{
+                const url = new URL(link.href, window.location.origin);
+                url.searchParams.set("next", returnUrl);
+                link.href = url.toString();
+            }catch(error){
+                console.warn("No se pudo preparar el retorno con borrador.", error);
+            }
+            link.addEventListener("click", guardarBorradorFactura);
+        });
+    }
+
+    document.querySelectorAll(".tabla-row").forEach(l => {
+        activarEventos(l);
+        recalcularLinea(l);
+    });
+
+    document.getElementById("agregar-linea").addEventListener("click", function(){
+        agregarLineaFactura();
+    });
+
+    document.addEventListener("click", function(e){
+        if(e.target.classList.contains("btn-eliminar")){
+            const fila = e.target.closest(".tabla-row");
+            const deleteField = fila.querySelector("input[name$='-DELETE']");
+
+            if(deleteField){
+                deleteField.checked = true;
+                fila.dataset.deleted = "1";
+                fila.style.display = "none";
+            } else {
+                fila.remove();
+            }
+            fila.querySelector(".comentario-box")?.classList.remove("is-open");
+            fila.querySelector(".erp-note-toggle")?.classList.remove("is-open");
+            recalcularTotales();
+            actualizarPreviewFactura();
+        }
+    });
+
+    document.addEventListener("click", function(e){
+        if(e.target.classList.contains("btn-comentario")){
+            const boton = e.target;
+            const fila = boton.closest(".tabla-row");
+            const box = fila.querySelector(".comentario-box");
+            const estabaAbierto = box.classList.contains("is-open");
+
+            document.querySelectorAll(".comentario-box.is-open").forEach(abierto => {
+                abierto.classList.remove("is-open");
+            });
+            document.querySelectorAll(".erp-note-toggle.is-open").forEach(toggle => {
+                toggle.classList.remove("is-open");
+            });
+
+            if(!estabaAbierto){
+                box.classList.add("is-open");
+                boton.classList.add("is-open");
+                const campo = box.querySelector("textarea, input");
+                if(campo){
+                    campo.focus();
+                }
+            }
+            return;
+        }
+
+        if(!e.target.closest(".erp-note-cell")){
+            document.querySelectorAll(".comentario-box.is-open").forEach(abierto => {
+                abierto.classList.remove("is-open");
+            });
+            document.querySelectorAll(".erp-note-toggle.is-open").forEach(toggle => {
+                toggle.classList.remove("is-open");
+            });
+        }
+    });
+
+    const moneda = document.getElementById("id_moneda");
+    const tipoWrapper = document.getElementById("tipo-cambio-wrapper");
+
+    function toggleTipoCambio(){
+        const simbolo = moneda.value === "USD" ? "$" : "L.";
+        document.querySelectorAll(".invoice-symbol").forEach(el => {
+            el.textContent = simbolo;
+        });
+        if(moneda.value === "USD"){
+            tipoWrapper.style.display = "flex";
+        } else {
+            tipoWrapper.style.display = "none";
+        }
+    }
+
+    prepararAccesosRapidosConBorrador();
+    initSearchableSelects(document);
+    syncClienteSearchFromSelect();
+    if(clienteSearchInput){
+        clienteSearchInput.addEventListener("focus", renderClienteSuggestions);
+        clienteSearchInput.addEventListener("input", function(){
+            syncClienteSelectFromSearch();
+            renderClienteSuggestions();
+        });
+        clienteSearchInput.addEventListener("change", syncClienteSelectFromSearch);
+        clienteSearchInput.addEventListener("blur", function(){
+            syncClienteSelectFromSearch();
+            window.setTimeout(() => {
+                if(clienteSuggestionsPanel){
+                    clienteSuggestionsPanel.style.display = "none";
+                }
+            }, 120);
+        });
+    }
+    if(clienteSelect){
+        clienteSelect.addEventListener("change", syncClienteSearchFromSelect);
+    }
+    document.querySelector("form").addEventListener("submit", function(){
+        syncClienteSelectFromSearch();
+        prepararFormsetAntesSubmit();
+    });
+    restaurarBorradorFacturaSiAplica();
+    toggleTipoCambio();
+    moneda.addEventListener("change", toggleTipoCambio);
+    [
+        "id_fecha_emision",
+        "id_fecha_vencimiento",
+        "id_vendedor",
+        "id_estado",
+        "id_orden_compra_exenta",
+        "id_registro_exonerado",
+        "id_registro_sag",
+        "id_numero_factura",
+        "id_numero_factura_sufijo"
+    ].forEach(id => {
+        const element = document.getElementById(id);
+        if(element){
+            element.addEventListener("input", actualizarPreviewFactura);
+            element.addEventListener("change", actualizarPreviewFactura);
+        }
+    });
+    document.addEventListener("preview-factura-refresh", actualizarPreviewFactura);
+    actualizarPreviewFactura();
+});
+</script>
+
+<script>
+flatpickr("#id_fecha_emision", {
+    dateFormat: "d/m/Y",
+    allowInput: true
+});
+flatpickr("#id_fecha_vencimiento", {
+    dateFormat: "d/m/Y",
+    allowInput: true
+});
+</script>
+{% if permite_gestion_fiscal_historica and prefijo_factura_manual_url %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const fechaInput = document.getElementById("id_fecha_emision");
+    const prefijoBox = document.querySelector(".erp-manual-prefix");
+    const ayudaBox = document.getElementById("numero-factura-ayuda");
+    if(!fechaInput || !prefijoBox){
+        return;
+    }
+
+    async function actualizarPrefijo(){
+        const fecha = (fechaInput.value || "").trim();
+        if(!fecha){
+            return;
+        }
+        try{
+            const response = await fetch("{{ prefijo_factura_manual_url|escapejs }}?fecha=" + encodeURIComponent(fecha), {
+                headers: {"X-Requested-With": "XMLHttpRequest"}
+            });
+            const data = await response.json();
+            if(data.ok){
+                prefijoBox.textContent = data.prefijo;
+                if(ayudaBox && data.detalle){
+                    ayudaBox.textContent = data.detalle;
+                }
+            }else{
+                prefijoBox.textContent = "Sin CAI";
+                if(ayudaBox && data.detalle){
+                    ayudaBox.textContent = data.detalle;
+                }
+            }
+        }catch(error){
+            if(ayudaBox){
+                ayudaBox.textContent = "No se pudo actualizar el prefijo del CAI en este momento.";
+            }
+        }
+        document.dispatchEvent(new CustomEvent("preview-factura-refresh"));
+    }
+
+    fechaInput.addEventListener("change", actualizarPrefijo);
+    fechaInput.addEventListener("blur", actualizarPrefijo);
+});
+</script>
+{% endif %}
+{% endblock %}

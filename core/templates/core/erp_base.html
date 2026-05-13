@@ -1,0 +1,694 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ERP{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+{% if empresa %}
+    {% url 'dashboard' empresa.slug as dashboard_url %}
+    {% url 'facturacion_dashboard' empresa.slug as facturacion_url %}
+    {% url 'configuracion_facturacion' empresa.slug as configuracion_facturacion_url %}
+    {% url 'facturas_dashboard' empresa.slug as facturas_url %}
+    {% url 'clientes_facturacion' empresa.slug as clientes_url %}
+    {% url 'productos_facturacion' empresa.slug as productos_url %}
+    {% url 'categorias_farmaceuticas' empresa.slug as categorias_farmaceuticas_url %}
+    {% url 'proveedores_facturacion' empresa.slug as proveedores_url %}
+    {% url 'inventario_facturacion' empresa.slug as inventario_url %}
+    {% url 'inventario_farmaceutico' empresa.slug as inventario_farmaceutico_url %}
+    {% url 'traslado_rapido_farmaceutico' empresa.slug as traslado_rapido_farmaceutico_url %}
+    {% url 'entrada_inventario' empresa.slug as entrada_inventario_url %}
+    {% url 'compras_dashboard' empresa.slug as compras_url %}
+    {% url 'libro_compras_fiscal' empresa.slug as libro_compras_fiscal_url %}
+    {% url 'entradas_inventario_dashboard' empresa.slug as entradas_inventario_url %}
+    {% url 'kardex_inventario' empresa.slug as kardex_inventario_url %}
+    {% url 'cai_facturacion' empresa.slug as cai_url %}
+    {% url 'impuestos_facturacion' empresa.slug as impuestos_url %}
+    {% url 'notas_credito_dashboard' empresa.slug as notas_url %}
+    {% url 'recibos_dashboard' empresa.slug as recibos_url %}
+    {% url 'egresos_dashboard' empresa.slug as egresos_url %}
+    {% url 'cierres_caja' empresa.slug as cierres_caja_url %}
+    {% url 'resumen_diario_caja' empresa.slug as resumen_diario_caja_url %}
+    {% url 'reportes_facturacion' empresa.slug as reportes_url %}
+    {% url 'reporte_ingresos_bancos' empresa.slug as reporte_ingresos_bancos_url %}
+    {% url 'reporte_cxc' empresa.slug as cxc_url %}
+    {% url 'reporte_cxp' empresa.slug as cxp_url %}
+    {% url 'contabilidad_dashboard' empresa.slug as contabilidad_url %}
+    {% url 'configuracion_contable' empresa.slug as configuracion_contable_url %}
+    {% url 'periodos_contables' empresa.slug as periodos_contables_url %}
+    {% url 'clasificaciones_compras_fiscales' empresa.slug as clasificaciones_compras_fiscales_url %}
+    {% url 'bancos_dashboard' empresa.slug as bancos_dashboard_url %}
+    {% url 'conciliacion_bancaria' empresa.slug as conciliacion_bancaria_url %}
+    {% url 'catalogo_cuentas' empresa.slug as catalogo_cuentas_url %}
+    {% url 'asientos_contables' empresa.slug as asientos_contables_url %}
+    {% url 'reportes_contables' empresa.slug as reportes_contables_url %}
+    {% url 'auditoria_contable' empresa.slug as auditoria_contable_url %}
+    {% url 'reporte_impuestos' empresa.slug as reporte_impuestos_url %}
+    {% url 'libro_diario' empresa.slug as libro_diario_url %}
+    {% url 'mayor_cuenta' empresa.slug as mayor_cuenta_url %}
+    {% url 'balance_comprobacion' empresa.slug as balance_comprobacion_url %}
+    {% url 'estado_resultados' empresa.slug as estado_resultados_url %}
+    {% url 'balance_general' empresa.slug as balance_general_url %}
+    {% url 'rrhh_dashboard' empresa.slug as rrhh_url %}
+    {% url 'configuracion_rrhh' empresa.slug as configuracion_rrhh_url %}
+    {% url 'empleados_rrhh' empresa.slug as empleados_rrhh_url %}
+    {% url 'planillas_rrhh' empresa.slug as planillas_rrhh_url %}
+    {% url 'movimientos_planilla' empresa.slug as movimientos_planilla_url %}
+    {% url 'vacaciones_rrhh' empresa.slug as vacaciones_rrhh_url %}
+    {% url 'crm_dashboard' empresa.slug as crm_url %}
+    {% url 'crm_configuracion' empresa.slug as configuracion_crm_url %}
+    {% url 'crm_plantillas' empresa.slug as crm_plantillas_url %}
+    {% url 'crm_campanias' empresa.slug as crm_campanias_url %}
+    {% url 'agenda_citas' empresa.slug as agenda_citas_url %}
+    {% url 'asistente_consulta' empresa.slug as asistente_consulta_url %}
+{% endif %}
+<div class="erp-shell">
+    <div class="erp-mobile-topbar">
+        <button class="erp-mobile-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" data-mobile-menu-toggle>
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a class="erp-mobile-brand" href="{{ dashboard_url|default:'#' }}">
+            {% if empresa and empresa.logo %}
+            <img class="erp-mobile-brand-logo" src="{{ empresa.logo.url }}" alt="{{ empresa.nombre }}">
+            {% endif %}
+            <span>DV Solutions ERP</span>
+            <strong>{{ empresa.nombre|default:"ERP Corporativo" }}</strong>
+        </a>
+        {% if empresa %}
+        <a class="erp-mobile-avatar" href="{{ dashboard_url }}" aria-label="Panel principal">{{ empresa.nombre|slice:":1" }}</a>
+        {% endif %}
+    </div>
+    <div class="erp-mobile-backdrop" data-mobile-menu-close></div>
+    <aside class="erp-sidebar">
+        <div class="erp-mobile-drawer-head">
+            <div>
+                <span>Menu ERP</span>
+                <strong>{{ empresa.nombre|default:"ERP Corporativo" }}</strong>
+            </div>
+            <button class="erp-mobile-close" type="button" aria-label="Cerrar menu" data-mobile-menu-close>&times;</button>
+        </div>
+        <div class="erp-brand">
+            {% if empresa and empresa.logo %}
+            <div class="erp-brand-logo-wrap">
+                <img class="erp-brand-logo" src="{{ empresa.logo.url }}" alt="{{ empresa.nombre }}">
+            </div>
+            {% endif %}
+            <div class="erp-brand-kicker">DV Solutions ERP</div>
+            <h1>{{ empresa.nombre|default:"ERP Corporativo" }}</h1>
+            <p>{% block sidebar_description %}Plataforma empresarial de alto nivel con una experiencia sobria, precisa y profesional.{% endblock %}</p>
+        </div>
+
+        <div>
+            <div class="erp-nav-group-title">Navegacion</div>
+            <nav class="erp-nav">
+                <a class="erp-nav-link {% if request.path == dashboard_url %}is-active{% endif %}" href="{{ dashboard_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Panel Principal</span>
+                </a>
+                <a class="erp-nav-link {% if '/dashboard/facturacion/' in request.path %}is-active{% endif %}" href="{{ facturacion_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Facturacion</span>
+                </a>
+                {% if erp_access.modulo_contabilidad %}
+                <a class="erp-nav-link {% if '/dashboard/contabilidad/' in request.path %}is-active{% endif %}" href="{{ contabilidad_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Contabilidad</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_rrhh %}
+                <a class="erp-nav-link {% if '/dashboard/rrhh/' in request.path %}is-active{% endif %}" href="{{ rrhh_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Recursos Humanos</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_crm %}
+                <a class="erp-nav-link {% if '/dashboard/crm/' in request.path %}is-active{% endif %}" href="{{ crm_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>CRM y Marketing</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_citas %}
+                <a class="erp-nav-link {% if '/dashboard/citas/' in request.path %}is-active{% endif %}" href="{{ agenda_citas_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Citas</span>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+
+        {% if '/dashboard/facturacion/' in request.path %}
+        <div>
+            <div class="erp-nav-group-title">Operacion</div>
+            <nav class="erp-nav">
+                {% if erp_access.facturas %}<a class="erp-nav-link {% if '/dashboard/facturacion/facturas/' in request.path or '/dashboard/facturacion/crear/' in request.path %}is-active{% endif %}" href="{{ facturas_url }}"><span class="erp-nav-bullet"></span><span>Facturas</span></a>{% endif %}
+                {% if erp_access.facturas %}<a class="erp-nav-link {% if '/dashboard/facturacion/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_facturacion_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.clientes %}<a class="erp-nav-link {% if '/dashboard/facturacion/clientes/' in request.path %}is-active{% endif %}" href="{{ clientes_url }}"><span class="erp-nav-bullet"></span><span>Clientes</span></a>{% endif %}
+                {% if erp_access.productos %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/' in request.path %}is-active{% endif %}" href="{{ productos_url }}"><span class="erp-nav-bullet"></span><span>Productos</span></a>{% endif %}
+                {% if erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/categorias-farmaceuticas/' in request.path %}is-active{% endif %}" href="{{ categorias_farmaceuticas_url }}"><span class="erp-nav-bullet"></span><span>Categorias Farmaceuticas</span></a>{% endif %}
+                {% if erp_access.proveedores %}<a class="erp-nav-link {% if '/dashboard/facturacion/proveedores/' in request.path %}is-active{% endif %}" href="{{ proveedores_url }}"><span class="erp-nav-bullet"></span><span>Proveedores</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/' in request.path %}is-active{% endif %}" href="{{ inventario_url }}"><span class="erp-nav-bullet"></span><span>Inventario</span></a>{% endif %}
+                {% if erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/' in request.path %}is-active{% endif %}" href="{{ inventario_farmaceutico_url }}"><span class="erp-nav-bullet"></span><span>Inventario Farmaceutico</span></a>{% endif %}
+                {% if erp_access.usa_bodegas_internas %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/traslado-rapido/' in request.path %}is-active{% endif %}" href="{{ traslado_rapido_farmaceutico_url }}"><span class="erp-nav-bullet"></span><span>Transferencia Rapida</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/entrada/' in request.path %}is-active{% endif %}" href="{{ entrada_inventario_url }}"><span class="erp-nav-bullet"></span><span>Entrada Inventario</span></a>{% endif %}
+                {% if erp_access.compras %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/compras/' in request.path %}is-active{% endif %}" href="{{ compras_url }}"><span class="erp-nav-bullet"></span><span>Compras</span></a>{% endif %}
+                {% if erp_access.compras %}<a class="erp-nav-link {% if '/dashboard/facturacion/libro-compras/' in request.path %}is-active{% endif %}" href="{{ libro_compras_fiscal_url }}"><span class="erp-nav-bullet"></span><span>Libro Compras</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/entradas/' in request.path %}is-active{% endif %}" href="{{ entradas_inventario_url }}"><span class="erp-nav-bullet"></span><span>Entradas</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/kardex/' in request.path %}is-active{% endif %}" href="{{ kardex_inventario_url }}"><span class="erp-nav-bullet"></span><span>Kardex</span></a>{% endif %}
+                {% if erp_access.cai %}<a class="erp-nav-link {% if '/dashboard/facturacion/cai/' in request.path %}is-active{% endif %}" href="{{ cai_url }}"><span class="erp-nav-bullet"></span><span>CAI</span></a>{% endif %}
+                {% if erp_access.impuestos %}<a class="erp-nav-link {% if '/dashboard/facturacion/impuestos/' in request.path %}is-active{% endif %}" href="{{ impuestos_url }}"><span class="erp-nav-bullet"></span><span>Impuestos</span></a>{% endif %}
+                {% if erp_access.notas_credito %}<a class="erp-nav-link {% if '/dashboard/facturacion/notas-credito/' in request.path %}is-active{% endif %}" href="{{ notas_url }}"><span class="erp-nav-bullet"></span><span>Notas de Credito</span></a>{% endif %}
+                {% if erp_access.recibos %}<a class="erp-nav-link {% if '/dashboard/facturacion/recibos/' in request.path %}is-active{% endif %}" href="{{ recibos_url }}"><span class="erp-nav-bullet"></span><span>Recibos</span></a>{% endif %}
+                {% if erp_access.usa_cierre_caja %}<a class="erp-nav-link {% if '/dashboard/facturacion/cierres-caja/' in request.path %}is-active{% endif %}" href="{{ cierres_caja_url }}"><span class="erp-nav-bullet"></span><span>Cierres de Caja</span></a>{% endif %}
+                {% if erp_access.usa_cierre_caja %}<a class="erp-nav-link {% if '/dashboard/facturacion/cierres-caja/resumen-diario/' in request.path %}is-active{% endif %}" href="{{ resumen_diario_caja_url }}"><span class="erp-nav-bullet"></span><span>Resumen Diario</span></a>{% endif %}
+                {% if erp_access.egresos %}<a class="erp-nav-link {% if '/dashboard/facturacion/egresos/' in request.path %}is-active{% endif %}" href="{{ egresos_url }}"><span class="erp-nav-bullet"></span><span>Egresos</span></a>{% endif %}
+                {% if erp_access.reportes %}<a class="erp-nav-link {% if '/dashboard/facturacion/reportes/' in request.path %}is-active{% endif %}" href="{{ reportes_url }}"><span class="erp-nav-bullet"></span><span>Reportes</span></a>{% endif %}
+                {% if erp_access.usa_reporte_bancos %}<a class="erp-nav-link {% if '/dashboard/facturacion/reportes/bancos/' in request.path %}is-active{% endif %}" href="{{ reporte_ingresos_bancos_url }}"><span class="erp-nav-bullet"></span><span>Ingresos por Banco</span></a>{% endif %}
+                {% if erp_access.cxc %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxc/' in request.path %}is-active{% endif %}" href="{{ cxc_url }}"><span class="erp-nav-bullet"></span><span>Cuentas por Cobrar</span></a>{% endif %}
+                {% if erp_access.cxp %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxp/' in request.path %}is-active{% endif %}" href="{{ cxp_url }}"><span class="erp-nav-bullet"></span><span>Cuentas por Pagar</span></a>{% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
+        {% if '/dashboard/contabilidad/' in request.path %}
+        <div>
+            <div class="erp-nav-group-title">Contabilidad</div>
+            <nav class="erp-nav">
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if request.path == contabilidad_url %}is-active{% endif %}" href="{{ contabilidad_url }}"><span class="erp-nav-bullet"></span><span>Resumen</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_contable_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/periodos/' in request.path %}is-active{% endif %}" href="{{ periodos_contables_url }}"><span class="erp-nav-bullet"></span><span>Periodos Contables</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/clasificaciones-compras/' in request.path %}is-active{% endif %}" href="{{ clasificaciones_compras_fiscales_url }}"><span class="erp-nav-bullet"></span><span>Clasif. Compras</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/bancos/' in request.path and '/dashboard/contabilidad/bancos/conciliacion/' not in request.path %}is-active{% endif %}" href="{{ bancos_dashboard_url }}"><span class="erp-nav-bullet"></span><span>Bancos y Tarjetas</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/bancos/conciliacion/' in request.path %}is-active{% endif %}" href="{{ conciliacion_bancaria_url }}"><span class="erp-nav-bullet"></span><span>Conciliacion</span></a>{% endif %}
+                {% if erp_access.catalogo_cuentas %}<a class="erp-nav-link {% if '/dashboard/contabilidad/cuentas/' in request.path %}is-active{% endif %}" href="{{ catalogo_cuentas_url }}"><span class="erp-nav-bullet"></span><span>Catalogo de Cuentas</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/asientos/' in request.path %}is-active{% endif %}" href="{{ asientos_contables_url }}"><span class="erp-nav-bullet"></span><span>Asientos</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/' in request.path %}is-active{% endif %}" href="{{ reportes_contables_url }}"><span class="erp-nav-bullet"></span><span>Reportes Contables</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_contable_url }}"><span class="erp-nav-bullet"></span><span>Auditoria Contable</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/impuestos/' in request.path %}is-active{% endif %}" href="{{ reporte_impuestos_url }}"><span class="erp-nav-bullet"></span><span>Reporte Impuestos</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/libro-diario/' in request.path %}is-active{% endif %}" href="{{ libro_diario_url }}"><span class="erp-nav-bullet"></span><span>Libro Diario</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/mayor-cuenta/' in request.path %}is-active{% endif %}" href="{{ mayor_cuenta_url }}"><span class="erp-nav-bullet"></span><span>Mayor por Cuenta</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/balance-comprobacion/' in request.path %}is-active{% endif %}" href="{{ balance_comprobacion_url }}"><span class="erp-nav-bullet"></span><span>Balance de Comprobacion</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/estado-resultados/' in request.path %}is-active{% endif %}" href="{{ estado_resultados_url }}"><span class="erp-nav-bullet"></span><span>Estado de Resultados</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/balance-general/' in request.path %}is-active{% endif %}" href="{{ balance_general_url }}"><span class="erp-nav-bullet"></span><span>Balance General</span></a>{% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
+        {% if '/dashboard/rrhh/' in request.path %}
+        <div>
+            <div class="erp-nav-group-title">Recursos Humanos</div>
+            <nav class="erp-nav">
+                {% if erp_access.rrhh %}<a class="erp-nav-link {% if request.path == rrhh_url %}is-active{% endif %}" href="{{ rrhh_url }}"><span class="erp-nav-bullet"></span><span>Resumen</span></a>{% endif %}
+                {% if erp_access.configuracion_rrhh %}<a class="erp-nav-link {% if '/dashboard/rrhh/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.empleados %}<a class="erp-nav-link {% if '/dashboard/rrhh/empleados/' in request.path %}is-active{% endif %}" href="{{ empleados_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Empleados</span></a>{% endif %}
+                {% if erp_access.planillas %}<a class="erp-nav-link {% if '/dashboard/rrhh/planillas/' in request.path %}is-active{% endif %}" href="{{ planillas_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Planillas</span></a>{% endif %}
+                {% if erp_access.planillas %}<a class="erp-nav-link {% if '/dashboard/rrhh/movimientos/' in request.path %}is-active{% endif %}" href="{{ movimientos_planilla_url }}"><span class="erp-nav-bullet"></span><span>Bonos y Deducciones</span></a>{% endif %}
+                {% if erp_access.vacaciones %}<a class="erp-nav-link {% if '/dashboard/rrhh/vacaciones/' in request.path %}is-active{% endif %}" href="{{ vacaciones_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Vacaciones</span></a>{% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
+        {% if '/dashboard/crm/' in request.path %}
+        <div>
+            <div class="erp-nav-group-title">CRM y Agenda</div>
+            <nav class="erp-nav">
+                {% if erp_access.crm %}<a class="erp-nav-link {% if request.path == crm_url %}is-active{% endif %}" href="{{ crm_url }}"><span class="erp-nav-bullet"></span><span>Resumen</span></a>{% endif %}
+                {% if erp_access.configuracion_crm %}<a class="erp-nav-link {% if '/dashboard/crm/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_crm_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.campanias %}<a class="erp-nav-link {% if '/dashboard/crm/plantillas/' in request.path %}is-active{% endif %}" href="{{ crm_plantillas_url }}"><span class="erp-nav-bullet"></span><span>Plantillas</span></a>{% endif %}
+                {% if erp_access.campanias %}<a class="erp-nav-link {% if '/dashboard/crm/campanias/' in request.path %}is-active{% endif %}" href="{{ crm_campanias_url }}"><span class="erp-nav-bullet"></span><span>Campanias</span></a>{% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
+        {% if '/dashboard/citas/' in request.path %}
+        <div>
+            <div class="erp-nav-group-title">Citas</div>
+            <nav class="erp-nav">
+                {% if erp_access.citas %}<a class="erp-nav-link {% if request.path == agenda_citas_url %}is-active{% endif %}" href="{{ agenda_citas_url }}"><span class="erp-nav-bullet"></span><span>Calendario</span></a>{% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
+        <div class="erp-sidebar-footer">
+            <div><strong>Usuario:</strong> {{ request.user.username|default:"Invitado" }}</div>
+            {% if empresa %}
+            <div><strong>Empresa:</strong> {{ empresa.nombre }}</div>
+            <div style="margin-top:10px;">
+                <a href="{% url 'cerrar_sesion' empresa.slug %}" style="color:#fff;">Cerrar sesion</a>
+            </div>
+            {% endif %}
+        </div>
+    </aside>
+
+    <div class="erp-main">
+        <header class="erp-topbar">
+            <div>
+                <div class="erp-topbar-kicker">{% block header_kicker %}Institucional{% endblock %}</div>
+                <h2>{% block header_title %}ERP{% endblock %}</h2>
+                <p>{% block header_description %}Operacion empresarial con una interfaz clara, confiable y preparada para crecer modulo a modulo.{% endblock %}</p>
+            </div>
+            <div class="erp-topbar-actions">
+                {% if empresa %}
+                <div class="erp-user-chip">{{ empresa.nombre }}</div>
+                {% endif %}
+                {% block topbar_actions %}{% endblock %}
+            </div>
+        </header>
+
+        <main class="erp-content">
+            {% if messages %}
+            <div class="erp-message-stack">
+                {% for message in messages %}
+                    <div class="erp-message">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% if empresa and request.user.is_authenticated %}
+<button class="erp-assistant-fab" type="button" data-assistant-toggle aria-expanded="false" aria-controls="erpAssistantPanel">
+    <span class="erp-assistant-fab-dot"></span>
+    <span>Asistente ERP</span>
+</button>
+
+<aside class="erp-assistant-panel" id="erpAssistantPanel" aria-hidden="true">
+    <div class="erp-assistant-head">
+        <div>
+            <div class="erp-assistant-kicker">Ayuda guiada</div>
+            <h3>Asistente ERP</h3>
+            <p>Te ayuda con facturación, contabilidad, RRHH, CRM y uso operativo del sistema.</p>
+        </div>
+        <button class="erp-assistant-close" type="button" aria-label="Cerrar asistente" data-assistant-close>&times;</button>
+    </div>
+    <div class="erp-assistant-suggestions" data-assistant-suggestions>
+        <button type="button" class="erp-assistant-chip" data-assistant-question="Como crear una factura">Crear factura</button>
+        <button type="button" class="erp-assistant-chip" data-assistant-question="Como registrar un pago">Registrar pago</button>
+        <button type="button" class="erp-assistant-chip" data-assistant-question="Como calcular una planilla">Calcular planilla</button>
+        <button type="button" class="erp-assistant-chip" data-assistant-question="Como importar movimientos bancarios">Importar bancos</button>
+    </div>
+    <div class="erp-assistant-body" data-assistant-body>
+        <div class="erp-assistant-message is-system">
+            <strong>Asistente ERP</strong>
+            <p>Estoy listo para ayudarte. Escribe tu duda o toca una sugerencia para responderte con pasos concretos dentro del sistema.</p>
+        </div>
+    </div>
+    <form class="erp-assistant-form" data-assistant-form>
+        <input type="hidden" value="{{ asistente_consulta_url }}">
+        <label class="erp-assistant-label" for="assistantQuestion">Escribe tu consulta</label>
+        <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: como registrar un pago parcial o como crear una nota de credito"></textarea>
+        <div class="erp-assistant-actions">
+            <span class="erp-assistant-context">Pantalla actual: {{ request.path }}</span>
+            <button type="submit" class="erp-button-primary">Consultar</button>
+        </div>
+    </form>
+</aside>
+{% endif %}
+{% if empresa %}
+<nav class="erp-mobile-bottom-nav" aria-label="Navegacion movil principal">
+    <a class="{% if request.path == dashboard_url %}is-active{% endif %}" href="{{ dashboard_url }}">
+        <span>Inicio</span>
+    </a>
+    <a class="{% if '/dashboard/facturacion/facturas/' in request.path or '/dashboard/facturacion/crear/' in request.path %}is-active{% endif %}" href="{{ facturas_url }}">
+        <span>Facturas</span>
+    </a>
+    {% if erp_access.modulo_crm %}
+    <a class="{% if '/dashboard/crm/' in request.path %}is-active{% endif %}" href="{{ crm_url }}">
+        <span>CRM</span>
+    </a>
+    {% endif %}
+    {% if erp_access.modulo_citas %}
+    <a class="{% if '/dashboard/citas/' in request.path %}is-active{% endif %}" href="{{ agenda_citas_url }}">
+        <span>Citas</span>
+    </a>
+    {% endif %}
+    <button type="button" data-mobile-menu-toggle>
+        <span>Mas</span>
+    </button>
+</nav>
+{% endif %}
+{% block extra_js %}{% endblock %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const body = document.body;
+    const menuToggles = document.querySelectorAll("[data-mobile-menu-toggle]");
+    const menuClosers = document.querySelectorAll("[data-mobile-menu-close]");
+    const sidebar = document.querySelector(".erp-sidebar");
+
+    function setMobileMenu(open){
+        body.classList.toggle("erp-mobile-menu-open", open);
+        menuToggles.forEach(button => button.setAttribute("aria-expanded", open ? "true" : "false"));
+    }
+
+    menuToggles.forEach(button => {
+        button.addEventListener("click", function(){
+            setMobileMenu(!body.classList.contains("erp-mobile-menu-open"));
+        });
+    });
+
+    menuClosers.forEach(button => {
+        button.addEventListener("click", function(){
+            setMobileMenu(false);
+        });
+    });
+
+    if(sidebar){
+        sidebar.querySelectorAll("a").forEach(link => {
+            link.addEventListener("click", function(){
+                setMobileMenu(false);
+            });
+        });
+    }
+
+    document.addEventListener("keydown", function(event){
+        if(event.key === "Escape"){
+            setMobileMenu(false);
+        }
+    });
+
+    function escapeHtml(value){
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function escapeRegExp(value){
+        return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function getAutocompleteWrappers(){
+        return document.querySelectorAll(".erp-autocomplete, .erp-search-select");
+    }
+
+    function getInputAndPanel(wrapper){
+        const input = wrapper.querySelector("input[type='text'], input[type='search']");
+        const panel = wrapper.querySelector(".erp-suggestion-list");
+        if(!input || !panel){
+            return null;
+        }
+        return { input, panel };
+    }
+
+    function getItems(panel){
+        return Array.from(panel.querySelectorAll(".erp-suggestion-item"));
+    }
+
+    function upsertFooter(panel, count){
+        let footer = panel.querySelector(".erp-suggestion-footer");
+        if(!footer){
+            footer = document.createElement("div");
+            footer.className = "erp-suggestion-footer";
+            panel.appendChild(footer);
+        }
+
+        footer.textContent = count === 1
+            ? "1 resultado interno del ERP"
+            : count + " resultados internos del ERP";
+    }
+
+    function setActiveItem(panel, index){
+        const items = getItems(panel);
+        if(!items.length){
+            panel.dataset.activeIndex = "-1";
+            return;
+        }
+
+        let safeIndex = index;
+        if(safeIndex < 0){
+            safeIndex = items.length - 1;
+        }
+        if(safeIndex >= items.length){
+            safeIndex = 0;
+        }
+
+        items.forEach((item, itemIndex) => {
+            item.classList.toggle("is-active", itemIndex === safeIndex);
+        });
+
+        panel.dataset.activeIndex = String(safeIndex);
+        items[safeIndex].scrollIntoView({ block: "nearest" });
+    }
+
+    function highlightItems(input, panel){
+        const term = (input.value || "").trim();
+        const items = getItems(panel);
+        const regex = term ? new RegExp("(" + escapeRegExp(term) + ")", "ig") : null;
+
+        items.forEach((item, index) => {
+            const rawText = item.dataset.rawText || item.textContent || "";
+            item.dataset.rawText = rawText;
+            const highlightedText = regex
+                ? escapeHtml(rawText).replace(regex, '<mark class="erp-suggestion-mark">$1</mark>')
+                : escapeHtml(rawText);
+            item.innerHTML = `
+                <span class="erp-suggestion-label">${highlightedText}</span>
+                <span class="erp-suggestion-meta">Dato interno del ERP</span>
+            `;
+
+            item.onmouseenter = function(){
+                setActiveItem(panel, index);
+            };
+        });
+
+        upsertFooter(panel, items.length);
+
+        if(items.length){
+            const current = parseInt(panel.dataset.activeIndex || "-1", 10);
+            if(Number.isNaN(current) || current < 0 || current >= items.length){
+                setActiveItem(panel, 0);
+            } else {
+                setActiveItem(panel, current);
+            }
+        }
+    }
+
+    function refreshAutocomplete(wrapper){
+        const refs = getInputAndPanel(wrapper);
+        if(!refs){
+            return;
+        }
+        const { input, panel } = refs;
+        if(panel.style.display === "none" || panel.hidden){
+            return;
+        }
+        highlightItems(input, panel);
+    }
+
+    getAutocompleteWrappers().forEach(wrapper => {
+        const refs = getInputAndPanel(wrapper);
+        if(!refs){
+            return;
+        }
+
+        const { input, panel } = refs;
+
+        const observer = new MutationObserver(function(){
+            if(panel.style.display !== "none" && panel.childElementCount){
+                highlightItems(input, panel);
+            }
+        });
+        observer.observe(panel, { childList: true });
+
+        input.addEventListener("focus", function(){
+            window.setTimeout(() => refreshAutocomplete(wrapper), 0);
+        });
+
+        input.addEventListener("input", function(){
+            panel.dataset.activeIndex = "0";
+            window.setTimeout(() => refreshAutocomplete(wrapper), 0);
+        });
+
+        input.addEventListener("keydown", function(event){
+            const items = getItems(panel);
+            if(!items.length || panel.style.display === "none"){
+                return;
+            }
+
+            let activeIndex = parseInt(panel.dataset.activeIndex || "-1", 10);
+            if(Number.isNaN(activeIndex)){
+                activeIndex = -1;
+            }
+
+            if(event.key === "ArrowDown"){
+                event.preventDefault();
+                setActiveItem(panel, activeIndex + 1);
+            } else if(event.key === "ArrowUp"){
+                event.preventDefault();
+                setActiveItem(panel, activeIndex - 1);
+            } else if(event.key === "Enter"){
+                const targetIndex = activeIndex >= 0 ? activeIndex : 0;
+                const target = items[targetIndex];
+                if(target){
+                    event.preventDefault();
+                    target.click();
+                }
+            } else if(event.key === "Tab"){
+                const targetIndex = activeIndex >= 0 ? activeIndex : 0;
+                const target = items[targetIndex];
+                if(target){
+                    target.click();
+                }
+            } else if(event.key === "Escape"){
+                panel.style.display = "none";
+            }
+        });
+    });
+
+    const assistantToggle = document.querySelector("[data-assistant-toggle]");
+    const assistantPanel = document.querySelector(".erp-assistant-panel");
+    const assistantClose = document.querySelector("[data-assistant-close]");
+    const assistantForm = document.querySelector("[data-assistant-form]");
+    const assistantBody = document.querySelector("[data-assistant-body]");
+    const assistantQuestion = assistantForm ? assistantForm.querySelector("textarea[name='pregunta']") : null;
+    const assistantUrlInput = assistantForm ? assistantForm.querySelector("input[type='hidden']") : null;
+
+    function getCookie(name) {
+        const cookieValue = document.cookie
+            .split(";")
+            .map(value => value.trim())
+            .find(value => value.startsWith(name + "="));
+        return cookieValue ? decodeURIComponent(cookieValue.split("=")[1]) : "";
+    }
+
+    function setAssistantOpen(open) {
+        if(!assistantToggle || !assistantPanel){
+            return;
+        }
+        assistantToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        assistantPanel.setAttribute("aria-hidden", open ? "false" : "true");
+        assistantPanel.classList.toggle("is-open", open);
+        body.classList.toggle("erp-assistant-open", open);
+        if(open && assistantQuestion){
+            window.setTimeout(() => assistantQuestion.focus(), 100);
+        }
+    }
+
+    function appendAssistantMessage(kind, title, bodyText, steps, suggestions, contextLabel) {
+        if(!assistantBody){
+            return;
+        }
+        const wrapper = document.createElement("div");
+        wrapper.className = "erp-assistant-message " + (kind === "user" ? "is-user" : "is-system");
+
+        let stepsHtml = "";
+        if(Array.isArray(steps) && steps.length){
+            stepsHtml = '<ol class="erp-assistant-steps">' + steps.map(step => '<li>' + escapeHtml(step) + '</li>').join("") + "</ol>";
+        }
+
+        let suggestionsHtml = "";
+        if(Array.isArray(suggestions) && suggestions.length){
+            suggestionsHtml = '<div class="erp-assistant-inline-suggestions">' + suggestions.map(question => '<button type="button" class="erp-assistant-chip" data-assistant-question="' + escapeHtml(question) + '">' + escapeHtml(question) + "</button>").join("") + "</div>";
+        }
+
+        const contextHtml = contextLabel ? '<span class="erp-assistant-badge">' + escapeHtml(contextLabel) + "</span>" : "";
+
+        wrapper.innerHTML = `
+            <strong>${escapeHtml(title)}</strong>
+            ${contextHtml}
+            <p>${escapeHtml(bodyText)}</p>
+            ${stepsHtml}
+            ${suggestionsHtml}
+        `;
+        assistantBody.appendChild(wrapper);
+        assistantBody.scrollTop = assistantBody.scrollHeight;
+    }
+
+    function submitAssistantQuestion(questionText) {
+        if(!assistantForm || !assistantQuestion || !assistantUrlInput || !questionText.trim()){
+            return;
+        }
+
+        setAssistantOpen(true);
+        appendAssistantMessage("user", "Tu consulta", questionText.trim(), [], [], "");
+
+        const formData = new FormData();
+        formData.append("pregunta", questionText.trim());
+        formData.append("pagina", window.location.pathname);
+
+        fetch(assistantUrlInput.value, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: formData,
+            credentials: "same-origin",
+        })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+            if(!ok){
+                appendAssistantMessage(
+                    "system",
+                    "No pude completar la consulta",
+                    data.error || "Hubo un problema al procesar tu pregunta. Intenta nuevamente.",
+                    [],
+                    [],
+                    "Asistente"
+                );
+                return;
+            }
+            appendAssistantMessage(
+                "system",
+                data.title || "Asistente ERP",
+                data.answer || "Aquí tienes una guía rápida.",
+                data.steps || [],
+                data.suggested_questions || [],
+                data.context_label || ""
+            );
+        })
+        .catch(() => {
+            appendAssistantMessage(
+                "system",
+                "Asistente no disponible",
+                "No pude conectarme con el asistente en este momento. Intenta nuevamente en un momento.",
+                [],
+                [],
+                "Asistente"
+            );
+        });
+    }
+
+    if(assistantToggle && assistantPanel){
+        assistantToggle.addEventListener("click", function(){
+            setAssistantOpen(!assistantPanel.classList.contains("is-open"));
+        });
+    }
+
+    if(assistantClose){
+        assistantClose.addEventListener("click", function(){
+            setAssistantOpen(false);
+        });
+    }
+
+    document.addEventListener("click", function(event){
+        const trigger = event.target.closest("[data-assistant-question]");
+        if(!trigger){
+            return;
+        }
+        const question = trigger.getAttribute("data-assistant-question") || "";
+        if(assistantQuestion){
+            assistantQuestion.value = question;
+        }
+        submitAssistantQuestion(question);
+    });
+
+    if(assistantForm && assistantQuestion){
+        assistantForm.addEventListener("submit", function(event){
+            event.preventDefault();
+            const question = assistantQuestion.value || "";
+            assistantQuestion.value = "";
+            submitAssistantQuestion(question);
+        });
+    }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Resumen Diario de Caja - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Gerencia de Caja{% endblock %}
+{% block header_title %}Resumen Diario{% endblock %}
+{% block header_description %}Vista ejecutiva de cobros, cajeros, cuentas bancarias y cierres del dia seleccionado.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'cierres_caja' empresa.slug %}">Cierres de Caja</a>
+<a class="erp-action-link" href="{% url 'facturacion_dashboard' empresa.slug %}">Volver a Facturacion</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <form method="get" class="erp-form-grid three">
+        <div class="erp-field">
+            <label for="fecha">Fecha</label>
+            <input id="fecha" type="date" name="fecha" value="{{ fecha }}">
+        </div>
+        <div class="erp-actions-right" style="align-items:end;">
+            <button class="erp-btn" type="submit">Ver resumen</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cobrado en el dia</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.total|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ resumen.pagos }} pago(s) en {{ resumen.facturas }} factura(s).</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cierres registrados</div>
+        <p class="erp-stat-value">{{ resumen.cierres }}</p>
+        <p class="erp-card-muted">Cierres por cajero y turno.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Total reportado</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.total_cerrado|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Suma declarada en cierres.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Diferencia neta</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.diferencia_cierres|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Reportado menos sistema.</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    {% for item in resumen_metodos %}
+    <article class="erp-card">
+        <div class="erp-kpi-label">{{ item.metodo }}</div>
+        <p class="erp-stat-value erp-money">L. {{ item.total|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ item.cantidad }} pago(s).</p>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="erp-grid">
+    <article class="erp-table-card">
+        <div class="erp-section-heading">
+            <div>
+                <h3>Por cajero</h3>
+                <p>Controla quien recibio el dinero y si ya realizo cierre.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead><tr><th>Cajero</th><th>Pagos</th><th>Total</th><th>Cierres</th></tr></thead>
+                <tbody>
+                {% for item in resumen_cajeros %}
+                <tr>
+                    <td><strong>{{ item.cajero.username|default:"Sin usuario" }}</strong></td>
+                    <td>{{ item.cantidad }}</td>
+                    <td class="erp-money">L. {{ item.total|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% for cierre in item.cierres %}
+                        <a class="erp-link" href="{% url 'ver_cierre_caja' empresa.slug cierre.id %}">{{ cierre.get_turno_display }}</a>{% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                        <span class="erp-muted">Sin cierre</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="erp-empty-row">No hay pagos por cajero en esta fecha.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="erp-table-card">
+        <div class="erp-section-heading">
+            <div>
+                <h3>Por cuenta o banco</h3>
+                <p>Lectura rapida para validar transferencias, POS y caja.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead><tr><th>Cuenta</th><th>Tipo</th><th>Pagos</th><th>Total</th></tr></thead>
+                <tbody>
+                {% for item in resumen_cuentas %}
+                <tr>
+                    <td><strong>{{ item.cuenta.nombre }}</strong><small>{{ item.cuenta.numero|default:"Sin numero" }}</small></td>
+                    <td>{{ item.cuenta.get_tipo_display }}</td>
+                    <td>{{ item.cantidad }}</td>
+                    <td class="erp-money">L. {{ item.total|floatformat:2|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="erp-empty-row">No hay pagos con cuenta financiera asignada.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Pagos del dia</h3>
+            <p>Detalle operativo para auditoria y conciliacion.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Factura</th>
+                    <th>Cliente</th>
+                    <th>Cajero</th>
+                    <th>Metodo</th>
+                    <th>Cuenta</th>
+                    <th>Referencia</th>
+                    <th class="erp-money">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for pago in pagos %}
+                <tr>
+                    <td><a href="{% url 'ver_factura' empresa.slug pago.factura.id %}">{{ pago.factura.numero_factura|default:"Sin numero" }}</a></td>
+                    <td>{{ pago.factura.cliente.nombre }}</td>
+                    <td>{{ pago.cajero.username|default:"Sin usuario" }}</td>
+                    <td><span class="erp-badge neutral">{{ pago.get_metodo_display }}</span></td>
+                    <td>{{ pago.cuenta_financiera.nombre|default:"Sin cuenta" }}</td>
+                    <td>{{ pago.referencia|default:"-" }}</td>
+                    <td class="erp-money">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="erp-empty-row">No hay pagos registrados para esta fecha.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body{font-family:Arial,sans-serif;color:#1f2937;font-size:12px;}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:25px;}
+        .logo img{max-height:70px;}
+        .title{font-size:22px;font-weight:bold;color:#1e2a38;margin-bottom:8px;}
+        .card{border:1px solid #d1d5db;border-radius:10px;padding:16px;margin-bottom:15px;}
+        .row{margin-bottom:6px;}
+        .amount{font-size:18px;font-weight:bold;color:#111827;}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            {% if logo_url %}
+                <img src="{{ logo_url }}" alt="Logo">
+            {% endif %}
+        </div>
+        <div>
+            <div class="title">Comprobante de Egreso</div>
+            <div>{{ empresa.nombre }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="row"><strong>Comprobante:</strong> {{ comprobante.numero_comprobante }}</div>
+        <div class="row"><strong>Fecha:</strong> {{ comprobante.fecha }}</div>
+        <div class="row"><strong>Proveedor:</strong> {{ comprobante.proveedor_nombre }}</div>
+        <div class="row"><strong>Compra:</strong> {{ comprobante.compra.numero_compra }}</div>
+        <div class="row"><strong>Metodo:</strong> {{ comprobante.get_metodo_display }}</div>
+        <div class="row"><strong>Referencia:</strong> {{ comprobante.referencia|default:"-" }}</div>
+        <div class="row"><strong>Observacion:</strong> {{ comprobante.observacion|default:"-" }}</div>
+    </div>
+
+    <div class="card">
+        <div class="amount">Monto pagado: L. {{ comprobante.monto|floatformat:2|intcomma }}</div>
+    </div>
+</body>
+</html>

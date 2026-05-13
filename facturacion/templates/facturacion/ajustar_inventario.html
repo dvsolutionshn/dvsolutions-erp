@@ -1,0 +1,64 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Ajuste de Inventario - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Logistica{% endblock %}
+{% block header_title %}Ajuste de Inventario{% endblock %}
+{% block header_description %}Registra entradas o salidas manuales desde una captura mas simple y mucho mas facil de operar.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Volver a Inventario</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+@media (max-width: 760px){
+    .erp-compact-grid.three-col{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-compact-form">
+    <article class="erp-compact-card">
+        <h3>Ajuste manual</h3>
+        <p>Usa este formulario para corregir diferencias, cargar inventario inicial o registrar un movimiento extraordinario sin una pantalla pesada.</p>
+        <div class="erp-compact-meta" style="margin-top:14px;">
+            Cada ajuste deja trazabilidad en inventario y actualiza el stock del producto seleccionado.
+        </div>
+    </article>
+
+    <form method="post" class="erp-compact-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <section class="erp-compact-card">
+            <ul class="erp-field-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        </section>
+        {% endif %}
+
+        <section class="erp-compact-card">
+            <h3>Datos del ajuste</h3>
+            <div class="erp-compact-grid three-col" style="margin-top:16px;">
+                {% for field in form %}
+                <div class="erp-field {% if field.name == 'observacion' %}erp-field-span-full{% endif %}">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {% if field.errors %}<ul class="erp-field-errors">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="erp-compact-card">
+            <div class="erp-form-actions">
+                <div class="erp-field-help">El ajuste quedara registrado en la bitacora de inventario y visible desde el detalle del producto.</div>
+                <div class="erp-actions-right">
+                    <a class="erp-btn-secondary" href="{% url 'inventario_facturacion' empresa.slug %}">Cancelar</a>
+                    <button type="submit" class="erp-btn">Guardar Ajuste</button>
+                </div>
+            </div>
+        </section>
+    </form>
+</section>
+{% endblock %}

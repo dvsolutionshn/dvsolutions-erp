@@ -1,0 +1,92 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Libro de Compras - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Fiscal{% endblock %}
+{% block header_title %}Libro de Compras Fiscal{% endblock %}
+{% block header_description %}Administra los libros mensuales de compras, importa desde Excel y controla el ISV acreditable sin duplicar facturas entre periodos.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_registro_compra_fiscal' empresa.slug %}">Crear Libro de Compras Nuevo</a>
+<a class="erp-action-link" href="{% url 'clasificaciones_compras_fiscales' empresa.slug %}">Clasificaciones</a>
+<a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras Inventario</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Libros registrados</div><div class="erp-stat-value">{{ periodos|length }}</div><p class="erp-card-muted">Periodos mensuales con compras fiscales.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Documentos</div><div class="erp-stat-value">{{ resumen.documentos }}</div><p class="erp-card-muted">Compras fiscales activas.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">ISV acreditable</div><div class="erp-stat-value">L. {{ resumen.isv_total|floatformat:2|intcomma }}</div><p class="erp-card-muted">ISV 15% + ISV 18%.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Total compras</div><div class="erp-stat-value">L. {{ resumen.total|floatformat:2|intcomma }}</div><p class="erp-card-muted">Total fiscal consolidado.</p></article>
+</section>
+
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Importar libro mensual desde Excel</h3>
+            <p class="erp-card-muted">Selecciona el mes del libro. Si una factura ya existe en meses anteriores, el sistema la omite para evitar doble credito fiscal.</p>
+        </div>
+    </div>
+    <form method="post" action="{% url 'importar_libro_compras_fiscal' empresa.slug %}" enctype="multipart/form-data" class="erp-filters">
+        {% csrf_token %}
+        <div class="erp-filter-field">
+            <label for="{{ importar_form.archivo.id_for_label }}">Archivo Excel</label>
+            {{ importar_form.archivo }}
+        </div>
+        <div class="erp-filter-field">
+            <label for="{{ importar_form.periodo_anio.id_for_label }}">Anio</label>
+            {{ importar_form.periodo_anio }}
+        </div>
+        <div class="erp-filter-field">
+            <label for="{{ importar_form.periodo_mes.id_for_label }}">Mes</label>
+            {{ importar_form.periodo_mes }}
+        </div>
+        <div class="erp-filter-actions">
+            <button class="erp-btn" type="submit">Importar Libro</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Libros por mes</h3>
+            <p class="erp-card-muted">Entra al mes para ver las facturas correspondientes, anular registros o revisar totales fiscales.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Periodo</th>
+                    <th>Documentos</th>
+                    <th>Subtotal exento</th>
+                    <th>Subtotal 15%</th>
+                    <th>ISV 15%</th>
+                    <th>Subtotal 18%</th>
+                    <th>ISV 18%</th>
+                    <th>Total compras</th>
+                    <th>Accion</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for periodo in periodos %}
+                <tr>
+                    <td><strong>{{ periodo.periodo_mes }}/{{ periodo.periodo_anio }}</strong></td>
+                    <td>{{ periodo.documentos }}</td>
+                    <td class="amount">L. {{ periodo.exento|default:0|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ periodo.base_15|default:0|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ periodo.isv_15|default:0|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ periodo.base_18|default:0|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ periodo.isv_18|default:0|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ periodo.total|default:0|floatformat:2|intcomma }}</td>
+                    <td><a class="erp-inline-link" href="{% url 'libro_compras_fiscal_detalle' empresa.slug periodo.periodo_anio periodo.periodo_mes %}">Ver mes</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="erp-empty">Todavia no hay libros mensuales registrados. Importa un Excel o crea un libro de compras nuevo.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

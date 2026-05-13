@@ -1,0 +1,42 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body{font-family:Arial,sans-serif;color:#1f2937;font-size:12px;}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:25px;}
+        .logo img{max-height:70px;}
+        .title{font-size:22px;font-weight:bold;color:#1e2a38;margin-bottom:8px;}
+        .card{border:1px solid #d1d5db;border-radius:10px;padding:16px;margin-bottom:15px;}
+        .row{margin-bottom:6px;}
+        .amount{font-size:18px;font-weight:bold;color:#111827;}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            {% if logo_url %}
+                <img src="{{ logo_url }}" alt="Logo">
+            {% endif %}
+        </div>
+        <div>
+            <div class="title">Recibo de Pago</div>
+            <div>{{ empresa.nombre }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="row"><strong>Recibo:</strong> {{ recibo.numero_recibo }}</div>
+        <div class="row"><strong>Fecha:</strong> {{ recibo.fecha }}</div>
+        <div class="row"><strong>Cliente:</strong> {{ recibo.cliente.nombre }}</div>
+        <div class="row"><strong>Factura:</strong> {{ recibo.factura.numero_factura|default:recibo.factura.id }}</div>
+        <div class="row"><strong>Método:</strong> {{ recibo.get_metodo_display }}</div>
+        <div class="row"><strong>Referencia:</strong> {{ recibo.referencia|default:"-" }}</div>
+    </div>
+
+    <div class="card">
+        <div class="amount">Monto recibido: {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</div>
+    </div>
+</body>
+</html>

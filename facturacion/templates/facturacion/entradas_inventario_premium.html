@@ -1,0 +1,81 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Entradas de Inventario - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Logistica{% endblock %}
+{% block header_title %}Entradas de Inventario{% endblock %}
+{% block header_description %}Documentos de ingreso de existencias con cabecera, lineas y estado operativo.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_entrada_inventario_documento' empresa.slug %}">Nueva Entrada</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Entradas</div>
+        <div class="erp-stat-value">{{ resumen.total }}</div>
+        <p class="erp-card-muted">Documentos registrados en inventario.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Aplicadas</div>
+        <div class="erp-stat-value">{{ resumen.aplicadas }}</div>
+        <p class="erp-card-muted">Ya impactaron existencias y kardex.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Borradores</div>
+        <div class="erp-stat-value">{{ resumen.borradores }}</div>
+        <p class="erp-card-muted">Pendientes de aplicarse al inventario.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Unidades</div>
+        <div class="erp-stat-value">{{ resumen.unidades|floatformat:2|intcomma }}</div>
+        <p class="erp-card-muted">Total registrado en estos documentos.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Documentos de entrada</h3>
+            <div class="erp-card-muted">Cada entrada agrupa varias líneas y conserva trazabilidad operativa.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Referencia</th>
+                    <th>Fecha</th>
+                    <th>Líneas</th>
+                    <th>Unidades</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for entrada in entradas %}
+                <tr>
+                    <td>
+                        <strong>{{ entrada.referencia }}</strong>
+                        <div class="erp-card-muted">{{ entrada.observacion|default:"Sin observacion"|truncatechars:70 }}</div>
+                    </td>
+                    <td>{{ entrada.fecha_documento }}</td>
+                    <td>{{ entrada.lineas.count }}</td>
+                    <td class="amount">{{ entrada.total_unidades|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if entrada.estado == "aplicada" %}
+                        <span class="erp-badge success">Aplicada</span>
+                        {% else %}
+                        <span class="erp-badge warning">Borrador</span>
+                        {% endif %}
+                    </td>
+                    <td><a class="erp-inline-link" href="{% url 'ver_entrada_inventario' empresa.slug entrada.id %}">Ver</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="erp-empty">No hay entradas registradas.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

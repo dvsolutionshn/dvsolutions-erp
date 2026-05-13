@@ -1,0 +1,713 @@
+{% extends "core/erp_base.html" %}
+{% load custom_filters %}
+
+{% block title %}{{ titulo_documento|default:"Nota de Crédito" }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Ajuste Comercial{% endblock %}
+{% block header_title %}{{ titulo_documento|default:"Nota de Crédito" }}{% endblock %}
+{% block header_description %}Emite notas de crédito totales o parciales con una interfaz clara y conectada al resto del flujo comercial.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'notas_credito_dashboard' empresa.slug %}">Volver a Notas de Crédito</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-form-split{
+    display:grid;
+    grid-template-columns:minmax(0,1.65fr) minmax(320px,.95fr);
+    gap:22px;
+}
+.erp-credit-form,
+.erp-credit-form .erp-compact-form,
+.erp-credit-form .erp-compact-card,
+.erp-credit-form .erp-form-card,
+.erp-credit-form .erp-field,
+.erp-credit-form .erp-line-layout{
+    overflow:visible;
+}
+.erp-credit-form .erp-compact-card,
+.erp-credit-form .erp-form-card{
+    padding:15px 16px;
+    border-radius:14px;
+}
+.erp-credit-form .erp-compact-card h3,
+.erp-credit-form .erp-form-card h3{
+    margin:0 0 4px;
+    font-size:16px;
+}
+.erp-credit-form .erp-compact-card p,
+.erp-credit-form .erp-form-card p{
+    font-size:13px;
+    line-height:1.45;
+}
+.erp-credit-form .erp-compact-grid{
+    gap:10px 14px;
+}
+.erp-credit-form .erp-field{
+    gap:4px;
+}
+.erp-credit-form .erp-field input,
+.erp-credit-form .erp-field select,
+.erp-credit-form .erp-field textarea{
+    min-height:38px;
+    padding:8px 11px;
+    border-radius:8px;
+}
+.erp-credit-form .erp-field textarea{
+    min-height:62px;
+    height:62px;
+}
+.erp-note-toggle{
+    width:38px;
+    height:38px;
+    border-radius:10px;
+    border:1px solid var(--line-strong);
+    background:#f6f9fc;
+    color:var(--primary);
+    font-weight:700;
+    cursor:pointer;
+}
+.erp-delete-cell{
+    display:flex;
+    justify-content:center;
+}
+.erp-note-toggle.is-open{
+    background:linear-gradient(180deg,var(--primary-2),var(--primary));
+    color:#fff;
+    border-color:transparent;
+    box-shadow:0 12px 22px rgba(15,39,66,.18);
+}
+.erp-selector-actions{
+    margin-top:12px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+.erp-autocomplete{
+    position:relative;
+    z-index:15;
+}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:90;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow-soft);
+    padding:8px;
+    display:none;
+    max-height:240px;
+    overflow:auto;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{
+    background:#f4f8fc;
+}
+.erp-credit-form{
+    display:grid;
+    grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr);
+    gap:22px;
+}
+@media (max-width: 1100px){
+    .erp-form-split{
+        grid-template-columns:1fr;
+    }
+    .erp-credit-form{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+
+    <div class="erp-credit-form">
+        <div class="erp-compact-form">
+            <section class="erp-compact-card">
+                <h3>Cabecera del ajuste</h3>
+                <p>Selecciona la factura origen y define la razón del crédito antes de cargar las líneas.</p>
+                <div class="erp-compact-grid two-col" style="margin-top:16px;">
+                    <div class="erp-field">
+                        {{ form.factura_origen.label_tag }}
+                        <div class="erp-autocomplete">
+                            <input type="text" id="factura-origen-search" class="erp-select-search" placeholder="Buscar por numero o cliente" autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="search">
+                            <div id="facturas-origen-sugeridas" class="erp-suggestion-list"></div>
+                        </div>
+                        <div style="display:none;">{{ form.factura_origen }}</div>
+                        <p class="erp-field-help">Escribe el número o el cliente y selecciona la factura sugerida.</p>
+                        {% if form.factura_origen.errors %}<ul class="erp-field-errors">{% for error in form.factura_origen.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                    </div>
+                    <div class="erp-field">{{ form.fecha_emision.label_tag }}{{ form.fecha_emision }}{% if form.fecha_emision.errors %}<ul class="erp-field-errors">{% for error in form.fecha_emision.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field">{{ form.estado.label_tag }}{{ form.estado }}{% if form.estado.errors %}<ul class="erp-field-errors">{% for error in form.estado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    <div class="erp-field erp-field-span-full">{{ form.motivo.label_tag }}{{ form.motivo }}{% if form.motivo.errors %}<ul class="erp-field-errors">{% for error in form.motivo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                </div>
+            </section>
+
+            <section id="factura-info" class="erp-compact-card" style="display:none;">
+                <h3>Resumen de la factura origen</h3>
+                <div class="erp-mini-grid" style="margin-top:18px;">
+                    <div class="erp-mini-stat"><div class="label">Factura</div><div class="value" data-factura-numero>-</div></div>
+                    <div class="erp-mini-stat"><div class="label">Cliente</div><div class="value" data-factura-cliente>-</div></div>
+                    <div class="erp-mini-stat"><div class="label">Total</div><div class="value" data-factura-total>-</div></div>
+                    <div class="erp-mini-stat"><div class="label">Disponible</div><div class="value" data-factura-saldo>-</div></div>
+                </div>
+                <div class="erp-soft-panel" style="margin-top:16px;">
+                    Puedes acreditar toda la factura o cargar solo los productos que correspondan al ajuste.
+                </div>
+            </section>
+
+            {% if not modo_edicion %}
+            <section id="selector-productos" class="erp-compact-card" style="display:none;">
+                <h3>Modo de carga</h3>
+                <div class="erp-selector-box" style="margin-top:18px;">
+                    <div class="erp-selector-options">
+                        <label class="erp-selector-choice">
+                            <input type="radio" name="modo_carga_nota" value="total" checked>
+                            Toda la factura
+                        </label>
+                        <label class="erp-selector-choice">
+                            <input type="radio" name="modo_carga_nota" value="parcial">
+                            Seleccionar productos
+                        </label>
+                    </div>
+                    <div id="productos-selector-lista" class="erp-product-pick"></div>
+                    <div class="erp-selector-actions">
+                        <button type="button" id="seleccionar-todos-productos" class="erp-btn-secondary">Seleccionar todos</button>
+                        <button type="button" id="quitar-todos-productos" class="erp-btn-secondary">Quitar todos</button>
+                        <button type="button" id="cargar-productos-seleccionados" class="erp-btn">Cargar productos seleccionados</button>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+        </div>
+
+        <aside class="erp-compact-form">
+            <section class="erp-compact-card">
+                <h3>Resumen de la nota</h3>
+                <p>Los montos reflejan el impacto del crédito en tiempo real.</p>
+                <div class="erp-summary-totals" style="margin-top:18px;">
+                    <div class="erp-mini-stat"><div class="label">Descuento</div><div class="value">L. <span id="descuento_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Subtotal</div><div class="value">L. <span id="subtotal_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Impuesto</div><div class="value">L. <span id="impuesto_general">0.00</span></div></div>
+                    <div class="erp-mini-stat"><div class="label">Total</div><div class="value">L. <span id="total_general">0.00</span></div></div>
+                </div>
+            </section>
+            <section class="erp-compact-card">
+                <h3>Lectura rápida</h3>
+                <div class="erp-soft-panel">
+                    Puedes acreditar la factura completa o seleccionar únicamente los productos afectados por el ajuste.
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <section class="erp-form-card">
+        <div class="erp-form-actions" style="margin-bottom:16px;">
+            <div>
+                <h3 style="margin:0 0 8px;">Lineas de credito</h3>
+                <p>Puedes trabajar la devolución completa o dejar solo las líneas afectadas.</p>
+            </div>
+        </div>
+
+        {{ formset.management_form }}
+
+        <div class="erp-line-layout">
+            <div class="erp-line-header">
+                <div>Producto</div>
+                <div>Cantidad</div>
+                <div>Precio</div>
+                <div>% Desc</div>
+                <div>Nota</div>
+                <div>Subtotal</div>
+                <div>Impuesto</div>
+                <div>Monto</div>
+                <div></div>
+            </div>
+
+            <div id="lineas-container" class="erp-line-layout">
+            {% for form_linea in formset %}
+                <div class="tabla-row erp-line-row">
+                    {{ form_linea.id }}
+                    <div style="display:none;">{{ form_linea.DELETE }}</div>
+                    <div>{{ form_linea.producto|add_class:"producto" }}</div>
+                    <div>{{ form_linea.cantidad|add_class:"cantidad" }}</div>
+                    <div>{{ form_linea.precio_unitario|add_class:"precio" }}</div>
+                    <div>{{ form_linea.descuento_porcentaje|add_class:"descuento" }}</div>
+                    <div class="erp-note-cell">
+                        <button type="button" class="btn-comentario erp-note-toggle" title="Agregar nota">...</button>
+                        <div class="comentario-box erp-comment-box erp-comment-pop">
+                            <span class="erp-comment-title">Nota de linea</span>
+                            {{ form_linea.comentario }}
+                        </div>
+                    </div>
+                    <div><input class="subtotal" readonly></div>
+                    <div>{{ form_linea.impuesto|add_class:"impuesto" }}</div>
+                    <div><input class="impuesto_monto" readonly></div>
+                    <div class="erp-delete-cell"><button type="button" class="delete-btn erp-btn-danger btn-eliminar">X</button></div>
+                </div>
+            {% endfor %}
+            </div>
+            <div class="erp-purchase-line-footer">
+                <div class="erp-field-help">Agrega líneas manuales si el ajuste no viene completo desde la factura origen.</div>
+                <button type="button" id="agregar-linea" class="erp-btn">Agregar línea</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-form-card">
+        <div class="erp-form-actions">
+            <div class="erp-field-help">La nota quedara conectada a la factura origen y respetara el saldo disponible del documento.</div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'notas_credito_dashboard' empresa.slug %}">Cancelar</a>
+                <button type="submit" class="erp-btn">{% if modo_edicion %}Guardar Cambios{% else %}Guardar Nota de Credito{% endif %}</button>
+            </div>
+        </div>
+    </section>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const productos = {
+        {% for p in productos %}
+            "{{ p.id }}": {
+                precio: {{ p.precio|default:0 }},
+                impuesto: "{% if p.impuesto_predeterminado_id %}{{ p.impuesto_predeterminado_id }}{% endif %}"
+            },
+        {% endfor %}
+    };
+    const impuestos = {
+        {% for imp in impuestos %}
+            "{{ imp.id }}": {{ imp.porcentaje|default:0 }},
+        {% endfor %}
+    };
+    const detalleFacturaBaseUrl = "{% url 'detalle_factura_para_nota_credito' empresa.slug 0 %}";
+    const facturaSelect = document.getElementById("id_factura_origen");
+    const facturaSearchInput = document.getElementById("factura-origen-search");
+    const facturaSuggestionsPanel = document.getElementById("facturas-origen-sugeridas");
+    const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
+    const container = document.getElementById("lineas-container");
+    const facturaInfo = document.getElementById("factura-info");
+    const facturaNumero = facturaInfo ? facturaInfo.querySelector("[data-factura-numero]") : null;
+    const facturaCliente = facturaInfo ? facturaInfo.querySelector("[data-factura-cliente]") : null;
+    const facturaTotal = facturaInfo ? facturaInfo.querySelector("[data-factura-total]") : null;
+    const facturaSaldo = facturaInfo ? facturaInfo.querySelector("[data-factura-saldo]") : null;
+    const selectorProductos = document.getElementById("selector-productos");
+    const listaProductosSelector = document.getElementById("productos-selector-lista");
+    const botonCargarSeleccionados = document.getElementById("cargar-productos-seleccionados");
+    const botonSeleccionarTodos = document.getElementById("seleccionar-todos-productos");
+    const botonQuitarTodos = document.getElementById("quitar-todos-productos");
+    const plantillaBase = document.querySelector(".tabla-row") ? document.querySelector(".tabla-row").cloneNode(true) : null;
+    let lineasFacturaActual = [];
+
+    function syncFacturaSearchFromSelect(){
+        if(!facturaSelect || !facturaSearchInput){ return; }
+        const option = facturaSelect.options[facturaSelect.selectedIndex];
+        facturaSearchInput.value = option && option.value ? option.text.trim() : "";
+    }
+
+    function syncFacturaSelectFromSearch(){
+        if(!facturaSelect || !facturaSearchInput){ return; }
+        const buscado = (facturaSearchInput.value || "").trim().toLowerCase();
+        let matched = false;
+        Array.from(facturaSelect.options).forEach(option => {
+            if(option.value && option.text.trim().toLowerCase() === buscado){
+                facturaSelect.value = option.value;
+                matched = true;
+            }
+        });
+        if(!matched && !buscado){
+            facturaSelect.value = "";
+        }
+    }
+
+    function renderFacturaSuggestions(){
+        if(!facturaSelect || !facturaSearchInput || !facturaSuggestionsPanel){ return; }
+        const term = (facturaSearchInput.value || "").trim().toLowerCase();
+        const options = Array.from(facturaSelect.options)
+            .filter(option => option.value)
+            .filter(option => !term || option.text.trim().toLowerCase().includes(term))
+            .slice(0, 8);
+
+        facturaSuggestionsPanel.innerHTML = "";
+        if(!options.length){
+            facturaSuggestionsPanel.style.display = "none";
+            return;
+        }
+
+        options.forEach(option => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = option.text.trim();
+            button.addEventListener("click", function(){
+                facturaSearchInput.value = option.text.trim();
+                facturaSelect.value = option.value;
+                facturaSuggestionsPanel.style.display = "none";
+                facturaSelect.dispatchEvent(new Event("change"));
+            });
+            facturaSuggestionsPanel.appendChild(button);
+        });
+        facturaSuggestionsPanel.style.display = "block";
+    }
+
+    function formatearMoneda(moneda, valor){
+        const numero = parseFloat(valor || 0);
+        const simbolo = moneda === "USD" ? "$ " : "L. ";
+        return simbolo + numero.toFixed(2);
+    }
+
+    function actualizarInfoFactura(data){
+        if(!facturaInfo){ return; }
+        if(!data){
+            facturaInfo.style.display = "none";
+            if(selectorProductos){
+                selectorProductos.style.display = "none";
+            }
+            return;
+        }
+        facturaNumero.textContent = data.numero_factura;
+        facturaCliente.textContent = data.cliente;
+        facturaTotal.textContent = formatearMoneda(data.moneda, data.total);
+        facturaSaldo.textContent = formatearMoneda(data.moneda, data.saldo_disponible);
+        facturaInfo.style.display = "block";
+        if(selectorProductos){
+            selectorProductos.style.display = "block";
+        }
+    }
+
+    function renderizarSelectorProductos(lineas){
+        if(!listaProductosSelector){ return; }
+        if(!lineas.length){
+            listaProductosSelector.innerHTML = "<p>No hay lineas disponibles en esta factura.</p>";
+            return;
+        }
+        listaProductosSelector.innerHTML = lineas.map((linea, index) => `
+            <div class="erp-product-item">
+                <label>
+                    <input type="checkbox" class="producto-selector-check" data-index="${index}" checked>
+                    <span>${linea.producto_nombre}</span>
+                </label>
+                <div class="erp-product-meta">
+                    Cant: ${linea.cantidad}<br>
+                    Precio: ${formatearMoneda(linea.moneda || "HNL", linea.precio_unitario)}<br>
+                    Total: ${formatearMoneda(linea.moneda || "HNL", linea.linea_total)}
+                </div>
+            </div>
+        `).join("");
+    }
+
+    function obtenerModoCarga(){
+        const seleccionado = document.querySelector('input[name="modo_carga_nota"]:checked');
+        return seleccionado ? seleccionado.value : "total";
+    }
+
+    function marcarChecksProductos(marcado){
+        document.querySelectorAll(".producto-selector-check").forEach(check => {
+            check.checked = marcado;
+        });
+    }
+
+    function recalcularLinea(linea){
+        const cantidad = linea.querySelector(".cantidad");
+        const precio = linea.querySelector(".precio");
+        const descuento = linea.querySelector(".descuento");
+        const subtotal = linea.querySelector(".subtotal");
+        const impuestoSelect = linea.querySelector(".impuesto");
+        const impuestoMonto = linea.querySelector(".impuesto_monto");
+        const cantidadVal = parseFloat(cantidad.value) || 0;
+        const precioVal = parseFloat(precio.value) || 0;
+        const descuentoVal = parseFloat(descuento.value) || 0;
+        const base = cantidadVal * precioVal;
+        const desc = base * (descuentoVal / 100);
+        const sub = base - desc;
+        subtotal.value = sub.toFixed(2);
+        const porcentaje = impuestos[impuestoSelect.value] || 0;
+        impuestoMonto.value = (sub * (porcentaje / 100)).toFixed(2);
+        recalcularTotales();
+    }
+
+    function recalcularTotales(){
+        let subtotal = 0, impuesto = 0, descuento = 0;
+        document.querySelectorAll(".tabla-row:not([data-deleted='1'])").forEach(l => {
+            let c = parseFloat(l.querySelector(".cantidad")?.value) || 0;
+            let p = parseFloat(l.querySelector(".precio")?.value) || 0;
+            let d = parseFloat(l.querySelector(".descuento")?.value) || 0;
+            descuento += (c * p) * (d / 100);
+        });
+        document.querySelectorAll(".tabla-row:not([data-deleted='1']) .subtotal").forEach(e => subtotal += parseFloat(e.value) || 0);
+        document.querySelectorAll(".tabla-row:not([data-deleted='1']) .impuesto_monto").forEach(e => impuesto += parseFloat(e.value) || 0);
+        document.getElementById("descuento_general").innerText = descuento.toFixed(2);
+        document.getElementById("subtotal_general").innerText = subtotal.toFixed(2);
+        document.getElementById("impuesto_general").innerText = impuesto.toFixed(2);
+        document.getElementById("total_general").innerText = (subtotal + impuesto).toFixed(2);
+    }
+
+    function activarEventos(linea){
+        linea.querySelector(".producto").addEventListener("change", function(){
+            const datosProducto = productos[this.value] || {};
+            linea.querySelector(".precio").value = datosProducto.precio || 0;
+            const impuestoSelect = linea.querySelector(".impuesto");
+            if(impuestoSelect && datosProducto.impuesto){
+                impuestoSelect.value = datosProducto.impuesto;
+            }
+            recalcularLinea(linea);
+        });
+        linea.querySelector(".cantidad").addEventListener("input", () => recalcularLinea(linea));
+        linea.querySelector(".precio").addEventListener("input", () => recalcularLinea(linea));
+        linea.querySelector(".descuento").addEventListener("input", () => recalcularLinea(linea));
+        linea.querySelector(".impuesto").addEventListener("change", () => recalcularLinea(linea));
+    }
+
+    function renumerarCampos(linea, index){
+        linea.querySelectorAll("input, select, textarea").forEach(el => {
+            if(el.name){
+                let name = el.name.replace(/lineanotacredito_set-\d+-/, `lineanotacredito_set-${index}-`);
+                el.name = name;
+                el.id = "id_" + name;
+            }
+        });
+    }
+
+    function limpiarFila(linea){
+        linea.querySelectorAll("input, select, textarea").forEach(el => {
+            if(el.type === "checkbox"){
+                el.checked = false;
+            } else if(el.type !== "hidden"){
+                el.value = "";
+            }
+        });
+        const comentarioBox = linea.querySelector(".comentario-box");
+        if(comentarioBox){
+            comentarioBox.classList.remove("is-open");
+        }
+        linea.querySelector(".erp-note-toggle")?.classList.remove("is-open");
+        delete linea.dataset.deleted;
+        linea.style.display = "";
+    }
+
+    function crearLineaBase(index){
+        if(!plantillaBase){ return null; }
+        const nueva = plantillaBase.cloneNode(true);
+        limpiarFila(nueva);
+        renumerarCampos(nueva, index);
+        const idField = nueva.querySelector("input[name$='-id']");
+        if(idField){ idField.remove(); }
+        const deleteField = nueva.querySelector("input[name$='-DELETE']");
+        if(deleteField){ deleteField.checked = false; }
+        return nueva;
+    }
+
+    function poblarLinea(linea, datos){
+        linea.querySelector(".producto").value = datos.producto_id || "";
+        linea.querySelector(".cantidad").value = datos.cantidad || "";
+        linea.querySelector(".precio").value = datos.precio_unitario || "";
+        linea.querySelector(".descuento").value = datos.descuento_porcentaje || "0";
+        linea.querySelector(".impuesto").value = datos.impuesto_id || "";
+        const comentarioField = linea.querySelector("textarea[name$='-comentario'], input[name$='-comentario']");
+        if(comentarioField){
+            comentarioField.value = datos.comentario || "";
+        }
+    }
+
+    function cargarLineasFactura(data){
+        container.innerHTML = "";
+        const lineas = data.lineas && data.lineas.length ? data.lineas : [{}];
+        lineas.forEach((lineaData, index) => {
+            const fila = crearLineaBase(index);
+            if(!fila){ return; }
+            poblarLinea(fila, lineaData);
+            container.appendChild(fila);
+            activarEventos(fila);
+            recalcularLinea(fila);
+        });
+        totalFormsInput.value = String(lineas.length);
+        recalcularTotales();
+    }
+
+    function cargarLineasSeleccionadas(){
+        if(!lineasFacturaActual.length){
+            return;
+        }
+        const modo = obtenerModoCarga();
+        let lineas = lineasFacturaActual;
+        if(modo === "parcial"){
+            const checks = Array.from(document.querySelectorAll(".producto-selector-check:checked"));
+            const indices = checks.map(check => parseInt(check.dataset.index, 10));
+            lineas = lineasFacturaActual.filter((_, index) => indices.includes(index));
+        }
+        cargarLineasFactura({ lineas });
+    }
+
+    document.querySelectorAll(".tabla-row").forEach(l => { activarEventos(l); recalcularLinea(l); });
+
+    document.getElementById("agregar-linea").addEventListener("click", function(){
+        let formCount = parseInt(totalFormsInput.value);
+        let plantilla = document.querySelector(".tabla-row:not([data-deleted='1'])") || plantillaBase;
+        if(!plantilla){ return; }
+        let nueva = plantilla.cloneNode(true);
+        limpiarFila(nueva);
+        renumerarCampos(nueva, formCount);
+        let idField = nueva.querySelector("input[name$='-id']");
+        if(idField){ idField.remove(); }
+        let deleteField = nueva.querySelector("input[name$='-DELETE']");
+        if(deleteField){ deleteField.checked = false; }
+        container.appendChild(nueva);
+        totalFormsInput.value = String(document.querySelectorAll(".tabla-row").length);
+        activarEventos(nueva);
+        recalcularLinea(nueva);
+    });
+
+    document.addEventListener("click", function(e){
+        if(e.target.classList.contains("btn-eliminar")){
+            const fila = e.target.closest(".tabla-row");
+            const deleteField = fila.querySelector("input[name$='-DELETE']");
+            if(deleteField){
+                deleteField.checked = true;
+                fila.dataset.deleted = "1";
+                fila.style.display = "none";
+            } else {
+                fila.remove();
+            }
+            fila.querySelector(".comentario-box")?.classList.remove("is-open");
+            fila.querySelector(".erp-note-toggle")?.classList.remove("is-open");
+            recalcularTotales();
+        }
+        if(e.target.classList.contains("btn-comentario")){
+            const boton = e.target;
+            const fila = boton.closest(".tabla-row");
+            const box = fila.querySelector(".comentario-box");
+            const estabaAbierto = box.classList.contains("is-open");
+
+            document.querySelectorAll(".comentario-box.is-open").forEach(abierto => {
+                abierto.classList.remove("is-open");
+            });
+            document.querySelectorAll(".erp-note-toggle.is-open").forEach(toggle => {
+                toggle.classList.remove("is-open");
+            });
+
+            if(!estabaAbierto){
+                box.classList.add("is-open");
+                boton.classList.add("is-open");
+                const campo = box.querySelector("textarea, input");
+                if(campo){
+                    campo.focus();
+                }
+            }
+            return;
+        }
+
+        if(!e.target.closest(".erp-note-cell")){
+            document.querySelectorAll(".comentario-box.is-open").forEach(abierto => {
+                abierto.classList.remove("is-open");
+            });
+            document.querySelectorAll(".erp-note-toggle.is-open").forEach(toggle => {
+                toggle.classList.remove("is-open");
+            });
+        }
+    });
+
+    {% if not modo_edicion %}
+    document.querySelectorAll('input[name="modo_carga_nota"]').forEach(radio => {
+        radio.addEventListener("change", function(){
+            if(!listaProductosSelector){ return; }
+            listaProductosSelector.style.display = this.value === "parcial" ? "block" : "none";
+            if(this.value === "total"){
+                cargarLineasSeleccionadas();
+            }
+        });
+    });
+
+    if(botonCargarSeleccionados){
+        botonCargarSeleccionados.addEventListener("click", function(){
+            cargarLineasSeleccionadas();
+        });
+    }
+
+    if(botonSeleccionarTodos){
+        botonSeleccionarTodos.addEventListener("click", function(){
+            marcarChecksProductos(true);
+        });
+    }
+
+    if(botonQuitarTodos){
+        botonQuitarTodos.addEventListener("click", function(){
+            marcarChecksProductos(false);
+        });
+    }
+
+    if(facturaSelect){
+        syncFacturaSearchFromSelect();
+        if(facturaSearchInput){
+            facturaSearchInput.addEventListener("focus", renderFacturaSuggestions);
+            facturaSearchInput.addEventListener("input", function(){
+                syncFacturaSelectFromSearch();
+                renderFacturaSuggestions();
+            });
+            facturaSearchInput.addEventListener("change", syncFacturaSelectFromSearch);
+            facturaSearchInput.addEventListener("blur", function(){
+                syncFacturaSelectFromSearch();
+                window.setTimeout(() => {
+                    if(facturaSuggestionsPanel){
+                        facturaSuggestionsPanel.style.display = "none";
+                    }
+                }, 120);
+            });
+        }
+        facturaSelect.addEventListener("change", syncFacturaSearchFromSelect);
+        facturaSelect.addEventListener("change", async function(){
+            const facturaId = this.value;
+            if(!facturaId){
+                lineasFacturaActual = [];
+                actualizarInfoFactura(null);
+                return;
+            }
+            try{
+                const response = await fetch(detalleFacturaBaseUrl.replace("/0/detalle/", `/${facturaId}/detalle/`), {
+                    headers: {"X-Requested-With": "XMLHttpRequest"}
+                });
+                if(!response.ok){
+                    throw new Error("No se pudo cargar la factura.");
+                }
+                const data = await response.json();
+                lineasFacturaActual = (data.lineas || []).map(linea => ({
+                    ...linea,
+                    moneda: data.moneda
+                }));
+                actualizarInfoFactura(data);
+                renderizarSelectorProductos(lineasFacturaActual);
+                listaProductosSelector.style.display = obtenerModoCarga() === "parcial" ? "block" : "none";
+                cargarLineasSeleccionadas();
+            }catch(error){
+                console.error(error);
+                lineasFacturaActual = [];
+                actualizarInfoFactura(null);
+            }
+        });
+    }
+    {% else %}
+    actualizarInfoFactura({
+        numero_factura: "{{ nota_credito.factura_origen.numero_factura|default:nota_credito.factura_origen.id }}",
+        cliente: "{{ nota_credito.cliente.nombre|escapejs }}",
+        moneda: "{{ nota_credito.moneda }}",
+        total: "{{ nota_credito.factura_origen.total }}",
+        saldo_disponible: "{{ nota_credito.factura_origen.total_documento_ajustado }}",
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

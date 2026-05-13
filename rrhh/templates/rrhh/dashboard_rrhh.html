@@ -1,0 +1,132 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Recursos Humanos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Talento Humano{% endblock %}
+{% block header_title %}Recursos Humanos{% endblock %}
+{% block header_description %}Planilla hondurena, expedientes, vacaciones, vouchers y comunicacion al colaborador desde una sola capa operativa.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'crear_empleado_rrhh' empresa.slug %}" class="erp-action-link">Nuevo Empleado</a>
+<a href="{% url 'crear_periodo_planilla' empresa.slug %}" class="erp-action-link">Nueva Planilla</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-list-kpis">
+        <article class="erp-list-kpi-card">
+            <div class="erp-kpi-label">Empleados</div>
+            <p class="erp-stat-value">{{ resumen.empleados }}</p>
+            <p class="erp-card-muted">{{ resumen.activos }} activos dentro del expediente laboral.</p>
+        </article>
+        <article class="erp-list-kpi-card">
+            <div class="erp-kpi-label">Planillas</div>
+            <p class="erp-stat-value">{{ resumen.periodos }}</p>
+            <p class="erp-card-muted">{{ resumen.planillas_abiertas }} periodos en trabajo o calculo.</p>
+        </article>
+        <article class="erp-list-kpi-card">
+            <div class="erp-kpi-label">Vouchers</div>
+            <p class="erp-stat-value">{% if config_crm.whatsapp_activo %}API lista{% else %}PDF + correo{% endif %}</p>
+            <p class="erp-card-muted">Envio por correo, enlace WhatsApp y canal API cuando CRM este activo.</p>
+        </article>
+        <article class="erp-list-kpi-card">
+            <div class="erp-kpi-label">Vacaciones</div>
+            <p class="erp-stat-value">HN</p>
+            <p class="erp-card-muted">Escala de 10, 12, 15 y 20 dias segun la antiguedad.</p>
+        </article>
+    </section>
+
+    <section class="erp-card erp-list-toolbar">
+        <div>
+            <div class="erp-kpi-label">Panel operativo</div>
+            <h3 style="margin:6px 0 8px;">Una planilla clara, profesional y lista para operar todos los dias</h3>
+            <p class="erp-card-muted" style="max-width:720px;">
+                Desde aqui se controlan colaboradores, periodos, vacaciones y devengados en una sola vista.
+                La experiencia esta pensada para que el equipo de recursos humanos trabaje rapido, con claridad y trazabilidad.
+            </p>
+        </div>
+        <div class="erp-actions-cluster">
+            <a class="erp-pill-link" href="{% url 'configuracion_rrhh' empresa.slug %}">Configurar calculo</a>
+            <a class="erp-pill-link" href="{% url 'movimientos_planilla' empresa.slug %}">Bonos y deducciones</a>
+            <a class="erp-pill-link" href="{% url 'vacaciones_rrhh' empresa.slug %}">Vacaciones</a>
+        </div>
+    </section>
+
+    <section class="erp-grid">
+        <article class="erp-card erp-module-card">
+            <div class="erp-kpi-label">Expedientes</div>
+            <h3>Empleados</h3>
+            <p>Foto, identidad, banco, salario, correo, telefono y reglas de deduccion por empleado.</p>
+            <a class="erp-btn" href="{% url 'empleados_rrhh' empresa.slug %}">Entrar al modulo</a>
+        </article>
+        <article class="erp-card erp-module-card">
+            <div class="erp-kpi-label">Nomina</div>
+            <h3>Planillas</h3>
+            <p>Periodos mensuales, quincenales o especiales, con 14avo proporcional y voucher PDF.</p>
+            <a class="erp-btn" href="{% url 'planillas_rrhh' empresa.slug %}">Entrar al modulo</a>
+        </article>
+        <article class="erp-card erp-module-card">
+            <div class="erp-kpi-label">Control</div>
+            <h3>Vacaciones</h3>
+            <p>Solicitud, aprobacion y saldo vivo del colaborador con base en su antiguedad.</p>
+            <a class="erp-btn" href="{% url 'vacaciones_rrhh' empresa.slug %}">Entrar al modulo</a>
+        </article>
+        <article class="erp-card erp-module-card">
+            <div class="erp-kpi-label">Parametros</div>
+            <h3>Configuracion</h3>
+            <p>IHSS, RAP, ISR base, factores de horas extra y activacion del motor de calculo.</p>
+            <a class="erp-btn" href="{% url 'configuracion_rrhh' empresa.slug %}">Entrar al modulo</a>
+        </article>
+    </section>
+
+    <section class="erp-grid">
+        <article class="erp-card">
+            <div class="erp-card-header">
+                <div>
+                    <h3>Empleados recientes</h3>
+                    <p>Ultimos expedientes creados en esta empresa.</p>
+                </div>
+                <a class="erp-pill-link" href="{% url 'empleados_rrhh' empresa.slug %}">Ver todos</a>
+            </div>
+            <div class="erp-mini-list">
+                {% for empleado in empleados_recientes %}
+                <div class="erp-mini-item">
+                    <div>
+                        <strong>{{ empleado.nombre_completo }}</strong>
+                        <div class="erp-card-muted">{{ empleado.puesto|default:"Sin puesto" }} · {{ empleado.departamento|default:"Sin area" }}</div>
+                    </div>
+                    <span class="erp-badge {% if empleado.estado == 'activo' %}success{% else %}warning{% endif %}">{{ empleado.get_estado_display }}</span>
+                </div>
+                {% empty %}
+                <div class="erp-empty">Todavia no hay empleados registrados.</div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="erp-card">
+            <div class="erp-card-header">
+                <div>
+                    <h3>Planillas recientes</h3>
+                    <p>Control rapido de periodos listos para calcular o cerrar.</p>
+                </div>
+                <a class="erp-pill-link" href="{% url 'planillas_rrhh' empresa.slug %}">Ver todas</a>
+            </div>
+            <div class="erp-mini-list">
+                {% for periodo in periodos_recientes %}
+                <div class="erp-mini-item">
+                    <div>
+                        <strong>{{ periodo.nombre }}</strong>
+                        <div class="erp-card-muted">{{ periodo.fecha_inicio|date:"d/m/Y" }} - {{ periodo.fecha_fin|date:"d/m/Y" }}</div>
+                    </div>
+                    <span class="erp-badge {% if periodo.estado == 'pagada' %}success{% elif periodo.estado == 'cerrada' %}info{% else %}warning{% endif %}">
+                        {{ periodo.get_estado_display }}
+                    </span>
+                </div>
+                {% empty %}
+                <div class="erp-empty">Todavia no hay periodos registrados.</div>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+</section>
+{% endblock %}

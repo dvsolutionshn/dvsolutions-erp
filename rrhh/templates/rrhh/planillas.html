@@ -1,0 +1,71 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Planillas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Nomina{% endblock %}
+{% block header_title %}Planillas{% endblock %}
+{% block header_description %}Periodos de pago, calculo de deducciones, vouchers y seguimiento de estado de cierre.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_periodo_planilla' empresa.slug %}">Nueva Planilla</a>{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-list-kpis">
+        <article class="erp-list-kpi-card">
+            <div class="erp-kpi-label">Periodos</div>
+            <p class="erp-stat-value">{{ resumen_planillas.total }}</p>
+            <p class="erp-card-muted">Historial completo de planillas generadas.</p>
+        </article>
+        <article class="erp-list-kpi-card">
+            <div class="erp-kpi-label">Abiertas</div>
+            <p class="erp-stat-value">{{ resumen_planillas.abiertas }}</p>
+            <p class="erp-card-muted">Crea el periodo y luego calcula cuando todo este listo.</p>
+        </article>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-list-table">
+                <thead>
+                    <tr>
+                        <th>Periodo</th>
+                        <th>Rango</th>
+                        <th>Pago</th>
+                        <th>Estado</th>
+                        <th>Devengado</th>
+                        <th>Deducciones</th>
+                        <th>Neto</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for periodo in periodos %}
+                    <tr>
+                        <td class="erp-doc-cell">
+                            <div class="erp-doc-title">{{ periodo.nombre }}</div>
+                            <div class="erp-doc-subtext">{{ periodo.get_frecuencia_display }}{% if periodo.incluir_14avo %} · Incluye 14avo{% endif %}</div>
+                        </td>
+                        <td>{{ periodo.fecha_inicio|date:"d/m/Y" }} - {{ periodo.fecha_fin|date:"d/m/Y" }}</td>
+                        <td>{{ periodo.fecha_pago|date:"d/m/Y" }}</td>
+                        <td>
+                            <span class="erp-badge {% if periodo.estado == 'pagada' %}success{% elif periodo.estado == 'cerrada' %}info{% else %}warning{% endif %}">
+                                {{ periodo.get_estado_display }}
+                            </span>
+                        </td>
+                        <td class="amount">L. {{ periodo.total_devengado|floatformat:2|intcomma }}</td>
+                        <td class="amount">L. {{ periodo.total_deducciones|floatformat:2|intcomma }}</td>
+                        <td class="amount">L. {{ periodo.total_neto|floatformat:2|intcomma }}</td>
+                        <td>
+                            <div class="erp-actions-cluster">
+                                <a class="erp-pill-link" href="{% url 'ver_planilla' empresa.slug periodo.id %}">Abrir planilla</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="erp-empty">Todavia no hay planillas registradas.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}

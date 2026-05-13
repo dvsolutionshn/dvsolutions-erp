@@ -1,0 +1,101 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Detalle Cierre de Caja - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion de Caja{% endblock %}
+{% block header_title %}Detalle del Cierre{% endblock %}
+{% block header_description %}Facturas, clientes y pagos incluidos en el cierre seleccionado para auditoria operativa.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'cierres_caja' empresa.slug %}">Volver a Cierres</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cajero</div>
+        <p class="erp-stat-value">{{ cierre.cajero.username }}</p>
+        <p class="erp-card-muted">{{ cierre.fecha|date:"d/m/Y" }} · {{ cierre.get_turno_display }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Sistema</div>
+        <p class="erp-stat-value erp-money">L. {{ cierre.total_sistema|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Total calculado por pagos registrados.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Reportado</div>
+        <p class="erp-stat-value erp-money">L. {{ cierre.total_reportado|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Total declarado por el cajero.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Diferencia</div>
+        <p class="erp-stat-value erp-money">L. {{ cierre.diferencia|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Reportado menos sistema.</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    {% for item in resumen_metodos %}
+    <article class="erp-card">
+        <div class="erp-kpi-label">{{ item.metodo }}</div>
+        <p class="erp-stat-value erp-money">L. {{ item.total|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ item.cantidad }} pago(s) incluidos.</p>
+    </article>
+    {% endfor %}
+</section>
+
+{% if cierre.observacion %}
+<section class="erp-soft-panel">
+    <strong>Observacion:</strong> {{ cierre.observacion }}
+</section>
+{% endif %}
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Facturas incluidas</h3>
+            <p>Detalle de cada pago que alimenta este cierre de caja.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Factura</th>
+                    <th>Cliente</th>
+                    <th>Fecha pago</th>
+                    <th>Metodo</th>
+                    <th>Cuenta</th>
+                    <th>Referencia</th>
+                    <th class="erp-money">Monto</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pago in pagos %}
+                <tr>
+                    <td>
+                        <strong>{{ pago.factura.numero_factura|default:"Sin numero" }}</strong>
+                        <div class="erp-card-muted">Factura ID {{ pago.factura.id }}</div>
+                    </td>
+                    <td>{{ pago.factura.cliente.nombre }}</td>
+                    <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+                    <td><span class="erp-badge neutral">{{ pago.get_metodo_display }}</span></td>
+                    <td>
+                        {{ pago.cuenta_financiera.nombre|default:"Sin cuenta" }}
+                        {% if pago.cuenta_financiera.numero %}
+                        <div class="erp-card-muted">{{ pago.cuenta_financiera.numero }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ pago.referencia|default:"-" }}</td>
+                    <td class="erp-money">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                    <td><a class="erp-btn-secondary" href="{% url 'ver_factura' empresa.slug pago.factura.id %}">Ver factura</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty-row">No hay pagos asociados a este cierre.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Contabilidad - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Finanzas{% endblock %}
+{% block header_title %}Contabilidad{% endblock %}
+{% block header_description %}Base contable institucional para construir asientos, partidas y reportes con una estructura preparada para integrarse con el resto del ERP.{% endblock %}
+
+{% block topbar_actions %}
+{% if erp_access.contabilidad %}<a href="{% url 'configuracion_contable' empresa.slug %}" class="erp-action-link">Configurar Cuentas</a>{% endif %}
+{% if erp_access.contabilidad %}<a href="{% url 'periodos_contables' empresa.slug %}" class="erp-action-link">Periodos</a>{% endif %}
+{% if erp_access.contabilidad %}<a href="{% url 'clasificaciones_compras_fiscales' empresa.slug %}" class="erp-action-link">Clasif. Compras</a>{% endif %}
+{% if erp_access.contabilidad %}<a href="{% url 'bancos_dashboard' empresa.slug %}" class="erp-action-link">Bancos</a>{% endif %}
+{% if erp_access.catalogo_cuentas %}<a href="{% url 'crear_cuenta_contable' empresa.slug %}" class="erp-action-link">Nueva Cuenta</a>{% endif %}
+{% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="erp-action-link">Nuevo Asiento</a>{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas activas</div><p class="erp-stat-value">{{ resumen.cuentas_activas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Asientos</div><p class="erp-stat-value">{{ resumen.asientos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Contabilizados</div><p class="erp-stat-value">{{ resumen.contabilizados }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Borradores</div><p class="erp-stat-value">{{ resumen.borradores }}</p></article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Catalogo</div>
+        <h3>Cuentas Contables</h3>
+        <p>Construye tu plan de cuentas institucional por empresa, tipo contable y cuentas de movimiento.</p>
+        <a class="erp-btn-secondary" href="{% url 'catalogo_cuentas' empresa.slug %}">Ver Catalogo</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Operacion</div>
+        <h3>Asientos Contables</h3>
+        <p>Registra partidas balanceadas en borrador o contabilizadas para llevar control financiero con trazabilidad.</p>
+        <a class="erp-btn-secondary" href="{% url 'asientos_contables' empresa.slug %}">Ver Asientos</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Automatizacion</div>
+        <h3>Configuracion Contable</h3>
+        <p>Define las cuentas que usara esta empresa para ventas, cobros, compras, pagos, inventario e impuestos.</p>
+        <a class="erp-btn-secondary" href="{% url 'configuracion_contable' empresa.slug %}">Configurar Cuentas</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Cierre mensual</div>
+        <h3>Periodos Contables</h3>
+        <p>Abre o cierra meses contables para proteger asientos y reportes cuando el periodo ya fue revisado.</p>
+        <a class="erp-btn-secondary" href="{% url 'periodos_contables' empresa.slug %}">Ver Periodos</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Compras fiscales</div>
+        <h3>Clasificaciones Contables</h3>
+        <p>Define si una compra fiscal ira a combustible, alquiler, servicios, inventario u otra cuenta contable.</p>
+        <a class="erp-btn-secondary" href="{% url 'clasificaciones_compras_fiscales' empresa.slug %}">Configurar Clasificaciones</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Tesoreria</div>
+        <h3>Bancos y Tarjetas</h3>
+        <p>Importa estados de cuenta, clasifica movimientos y genera asientos desde dinero real.</p>
+        <a class="erp-btn-secondary" href="{% url 'bancos_dashboard' empresa.slug %}">Abrir Bancos</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Analitica</div>
+        <h3>Reportes</h3>
+        <p>Lectura ejecutiva del estado contable mientras preparamos balance, mayor y auxiliares mas avanzados.</p>
+        <a class="erp-btn-secondary" href="{% url 'reportes_contables' empresa.slug %}">Ver Reportes</a>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Ultimos asientos</h3>
+            <p class="erp-card-muted">Resumen rapido de la actividad contable reciente.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Numero</th>
+                    <th>Fecha</th>
+                    <th>Descripcion</th>
+                    <th>Estado</th>
+                    <th>Debe</th>
+                    <th>Haber</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asiento in ultimos_asientos %}
+                <tr>
+                    <td>{{ asiento.numero|default:"Sin numero" }}</td>
+                    <td>{{ asiento.fecha|date:"F j, Y" }}</td>
+                    <td>{{ asiento.descripcion }}</td>
+                    <td><span class="erp-badge {% if asiento.estado == 'contabilizado' %}success{% elif asiento.estado == 'borrador' %}warning{% else %}danger{% endif %}">{{ asiento.get_estado_display }}</span></td>
+                    <td>L. {{ asiento.total_debe }}</td>
+                    <td>L. {{ asiento.total_haber }}</td>
+                    <td class="actions"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="erp-empty">Todavia no hay asientos contables registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,252 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Productos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Catalogo Comercial{% endblock %}
+{% block header_title %}Productos{% endblock %}
+{% block header_description %}Organiza el catalogo comercial, fiscal y operativo desde una vista mas limpia, consistente y preparada para crecer con inventario.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-product-table{
+    min-width:1260px;
+}
+.erp-autocomplete{
+    position:relative;
+}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:20;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow-soft);
+    padding:8px;
+    display:none;
+    max-height:260px;
+    overflow:auto;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{
+    background:#f4f8fc;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-list-kpis">
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Productos</div>
+            <div class="erp-stat-value">{{ resumen.total }}</div>
+            <p class="erp-card-muted">Catalogo total disponible para facturacion y operacion.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Activos</div>
+            <div class="erp-stat-value">{{ resumen.activos }}</div>
+            <p class="erp-card-muted">Items listos para utilizarse de inmediato.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Servicios</div>
+            <div class="erp-stat-value">{{ resumen.servicios }}</div>
+            <p class="erp-card-muted">Elementos que no requieren movimiento fisico.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Valor catalogo</div>
+            <div class="erp-stat-value erp-money">L. {{ resumen.valor_catalogo|floatformat:2|intcomma }}</div>
+            <p class="erp-card-muted">Suma referencial del precio base del portafolio.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Con inventario</div>
+            <div class="erp-stat-value">{{ resumen.con_inventario }}</div>
+            <p class="erp-card-muted">Productos preparados para control de existencias.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Controlados</div>
+            <div class="erp-stat-value">{{ resumen.controlados }}</div>
+            <p class="erp-card-muted">Items con control farmaceutico especial.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Refrigerados</div>
+            <div class="erp-stat-value">{{ resumen.refrigerados }}</div>
+            <p class="erp-card-muted">Productos que requieren cadena fria o custodia.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Inactivos</div>
+            <div class="erp-stat-value">{{ resumen.inactivos }}</div>
+            <p class="erp-card-muted">Items conservados para historial o reactivacion futura.</p>
+        </article>
+    </section>
+
+    <section class="erp-card erp-list-filter-card">
+        <div class="erp-list-toolbar">
+            <div>
+                <h3 class="erp-panel-title" style="margin:0;">Catalogo de Productos</h3>
+                <p>Concentra nombre, clasificacion, impuesto base y estado operativo desde una misma vista administrativa.</p>
+            </div>
+            {% if erp_access.usa_inventario_farmaceutico %}
+            <a class="erp-btn-secondary" href="{% url 'categorias_farmaceuticas' empresa.slug %}">Categorias</a>
+            {% endif %}
+        </div>
+        <form method="get" class="erp-list-filter-grid">
+            <div class="erp-filter-field">
+                <label for="q">Buscar producto</label>
+                <div class="erp-autocomplete">
+                    <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Escribe nombre, codigo o descripcion" autocomplete="off">
+                    <div id="productos-sugerencias" class="erp-suggestion-list"></div>
+                </div>
+            </div>
+            {% if categorias_farmaceuticas %}
+            <div class="erp-filter-field">
+                <label for="categoria">Categoria</label>
+                <select id="categoria" name="categoria">
+                    <option value="">Todas las categorias</option>
+                    {% for categoria in categorias_farmaceuticas %}
+                    <option value="{{ categoria.id }}" {% if categoria_id == categoria.id|stringformat:"s" %}selected{% endif %}>{{ categoria.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="erp-list-filter-actions" style="grid-column:1 / -1;">
+                <button class="erp-btn" type="submit">Buscar</button>
+                <a class="erp-btn-secondary" href="{% url 'productos_facturacion' empresa.slug %}">Limpiar</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-product-table erp-list-table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Codigo / Tipo</th>
+                        <th>Clasificacion</th>
+                        <th>Unidad</th>
+                        <th>Impuesto</th>
+                        <th>Precio</th>
+                        <th>Inventario</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for producto in productos %}
+                    <tr>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ producto.nombre }}</div>
+                                <div class="erp-doc-subtext">{{ producto.descripcion|default:"Sin descripcion comercial"|truncatechars:88 }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ producto.codigo|default:"-" }}</div>
+                                <div class="erp-doc-subtext">{{ producto.get_tipo_item_display }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if producto.perfil_farmaceutico %}
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ producto.perfil_farmaceutico.categoria.nombre|default:"Sin categoria" }}</div>
+                                <div class="erp-doc-subtext">
+                                    {{ producto.perfil_farmaceutico.principio_activo|default:"Sin principio activo" }}
+                                    {% if producto.perfil_farmaceutico.producto_controlado %} | Controlado{% endif %}
+                                    {% if producto.perfil_farmaceutico.requiere_refrigeracion %} | Refrigerado{% endif %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <span class="erp-badge neutral">Sin perfil</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ producto.get_unidad_medida_display }}</td>
+                        <td>{% if producto.impuesto_predeterminado %}{{ producto.impuesto_predeterminado.nombre }}{% else %}-{% endif %}</td>
+                        <td class="amount"><span class="erp-money">L. {{ producto.precio|floatformat:2|intcomma }}</span></td>
+                        <td>
+                            {% if producto.controla_inventario %}
+                            <span class="erp-badge info">Controlado</span>
+                            {% else %}
+                            <span class="erp-badge neutral">No aplica</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if producto.activo %}
+                            <span class="erp-badge success">Activo</span>
+                            {% else %}
+                            <span class="erp-badge danger">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <div class="erp-actions-cluster">
+                                <a class="erp-pill-link" href="{% url 'editar_producto_facturacion' empresa.slug producto.id %}">Editar</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="9" class="erp-empty">No hay productos registrados.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("productos-sugerencias");
+    const sugerencias = [{% for producto_nombre in productos_sugeridos %}"{{ producto_nombre|escapejs }}",{% endfor %}];
+
+    if(!input || !panel){
+        return;
+    }
+
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const matches = term
+            ? sugerencias.filter(item => item.toLowerCase().includes(term)).slice(0, 8)
+            : sugerencias.slice(0, 8);
+
+        panel.innerHTML = "";
+        if(!matches.length){
+            panel.style.display = "none";
+            return;
+        }
+
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){
+                input.value = item;
+                panel.style.display = "none";
+            });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", function(){
+        window.setTimeout(() => panel.style.display = "none", 120);
+    });
+});
+</script>
+{% endblock %}

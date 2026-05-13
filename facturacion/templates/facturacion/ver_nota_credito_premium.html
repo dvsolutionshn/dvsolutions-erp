@@ -1,0 +1,141 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Nota de Crédito {{ nota.numero_nota|default:"Borrador" }}{% endblock %}
+{% block header_kicker %}Ajuste Comercial{% endblock %}
+{% block header_title %}Nota de Crédito {{ nota.numero_nota|default:"Borrador" }}{% endblock %}
+{% block header_description %}Vista documental del ajuste aplicado sobre la factura origen, con motivo, líneas afectadas y lectura fiscal consolidada.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'notas_credito_dashboard' empresa.slug %}">Volver a Notas</a>
+<a class="erp-action-link" href="{% url 'descargar_nota_credito_pdf' empresa.slug nota.id %}">Descargar PDF</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-credit-flow{display:flex;flex-direction:column;gap:18px;}
+.erp-credit-sheet{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px 30px;}
+.erp-credit-head{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.82fr);gap:24px;align-items:start;padding-bottom:20px;border-bottom:1px solid var(--line);}
+.erp-credit-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:10px;}
+.erp-credit-number{margin:0 0 10px;font-size:30px;line-height:1.08;color:#102338;}
+.erp-credit-copy{color:#586a80;line-height:1.65;}
+.erp-credit-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px;margin-top:18px;}
+.erp-credit-meta-item,.erp-credit-side-item{padding-bottom:10px;border-bottom:1px solid #eef2f7;}
+.erp-credit-meta-item span,.erp-credit-side-item span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:6px;}
+.erp-credit-meta-item strong,.erp-credit-side-item strong{display:block;font-size:15px;line-height:1.5;color:#11263d;word-break:break-word;}
+.erp-credit-side{border:1px solid var(--line);border-radius:14px;padding:18px;background:#fbfcfe;}
+.erp-credit-side-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;}
+.erp-credit-body{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(310px,.8fr);gap:22px;margin-top:22px;}
+.erp-credit-block{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;}
+.erp-credit-block-title{padding:14px 18px;border-bottom:1px solid var(--line);background:#f8fafc;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#384b61;}
+.erp-credit-card{padding:18px;}
+.erp-credit-card h4{margin:0 0 10px;font-size:20px;color:#102338;}
+.erp-credit-card p{margin:0;color:#586a80;line-height:1.65;}
+.erp-credit-summary-list{display:flex;flex-direction:column;gap:10px;}
+.erp-credit-summary-row{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;color:#48596d;}
+.erp-credit-summary-row strong{color:#102338;}
+.erp-credit-summary-row.total{padding-top:12px;margin-top:4px;border-top:1px solid var(--line);font-size:17px;}
+.erp-credit-lines{margin-top:22px;}
+.erp-credit-lines table{width:100%;border-collapse:collapse;}
+.erp-credit-lines th{padding:13px 16px;background:#f8fafc;border-bottom:1px solid var(--line);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#55657b;}
+.erp-credit-lines td{padding:14px 16px;border-bottom:1px solid #edf2f7;vertical-align:top;color:#1c2d42;}
+.erp-credit-lines tr:last-child td{border-bottom:none;}
+.erp-credit-product{font-weight:700;color:#102338;}
+.erp-credit-status{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fbfdff;color:#52657a;line-height:1.65;margin-top:22px;}
+@media (max-width: 980px){
+    .erp-credit-head,.erp-credit-body{grid-template-columns:1fr;}
+    .erp-credit-meta,.erp-credit-side-grid{grid-template-columns:1fr;}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-credit-flow">
+    <article class="erp-credit-sheet">
+        <div class="erp-credit-head">
+            <div>
+                <div class="erp-credit-kicker">Documento de ajuste</div>
+                <h3 class="erp-credit-number">Nota de Crédito {{ nota.numero_nota|default:"Borrador" }}</h3>
+                <div class="erp-credit-copy">Documento correctivo vinculado a la factura origen para reflejar devoluciones, descuentos posteriores o ajustes comerciales con soporte fiscal claro.</div>
+                <div class="erp-credit-meta">
+                    <div class="erp-credit-meta-item"><span>Factura origen</span><strong><a class="erp-inline-link" href="{% url 'ver_factura' empresa.slug nota.factura_origen.id %}">{{ nota.factura_origen.numero_factura|default:nota.factura_origen.id }}</a></strong></div>
+                    <div class="erp-credit-meta-item"><span>Cliente</span><strong>{{ nota.cliente.nombre }}</strong></div>
+                    <div class="erp-credit-meta-item"><span>Fecha emisión</span><strong>{{ nota.fecha_emision }}</strong></div>
+                    <div class="erp-credit-meta-item"><span>CAI histórico</span><strong>{{ nota.cai_numero_historico|default:"Sin CAI asignado" }}</strong></div>
+                </div>
+            </div>
+            <aside class="erp-credit-side">
+                <div class="erp-credit-side-grid">
+                    <div class="erp-credit-side-item"><span>Estado</span><strong>{% if nota.estado == "borrador" %}<span class="erp-badge warning">Borrador</span>{% elif nota.estado == "emitida" %}<span class="erp-badge success">Emitida</span>{% else %}<span class="erp-badge danger">Anulada</span>{% endif %}</strong></div>
+                    <div class="erp-credit-side-item"><span>Moneda</span><strong>{{ nota.moneda }}</strong></div>
+                    <div class="erp-credit-side-item"><span>Total nota</span><strong>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ nota.total|floatformat:2|intcomma }}</strong></div>
+                    <div class="erp-credit-side-item"><span>Empresa</span><strong>{{ empresa.nombre }}</strong></div>
+                </div>
+            </aside>
+        </div>
+
+        <div class="erp-credit-body">
+            <div class="erp-credit-block">
+                <div class="erp-credit-block-title">Motivo y contexto</div>
+                <div class="erp-credit-card">
+                    <h4>{{ nota.cliente.nombre }}</h4>
+                    <p>{% if nota.motivo %}{{ nota.motivo }}{% else %}No se registró un motivo adicional para esta nota de crédito.{% endif %}</p>
+                </div>
+            </div>
+            <div class="erp-credit-block">
+                <div class="erp-credit-block-title">Resumen del ajuste</div>
+                <div class="erp-credit-card">
+                    <div class="erp-credit-summary-list">
+                        <div class="erp-credit-summary-row"><span>Subtotal</span><strong>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ nota.subtotal|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-credit-summary-row"><span>Impuesto</span><strong>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ nota.impuesto|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-credit-summary-row total"><span>Total emitido</span><strong>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ nota.total|floatformat:2|intcomma }}</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="erp-credit-block erp-credit-lines">
+            <div class="erp-credit-block-title">Líneas afectadas</div>
+            <table>
+                <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Impuesto</th><th>Total</th></tr></thead>
+                <tbody>
+                {% for linea in nota.lineas.all %}
+                    <tr>
+                        <td><span class="erp-credit-product">{{ linea.producto.nombre }}</span></td>
+                        <td>{{ linea.cantidad }}</td>
+                        <td class="amount">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.precio_unitario|floatformat:2|intcomma }}</td>
+                        <td class="amount">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</td>
+                        <td class="amount">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</td>
+                        <td class="amount">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="erp-empty">Esta nota todavía no tiene líneas registradas.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="erp-credit-status">
+            {% if nota.estado == "borrador" %}
+                La nota permanece en borrador y todavía puede revisarse antes de su emisión formal.
+            {% elif nota.estado == "emitida" %}
+                Esta nota ya afecta el documento origen y forma parte de la trazabilidad fiscal y comercial.
+            {% else %}
+                Esta nota fue anulada y se conserva únicamente como referencia documental dentro del historial del sistema.
+            {% endif %}
+        </div>
+    </article>
+
+    <div class="erp-toolbar">
+        <div></div>
+        <div class="erp-actions-cluster">
+            <a class="erp-pill-link" href="{% url 'editar_nota_credito' empresa.slug nota.id %}">Editar</a>
+            {% if nota.estado != "anulada" %}
+            <form method="post" action="{% url 'anular_nota_credito' empresa.slug nota.id %}" class="erp-inline-form">
+                {% csrf_token %}
+                <button class="erp-pill-btn danger" type="submit" onclick="return confirm('Seguro que desea anular esta nota de crédito?');">Anular</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

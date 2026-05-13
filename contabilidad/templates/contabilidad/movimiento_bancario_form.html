@@ -1,0 +1,68 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Editar Movimiento Bancario - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bancos{% endblock %}
+{% block header_title %}Editar Movimiento Bancario{% endblock %}
+{% block header_description %}Corrige lecturas importadas antes de contabilizar el movimiento. Una vez contabilizado, el documento queda protegido.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'movimientos_bancarios' empresa.slug %}" class="erp-action-link">Volver a Movimientos</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cuenta</div>
+        <p class="erp-stat-value">{{ movimiento.cuenta_financiera.nombre }}</p>
+        <p class="erp-card-muted">{{ movimiento.cuenta_financiera.get_tipo_display }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Origen</div>
+        <p class="erp-stat-value">{{ movimiento.origen_importacion|default:"Manual" }}</p>
+        <p class="erp-card-muted">Archivo o carga que genero el movimiento.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Estado</div>
+        <p class="erp-stat-value">{{ movimiento.get_estado_display }}</p>
+        <p class="erp-card-muted">Solo se edita antes de contabilizar.</p>
+    </article>
+</section>
+
+<section class="erp-form-card">
+    <div class="erp-form-actions">
+        <div>
+            <h3 style="margin:0 0 8px;">Datos importados</h3>
+            <p>Revisa fecha, descripcion y montos. Usa debito para salidas y credito para entradas.</p>
+        </div>
+    </div>
+
+    <form method="post" class="erp-form-shell" style="margin-top:18px;">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="erp-message-stack">
+            {% for error in form.non_field_errors %}
+            <div class="erp-message">{{ error }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="erp-form-grid two">
+            {% for field in form %}
+            <div class="erp-field {% if field.name == 'descripcion' %}" style="grid-column:1 / -1;{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="erp-form-actions" style="margin-top:22px;">
+            <div class="erp-field-help">Si seleccionas una clasificacion, el movimiento queda listo para contabilizar.</div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'movimientos_bancarios' empresa.slug %}">Cancelar</a>
+                <button type="submit" class="erp-btn">Guardar Cambios</button>
+            </div>
+        </div>
+    </form>
+</section>
+{% endblock %}

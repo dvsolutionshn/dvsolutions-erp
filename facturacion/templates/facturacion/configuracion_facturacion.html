@@ -1,0 +1,677 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Configuracion de Facturacion - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Configuracion Comercial{% endblock %}
+{% block header_title %}Configuracion de Facturacion{% endblock %}
+{% block header_description %}Personaliza la experiencia documental de esta empresa sin afectar a las demas companias del ERP.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn erp-btn-secondary" href="{% url 'facturacion_dashboard' empresa.slug %}">Volver</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-config-shell{
+    display:grid;
+    grid-template-columns:minmax(0,1.2fr) minmax(340px,.8fr);
+    gap:24px;
+    align-items:start;
+}
+.erp-config-form{
+    display:flex;
+    flex-direction:column;
+    gap:22px;
+}
+.erp-preview-card{
+    position:sticky;
+    top:20px;
+}
+.erp-preview-frame{
+    border:1px solid var(--line);
+    border-radius:18px;
+    overflow:hidden;
+    background:#fff;
+}
+.erp-preview-head{
+    padding:20px 22px;
+    color:#fff;
+    background:linear-gradient(135deg, var(--preview-primary, #334155), var(--preview-secondary, #94a3b8));
+}
+.erp-preview-brand{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+}
+.erp-preview-logo{
+    width:var(--preview-logo-width, 110px);
+    height:var(--preview-logo-height, 60px);
+    border-radius:12px;
+    background:rgba(255,255,255,.16);
+    border:1px solid rgba(255,255,255,.22);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:rgba(255,255,255,.92);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    flex:0 0 auto;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14);
+}
+.erp-preview-logo img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+.erp-preview-brand-copy{
+    flex:1 1 auto;
+    min-width:0;
+}
+.erp-logo-size-control{
+    grid-column:1 / -1;
+    padding:16px 18px;
+    border:1px dashed var(--line);
+    border-radius:14px;
+    background:#fbfcfe;
+}
+.erp-logo-size-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:14px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+}
+.erp-logo-size-value{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 12px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:#fff;
+    font-size:13px;
+    font-weight:700;
+    color:#16365a;
+}
+.erp-logo-size-slider{
+    width:100%;
+    accent-color:var(--brand);
+}
+.erp-logo-size-quick{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:12px;
+}
+.erp-logo-size-quick button{
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:999px;
+    padding:7px 12px;
+    color:#38506b;
+    font-size:12px;
+    cursor:pointer;
+}
+.erp-logo-size-quick button:hover{
+    border-color:rgba(47,107,255,.35);
+    color:#1f4fd1;
+}
+.erp-hidden-config-input{
+    display:none;
+}
+.erp-logo-dimension-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:16px;
+    margin-top:14px;
+}
+@media (max-width: 720px){
+    .erp-logo-dimension-grid{
+        grid-template-columns:1fr;
+    }
+}
+.erp-preview-head small{
+    display:block;
+    margin-bottom:8px;
+    text-transform:uppercase;
+    letter-spacing:.16em;
+    opacity:.78;
+}
+.erp-preview-head strong{
+    display:block;
+    font-size:22px;
+    line-height:1.2;
+}
+.erp-preview-head span{
+    display:block;
+    margin-top:8px;
+    font-size:13px;
+    opacity:.88;
+}
+.erp-preview-body{
+    padding:20px 22px 22px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+}
+.erp-preview-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+}
+.erp-preview-box{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px 14px;
+    background:#fbfcfe;
+}
+.erp-preview-box small{
+    display:block;
+    margin-bottom:5px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    font-size:10px;
+    color:var(--muted);
+}
+.erp-preview-box strong{
+    display:block;
+    font-size:14px;
+    color:#162334;
+}
+.erp-preview-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+}
+.erp-preview-table th,
+.erp-preview-table td{
+    padding:10px 8px;
+    border-bottom:1px solid #edf1f6;
+    text-align:left;
+}
+.erp-preview-table th{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    color:var(--muted);
+}
+.erp-preview-table td:last-child,
+.erp-preview-table th:last-child{
+    text-align:right;
+}
+.erp-preview-summary{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+.erp-preview-summary-row{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    font-size:13px;
+    color:#45566c;
+}
+.erp-preview-summary-row.total{
+    padding-top:10px;
+    border-top:1px solid var(--line);
+    font-size:15px;
+    font-weight:700;
+    color:#122237;
+}
+.erp-preview-legend,
+.erp-preview-foot{
+    margin:0;
+    padding:12px 14px;
+    border-radius:12px;
+    background:#f8fafc;
+    color:#516176;
+    font-size:13px;
+    line-height:1.6;
+    white-space:pre-wrap;
+}
+.erp-config-visibility{
+    gap:10px;
+}
+.erp-config-visibility label{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    padding:12px 14px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+}
+.erp-template-switch{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    gap:12px;
+    margin-top:12px;
+}
+.erp-template-option{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px;
+    background:#fff;
+}
+.erp-template-option.is-active{
+    border-color:rgba(47, 107, 255, .45);
+    box-shadow:0 0 0 3px rgba(47, 107, 255, .08);
+}
+.erp-template-option strong{
+    display:block;
+    margin-bottom:6px;
+    font-size:15px;
+    color:#122237;
+}
+.erp-template-option p{
+    margin:0;
+    color:#5d718a;
+    font-size:13px;
+    line-height:1.55;
+}
+@media (max-width: 1080px){
+    .erp-config-shell{
+        grid-template-columns:1fr;
+    }
+    .erp-preview-card{
+        position:static;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Plantilla PDF</div>
+        <div class="erp-stat-value">{{ configuracion.get_plantilla_factura_pdf_display }}</div>
+        <p class="erp-card-muted">Define que formato descargara el boton principal de factura para esta empresa.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Identidad</div>
+        <div class="erp-stat-value">{{ configuracion.nombre_comercial_documentos|default:empresa.nombre }}</div>
+        <p class="erp-card-muted">Nombre visible en documentos comerciales y fiscales generados desde facturacion.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Ultima Actualizacion</div>
+        <div class="erp-stat-value">{{ configuracion.fecha_actualizacion|date:"d/m/Y" }}</div>
+        <p class="erp-card-muted">Cada cambio aplica solo a nuevos PDF generados para esta empresa.</p>
+    </article>
+</section>
+
+<section class="erp-config-shell">
+    <article class="erp-card erp-config-form">
+        <div style="display:flex; justify-content:space-between; gap:18px; align-items:flex-start; flex-wrap:wrap;">
+            <div>
+                <div class="erp-kpi-label">Preferencias por Empresa</div>
+                <h3 style="margin:8px 0 6px;">Documento fiscal personalizado</h3>
+                <p class="erp-card-muted" style="max-width:760px;">Ajusta colores, nombre visible y detalles fiscales mientras ves una muestra en vivo de como se sentira el documento final para esta empresa.</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <span data-preview-color-dot="primary" style="width:34px; height:34px; border-radius:999px; border:1px solid #dbe3ef; background:{{ configuracion.color_primario }};"></span>
+                <span data-preview-color-dot="secondary" style="width:34px; height:34px; border-radius:999px; border:1px solid #dbe3ef; background:{{ configuracion.color_secundario }};"></span>
+            </div>
+        </div>
+
+        <form method="post" class="erp-form-grid" style="margin-top:22px;" id="facturacion-config-form">
+            {% csrf_token %}
+
+            <div class="erp-field">
+                <label for="{{ form.plantilla_factura_pdf.id_for_label }}">Plantilla de factura PDF</label>
+                {{ form.plantilla_factura_pdf }}
+                <small>{{ form.plantilla_factura_pdf.help_text }}</small>
+                {{ form.plantilla_factura_pdf.errors }}
+                <div class="erp-template-switch">
+                    <div class="erp-template-option{% if configuracion.plantilla_factura_pdf == 'normal' %} is-active{% endif %}">
+                        <strong>Factura clasica</strong>
+                        <p>Diseno fiscal tradicional, limpio y directo para uso diario o clientes que prefieren un formato sobrio.</p>
+                    </div>
+                    <div class="erp-template-option{% if configuracion.plantilla_factura_pdf == 'alternativa' %} is-active{% endif %}">
+                        <strong>PDF alternativo</strong>
+                        <p>Presentacion mas comercial y moderna para empresas que quieren una factura con identidad visual mas marcada.</p>
+                    </div>
+                    {% if permite_plantilla_notas_extensas %}
+                    <div class="erp-template-option{% if configuracion.plantilla_factura_pdf == 'notas_extensas' %} is-active{% endif %}">
+                        <strong>Factura notas extensas</strong>
+                        <p>Formato especial para servicios con observaciones largas, con mas ancho util y notas en bloque completo.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.nombre_comercial_documentos.id_for_label }}">Nombre comercial en documentos</label>
+                {{ form.nombre_comercial_documentos }}
+                <small>{{ form.nombre_comercial_documentos.help_text }}</small>
+                {{ form.nombre_comercial_documentos.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.color_primario.id_for_label }}">Color primario</label>
+                {{ form.color_primario }}
+                <small>{{ form.color_primario.help_text }}</small>
+                {{ form.color_primario.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.color_secundario.id_for_label }}">Color secundario</label>
+                {{ form.color_secundario }}
+                <small>{{ form.color_secundario.help_text }}</small>
+                {{ form.color_secundario.errors }}
+            </div>
+
+            <div class="erp-logo-size-control">
+                <div class="erp-logo-size-top">
+                    <div>
+                        <label for="logo-width-slider" style="display:block; margin-bottom:6px; font-weight:700; color:#122237;">Tamano del logo en PDF</label>
+                        <small style="color:#5d718a;">Ajusta ancho y alto visualmente y mira el cambio en la preview antes de guardar.</small>
+                    </div>
+                    <div class="erp-logo-size-value">
+                        <span>Tamano actual</span>
+                        <strong data-logo-size-value>{{ configuracion.logo_ancho_pdf|default:110 }} x {{ configuracion.logo_alto_pdf|default:60 }} px</strong>
+                    </div>
+                </div>
+                {{ form.logo_ancho_pdf }}
+                {{ form.logo_alto_pdf }}
+                <div class="erp-logo-dimension-grid">
+                    <div>
+                        <label for="logo-width-slider" style="display:block; margin-bottom:8px; font-weight:700; color:#122237;">Ancho</label>
+                        <input
+                            type="range"
+                            id="logo-width-slider"
+                            class="erp-logo-size-slider"
+                            min="40"
+                            max="260"
+                            step="5"
+                            value="{{ configuracion.logo_ancho_pdf|default:110 }}"
+                        >
+                    </div>
+                    <div>
+                        <label for="logo-height-slider" style="display:block; margin-bottom:8px; font-weight:700; color:#122237;">Alto</label>
+                        <input
+                            type="range"
+                            id="logo-height-slider"
+                            class="erp-logo-size-slider"
+                            min="30"
+                            max="160"
+                            step="5"
+                            value="{{ configuracion.logo_alto_pdf|default:60 }}"
+                        >
+                    </div>
+                </div>
+                <div class="erp-logo-size-quick">
+                    <button type="button" data-logo-width-preset="80" data-logo-height-preset="46">Compacto</button>
+                    <button type="button" data-logo-width-preset="110" data-logo-height-preset="60">Equilibrado</button>
+                    <button type="button" data-logo-width-preset="150" data-logo-height-preset="78">Protagonista</button>
+                </div>
+                <small style="display:block; margin-top:10px; color:#5d718a;">{{ form.logo_ancho_pdf.help_text }} {{ form.logo_alto_pdf.help_text }}</small>
+                {{ form.logo_ancho_pdf.errors }}
+                {{ form.logo_alto_pdf.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.leyenda_factura.id_for_label }}">Leyenda de factura</label>
+                {{ form.leyenda_factura }}
+                <small>{{ form.leyenda_factura.help_text }}</small>
+                {{ form.leyenda_factura.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.pie_factura.id_for_label }}">Pie adicional del PDF</label>
+                {{ form.pie_factura }}
+                <small>{{ form.pie_factura.help_text }}</small>
+                {{ form.pie_factura.errors }}
+            </div>
+
+            <div class="erp-card" style="grid-column:1 / -1; background:#f8fafc;">
+                <div class="erp-kpi-label">Datos Visibles</div>
+                <div class="erp-config-visibility" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); margin-top:14px;">
+                    <label>
+                        {{ form.mostrar_vendedor }}
+                        <span>Mostrar vendedor en PDF</span>
+                    </label>
+                    <label>
+                        {{ form.mostrar_descuentos }}
+                        <span>Mostrar descuentos</span>
+                    </label>
+                    <label>
+                        {{ form.mostrar_notas_linea }}
+                        <span>Mostrar notas de linea</span>
+                    </label>
+                </div>
+                {{ form.mostrar_vendedor.errors }}
+                {{ form.mostrar_descuentos.errors }}
+                {{ form.mostrar_notas_linea.errors }}
+            </div>
+
+            <div style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
+                <a class="erp-btn erp-btn-secondary" href="{% url 'facturacion_dashboard' empresa.slug %}">Cancelar</a>
+                <button class="erp-btn" type="submit">Guardar Configuracion</button>
+            </div>
+        </form>
+    </article>
+
+    <aside class="erp-card erp-preview-card">
+        <div class="erp-kpi-label">Preview en vivo</div>
+        <h3 style="margin:8px 0 6px;">Vista referencial del PDF</h3>
+        <p class="erp-card-muted" style="margin-bottom:18px;">Cada ajuste visual se refleja aqui al instante para afinar la presentacion antes de guardar.</p>
+
+        <div class="erp-preview-frame" id="factura-preview-frame">
+            <div class="erp-preview-head">
+                <div class="erp-preview-brand">
+                    <div class="erp-preview-logo" data-preview-logo>
+                        {% if empresa.logo %}
+                            <img src="{{ empresa.logo.url }}" alt="Logo {{ empresa.nombre }}">
+                        {% else %}
+                            Logo
+                        {% endif %}
+                    </div>
+                    <div class="erp-preview-brand-copy">
+                        <small data-preview-template>{{ configuracion.get_plantilla_factura_pdf_display }}</small>
+                        <strong data-preview-company>{{ configuracion.nombre_comercial_documentos|default:empresa.nombre }}</strong>
+                        <span>Factura 001-001-01-00001869</span>
+                    </div>
+                </div>
+            </div>
+            <div class="erp-preview-body">
+                <div class="erp-preview-grid">
+                    <div class="erp-preview-box">
+                        <small>Cliente</small>
+                        <strong>Cliente corporativo</strong>
+                    </div>
+                    <div class="erp-preview-box">
+                        <small>Fecha</small>
+                        <strong>25/04/2026</strong>
+                    </div>
+                    <div class="erp-preview-box">
+                        <small>CAI</small>
+                        <strong>4IEA95-560C26-4661E0...</strong>
+                    </div>
+                    <div class="erp-preview-box">
+                        <small>Moneda</small>
+                        <strong>Lempiras</strong>
+                    </div>
+                </div>
+
+                <table class="erp-preview-table">
+                    <thead>
+                        <tr>
+                            <th>Descripcion</th>
+                            <th>Cant.</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                Acetaminofen
+                                <div data-preview-note style="margin-top:6px; color:#708196; font-size:12px; display:{% if configuracion.mostrar_notas_linea %}block{% else %}none{% endif %};">Nota interna visible en la linea.</div>
+                            </td>
+                            <td>2.00</td>
+                            <td>L. 540.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="erp-preview-summary">
+                    <div class="erp-preview-summary-row" data-preview-discount-row style="display:{% if configuracion.mostrar_descuentos %}flex{% else %}none{% endif %};">
+                        <span>Descuento</span>
+                        <strong>L. 40.00</strong>
+                    </div>
+                    <div class="erp-preview-summary-row">
+                        <span>Sub total antes de impuesto</span>
+                        <strong>L. 500.00</strong>
+                    </div>
+                    <div class="erp-preview-summary-row">
+                        <span>ISV 15%</span>
+                        <strong>L. 75.00</strong>
+                    </div>
+                    <div class="erp-preview-summary-row total">
+                        <span>Total</span>
+                        <strong>L. 575.00</strong>
+                    </div>
+                </div>
+
+                <div class="erp-preview-box" data-preview-vendor-box style="display:{% if configuracion.mostrar_vendedor %}block{% else %}none{% endif %};">
+                    <small>Vendedor</small>
+                    <strong>Ejecutivo comercial</strong>
+                </div>
+
+                <p class="erp-preview-legend" data-preview-legend>{% if configuracion.leyenda_factura %}{{ configuracion.leyenda_factura }}{% else %}Leyenda comercial o fiscal visible al pie del documento generado.{% endif %}</p>
+                <p class="erp-preview-foot" data-preview-foot>{% if configuracion.pie_factura %}{{ configuracion.pie_factura }}{% else %}Pie adicional del PDF con observaciones, referencias o mensaje institucional.{% endif %}</p>
+            </div>
+        </div>
+    </aside>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("facturacion-config-form");
+    if (!form) return;
+
+    const frame = document.getElementById("factura-preview-frame");
+    const company = document.querySelector("[data-preview-company]");
+    const template = document.querySelector("[data-preview-template]");
+    const legend = document.querySelector("[data-preview-legend]");
+    const foot = document.querySelector("[data-preview-foot]");
+    const note = document.querySelector("[data-preview-note]");
+    const vendorBox = document.querySelector("[data-preview-vendor-box]");
+    const discountRow = document.querySelector("[data-preview-discount-row]");
+    const primaryDot = document.querySelector('[data-preview-color-dot="primary"]');
+    const secondaryDot = document.querySelector('[data-preview-color-dot="secondary"]');
+    const previewLogo = document.querySelector("[data-preview-logo]");
+    const logoValue = document.querySelector("[data-logo-size-value]");
+
+    const nombreInput = document.getElementById("id_nombre_comercial_documentos");
+    const plantillaInput = document.getElementById("id_plantilla_factura_pdf");
+    const colorPrimarioInput = document.getElementById("id_color_primario");
+    const colorSecundarioInput = document.getElementById("id_color_secundario");
+    const logoAnchoInput = document.getElementById("id_logo_ancho_pdf");
+    const logoAltoInput = document.getElementById("id_logo_alto_pdf");
+    const logoWidthSlider = document.getElementById("logo-width-slider");
+    const logoHeightSlider = document.getElementById("logo-height-slider");
+    const leyendaInput = document.getElementById("id_leyenda_factura");
+    const pieInput = document.getElementById("id_pie_factura");
+    const vendedorInput = document.getElementById("id_mostrar_vendedor");
+    const descuentosInput = document.getElementById("id_mostrar_descuentos");
+    const notasInput = document.getElementById("id_mostrar_notas_linea");
+
+    if (logoAnchoInput) {
+        logoAnchoInput.classList.add("erp-hidden-config-input");
+        logoAnchoInput.setAttribute("tabindex", "-1");
+        logoAnchoInput.setAttribute("aria-hidden", "true");
+    }
+    if (logoAltoInput) {
+        logoAltoInput.classList.add("erp-hidden-config-input");
+        logoAltoInput.setAttribute("tabindex", "-1");
+        logoAltoInput.setAttribute("aria-hidden", "true");
+    }
+
+    function safeValue(input, fallback) {
+        return input && input.value.trim() ? input.value.trim() : fallback;
+    }
+
+    function applyPreview() {
+        const primary = safeValue(colorPrimarioInput, "#334155");
+        const secondary = safeValue(colorSecundarioInput, "#94a3b8");
+        const logoWidth = logoAnchoInput && logoAnchoInput.value ? `${logoAnchoInput.value}px` : "110px";
+        const logoHeight = logoAltoInput && logoAltoInput.value ? `${logoAltoInput.value}px` : "60px";
+        frame.style.setProperty("--preview-primary", primary);
+        frame.style.setProperty("--preview-secondary", secondary);
+        frame.style.setProperty("--preview-logo-width", logoWidth);
+        frame.style.setProperty("--preview-logo-height", logoHeight);
+
+        if (primaryDot) primaryDot.style.background = primary;
+        if (secondaryDot) secondaryDot.style.background = secondary;
+        if (previewLogo) {
+            previewLogo.style.width = logoWidth;
+            previewLogo.style.height = logoHeight;
+        }
+        if (logoValue) logoValue.textContent = `${logoWidth} x ${logoHeight}`;
+        if (logoWidthSlider && logoAnchoInput) logoWidthSlider.value = logoAnchoInput.value;
+        if (logoHeightSlider && logoAltoInput) logoHeightSlider.value = logoAltoInput.value;
+
+        company.textContent = safeValue(nombreInput, "{{ empresa.nombre|escapejs }}");
+        const selected = plantillaInput ? plantillaInput.options[plantillaInput.selectedIndex] : null;
+        template.textContent = selected ? selected.text : "Factura clasica";
+
+        legend.textContent = safeValue(leyendaInput, "Leyenda comercial o fiscal visible al pie del documento generado.");
+        foot.textContent = safeValue(pieInput, "Pie adicional del PDF con observaciones, referencias o mensaje institucional.");
+
+        if (vendorBox) vendorBox.style.display = vendedorInput && vendedorInput.checked ? "block" : "none";
+        if (discountRow) discountRow.style.display = descuentosInput && descuentosInput.checked ? "flex" : "none";
+        if (note) note.style.display = notasInput && notasInput.checked ? "block" : "none";
+    }
+
+    function syncLogoSize(widthValue, heightValue) {
+        if (typeof widthValue !== "undefined" && logoAnchoInput) logoAnchoInput.value = widthValue;
+        if (typeof heightValue !== "undefined" && logoAltoInput) logoAltoInput.value = heightValue;
+        if (logoWidthSlider && logoAnchoInput) logoWidthSlider.value = logoAnchoInput.value;
+        if (logoHeightSlider && logoAltoInput) logoHeightSlider.value = logoAltoInput.value;
+        applyPreview();
+    }
+
+    [
+        nombreInput,
+        plantillaInput,
+        colorPrimarioInput,
+        colorSecundarioInput,
+        logoAnchoInput,
+        logoAltoInput,
+        leyendaInput,
+        pieInput,
+        vendedorInput,
+        descuentosInput,
+        notasInput,
+    ].filter(Boolean).forEach((input) => {
+        input.addEventListener("input", applyPreview);
+        input.addEventListener("change", applyPreview);
+    });
+
+    if (logoWidthSlider) {
+        logoWidthSlider.addEventListener("input", (event) => syncLogoSize(event.target.value));
+        logoWidthSlider.addEventListener("change", (event) => syncLogoSize(event.target.value));
+    }
+    if (logoHeightSlider) {
+        logoHeightSlider.addEventListener("input", (event) => syncLogoSize(undefined, event.target.value));
+        logoHeightSlider.addEventListener("change", (event) => syncLogoSize(undefined, event.target.value));
+    }
+
+    document.querySelectorAll("[data-logo-width-preset]").forEach((button) => {
+        button.addEventListener("click", () => {
+            syncLogoSize(
+                button.dataset.logoWidthPreset || "110",
+                button.dataset.logoHeightPreset || "60"
+            );
+        });
+    });
+
+    applyPreview();
+});
+</script>
+{% endblock %}

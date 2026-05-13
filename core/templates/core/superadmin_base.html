@@ -1,0 +1,95 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Control Maestro{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="erp-shell">
+    <aside class="erp-sidebar">
+        <div class="erp-brand">
+            <div class="erp-brand-kicker">DV Solutions Control</div>
+            <h1>Superadmin</h1>
+            <p>Panel privado para administrar empresas, usuarios, roles y capacidad comercial del ERP.</p>
+        </div>
+
+        <div>
+            <div class="erp-nav-group-title">Control Maestro</div>
+            <nav class="erp-nav">
+                <a class="erp-nav-link {% if request.path == superadmin_dashboard_url %}is-active{% endif %}" href="{{ superadmin_dashboard_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Dashboard</span>
+                </a>
+                <a class="erp-nav-link {% if '/control/empresas/' in request.path %}is-active{% endif %}" href="{{ superadmin_empresas_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Empresas</span>
+                </a>
+                <a class="erp-nav-link {% if '/control/usuarios/' in request.path %}is-active{% endif %}" href="{{ superadmin_usuarios_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Usuarios y Roles</span>
+                </a>
+                <a class="erp-nav-link {% if '/control/planes/' in request.path %}is-active{% endif %}" href="{{ superadmin_planes_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Planes</span>
+                </a>
+                <a class="erp-nav-link {% if '/control/roles/' in request.path %}is-active{% endif %}" href="{{ superadmin_roles_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Roles</span>
+                </a>
+                <a class="erp-nav-link {% if '/control/modulos/' in request.path %}is-active{% endif %}" href="{{ superadmin_modulos_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Modulos</span>
+                </a>
+                <a class="erp-nav-link {% if '/control/licencias/' in request.path %}is-active{% endif %}" href="{{ superadmin_licencias_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Licencias</span>
+                </a>
+                {% if enable_django_admin and django_admin_url %}
+                <a class="erp-nav-link" href="{{ django_admin_url }}" target="_blank" rel="noopener">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Admin Tecnico</span>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+
+        <div class="erp-sidebar-footer">
+            <div><strong>Superadmin:</strong> {{ request.user.username }}</div>
+            <div><strong>Acceso:</strong> Privado</div>
+            <div style="margin-top:10px;">
+                <a href="{% url 'superadmin_logout' %}" style="color:#fff;">Cerrar sesion</a>
+            </div>
+        </div>
+    </aside>
+
+    <div class="erp-main">
+        <header class="erp-topbar">
+            <div>
+                <div class="erp-topbar-kicker">{% block header_kicker %}Control Institucional{% endblock %}</div>
+                <h2>{% block header_title %}Superadmin{% endblock %}</h2>
+                <p>{% block header_description %}Gestion privada del ERP para operar tu cartera de empresas y usuarios sin exponer nada al cliente final.{% endblock %}</p>
+            </div>
+            <div class="erp-topbar-actions">
+                <div class="erp-user-chip">Privado</div>
+                {% block topbar_actions %}{% endblock %}
+            </div>
+        </header>
+
+        <main class="erp-content">
+            {% if messages %}
+            <div class="erp-message-stack">
+                {% for message in messages %}
+                    <div class="erp-message">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+</body>
+</html>

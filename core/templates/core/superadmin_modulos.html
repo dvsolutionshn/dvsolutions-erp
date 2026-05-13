@@ -1,0 +1,23 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}Modulos{% endblock %}
+{% block header_title %}Catalogo de Modulos{% endblock %}
+{% block header_description %}Vista comercial del ERP para entender que modulos existen, en cuantos planes viven y en cuantas empresas ya estan activos.{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    {% for item in modulos %}
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Modulo ERP</div>
+        <h3>{{ item.modulo.nombre }}</h3>
+        <div class="erp-inline-actions" style="margin-bottom:12px;">
+            <span class="erp-badge info">{{ item.planes_count }} planes</span>
+            <span class="erp-badge neutral">{{ item.empresas_count }} empresas</span>
+        </div>
+        <p>Usa esta lectura para decidir en que planes vendes cada capacidad del sistema y donde ya esta encendida.</p>
+    </article>
+    {% empty %}
+    <div class="erp-empty">Todavia no hay modulos registrados.</div>
+    {% endfor %}
+</section>
+{% endblock %}

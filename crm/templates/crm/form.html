@@ -1,0 +1,45 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}CRM{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Configuracion operativa del modulo CRM, Marketing y Agenda.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver a CRM</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <form method="post" class="erp-form-shell">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="erp-message">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="erp-form-grid two">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="erp-form-actions">
+            <a class="erp-btn-secondary" href="{% url 'crm_dashboard' empresa.slug %}">Cancelar</a>
+            <button class="erp-btn" type="submit">Guardar</button>
+        </div>
+    </form>
+    {% if form.whatsapp_numero_prueba %}
+    <form method="post" action="{% url 'crm_enviar_prueba_whatsapp' empresa.slug %}" class="erp-form-shell" style="margin-top:18px;">
+        {% csrf_token %}
+        <div class="erp-card-header">
+            <div>
+                <h3>Prueba de WhatsApp Cloud API</h3>
+                <p>Guarda primero la configuracion. Luego envia la plantilla de prueba al numero autorizado en Meta. Para campanias usa la plantilla comercial aprobada configurada arriba.</p>
+            </div>
+            <button class="erp-btn-secondary" type="submit">Enviar prueba WhatsApp</button>
+        </div>
+    </form>
+    {% endif %}
+</section>
+{% endblock %}

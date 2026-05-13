@@ -1,0 +1,99 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Impuestos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Configuracion Fiscal{% endblock %}
+{% block header_title %}Impuestos{% endblock %}
+{% block header_description %}Estructura tributaria clara y preparada para sostener el crecimiento del ERP.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_impuesto_facturacion' empresa.slug %}">Nuevo Impuesto</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-tax-kpis{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+.erp-tax-table{
+    min-width:920px;
+}
+.erp-tax-name{
+    font-weight:700;
+    color:#102338;
+}
+.erp-tax-meta{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+}
+.erp-chip-link{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--primary);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.02em;
+    box-shadow:var(--shadow-soft);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-tax-kpis">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Impuestos</div>
+        <div class="erp-stat-value">{{ resumen.total }}</div>
+        <p class="erp-card-muted">Tipos tributarios disponibles en el sistema.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Activos</div>
+        <div class="erp-stat-value">{{ resumen.activos }}</div>
+        <p class="erp-card-muted">Disponibles para nuevos documentos.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Inactivos</div>
+        <div class="erp-stat-value">{{ resumen.inactivos }}</div>
+        <p class="erp-card-muted">Fuera de uso operativo.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Promedio</div>
+        <div class="erp-stat-value">{{ resumen.promedio|floatformat:2 }}%</div>
+        <p class="erp-card-muted">Promedio simple de tasas configuradas.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Estructura de Impuestos</h3>
+            <div class="erp-card-muted">Mantiene una configuracion tributaria consistente para facturas, notas de credito y reportes.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table erp-tax-table">
+            <thead><tr><th>Nombre</th><th>Porcentaje</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for impuesto in impuestos %}
+                <tr>
+                    <td>
+                        <div class="erp-tax-name">{{ impuesto.nombre }}</div>
+                        <div class="erp-tax-meta">{% if impuesto.activo %}Disponible para seleccion en documentos{% else %}Oculto del flujo operativo{% endif %}</div>
+                    </td>
+                    <td class="amount"><span class="erp-money">{{ impuesto.porcentaje }}%</span></td>
+                    <td>{% if impuesto.activo %}<span class="erp-badge success">Activo</span>{% else %}<span class="erp-badge danger">Inactivo</span>{% endif %}</td>
+                    <td class="actions"><a class="erp-chip-link" href="{% url 'editar_impuesto_facturacion' empresa.slug impuesto.id %}">Editar</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4" class="erp-empty">No hay impuestos registrados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

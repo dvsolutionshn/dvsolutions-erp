@@ -1,0 +1,152 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Movimientos Bancarios - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bancos{% endblock %}
+{% block header_title %}Clasificacion Bancaria{% endblock %}
+{% block header_description %}Trabaja los movimientos importados en lote: filtra, clasifica, contabiliza y deja la conciliacion lista para cierre mensual.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'bancos_dashboard' empresa.slug %}" class="erp-action-link">Volver a Bancos</a>
+<a href="{% url 'clasificaciones_bancarias' empresa.slug %}" class="erp-action-link">Clasificaciones</a>
+<a href="{% url 'reglas_bancarias' empresa.slug %}" class="erp-action-link">Reglas</a>
+<a href="{% url 'conciliacion_bancaria' empresa.slug %}" class="erp-action-link">Conciliacion</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Movimientos</div><p class="erp-stat-value">{{ resumen.total }}</p><p class="erp-card-muted">Lineas visibles con los filtros actuales.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Pendientes</div><p class="erp-stat-value">{{ resumen.pendientes }}</p><p class="erp-card-muted">Requieren clasificacion antes de contabilizar.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debitos</div><p class="erp-stat-value">L. {{ resumen.debitos|floatformat:2|intcomma }}</p><p class="erp-card-muted">Salidas del banco o tarjeta.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Creditos</div><p class="erp-stat-value">L. {{ resumen.creditos|floatformat:2|intcomma }}</p><p class="erp-card-muted">Entradas o abonos recibidos.</p></article>
+</section>
+
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros de trabajo</h3>
+            <p class="erp-card-muted">Busca por descripcion, referencia o cuenta. Usa estado pendiente para procesar lo importado mas rapido.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="q">Buscar</label>
+            <input id="q" name="q" value="{{ filtros.q }}" placeholder="Proveedor, deposito, ACH, referencia" autocomplete="off">
+        </div>
+        <div class="erp-filter-field">
+            <label for="cuenta">Cuenta</label>
+            <select id="cuenta" name="cuenta">
+                <option value="">Todas</option>
+                {% for cuenta in cuentas %}
+                <option value="{{ cuenta.id }}" {% if filtros.cuenta == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-filter-field">
+            <label for="estado">Estado</label>
+            <select id="estado" name="estado">
+                <option value="">Todos</option>
+                <option value="pendiente" {% if filtros.estado == "pendiente" %}selected{% endif %}>Pendiente</option>
+                <option value="clasificado" {% if filtros.estado == "clasificado" %}selected{% endif %}>Clasificado</option>
+                <option value="contabilizado" {% if filtros.estado == "contabilizado" %}selected{% endif %}>Contabilizado</option>
+            </select>
+        </div>
+        <div class="erp-filter-field">
+            <label for="tipo">Tipo</label>
+            <select id="tipo" name="tipo">
+                <option value="">Todos</option>
+                <option value="egreso" {% if filtros.tipo == "egreso" %}selected{% endif %}>Debitos / egresos</option>
+                <option value="ingreso" {% if filtros.tipo == "ingreso" %}selected{% endif %}>Creditos / ingresos</option>
+            </select>
+        </div>
+        <div class="erp-filter-actions">
+            <button class="erp-btn-secondary" type="submit">Filtrar</button>
+            <a class="erp-btn-secondary" href="{% url 'movimientos_bancarios' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<form method="post" action="{% url 'clasificar_movimientos_bancarios_lote' empresa.slug %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <section class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Clasificacion rapida</h3>
+                <p class="erp-card-muted">Selecciona cuentas en varias lineas y guarda todo en lote. Los movimientos contabilizados quedan bloqueados para proteger los asientos.</p>
+            </div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'aplicar_reglas_bancarias' empresa.slug %}">Aplicar Reglas</a>
+                <button class="erp-btn" type="submit">Guardar Clasificaciones</button>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-financial-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Cuenta</th>
+                        <th>Descripcion</th>
+                        <th>Debito</th>
+                        <th>Credito</th>
+                        <th>Saldo</th>
+                        <th>Clasificacion</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.fecha }}</td>
+                    <td><strong>{{ movimiento.cuenta_financiera.nombre }}</strong><div class="erp-card-muted">{{ movimiento.cuenta_financiera.get_tipo_display }}</div></td>
+                    <td>
+                        <strong>{{ movimiento.descripcion }}</strong>
+                        <div class="erp-card-muted">{{ movimiento.referencia|default:"Sin referencia" }}</div>
+                        {% if movimiento.origen_importacion %}<div class="erp-card-muted">{{ movimiento.origen_importacion }}</div>{% endif %}
+                    </td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.debito|floatformat:2|intcomma }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.credito|floatformat:2|intcomma }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.saldo|floatformat:2|intcomma }}</span></td>
+                    <td>
+                        <input type="hidden" name="movimiento_ids" value="{{ movimiento.id }}">
+                        {% if movimiento.estado != "contabilizado" %}
+                        <select name="clasificacion_{{ movimiento.id }}">
+                            <option value="">Pendiente</option>
+                            {% for clasificacion in clasificaciones %}
+                            <option value="{{ clasificacion.id }}" {% if movimiento.clasificacion_id == clasificacion.id %}selected{% endif %}>{{ clasificacion.nombre }} · {{ clasificacion.get_tipo_display }}</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        {{ movimiento.clasificacion.nombre|default:"-" }}
+                        {% endif %}
+                    </td>
+                    <td><span class="erp-badge {% if movimiento.estado == 'contabilizado' %}success{% elif movimiento.estado == 'clasificado' %}warning{% else %}danger{% endif %}">{{ movimiento.get_estado_display }}</span></td>
+                    <td class="actions">
+                        {% if movimiento.estado != "contabilizado" %}
+                        <a class="erp-link" href="{% url 'editar_movimiento_bancario' empresa.slug movimiento.id %}">Editar</a>
+                        {% endif %}
+                        {% if movimiento.estado != "contabilizado" and movimiento.credito > 0 %}
+                        <a class="erp-link" href="{% url 'enlazar_movimiento_factura' empresa.slug movimiento.id %}">Enlazar Factura</a>
+                        {% endif %}
+                        {% if movimiento.estado != "contabilizado" and movimiento.debito > 0 %}
+                        <a class="erp-link" href="{% url 'enlazar_movimiento_compra' empresa.slug movimiento.id %}">Enlazar Compra</a>
+                        {% endif %}
+                        {% if movimiento.estado == "clasificado" %}
+                        <a class="erp-link" href="{% url 'contabilizar_movimiento_bancario' empresa.slug movimiento.id %}?next={{ request.get_full_path|urlencode }}">Contabilizar</a>
+                        {% elif movimiento.asiento %}
+                        <a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.asiento.id %}">Ver asiento</a>
+                        {% else %}
+                        <span class="erp-card-muted">Pendiente</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="erp-empty">Todavia no hay movimientos importados con estos filtros.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</form>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}CRM - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}CRM y Marketing{% endblock %}
+{% block header_title %}Relacion con Clientes{% endblock %}
+{% block header_description %}Campanias, cumpleanos, promociones y seguimiento comercial conectado con los clientes del ERP.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crm_configuracion' empresa.slug %}">Configuracion</a>
+<a class="erp-action-link" href="{% url 'crm_crear_campania' empresa.slug %}">Nueva Campania</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Clientes</div><p class="erp-stat-value">{{ resumen.clientes }}</p><p class="erp-card-muted">Contactos activos registrados.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Aceptan Promos</div><p class="erp-stat-value">{{ resumen.aceptan_promos }}</p><p class="erp-card-muted">Base autorizada para campanias.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Campanias</div><p class="erp-stat-value">{{ resumen.campanias }}</p><p class="erp-card-muted">Promociones y mensajes preparados.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">WhatsApp</div><p class="erp-stat-value">{% if config.whatsapp_activo %}API{% else %}Links{% endif %}</p><p class="erp-card-muted">Preparado para Cloud API por empresa.</p></article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Marketing</div>
+        <h3>Campanias</h3>
+        <p>Prepara promociones para clientes con consentimiento y genera enlaces WhatsApp por contacto.</p>
+        <a class="erp-btn" href="{% url 'crm_campanias' empresa.slug %}">Ver Campanias</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Comunicacion</div>
+        <h3>Plantillas</h3>
+        <p>Mensajes reutilizables para promociones, cumpleanos y citas.</p>
+        <a class="erp-btn" href="{% url 'crm_plantillas' empresa.slug %}">Ver Plantillas</a>
+    </article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-table-card">
+        <h3 class="erp-panel-title">Cumpleanos de Manana</h3>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <tbody>
+                {% for cliente in cumpleanos_manana %}
+                <tr><td><strong>{{ cliente.nombre }}</strong><small>{{ cliente.telefono_whatsapp|default:cliente.telefono|default:"Sin telefono" }}</small></td></tr>
+                {% empty %}
+                <tr><td class="erp-empty">No hay cumpleanos programados para manana.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="erp-card erp-table-card">
+        <h3 class="erp-panel-title">Productos con Alerta</h3>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <tbody>
+                {% for producto in productos_alerta %}
+                <tr><td><strong>{{ producto.nombre }}</strong><small>Alerta: {{ producto.fecha_alerta|date:"d/m/Y" }}</small></td></tr>
+                {% empty %}
+                <tr><td class="erp-empty">No hay productos con alerta cercana.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

@@ -1,0 +1,461 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+@page {
+    size: Letter;
+    margin: 4mm 5mm;
+}
+
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 9.2px;
+    color: #17263a;
+    margin: 0;
+    padding: 0;
+}
+
+.document {
+    width: 100%;
+    min-height: 264mm;
+}
+
+.top-rule,
+.bottom-rule {
+    height: 3px;
+    background: {{ configuracion_facturacion.color_primario|default:"#334155" }};
+}
+
+.top-rule { margin-bottom: 5px; }
+.bottom-rule { margin-top: 5px; }
+
+.header-table,
+.detail-table,
+.summary-table,
+.notes-fiscal,
+.totals-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.header-left,
+.header-right,
+.summary-left,
+.summary-right,
+.card-cell {
+    vertical-align: top;
+}
+
+.header-left {
+    width: 60%;
+    padding-right: 8px;
+}
+
+.header-right {
+    width: 40%;
+    text-align: right;
+}
+
+.logo-box {
+    width: {{ configuracion_facturacion.logo_ancho_pdf|default:88 }}px;
+    height: {{ configuracion_facturacion.logo_alto_pdf|default:46 }}px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.logo-box img {
+    display: block;
+    max-width: {{ configuracion_facturacion.logo_ancho_pdf|default:88 }}px;
+    max-height: {{ configuracion_facturacion.logo_alto_pdf|default:46 }}px;
+    width: auto;
+    height: auto;
+}
+
+.company-name {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: {{ configuracion_facturacion.color_primario|default:"#334155" }};
+    margin-bottom: 3px;
+}
+
+.company-meta {
+    font-size: 8px;
+    color: #5f7087;
+    line-height: 1.32;
+}
+
+.invoice-box {
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    padding: 8px 10px;
+    background: #f8fafc;
+    display: inline-block;
+    min-width: 190px;
+    text-align: left;
+}
+
+.invoice-box .eyebrow {
+    font-size: 7.2px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 3px;
+}
+
+.invoice-box .title {
+    font-size: 15px;
+    font-weight: 700;
+    color: {{ configuracion_facturacion.color_primario|default:"#334155" }};
+    margin-bottom: 2px;
+}
+
+.invoice-box .number {
+    font-size: 10.8px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.invoice-box .meta {
+    font-size: 8px;
+    color: #5f7087;
+    line-height: 1.3;
+}
+
+.section-title {
+    margin: 6px 0 4px;
+    font-size: 7.9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: #64748b;
+}
+
+.card-cell {
+    width: 50%;
+}
+
+.card-cell:first-child { padding-right: 4px; }
+.card-cell:last-child { padding-left: 4px; }
+
+.info-card,
+.notes-box,
+.totals-box {
+    border: 1px solid #d9e2ec;
+    border-radius: 7px;
+    background: #fff;
+}
+
+.info-card {
+    padding: 8px 10px;
+    min-height: 50px;
+}
+
+.info-label,
+.notes-label {
+    font-size: 7.2px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: #64748b;
+    margin-bottom: 3px;
+}
+
+.info-value {
+    font-size: 8.5px;
+    line-height: 1.32;
+    font-weight: 600;
+}
+
+.items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+}
+
+.items th {
+    background: #edf3f9;
+    color: #334155;
+    font-size: 7.2px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    padding: 4px 4px;
+    border: 1px solid #d9e2ec;
+}
+
+.items td {
+    padding: 4px 4px;
+    border: 1px solid #e5e7eb;
+    vertical-align: top;
+    font-size: 8.25px;
+}
+
+.line-item-name {
+    font-weight: 700;
+    color: #1f3147;
+}
+
+.line-item-comment {
+    margin-top: 2px;
+    font-size: 7.25px;
+    color: #415167;
+    line-height: 1.22;
+    white-space: pre-wrap;
+}
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
+.summary-table {
+    margin-top: 5px;
+}
+
+.summary-left {
+    width: 56%;
+    padding-right: 5px;
+}
+
+.summary-right {
+    width: 44%;
+    padding-left: 5px;
+}
+
+.notes-box {
+    padding: 6px 8px;
+    min-height: 54px;
+    display: inline-block;
+    width: auto;
+    min-width: 175px;
+    max-width: 230px;
+}
+
+.notes-divider {
+    margin: 5px 0 5px;
+    border-top: 1px solid #e8eef5;
+}
+
+.notes-fiscal td {
+    border: 0;
+    padding: 1px 0;
+    font-size: 7.35px;
+}
+
+.notes-fiscal {
+    width: auto;
+}
+
+.totals-grid td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 8px;
+}
+
+.totals-grid tr:last-child td {
+    border-bottom: 0;
+}
+
+.totals-grid .total-row td {
+    background: {{ configuracion_facturacion.color_primario|default:"#334155" }};
+    color: #fff;
+    font-weight: 700;
+    font-size: 9px;
+}
+
+.letters {
+    padding: 6px;
+    background: #f8fafc;
+    border-top: 1px solid #e5e7eb;
+    font-size: 7.9px;
+    font-weight: 600;
+    color: {{ configuracion_facturacion.color_primario|default:"#334155" }};
+}
+
+.footer {
+    margin-top: 5px;
+    font-size: 7.5px;
+    color: #475569;
+    line-height: 1.28;
+}
+
+.footer-box {
+    border-top: 1px solid #d9e2ec;
+    padding-top: 5px;
+}
+
+.footer-title {
+    font-weight: 700;
+    color: {{ configuracion_facturacion.color_primario|default:"#334155" }};
+    margin-bottom: 2px;
+}
+
+.footer-note {
+    margin-top: 4px;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="document">
+    <div class="top-rule"></div>
+
+    <table class="header-table">
+        <tr>
+            <td class="header-left">
+                {% if logo_url %}
+                <div class="logo-box">
+                    <img src="{{ logo_url }}" alt="Logo {{ empresa.nombre }}">
+                </div>
+                {% endif %}
+                <div class="company-name">{{ configuracion_facturacion.nombre_comercial_documentos|default:empresa.nombre }}</div>
+                <div class="company-meta">
+                    RTN: {{ empresa.rtn|default:"-" }}<br>
+                    {{ empresa.direccion|default:"-" }}<br>
+                    Tel: {{ empresa.telefono|default:"-" }}{% if empresa.correo %}<br>{{ empresa.correo }}{% endif %}
+                </div>
+            </td>
+            <td class="header-right">
+                <div class="invoice-box">
+                    <div class="eyebrow">Documento fiscal</div>
+                    <div class="title">FACTURA</div>
+                    <div class="number">{{ factura.numero_factura|default:"Borrador" }}</div>
+                    <div class="meta">
+                        Emision: {{ factura.fecha_emision|date:"d/m/Y" }}<br>
+                        Vence: {{ factura.fecha_vencimiento|date:"d/m/Y"|default:"-" }}
+                        {% if configuracion_facturacion.mostrar_vendedor and factura.vendedor %}
+                        <br>Vendedor: {{ factura.vendedor }}
+                        {% endif %}
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">Cliente y documento</div>
+    <table class="detail-table">
+        <tr>
+            <td class="card-cell">
+                <div class="info-card">
+                    <div class="info-label">Cliente</div>
+                    <div class="info-value">
+                        {{ factura.cliente.nombre }}<br>
+                        RTN: {{ factura.cliente.rtn|default:"-" }}<br>
+                        {{ factura.cliente.direccion|default:"-" }}
+                    </div>
+                </div>
+            </td>
+            <td class="card-cell">
+                <div class="info-card">
+                    <div class="info-label">Documento</div>
+                    <div class="info-value">
+                        Moneda: {{ factura.get_moneda_display }}<br>
+                        Emision: {{ factura.fecha_emision|date:"d/m/Y" }}<br>
+                        Vencimiento: {{ factura.fecha_vencimiento|date:"d/m/Y"|default:"-" }}
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th>Producto / servicio</th>
+                <th class="text-center">Cant.</th>
+                <th class="text-right">Precio</th>
+                {% if configuracion_facturacion.mostrar_descuentos %}<th class="text-right">Desc.</th>{% endif %}
+                <th class="text-right">Impuesto</th>
+                <th class="text-right">Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linea in factura.lineas.all %}
+            <tr>
+                <td>
+                    <div class="line-item-name">{{ linea.descripcion_visual }}</div>
+                    {% if configuracion_facturacion.mostrar_notas_linea and linea.comentario %}
+                    <div class="line-item-comment">{{ linea.comentario|linebreaksbr }}</div>
+                    {% endif %}
+                </td>
+                <td class="text-center">{{ linea.cantidad }}</td>
+                <td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.precio_unitario|floatformat:2|intcomma }}</td>
+                {% if configuracion_facturacion.mostrar_descuentos %}
+                <td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</td>
+                {% endif %}
+                <td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</td>
+                <td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="summary-table">
+        <tr>
+            <td class="summary-left">
+                <div class="notes-box">
+                    <div class="notes-label">Datos fiscales</div>
+                    <table class="notes-fiscal">
+                        <tr>
+                            <td>Orden compra exenta:</td>
+                            <td class="text-right">{{ factura.orden_compra_exenta|default:"-" }}</td>
+                        </tr>
+                        <tr>
+                            <td>Registro exonerado:</td>
+                            <td class="text-right">{{ factura.registro_exonerado|default:"-" }}</td>
+                        </tr>
+                        <tr>
+                            <td>Registro SAG:</td>
+                            <td class="text-right">{{ factura.registro_sag|default:"-" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+            <td class="summary-right">
+                <div class="totals-box">
+                    <table class="totals-grid">
+                        <tr><td>Sub Total</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_bruto|floatformat:2|intcomma }}</td></tr>
+                        {% if configuracion_facturacion.mostrar_descuentos %}<tr><td>Descuento</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.descuento_total|floatformat:2|intcomma }}</td></tr>{% endif %}
+                        <tr><td>Sub total antes de impuesto</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_antes_impuesto|floatformat:2|intcomma }}</td></tr>
+                        <tr><td>Base 15%</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_15|floatformat:2|intcomma }}</td></tr>
+                        <tr><td>Base 18%</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_18|floatformat:2|intcomma }}</td></tr>
+                        <tr><td>Exento</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exento|floatformat:2|intcomma }}</td></tr>
+                        <tr><td>Exonerado</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exonerado|floatformat:2|intcomma }}</td></tr>
+                        <tr><td>ISV 15%</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_15|floatformat:2|intcomma }}</td></tr>
+                        <tr><td>ISV 18%</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_18|floatformat:2|intcomma }}</td></tr>
+                        <tr class="total-row"><td>Total</td><td class="text-right">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</td></tr>
+                        {% if factura.moneda == "USD" %}
+                        <tr><td>Tasa de Cambio</td><td class="text-right">L. {{ factura.tipo_cambio|floatformat:4|intcomma }}</td></tr>
+                        <tr><td>Total en Lempiras</td><td class="text-right">L. {{ factura.total_lempiras|floatformat:2|intcomma }}</td></tr>
+                        {% endif %}
+                    </table>
+                    <div class="letters">{{ factura.total_en_letras }}</div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        <div class="footer-box">
+            <div class="footer-title">Informacion fiscal autorizada</div>
+            {% if factura.cai_numero_historico %}
+                CAI: {{ factura.cai_numero_historico }}<br>
+                Rango autorizado:
+                {{ factura.cai_establecimiento_historico }}-{{ factura.cai_punto_emision_historico }}-{{ factura.cai_tipo_documento_historico }}-{{ factura.cai_rango_inicial_historico|stringformat:"08d" }}
+                al
+                {{ factura.cai_establecimiento_historico }}-{{ factura.cai_punto_emision_historico }}-{{ factura.cai_tipo_documento_historico }}-{{ factura.cai_rango_final_historico|stringformat:"08d" }}<br>
+                Fecha limite de emision: {{ factura.cai_fecha_limite_historico|date:"d/m/Y" }}
+            {% else %}
+                Factura en borrador sin CAI asignado.
+            {% endif %}
+            <div class="footer-note">
+                {% if configuracion_facturacion.pie_factura %}{{ configuracion_facturacion.pie_factura }}<br>{% endif %}
+                {{ configuracion_facturacion.leyenda_factura|default:"La factura es beneficio de todos." }}
+            </div>
+        </div>
+        <div class="bottom-rule"></div>
+    </div>
+</div>
+</body>
+</html>

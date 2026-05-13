@@ -1,0 +1,68 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Abastecimiento{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Registra la información comercial y fiscal del proveedor desde una experiencia más simple, limpia y operativa.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'proveedores_facturacion' empresa.slug %}">Volver a proveedores</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-provider-form .erp-field-span-full{
+    grid-column:1 / -1;
+}
+@media (max-width: 760px){
+    .erp-compact-grid.three-col,
+    .erp-compact-grid.two-col{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-compact-form erp-provider-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <section class="erp-compact-card">
+        <ul class="erp-field-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+
+    <section class="erp-compact-card">
+        <h3>Ficha del proveedor</h3>
+        <p>Captura la información esencial del proveedor con menos ruido visual y una lectura más clara para compras y abastecimiento.</p>
+        <div class="erp-compact-grid three-col" style="margin-top:16px;">
+            <div class="erp-field">{{ form.nombre.label_tag }}{{ form.nombre }}{% if form.nombre.errors %}<ul class="erp-field-errors">{% for error in form.nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field">{{ form.rtn.label_tag }}{{ form.rtn }}{% if form.rtn.errors %}<ul class="erp-field-errors">{% for error in form.rtn.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field">{{ form.contacto.label_tag }}{{ form.contacto }}{% if form.contacto.errors %}<ul class="erp-field-errors">{% for error in form.contacto.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field">{{ form.telefono.label_tag }}{{ form.telefono }}{% if form.telefono.errors %}<ul class="erp-field-errors">{% for error in form.telefono.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field">{{ form.correo.label_tag }}{{ form.correo }}{% if form.correo.errors %}<ul class="erp-field-errors">{% for error in form.correo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field">{{ form.ciudad.label_tag }}{{ form.ciudad }}{% if form.ciudad.errors %}<ul class="erp-field-errors">{% for error in form.ciudad.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field">{{ form.condicion_pago.label_tag }}{{ form.condicion_pago }}{% if form.condicion_pago.help_text %}<div class="erp-field-help">{{ form.condicion_pago.help_text }}</div>{% endif %}{% if form.condicion_pago.errors %}<ul class="erp-field-errors">{% for error in form.condicion_pago.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field">{{ form.dias_credito.label_tag }}{{ form.dias_credito }}{% if form.dias_credito.help_text %}<div class="erp-field-help">{{ form.dias_credito.help_text }}</div>{% endif %}{% if form.dias_credito.errors %}<ul class="erp-field-errors">{% for error in form.dias_credito.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <div class="erp-field erp-field-span-full">{{ form.direccion.label_tag }}{{ form.direccion }}{% if form.direccion.errors %}<ul class="erp-field-errors">{% for error in form.direccion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+        </div>
+    </section>
+
+    <section class="erp-compact-card">
+        <h3>Estado y guardado</h3>
+        <div class="erp-check-grid" style="margin-top:14px;">
+            <div class="erp-check-card"><label for="{{ form.activo.id_for_label }}">Proveedor activo</label>{{ form.activo }}</div>
+        </div>
+        {% if form.activo.errors %}<ul class="erp-field-errors" style="margin-top:10px;">{% for error in form.activo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+    </section>
+
+    <section class="erp-compact-card">
+        <div class="erp-form-actions">
+            <div class="erp-field-help">Este proveedor quedará disponible para nuevas compras y futuras ampliaciones del módulo.</div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'proveedores_facturacion' empresa.slug %}">Cancelar</a>
+                <button type="submit" class="erp-btn">{{ texto_boton }}</button>
+            </div>
+        </div>
+    </section>
+</form>
+{% endblock %}

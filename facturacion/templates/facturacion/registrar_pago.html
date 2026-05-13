@@ -1,4 +1,211 @@
+{% extends "core/erp_base.html" %}
 {% load humanize %}
+
+{% block title %}Registrar Pago - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Cuentas por Cobrar{% endblock %}
+{% block header_title %}Registrar Pago{% endblock %}
+{% block header_description %}Aplica un cobro a la factura y define la cuenta financiera donde ingreso el dinero para mantener contabilidad y bancos conectados.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'ver_factura' empresa.slug factura.id %}">Volver a Factura</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Factura</div>
+        <p class="erp-stat-value">{{ factura.numero_factura|default:"Sin numero" }}</p>
+        <p class="erp-card-muted">{{ factura.cliente.nombre }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Total Factura</div>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Valor original del documento.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Saldo Pendiente</div>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Monto disponible para aplicar pago.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Estado</div>
+        <p class="erp-stat-value">{{ factura.get_estado_pago_display }}</p>
+        <p class="erp-card-muted">Situacion actual de cobro.</p>
+    </article>
+</section>
+
+<section class="erp-form-card">
+    <div class="erp-form-actions">
+        <div>
+            <h3 style="margin:0 0 8px;">Datos del cobro</h3>
+            <p>Selecciona la cuenta financiera para que el asiento contable use el banco o caja correcto.</p>
+        </div>
+    </div>
+
+    <form method="post" class="erp-form-shell" style="margin-top:18px;">
+        {% csrf_token %}
+
+        {% if usa_pagos_mixtos %}
+        <div class="erp-form-grid two">
+            <div class="erp-field">
+                <label for="fecha">Fecha de pago</label>
+                <input id="fecha" type="date" name="fecha" value="{{ form_data.fecha|default:today }}">
+            </div>
+            <div class="erp-field">
+                <label>Modo de cobro</label>
+                <div class="erp-info-value">Pago mixto</div>
+                <div class="erp-field-help">Puedes dividir el cobro entre efectivo, tarjeta y transferencia.</div>
+            </div>
+        </div>
+
+        <div class="erp-grid">
+            <article class="erp-card erp-payment-method-card">
+                <div class="erp-kpi-label">Efectivo</div>
+                <div class="erp-field" style="margin-top:14px;">
+                    <label for="monto_efectivo">Monto efectivo</label>
+                    <input id="monto_efectivo" type="number" step="0.01" name="monto_efectivo" value="{{ form_data.monto_efectivo|default:'' }}" placeholder="0.00">
+                </div>
+                <div class="erp-field">
+                    <label for="cuenta_efectivo">Caja destino</label>
+                    <select id="cuenta_efectivo" name="cuenta_efectivo">
+                        <option value="">Seleccione caja</option>
+                        {% for cuenta in cajas %}
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                        {% endfor %}
+                        {% if not cajas %}
+                        {% for cuenta in cuentas_financieras %}
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                        {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="erp-field">
+                    <label for="referencia_efectivo">Referencia</label>
+                    <input id="referencia_efectivo" type="text" name="referencia_efectivo" value="{{ form_data.referencia_efectivo|default:'' }}" placeholder="Opcional">
+                </div>
+            </article>
+
+            <article class="erp-card erp-payment-method-card">
+                <div class="erp-kpi-label">Tarjeta</div>
+                <div class="erp-field" style="margin-top:14px;">
+                    <label for="monto_tarjeta">Monto tarjeta</label>
+                    <input id="monto_tarjeta" type="number" step="0.01" name="monto_tarjeta" value="{{ form_data.monto_tarjeta|default:'' }}" placeholder="0.00">
+                </div>
+                <div class="erp-field">
+                    <label for="cuenta_tarjeta">Cuenta / POS destino</label>
+                    <select id="cuenta_tarjeta" name="cuenta_tarjeta">
+                        <option value="">Seleccione cuenta</option>
+                        {% for cuenta in cuentas_tarjeta %}
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_tarjeta == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="erp-field">
+                    <label for="referencia_tarjeta">Voucher / autorizacion</label>
+                    <input id="referencia_tarjeta" type="text" name="referencia_tarjeta" value="{{ form_data.referencia_tarjeta|default:'' }}" placeholder="Numero de voucher">
+                </div>
+            </article>
+
+            <article class="erp-card erp-payment-method-card">
+                <div class="erp-kpi-label">Transferencia</div>
+                <div class="erp-field" style="margin-top:14px;">
+                    <label for="monto_transferencia">Monto transferencia</label>
+                    <input id="monto_transferencia" type="number" step="0.01" name="monto_transferencia" value="{{ form_data.monto_transferencia|default:'' }}" placeholder="0.00">
+                </div>
+                <div class="erp-field">
+                    <label for="cuenta_transferencia">Banco donde cayo</label>
+                    <select id="cuenta_transferencia" name="cuenta_transferencia">
+                        <option value="">Seleccione banco</option>
+                        {% for cuenta in bancos %}
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_transferencia == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}{% if cuenta.numero %} - {{ cuenta.numero }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="erp-field">
+                    <label for="referencia_transferencia">Referencia bancaria</label>
+                    <input id="referencia_transferencia" type="text" name="referencia_transferencia" value="{{ form_data.referencia_transferencia|default:'' }}" placeholder="Numero de transferencia">
+                </div>
+            </article>
+        </div>
+        <div class="erp-soft-panel">
+            <strong>Total capturado:</strong> <span id="total-mixto">L. 0.00</span>
+            <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+        </div>
+        {% else %}
+        <div class="erp-form-grid two">
+            <div class="erp-field">
+                <label for="fecha">Fecha de pago</label>
+                <input id="fecha" type="date" name="fecha" value="{{ form_data.fecha|default:today }}">
+            </div>
+            <div class="erp-field">
+                <label for="monto">Monto</label>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <input id="monto" type="number" step="0.01" name="monto" value="{{ form_data.monto|default:'' }}" required>
+                    <button type="button" class="erp-btn-secondary" style="white-space:nowrap;" onclick="pagarTodo()">Pagar todo</button>
+                </div>
+                <div class="erp-field-help">No puede superar el saldo pendiente.</div>
+            </div>
+            <div class="erp-field">
+                <label for="metodo">Metodo de pago</label>
+                <select id="metodo" name="metodo" required>
+                    <option value="" disabled {% if not form_data.metodo %}selected{% endif %}>Seleccione metodo</option>
+                    <option value="efectivo" {% if form_data.metodo == "efectivo" %}selected{% endif %}>Efectivo</option>
+                    <option value="transferencia" {% if form_data.metodo == "transferencia" %}selected{% endif %}>Transferencia</option>
+                    <option value="tarjeta" {% if form_data.metodo == "tarjeta" %}selected{% endif %}>Tarjeta</option>
+                </select>
+            </div>
+            <div class="erp-field">
+                <label for="cuenta_financiera">Cuenta donde ingreso el pago</label>
+                <select id="cuenta_financiera" name="cuenta_financiera" required>
+                    <option value="" disabled {% if not form_data.cuenta_financiera %}selected{% endif %}>Seleccione cuenta o caja</option>
+                    {% for cuenta in cuentas_financieras %}
+                    <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera == cuenta.id|stringformat:"s" %}selected{% endif %}>
+                        {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="erp-field-help">Esta cuenta define el Debe del asiento contable del cobro.</div>
+            </div>
+            <div class="erp-field" style="grid-column:1 / -1;">
+                <label for="referencia">Referencia</label>
+                <input id="referencia" type="text" name="referencia" value="{{ form_data.referencia|default:'' }}" placeholder="Deposito, transferencia, voucher o comprobante">
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="erp-form-actions" style="margin-top:22px;">
+            <div class="erp-field-help">Al guardar, se genera el recibo y se registra el asiento contable del cobro.</div>
+            <div class="erp-actions-right">
+                <a class="erp-btn-secondary" href="{% url 'ver_factura' empresa.slug factura.id %}">Cancelar</a>
+                <button type="submit" class="erp-btn">Guardar Pago</button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<script>
+function pagarTodo(){
+    const monto = document.getElementById("monto");
+    if(monto){ monto.value = "{{ factura.saldo_pendiente }}"; }
+}
+function actualizarTotalMixto(){
+    const total = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
+        const input = document.getElementById(id);
+        const value = input ? parseFloat(input.value || "0") : 0;
+        return acc + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    const target = document.getElementById("total-mixto");
+    if(target){ target.textContent = "L. " + total.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2}); }
+}
+["monto_efectivo", "monto_tarjeta", "monto_transferencia"].forEach(id => {
+    const input = document.getElementById(id);
+    if(input){ input.addEventListener("input", actualizarTotalMixto); }
+});
+actualizarTotalMixto();
+</script>
+{% endblock %}
+
+{% comment %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -137,6 +344,26 @@
             font-family: inherit;
         }
 
+        .messages{
+            margin-bottom:15px;
+        }
+
+        .message{
+            padding:10px;
+            border-radius:6px;
+            margin-bottom:8px;
+            background:#f8d7da;
+            color:#721c24;
+        }
+
+        .hint{
+            display:block;
+            margin-top:6px;
+            color:#64748b;
+            font-size:12px;
+            line-height:1.4;
+        }
+
     </style>
 
 </head>
@@ -146,6 +373,14 @@
 <div class="container">
 
     <h2>Registrar Pago</h2>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <div class="message">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <div class="info">
         <p><strong>Factura:</strong> {{ factura.numero_factura }}</p>
@@ -164,7 +399,7 @@
         <!-- MONTO -->
         <div class="form-group">
             <label>Monto</label>
-            <input type="number" step="0.01" name="monto" id="monto" required>
+            <input type="number" step="0.01" name="monto" id="monto" value="{{ form_data.monto|default:'' }}" required>
 
             <button type="button" class="btn-total" onclick="pagarTodo()">
                 💰 Pagar todo
@@ -185,10 +420,27 @@
             </div>
         </div>
 
+        <!-- CUENTA FINANCIERA -->
+        <div class="form-group">
+            <label>Cuenta donde ingreso el pago</label>
+
+            <div class="select-wrapper">
+                <select name="cuenta_financiera" required>
+                    <option value="" disabled {% if not form_data.cuenta_financiera %}selected{% endif %}>Seleccione cuenta o caja</option>
+                    {% for cuenta in cuentas_financieras %}
+                    <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera == cuenta.id|stringformat:"s" %}selected{% endif %}>
+                        {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <span class="hint">Esta cuenta define el Debe del asiento contable del cobro.</span>
+        </div>
+
         <!-- REFERENCIA -->
         <div class="form-group">
             <label>Referencia</label>
-            <input type="text" name="referencia">
+            <input type="text" name="referencia" value="{{ form_data.referencia|default:'' }}">
         </div>
 
         <button type="submit">Guardar Pago</button>
@@ -207,3 +459,4 @@ function pagarTodo(){
 
 </body>
 </html>
+{% endcomment %}

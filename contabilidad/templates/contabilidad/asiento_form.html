@@ -1,0 +1,1015 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Registra operaciones del diario con una captura mas agil: busca cuentas por codigo o nombre, arma contrapartidas rapido y deja el asiento balanceado sin friccion.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'asientos_contables' empresa.slug %}" class="erp-action-link">Volver a Asientos</a>
+{% endblock %}
+
+{% block content %}
+{{ cuentas_busqueda|json_script:"erp-cuentas-contables-data" }}
+
+<style>
+    .erp-asiento-shell{
+        display:grid;
+        gap:12px;
+    }
+    .erp-asiento-header{
+        display:grid;
+        grid-template-columns:minmax(0, 2.15fr) minmax(260px, .95fr);
+        gap:14px;
+    }
+    .erp-asiento-header .erp-form-card{
+        padding:14px 16px;
+        border-radius:16px;
+    }
+    .erp-asiento-header .erp-form-grid{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:10px 12px;
+        align-items:start;
+    }
+    .erp-asiento-header .erp-field label{
+        margin-bottom:3px;
+        color:#4f6481;
+        font-size:10px;
+        font-weight:800;
+        letter-spacing:.12em;
+        text-transform:uppercase;
+    }
+    .erp-asiento-header .erp-field input,
+    .erp-asiento-header .erp-field select,
+    .erp-asiento-header .erp-field textarea{
+        min-height:40px;
+        padding:0 11px;
+        border-radius:10px;
+        font-size:13px;
+    }
+    .erp-asiento-header .erp-field textarea{
+        min-height:40px;
+        height:40px;
+        padding:9px 11px;
+        resize:vertical;
+    }
+    .erp-asiento-inline-check{
+        display:flex;
+        flex-direction:column;
+        justify-content:flex-end;
+        min-height:100%;
+    }
+    .erp-asiento-inline-check .erp-asiento-toggle{
+        min-height:40px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        padding:0 12px;
+        border:1px solid rgba(182, 198, 217, .95);
+        border-radius:10px;
+        background:#fff;
+        color:#153259;
+        font-size:13px;
+        font-weight:600;
+    }
+    .erp-asiento-header .erp-field input[type="checkbox"]{
+        width:18px;
+        height:18px;
+        min-height:18px;
+        padding:0;
+        accent-color:#2f6bff;
+    }
+    .erp-asiento-header .erp-field-help{
+        font-size:11px;
+        line-height:1.45;
+    }
+    .erp-asiento-summary{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:10px;
+        align-content:start;
+    }
+    .erp-asiento-kpi{
+        padding:12px 14px;
+        border:1px solid rgba(193, 207, 221, .88);
+        border-radius:14px;
+        background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(247,250,255,.9));
+    }
+    .erp-asiento-kpi .erp-kpi-label{
+        margin-bottom:6px;
+    }
+    .erp-asiento-kpi strong{
+        display:block;
+        font-size:22px;
+        color:#102a4c;
+        letter-spacing:-.02em;
+    }
+    .erp-asiento-kpi small{
+        display:block;
+        margin-top:4px;
+        color:#5e728c;
+        font-size:12px;
+    }
+    .erp-asiento-kpi.is-alert strong{
+        color:#b6523a;
+    }
+    .erp-asiento-lines{
+        overflow:visible;
+    }
+    .erp-asiento-toolbar{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+        margin-bottom:10px;
+    }
+    .erp-asiento-toolbar-copy{
+        max-width:760px;
+    }
+    .erp-asiento-toolbar-copy h3{
+        margin:0 0 4px;
+        font-size:26px;
+    }
+    .erp-asiento-toolbar-copy p{
+        margin:0;
+    }
+    .erp-asiento-table{
+        display:grid;
+        gap:8px;
+        overflow:visible;
+    }
+    .erp-asiento-head,
+    .erp-asiento-row{
+        display:grid;
+        grid-template-columns:minmax(0, 2.1fr) minmax(180px, 1fr) 126px 126px 44px;
+        gap:8px;
+        align-items:start;
+    }
+    .erp-asiento-head{
+        padding:0 6px 2px;
+        color:#4f6481;
+        font-size:11px;
+        font-weight:800;
+        letter-spacing:.12em;
+        text-transform:uppercase;
+    }
+    .erp-asiento-row{
+        position:relative;
+        padding:6px;
+        border:1px solid rgba(201, 213, 228, .82);
+        border-radius:12px;
+        background:#fff;
+        box-shadow:none;
+        overflow:visible;
+    }
+    .erp-asiento-row.is-active{
+        z-index:8;
+        border-color:rgba(76,123,255,.42);
+        box-shadow:0 0 0 4px rgba(76,123,255,.08);
+    }
+    .erp-asiento-cell{
+        min-width:0;
+    }
+    .erp-asiento-field{
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+    }
+    .erp-asiento-hidden-select{
+        display:none !important;
+    }
+    .erp-account-picker{
+        position:relative;
+    }
+    .erp-account-search{
+        width:100%;
+        min-height:40px;
+        padding:0 34px 0 12px;
+        border:1px solid rgba(182, 198, 217, .95);
+        border-radius:10px;
+        background:#fff;
+        color:#102a4c;
+        font-size:13px;
+        transition:border-color .2s ease, box-shadow .2s ease;
+    }
+    .erp-account-search:focus,
+    .erp-asiento-row input[type="text"]:focus,
+    .erp-asiento-row input[type="number"]:focus{
+        border-color:#4c7bff;
+        box-shadow:0 0 0 4px rgba(76,123,255,.12);
+        outline:none;
+    }
+    .erp-account-caret{
+        position:absolute;
+        right:14px;
+        top:50%;
+        transform:translateY(-50%);
+        color:#7d90a8;
+        font-size:14px;
+        pointer-events:none;
+    }
+    .erp-account-results{
+        position:absolute;
+        top:calc(100% + 8px);
+        left:0;
+        right:0;
+        z-index:18;
+        display:none;
+        max-height:260px;
+        overflow:auto;
+        padding:6px;
+        border:1px solid rgba(186, 201, 221, .9);
+        border-radius:14px;
+        background:#fff;
+        box-shadow:0 16px 28px rgba(15,39,66,.14);
+    }
+    .erp-account-results.is-open{
+        display:block;
+    }
+    .erp-account-option{
+        display:flex;
+        flex-direction:column;
+        gap:2px;
+        width:100%;
+        padding:9px 11px;
+        border:none;
+        border-radius:10px;
+        background:#fff;
+        text-align:left;
+        cursor:pointer;
+        transition:background .18s ease, transform .18s ease;
+    }
+    .erp-account-option.is-focused{
+        background:#eaf1ff;
+    }
+    .erp-account-option:hover{
+        background:#eef4ff;
+        transform:translateY(-1px);
+    }
+    .erp-account-option strong{
+        color:#12305a;
+        font-size:13px;
+    }
+    .erp-account-option span{
+        color:#667b95;
+        font-size:12px;
+    }
+    .erp-account-empty{
+        padding:10px 12px;
+        color:#7a8da6;
+        font-size:12px;
+    }
+    .erp-asiento-row input[type="text"],
+    .erp-asiento-row input[type="number"]{
+        width:100%;
+        min-height:40px;
+        padding:0 12px;
+        border:1px solid rgba(182, 198, 217, .95);
+        border-radius:10px;
+        background:#fff;
+        font-size:13px;
+    }
+    .erp-asiento-row input[type="number"]{
+        text-align:right;
+        font-variant-numeric:tabular-nums;
+    }
+    .erp-asiento-delete{
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        min-height:40px;
+    }
+    .erp-asiento-delete input{
+        display:none !important;
+    }
+    .erp-asiento-remove{
+        width:30px;
+        height:30px;
+        border:1px solid rgba(225, 110, 110, .36);
+        border-radius:8px;
+        background:#fff6f6;
+        color:#c14e4e;
+        font-size:16px;
+        font-weight:700;
+        line-height:1;
+        cursor:pointer;
+        transition:all .18s ease;
+    }
+    .erp-asiento-remove:hover{
+        background:#ffe9e9;
+        border-color:rgba(225, 110, 110, .54);
+        transform:translateY(-1px);
+    }
+    .erp-asiento-pair{
+        margin-top:2px;
+        color:#6c819b;
+        font-size:11px;
+        letter-spacing:.04em;
+        text-transform:uppercase;
+    }
+    .erp-asiento-pair strong{
+        color:#173a68;
+        font-size:11px;
+    }
+    .erp-asiento-actions{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+        margin-top:12px;
+    }
+    .erp-asiento-actions-copy{
+        color:#6d8098;
+        font-size:12px;
+        line-height:1.55;
+    }
+    .erp-asiento-header-copy{
+        margin-bottom:10px;
+    }
+    .erp-asiento-header-copy h3{
+        margin:0 0 4px;
+        font-size:23px;
+    }
+    .erp-asiento-header-copy p{
+        margin:0;
+        font-size:13px;
+        color:#6c8098;
+    }
+    .erp-asiento-add{
+        min-width:160px;
+    }
+    .erp-field-errors ul,
+    .errorlist{
+        margin:6px 0 0;
+        padding-left:18px;
+        color:#b6523a;
+        font-size:12px;
+    }
+    @media (max-width: 1200px){
+        .erp-asiento-header{
+            grid-template-columns:1fr;
+        }
+    }
+    @media (max-width: 980px){
+        .erp-asiento-header .erp-form-grid{
+            grid-template-columns:1fr;
+        }
+        .erp-asiento-head{
+            display:none;
+        }
+        .erp-asiento-row{
+            grid-template-columns:1fr;
+        }
+        .erp-asiento-summary{
+            grid-template-columns:1fr;
+        }
+        .erp-asiento-actions,
+        .erp-asiento-toolbar{
+            flex-direction:column;
+            align-items:stretch;
+        }
+        .erp-asiento-add{
+            width:100%;
+        }
+    }
+</style>
+
+<form method="post" class="erp-form-shell erp-asiento-shell" autocomplete="off">
+    {% csrf_token %}
+    <section class="erp-asiento-header">
+        <article class="erp-form-card">
+            <div class="erp-asiento-header-copy">
+                <h3>Cabecera del asiento</h3>
+                <p>Completa la referencia contable del periodo y deja la captura lista para trabajar el mes con mayor velocidad.</p>
+            </div>
+            <div class="erp-form-grid">
+                <div class="erp-field">
+                    <label for="{{ form.fecha.id_for_label }}">{{ form.fecha.label }}</label>
+                    {{ form.fecha }}
+                    {% if form.fecha.help_text %}<div class="erp-field-help">{{ form.fecha.help_text }}</div>{% endif %}
+                    {{ form.fecha.errors }}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.descripcion.id_for_label }}">{{ form.descripcion.label }}</label>
+                    {{ form.descripcion }}
+                    {% if form.descripcion.help_text %}<div class="erp-field-help">{{ form.descripcion.help_text }}</div>{% endif %}
+                    {{ form.descripcion.errors }}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+                    {{ form.estado }}
+                    {% if form.estado.help_text %}<div class="erp-field-help">{{ form.estado.help_text }}</div>{% endif %}
+                    {{ form.estado.errors }}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.referencia.id_for_label }}">{{ form.referencia.label }}</label>
+                    {{ form.referencia }}
+                    {% if form.referencia.help_text %}<div class="erp-field-help">{{ form.referencia.help_text }}</div>{% endif %}
+                    {{ form.referencia.errors }}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.origen.id_for_label }}">{{ form.origen.label }}</label>
+                    {{ form.origen }}
+                    {% if form.origen.help_text %}<div class="erp-field-help">{{ form.origen.help_text }}</div>{% endif %}
+                    {{ form.origen.errors }}
+                </div>
+                <div class="erp-field erp-asiento-inline-check">
+                    <label for="{{ form.contabilizar_ahora.id_for_label }}">{{ form.contabilizar_ahora.label }}</label>
+                    <div class="erp-asiento-toggle">
+                        <span>Listo para contabilizar</span>
+                        {{ form.contabilizar_ahora }}
+                    </div>
+                    {% if form.contabilizar_ahora.help_text %}<div class="erp-field-help">{{ form.contabilizar_ahora.help_text }}</div>{% endif %}
+                    {{ form.contabilizar_ahora.errors }}
+                </div>
+            </div>
+        </article>
+
+        <article class="erp-form-card">
+            <div class="erp-asiento-summary">
+                <div class="erp-asiento-kpi">
+                    <div class="erp-kpi-label">Debe acumulado</div>
+                    <strong id="erpAsientoDebe">L. 0.00</strong>
+                    <small>Suma en vivo de todas las lineas en debe.</small>
+                </div>
+                <div class="erp-asiento-kpi">
+                    <div class="erp-kpi-label">Haber acumulado</div>
+                    <strong id="erpAsientoHaber">L. 0.00</strong>
+                    <small>Suma en vivo de todas las lineas en haber.</small>
+                </div>
+                <div class="erp-asiento-kpi is-alert">
+                    <div class="erp-kpi-label">Diferencia</div>
+                    <strong id="erpAsientoDiferencia">L. 0.00</strong>
+                    <small id="erpAsientoEstado">Cuando llegue a cero, el asiento queda listo para contabilizarse.</small>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="erp-form-card erp-asiento-lines">
+        <div class="erp-asiento-toolbar">
+            <div class="erp-asiento-toolbar-copy">
+                <h3>Lineas del asiento</h3>
+                <p>Busca cuentas por codigo o nombre, completa la operacion y deja que el sistema te ayude a preparar la contrapartida y la siguiente linea.</p>
+            </div>
+            <button type="button" class="erp-btn erp-asiento-add" id="erpAddAsientoLine">Agregar linea</button>
+        </div>
+
+        {{ formset.management_form }}
+
+        <div class="erp-asiento-table" id="erpAsientoTable">
+            <div class="erp-asiento-head">
+                <div>Cuenta</div>
+                <div>Detalle</div>
+                <div>Debe</div>
+                <div>Haber</div>
+                <div>Eliminar</div>
+            </div>
+
+            {% for linea_form in formset %}
+            <div class="erp-asiento-row" data-line-index="{{ forloop.counter0 }}">
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ linea_form.id }}
+                        <div class="erp-account-picker">
+                            {{ linea_form.cuenta.as_hidden }}
+                            <input
+                                type="text"
+                                class="erp-account-search"
+                                data-role="cuenta-search"
+                                data-target-id="{{ linea_form.cuenta.id_for_label }}"
+                                placeholder="Codigo o nombre de la cuenta"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <span class="erp-account-caret">▾</span>
+                            <div class="erp-account-results" data-role="cuenta-results"></div>
+                        </div>
+                        <div class="erp-asiento-pair">Tip: escribe <strong>1101</strong>, <strong>banco</strong> o parte del nombre para filtrar al instante.</div>
+                        {{ linea_form.cuenta.errors }}
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ linea_form.detalle }}
+                        {{ linea_form.detalle.errors }}
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ linea_form.debe }}
+                        {{ linea_form.debe.errors }}
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ linea_form.haber }}
+                        {{ linea_form.haber.errors }}
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-delete">
+                        {% if linea_form.DELETE %}{{ linea_form.DELETE }}{% endif %}
+                        <button type="button" class="erp-asiento-remove" data-role="remove-line" aria-label="Eliminar linea">&times;</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <template id="erpAsientoEmptyRow">
+            <div class="erp-asiento-row" data-line-index="__prefix__">
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ formset.empty_form.id }}
+                        <div class="erp-account-picker">
+                            {{ formset.empty_form.cuenta.as_hidden }}
+                            <input
+                                type="text"
+                                class="erp-account-search"
+                                data-role="cuenta-search"
+                                data-target-id="{{ formset.empty_form.cuenta.id_for_label }}"
+                                placeholder="Codigo o nombre de la cuenta"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <span class="erp-account-caret">▾</span>
+                            <div class="erp-account-results" data-role="cuenta-results"></div>
+                        </div>
+                        <div class="erp-asiento-pair">Tip: escribe <strong>1101</strong>, <strong>banco</strong> o parte del nombre para filtrar al instante.</div>
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ formset.empty_form.detalle }}
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ formset.empty_form.debe }}
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-field">
+                        {{ formset.empty_form.haber }}
+                    </div>
+                </div>
+                <div class="erp-asiento-cell">
+                    <div class="erp-asiento-delete">
+                        {% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE }}{% endif %}
+                        <button type="button" class="erp-asiento-remove" data-role="remove-line" aria-label="Eliminar linea">&times;</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        {% if formset.non_form_errors %}<div class="erp-field-errors">{{ formset.non_form_errors }}</div>{% endif %}
+
+        <div class="erp-asiento-actions">
+            <div class="erp-asiento-actions-copy">
+                Puedes trabajar el mes completo dentro de un solo asiento. Cuando cierres una pareja Debe/Haber, el sistema prepara la siguiente linea para que sigas sin detenerte.
+            </div>
+            <button type="button" class="erp-btn-secondary erp-asiento-add" id="erpAddAsientoLineBottom">Agregar linea</button>
+        </div>
+    </section>
+
+    <div class="erp-form-actions">
+        <a href="{% url 'asientos_contables' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Asiento</button>
+    </div>
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const cuentasDataNode = document.getElementById("erp-cuentas-contables-data");
+    const cuentas = cuentasDataNode ? JSON.parse(cuentasDataNode.textContent) : [];
+    const table = document.getElementById("erpAsientoTable");
+    const totalFormsInput = document.getElementById("id_lineas-TOTAL_FORMS");
+    const emptyRowTemplate = document.getElementById("erpAsientoEmptyRow");
+    const addButtons = [
+        document.getElementById("erpAddAsientoLine"),
+        document.getElementById("erpAddAsientoLineBottom"),
+    ].filter(Boolean);
+
+    const formatMoney = (value) => {
+        const amount = Number(value || 0);
+        return `L. ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const parseAmount = (raw) => {
+        const normalized = String(raw || "").replace(/,/g, "").trim();
+        const parsed = Number.parseFloat(normalized);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const clearZeroOnFocus = (input) => {
+        if (!input) {
+            return;
+        }
+        const amount = parseAmount(input.value);
+        if (amount === 0) {
+            input.value = "";
+        }
+    };
+
+    const getRows = () => Array.from(table.querySelectorAll(".erp-asiento-row"));
+
+    const rowHasData = (row) => {
+        const search = row.querySelector('[data-role="cuenta-search"]');
+        const detail = row.querySelector('input[name$="-detalle"]');
+        const debe = row.querySelector('input[name$="-debe"]');
+        const haber = row.querySelector('input[name$="-haber"]');
+        const deleteField = row.querySelector('input[name$="-DELETE"]');
+        if (deleteField && deleteField.checked) {
+            return false;
+        }
+        return Boolean(
+            (search && search.value.trim()) ||
+            (detail && detail.value.trim()) ||
+            parseAmount(debe ? debe.value : 0) > 0 ||
+            parseAmount(haber ? haber.value : 0) > 0
+        );
+    };
+
+    const rowIsBalancedPair = (row) => {
+        const cuenta = row.querySelector('input[name$="-cuenta"]');
+        const debe = row.querySelector('input[name$="-debe"]');
+        const haber = row.querySelector('input[name$="-haber"]');
+        return Boolean(
+            cuenta && cuenta.value &&
+            ((parseAmount(debe ? debe.value : 0) > 0 && parseAmount(haber ? haber.value : 0) === 0) ||
+             (parseAmount(haber ? haber.value : 0) > 0 && parseAmount(debe ? debe.value : 0) === 0))
+        );
+    };
+
+    const updateTotals = () => {
+        let totalDebe = 0;
+        let totalHaber = 0;
+        getRows().forEach((row) => {
+            const deleteField = row.querySelector('input[name$="-DELETE"]');
+            if (deleteField && deleteField.checked) {
+                row.style.display = "none";
+                return;
+            }
+            row.style.display = "";
+            totalDebe += parseAmount(row.querySelector('input[name$="-debe"]')?.value);
+            totalHaber += parseAmount(row.querySelector('input[name$="-haber"]')?.value);
+        });
+        const diff = totalDebe - totalHaber;
+        document.getElementById("erpAsientoDebe").textContent = formatMoney(totalDebe);
+        document.getElementById("erpAsientoHaber").textContent = formatMoney(totalHaber);
+        document.getElementById("erpAsientoDiferencia").textContent = formatMoney(Math.abs(diff));
+        const estado = document.getElementById("erpAsientoEstado");
+        if (diff === 0 && totalDebe > 0) {
+            estado.textContent = "Asiento balanceado. Ya puedes contabilizarlo cuando quieras.";
+        } else if (totalDebe === 0 && totalHaber === 0) {
+            estado.textContent = "Agrega lineas para empezar a construir el asiento del mes.";
+        } else if (diff > 0) {
+            estado.textContent = "Falta contrapartida en Haber para cerrar las operaciones capturadas.";
+        } else {
+            estado.textContent = "Falta contrapartida en Debe para cuadrar el asiento.";
+        }
+    };
+
+    const focusAccountOption = (row, nextIndex) => {
+        const results = row.querySelector('[data-role="cuenta-results"]');
+        if (!results) {
+            return;
+        }
+        const options = Array.from(results.querySelectorAll(".erp-account-option"));
+        if (!options.length) {
+            row.dataset.focusedOption = "";
+            return;
+        }
+        let index = Number.parseInt(row.dataset.focusedOption || "-1", 10);
+        index = nextIndex;
+        if (index < 0) {
+            index = options.length - 1;
+        }
+        if (index >= options.length) {
+            index = 0;
+        }
+        row.dataset.focusedOption = String(index);
+        options.forEach((option, optionIndex) => {
+            option.classList.toggle("is-focused", optionIndex === index);
+        });
+        options[index].scrollIntoView({ block: "nearest" });
+    };
+
+    const renderAccountResults = (row, term = "") => {
+        const results = row.querySelector('[data-role="cuenta-results"]');
+        if (!results) {
+            return;
+        }
+        const searchTerm = term.trim().toLowerCase();
+        const selectedField = row.querySelector('input[name$="-cuenta"]');
+        const filtered = cuentas
+            .filter((cuenta) => {
+                if (!searchTerm) {
+                    return true;
+                }
+                return (
+                    cuenta.codigo.toLowerCase().includes(searchTerm) ||
+                    cuenta.nombre.toLowerCase().includes(searchTerm)
+                );
+            })
+            .slice(0, 12);
+
+        results.innerHTML = "";
+        row.dataset.focusedOption = filtered.length ? "0" : "";
+        if (!filtered.length) {
+            const empty = document.createElement("div");
+            empty.className = "erp-account-empty";
+            empty.textContent = "No encontramos una cuenta con ese texto.";
+            results.appendChild(empty);
+        } else {
+            filtered.forEach((cuenta) => {
+                const option = document.createElement("button");
+                option.type = "button";
+                option.className = "erp-account-option";
+                option.dataset.id = cuenta.id;
+                option.innerHTML = `<strong>${cuenta.codigo}</strong><span>${cuenta.nombre}</span>`;
+                option.addEventListener("click", () => {
+                    const visibleInput = row.querySelector('[data-role="cuenta-search"]');
+                    if (selectedField) {
+                        selectedField.value = cuenta.id;
+                    }
+                    if (visibleInput) {
+                        visibleInput.value = `${cuenta.codigo} - ${cuenta.nombre}`;
+                    }
+                    results.classList.remove("is-open");
+                    if (row.dataset.counterpartLock === "1") {
+                        updateTotals();
+                        ensureBlankRow();
+                    } else {
+                        maybeCreatePairAndAdvance(row);
+                    }
+                });
+                results.appendChild(option);
+            });
+        }
+
+        results.classList.add("is-open");
+        focusAccountOption(row, 0);
+    };
+
+    const ensureBlankRow = () => {
+        const rows = getRows().filter((row) => {
+            const deleteField = row.querySelector('input[name$="-DELETE"]');
+            return !(deleteField && deleteField.checked);
+        });
+        if (!rows.length || rowHasData(rows[rows.length - 1])) {
+            addLine();
+        }
+    };
+
+    const addLine = () => {
+        const nextIndex = Number.parseInt(totalFormsInput.value || "0", 10);
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = emptyRowTemplate.innerHTML.replace(/__prefix__/g, String(nextIndex)).trim();
+        const newRow = wrapper.firstElementChild;
+        table.appendChild(newRow);
+        totalFormsInput.value = String(nextIndex + 1);
+        initRow(newRow);
+        updateTotals();
+        return newRow;
+    };
+
+    const buildPairSignature = (row) => {
+        const cuenta = row.querySelector('input[name$="-cuenta"]');
+        const detalle = row.querySelector('input[name$="-detalle"]');
+        const debe = row.querySelector('input[name$="-debe"]');
+        const haber = row.querySelector('input[name$="-haber"]');
+        const debeValue = parseAmount(debe?.value);
+        const haberValue = parseAmount(haber?.value);
+        const side = debeValue > 0 ? "debe" : haberValue > 0 ? "haber" : "";
+        const amount = side === "debe" ? debeValue : haberValue;
+        return side && cuenta?.value ? `${cuenta.value}|${side}|${amount.toFixed(2)}|${(detalle?.value || "").trim()}` : "";
+    };
+
+    const maybeCreatePairAndAdvance = (row) => {
+        if (row.dataset.counterpartLock === "1") {
+            updateTotals();
+            ensureBlankRow();
+            return;
+        }
+        const rows = getRows();
+        const index = rows.indexOf(row);
+        if (index === -1) {
+            return;
+        }
+        const debeInput = row.querySelector('input[name$="-debe"]');
+        const haberInput = row.querySelector('input[name$="-haber"]');
+        const detailInput = row.querySelector('input[name$="-detalle"]');
+        const currentSignature = buildPairSignature(row);
+
+        let currentValue = parseAmount(debeInput?.value);
+        let targetFieldName = "haber";
+        if (currentValue <= 0) {
+            currentValue = parseAmount(haberInput?.value);
+            targetFieldName = "debe";
+        }
+        if (currentValue <= 0 || !rowIsBalancedPair(row) || !currentSignature) {
+            updateTotals();
+            return;
+        }
+        if (row.dataset.generatedSignature === currentSignature) {
+            updateTotals();
+            ensureBlankRow();
+            return;
+        }
+
+        let nextRow = rows[index + 1];
+        if (!nextRow) {
+            nextRow = addLine();
+        }
+        const nextDebe = nextRow.querySelector('input[name$="-debe"]');
+        const nextHaber = nextRow.querySelector('input[name$="-haber"]');
+        const nextDetail = nextRow.querySelector('input[name$="-detalle"]');
+        const nextSearch = nextRow.querySelector('[data-role="cuenta-search"]');
+        const nextCuenta = nextRow.querySelector('input[name$="-cuenta"]');
+        const nextDelete = nextRow.querySelector('input[name$="-DELETE"]');
+
+        if (nextDelete && nextDelete.checked) {
+            nextDelete.checked = false;
+        }
+
+        const nextIsBlank = Boolean(
+            nextRow &&
+            !nextCuenta?.value &&
+            !nextDetail?.value.trim() &&
+            parseAmount(nextDebe?.value) === 0 &&
+            parseAmount(nextHaber?.value) === 0
+        );
+
+        if (!nextIsBlank) {
+            updateTotals();
+            return;
+        }
+
+        if (targetFieldName === "haber" && nextHaber && parseAmount(nextHaber.value) === 0 && parseAmount(nextDebe?.value) === 0) {
+            nextHaber.value = currentValue.toFixed(2);
+        }
+        if (targetFieldName === "debe" && nextDebe && parseAmount(nextDebe.value) === 0 && parseAmount(nextHaber?.value) === 0) {
+            nextDebe.value = currentValue.toFixed(2);
+        }
+        if (nextDetail && !nextDetail.value.trim() && detailInput && detailInput.value.trim()) {
+            nextDetail.value = detailInput.value.trim();
+        }
+        nextRow.dataset.autofilledCounterpart = "1";
+        nextRow.dataset.counterpartLock = "1";
+        row.dataset.generatedSignature = currentSignature;
+
+        if (nextCuenta && !nextCuenta.value && nextSearch) {
+            nextSearch.focus();
+            renderAccountResults(nextRow, "");
+        }
+        updateTotals();
+    };
+
+    const initRow = (row) => {
+        if (!row || row.dataset.initialized === "1") {
+            return;
+        }
+        row.dataset.initialized = "1";
+        const hiddenCuenta = row.querySelector('input[name$="-cuenta"]');
+        const visibleCuenta = row.querySelector('[data-role="cuenta-search"]');
+        const results = row.querySelector('[data-role="cuenta-results"]');
+        const debeInput = row.querySelector('input[name$="-debe"]');
+        const haberInput = row.querySelector('input[name$="-haber"]');
+        const detailInput = row.querySelector('input[name$="-detalle"]');
+        const deleteInput = row.querySelector('input[name$="-DELETE"]');
+        const removeButton = row.querySelector('[data-role="remove-line"]');
+
+        row.addEventListener("focusin", () => {
+            getRows().forEach((item) => item.classList.remove("is-active"));
+            row.classList.add("is-active");
+        });
+
+        if (hiddenCuenta && visibleCuenta && hiddenCuenta.value) {
+            const match = cuentas.find((cuenta) => String(cuenta.id) === String(hiddenCuenta.value));
+            if (match) {
+                visibleCuenta.value = `${match.codigo} - ${match.nombre}`;
+            }
+        }
+
+        if (visibleCuenta && results) {
+            visibleCuenta.setAttribute("autocomplete", "off");
+            visibleCuenta.addEventListener("focus", () => renderAccountResults(row, visibleCuenta.value));
+            visibleCuenta.addEventListener("input", () => {
+                if (hiddenCuenta) {
+                    hiddenCuenta.value = "";
+                }
+                if (row.dataset.counterpartLock !== "1") {
+                    row.dataset.generatedSignature = "";
+                }
+                renderAccountResults(row, visibleCuenta.value);
+            });
+            visibleCuenta.addEventListener("keydown", (event) => {
+                if (!results.classList.contains("is-open") && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+                    renderAccountResults(row, visibleCuenta.value);
+                    event.preventDefault();
+                    return;
+                }
+                const options = Array.from(results.querySelectorAll(".erp-account-option"));
+                const focusedIndex = Number.parseInt(row.dataset.focusedOption || "-1", 10);
+                if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    focusAccountOption(row, focusedIndex + 1);
+                } else if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    focusAccountOption(row, focusedIndex - 1);
+                } else if (event.key === "Enter" && results.classList.contains("is-open")) {
+                    const option = options[focusedIndex >= 0 ? focusedIndex : 0];
+                    if (option) {
+                        event.preventDefault();
+                        option.click();
+                    }
+                } else if (event.key === "Escape") {
+                    results.classList.remove("is-open");
+                }
+            });
+            visibleCuenta.addEventListener("blur", () => {
+                window.setTimeout(() => results.classList.remove("is-open"), 160);
+            });
+        }
+
+        [debeInput, haberInput].forEach((input) => {
+            if (!input) {
+                return;
+            }
+            input.setAttribute("step", "0.01");
+            input.setAttribute("min", "0");
+            input.addEventListener("focus", () => clearZeroOnFocus(input));
+            input.addEventListener("input", () => {
+                if (input === debeInput && debeInput && haberInput && parseAmount(debeInput.value) > 0) {
+                    haberInput.value = "";
+                }
+                if (input === haberInput && debeInput && haberInput && parseAmount(haberInput.value) > 0) {
+                    debeInput.value = "";
+                }
+                if (row.dataset.counterpartLock !== "1") {
+                    row.dataset.generatedSignature = "";
+                }
+                updateTotals();
+            });
+            input.addEventListener("blur", () => {
+                const amount = parseAmount(input.value);
+                input.value = amount ? amount.toFixed(2) : "0.00";
+                if (row.dataset.counterpartLock === "1") {
+                    updateTotals();
+                    ensureBlankRow();
+                    return;
+                }
+                const isAutoCounterpart = row.dataset.autofilledCounterpart === "1";
+                if (!isAutoCounterpart) {
+                    maybeCreatePairAndAdvance(row);
+                } else {
+                    row.dataset.autofilledCounterpart = "";
+                    updateTotals();
+                    ensureBlankRow();
+                }
+            });
+        });
+
+        if (detailInput) {
+            detailInput.addEventListener("input", () => {
+                if (row.dataset.counterpartLock !== "1") {
+                    row.dataset.generatedSignature = "";
+                }
+            });
+        }
+
+        if (deleteInput) {
+            deleteInput.addEventListener("change", updateTotals);
+        }
+        if (removeButton) {
+            removeButton.addEventListener("click", () => {
+                if (deleteInput) {
+                    deleteInput.checked = true;
+                }
+                row.style.display = "none";
+                updateTotals();
+                ensureBlankRow();
+            });
+        }
+    };
+
+    addButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const row = addLine();
+            const search = row.querySelector('[data-role="cuenta-search"]');
+            if (search) {
+                search.focus();
+            }
+        });
+    });
+
+    getRows().forEach(initRow);
+    ensureBlankRow();
+    updateTotals();
+});
+</script>
+{% endblock %}

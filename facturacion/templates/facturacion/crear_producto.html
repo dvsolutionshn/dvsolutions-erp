@@ -1,0 +1,112 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo|default:"Nuevo producto" }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Catalogo comercial{% endblock %}
+{% block header_title %}{{ titulo|default:"Nuevo producto" }}{% endblock %}
+{% block header_description %}Construye el catalogo de productos y servicios con una captura mas compacta, ordenada y profesional.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'productos_facturacion' empresa.slug %}">Volver a productos</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-product-form .erp-field-span-full{
+    grid-column:1 / -1;
+}
+.erp-product-form .erp-field textarea{
+    min-height:62px;
+    height:62px;
+}
+@media (max-width: 760px){
+    .erp-compact-grid.three-col,
+    .erp-compact-grid.two-col{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-compact-form erp-product-form is-dense">
+    <form method="post" class="erp-compact-form is-dense">
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% if form.non_field_errors %}
+        <section class="erp-compact-card is-slim">
+            <ul class="erp-field-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        </section>
+        {% endif %}
+
+        <section class="erp-compact-card is-slim">
+            <h3>Datos base</h3>
+            <p>Registra el producto, su precio de referencia y la configuracion comercial principal.</p>
+            <div class="erp-compact-grid three-col is-tight" style="margin-top:12px;">
+                <div class="erp-field">{{ form.nombre.label_tag }}{{ form.nombre }}{% if form.nombre.errors %}<ul class="erp-field-errors">{% for error in form.nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.codigo.label_tag }}{{ form.codigo }}{% if form.codigo.help_text %}<div class="erp-field-help">{{ form.codigo.help_text }}</div>{% endif %}{% if form.codigo.errors %}<ul class="erp-field-errors">{% for error in form.codigo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.tipo_item.label_tag }}{{ form.tipo_item }}{% if form.tipo_item.errors %}<ul class="erp-field-errors">{% for error in form.tipo_item.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.unidad_medida.label_tag }}{{ form.unidad_medida }}{% if form.unidad_medida.errors %}<ul class="erp-field-errors">{% for error in form.unidad_medida.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.precio.label_tag }}{{ form.precio }}{% if form.precio.help_text %}<div class="erp-field-help">{{ form.precio.help_text }}</div>{% endif %}{% if form.precio.errors %}<ul class="erp-field-errors">{% for error in form.precio.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.impuesto_predeterminado.label_tag }}{{ form.impuesto_predeterminado }}{% if form.impuesto_predeterminado.help_text %}<div class="erp-field-help">{{ form.impuesto_predeterminado.help_text }}</div>{% endif %}{% if form.impuesto_predeterminado.errors %}<ul class="erp-field-errors">{% for error in form.impuesto_predeterminado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field erp-field-span-full">{{ form.descripcion.label_tag }}{{ form.descripcion }}{% if form.descripcion.help_text %}<div class="erp-field-help">{{ form.descripcion.help_text }}</div>{% endif %}{% if form.descripcion.errors %}<ul class="erp-field-errors">{% for error in form.descripcion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            </div>
+        </section>
+
+        <section class="erp-compact-card is-slim">
+            <h3>Seguimiento y control</h3>
+            <div class="erp-compact-grid three-col is-tight" style="margin-top:12px;">
+                <div class="erp-field">{{ form.fecha_referencia.label_tag }}{{ form.fecha_referencia }}{% if form.fecha_referencia.help_text %}<div class="erp-field-help">{{ form.fecha_referencia.help_text }}</div>{% endif %}{% if form.fecha_referencia.errors %}<ul class="erp-field-errors">{% for error in form.fecha_referencia.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.fecha_alerta.label_tag }}{{ form.fecha_alerta }}{% if form.fecha_alerta.help_text %}<div class="erp-field-help">{{ form.fecha_alerta.help_text }}</div>{% endif %}{% if form.fecha_alerta.errors %}<ul class="erp-field-errors">{% for error in form.fecha_alerta.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.nota_fecha.label_tag }}{{ form.nota_fecha }}{% if form.nota_fecha.help_text %}<div class="erp-field-help">{{ form.nota_fecha.help_text }}</div>{% endif %}{% if form.nota_fecha.errors %}<ul class="erp-field-errors">{% for error in form.nota_fecha.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            </div>
+        </section>
+
+        <section class="erp-compact-card is-slim">
+            <h3>Estado y control</h3>
+            <div class="erp-inline-checks" style="margin-top:12px;">
+                <div class="erp-check-card is-inline"><label for="{{ form.controla_inventario.id_for_label }}">Controla inventario</label>{{ form.controla_inventario }}</div>
+                <div class="erp-check-card is-inline"><label for="{{ form.activo.id_for_label }}">Activo</label>{{ form.activo }}</div>
+            </div>
+            {% for bool_field in form %}
+                {% if bool_field.name == 'controla_inventario' or bool_field.name == 'activo' %}
+                    {% if bool_field.errors %}<ul class="erp-field-errors">{% for error in bool_field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                {% endif %}
+            {% endfor %}
+        </section>
+
+        {% if mostrar_perfil_farmaceutico %}
+        <section class="erp-compact-card is-slim">
+            <h3>Perfil farmaceutico</h3>
+            <div class="erp-compact-grid three-col is-tight" style="margin-top:12px;">
+                <div class="erp-field">{{ form.categoria_farmaceutica.label_tag }}{{ form.categoria_farmaceutica }}{% if form.categoria_farmaceutica.errors %}<ul class="erp-field-errors">{% for error in form.categoria_farmaceutica.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.principio_activo.label_tag }}{{ form.principio_activo }}{% if form.principio_activo.errors %}<ul class="erp-field-errors">{% for error in form.principio_activo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.presentacion.label_tag }}{{ form.presentacion }}{% if form.presentacion.errors %}<ul class="erp-field-errors">{% for error in form.presentacion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.concentracion.label_tag }}{{ form.concentracion }}{% if form.concentracion.errors %}<ul class="erp-field-errors">{% for error in form.concentracion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.laboratorio.label_tag }}{{ form.laboratorio }}{% if form.laboratorio.errors %}<ul class="erp-field-errors">{% for error in form.laboratorio.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.registro_sanitario.label_tag }}{{ form.registro_sanitario }}{% if form.registro_sanitario.errors %}<ul class="erp-field-errors">{% for error in form.registro_sanitario.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.alerta_vencimiento_dias.label_tag }}{{ form.alerta_vencimiento_dias }}{% if form.alerta_vencimiento_dias.errors %}<ul class="erp-field-errors">{% for error in form.alerta_vencimiento_dias.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            </div>
+            <div class="erp-inline-checks" style="margin-top:12px;">
+                <div class="erp-check-card is-inline"><label for="{{ form.requiere_receta.id_for_label }}">Requiere receta</label>{{ form.requiere_receta }}</div>
+                <div class="erp-check-card is-inline"><label for="{{ form.requiere_refrigeracion.id_for_label }}">Requiere refrigeracion</label>{{ form.requiere_refrigeracion }}</div>
+                <div class="erp-check-card is-inline"><label for="{{ form.producto_controlado.id_for_label }}">Producto controlado</label>{{ form.producto_controlado }}</div>
+            </div>
+            {% for bool_field in form %}
+                {% if bool_field.name == 'requiere_receta' or bool_field.name == 'requiere_refrigeracion' or bool_field.name == 'producto_controlado' %}
+                    {% if bool_field.errors %}<ul class="erp-field-errors">{% for error in bool_field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                {% endif %}
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        <section class="erp-compact-card is-slim">
+            <div class="erp-form-actions">
+                <div class="erp-field-help">Este registro quedara disponible para facturas, compras e inventario.</div>
+                <div class="erp-actions-right">
+                    <a class="erp-btn-secondary" href="{% url 'productos_facturacion' empresa.slug %}">Cancelar</a>
+                    <button type="submit" class="erp-btn">{{ texto_boton|default:"Guardar producto" }}</button>
+                </div>
+            </div>
+        </section>
+    </form>
+</section>
+{% endblock %}

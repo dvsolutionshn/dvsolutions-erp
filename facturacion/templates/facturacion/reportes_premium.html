@@ -1,0 +1,768 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+{% load custom_filters %}
+
+{% block title %}Reportes - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Analitica Comercial{% endblock %}
+{% block header_title %}Reportes de Facturacion{% endblock %}
+{% block header_description %}Vista ejecutiva de ventas, impuestos, saldos y comportamiento de cobro con una presentacion mas clara y profesional.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'dashboard_bi_facturacion' empresa.slug %}?{{ request.GET.urlencode }}">Dashboard BI</a>
+{% if puede_configurar_power_bi %}
+<a class="erp-action-link" href="{% url 'configuracion_power_bi_reportes' empresa.slug %}">Configurar embed externo</a>
+{% endif %}
+<a class="erp-action-link" href="/{{ empresa.slug }}/dashboard/facturacion/reportes/excel/?{{ request.GET.urlencode }}">Exportar Excel</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-report-shell{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+}
+.erp-report-hero{
+    display:grid;
+    grid-template-columns:minmax(0, 1.1fr) minmax(320px, .9fr);
+    gap:20px;
+    align-items:stretch;
+    overflow:hidden;
+    position:relative;
+}
+.erp-report-hero::after{
+    content:"";
+    position:absolute;
+    right:-70px;
+    top:-70px;
+    width:220px;
+    height:220px;
+    border-radius:999px;
+    background:radial-gradient(circle, rgba(41,104,242,.14), rgba(41,104,242,0));
+    pointer-events:none;
+}
+.erp-report-hero-copy{
+    position:relative;
+    z-index:1;
+}
+.erp-report-hero-copy h3{
+    margin:10px 0 10px;
+    font-size:29px;
+    line-height:1.15;
+    color:#102338;
+}
+.erp-report-hero-copy p{
+    margin:0;
+    max-width:760px;
+    color:var(--muted);
+    line-height:1.75;
+}
+.erp-report-pill-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:18px;
+}
+.erp-report-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    border-radius:999px;
+    background:rgba(255,255,255,.82);
+    border:1px solid var(--line);
+    color:#16365f;
+    font-weight:700;
+    box-shadow:var(--shadow-soft);
+}
+.erp-report-hero-kpis{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:14px;
+    position:relative;
+    z-index:1;
+}
+.erp-report-hero-kpis .erp-mini-stat{
+    min-height:120px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+}
+.erp-report-filter-card{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+.erp-report-filter-head{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+}
+.erp-report-filter-head p{
+    margin:6px 0 0;
+    color:var(--muted);
+    line-height:1.6;
+}
+.erp-report-filter-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:14px;
+}
+.erp-report-filter-actions{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+.erp-report-blocks{
+    display:grid;
+    grid-template-columns:1.2fr .8fr;
+    gap:18px;
+}
+.erp-report-cluster{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+.erp-report-cluster-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:14px;
+}
+.erp-report-cluster-grid.compact{
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+}
+.erp-report-section-title{
+    margin:0;
+    font-size:17px;
+    font-weight:700;
+    color:#102338;
+}
+.erp-report-section-copy{
+    margin:4px 0 0;
+    color:var(--muted);
+    line-height:1.6;
+    font-size:14px;
+}
+.erp-report-card{
+    padding:18px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:#fbfdff;
+}
+.erp-report-card .value{
+    margin-top:10px;
+    font-size:26px;
+    font-weight:800;
+    color:#102338;
+}
+.erp-report-card .note{
+    margin-top:8px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+}
+.erp-report-table-head{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+}
+.erp-report-table-head p{
+    margin:6px 0 0;
+    color:var(--muted);
+    line-height:1.6;
+}
+.erp-report-table-wrap{
+    overflow-x:auto;
+    overflow-y:hidden;
+}
+.erp-report-table{
+    min-width:1100px;
+}
+.erp-report-summary-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 12px;
+    border-radius:999px;
+    background:#f4f8fc;
+    border:1px solid var(--line);
+    color:#1f3e68;
+    font-size:12px;
+    font-weight:700;
+}
+.erp-report-doc{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+.erp-report-doc strong{
+    color:#0f2d56;
+}
+.erp-report-doc small{
+    color:var(--muted);
+    line-height:1.45;
+}
+.erp-report-fiscal-stack{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:110px;
+}
+.erp-report-fiscal-stack strong{
+    color:#0f2d56;
+    font-size:13px;
+}
+.erp-report-fiscal-stack span{
+    color:var(--muted);
+    font-size:11px;
+}
+.erp-report-total{
+    text-align:right;
+}
+.erp-report-total strong{
+    display:block;
+    color:#0f2d56;
+    font-size:15px;
+}
+.erp-report-total small{
+    color:var(--muted);
+}
+.erp-bi-shell{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+.erp-bi-head{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+}
+.erp-bi-frame-wrap{
+    border:1px solid var(--line);
+    border-radius:16px;
+    overflow:hidden;
+    background:#f9fbff;
+}
+.erp-bi-frame{
+    width:100%;
+    border:0;
+    display:block;
+    background:#fff;
+}
+.erp-bi-empty{
+    padding:18px;
+    border:1px dashed var(--line-strong);
+    border-radius:14px;
+    background:#f8fbff;
+    color:var(--muted);
+    line-height:1.7;
+}
+.erp-bi-internal-grid{
+    display:grid;
+    grid-template-columns:1.15fr .85fr;
+    gap:18px;
+}
+.erp-bi-internal-stack{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+.erp-bi-list{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+.erp-bi-row{
+    display:grid;
+    grid-template-columns:minmax(120px, 180px) minmax(0,1fr) auto;
+    gap:12px;
+    align-items:center;
+}
+.erp-bi-row-meta{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+.erp-bi-row-meta strong{
+    color:#102338;
+    font-size:13px;
+}
+.erp-bi-row-meta small{
+    color:var(--muted);
+    line-height:1.4;
+}
+.erp-bi-bar-track{
+    position:relative;
+    height:10px;
+    border-radius:999px;
+    background:#edf3fb;
+    overflow:hidden;
+}
+.erp-bi-bar-fill{
+    position:absolute;
+    inset:0 auto 0 0;
+    border-radius:999px;
+    background:linear-gradient(90deg, #2968f2, #4a8cf8);
+}
+.erp-bi-row-value{
+    min-width:120px;
+    text-align:right;
+    font-weight:800;
+    color:#102338;
+}
+.erp-bi-grid-mini{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:14px;
+}
+.erp-bi-timeline{
+    display:flex;
+    align-items:flex-end;
+    gap:14px;
+    min-height:250px;
+    padding-top:18px;
+}
+.erp-bi-timeline-col{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+}
+.erp-bi-timeline-bar{
+    width:100%;
+    max-width:76px;
+    min-height:22px;
+    border-radius:14px 14px 8px 8px;
+    background:linear-gradient(180deg, #2968f2 0%, #83b6ff 100%);
+    box-shadow:0 14px 24px rgba(41,104,242,.16);
+}
+.erp-bi-timeline-amount{
+    font-size:11px;
+    color:#102338;
+    font-weight:700;
+    text-align:center;
+}
+.erp-bi-timeline-label{
+    font-size:11px;
+    color:var(--muted);
+    text-align:center;
+    line-height:1.4;
+}
+@media (max-width: 1180px){
+    .erp-report-hero,
+    .erp-report-blocks,
+    .erp-bi-internal-grid{
+        grid-template-columns:1fr;
+    }
+}
+@media (max-width: 760px){
+    .erp-report-hero-kpis,
+    .erp-report-cluster-grid,
+    .erp-report-cluster-grid.compact,
+    .erp-report-filter-grid{
+        grid-template-columns:1fr;
+    }
+    .erp-report-table{
+        min-width:920px;
+    }
+    .erp-bi-row{
+        grid-template-columns:1fr;
+    }
+    .erp-bi-row-value{
+        text-align:left;
+        min-width:0;
+    }
+    .erp-bi-timeline{
+        min-height:220px;
+        gap:10px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-report-shell">
+    <section class="erp-card erp-report-hero">
+        <div class="erp-report-hero-copy">
+            <div class="erp-kpi-label">Control ejecutivo</div>
+            <h3>Lectura comercial y fiscal de la facturacion en una sola vista.</h3>
+            <p>Filtra por cliente, estado, fecha o tipo de impuesto y revisa rapidamente ventas, cartera pendiente y composicion fiscal sin perder detalle operativo.</p>
+            <div class="erp-report-pill-row">
+                <span class="erp-report-pill">Documentos visibles: {{ facturas|length }}</span>
+                <span class="erp-report-pill">Saldo pendiente: L. {{ total_saldo|floatformat:2|intcomma }}</span>
+                <span class="erp-report-pill">Descuento consolidado: L. {{ total_descuento|floatformat:2|intcomma }}</span>
+            </div>
+        </div>
+        <div class="erp-report-hero-kpis">
+            <article class="erp-mini-stat">
+                <div class="label">Total Facturado</div>
+                <div class="value">L. {{ totales.total|default:0|floatformat:2|intcomma }}</div>
+            </article>
+            <article class="erp-mini-stat">
+                <div class="label">Subtotal antes de impuesto</div>
+                <div class="value">L. {{ totales.subtotal|default:0|floatformat:2|intcomma }}</div>
+            </article>
+            <article class="erp-mini-stat">
+                <div class="label">Impuesto consolidado</div>
+                <div class="value">L. {{ totales.impuesto|default:0|floatformat:2|intcomma }}</div>
+            </article>
+            <article class="erp-mini-stat">
+                <div class="label">Saldo por cobrar</div>
+                <div class="value">L. {{ total_saldo|floatformat:2|intcomma }}</div>
+            </article>
+        </div>
+    </section>
+
+    <section class="erp-card erp-bi-shell">
+        <div class="erp-bi-head">
+            <div>
+                <h3 class="erp-report-section-title">BI interno de facturacion</h3>
+                <p class="erp-report-section-copy">Este tablero se genera directamente desde los datos del ERP: tendencia comercial, clientes top, productos mas vendidos y mezcla de cobro sin depender de herramientas externas.</p>
+            </div>
+            <span class="erp-report-summary-chip">Actualizado con los filtros visibles</span>
+        </div>
+
+        <div class="erp-bi-internal-grid">
+            <section class="erp-bi-internal-stack">
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Ventas por mes</div>
+                    <div class="note">Lectura de los ultimos meses visibles en la consulta actual.</div>
+                    <div class="erp-bi-timeline">
+                        {% for item in bi_interno.ventas_mensuales %}
+                        <div class="erp-bi-timeline-col">
+                            <div class="erp-bi-timeline-amount">L. {{ item.total|floatformat:0|intcomma }}</div>
+                            <div class="erp-bi-timeline-bar" style="height:{{ item.ancho|floatformat:0 }}%;"></div>
+                            <div class="erp-bi-timeline-label">
+                                {{ item.periodo|date:"M Y" }}<br>
+                                {{ item.documentos }} docs
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="erp-bi-empty" style="width:100%;">Todavia no hay suficiente historial para graficar la tendencia mensual con los filtros seleccionados.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Clientes con mayor facturacion</div>
+                    <div class="note">Clientes que mas aportan al ingreso dentro del rango filtrado.</div>
+                    <div class="erp-bi-list" style="margin-top:14px;">
+                        {% for item in bi_interno.top_clientes %}
+                        <div class="erp-bi-row">
+                            <div class="erp-bi-row-meta">
+                                <strong>{{ item.nombre }}</strong>
+                                <small>{{ item.documentos }} documento{{ item.documentos|pluralize }}</small>
+                            </div>
+                            <div class="erp-bi-bar-track">
+                                <span class="erp-bi-bar-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></span>
+                            </div>
+                            <div class="erp-bi-row-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                        </div>
+                        {% empty %}
+                        <div class="erp-bi-empty">Todavia no hay clientes suficientes para calcular un ranking comercial.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="erp-bi-internal-stack">
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Productos mas vendidos</div>
+                    <div class="note">Ranking operativo construido desde las lineas de factura visibles.</div>
+                    <div class="erp-bi-list" style="margin-top:14px;">
+                        {% for item in bi_interno.top_productos %}
+                        <div class="erp-bi-row">
+                            <div class="erp-bi-row-meta">
+                                <strong>{{ item.nombre }}</strong>
+                                <small>{{ item.cantidad|floatformat:2 }} unidades</small>
+                            </div>
+                            <div class="erp-bi-bar-track">
+                                <span class="erp-bi-bar-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></span>
+                            </div>
+                            <div class="erp-bi-row-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                        </div>
+                        {% empty %}
+                        <div class="erp-bi-empty">No hay lineas suficientes para construir el ranking de productos.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Mezcla de cobro</div>
+                    <div class="note">Peso economico por estado de cobranza sobre el total filtrado.</div>
+                    <div class="erp-bi-list" style="margin-top:14px;">
+                        {% for item in bi_interno.estado_cobro %}
+                        <div class="erp-bi-row">
+                            <div class="erp-bi-row-meta">
+                                <strong>{{ item.etiqueta }}</strong>
+                                <small>{{ item.cantidad }} factura{{ item.cantidad|pluralize }}</small>
+                            </div>
+                            <div class="erp-bi-bar-track">
+                                <span class="erp-bi-bar-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></span>
+                            </div>
+                            <div class="erp-bi-row-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </section>
+        </div>
+    </section>
+
+    <section class="erp-card erp-bi-shell">
+        <div class="erp-bi-head">
+            <div>
+                <h3 class="erp-report-section-title">{{ configuracion_power_bi.titulo_panel|default:"Panel BI externo" }}</h3>
+                <p class="erp-report-section-copy">
+                    {% if configuracion_power_bi.descripcion_panel %}
+                        {{ configuracion_power_bi.descripcion_panel }}
+                    {% else %}
+                        Si mas adelante quieres mostrar un dashboard externo, aqui puedes incrustarlo sin afectar el BI interno del ERP.
+                    {% endif %}
+                </p>
+            </div>
+            {% if puede_configurar_power_bi %}
+            <a class="erp-btn-secondary" href="{% url 'configuracion_power_bi_reportes' empresa.slug %}">Administrar panel BI</a>
+            {% endif %}
+        </div>
+        {% if configuracion_power_bi.activo and configuracion_power_bi.mostrar_en_reportes and configuracion_power_bi.url_embed %}
+        <div class="erp-bi-frame-wrap">
+            <iframe
+                class="erp-bi-frame"
+                src="{{ configuracion_power_bi.url_embed }}"
+                title="{{ configuracion_power_bi.titulo_panel|default:'Dashboard BI' }}"
+                loading="lazy"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen
+                style="height:{{ configuracion_power_bi.alto_iframe }}px;"
+            ></iframe>
+        </div>
+        {% else %}
+        <div class="erp-bi-empty">
+            El dashboard BI todavia no esta configurado para esta empresa.
+            {% if puede_configurar_power_bi %}
+            Puedes activarlo desde <strong>Configurar BI</strong> y pegar aqui la URL embed de Power BI.
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="erp-card erp-report-filter-card">
+        <div class="erp-report-filter-head">
+            <div>
+                <h3 class="erp-report-section-title">Filtros del reporte</h3>
+                <p>La exportacion a Excel toma exactamente estos filtros. Si no filtras nada, exporta toda la cartera.</p>
+            </div>
+            <div class="erp-report-filter-actions">
+                <a class="erp-btn-secondary" href="/{{ empresa.slug }}/dashboard/facturacion/reportes/">Limpiar vista</a>
+                <a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/reportes/excel/?{{ request.GET.urlencode }}">Exportar Excel</a>
+            </div>
+        </div>
+        <form method="GET" class="erp-report-filter-grid">
+            <div class="erp-filter-field">
+                <label>Cliente</label>
+                <select name="cliente">
+                    <option value="">Todos los clientes</option>
+                    {% for c in clientes %}
+                    <option value="{{ c.id }}" {% if request.GET.cliente == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="erp-filter-field">
+                <label>Estado de pago</label>
+                <select name="estado_pago">
+                    <option value="">Todos</option>
+                    <option value="pendiente" {% if request.GET.estado_pago == "pendiente" %}selected{% endif %}>Pendiente</option>
+                    <option value="parcial" {% if request.GET.estado_pago == "parcial" %}selected{% endif %}>Parcial</option>
+                    <option value="pagado" {% if request.GET.estado_pago == "pagado" %}selected{% endif %}>Pagado</option>
+                </select>
+            </div>
+            <div class="erp-filter-field">
+                <label>Fecha desde</label>
+                <input type="date" name="fecha_desde" value="{{ request.GET.fecha_desde }}">
+            </div>
+            <div class="erp-filter-field">
+                <label>Fecha hasta</label>
+                <input type="date" name="fecha_hasta" value="{{ request.GET.fecha_hasta }}">
+            </div>
+            <div class="erp-filter-field">
+                <label>Impuesto</label>
+                <select name="impuesto">
+                    <option value="">Todos</option>
+                    <option value="15" {% if request.GET.impuesto == "15" %}selected{% endif %}>ISV 15%</option>
+                    <option value="18" {% if request.GET.impuesto == "18" %}selected{% endif %}>ISV 18%</option>
+                    <option value="0" {% if request.GET.impuesto == "0" %}selected{% endif %}>Exento</option>
+                </select>
+            </div>
+            <div class="erp-report-filter-actions" style="grid-column:1 / -1;">
+                <button type="submit" class="erp-btn">Aplicar filtros</button>
+                <a href="/{{ empresa.slug }}/dashboard/facturacion/reportes/" class="erp-btn-secondary">Restablecer</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="erp-report-blocks">
+        <section class="erp-card erp-report-cluster">
+            <div>
+                <h3 class="erp-report-section-title">Composicion fiscal</h3>
+                <p class="erp-report-section-copy">Distribucion de la base imponible y del impuesto generado por los documentos filtrados.</p>
+            </div>
+            <div class="erp-report-cluster-grid">
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Base 15%</div>
+                    <div class="value">L. {{ total_base_15|floatformat:2|intcomma }}</div>
+                    <div class="note">Base gravada al 15% dentro del periodo visible.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">ISV 15%</div>
+                    <div class="value">L. {{ total_isv_15|floatformat:2|intcomma }}</div>
+                    <div class="note">Impuesto generado por las lineas al 15%.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Base 18%</div>
+                    <div class="value">L. {{ total_base_18|floatformat:2|intcomma }}</div>
+                    <div class="note">Base gravada al 18% en la seleccion actual.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">ISV 18%</div>
+                    <div class="value">L. {{ total_isv_18|floatformat:2|intcomma }}</div>
+                    <div class="note">Impuesto asociado a ventas gravadas al 18%.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Exento</div>
+                    <div class="value">L. {{ total_exento|floatformat:2|intcomma }}</div>
+                    <div class="note">Documentos o lineas sin carga fiscal.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Exonerado</div>
+                    <div class="value">L. {{ total_exonerado|floatformat:2|intcomma }}</div>
+                    <div class="note">Ventas con soporte exonerado visible en el filtro.</div>
+                </article>
+            </div>
+        </section>
+
+        <section class="erp-card erp-report-cluster">
+            <div>
+                <h3 class="erp-report-section-title">Lectura comercial</h3>
+                <p class="erp-report-section-copy">Indicadores rapidos de cobro, descuento y conversion del documento ya filtrado.</p>
+            </div>
+            <div class="erp-report-cluster-grid compact">
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Total documentos</div>
+                    <div class="value">{{ facturas|length }}</div>
+                    <div class="note">Cantidad de facturas que cumplen con la vista actual.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Descuento total</div>
+                    <div class="value">L. {{ total_descuento|floatformat:2|intcomma }}</div>
+                    <div class="note">Descuento consolidado de todas las lineas filtradas.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Saldo pendiente</div>
+                    <div class="value">L. {{ total_saldo|floatformat:2|intcomma }}</div>
+                    <div class="note">Monto aun pendiente de cobro al cierre de esta consulta.</div>
+                </article>
+                <article class="erp-report-card">
+                    <div class="erp-kpi-label">Facturado neto</div>
+                    <div class="value">L. {{ totales.total|default:0|floatformat:2|intcomma }}</div>
+                    <div class="note">Total final emitido por los documentos visibles.</div>
+                </article>
+            </div>
+        </section>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-report-table-head">
+            <div>
+                <h3 class="erp-report-section-title">Detalle documental</h3>
+                <p>Consulta documento por documento con su composicion fiscal, saldo y estado de cobro.</p>
+            </div>
+            <div class="erp-inline-actions">
+                <span class="erp-report-summary-chip">Base imponible: L. {{ totales.subtotal|default:0|floatformat:2|intcomma }}</span>
+                <span class="erp-report-summary-chip">Impuesto: L. {{ totales.impuesto|default:0|floatformat:2|intcomma }}</span>
+            </div>
+        </div>
+        <div class="erp-table-wrap erp-report-table-wrap">
+            <table class="erp-table erp-report-table">
+                <thead>
+                    <tr>
+                        <th>Cliente / Documento</th>
+                        <th>Fecha</th>
+                        <th>Vencimiento</th>
+                        <th>Fiscal 15%</th>
+                        <th>Fiscal 18%</th>
+                        <th>Exento / Exonerado</th>
+                        <th>Descuento</th>
+                        <th>Total</th>
+                        <th>Saldo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for f in facturas %}
+                {% with r=f.resumen_fiscal %}
+                    <tr>
+                        <td>
+                            <div class="erp-report-doc">
+                                <strong>{{ f.cliente.nombre }}</strong>
+                                <small>{{ f.numero_factura|default:"Sin numero" }}</small>
+                            </div>
+                        </td>
+                        <td>{{ f.fecha_emision|date:"d/m/Y" }}</td>
+                        <td>{{ f.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</td>
+                        <td>
+                            <div class="erp-report-fiscal-stack">
+                                <strong>L. {{ r.base_15|floatformat:2|intcomma }}</strong>
+                                <span>ISV: L. {{ r.isv_15|floatformat:2|intcomma }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-report-fiscal-stack">
+                                <strong>L. {{ r.base_18|floatformat:2|intcomma }}</strong>
+                                <span>ISV: L. {{ r.isv_18|floatformat:2|intcomma }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-report-fiscal-stack">
+                                <strong>L. {{ r.base_exento|floatformat:2|intcomma }}</strong>
+                                <span>Exonerado: L. {{ r.base_exonerado|floatformat:2|intcomma }}</span>
+                            </div>
+                        </td>
+                        <td class="amount"><span class="erp-money">L. {{ f.lineas.all|sum_descuento|floatformat:2|intcomma }}</span></td>
+                        <td class="erp-report-total">
+                            <strong>L. {{ f.total|floatformat:2|intcomma }}</strong>
+                            <small>Total emitido</small>
+                        </td>
+                        <td class="erp-report-total">
+                            <strong>L. {{ f.saldo_pendiente|floatformat:2|intcomma }}</strong>
+                            <small>Saldo actual</small>
+                        </td>
+                        <td>
+                            {% if f.estado_pago == "pagado" %}
+                            <span class="erp-badge success">Pagado</span>
+                            {% elif f.estado_pago == "parcial" %}
+                            <span class="erp-badge warning">Parcial</span>
+                            {% else %}
+                            <span class="erp-badge danger">Pendiente</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endwith %}
+                {% empty %}
+                    <tr><td colspan="10" class="erp-empty">Sin resultados para los filtros seleccionados.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}

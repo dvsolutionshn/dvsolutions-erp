@@ -1,0 +1,66 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Arma perfiles funcionales como cajero, facturador, inventario o gerente comercial con permisos reales de backend.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_roles' %}" class="erp-action-link">Volver a Roles</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-form-shell">
+    {% csrf_token %}
+    <section class="erp-form-card">
+        <h3>Perfil del rol</h3>
+        <div class="erp-form-grid">
+            {% for field in form %}
+                {% if field.name == 'nombre' or field.name == 'codigo' or field.name == 'descripcion' or field.name == 'activo' %}
+                <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {{ field.errors }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="erp-form-card">
+        <h3>Accesos por area</h3>
+        <div class="erp-form-grid">
+            {% for field in form %}
+                {% if field.name != 'nombre' and field.name != 'codigo' and field.name != 'descripcion' and field.name != 'activo' and field.name != 'puede_crear_facturas' and field.name != 'puede_editar_facturas' and field.name != 'puede_anular_facturas' and field.name != 'puede_eliminar_borradores' and field.name != 'puede_registrar_pagos_clientes' and field.name != 'puede_crear_clientes' and field.name != 'puede_editar_clientes' and field.name != 'puede_crear_productos' and field.name != 'puede_editar_productos' and field.name != 'puede_crear_proveedores' and field.name != 'puede_editar_proveedores' and field.name != 'puede_ajustar_inventario' and field.name != 'puede_crear_compras' and field.name != 'puede_editar_compras' and field.name != 'puede_aplicar_compras' and field.name != 'puede_anular_compras' and field.name != 'puede_registrar_pagos_proveedores' and field.name != 'puede_crear_notas_credito' and field.name != 'puede_editar_notas_credito' and field.name != 'puede_anular_notas_credito' and field.name != 'puede_exportar_reportes' %}
+                <div class="erp-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {{ field.errors }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="erp-form-card">
+        <h3>Acciones especificas</h3>
+        <div class="erp-form-grid">
+            {% for field in form %}
+                {% if field.name == 'puede_crear_facturas' or field.name == 'puede_editar_facturas' or field.name == 'puede_anular_facturas' or field.name == 'puede_eliminar_borradores' or field.name == 'puede_registrar_pagos_clientes' or field.name == 'puede_crear_clientes' or field.name == 'puede_editar_clientes' or field.name == 'puede_crear_productos' or field.name == 'puede_editar_productos' or field.name == 'puede_crear_proveedores' or field.name == 'puede_editar_proveedores' or field.name == 'puede_ajustar_inventario' or field.name == 'puede_crear_compras' or field.name == 'puede_editar_compras' or field.name == 'puede_aplicar_compras' or field.name == 'puede_anular_compras' or field.name == 'puede_registrar_pagos_proveedores' or field.name == 'puede_crear_notas_credito' or field.name == 'puede_editar_notas_credito' or field.name == 'puede_anular_notas_credito' or field.name == 'puede_exportar_reportes' %}
+                <div class="erp-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {{ field.errors }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+    <div class="erp-form-actions">
+        <a href="{% url 'superadmin_roles' %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Guardar Rol</button>
+    </div>
+</form>
+{% endblock %}

@@ -60,36 +60,32 @@ td{
     vertical-align:top;
 }
 
-/* 🔥 columnas alineadas PERFECTO */
-th:nth-child(1), td:nth-child(1){ width:45%; }
-th:nth-child(2), td:nth-child(2){ width:10%; text-align:center; }
-th:nth-child(3), td:nth-child(3){ width:15%; text-align:right; }
+th:nth-child(1), td:nth-child(1){ width:38%; }
+th:nth-child(2), td:nth-child(2){ width:8%; text-align:center; }
+th:nth-child(3), td:nth-child(3){ width:12%; text-align:right; }
 th:nth-child(4), td:nth-child(4){ width:10%; text-align:right; }
-th:nth-child(5), td:nth-child(5){ width:10%; text-align:center; }
+th:nth-child(5), td:nth-child(5){ width:12%; text-align:right; }
 th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
+th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
 
-/* producto */
 .producto-nombre{
     font-weight:500;
 }
 
-/* comentario bonito */
 .comentario-linea{
     margin-top:5px;
     padding-left:10px;
     border-left:3px solid #e0e0e0;
-
     font-size:12px;
     color:#666;
     line-height:1.4;
-
     white-space:pre-wrap;
     word-wrap:break-word;
     overflow-wrap:break-word;
 }
 
 .totales{
-    width:450px;
+    width:500px;
     margin-left:auto;
 }
 
@@ -125,6 +121,37 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
 .btn:hover{
     background:#574fd6;
 }
+
+.btn-danger{
+    background:#dc3545;
+    border:none;
+    cursor:pointer;
+}
+
+.btn-danger:hover{
+    background:#bb2d3b;
+}
+
+.btn-secondary{
+    border:none;
+    cursor:pointer;
+}
+
+.actions-form{
+    display:inline;
+}
+
+.messages{
+    margin-bottom:20px;
+}
+
+.message{
+    padding:12px;
+    border-radius:8px;
+    margin-bottom:8px;
+    background:#e7f3ff;
+    color:#084298;
+}
 </style>
 </head>
 
@@ -132,15 +159,23 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
 
 <div class="topbar">
     <h2>Factura {{ factura.numero_factura }}</h2>
-    <a href="/{{ empresa.slug }}/dashboard/facturacion/">← Volver</a>
+    <a href="{% url 'facturas_dashboard' empresa.slug %}">Volver</a>
 </div>
 
 <div class="container">
 
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+        <div class="message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <div class="card">
     <div class="section-title">Información General</div>
     <p><strong>Empresa:</strong> {{ empresa.nombre }}</p>
-    <p><strong>CAI:</strong> {{ factura.cai.numero_cai }}</p>
+    <p><strong>CAI:</strong> {% if factura.cai_numero_historico %}{{ factura.cai_numero_historico }}{% else %}Sin CAI asignado{% endif %}</p>
     <p><strong>Fecha:</strong> {{ factura.fecha_emision }}</p>
     <p><strong>Fecha de vencimiento:</strong> {{ factura.fecha_vencimiento|default:"-" }}</p>
     <p><strong>Vendedor:</strong> {{ factura.vendedor.username|default:"-" }}</p>
@@ -165,6 +200,27 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
 </div>
 
 <div class="card">
+    <div class="section-title">Datos fiscales adicionales</div>
+
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:15px;">
+        <div style="background:#f8fafc;padding:12px;border-radius:10px;">
+            <strong>Orden compra exenta</strong><br>
+            {{ factura.orden_compra_exenta|default:"-" }}
+        </div>
+
+        <div style="background:#f8fafc;padding:12px;border-radius:10px;">
+            <strong>Registro exonerado</strong><br>
+            {{ factura.registro_exonerado|default:"-" }}
+        </div>
+
+        <div style="background:#f8fafc;padding:12px;border-radius:10px;">
+            <strong>Registro SAG</strong><br>
+            {{ factura.registro_sag|default:"-" }}
+        </div>
+    </div>
+</div>
+
+<div class="card">
     <div class="section-title">Detalle de Productos</div>
 
     <table>
@@ -173,8 +229,9 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
                 <th>Descripción</th>
                 <th>Cant.</th>
                 <th>Precio</th>
+                <th>Desc. %</th>
+                <th>Desc. L.</th>
                 <th>Impuesto</th>
-                <th>%</th>
                 <th>Total</th>
             </tr>
         </thead>
@@ -183,7 +240,7 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
             <tr>
                 <td>
                     <div class="producto-nombre">
-                        {{ linea.producto.nombre }}
+                        {{ linea.descripcion_visual }}
                     </div>
 
                     {% if linea.comentario %}
@@ -200,12 +257,17 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
                     {{ linea.precio_unitario|floatformat:2|intcomma }}
                 </td>
 
+                <td>{{ linea.descuento_porcentaje|floatformat:2 }}%</td>
+
+                <td>
+                    {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                    {{ linea.descuento_monto|floatformat:2|intcomma }}
+                </td>
+
                 <td>
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
                     {{ linea.impuesto_monto|floatformat:2|intcomma }}
                 </td>
-
-                <td>{{ linea.impuesto.porcentaje }}%</td>
 
                 <td>
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
@@ -221,12 +283,13 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
     <div class="section-title">Resumen Fiscal</div>
 
     <table class="totales">
-        <tr><td>Gravado 15%</td><td align="right">L. {{ resumen.base_15|floatformat:2|intcomma }}</td></tr>
-        <tr><td>Gravado 18%</td><td align="right">L. {{ resumen.base_18|floatformat:2|intcomma }}</td></tr>
+        <tr><td>Descuento Total</td><td align="right">L. {{ resumen.descuento_total|floatformat:2|intcomma }}</td></tr>
+        <tr><td>Base 15%</td><td align="right">L. {{ resumen.base_15|floatformat:2|intcomma }}</td></tr>
+        <tr><td>Base 18%</td><td align="right">L. {{ resumen.base_18|floatformat:2|intcomma }}</td></tr>
         <tr><td>Exento</td><td align="right">L. {{ resumen.base_exento|floatformat:2|intcomma }}</td></tr>
         <tr><td>Exonerado</td><td align="right">L. {{ resumen.base_exonerado|floatformat:2|intcomma }}</td></tr>
-        <tr><td>I.S.V. 15%</td><td align="right">L. {{ resumen.isv_15|floatformat:2|intcomma }}</td></tr>
-        <tr><td>I.S.V. 18%</td><td align="right">L. {{ resumen.isv_18|floatformat:2|intcomma }}</td></tr>
+        <tr><td>ISV 15%</td><td align="right">L. {{ resumen.isv_15|floatformat:2|intcomma }}</td></tr>
+        <tr><td>ISV 18%</td><td align="right">L. {{ resumen.isv_18|floatformat:2|intcomma }}</td></tr>
 
         <tr class="total-final">
             <td><strong>TOTAL A PAGAR</strong></td>
@@ -244,9 +307,107 @@ th:nth-child(6), td:nth-child(6){ width:10%; text-align:right; }
 </div>
 
 <div class="card">
+    <div class="section-title">Estado de Pago</div>
+
+    <p><strong>Total Pagado:</strong>
+        {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+        {{ factura.total_pagado|floatformat:2|intcomma }}
+    </p>
+
+    <p><strong>Saldo Pendiente:</strong>
+        {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+        {{ factura.saldo_pendiente|floatformat:2|intcomma }}
+    </p>
+
+    {% if factura.total > 0 and factura.saldo_pendiente > 0 %}
+        <span class="badge pendiente">FACTURA PENDIENTE</span>
+    {% else %}
+        <span class="badge pagada">FACTURA PAGADA</span>
+    {% endif %}
+
+    <br><br>
+
+    {% if factura.total > 0 and factura.estado != "anulada" %}
+    <a class="btn" href="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/">
+        Registrar Pago
+    </a>
+    {% endif %}
+</div>
+
+{% if factura.pagos_facturacion.all %}
+<div class="card">
+    <div class="section-title">Historial de Pagos</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Método</th>
+                <th>Monto</th>
+                <th>Referencia</th>
+                <th>Recibo</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for pago in factura.pagos_facturacion.all %}
+            <tr>
+                <td>{{ pago.fecha }}</td>
+                <td>{{ pago.get_metodo_display }}</td>
+                <td>
+                    {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                    {{ pago.monto|floatformat:2|intcomma }}
+                </td>
+                <td>{{ pago.referencia }}</td>
+                <td>
+                    {% if pago.recibo %}
+                    <a href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver Recibo</a>
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="card">
     <a class="btn" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}">
         Descargar PDF Profesional
     </a>
+
+    <form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}" class="actions-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary">
+            Duplicar Factura
+        </button>
+    </form>
+
+    <form method="post" action="{% url 'generar_nota_credito_desde_factura' empresa.slug factura.id %}" class="actions-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary">
+            Generar Nota de Crédito
+        </button>
+    </form>
+
+    {% if factura.estado == "borrador" and not factura.numero_factura %}
+    <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" class="actions-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" onclick="return confirm('¿Seguro que desea eliminar este borrador?');">
+            Eliminar Borrador
+        </button>
+    </form>
+    {% endif %}
+
+    {% if factura.estado != "anulada" %}
+    <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}" class="actions-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" onclick="return confirm('¿Seguro que desea anular esta factura?');">
+            Anular Factura
+        </button>
+    </form>
+    {% endif %}
 </div>
 
 </div>

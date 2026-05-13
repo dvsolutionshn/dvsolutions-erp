@@ -1,0 +1,158 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Recibos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Cobranza{% endblock %}
+{% block header_title %}Recibos{% endblock %}
+{% block header_description %}Comprobantes formales de pago con trazabilidad documental directa y lectura clara para cobranza.{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-receipt-kpis{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+.erp-receipt-table{
+    min-width:1080px;
+}
+.erp-receipt-number{
+    font-weight:700;
+    color:#102338;
+}
+.erp-receipt-meta{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+}
+.erp-chip-link{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--primary);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.02em;
+    box-shadow:var(--shadow-soft);
+    margin-right:8px;
+}
+.erp-autocomplete{position:relative;}
+.erp-suggestion-list{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:20;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-soft);padding:8px;display:none;max-height:240px;overflow:auto;}
+.erp-suggestion-item{width:100%;border:none;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;cursor:pointer;color:var(--primary);}
+.erp-suggestion-item:hover{background:#f4f8fc;}
+.erp-search-toolbar{margin:18px 0 20px;display:flex;gap:12px;align-items:end;flex-wrap:wrap;}
+.erp-search-toolbar .erp-field{min-width:320px;flex:1 1 320px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-receipt-kpis">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Recibos</div>
+        <div class="erp-stat-value">{{ resumen.total }}</div>
+        <p class="erp-card-muted">Comprobantes generados por pagos registrados.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Monto total</div>
+        <div class="erp-stat-value erp-money">L. {{ resumen.monto_total|floatformat:2|intcomma }}</div>
+        <p class="erp-card-muted">Valor consolidado de cobranza documentada.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Efectivo</div>
+        <div class="erp-stat-value">{{ resumen.efectivo }}</div>
+        <p class="erp-card-muted">Recibos con método efectivo.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Transferencia</div>
+        <div class="erp-stat-value">{{ resumen.transferencia }}</div>
+        <p class="erp-card-muted">Recibos emitidos por transferencia.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Relación de recibos</h3>
+            <div class="erp-card-muted">Consulta el soporte documental de cada abono con acceso rápido al recibo y su PDF.</div>
+        </div>
+    </div>
+    <form method="get" class="erp-search-toolbar">
+        <div class="erp-field">
+            <label for="q">Buscar recibo</label>
+            <div class="erp-autocomplete">
+                <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Numero, cliente, factura o referencia" autocomplete="off">
+                <div id="recibos-sugerencias" class="erp-suggestion-list"></div>
+            </div>
+        </div>
+        <div class="erp-actions-right">
+            <button class="erp-btn" type="submit">Buscar</button>
+            <a class="erp-btn-secondary" href="{% url 'recibos_dashboard' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+    <div class="erp-table-wrap">
+        <table class="erp-table erp-receipt-table">
+            <thead><tr><th>Numero</th><th>Fecha</th><th>Cliente</th><th>Factura</th><th>Metodo</th><th>Monto</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for recibo in recibos %}
+                <tr>
+                    <td>
+                        <div class="erp-receipt-number">{{ recibo.numero_recibo }}</div>
+                        <div class="erp-receipt-meta">Referencia: {{ recibo.referencia|default:"Sin referencia" }}</div>
+                    </td>
+                    <td>{{ recibo.fecha }}</td>
+                    <td>
+                        <div class="erp-receipt-number">{{ recibo.cliente.nombre }}</div>
+                        <div class="erp-receipt-meta">Empresa: {{ empresa.nombre }}</div>
+                    </td>
+                    <td>
+                        <div class="erp-receipt-number">{{ recibo.factura.numero_factura|default:recibo.factura.id }}</div>
+                        <div class="erp-receipt-meta">{{ recibo.factura.get_estado_display }}</div>
+                    </td>
+                    <td><span class="erp-badge info">{{ recibo.get_metodo_display }}</span></td>
+                    <td class="amount"><span class="erp-money">{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</span></td>
+                    <td class="actions"><a class="erp-chip-link" href="{% url 'ver_recibo' empresa.slug recibo.id %}">Ver</a><a class="erp-chip-link" href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">PDF</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="erp-empty">No hay recibos registrados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("recibos-sugerencias");
+    const sugerencias = [{% for recibo in recibos %}"{{ recibo.numero_recibo|escapejs }}","{{ recibo.cliente.nombre|escapejs }}","{{ recibo.factura.numero_factura|default:recibo.factura.id|escapejs }}"{% if recibo.referencia %},"{{ recibo.referencia|escapejs }}"{% endif %},{% endfor %}];
+    if(!input || !panel){ return; }
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const uniques = [...new Set(sugerencias.filter(Boolean))];
+        const matches = (term ? uniques.filter(item => item.toLowerCase().includes(term)) : uniques).slice(0, 8);
+        panel.innerHTML = "";
+        if(!matches.length){ panel.style.display = "none"; return; }
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){ input.value = item; panel.style.display = "none"; });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", () => window.setTimeout(() => panel.style.display = "none", 120));
+});
+</script>
+{% endblock %}

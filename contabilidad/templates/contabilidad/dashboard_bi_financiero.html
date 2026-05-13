@@ -1,0 +1,274 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Dashboard BI Financiero - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Business Intelligence{% endblock %}
+{% block header_title %}Dashboard BI Financiero{% endblock %}
+{% block header_description %}Panel gerencial construido desde compras, pagos y bancos para entender egresos, cartera por pagar y movimiento financiero sin salir del ERP.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'reportes_contables' empresa.slug %}">Volver a reportes</a>
+<a class="erp-action-link" href="{% url 'bancos_dashboard' empresa.slug %}">Bancos</a>
+<a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-bi-shell{display:flex;flex-direction:column;gap:20px;}
+.erp-bi-header{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(340px,.9fr);gap:18px;}
+.erp-bi-header-copy h3{margin:10px 0 8px;font-size:36px;line-height:1.08;color:#102338;}
+.erp-bi-header-copy p{margin:0;color:var(--muted);line-height:1.75;max-width:760px;}
+.erp-bi-filter-strip{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;}
+.erp-bi-chip{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:#173a66;font-size:12px;font-weight:700;}
+.erp-bi-kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.erp-bi-kpi{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,#ffffff,#f9fbff);padding:18px;}
+.erp-bi-kpi::before{content:"";position:absolute;left:18px;top:0;width:120px;height:5px;border-radius:999px;background:var(--accent,#2968f2);}
+.erp-bi-kpi-label{display:block;text-transform:uppercase;letter-spacing:.14em;font-size:11px;color:#64748b;margin-bottom:12px;}
+.erp-bi-kpi-value{font-size:38px;line-height:1;font-weight:800;color:#102338;}
+.erp-bi-kpi-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;padding-top:18px;border-top:1px solid var(--line);}
+.erp-bi-kpi-meta strong{display:block;color:#102338;font-size:22px;}
+.erp-bi-kpi-meta span{color:var(--muted);font-size:13px;}
+.erp-bi-trend{display:inline-flex;align-items:center;gap:8px;margin-top:12px;font-weight:700;}
+.erp-bi-trend.up{color:#16a34a;}
+.erp-bi-trend.down{color:#dc2626;}
+.erp-bi-main-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;}
+.erp-bi-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:18px;box-shadow:var(--shadow-soft);}
+.erp-bi-card h4{margin:0;font-size:18px;color:#102338;}
+.erp-bi-card p{margin:6px 0 0;color:var(--muted);line-height:1.6;font-size:13px;}
+.erp-bi-bars{display:flex;align-items:flex-end;gap:14px;min-height:280px;padding-top:18px;}
+.erp-bi-bar-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.erp-bi-bar-top{font-size:11px;color:#102338;font-weight:700;text-align:center;}
+.erp-bi-bar-stack{width:100%;max-width:84px;min-height:24px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;}
+.erp-bi-bar-main,.erp-bi-bar-secondary{width:100%;border-radius:14px 14px 8px 8px;}
+.erp-bi-bar-main{background:linear-gradient(180deg,#2968f2,#8bb5ff);min-height:18px;}
+.erp-bi-bar-secondary{background:linear-gradient(180deg,#0f766e,#99f6e4);min-height:8px;}
+.erp-bi-bar-label{text-align:center;font-size:11px;color:var(--muted);line-height:1.4;}
+.erp-bi-ranking{display:flex;flex-direction:column;gap:12px;margin-top:14px;}
+.erp-bi-ranking-row{display:grid;grid-template-columns:minmax(150px,190px) minmax(0,1fr) auto;gap:12px;align-items:center;}
+.erp-bi-ranking-meta{display:flex;flex-direction:column;gap:4px;}
+.erp-bi-ranking-meta strong{color:#102338;font-size:13px;}
+.erp-bi-ranking-meta small{color:var(--muted);line-height:1.4;}
+.erp-bi-track{height:10px;border-radius:999px;background:#edf3fb;overflow:hidden;}
+.erp-bi-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#2968f2,#4a8cf8);}
+.erp-bi-ranking-value{text-align:right;min-width:120px;font-weight:800;color:#102338;}
+.erp-bi-compact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;}
+.erp-bi-compare{display:flex;flex-direction:column;gap:12px;margin-top:14px;}
+.erp-bi-compare-row{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:12px;align-items:center;}
+.erp-bi-compare-label{color:#102338;font-weight:700;font-size:12px;}
+.erp-bi-compare-bars{display:flex;flex-direction:column;gap:8px;}
+.erp-bi-compare-track{height:10px;border-radius:999px;background:#edf3fb;overflow:hidden;position:relative;}
+.erp-bi-compare-track div{height:100%;border-radius:999px;}
+.erp-bi-compare-track .facturado{background:linear-gradient(90deg,#2968f2,#9ec5ff);}
+.erp-bi-compare-track .pagado{background:linear-gradient(90deg,#14b8a6,#99f6e4);}
+.erp-bi-compare-value{text-align:right;min-width:130px;font-weight:800;color:#102338;}
+.erp-bi-donut-wrap{display:grid;grid-template-columns:180px minmax(0,1fr);gap:18px;align-items:center;margin-top:12px;}
+.erp-bi-donut{width:180px;height:180px;border-radius:999px;position:relative;margin:auto;}
+.erp-bi-donut::after{content:"";position:absolute;inset:34px;border-radius:999px;background:#fff;box-shadow:inset 0 0 0 1px #eef3fa;}
+.erp-bi-donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:1;}
+.erp-bi-donut-center strong{font-size:28px;color:#102338;}
+.erp-bi-donut-center span{font-size:12px;color:var(--muted);}
+.erp-bi-legend{display:flex;flex-direction:column;gap:12px;}
+.erp-bi-legend-item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;}
+.erp-bi-legend-dot{width:12px;height:12px;border-radius:999px;}
+.erp-bi-legend-label{color:#102338;font-weight:700;}
+.erp-bi-legend-value{color:#102338;font-weight:800;}
+.erp-bi-highlight{border:1px solid var(--line);border-radius:16px;background:#fbfdff;padding:16px;margin-top:14px;}
+.erp-bi-highlight strong{display:block;font-size:24px;color:#102338;}
+.erp-bi-highlight span{display:block;margin-top:6px;color:var(--muted);font-size:13px;}
+.erp-bi-empty{padding:18px;border:1px dashed var(--line);border-radius:16px;background:#fbfdff;color:var(--muted);margin-top:14px;}
+@media (max-width:1180px){.erp-bi-header,.erp-bi-main-grid{grid-template-columns:1fr;}}
+@media (max-width:760px){
+  .erp-bi-kpi-grid,.erp-bi-compact-grid,.erp-bi-donut-wrap{grid-template-columns:1fr;}
+  .erp-bi-ranking-row,.erp-bi-compare-row{grid-template-columns:1fr;}
+  .erp-bi-ranking-value,.erp-bi-compare-value{text-align:left;min-width:0;}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-bi-shell">
+    <section class="erp-card erp-bi-header">
+        <div class="erp-bi-header-copy">
+            <div class="erp-kpi-label">Panel ejecutivo</div>
+            <h3>Lectura financiera y bancaria en una sola vista.</h3>
+            <p>Monitorea compras, egresos, pagos a proveedores, cartera por pagar y movimiento bancario desde un tablero construido directamente sobre la operacion financiera del ERP.</p>
+            <div class="erp-bi-filter-strip">
+                <span class="erp-bi-chip">Empresa: {{ empresa.nombre }}</span>
+                <span class="erp-bi-chip">Mes actual: {{ inicio_mes_actual|date:"M Y" }}</span>
+                <span class="erp-bi-chip">Compras visibles: {{ compras|length }}</span>
+                <span class="erp-bi-chip">Tasa de pago: {{ kpis_bi.tasa_pago_actual|floatformat:1 }}%</span>
+            </div>
+        </div>
+        <div class="erp-bi-kpi-grid">
+            <article class="erp-bi-kpi" style="--accent:#2968f2;">
+                <span class="erp-bi-kpi-label">Compras del mes</span>
+                <div class="erp-bi-kpi-value">L. {{ kpis_bi.total_compras_actual|floatformat:0|intcomma }}</div>
+                <div class="erp-bi-trend {% if kpis_bi.variacion_compras >= 0 %}up{% else %}down{% endif %}">
+                    <span>{% if kpis_bi.variacion_compras >= 0 %}&#9650;{% else %}&#9660;{% endif %}</span>
+                    <span>{{ kpis_bi.variacion_compras|floatformat:2 }}%</span>
+                </div>
+                <div class="erp-bi-kpi-meta">
+                    <div><strong>{{ kpis_bi.documentos_actual }}</strong><span>documentos emitidos este mes</span></div>
+                    <div><strong>L. {{ kpis_bi.ticket_promedio|floatformat:0|intcomma }}</strong><span>ticket promedio</span></div>
+                </div>
+            </article>
+            <article class="erp-bi-kpi" style="--accent:#14b8a6;">
+                <span class="erp-bi-kpi-label">Pagado a proveedores</span>
+                <div class="erp-bi-kpi-value">L. {{ kpis_bi.pagos_actual|floatformat:0|intcomma }}</div>
+                <div class="erp-bi-trend {% if kpis_bi.variacion_pagos >= 0 %}up{% else %}down{% endif %}">
+                    <span>{% if kpis_bi.variacion_pagos >= 0 %}&#9650;{% else %}&#9660;{% endif %}</span>
+                    <span>{{ kpis_bi.variacion_pagos|floatformat:2 }}%</span>
+                </div>
+                <div class="erp-bi-kpi-meta">
+                    <div><strong>{{ kpis_bi.tasa_pago_actual|floatformat:1 }}%</strong><span>cobertura del mes</span></div>
+                    <div><strong>{{ kpis_bi.movimientos_mes }}</strong><span>movimientos bancarios del mes</span></div>
+                </div>
+            </article>
+            <article class="erp-bi-kpi" style="--accent:#f59e0b;">
+                <span class="erp-bi-kpi-label">Saldo por pagar total</span>
+                <div class="erp-bi-kpi-value">L. {{ kpis_bi.saldo_total|floatformat:0|intcomma }}</div>
+                <div class="erp-bi-kpi-meta">
+                    <div><strong>{{ kpis_bi.pendientes_conciliar }}</strong><span>movimientos sin conciliar</span></div>
+                    <div><strong>{{ kpis_bi.conciliados }}</strong><span>movimientos conciliados</span></div>
+                </div>
+            </article>
+            <article class="erp-bi-kpi" style="--accent:#8b5cf6;">
+                <span class="erp-bi-kpi-label">Volumen bancario del mes</span>
+                <div class="erp-bi-kpi-value">L. {{ kpis_bi.total_volumen_bancario|floatformat:0|intcomma }}</div>
+                <div class="erp-bi-kpi-meta">
+                    <div><strong>{{ resumen_movimientos|length }}</strong><span>estados operativos visibles</span></div>
+                    <div><strong>{{ compras_por_mes|length }}</strong><span>meses en comparativo</span></div>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section class="erp-bi-main-grid">
+        <article class="erp-bi-card">
+            <h4>Compras y pagos por mes</h4>
+            <p>Lectura consolidada para ver cuanto se compromete en compras y cuanto se paga realmente a proveedores cada mes.</p>
+            <div class="erp-bi-bars">
+                {% for item in compras_por_mes %}
+                <div class="erp-bi-bar-col">
+                    <div class="erp-bi-bar-top">{{ item.documentos }} docs</div>
+                    <div class="erp-bi-bar-stack">
+                        <div class="erp-bi-bar-main" style="height:{{ item.alto_comprado|floatformat:0 }}%;"></div>
+                        <div class="erp-bi-bar-secondary" style="height:{{ item.alto_pagado|floatformat:0 }}%;"></div>
+                    </div>
+                    <div class="erp-bi-bar-label">{{ item.etiqueta }}<br>Comp: L. {{ item.comprado|floatformat:0|intcomma }}<br>Pago: L. {{ item.pagado|floatformat:0|intcomma }}</div>
+                </div>
+                {% empty %}
+                <div class="erp-bi-empty">Todavia no hay suficientes compras para construir la serie mensual.</div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="erp-bi-card">
+            <h4>Estado bancario visible</h4>
+            <p>Distribucion operativa del movimiento bancario segun su avance contable y de conciliacion.</p>
+            <div class="erp-bi-highlight">
+                <strong>{{ kpis_bi.movimientos_mes }}</strong>
+                <span>movimientos del mes analizados dentro del tablero financiero.</span>
+            </div>
+            <div class="erp-bi-legend" style="margin-top:14px;">
+                {% for item in resumen_movimientos %}
+                <div class="erp-bi-legend-item">
+                    <span class="erp-bi-legend-dot" style="background:{{ item.color }};"></span>
+                    <div>
+                        <div class="erp-bi-legend-label">{{ item.etiqueta }}</div>
+                        <small>{{ item.cantidad }} movimiento{{ item.cantidad|pluralize }} · {{ item.porcentaje|floatformat:1 }}%</small>
+                    </div>
+                    <div class="erp-bi-legend-value">L. {{ item.monto|floatformat:2|intcomma }}</div>
+                </div>
+                {% empty %}
+                <div class="erp-bi-empty">Todavia no hay movimientos bancarios para construir la lectura operativa.</div>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+
+    <section class="erp-bi-compact-grid">
+        <article class="erp-bi-card">
+            <h4>Top proveedores por compra</h4>
+            <p>Detecta rapidamente quienes concentran el mayor volumen de abastecimiento del negocio.</p>
+            <div class="erp-bi-ranking">
+                {% for item in top_proveedores %}
+                <div class="erp-bi-ranking-row">
+                    <div class="erp-bi-ranking-meta">
+                        <strong>{{ item.nombre }}</strong>
+                        <small>{{ item.documentos }} documento{{ item.documentos|pluralize }}</small>
+                    </div>
+                    <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                    <div class="erp-bi-ranking-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                </div>
+                {% empty %}
+                <div class="erp-bi-empty">Sin proveedores suficientes para construir el ranking.</div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="erp-bi-card">
+            <h4>Pagado vs comprado</h4>
+            <p>Comparativo rapido del ultimo tramo visible para validar disciplina de pago frente al abastecimiento.</p>
+            <div class="erp-bi-compare">
+                {% for item in compras_por_mes %}
+                <div class="erp-bi-compare-row">
+                    <div class="erp-bi-compare-label">{{ item.etiqueta }}</div>
+                    <div class="erp-bi-compare-bars">
+                        <div class="erp-bi-compare-track"><div class="facturado" style="width:{{ item.alto_comprado|floatformat:0 }}%;"></div></div>
+                        <div class="erp-bi-compare-track"><div class="pagado" style="width:{{ item.alto_pagado|floatformat:0 }}%;"></div></div>
+                    </div>
+                    <div class="erp-bi-compare-value">L. {{ item.comprado|floatformat:0|intcomma }} / L. {{ item.pagado|floatformat:0|intcomma }}</div>
+                </div>
+                {% empty %}
+                <div class="erp-bi-empty">Todavia no hay suficiente movimiento mensual para comparar compras y pagos.</div>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+
+    <section class="erp-bi-compact-grid">
+        <article class="erp-bi-card">
+            <h4>Proveedores con saldo vencido</h4>
+            <p>Prioriza tesoreria viendo quienes tienen la deuda mas atrasada y cuantas compras siguen abiertas.</p>
+            <div class="erp-bi-ranking">
+                {% for item in proveedores_vencidos %}
+                <div class="erp-bi-ranking-row">
+                    <div class="erp-bi-ranking-meta">
+                        <strong>{{ item.nombre }}</strong>
+                        <small>{{ item.numero_compra }} · {{ item.dias_vencido }} dias vencido{{ item.dias_vencido|pluralize }}</small>
+                    </div>
+                    <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                    <div class="erp-bi-ranking-value">L. {{ item.saldo|floatformat:2|intcomma }}</div>
+                </div>
+                {% empty %}
+                <div class="erp-bi-empty">No hay cuentas por pagar vencidas en este momento.</div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="erp-bi-card">
+            <h4>Egresos por banco y caja</h4>
+            <p>Identifica desde que cuentas se esta cubriendo la operacion financiera del negocio.</p>
+            <div class="erp-bi-ranking">
+                {% for item in egresos_por_banco %}
+                <div class="erp-bi-ranking-row">
+                    <div class="erp-bi-ranking-meta">
+                        <strong>{{ item.nombre }}</strong>
+                        <small>{{ item.tipo }} · {{ item.operaciones }} operacion{{ item.operaciones|pluralize:"es" }}</small>
+                    </div>
+                    <div class="erp-bi-track"><div class="erp-bi-fill" style="width:{{ item.ancho|floatformat:0 }}%;"></div></div>
+                    <div class="erp-bi-ranking-value">L. {{ item.total|floatformat:2|intcomma }}</div>
+                </div>
+                {% empty %}
+                <div class="erp-bi-empty">Todavia no hay pagos asociados a bancos o caja visibles.</div>
+                {% endfor %}
+            </div>
+            <div class="erp-bi-highlight">
+                <strong>{{ kpis_bi.conciliados }}</strong>
+                <span>movimientos ya conciliados contra {{ kpis_bi.pendientes_conciliar }} que todavia necesitan revision final.</span>
+            </div>
+        </article>
+    </section>
+</section>
+{% endblock %}

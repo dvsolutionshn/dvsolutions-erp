@@ -1,0 +1,46 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Superadmin</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+</head>
+<body>
+    <div class="erp-main" style="max-width:620px;margin:0 auto;padding-top:72px;">
+        <div class="erp-form-card">
+            <div class="erp-topbar-kicker">Acceso Privado</div>
+            <h2 style="margin:0 0 12px;">Control Maestro del ERP</h2>
+            <p style="margin:0 0 22px;color:var(--muted);">Solo superusuarios autorizados pueden entrar aqui. Este panel no forma parte del portal del cliente.</p>
+            {% if messages %}
+            <div class="erp-message-stack" style="margin-bottom:18px;">
+                {% for message in messages %}
+                    <div class="erp-message">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <form method="post" class="erp-form-shell">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="erp-field-errors">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="erp-form-grid">
+                    <div class="erp-field">
+                        <label for="{{ form.username.id_for_label }}">Usuario</label>
+                        {{ form.username }}
+                    </div>
+                    <div class="erp-field">
+                        <label for="{{ form.password.id_for_label }}">Contrasena</label>
+                        {{ form.password }}
+                    </div>
+                </div>
+                <div class="erp-form-actions">
+                    <div class="erp-field-help">Usa tu cuenta maestra. Si un usuario no es superadmin, el sistema no lo dejara entrar.</div>
+                    <button type="submit" class="erp-btn">Entrar al Control</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,259 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Inventario - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Logistica{% endblock %}
+{% block header_title %}Inventario{% endblock %}
+{% block header_description %}Control inicial de existencias, movimientos y ajustes manuales conectado con facturación.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'entrada_inventario' empresa.slug %}">Nueva Entrada</a>
+<a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras</a>
+<a class="erp-action-link" href="{% url 'entradas_inventario_dashboard' empresa.slug %}">Entradas</a>
+<a class="erp-action-link" href="{% url 'ajustar_inventario' empresa.slug %}">Nuevo Ajuste</a>
+<a class="erp-action-link" href="{% url 'kardex_inventario' empresa.slug %}">Ver Kardex</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-inventory-kpis{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+.erp-inventory-table{
+    min-width:1180px;
+}
+.erp-stock-critical{
+    color:#b42318;
+    font-weight:700;
+}
+.erp-stock-ok{
+    color:#10633c;
+    font-weight:700;
+}
+.erp-inline-link{
+    color:var(--primary);
+    font-weight:700;
+}
+.erp-alert-banner{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:18px;
+    padding:20px 24px;
+    border:1px solid rgba(180,35,24,.16);
+    background:linear-gradient(135deg, rgba(180,35,24,.08), rgba(180,35,24,.03));
+}
+.erp-alert-banner strong{
+    display:block;
+    color:#7a271a;
+    font-size:1rem;
+    margin-bottom:6px;
+}
+.erp-alert-banner p{
+    margin:0;
+    color:#7a271a;
+}
+.erp-alert-metrics{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+}
+.erp-alert-pill{
+    min-width:150px;
+    padding:12px 16px;
+    border-radius:16px;
+    background:rgba(255,255,255,.72);
+    border:1px solid rgba(180,35,24,.14);
+}
+.erp-alert-pill-label{
+    display:block;
+    margin-bottom:4px;
+    font-size:.72rem;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    color:#8c2d1f;
+}
+.erp-alert-pill-value{
+    font-size:1.45rem;
+    font-weight:800;
+    color:#7a271a;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-inventory-kpis">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Productos Controlados</div>
+        <div class="erp-stat-value">{{ resumen.productos_controlados }}</div>
+        <p class="erp-card-muted">Items físicos con seguimiento de existencias.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Stock Total</div>
+        <div class="erp-stat-value">{{ resumen.stock_total|floatformat:2|intcomma }}</div>
+        <p class="erp-card-muted">Suma global de unidades disponibles.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Con Alerta</div>
+        <div class="erp-stat-value">{{ resumen.con_alerta }}</div>
+        <p class="erp-card-muted">Productos en o por debajo del mínimo esperado.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Agotados</div>
+        <div class="erp-stat-value">{{ resumen.agotados }}</div>
+        <p class="erp-card-muted">Productos sin existencias disponibles para salida.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Movimientos</div>
+        <div class="erp-stat-value">{{ resumen.movimientos }}</div>
+        <p class="erp-card-muted">Bitácora acumulada de entradas, salidas y ajustes.</p>
+    </article>
+</section>
+
+{% if productos_alerta %}
+<section class="erp-card erp-alert-banner">
+    <div>
+        <strong>Inventario requiere atencion inmediata</strong>
+        <p>Antes de emitir nuevas facturas, revisa las existencias en alerta o agotadas para evitar bloqueos por stock insuficiente.</p>
+    </div>
+    <div class="erp-alert-metrics">
+        <div class="erp-alert-pill">
+            <span class="erp-alert-pill-label">Con alerta</span>
+            <span class="erp-alert-pill-value">{{ resumen.con_alerta }}</span>
+        </div>
+        <div class="erp-alert-pill">
+            <span class="erp-alert-pill-label">Agotados</span>
+            <span class="erp-alert-pill-value">{{ resumen.agotados }}</span>
+        </div>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Alertas de stock minimo</h3>
+            <div class="erp-card-muted">Productos que requieren atencion inmediata por nivel bajo de existencias.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Stock Actual</th>
+                    <th>Stock Minimo</th>
+                    <th>Accion</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for producto in productos_alerta %}
+                <tr>
+                    <td>{{ producto.nombre }}</td>
+                    <td class="amount"><span class="erp-stock-critical">{{ producto.stock_actual|floatformat:2|intcomma }}</span></td>
+                    <td class="amount">{{ producto.inventario.stock_minimo|floatformat:2|intcomma }}</td>
+                    <td><a class="erp-inline-link" href="{% url 'entrada_inventario' empresa.slug %}">Registrar entrada</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Existencias por producto</h3>
+            <div class="erp-card-muted">Haz clic en un producto para ver su historial reciente de movimientos.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table erp-inventory-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Código</th>
+                    <th>Unidad</th>
+                    <th>Stock Actual</th>
+                    <th>Stock Mínimo</th>
+                    <th>Impuesto Base</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for producto in productos %}
+                <tr>
+                    <td>
+                        <a class="erp-inline-link" href="{% url 'inventario_facturacion' empresa.slug %}?producto={{ producto.id }}">{{ producto.nombre }}</a>
+                        <div class="erp-card-muted">{{ producto.descripcion|default:"Sin descripción"|truncatechars:70 }}</div>
+                    </td>
+                    <td>{{ producto.codigo|default:"-" }}</td>
+                    <td>{{ producto.get_unidad_medida_display }}</td>
+                    <td class="amount">
+                        {% if producto.stock_actual <= producto.inventario.stock_minimo %}
+                            <span class="erp-stock-critical">{{ producto.stock_actual|floatformat:2|intcomma }}</span>
+                        {% else %}
+                            <span class="erp-stock-ok">{{ producto.stock_actual|floatformat:2|intcomma }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="amount">{{ producto.inventario.stock_minimo|floatformat:2|intcomma }}</td>
+                    <td>{% if producto.impuesto_predeterminado %}{{ producto.impuesto_predeterminado.nombre }}{% else %}-{% endif %}</td>
+                    <td>
+                        {% if producto.stock_actual <= producto.inventario.stock_minimo %}
+                            <span class="erp-badge danger">Alerta</span>
+                        {% else %}
+                            <span class="erp-badge success">Normal</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="erp-empty">Aún no hay productos con control de inventario.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% if producto_seleccionado %}
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Movimientos de {{ producto_seleccionado.nombre }}</h3>
+            <div class="erp-card-muted">Trazabilidad reciente del producto seleccionado.</div>
+        </div>
+        <a class="erp-btn-secondary" href="{% url 'inventario_facturacion' empresa.slug %}">Limpiar selección</a>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                    <th>Antes</th>
+                    <th>Después</th>
+                    <th>Referencia</th>
+                    <th>Observación</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td>
+                    <td>{{ movimiento.get_tipo_display }}</td>
+                    <td class="amount">{{ movimiento.cantidad|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</td>
+                    <td>{{ movimiento.referencia|default:"-" }}</td>
+                    <td>{{ movimiento.observacion|default:"-"|truncatechars:70 }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="erp-empty">Este producto todavía no tiene movimientos registrados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

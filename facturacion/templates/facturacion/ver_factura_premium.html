@@ -1,0 +1,726 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Factura {{ factura.numero_factura|default:"Sin numero" }}{% endblock %}
+{% block header_kicker %}Vista Documento{% endblock %}
+{% block header_title %}Factura {{ factura.numero_factura|default:"Sin numero" }}{% endblock %}
+{% block header_description %}Vista simplificada del documento en un formato de lectura rapida, cercano a un pre-PDF y facil de validar antes de imprimir o compartir.{% endblock %}
+{% block topbar_actions %}
+{% if factura.estado == "borrador" %}
+<form method="post" action="{% url 'validar_factura' empresa.slug factura.id %}" class="erp-inline-form">
+    {% csrf_token %}
+    <button class="erp-btn" type="submit">Validar factura</button>
+</form>
+{% endif %}
+<button
+    class="erp-action-link erp-print-button"
+    type="button"
+    data-preview-title="Factura clasica"
+    data-preview-url="{% url 'vista_previa_factura_pdf' empresa.slug factura.id %}"
+    data-download-url="{% url 'descargar_factura_pdf' empresa.slug factura.id %}"
+>
+    PDF
+</button>
+<button
+    class="erp-action-link erp-print-button"
+    type="button"
+    data-preview-title="Factura alternativa"
+    data-preview-url="{% url 'vista_previa_factura_pdf_alternativo' empresa.slug factura.id %}"
+    data-download-url="{% url 'descargar_factura_pdf_alternativo' empresa.slug factura.id %}"
+>
+    PDF Alternativo
+</button>
+{% if permite_plantilla_notas_extensas %}
+<button
+    class="erp-action-link erp-print-button"
+    type="button"
+    data-preview-title="Factura notas extensas"
+    data-preview-url="{% url 'vista_previa_factura_pdf_notas_extensas' empresa.slug factura.id %}"
+    data-download-url="{% url 'descargar_factura_pdf_notas_extensas' empresa.slug factura.id %}"
+>
+    PDF Notas
+</button>
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-document-flow{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+}
+.erp-document-alert{
+    border-color:#cfe0f6;
+    background:#f8fbff;
+}
+.erp-document-sheet{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:28px 30px;
+    box-shadow:none;
+}
+.erp-document-header{
+    display:grid;
+    grid-template-columns:minmax(0,1.3fr) minmax(280px,.9fr);
+    gap:26px;
+    align-items:start;
+    padding-bottom:20px;
+    border-bottom:1px solid var(--line);
+}
+.erp-document-kicker{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.18em;
+    color:var(--muted);
+    margin-bottom:10px;
+}
+.erp-document-number{
+    margin:0 0 10px;
+    font-size:30px;
+    line-height:1.1;
+    color:#102338;
+}
+.erp-document-meta{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px 18px;
+    margin-top:18px;
+}
+.erp-document-meta-item{
+    padding-bottom:10px;
+    border-bottom:1px solid #eef2f7;
+}
+.erp-document-meta-item span{
+    display:block;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:var(--muted);
+    margin-bottom:6px;
+}
+.erp-document-meta-item strong{
+    font-size:15px;
+    color:#14263d;
+    line-height:1.45;
+    word-break:break-word;
+}
+.erp-document-state{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px 18px 16px;
+    background:#fbfcfe;
+}
+.erp-document-state-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:14px;
+}
+.erp-document-state-item{
+    padding-bottom:10px;
+    border-bottom:1px solid #eef2f7;
+}
+.erp-document-state-item span{
+    display:block;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:var(--muted);
+    margin-bottom:6px;
+}
+.erp-document-state-item strong{
+    color:#102338;
+    font-size:15px;
+}
+.erp-document-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr);
+    gap:22px;
+    margin-top:22px;
+}
+.erp-document-block{
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+    background:#fff;
+}
+.erp-document-block-title{
+    padding:14px 18px;
+    border-bottom:1px solid var(--line);
+    background:#f8fafc;
+    font-size:13px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#35485f;
+}
+.erp-document-client{
+    padding:18px;
+}
+.erp-document-client h4{
+    margin:0 0 10px;
+    font-size:20px;
+    color:#102338;
+}
+.erp-document-client p{
+    margin:0;
+    color:#55657b;
+    line-height:1.65;
+}
+.erp-document-fiscal{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:14px 16px;
+    padding:18px;
+}
+.erp-document-fiscal-item span{
+    display:block;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:var(--muted);
+    margin-bottom:6px;
+}
+.erp-document-fiscal-item strong{
+    display:block;
+    color:#102338;
+    line-height:1.5;
+    word-break:break-word;
+}
+.erp-document-lines{
+    margin-top:22px;
+}
+.erp-document-lines table{
+    width:100%;
+    border-collapse:collapse;
+}
+.erp-document-lines thead th{
+    padding:13px 16px;
+    background:#f8fafc;
+    border-bottom:1px solid var(--line);
+    text-align:left;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    color:#55657b;
+}
+.erp-document-lines tbody td{
+    padding:14px 16px;
+    border-bottom:1px solid #edf2f7;
+    vertical-align:top;
+    font-size:14px;
+    color:#1b2b3f;
+}
+.erp-document-lines tbody tr:last-child td{
+    border-bottom:none;
+}
+.erp-document-lines .amount{
+    text-align:right;
+    font-weight:700;
+    white-space:nowrap;
+}
+.erp-document-product{
+    font-weight:700;
+    color:#102338;
+}
+.erp-document-comment{
+    margin-top:8px;
+    padding-left:10px;
+    border-left:2px solid #d9e2ee;
+    color:#66758a;
+    font-size:12px;
+    line-height:1.6;
+    white-space:pre-wrap;
+}
+.erp-document-summary{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+.erp-document-summary-card{
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:#fff;
+    overflow:hidden;
+}
+.erp-document-summary-body{
+    padding:16px 18px;
+}
+.erp-document-summary-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+.erp-document-summary-row{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-start;
+    font-size:14px;
+    color:#46576d;
+}
+.erp-document-summary-row strong{
+    color:#102338;
+}
+.erp-document-summary-row.total{
+    margin-top:6px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+    font-size:17px;
+}
+.erp-document-total-letters{
+    margin-top:14px;
+    padding:14px 16px;
+    border-radius:12px;
+    background:#f8fafc;
+    color:#203246;
+    font-weight:700;
+    line-height:1.6;
+}
+.erp-document-payments{
+    margin-top:22px;
+}
+.erp-document-actions{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-top:24px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+}
+.erp-document-actions-group{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+}
+.erp-inline-form{
+    margin:0;
+}
+.erp-preview-modal{
+    position:fixed;
+    inset:0;
+    z-index:250;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:22px;
+    background:rgba(8,18,31,.52);
+    backdrop-filter:blur(4px);
+}
+.erp-preview-modal.is-visible{
+    display:flex;
+}
+.erp-preview-dialog{
+    width:min(1180px, 100%);
+    height:min(88vh, 940px);
+    display:flex;
+    flex-direction:column;
+    background:#fff;
+    border:1px solid rgba(219,227,239,.9);
+    border-radius:20px;
+    overflow:hidden;
+    box-shadow:0 30px 80px rgba(7,20,36,.16);
+}
+.erp-preview-toolbar{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    align-items:center;
+    padding:16px 18px;
+    border-bottom:1px solid var(--line);
+    background:#f8fafc;
+}
+.erp-preview-toolbar h4{
+    margin:0;
+    font-size:18px;
+    color:#102338;
+}
+.erp-preview-toolbar p{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:13px;
+}
+.erp-preview-toolbar-actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+.erp-preview-frame-shell{
+    flex:1;
+    min-height:0;
+    background:#dbe4ef;
+}
+.erp-preview-frame-shell iframe{
+    width:100%;
+    height:100%;
+    border:0;
+    background:#fff;
+}
+@media (max-width: 1100px){
+    .erp-document-header,
+    .erp-document-grid{
+        grid-template-columns:1fr;
+    }
+}
+@media (max-width: 760px){
+    .erp-document-sheet{
+        padding:18px;
+    }
+    .erp-document-number{
+        font-size:24px;
+    }
+    .erp-document-meta,
+    .erp-document-state-grid,
+    .erp-document-fiscal{
+        grid-template-columns:1fr;
+    }
+    .erp-document-lines{
+        overflow:auto;
+    }
+    .erp-document-lines table{
+        min-width:760px;
+    }
+    .erp-document-actions,
+    .erp-document-actions-group{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .erp-preview-modal{
+        padding:10px;
+    }
+    .erp-preview-dialog{
+        height:92vh;
+    }
+    .erp-preview-toolbar{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .erp-preview-toolbar-actions{
+        justify-content:stretch;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="erp-document-flow">
+    {% if request.GET.nueva == "1" %}
+    <section class="erp-card erp-document-alert">
+        <div class="erp-form-actions">
+            <div>
+                <h3 class="erp-panel-title" style="margin:0 0 8px;">Factura generada</h3>
+                <div class="erp-card-muted">La factura se guardo correctamente. Si quieres, puedes descargar el PDF o revisar esta vista simplificada antes de compartirla.</div>
+            </div>
+            <div class="erp-actions-right">
+                <a class="erp-btn" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}">Generar PDF</a>
+                <a class="erp-btn-secondary" href="{% url 'descargar_factura_pdf_alternativo' empresa.slug factura.id %}">Probar PDF alternativo</a>
+                <a class="erp-btn-secondary" href="{% url 'facturas_dashboard' empresa.slug %}">Volver a facturas</a>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="erp-document-sheet">
+        <div class="erp-document-header">
+            <div>
+                <div class="erp-document-kicker">Documento comercial</div>
+                <h3 class="erp-document-number">{{ factura.numero_factura|default:"Sin numero asignado" }}</h3>
+                <div class="erp-document-meta">
+                    <div class="erp-document-meta-item">
+                        <span>Empresa</span>
+                        <strong>{{ empresa.nombre }}</strong>
+                    </div>
+                    <div class="erp-document-meta-item">
+                        <span>Cliente</span>
+                        <strong>{{ factura.cliente.nombre }}</strong>
+                    </div>
+                    <div class="erp-document-meta-item">
+                        <span>CAI</span>
+                        <strong>{{ factura.cai_numero_historico|default:"Sin CAI asignado" }}</strong>
+                    </div>
+                    <div class="erp-document-meta-item">
+                        <span>Moneda</span>
+                        <strong>{{ factura.get_moneda_display }}</strong>
+                    </div>
+                    <div class="erp-document-meta-item">
+                        <span>Fecha emision</span>
+                        <strong>{{ factura.fecha_emision|date:"d/m/Y" }}</strong>
+                    </div>
+                    <div class="erp-document-meta-item">
+                        <span>Vencimiento</span>
+                        <strong>{{ factura.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="erp-document-state">
+                <div class="erp-document-kicker" style="margin-bottom:14px;">Estado actual</div>
+                <div class="erp-document-state-grid">
+                    <div class="erp-document-state-item">
+                        <span>Documento</span>
+                        <strong>
+                            {% if factura.estado == "borrador" %}
+                                <span class="erp-badge warning">Borrador</span>
+                            {% elif factura.estado == "emitida" %}
+                                <span class="erp-badge success">Emitida</span>
+                            {% else %}
+                                <span class="erp-badge danger">Anulada</span>
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div class="erp-document-state-item">
+                        <span>Pago</span>
+                        <strong>
+                            {% if factura.estado_pago == "pagado" %}
+                                <span class="erp-badge success">Pagada</span>
+                            {% elif factura.estado_pago == "parcial" %}
+                                <span class="erp-badge warning">Parcial</span>
+                            {% else %}
+                                <span class="erp-badge danger">Pendiente</span>
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div class="erp-document-state-item">
+                        <span>Total pagado</span>
+                        <strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total_pagado|floatformat:2|intcomma }}</strong>
+                    </div>
+                    <div class="erp-document-state-item">
+                        <span>Saldo pendiente</span>
+                        <strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="erp-document-grid">
+            <section class="erp-document-block">
+                <div class="erp-document-block-title">Cliente y detalle</div>
+                <div class="erp-document-client">
+                    <h4>{{ factura.cliente.nombre }}</h4>
+                    <p><strong>RTN:</strong> {{ factura.cliente.rtn|default:"-" }}</p>
+                    {% if factura.vendedor %}
+                    <p><strong>Vendedor:</strong> {{ factura.vendedor.username }}</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="erp-document-block">
+                <div class="erp-document-block-title">Datos fiscales</div>
+                <div class="erp-document-fiscal">
+                    <div class="erp-document-fiscal-item">
+                        <span>Orden compra exenta</span>
+                        <strong>{{ factura.orden_compra_exenta|default:"-" }}</strong>
+                    </div>
+                    <div class="erp-document-fiscal-item">
+                        <span>Registro exonerado</span>
+                        <strong>{{ factura.registro_exonerado|default:"-" }}</strong>
+                    </div>
+                    <div class="erp-document-fiscal-item">
+                        <span>Registro SAG</span>
+                        <strong>{{ factura.registro_sag|default:"-" }}</strong>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section class="erp-document-lines">
+            <div class="erp-document-block">
+                <div class="erp-document-block-title">Detalle de productos</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Producto / servicio</th>
+                            <th>Cant.</th>
+                            <th>Precio</th>
+                            <th>Desc. %</th>
+                            <th>Desc.</th>
+                            <th>Impuesto</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for linea in factura.lineas.all %}
+                        <tr>
+                            <td>
+                                <div class="erp-document-product">{{ linea.descripcion_visual }}</div>
+                                {% if linea.comentario %}
+                                <div class="erp-document-comment">{{ linea.comentario }}</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ linea.cantidad }}</td>
+                            <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.precio_unitario|floatformat:2|intcomma }}</td>
+                            <td>{{ linea.descuento_porcentaje|floatformat:2 }}%</td>
+                            <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</td>
+                            <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</td>
+                            <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="erp-document-grid" style="margin-top:22px;">
+            {% if factura.pagos_facturacion.all %}
+            <section class="erp-document-summary">
+                <div class="erp-document-summary-card">
+                    <div class="erp-document-block-title">Historial de pagos</div>
+                    <div class="erp-table-wrap" style="border:none;border-radius:0;">
+                        <table class="erp-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Metodo</th>
+                                    <th>Cuenta</th>
+                                    <th>Monto</th>
+                                    <th>Referencia</th>
+                                    <th>Recibo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for pago in factura.pagos_facturacion.all %}
+                                <tr>
+                                    <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+                                    <td>{{ pago.get_metodo_display }}</td>
+                                    <td>{{ pago.cuenta_financiera.nombre|default:"-" }}</td>
+                                    <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto|floatformat:2|intcomma }}</td>
+                                    <td>{{ pago.referencia|default:"-" }}</td>
+                                    <td>{% if pago.recibo %}<a class="erp-link" href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver recibo</a>{% else %}-{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+
+            <section class="erp-document-summary">
+                <div class="erp-document-summary-card">
+                    <div class="erp-document-block-title">Resumen fiscal</div>
+                    <div class="erp-document-summary-body">
+                        <div class="erp-document-summary-list">
+                            <div class="erp-document-summary-row"><span>Sub total</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_bruto|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>Descuento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.descuento_total|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>Sub total antes de impuesto</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_antes_impuesto|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>Base 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_15|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>Base 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_18|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>Exento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exento|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>Exonerado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exonerado|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>ISV 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_15|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row"><span>ISV 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_18|floatformat:2|intcomma }}</strong></div>
+                            <div class="erp-document-summary-row total"><span>Total</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
+                        </div>
+                        <div class="erp-document-total-letters">{{ factura.total_en_letras }}</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="erp-document-actions">
+            <div class="erp-document-actions-group">
+                {% if factura.puede_editar_emitida %}
+                <a class="erp-btn-secondary" href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
+                {% else %}
+                <span class="erp-btn-secondary disabled" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
+                {% endif %}
+                {% if factura.estado == "borrador" %}
+                <form method="post" action="{% url 'validar_factura' empresa.slug factura.id %}" class="erp-inline-form">
+                    {% csrf_token %}
+                    <button class="erp-btn" type="submit">Validar factura</button>
+                </form>
+                {% endif %}
+                {% if factura.total > 0 and factura.estado != "anulada" and factura.saldo_pendiente > 0 %}
+                <a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/">Registrar pago</a>
+                {% endif %}
+            </div>
+
+            <div class="erp-document-actions-group">
+                <form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-secondary" type="submit">Duplicar</button></form>
+                <form method="post" action="{% url 'generar_nota_credito_desde_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-secondary" type="submit">Generar nota de credito</button></form>
+                {% if factura.estado == "borrador" and not factura.numero_factura or permite_gestion_fiscal_historica %}
+                <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea eliminar esta factura?');">{% if factura.estado == "borrador" and not factura.numero_factura %}Eliminar borrador{% else %}Eliminar factura{% endif %}</button></form>
+                {% endif %}
+                {% if factura.estado != "anulada" %}
+                <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea anular esta factura?');">Anular factura</button></form>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</div>
+
+<div class="erp-preview-modal" id="pdfPreviewModal" aria-hidden="true">
+    <div class="erp-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="pdfPreviewTitle">
+        <div class="erp-preview-toolbar">
+            <div>
+                <h4 id="pdfPreviewTitle">Vista previa del PDF</h4>
+                <p>Revisa el documento antes de descargarlo o compartirlo.</p>
+            </div>
+            <div class="erp-preview-toolbar-actions">
+                <a class="erp-btn erp-preview-download" href="#" target="_blank" rel="noopener">Descargar PDF</a>
+                <button class="erp-btn erp-btn-secondary" type="button" id="closePdfPreview">Cerrar</button>
+            </div>
+        </div>
+        <div class="erp-preview-frame-shell">
+            <iframe id="pdfPreviewFrame" src="about:blank" title="Vista previa PDF"></iframe>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const modal = document.getElementById("pdfPreviewModal");
+    const frame = document.getElementById("pdfPreviewFrame");
+    const title = document.getElementById("pdfPreviewTitle");
+    const downloadLink = document.querySelector(".erp-preview-download");
+    const closeBtn = document.getElementById("closePdfPreview");
+    const triggerButtons = document.querySelectorAll("[data-preview-url]");
+
+    if (!modal || !frame || !title || !downloadLink || !closeBtn || !triggerButtons.length) {
+        return;
+    }
+
+    const openPreview = (button) => {
+        const previewUrl = button.dataset.previewUrl;
+        const downloadUrl = button.dataset.downloadUrl;
+        const previewTitle = button.dataset.previewTitle || "Vista previa del PDF";
+
+        title.textContent = previewTitle;
+        frame.src = previewUrl;
+        downloadLink.href = downloadUrl;
+        modal.classList.add("is-visible");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+    };
+
+    const closePreview = () => {
+        modal.classList.remove("is-visible");
+        modal.setAttribute("aria-hidden", "true");
+        frame.src = "about:blank";
+        document.body.style.overflow = "";
+    };
+
+    triggerButtons.forEach((button) => {
+        button.addEventListener("click", () => openPreview(button));
+    });
+
+    closeBtn.addEventListener("click", closePreview);
+    modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+            closePreview();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("is-visible")) {
+            closePreview();
+        }
+    });
+});
+</script>
+{% endblock %}

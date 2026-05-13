@@ -1,0 +1,40 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Plantillas CRM - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}CRM{% endblock %}
+{% block header_title %}Plantillas de Mensaje{% endblock %}
+{% block header_description %}Mensajes reutilizables para promociones, cumpleanos, citas y avisos generales.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <form method="post" enctype="multipart/form-data" class="erp-form-shell">
+        {% csrf_token %}
+        <div class="erp-form-grid two">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="erp-form-actions"><button class="erp-btn" type="submit">Guardar Plantilla</button></div>
+    </form>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Nombre</th><th>Tipo</th><th>Canal</th><th>Imagen</th><th>Activa</th></tr></thead>
+            <tbody>
+            {% for plantilla in plantillas %}
+            <tr><td><strong>{{ plantilla.nombre }}</strong><small>{{ plantilla.mensaje|truncatechars:90 }}</small></td><td>{{ plantilla.get_tipo_display }}</td><td>{{ plantilla.get_canal_display }}</td><td>{% if plantilla.imagen_promocional %}Si{% else %}-{% endif %}</td><td>{{ plantilla.activa|yesno:"Si,No" }}</td></tr>
+            {% empty %}
+            <tr><td colspan="5" class="erp-empty">Aun no hay plantillas.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

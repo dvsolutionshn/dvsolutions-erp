@@ -1,0 +1,183 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Estado de Resultados - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Estado de Resultados{% endblock %}
+{% block header_description %}Consulta ingresos, costos, gastos y utilidad del periodo a partir de los asientos contabilizados del ERP.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'balance_comprobacion' empresa.slug %}" class="erp-action-link">Balance</a>
+<a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
+<a href="{% url 'exportar_estado_resultados_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
+<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros</h3>
+            <p class="erp-card-muted">Consulta el resultado del periodo usando las cuentas de ingresos, costos y gastos.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a href="{% url 'estado_resultados' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Ingresos</div><p class="erp-stat-value">L. {{ resumen.total_ingresos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Costos</div><p class="erp-stat-value">L. {{ resumen.total_costos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Gastos</div><p class="erp-stat-value">L. {{ resumen.total_gastos }}</p></article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Resultado</div>
+        <p class="erp-stat-value">L. {{ resumen.utilidad }}</p>
+        <p class="erp-card-muted">{% if resumen.resultado_positivo %}Utilidad del periodo.{% else %}Perdida del periodo.{% endif %}</p>
+    </article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas usadas</div><p class="erp-stat-value">{{ resumen.cuentas_ingreso|add:resumen.cuentas_costo|add:resumen.cuentas_gasto }}</p></article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Ingresos</h3>
+                <p class="erp-card-muted">Cuentas de ingreso con movimiento contabilizado.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr>
+                        <th>Cuenta</th>
+                        <th>Debe</th>
+                        <th>Haber</th>
+                        <th>Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in ingresos %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="erp-empty">No hay ingresos contabilizados en este periodo.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="3">Total ingresos</th>
+                        <th class="amount"><span class="erp-money">L. {{ resumen.total_ingresos }}</span></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </article>
+
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Costos</h3>
+                <p class="erp-card-muted">Cuentas de costo con movimiento contabilizado.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr>
+                        <th>Cuenta</th>
+                        <th>Debe</th>
+                        <th>Haber</th>
+                        <th>Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in costos %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="erp-empty">No hay costos contabilizados en este periodo.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="3">Total costos</th>
+                        <th class="amount"><span class="erp-money">L. {{ resumen.total_costos }}</span></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </article>
+
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Gastos</h3>
+                <p class="erp-card-muted">Cuentas de gasto con movimiento contabilizado.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr>
+                        <th>Cuenta</th>
+                        <th>Debe</th>
+                        <th>Haber</th>
+                        <th>Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in gastos %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="erp-empty">No hay gastos contabilizados en este periodo.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="3">Total gastos</th>
+                        <th class="amount"><span class="erp-money">L. {{ resumen.total_gastos }}</span></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </article>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Resultado neto</h3>
+            <p class="erp-card-muted">Ingresos menos costos y gastos del periodo seleccionado. Utilidad bruta: L. {{ resumen.utilidad_bruta }}.</p>
+        </div>
+        <span class="erp-badge {% if resumen.resultado_positivo %}success{% else %}danger{% endif %}">
+            {% if resumen.resultado_positivo %}Utilidad{% else %}Perdida{% endif %}
+        </span>
+    </div>
+    <p class="erp-stat-value">L. {{ resumen.utilidad }}</p>
+</section>
+{% endblock %}

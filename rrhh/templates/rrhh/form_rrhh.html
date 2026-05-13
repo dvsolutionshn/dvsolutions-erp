@@ -1,0 +1,244 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Recursos Humanos{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Captura operativa de talento humano con una experiencia mas limpia, rapida y enfocada en la planilla.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'rrhh_dashboard' empresa.slug %}" class="erp-action-link">Volver a RRHH</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="erp-compact-form" autocomplete="off">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <section class="erp-compact-card">
+        <div class="erp-message">{{ form.non_field_errors }}</div>
+    </section>
+    {% endif %}
+
+    {% if form_kind == "empleado" %}
+    <section class="erp-compact-card">
+        <h3>Identidad y perfil</h3>
+        <p>Datos principales del colaborador, fotografia y documentos base para expediente.</p>
+        <div class="erp-compact-grid three-col">
+            <div class="erp-field">
+                <label for="{{ form.codigo.id_for_label }}">{{ form.codigo.label }}</label>
+                {{ form.codigo }}
+                {% for error in form.codigo.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.identidad.id_for_label }}">{{ form.identidad.label }}</label>
+                {{ form.identidad }}
+                {% for error in form.identidad.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.rtn.id_for_label }}">{{ form.rtn.label }}</label>
+                {{ form.rtn }}
+                {% for error in form.rtn.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.nombres.id_for_label }}">{{ form.nombres.label }}</label>
+                {{ form.nombres }}
+                {% for error in form.nombres.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.apellidos.id_for_label }}">{{ form.apellidos.label }}</label>
+                {{ form.apellidos }}
+                {% for error in form.apellidos.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.foto.id_for_label }}">{{ form.foto.label }}</label>
+                {{ form.foto }}
+                {% if empleado and empleado.foto %}
+                <div class="erp-compact-meta">Foto actual registrada en el expediente.</div>
+                {% endif %}
+                {% for error in form.foto.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.fecha_nacimiento.id_for_label }}">{{ form.fecha_nacimiento.label }}</label>
+                {{ form.fecha_nacimiento }}
+                {% for error in form.fecha_nacimiento.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.fecha_ingreso.id_for_label }}">{{ form.fecha_ingreso.label }}</label>
+                {{ form.fecha_ingreso }}
+                {% for error in form.fecha_ingreso.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.fecha_salida.id_for_label }}">{{ form.fecha_salida.label }}</label>
+                {{ form.fecha_salida }}
+                {% for error in form.fecha_salida.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-compact-card">
+        <h3>Puesto y contacto</h3>
+        <p>Informacion operativa para comunicacion, ubicacion interna y relacion con el area.</p>
+        <div class="erp-compact-grid three-col">
+            <div class="erp-field">
+                <label for="{{ form.puesto.id_for_label }}">{{ form.puesto.label }}</label>
+                {{ form.puesto }}
+                {% for error in form.puesto.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.departamento.id_for_label }}">{{ form.departamento.label }}</label>
+                {{ form.departamento }}
+                {% for error in form.departamento.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+                {{ form.estado }}
+                {% for error in form.estado.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.correo.id_for_label }}">{{ form.correo.label }}</label>
+                {{ form.correo }}
+                {% for error in form.correo.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}</label>
+                {{ form.telefono }}
+                <div class="erp-field-help">Este numero se reutiliza para WhatsApp y avisos de voucher.</div>
+                {% for error in form.telefono.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field" style="grid-column:span 3;">
+                <label for="{{ form.direccion.id_for_label }}">{{ form.direccion.label }}</label>
+                {{ form.direccion }}
+                {% for error in form.direccion.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-compact-card">
+        <h3>Condiciones salariales y cuenta acreditada</h3>
+        <p>Parametros que impactan la planilla, el neto a pagar y la informacion del voucher.</p>
+        <div class="erp-compact-grid three-col">
+            <div class="erp-field">
+                <label for="{{ form.salario_mensual.id_for_label }}">{{ form.salario_mensual.label }}</label>
+                {{ form.salario_mensual }}
+                {% for error in form.salario_mensual.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.tipo_salario.id_for_label }}">{{ form.tipo_salario.label }}</label>
+                {{ form.tipo_salario }}
+                {% for error in form.tipo_salario.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.banco.id_for_label }}">{{ form.banco.label }}</label>
+                {{ form.banco }}
+                {% for error in form.banco.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.cuenta_bancaria.id_for_label }}">{{ form.cuenta_bancaria.label }}</label>
+                {{ form.cuenta_bancaria }}
+                {% for error in form.cuenta_bancaria.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+        <div class="erp-check-grid" style="margin-top:16px;">
+            <label class="erp-check-card">{{ form.aplica_ihss }}<span>Aplica IHSS</span></label>
+            <label class="erp-check-card">{{ form.aplica_rap }}<span>Aplica RAP</span></label>
+            <label class="erp-check-card">{{ form.aplica_isr }}<span>Aplica ISR</span></label>
+        </div>
+    </section>
+
+    <section class="erp-compact-card">
+        <h3>Observaciones</h3>
+        <p>Notas internas del expediente, condiciones especiales o comentarios administrativos.</p>
+        <div class="erp-compact-grid">
+            <div class="erp-field">
+                <label for="{{ form.observacion.id_for_label }}">{{ form.observacion.label }}</label>
+                {{ form.observacion }}
+                {% for error in form.observacion.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+    </section>
+
+    {% elif form_kind == "configuracion_rrhh" %}
+    <section class="erp-compact-card">
+        <h3>Deducciones legales</h3>
+        <p>Define techos y porcentajes base por empresa para IHSS, RAP e ISR inicial.</p>
+        <div class="erp-compact-grid three-col">
+            <div class="erp-field">
+                <label for="{{ form.ihss_trabajador_porcentaje.id_for_label }}">{{ form.ihss_trabajador_porcentaje.label }}</label>
+                {{ form.ihss_trabajador_porcentaje }}
+                {% for error in form.ihss_trabajador_porcentaje.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.ihss_techo_mensual.id_for_label }}">{{ form.ihss_techo_mensual.label }}</label>
+                {{ form.ihss_techo_mensual }}
+                {% for error in form.ihss_techo_mensual.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.isr_porcentaje_base.id_for_label }}">{{ form.isr_porcentaje_base.label }}</label>
+                {{ form.isr_porcentaje_base }}
+                {% for error in form.isr_porcentaje_base.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.rap_trabajador_porcentaje.id_for_label }}">{{ form.rap_trabajador_porcentaje.label }}</label>
+                {{ form.rap_trabajador_porcentaje }}
+                {% for error in form.rap_trabajador_porcentaje.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+        <div class="erp-check-grid" style="margin-top:16px;">
+            <label class="erp-check-card">{{ form.aplicar_rap }}<span>Aplicar RAP en planilla</span></label>
+            <label class="erp-check-card">{{ form.activa }}<span>Configuracion activa</span></label>
+        </div>
+    </section>
+
+    <section class="erp-compact-card">
+        <h3>Base operativa de calculo</h3>
+        <p>Controla dias base por mes y recargos de horas extra usados al recalcular vouchers.</p>
+        <div class="erp-compact-grid three-col">
+            <div class="erp-field">
+                <label for="{{ form.dias_base_mes.id_for_label }}">{{ form.dias_base_mes.label }}</label>
+                {{ form.dias_base_mes }}
+                {% for error in form.dias_base_mes.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.hora_extra_diurna_factor.id_for_label }}">{{ form.hora_extra_diurna_factor.label }}</label>
+                {{ form.hora_extra_diurna_factor }}
+                {% for error in form.hora_extra_diurna_factor.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.hora_extra_nocturna_factor.id_for_label }}">{{ form.hora_extra_nocturna_factor.label }}</label>
+                {{ form.hora_extra_nocturna_factor }}
+                {% for error in form.hora_extra_nocturna_factor.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.hora_extra_feriado_factor.id_for_label }}">{{ form.hora_extra_feriado_factor.label }}</label>
+                {{ form.hora_extra_feriado_factor }}
+                {% for error in form.hora_extra_feriado_factor.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+    </section>
+
+    {% else %}
+    <section class="erp-compact-card">
+        <h3>Formulario operativo</h3>
+        <p>Completa los datos del proceso de RRHH en una sola vista compacta.</p>
+        <div class="erp-compact-grid two-col">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="erp-compact-card">
+        <div class="erp-form-actions">
+            <a class="erp-btn-secondary" href="{% url 'rrhh_dashboard' empresa.slug %}">Cancelar</a>
+            <button class="erp-btn" type="submit">
+                {% if form_kind == "empleado" %}Guardar Empleado{% elif form_kind == "configuracion_rrhh" %}Guardar Configuracion{% else %}Guardar{% endif %}
+            </button>
+        </div>
+    </section>
+</form>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Bancos y Tarjetas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}Bancos y Tarjetas{% endblock %}
+{% block header_description %}Importa estados de cuenta, controla movimientos pendientes y prepara la contabilidad desde el flujo real de banco y tarjetas.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'crear_cuenta_financiera' empresa.slug %}" class="erp-action-link">Nueva Cuenta</a>
+<a href="{% url 'clasificaciones_bancarias' empresa.slug %}" class="erp-action-link">Clasificaciones</a>
+<a href="{% url 'reglas_bancarias' empresa.slug %}" class="erp-action-link">Reglas</a>
+<a href="{% url 'conciliacion_bancaria' empresa.slug %}" class="erp-action-link">Conciliacion</a>
+<a href="{% url 'movimientos_bancarios' empresa.slug %}" class="erp-action-link">Ver Movimientos</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Movimientos</div><p class="erp-stat-value">{{ resumen.movimientos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Pendientes</div><p class="erp-stat-value">{{ resumen.pendientes }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Contabilizados</div><p class="erp-stat-value">{{ resumen.contabilizados }}</p></article>
+</section>
+
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Importar estado de cuenta</h3>
+            <p class="erp-card-muted">Acepta Excel (.xlsx/.xlsm) y PDF con texto seleccionable: fecha, descripcion, debito/retiro, credito/deposito y saldo.</p>
+        </div>
+    </div>
+    <form method="post" action="{% url 'importar_movimientos_bancarios' empresa.slug %}" enctype="multipart/form-data" class="erp-filters">
+        {% csrf_token %}
+        <div class="erp-filter-field"><label>Cuenta o tarjeta</label>{{ import_form.cuenta_financiera }}</div>
+        <div class="erp-filter-field"><label>Archivo</label>{{ import_form.archivo }}</div>
+        <div class="erp-filter-actions"><button type="submit" class="erp-btn">Importar</button></div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    {% for cuenta in cuentas %}
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">{{ cuenta.get_tipo_display }}</div>
+        <h3>{{ cuenta.nombre }}</h3>
+        <p>{{ cuenta.institucion|default:"Institucion no indicada" }} · {{ cuenta.cuenta_contable.codigo }} - {{ cuenta.cuenta_contable.nombre }}</p>
+    </article>
+    {% empty %}
+    <article class="erp-card"><p class="erp-card-muted">Primero crea una cuenta bancaria o tarjeta de credito.</p></article>
+    {% endfor %}
+</section>
+{% endblock %}

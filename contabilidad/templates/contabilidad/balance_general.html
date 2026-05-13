@@ -1,0 +1,148 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Balance General - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Balance General{% endblock %}
+{% block header_description %}Consulta activos, pasivos y patrimonio a una fecha de corte para validar la posicion financiera de la empresa.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'balance_comprobacion' empresa.slug %}" class="erp-action-link">Balance de Comprobacion</a>
+<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Estado de Resultados</a>
+<a href="{% url 'exportar_balance_general_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
+<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Fecha de corte</h3>
+            <p class="erp-card-muted">Si no seleccionas fecha, el reporte toma todos los asientos contabilizados.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="fecha_corte">Corte hasta</label>
+            <input type="date" id="fecha_corte" name="fecha_corte" value="{{ filtros.fecha_corte }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a href="{% url 'balance_general' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Activos</div><p class="erp-stat-value">L. {{ resumen.total_activos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Pasivos</div><p class="erp-stat-value">L. {{ resumen.total_pasivos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Patrimonio</div><p class="erp-stat-value">L. {{ resumen.total_patrimonio }}</p></article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Estado</div>
+        <p class="erp-stat-value">{% if resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p>
+        <p class="erp-card-muted">Diferencia: L. {{ resumen.diferencia }}</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Activos</h3>
+                <p class="erp-card-muted">Recursos controlados por la empresa.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr><th>Cuenta</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr>
+                </thead>
+                <tbody>
+                    {% for fila in activos %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="erp-empty">No hay activos contabilizados.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot><tr><th colspan="3">Total activos</th><th class="amount"><span class="erp-money">L. {{ resumen.total_activos }}</span></th></tr></tfoot>
+            </table>
+        </div>
+    </article>
+
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Pasivos</h3>
+                <p class="erp-card-muted">Obligaciones pendientes de la empresa.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr><th>Cuenta</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr>
+                </thead>
+                <tbody>
+                    {% for fila in pasivos %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="erp-empty">No hay pasivos contabilizados.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot><tr><th colspan="3">Total pasivos</th><th class="amount"><span class="erp-money">L. {{ resumen.total_pasivos }}</span></th></tr></tfoot>
+            </table>
+        </div>
+    </article>
+
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Patrimonio</h3>
+                <p class="erp-card-muted">Capital, resultados y reservas.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr><th>Cuenta</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr>
+                </thead>
+                <tbody>
+                    {% for fila in patrimonio %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="erp-empty">No hay patrimonio contabilizado.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot><tr><th colspan="3">Total patrimonio</th><th class="amount"><span class="erp-money">L. {{ resumen.total_patrimonio }}</span></th></tr></tfoot>
+            </table>
+        </div>
+    </article>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Ecuacion contable</h3>
+            <p class="erp-card-muted">Activo debe ser igual a Pasivo mas Patrimonio.</p>
+        </div>
+        <span class="erp-badge {% if resumen.cuadrado %}success{% else %}danger{% endif %}">
+            {% if resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}
+        </span>
+    </div>
+    <p class="erp-stat-value">L. {{ resumen.total_activos }} = L. {{ resumen.total_pasivo_patrimonio }}</p>
+</section>
+{% endblock %}

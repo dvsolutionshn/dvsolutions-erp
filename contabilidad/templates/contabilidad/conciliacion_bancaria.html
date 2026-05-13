@@ -1,0 +1,235 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Conciliacion Bancaria - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bancos{% endblock %}
+{% block header_title %}Conciliacion Bancaria{% endblock %}
+{% block header_description %}Revisa movimientos importados, confirma los contabilizados y deja trazabilidad para cierres mensuales.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'bancos_dashboard' empresa.slug %}" class="erp-action-link">Volver a Bancos</a>
+<a href="{% url 'movimientos_bancarios' empresa.slug %}" class="erp-action-link">Movimientos</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Pendientes</div>
+        <p class="erp-stat-value">{{ resumen.pendientes }}</p>
+        <p class="erp-card-muted">Movimientos sin clasificacion.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Clasificados</div>
+        <p class="erp-stat-value">{{ resumen.clasificados }}</p>
+        <p class="erp-card-muted">Listos para contabilizar.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Sin Conciliar</div>
+        <p class="erp-stat-value">{{ resumen.sin_conciliar }}</p>
+        <p class="erp-card-muted">Contabilizados pendientes de revision.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Conciliados</div>
+        <p class="erp-stat-value">{{ resumen.conciliados }}</p>
+        <p class="erp-card-muted">Confirmados contra estado de cuenta.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Resumen por cuenta financiera</h3>
+            <p class="erp-card-muted">Compara saldo del ultimo estado importado contra el saldo contable acumulado de la cuenta.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Cuenta</th>
+                    <th>Movimientos</th>
+                    <th>Debitos</th>
+                    <th>Creditos</th>
+                    <th>Saldo Banco</th>
+                    <th>Saldo Contable</th>
+                    <th>Diferencia</th>
+                    <th>Pendientes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in resumen_cuentas %}
+                <tr>
+                    <td>
+                        <div class="erp-name-cell">{{ item.cuenta.nombre }}</div>
+                        <div class="erp-subtext">{{ item.cuenta.cuenta_contable.codigo }} {{ item.cuenta.cuenta_contable.nombre }}</div>
+                    </td>
+                    <td>{{ item.movimientos }}</td>
+                    <td class="amount">L. {{ item.debitos|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ item.creditos|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ item.saldo_banco|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ item.saldo_contable|floatformat:2|intcomma }}</td>
+                    <td class="amount">
+                        <span class="erp-badge {% if item.diferencia == 0 %}success{% else %}warning{% endif %}">L. {{ item.diferencia|floatformat:2|intcomma }}</span>
+                    </td>
+                    <td>{{ item.pendientes }} sin contabilizar / {{ item.sin_conciliar }} sin conciliar</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty">No hay cuentas financieras configuradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros de conciliacion</h3>
+            <p class="erp-card-muted">Filtra por cuenta, fecha, estado contable o marca de conciliacion.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label>Cuenta o tarjeta</label>
+            <select name="cuenta">
+                <option value="">Todas</option>
+                {% for cuenta in cuentas %}
+                <option value="{{ cuenta.id }}" {% if filtros.cuenta == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-filter-field">
+            <label>Desde</label>
+            <input type="date" name="desde" value="{{ filtros.desde }}">
+        </div>
+        <div class="erp-filter-field">
+            <label>Hasta</label>
+            <input type="date" name="hasta" value="{{ filtros.hasta }}">
+        </div>
+        <div class="erp-filter-field">
+            <label>Estado</label>
+            <select name="estado">
+                <option value="">Todos</option>
+                <option value="pendiente" {% if filtros.estado == "pendiente" %}selected{% endif %}>Pendiente</option>
+                <option value="clasificado" {% if filtros.estado == "clasificado" %}selected{% endif %}>Clasificado</option>
+                <option value="contabilizado" {% if filtros.estado == "contabilizado" %}selected{% endif %}>Contabilizado</option>
+            </select>
+        </div>
+        <div class="erp-filter-field">
+            <label>Conciliado</label>
+            <select name="conciliado">
+                <option value="">Todos</option>
+                <option value="no" {% if filtros.conciliado == "no" %}selected{% endif %}>No conciliado</option>
+                <option value="si" {% if filtros.conciliado == "si" %}selected{% endif %}>Conciliado</option>
+            </select>
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a class="erp-btn-secondary" href="{% url 'conciliacion_bancaria' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Debitos Filtrados</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.debitos|floatformat:2|intcomma }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Creditos Filtrados</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.creditos|floatformat:2|intcomma }}</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Movimientos para revision</h3>
+            <p class="erp-card-muted">Clasifica, contabiliza y concilia desde una sola bandeja.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Cuenta</th>
+                    <th>Descripcion</th>
+                    <th>Debito</th>
+                    <th>Credito</th>
+                    <th>Clasificacion</th>
+                    <th>Estado</th>
+                    <th>Conciliacion</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.fecha }}</td>
+                    <td>
+                        <div class="erp-name-cell">{{ movimiento.cuenta_financiera.nombre }}</div>
+                        <div class="erp-subtext">{{ movimiento.cuenta_financiera.get_tipo_display }}</div>
+                    </td>
+                    <td>
+                        <div class="erp-name-cell">{{ movimiento.descripcion }}</div>
+                        <div class="erp-subtext">{{ movimiento.referencia|default:"Sin referencia" }}</div>
+                    </td>
+                    <td class="amount">L. {{ movimiento.debito|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ movimiento.credito|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if movimiento.estado != "contabilizado" %}
+                        <form method="post" action="{% url 'clasificar_movimiento_bancario' empresa.slug movimiento.id %}" style="display:flex;gap:8px;align-items:center;">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <select name="clasificacion">
+                                <option value="">Pendiente</option>
+                                {% for clasificacion in clasificaciones %}
+                                <option value="{{ clasificacion.id }}" {% if movimiento.clasificacion_id == clasificacion.id %}selected{% endif %}>{{ clasificacion.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <button class="erp-chip-btn" type="submit">Guardar</button>
+                        </form>
+                        {% else %}
+                        {{ movimiento.clasificacion.nombre|default:"-" }}
+                        {% endif %}
+                    </td>
+                    <td><span class="erp-badge {% if movimiento.estado == 'contabilizado' %}success{% elif movimiento.estado == 'clasificado' %}warning{% else %}danger{% endif %}">{{ movimiento.get_estado_display }}</span></td>
+                    <td>
+                        {% if movimiento.conciliado %}
+                            <span class="erp-badge success">Conciliado</span>
+                            <div class="erp-subtext">{{ movimiento.fecha_conciliacion|date:"Y-m-d H:i" }}{% if movimiento.conciliado_por %} por {{ movimiento.conciliado_por.username }}{% endif %}</div>
+                        {% else %}
+                            <span class="erp-badge warning">No conciliado</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions">
+                        {% if movimiento.estado == "clasificado" %}
+                            <a class="erp-chip-link" href="{% url 'contabilizar_movimiento_bancario' empresa.slug movimiento.id %}?next={{ request.get_full_path|urlencode }}">Contabilizar</a>
+                        {% elif movimiento.estado == "contabilizado" and not movimiento.conciliado %}
+                            <form method="post" action="{% url 'conciliar_movimiento_bancario' empresa.slug movimiento.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="erp-chip-btn">Conciliar</button>
+                            </form>
+                            {% if movimiento.asiento %}<a class="erp-chip-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.asiento.id %}">Ver asiento</a>{% endif %}
+                        {% elif movimiento.conciliado %}
+                            <form method="post" action="{% url 'desconciliar_movimiento_bancario' empresa.slug movimiento.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="erp-chip-btn">Desconciliar</button>
+                            </form>
+                            {% if movimiento.asiento %}<a class="erp-chip-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.asiento.id %}">Ver asiento</a>{% endif %}
+                        {% else %}
+                            <span class="erp-card-muted">Pendiente de clasificar</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="erp-empty">No hay movimientos para los filtros seleccionados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

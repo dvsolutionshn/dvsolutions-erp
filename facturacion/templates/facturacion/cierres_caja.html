@@ -1,0 +1,170 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Cierres de Caja - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion de Caja{% endblock %}
+{% block header_title %}Cierres de Caja{% endblock %}
+{% block header_description %}Control diario por cajero para entregar efectivo, tarjeta y transferencia con trazabilidad por factura.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'resumen_diario_caja' empresa.slug %}">Resumen Diario</a>
+<a class="erp-action-link" href="{% url 'facturacion_dashboard' empresa.slug %}">Volver a Facturacion</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Total sistema</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.total_sistema|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ resumen.pagos }} pago(s) registrados por tu usuario.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Efectivo</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.efectivo_sistema|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Cobros en caja.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Tarjeta</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.tarjeta_sistema|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Cobros POS o tarjeta.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Transferencia</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.transferencia_sistema|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Cobros bancarios registrados.</p>
+    </article>
+</section>
+
+<section class="erp-form-card">
+    <div class="erp-form-actions">
+        <div>
+            <h3 style="margin:0 0 8px;">Cerrar mi caja</h3>
+            <p>El sistema trae tus cobros del dia. Si el dinero fisico no cuadra, reporta el valor real y quedara la diferencia.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-form-grid three" style="margin-top:18px;">
+        <div class="erp-field">
+            <label for="fecha_get">Fecha</label>
+            <input id="fecha_get" type="date" name="fecha" value="{{ fecha }}">
+        </div>
+        <div class="erp-field">
+            <label for="turno_get">Turno</label>
+            <select id="turno_get" name="turno">
+                {% for valor, etiqueta in turnos %}
+                <option value="{{ valor }}" {% if turno == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-actions-right" style="align-items:end;">
+            <button type="submit" class="erp-btn-secondary">Ver dia</button>
+        </div>
+    </form>
+
+    <form method="post" class="erp-form-grid three" style="margin-top:18px;">
+        {% csrf_token %}
+        <input type="hidden" name="fecha" value="{{ fecha }}">
+        <input type="hidden" name="turno" value="{{ turno }}">
+        <div class="erp-field">
+            <label for="efectivo_reportado">Efectivo reportado</label>
+            <input id="efectivo_reportado" type="number" step="0.01" name="efectivo_reportado" value="{{ resumen.efectivo_sistema|floatformat:2 }}">
+            <div class="erp-field-help">Sistema: L. {{ resumen.efectivo_sistema|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="erp-field">
+            <label for="tarjeta_reportado">Tarjeta reportada</label>
+            <input id="tarjeta_reportado" type="number" step="0.01" name="tarjeta_reportado" value="{{ resumen.tarjeta_sistema|floatformat:2 }}">
+            <div class="erp-field-help">Sistema: L. {{ resumen.tarjeta_sistema|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="erp-field">
+            <label for="transferencia_reportado">Transferencia reportada</label>
+            <input id="transferencia_reportado" type="number" step="0.01" name="transferencia_reportado" value="{{ resumen.transferencia_sistema|floatformat:2 }}">
+            <div class="erp-field-help">Sistema: L. {{ resumen.transferencia_sistema|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="erp-field" style="grid-column:1 / -1;">
+            <label for="observacion">Observacion</label>
+            <input id="observacion" type="text" name="observacion" placeholder="Ejemplo: Entrega por almuerzo, cambio de cajero, diferencia revisada.">
+        </div>
+        <div class="erp-form-actions" style="grid-column:1 / -1;">
+            <div class="erp-field-help">Si vuelves a cerrar el mismo dia y turno, se actualiza el cierre existente.</div>
+            <button type="submit" class="erp-btn">Registrar Cierre</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Pagos de mi caja</h3>
+            <p>Estos son los cobros que alimentan tu cierre del dia seleccionado.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Factura</th>
+                    <th>Cliente</th>
+                    <th>Metodo</th>
+                    <th>Cuenta</th>
+                    <th>Referencia</th>
+                    <th class="erp-money">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pago in pagos_usuario %}
+                <tr>
+                    <td><a href="{% url 'ver_factura' empresa.slug pago.factura.id %}">{{ pago.factura.numero_factura|default:"Sin numero" }}</a></td>
+                    <td>{{ pago.factura.cliente.nombre }}</td>
+                    <td><span class="erp-badge">{{ pago.get_metodo_display }}</span></td>
+                    <td>{{ pago.cuenta_financiera.nombre|default:"-" }}</td>
+                    <td>{{ pago.referencia|default:"-" }}</td>
+                    <td class="erp-money">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty-row">No tienes pagos registrados para esta fecha.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Historial de cierres</h3>
+            <p>Resumen reciente de cierres creados en la empresa.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Cajero</th>
+                    <th>Turno</th>
+                    <th>Sistema</th>
+                    <th>Reportado</th>
+                    <th>Diferencia</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cierre in cierres %}
+                <tr>
+                    <td>{{ cierre.fecha|date:"d/m/Y" }}</td>
+                    <td>{{ cierre.cajero.username }}</td>
+                    <td>{{ cierre.get_turno_display }}</td>
+                    <td class="erp-money">L. {{ cierre.total_sistema|floatformat:2|intcomma }}</td>
+                    <td class="erp-money">L. {{ cierre.total_reportado|floatformat:2|intcomma }}</td>
+                    <td class="erp-money">L. {{ cierre.diferencia|floatformat:2|intcomma }}</td>
+                    <td><span class="erp-badge neutral">{{ cierre.get_estado_display }}</span></td>
+                    <td><a class="erp-btn-secondary" href="{% url 'ver_cierre_caja' empresa.slug cierre.id %}">Ver detalle</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty-row">Todavia no hay cierres registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

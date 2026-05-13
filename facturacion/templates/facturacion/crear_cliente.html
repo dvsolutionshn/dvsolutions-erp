@@ -1,0 +1,85 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo|default:"Nuevo cliente" }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Catalogo comercial{% endblock %}
+{% block header_title %}{{ titulo|default:"Nuevo cliente" }}{% endblock %}
+{% block header_description %}Administra la informacion comercial y fiscal del cliente desde una captura mas directa, limpia y profesional.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'clientes_facturacion' empresa.slug %}">Volver a clientes</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-client-form .erp-field-span-full{
+    grid-column:1 / -1;
+}
+.erp-client-form .erp-inline-checks{
+    margin-top:4px;
+}
+.erp-client-form .erp-field textarea{
+    min-height:62px;
+    height:62px;
+}
+@media (max-width: 760px){
+    .erp-compact-grid.three-col,
+    .erp-compact-grid.two-col{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-compact-form erp-client-form is-dense">
+    <form method="post" class="erp-compact-form is-dense">
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% if form.non_field_errors %}
+        <section class="erp-compact-card is-slim">
+            <ul class="erp-field-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        </section>
+        {% endif %}
+
+        <section class="erp-compact-card is-slim">
+            <h3>Ficha del cliente</h3>
+            <p>Completa contacto, datos fiscales y preferencias comerciales en una sola vista mas agil.</p>
+            <div class="erp-compact-grid three-col is-tight" style="margin-top:12px;">
+                {% for field in form %}
+                {% if field.name == 'acepta_promociones' or field.name == 'activo' %}
+                {% else %}
+                <div class="erp-field {% if field.name == 'direccion' or field.name == 'observacion' or field.name == 'ciudad' %}erp-field-span-full{% endif %}">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                    {% if field.errors %}<ul class="erp-field-errors">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="erp-inline-checks">
+                <div class="erp-check-card is-inline">
+                    <label for="{{ form.acepta_promociones.id_for_label }}">Acepta promociones</label>
+                    {{ form.acepta_promociones }}
+                </div>
+                <div class="erp-check-card is-inline">
+                    <label for="{{ form.activo.id_for_label }}">Activo</label>
+                    {{ form.activo }}
+                </div>
+            </div>
+            {% if form.acepta_promociones.errors %}<ul class="erp-field-errors">{% for error in form.acepta_promociones.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+            {% if form.activo.errors %}<ul class="erp-field-errors">{% for error in form.activo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+        </section>
+
+        <section class="erp-compact-card is-slim">
+            <div class="erp-form-actions">
+                <div class="erp-field-help">Los cambios quedaran disponibles para facturacion, cartera y CRM.</div>
+                <div class="erp-actions-right">
+                    <a class="erp-btn-secondary" href="{% url 'clientes_facturacion' empresa.slug %}">Cancelar</a>
+                    <button type="submit" class="erp-btn">{{ texto_boton|default:"Guardar cliente" }}</button>
+                </div>
+            </div>
+        </section>
+    </form>
+</section>
+{% endblock %}

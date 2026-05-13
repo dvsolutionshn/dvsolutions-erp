@@ -1,0 +1,71 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Nuevo Lote - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Farmaceutico{% endblock %}
+{% block header_title %}Nuevo Lote{% endblock %}
+{% block header_description %}Registra existencias por lote, vencimiento y bodega para trazabilidad farmaceutica.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'inventario_farmaceutico' empresa.slug %}">Volver a Inventario Farmaceutico</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-compact-form">
+    <article class="erp-compact-card">
+        <h3>Nuevo lote</h3>
+        <p>Registra existencias por lote, vencimiento y bodega con una captura mas simple para operacion farmaceutica.</p>
+    </article>
+
+    <section class="erp-compact-card">
+    <form method="post" class="erp-compact-grid three-col">
+        {% csrf_token %}
+        <div class="erp-field">
+            <label for="producto">Producto</label>
+            <select id="producto" name="producto" required>
+                <option value="">Seleccione producto</option>
+                {% for producto in productos %}
+                <option value="{{ producto.id }}">{{ producto.nombre }}{% if producto.codigo %} - {{ producto.codigo }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-field">
+            <label for="numero_lote">Numero de lote</label>
+            <input id="numero_lote" type="text" name="numero_lote" required placeholder="Ejemplo: LOT-2026-001">
+        </div>
+        <div class="erp-field">
+            <label for="fecha_vencimiento">Fecha de vencimiento</label>
+            <input id="fecha_vencimiento" type="date" name="fecha_vencimiento">
+        </div>
+        <div class="erp-field">
+            <label for="bodega">Bodega inicial</label>
+            <select id="bodega" name="bodega" required>
+                {% for bodega in bodegas %}
+                <option value="{{ bodega.id }}" {% if bodega.id == bodega_principal.id %}selected{% endif %}>{{ bodega.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-field">
+            <label for="cantidad">Cantidad</label>
+            <input id="cantidad" type="number" step="0.01" name="cantidad" required placeholder="0.00">
+        </div>
+        <div class="erp-field">
+            <label for="proveedor">Proveedor</label>
+            <select id="proveedor" name="proveedor">
+                <option value="">Sin proveedor</option>
+                {% for proveedor in proveedores %}
+                <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-field" style="grid-column:1 / -1;">
+            <label for="observacion">Observacion</label>
+            <input id="observacion" type="text" name="observacion" placeholder="Ejemplo: ingreso inicial, factura de compra, revision sanitaria.">
+        </div>
+        <div class="erp-form-actions" style="grid-column:1 / -1;">
+            <a class="erp-btn-secondary" href="{% url 'inventario_farmaceutico' empresa.slug %}">Cancelar</a>
+            <button class="erp-btn" type="submit">Guardar Lote</button>
+        </div>
+    </form>
+    </section>
+</section>
+{% endblock %}

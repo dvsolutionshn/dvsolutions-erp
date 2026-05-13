@@ -1,0 +1,196 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}CAI - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Fiscal{% endblock %}
+{% block header_title %}CAI y Rangos Fiscales{% endblock %}
+{% block header_description %}Administra correlativos y vigencias fiscales con una lectura clara, profesional y apta para auditoria.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_cai_facturacion' empresa.slug %}">Nuevo CAI</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-fiscal-kpis{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+.erp-cai-table{
+    min-width:1100px;
+}
+.erp-cai-filters{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:end;
+}
+.erp-cai-filters .erp-field{
+    min-width:240px;
+    padding:0;
+    background:transparent;
+    border:none;
+    box-shadow:none;
+}
+.erp-cai-filters .erp-field label{
+    margin-bottom:6px;
+}
+.erp-cai-number{
+    font-weight:700;
+    color:#102338;
+}
+.erp-cai-meta{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+}
+.erp-chip-link{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--primary);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.02em;
+    box-shadow:var(--shadow-soft);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-fiscal-kpis">
+    <article class="erp-card">
+        <div class="erp-kpi-label">CAI</div>
+        <div class="erp-stat-value">{{ resumen.total }}</div>
+        <p class="erp-card-muted">Rangos fiscales registrados para la empresa.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Activos</div>
+        <div class="erp-stat-value">{{ resumen.activos }}</div>
+        <p class="erp-card-muted">Disponibles para nuevos documentos.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Vigentes</div>
+        <div class="erp-stat-value">{{ resumen.vigentes }}</div>
+        <p class="erp-card-muted">Con rango activo entre su fecha de activacion y vencimiento.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Vencidos</div>
+        <div class="erp-stat-value">{{ resumen.vencidos }}</div>
+        <p class="erp-card-muted">Requieren seguimiento o reemplazo.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Por Vencer</div>
+        <div class="erp-stat-value">{{ resumen.por_vencer }}</div>
+        <p class="erp-card-muted">Vencen en los próximos 15 días.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Agotados</div>
+        <div class="erp-stat-value">{{ resumen.agotados }}</div>
+        <p class="erp-card-muted">Ya llegaron al correlativo final autorizado.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Control de CAI</h3>
+            <div class="erp-card-muted">Consulta vigencia, correlativo y configuracion documental de cada rango fiscal.</div>
+        </div>
+        <form method="get" class="erp-cai-filters">
+            <div class="erp-field">
+                <label for="id_uso_documento">Filtrar por uso</label>
+                <select id="id_uso_documento" name="uso_documento">
+                    <option value="">Todos los documentos</option>
+                    <option value="factura" {% if uso_documento == "factura" %}selected{% endif %}>Facturas</option>
+                    <option value="nota_credito" {% if uso_documento == "nota_credito" %}selected{% endif %}>Notas de Credito</option>
+                </select>
+            </div>
+            <button type="submit" class="erp-btn">Aplicar</button>
+            {% if uso_documento %}
+            <a class="erp-btn-secondary" href="{% url 'cai_facturacion' empresa.slug %}">Limpiar</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table erp-cai-table">
+            <thead><tr><th>Numero CAI</th><th>Uso</th><th>Documento</th><th>Rango</th><th>Correlativo</th><th>Vigencia</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for cai in cais %}
+                <tr>
+                    <td>
+                        <div class="erp-cai-number">{{ cai.numero_cai }}</div>
+                        <div class="erp-cai-meta">Creado {{ cai.fecha_creacion|date:"M d, Y" }}</div>
+                    </td>
+                    <td>
+                        {% if cai.uso_documento == "factura" %}
+                        <span class="erp-badge info">Factura</span>
+                        {% else %}
+                        <span class="erp-badge warning">Nota de Credito</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="erp-cai-number">{{ cai.establecimiento }}-{{ cai.punto_emision }}-{{ cai.tipo_documento }}</div>
+                        <div class="erp-cai-meta">Documento fiscal asociado</div>
+                    </td>
+                    <td>
+                        <div>{{ cai.rango_inicial }} al {{ cai.rango_final }}</div>
+                        <div class="erp-cai-meta">Rango autorizado por administracion tributaria</div>
+                    </td>
+                    <td>
+                        <div class="erp-money">{{ cai.correlativo_actual }}</div>
+                        <div class="erp-cai-meta">
+                            {% if cai.correlativo_actual >= cai.rango_final %}
+                                Agotado
+                            {% else %}
+                                Disponible para seguir emitiendo
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div>{{ cai.fecha_activacion|date:"d/m/Y" }} al {{ cai.fecha_limite|date:"d/m/Y" }}</div>
+                        <div class="erp-cai-meta">
+                            {% if cai.fecha_limite < hoy %}
+                                Vencido
+                            {% elif cai.fecha_activacion > hoy %}
+                                Programado
+                            {% elif cai.fecha_limite <= fecha_alerta %}
+                                Por vencer
+                            {% else %}
+                                Vigente
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if cai.correlativo_actual >= cai.rango_final %}
+                        <span class="erp-badge danger">Agotado</span>
+                        {% elif cai.fecha_limite < hoy %}
+                        <span class="erp-badge danger">Vencido</span>
+                        {% elif cai.fecha_activacion > hoy %}
+                        <span class="erp-badge neutral">Programado</span>
+                        {% elif cai.fecha_limite <= fecha_alerta %}
+                        <span class="erp-badge warning">Por vencer</span>
+                        {% elif cai.activo %}
+                        <span class="erp-badge success">Activo</span>
+                        {% else %}
+                        <span class="erp-badge neutral">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions">
+                        <a class="erp-chip-link" href="{% url 'editar_cai_facturacion' empresa.slug cai.id %}">Editar</a>
+                        {% if permite_gestion_fiscal_historica %}
+                        <form method="post" action="{% url 'eliminar_cai_facturacion' empresa.slug cai.id %}" style="display:inline;">{% csrf_token %}<button class="erp-chip-btn danger" type="submit" onclick="return confirm('Seguro que desea eliminar este CAI?');">Eliminar</button></form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="8" class="erp-empty">No hay CAI registrados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

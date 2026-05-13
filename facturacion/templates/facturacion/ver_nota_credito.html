@@ -1,0 +1,86 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Nota de Crédito - {{ nota.numero_nota|default:"Borrador" }}</title>
+<style>
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f3f5;}
+.topbar{background:#1e2a38;color:white;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;}
+.topbar a{color:white;text-decoration:none;}
+.container{max-width:1300px;margin:40px auto;padding:0 25px;}
+.card{background:white;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.06);padding:25px;margin-bottom:25px;}
+.section-title{font-weight:600;margin-bottom:15px;color:#1e2a38;}
+table{width:100%;border-collapse:collapse;table-layout:fixed;}
+th{background:#f8f9fa;padding:10px;font-size:13px;text-align:left;}
+td{padding:8px 10px;border-bottom:1px solid #eee;font-size:14px;vertical-align:top;}
+.badge{padding:5px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+.borrador{background:#ffeeba;color:#856404;}
+.emitida{background:#d4edda;color:#155724;}
+.anulada{background:#f8d7da;color:#721c24;}
+.btn{background:#6c63ff;color:white;padding:8px 15px;border-radius:6px;text-decoration:none;font-size:14px;display:inline-block;border:none;cursor:pointer;}
+.btn-danger{background:#dc3545;}
+.actions-form{display:inline;}
+</style>
+</head>
+<body>
+<div class="topbar">
+    <h2>Nota de Crédito {{ nota.numero_nota|default:"Borrador" }}</h2>
+    <a href="{% url 'notas_credito_dashboard' empresa.slug %}">Volver</a>
+</div>
+<div class="container">
+<div class="card">
+    <div class="section-title">Información General</div>
+    <p><strong>Factura origen:</strong> {{ nota.factura_origen.numero_factura|default:nota.factura_origen.id }}</p>
+    <p><strong>Cliente:</strong> {{ nota.cliente.nombre }}</p>
+    <p><strong>CAI:</strong> {{ nota.cai_numero_historico|default:"Sin CAI asignado" }}</p>
+    <p><strong>Fecha:</strong> {{ nota.fecha_emision }}</p>
+    <p><strong>Motivo:</strong> {{ nota.motivo|default:"-" }}</p>
+    <p><strong>Estado:</strong>
+    {% if nota.estado == "borrador" %}
+        <span class="badge borrador">BORRADOR</span>
+    {% elif nota.estado == "emitida" %}
+        <span class="badge emitida">EMITIDA</span>
+    {% else %}
+        <span class="badge anulada">ANULADA</span>
+    {% endif %}
+    </p>
+</div>
+<div class="card">
+    <div class="section-title">Detalle</div>
+    <table>
+        <thead>
+            <tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Impuesto</th><th>Total</th></tr>
+        </thead>
+        <tbody>
+            {% for linea in nota.lineas.all %}
+            <tr>
+                <td>{{ linea.producto.nombre }}</td>
+                <td>{{ linea.cantidad }}</td>
+                <td>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.precio_unitario|floatformat:2|intcomma }}</td>
+                <td>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</td>
+                <td>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</td>
+                <td>{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="card">
+    <div class="section-title">Resumen</div>
+    <p><strong>Total:</strong> {% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ nota.total|floatformat:2|intcomma }}</p>
+    <strong>{{ nota.total_en_letras }}</strong>
+</div>
+<div class="card">
+    <a class="btn" href="{% url 'editar_nota_credito' empresa.slug nota.id %}">Editar Nota de Crédito</a>
+    {% if nota.estado != "anulada" %}
+    <form method="post" action="{% url 'anular_nota_credito' empresa.slug nota.id %}" class="actions-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" onclick="return confirm('¿Seguro que desea anular esta nota de crédito?');">
+            Anular Nota de Crédito
+        </button>
+    </form>
+    {% endif %}
+</div>
+</div>
+</body>
+</html>

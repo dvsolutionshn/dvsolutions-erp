@@ -1,0 +1,133 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Ingresos por Banco - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Tesoreria Comercial{% endblock %}
+{% block header_title %}Ingresos por Banco{% endblock %}
+{% block header_description %}Consulta que facturas fueron cobradas por cada banco, caja o POS para cuadrar transferencias y cierres con precision.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'facturacion_dashboard' empresa.slug %}">Volver a Facturacion</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Total Ingresado</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.total_ingresado|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Cobros filtrados con cuenta financiera asignada.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Pagos</div>
+        <p class="erp-stat-value">{{ resumen.cantidad_pagos }}</p>
+        <p class="erp-card-muted">Movimientos de cobro encontrados.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Transferencias</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.transferencias|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Ingresos recibidos por transferencia bancaria.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Tarjetas</div>
+        <p class="erp-stat-value erp-money">L. {{ resumen.tarjetas|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Cobros registrados por POS o tarjeta.</p>
+    </article>
+</section>
+
+<section class="erp-form-card">
+    <h3 style="margin:0 0 14px;">Filtros</h3>
+    <form method="get" class="erp-form-grid five">
+        <div class="erp-field">
+            <label for="fecha_desde">Desde</label>
+            <input id="fecha_desde" type="date" name="fecha_desde" value="{{ fecha_desde }}">
+        </div>
+        <div class="erp-field">
+            <label for="fecha_hasta">Hasta</label>
+            <input id="fecha_hasta" type="date" name="fecha_hasta" value="{{ fecha_hasta }}">
+        </div>
+        <div class="erp-field">
+            <label for="cuenta">Cuenta / banco</label>
+            <select id="cuenta" name="cuenta">
+                <option value="">Todas las cuentas</option>
+                {% for cuenta in cuentas_financieras %}
+                <option value="{{ cuenta.id }}" {% if cuenta_id == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-field">
+            <label for="metodo">Metodo</label>
+            <select id="metodo" name="metodo">
+                <option value="">Todos</option>
+                {% for valor, etiqueta in metodos_pago %}
+                <option value="{{ valor }}" {% if metodo == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-actions-right" style="align-items:end;">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a class="erp-btn-secondary" href="{% url 'reporte_ingresos_bancos' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    {% for item in resumen_cuentas %}
+    <article class="erp-card">
+        <div class="erp-kpi-label">{{ item.cuenta.get_tipo_display }}</div>
+        <p class="erp-stat-value erp-money">L. {{ item.total|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ item.cuenta.nombre }} · {{ item.cantidad }} pago(s)</p>
+    </article>
+    {% empty %}
+    <article class="erp-card">
+        <div class="erp-kpi-label">Sin movimientos</div>
+        <p class="erp-card-muted">No hay pagos bancarios para los filtros seleccionados.</p>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Detalle de ingresos</h3>
+            <p>Factura por factura, con cliente, metodo, cuenta destino y referencia.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Factura</th>
+                    <th>Cliente</th>
+                    <th>Metodo</th>
+                    <th>Cuenta</th>
+                    <th>Referencia</th>
+                    <th class="erp-money">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pago in pagos %}
+                <tr>
+                    <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+                    <td><a href="{% url 'ver_factura' empresa.slug pago.factura.id %}">{{ pago.factura.numero_factura|default:"Sin numero" }}</a></td>
+                    <td>{{ pago.factura.cliente.nombre }}</td>
+                    <td><span class="erp-badge">{{ pago.get_metodo_display }}</span></td>
+                    <td>
+                        <strong>{{ pago.cuenta_financiera.nombre }}</strong>
+                        {% if pago.cuenta_financiera.numero %}
+                        <div class="erp-card-muted">{{ pago.cuenta_financiera.numero }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ pago.referencia|default:"-" }}</td>
+                    <td class="erp-money">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="erp-empty-row">No hay ingresos registrados con los filtros actuales.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

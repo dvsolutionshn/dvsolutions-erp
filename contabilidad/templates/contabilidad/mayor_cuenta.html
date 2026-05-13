@@ -1,0 +1,92 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Mayor por Cuenta - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Mayor por Cuenta{% endblock %}
+{% block header_description %}Analiza el movimiento de una cuenta contable con debe, haber y saldo acumulado por cada partida.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Seleccionar cuenta</h3>
+            <p class="erp-card-muted">Consulta el mayor auxiliar por cuenta y periodo.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="cuenta">Cuenta</label>
+            <select id="cuenta" name="cuenta" required>
+                <option value="">Selecciona una cuenta</option>
+                {% for cuenta_item in cuentas %}
+                <option value="{{ cuenta_item.id }}" {% if filtros.cuenta == cuenta_item.id|stringformat:"s" %}selected{% endif %}>{{ cuenta_item.codigo }} - {{ cuenta_item.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Consultar</button>
+            <a href="{% url 'mayor_cuenta' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Cuenta</div><p class="erp-stat-value">{% if cuenta %}{{ cuenta.codigo }}{% else %}-{% endif %}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Movimientos</div><p class="erp-stat-value">{{ resumen.movimientos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldo</div><p class="erp-stat-value">L. {{ resumen.saldo }}</p></article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">{% if cuenta %}{{ cuenta.codigo }} - {{ cuenta.nombre }}{% else %}Mayor auxiliar{% endif %}</h3>
+            <p class="erp-card-muted">Selecciona una cuenta para consultar su movimiento contable.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Asiento</th>
+                    <th>Detalle</th>
+                    <th>Referencia</th>
+                    <th>Debe</th>
+                    <th>Haber</th>
+                    <th>Saldo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movimiento in movimientos %}
+                <tr>
+                    <td>{{ movimiento.linea.asiento.fecha|date:"F j, Y" }}</td>
+                    <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.linea.asiento.id %}">{{ movimiento.linea.asiento.numero|default:"Sin numero" }}</a></td>
+                    <td>{{ movimiento.linea.detalle|default:movimiento.linea.asiento.descripcion }}</td>
+                    <td>{{ movimiento.linea.asiento.referencia|default:"-" }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.debe }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.haber }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.saldo }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="erp-empty">Selecciona una cuenta o ajusta los filtros para ver movimientos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ campania.nombre }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Marketing{% endblock %}
+{% block header_title %}{{ campania.nombre }}{% endblock %}
+{% block header_description %}Prepara mensajes para todos los clientes objetivo con un boton. El envio automatico masivo requiere WhatsApp Business Cloud API.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crm_campanias' empresa.slug %}">Volver</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Audiencia</div><p class="erp-stat-value" style="font-size:22px;">{{ campania.get_audiencia_display }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Estado</div><p class="erp-stat-value" style="font-size:22px;">{{ campania.get_estado_display }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Envios</div><p class="erp-stat-value">{{ envios.count }}</p></article>
+    <article class="erp-card">
+        <form method="post" action="{% url 'crm_preparar_envios_campania' empresa.slug campania.id %}">
+            {% csrf_token %}
+            <button class="erp-btn" type="submit">Preparar Mensajes para Todos</button>
+        </form>
+    </article>
+    <article class="erp-card">
+        <form method="post" action="{% url 'crm_enviar_campania_whatsapp_api' empresa.slug campania.id %}">
+            {% csrf_token %}
+            <div class="erp-kpi-label">WhatsApp API</div>
+            <button class="erp-btn" type="submit">Enviar Todos por API</button>
+            <p class="erp-card-muted">Usa la plantilla comercial aprobada en Meta. Si hay imagen promocional, se envia como encabezado de la plantilla.</p>
+        </form>
+    </article>
+    <article class="erp-card">
+        <form method="post" action="{% url 'crm_enviar_campania_plantilla_prueba' empresa.slug campania.id %}">
+            {% csrf_token %}
+            <div class="erp-kpi-label">Demo sin imagen</div>
+            <button class="erp-btn erp-btn-secondary" type="submit">Enviar hello_world a Todos</button>
+            <p class="erp-card-muted">Usa la plantilla oficial de prueba de Meta para demostrar envio simultaneo mientras aprueban la plantilla comercial.</p>
+        </form>
+    </article>
+</section>
+
+{% if campania.plantilla and campania.plantilla.imagen_promocional %}
+<section class="erp-card">
+    <div class="erp-card-header">
+        <div>
+            <h3>Imagen promocional</h3>
+            <p>Esta imagen se enviara por WhatsApp Cloud API cuando uses Enviar Todos por API. Con el boton manual WhatsApp solo se abre el texto.</p>
+        </div>
+    </div>
+    <img src="{{ campania.plantilla.imagen_promocional.url }}" alt="Imagen promocional" style="max-width:360px;border-radius:18px;border:1px solid var(--line);">
+</section>
+{% endif %}
+
+<section class="erp-card erp-table-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Cliente</th><th>Canal</th><th>Estado</th><th>Mensaje</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for envio in envios %}
+            <tr>
+                <td><strong>{{ envio.cliente.nombre }}</strong><small>{{ envio.cliente.telefono_whatsapp|default:envio.cliente.telefono|default:"Sin telefono" }}</small></td>
+                <td>{{ envio.canal }}</td>
+                <td>{{ envio.get_estado_display }}</td>
+                <td>{{ envio.mensaje|truncatechars:120 }}</td>
+                <td class="actions">{% if envio.whatsapp_url %}<a class="erp-link" target="_blank" href="{{ envio.whatsapp_url }}">WhatsApp</a>{% else %}<span class="erp-muted">Sin telefono</span>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="erp-empty">Prepara los envios para ver los clientes objetivo.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

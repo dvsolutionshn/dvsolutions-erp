@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CAI, Factura, Cliente, Producto, LineaFactura, TipoImpuesto, PagoFactura
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ExistenciaLoteBodega, Factura, Cliente, LoteInventario, MovimientoLoteBodega, PerfilFarmaceuticoProducto, Producto, LineaFactura, TipoImpuesto, PagoFactura
 
 
 # ==========================
@@ -85,4 +85,53 @@ class FacturaAdmin(admin.ModelAdmin):
 # ==========================
 @admin.register(PagoFactura)
 class PagoFacturaAdmin(admin.ModelAdmin):
-    list_display = ('factura', 'monto', 'metodo', 'fecha')
+    list_display = ('factura', 'monto', 'metodo', 'fecha', 'cajero')
+
+
+@admin.register(CierreCaja)
+class CierreCajaAdmin(admin.ModelAdmin):
+    list_display = ('empresa', 'fecha', 'cajero', 'turno', 'total_sistema', 'total_reportado', 'diferencia', 'estado')
+    list_filter = ('empresa', 'fecha', 'turno', 'estado')
+    search_fields = ('empresa__nombre', 'cajero__username', 'observacion')
+
+
+@admin.register(BodegaInventario)
+class BodegaInventarioAdmin(admin.ModelAdmin):
+    list_display = ('empresa', 'nombre', 'tipo', 'activa')
+    list_filter = ('empresa', 'tipo', 'activa')
+    search_fields = ('nombre', 'empresa__nombre')
+
+
+@admin.register(LoteInventario)
+class LoteInventarioAdmin(admin.ModelAdmin):
+    list_display = ('empresa', 'producto', 'numero_lote', 'fecha_vencimiento', 'activo')
+    list_filter = ('empresa', 'activo', 'fecha_vencimiento')
+    search_fields = ('numero_lote', 'producto__nombre')
+
+
+@admin.register(ExistenciaLoteBodega)
+class ExistenciaLoteBodegaAdmin(admin.ModelAdmin):
+    list_display = ('empresa', 'bodega', 'lote', 'cantidad')
+    list_filter = ('empresa', 'bodega')
+    search_fields = ('lote__numero_lote', 'lote__producto__nombre', 'bodega__nombre')
+
+
+@admin.register(MovimientoLoteBodega)
+class MovimientoLoteBodegaAdmin(admin.ModelAdmin):
+    list_display = ('empresa', 'fecha', 'bodega', 'lote', 'tipo', 'cantidad', 'referencia')
+    list_filter = ('empresa', 'tipo', 'bodega')
+    search_fields = ('lote__numero_lote', 'lote__producto__nombre', 'referencia')
+
+
+@admin.register(CategoriaProductoFarmaceutico)
+class CategoriaProductoFarmaceuticoAdmin(admin.ModelAdmin):
+    list_display = ('empresa', 'nombre', 'requiere_receta_default', 'requiere_refrigeracion_default', 'producto_controlado_default', 'activa')
+    list_filter = ('empresa', 'activa', 'requiere_receta_default', 'requiere_refrigeracion_default', 'producto_controlado_default')
+    search_fields = ('nombre', 'descripcion')
+
+
+@admin.register(PerfilFarmaceuticoProducto)
+class PerfilFarmaceuticoProductoAdmin(admin.ModelAdmin):
+    list_display = ('empresa', 'producto', 'categoria', 'principio_activo', 'laboratorio', 'producto_controlado', 'requiere_refrigeracion')
+    list_filter = ('empresa', 'categoria', 'producto_controlado', 'requiere_refrigeracion', 'requiere_receta')
+    search_fields = ('producto__nombre', 'principio_activo', 'laboratorio', 'registro_sanitario')

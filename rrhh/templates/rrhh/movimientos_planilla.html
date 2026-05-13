@@ -1,0 +1,56 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Movimientos de Planilla - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}RRHH{% endblock %}
+{% block header_title %}Bonos y Deducciones{% endblock %}
+{% block header_description %}Registra bonos, comisiones, prestamos y deducciones antes de calcular la planilla.{% endblock %}
+
+{% block content %}
+<section class="erp-compact-form">
+    <section class="erp-compact-card">
+        <h3>Nuevo movimiento</h3>
+        <p>Carga el movimiento una sola vez y el sistema lo tomara cuando recalcules la planilla correspondiente.</p>
+        <form method="post" class="erp-compact-form">
+            {% csrf_token %}
+            <div class="erp-compact-grid two-col">
+                {% for field in form %}
+                <div class="erp-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="erp-form-actions">
+                <button class="erp-btn" type="submit">Agregar Movimiento</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-list-table">
+                <thead><tr><th>Empleado</th><th>Tipo</th><th>Descripcion</th><th>Monto</th><th>Fecha</th><th>Aplicado</th></tr></thead>
+                <tbody>
+                    {% for movimiento in movimientos %}
+                    <tr>
+                        <td class="erp-doc-cell">
+                            <div class="erp-doc-title">{{ movimiento.empleado.nombre_completo }}</div>
+                            <div class="erp-doc-subtext">{{ movimiento.periodo.nombre|default:"Disponible para cualquier planilla" }}</div>
+                        </td>
+                        <td>{{ movimiento.get_tipo_display }}</td>
+                        <td>{{ movimiento.descripcion }}</td>
+                        <td class="amount">L. {{ movimiento.monto|floatformat:2|intcomma }}</td>
+                        <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
+                        <td><span class="erp-badge {% if movimiento.aplicado %}success{% else %}warning{% endif %}">{{ movimiento.aplicado|yesno:"Aplicado,Pendiente" }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="erp-empty">Sin movimientos registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}

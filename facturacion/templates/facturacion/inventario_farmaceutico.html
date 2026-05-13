@@ -1,0 +1,106 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Inventario Farmaceutico - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Farmaceutico{% endblock %}
+{% block header_title %}Inventario Farmaceutico{% endblock %}
+{% block header_description %}Existencias por lote, vencimiento y ubicacion: bodega principal, provisional y vitrina.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_lote_inventario' empresa.slug %}">Nuevo Lote</a>
+<a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
+<a class="erp-action-link" href="{% url 'traslado_inventario_farmaceutico' empresa.slug %}">Trasladar</a>
+<a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Inventario Base</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Lotes activos</div>
+        <p class="erp-stat-value">{{ resumen.lotes }}</p>
+        <p class="erp-card-muted">Productos separados por lote.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Bodegas</div>
+        <p class="erp-stat-value">{{ resumen.bodegas }}</p>
+        <p class="erp-card-muted">Principal, provisional y vitrina.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Unidades</div>
+        <p class="erp-stat-value">{{ resumen.unidades|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Total por lotes y bodegas.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Por vencer</div>
+        <p class="erp-stat-value">{{ resumen.por_vencer }}</p>
+        <p class="erp-card-muted">Lotes vencidos o a 60 dias.</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    {% for item in resumen_bodegas %}
+    <article class="erp-card">
+        <div class="erp-kpi-label">{{ item.bodega.get_tipo_display }}</div>
+        <p class="erp-stat-value">{{ item.total|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ item.bodega.nombre }}</p>
+    </article>
+    {% endfor %}
+</section>
+
+{% if lotes_alerta %}
+<section class="erp-card erp-alert-banner">
+    <div>
+        <strong>Productos proximos a vencer</strong>
+        <p>Prioriza estos lotes para venta o revision antes de seguir abasteciendo vitrina.</p>
+    </div>
+</section>
+{% endif %}
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Existencias por lote y bodega</h3>
+            <p>Ordenado por vencimiento para vender primero lo que vence antes.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Lote</th>
+                    <th>Vencimiento</th>
+                    <th>Bodega</th>
+                    <th class="erp-money">Cantidad</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for existencia in existencias %}
+                <tr>
+                    <td>
+                        <strong>{{ existencia.lote.producto.nombre }}</strong>
+                        <div class="erp-card-muted">{{ existencia.lote.producto.codigo|default:"Sin codigo" }}</div>
+                    </td>
+                    <td>{{ existencia.lote.numero_lote }}</td>
+                    <td>{{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"Sin vencimiento" }}</td>
+                    <td><span class="erp-badge neutral">{{ existencia.bodega.nombre }}</span></td>
+                    <td class="erp-money">{{ existencia.cantidad|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if existencia.lote.vencido %}
+                        <span class="erp-badge danger">Vencido</span>
+                        {% elif existencia.lote.por_vencer %}
+                        <span class="erp-badge warning">Por vencer</span>
+                        {% else %}
+                        <span class="erp-badge success">Disponible</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty-row">Todavia no hay lotes registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

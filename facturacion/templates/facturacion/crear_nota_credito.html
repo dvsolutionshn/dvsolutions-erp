@@ -1,0 +1,428 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html>
+<head>
+<title>{{ titulo_documento|default:"Nota de Crédito" }} - {{ empresa.nombre }}</title>
+<style>
+body{margin:0;font-family:"Segoe UI",Roboto;background:#f4f6f9;}
+.topbar{background:linear-gradient(135deg,#1e293b,#334155);color:white;padding:18px 30px;display:flex;justify-content:space-between;}
+.container{max-width:1400px;margin:30px auto;padding:0 20px;}
+.card{background:white;border-radius:14px;padding:25px;margin-bottom:20px;box-shadow:0 8px 25px rgba(0,0,0,0.05);}
+.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;}
+.form-grid div{display:flex;flex-direction:column;gap:6px;background:#ffffff;padding:12px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,0.04);}
+label{font-size:12px;font-weight:600;}
+input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #d1d5db;background:#f9fafb;box-sizing:border-box;}
+.tabla-header{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto 1fr 1fr 1fr auto;background:#1e293b;color:white;padding:12px 18px;border-radius:10px;}
+.tabla-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto 1fr 1fr 1fr auto;gap:16px;padding:16px 10px;margin-top:10px;background:#ffffff;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,0.04);}
+.tabla-row > div{display:flex;align-items:center;padding:6px;}
+.add-btn{background:#10b981;color:white;padding:10px;border-radius:8px;border:none;cursor:pointer;}
+.delete-btn{background:#ef4444;color:white;padding:8px;border-radius:8px;border:none;cursor:pointer;}
+.btn-comentario{background:#6366f1;color:white;padding:8px;border-radius:8px;border:none;cursor:pointer;}
+.footer-bar{display:flex;justify-content:space-between;align-items:center;}
+.btn-guardar{background:linear-gradient(135deg,#1e293b,#6366f1);color:white;padding:12px 20px;border-radius:10px;border:none;cursor:pointer;}
+.messages{margin-bottom:20px;}
+.message{padding:12px;border-radius:8px;margin-bottom:8px;background:#fee2e2;color:#991b1b;}
+.helper-box{margin-top:15px;padding:14px 16px;border-radius:12px;background:#eef2ff;color:#312e81;line-height:1.5;}
+.helper-box strong{color:#1e1b4b;}
+.selector-box{margin-top:15px;padding:16px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;}
+.selector-options{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;}
+.selector-options label{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;}
+.selector-options input[type="radio"]{width:auto;}
+.productos-selector{display:none;margin-top:12px;}
+.producto-item{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:white;margin-bottom:8px;}
+.producto-item label{display:flex;align-items:flex-start;gap:10px;font-size:14px;font-weight:500;cursor:pointer;flex:1;}
+.producto-item input[type="checkbox"]{width:auto;margin-top:3px;}
+.producto-meta{font-size:12px;color:#64748b;text-align:right;min-width:160px;}
+.selector-actions{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;}
+.selector-btn{background:#334155;color:white;padding:10px 14px;border:none;border-radius:8px;cursor:pointer;}
+.selector-btn-secondary{background:#64748b;}
+</style>
+</head>
+<body>
+<div class="topbar">
+    <h2>{{ titulo_documento|default:"Nota de Crédito" }}</h2>
+    <a href="{% url 'notas_credito_dashboard' empresa.slug %}" style="color:white;">Volver</a>
+</div>
+<div class="container">
+<form method="post">
+{% csrf_token %}
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+        <div class="message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>Información General</h3>
+    <div class="form-grid">
+        <div>{{ form.factura_origen.label_tag }}{{ form.factura_origen }}</div>
+        <div>{{ form.fecha_emision.label_tag }}{{ form.fecha_emision }}</div>
+        <div>{{ form.estado.label_tag }}{{ form.estado }}</div>
+        <div>{{ form.motivo.label_tag }}{{ form.motivo }}</div>
+    </div>
+    <div id="factura-info" class="helper-box" style="display:none;">
+        <strong>Factura seleccionada:</strong> <span data-factura-numero>-</span><br>
+        <strong>Cliente:</strong> <span data-factura-cliente>-</span><br>
+        <strong>Total factura:</strong> <span data-factura-total>-</span><br>
+        <strong>Disponible para acreditar:</strong> <span data-factura-saldo>-</span><br>
+        Puedes dejar todas las líneas para una nota total o eliminar/modificar solo las que quieras acreditar.
+    </div>
+</div>
+{% if not modo_edicion %}
+<div id="selector-productos" class="card" style="display:none;">
+    <h3>Modo de Carga</h3>
+    <div class="selector-options">
+        <label>
+            <input type="radio" name="modo_carga_nota" value="total" checked>
+            Toda la factura
+        </label>
+        <label>
+            <input type="radio" name="modo_carga_nota" value="parcial">
+            Seleccionar productos
+        </label>
+    </div>
+    <div id="productos-selector-lista" class="productos-selector"></div>
+    <div class="selector-actions">
+        <button type="button" id="seleccionar-todos-productos" class="selector-btn selector-btn-secondary">Seleccionar todos</button>
+        <button type="button" id="quitar-todos-productos" class="selector-btn selector-btn-secondary">Quitar todos</button>
+        <button type="button" id="cargar-productos-seleccionados" class="selector-btn">Cargar productos seleccionados</button>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="tabla-header">
+        <div>Producto</div>
+        <div>Cantidad</div>
+        <div>Precio</div>
+        <div>% Desc</div>
+        <div>Nota</div>
+        <div>Subtotal</div>
+        <div>Impuesto</div>
+        <div>Monto</div>
+        <div></div>
+    </div>
+
+    {{ formset.management_form }}
+    <div id="lineas-container">
+    {% for form_linea in formset %}
+        <div class="tabla-row">
+            {{ form_linea.id }}
+            <div style="display:none;">{{ form_linea.DELETE }}</div>
+            <div>{{ form_linea.producto|add_class:"producto" }}</div>
+            <div>{{ form_linea.cantidad|add_class:"cantidad" }}</div>
+            <div>{{ form_linea.precio_unitario|add_class:"precio" }}</div>
+            <div>{{ form_linea.descuento_porcentaje|add_class:"descuento" }}</div>
+            <div>
+                <button type="button" class="btn-comentario">+</button>
+                <div class="comentario-box" style="display:none;">{{ form_linea.comentario }}</div>
+            </div>
+            <div><input class="subtotal" readonly></div>
+            <div>{{ form_linea.impuesto|add_class:"impuesto" }}</div>
+            <div><input class="impuesto_monto" readonly></div>
+            <div><button type="button" class="delete-btn btn-eliminar">X</button></div>
+        </div>
+    {% endfor %}
+    </div>
+    <br>
+    <button type="button" id="agregar-linea" class="add-btn">+ Agregar Línea</button>
+</div>
+
+<div class="card footer-bar">
+    <button type="submit" class="btn-guardar">Guardar Nota de Crédito</button>
+    <div>
+        <p>Descuento: <span id="descuento_general">0.00</span></p>
+        <p>Subtotal: <span id="subtotal_general">0.00</span></p>
+        <p>Impuesto: <span id="impuesto_general">0.00</span></p>
+        <p><strong>Total: <span id="total_general">0.00</span></strong></p>
+    </div>
+</div>
+</form>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const impuestos = {
+        {% for imp in impuestos %}
+            "{{ imp.id }}": {{ imp.porcentaje|default:0 }},
+        {% endfor %}
+    };
+    const detalleFacturaBaseUrl = "{% url 'detalle_factura_para_nota_credito' empresa.slug 0 %}";
+    const facturaSelect = document.getElementById("id_factura_origen");
+    const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
+    const container = document.getElementById("lineas-container");
+    const facturaInfo = document.getElementById("factura-info");
+    const facturaNumero = facturaInfo ? facturaInfo.querySelector("[data-factura-numero]") : null;
+    const facturaCliente = facturaInfo ? facturaInfo.querySelector("[data-factura-cliente]") : null;
+    const facturaTotal = facturaInfo ? facturaInfo.querySelector("[data-factura-total]") : null;
+    const facturaSaldo = facturaInfo ? facturaInfo.querySelector("[data-factura-saldo]") : null;
+    const selectorProductos = document.getElementById("selector-productos");
+    const listaProductosSelector = document.getElementById("productos-selector-lista");
+    const botonCargarSeleccionados = document.getElementById("cargar-productos-seleccionados");
+    const botonSeleccionarTodos = document.getElementById("seleccionar-todos-productos");
+    const botonQuitarTodos = document.getElementById("quitar-todos-productos");
+    const plantillaBase = document.querySelector(".tabla-row") ? document.querySelector(".tabla-row").cloneNode(true) : null;
+    let lineasFacturaActual = [];
+    function formatearMoneda(moneda, valor){
+        const numero = parseFloat(valor || 0);
+        const simbolo = moneda === "USD" ? "$ " : "L. ";
+        return simbolo + numero.toFixed(2);
+    }
+    function actualizarInfoFactura(data){
+        if(!facturaInfo){ return; }
+        if(!data){
+            facturaInfo.style.display = "none";
+            if(selectorProductos){
+                selectorProductos.style.display = "none";
+            }
+            return;
+        }
+        facturaNumero.textContent = data.numero_factura;
+        facturaCliente.textContent = data.cliente;
+        facturaTotal.textContent = formatearMoneda(data.moneda, data.total);
+        facturaSaldo.textContent = formatearMoneda(data.moneda, data.saldo_disponible);
+        facturaInfo.style.display = "block";
+        if(selectorProductos){
+            selectorProductos.style.display = "block";
+        }
+    }
+    function renderizarSelectorProductos(lineas){
+        if(!listaProductosSelector){ return; }
+        if(!lineas.length){
+            listaProductosSelector.innerHTML = "<p>No hay lineas disponibles en esta factura.</p>";
+            return;
+        }
+        listaProductosSelector.innerHTML = lineas.map((linea, index) => `
+            <div class="producto-item">
+                <label>
+                    <input type="checkbox" class="producto-selector-check" data-index="${index}" checked>
+                    <span>${linea.producto_nombre}</span>
+                </label>
+                <div class="producto-meta">
+                    Cant: ${linea.cantidad}<br>
+                    Precio: ${formatearMoneda(linea.moneda || "HNL", linea.precio_unitario)}<br>
+                    Total: ${formatearMoneda(linea.moneda || "HNL", linea.linea_total)}
+                </div>
+            </div>
+        `).join("");
+    }
+    function obtenerModoCarga(){
+        const seleccionado = document.querySelector('input[name="modo_carga_nota"]:checked');
+        return seleccionado ? seleccionado.value : "total";
+    }
+    function marcarChecksProductos(marcado){
+        document.querySelectorAll(".producto-selector-check").forEach(check => {
+            check.checked = marcado;
+        });
+    }
+    function recalcularLinea(linea){
+        const cantidad = linea.querySelector(".cantidad");
+        const precio = linea.querySelector(".precio");
+        const descuento = linea.querySelector(".descuento");
+        const subtotal = linea.querySelector(".subtotal");
+        const impuestoSelect = linea.querySelector(".impuesto");
+        const impuestoMonto = linea.querySelector(".impuesto_monto");
+        const cantidadVal = parseFloat(cantidad.value) || 0;
+        const precioVal = parseFloat(precio.value) || 0;
+        const descuentoVal = parseFloat(descuento.value) || 0;
+        const base = cantidadVal * precioVal;
+        const desc = base * (descuentoVal/100);
+        const sub = base - desc;
+        subtotal.value = sub.toFixed(2);
+        const porcentaje = impuestos[impuestoSelect.value] || 0;
+        impuestoMonto.value = (sub * (porcentaje/100)).toFixed(2);
+        recalcularTotales();
+    }
+    function recalcularTotales(){
+        let subtotal = 0, impuesto = 0, descuento = 0;
+        document.querySelectorAll(".tabla-row:not([data-deleted='1'])").forEach(l=>{
+            let c = parseFloat(l.querySelector(".cantidad")?.value)||0;
+            let p = parseFloat(l.querySelector(".precio")?.value)||0;
+            let d = parseFloat(l.querySelector(".descuento")?.value)||0;
+            descuento += (c*p)*(d/100);
+        });
+        document.querySelectorAll(".tabla-row:not([data-deleted='1']) .subtotal").forEach(e=>subtotal += parseFloat(e.value)||0);
+        document.querySelectorAll(".tabla-row:not([data-deleted='1']) .impuesto_monto").forEach(e=>impuesto += parseFloat(e.value)||0);
+        document.getElementById("descuento_general").innerText = descuento.toFixed(2);
+        document.getElementById("subtotal_general").innerText = subtotal.toFixed(2);
+        document.getElementById("impuesto_general").innerText = impuesto.toFixed(2);
+        document.getElementById("total_general").innerText = (subtotal+impuesto).toFixed(2);
+    }
+    function activarEventos(linea){
+        linea.querySelector(".cantidad").addEventListener("input",()=>recalcularLinea(linea));
+        linea.querySelector(".precio").addEventListener("input",()=>recalcularLinea(linea));
+        linea.querySelector(".descuento").addEventListener("input",()=>recalcularLinea(linea));
+        linea.querySelector(".impuesto").addEventListener("change",()=>recalcularLinea(linea));
+    }
+    function renumerarCampos(linea, index){
+        linea.querySelectorAll("input, select, textarea").forEach(el => {
+            if(el.name){
+                let name = el.name.replace(/lineanotacredito_set-\d+-/, `lineanotacredito_set-${index}-`);
+                el.name = name;
+                el.id = "id_" + name;
+            }
+        });
+    }
+    function limpiarFila(linea){
+        linea.querySelectorAll("input, select, textarea").forEach(el => {
+            if(el.type === "checkbox"){
+                el.checked = false;
+            } else if(el.type !== "hidden"){
+                el.value = "";
+            }
+        });
+        const comentarioBox = linea.querySelector(".comentario-box");
+        if(comentarioBox){
+            comentarioBox.style.display = "none";
+        }
+        delete linea.dataset.deleted;
+        linea.style.display = "";
+    }
+    function crearLineaBase(index){
+        if(!plantillaBase){ return null; }
+        const nueva = plantillaBase.cloneNode(true);
+        limpiarFila(nueva);
+        renumerarCampos(nueva, index);
+        const idField = nueva.querySelector("input[name$='-id']");
+        if(idField){ idField.remove(); }
+        const deleteField = nueva.querySelector("input[name$='-DELETE']");
+        if(deleteField){ deleteField.checked = false; }
+        return nueva;
+    }
+    function poblarLinea(linea, datos){
+        linea.querySelector(".producto").value = datos.producto_id || "";
+        linea.querySelector(".cantidad").value = datos.cantidad || "";
+        linea.querySelector(".precio").value = datos.precio_unitario || "";
+        linea.querySelector(".descuento").value = datos.descuento_porcentaje || "0";
+        linea.querySelector(".impuesto").value = datos.impuesto_id || "";
+        const comentarioField = linea.querySelector("textarea[name$='-comentario'], input[name$='-comentario']");
+        if(comentarioField){
+            comentarioField.value = datos.comentario || "";
+        }
+    }
+    function cargarLineasFactura(data){
+        container.innerHTML = "";
+        const lineas = data.lineas && data.lineas.length ? data.lineas : [{}];
+        lineas.forEach((lineaData, index) => {
+            const fila = crearLineaBase(index);
+            if(!fila){ return; }
+            poblarLinea(fila, lineaData);
+            container.appendChild(fila);
+            activarEventos(fila);
+            recalcularLinea(fila);
+        });
+        totalFormsInput.value = String(lineas.length);
+        recalcularTotales();
+    }
+    function cargarLineasSeleccionadas(){
+        if(!lineasFacturaActual.length){
+            return;
+        }
+        const modo = obtenerModoCarga();
+        let lineas = lineasFacturaActual;
+        if(modo === "parcial"){
+            const checks = Array.from(document.querySelectorAll(".producto-selector-check:checked"));
+            const indices = checks.map(check => parseInt(check.dataset.index, 10));
+            lineas = lineasFacturaActual.filter((_, index) => indices.includes(index));
+        }
+        cargarLineasFactura({ lineas });
+    }
+    document.querySelectorAll(".tabla-row").forEach(l=>{ activarEventos(l); recalcularLinea(l); });
+    document.getElementById("agregar-linea").addEventListener("click", function(){
+        let formCount = parseInt(totalFormsInput.value);
+        let plantilla = document.querySelector(".tabla-row:not([data-deleted='1'])") || plantillaBase;
+        if(!plantilla){ return; }
+        let nueva = plantilla.cloneNode(true);
+        limpiarFila(nueva);
+        renumerarCampos(nueva, formCount);
+        let idField = nueva.querySelector("input[name$='-id']");
+        if(idField){ idField.remove(); }
+        let deleteField = nueva.querySelector("input[name$='-DELETE']");
+        if(deleteField){ deleteField.checked = false; }
+        container.appendChild(nueva);
+        totalFormsInput.value = String(document.querySelectorAll(".tabla-row").length);
+        activarEventos(nueva); recalcularLinea(nueva);
+    });
+    document.addEventListener("click", function(e){
+        if(e.target.classList.contains("btn-eliminar")){
+            const fila = e.target.closest(".tabla-row");
+            const deleteField = fila.querySelector("input[name$='-DELETE']");
+            if(deleteField){ deleteField.checked = true; fila.dataset.deleted = "1"; fila.style.display = "none"; }
+            else { fila.remove(); }
+            recalcularTotales();
+        }
+        if(e.target.classList.contains("btn-comentario")){
+            let box = e.target.closest(".tabla-row").querySelector(".comentario-box");
+            box.style.display = box.style.display==="none"?"block":"none";
+        }
+    });
+    {% if not modo_edicion %}
+    document.querySelectorAll('input[name="modo_carga_nota"]').forEach(radio => {
+        radio.addEventListener("change", function(){
+            if(!listaProductosSelector){ return; }
+            listaProductosSelector.style.display = this.value === "parcial" ? "block" : "none";
+            if(this.value === "total"){
+                cargarLineasSeleccionadas();
+            }
+        });
+    });
+    if(botonCargarSeleccionados){
+        botonCargarSeleccionados.addEventListener("click", function(){
+            cargarLineasSeleccionadas();
+        });
+    }
+    if(botonSeleccionarTodos){
+        botonSeleccionarTodos.addEventListener("click", function(){
+            marcarChecksProductos(true);
+        });
+    }
+    if(botonQuitarTodos){
+        botonQuitarTodos.addEventListener("click", function(){
+            marcarChecksProductos(false);
+        });
+    }
+    if(facturaSelect){
+        facturaSelect.addEventListener("change", async function(){
+            const facturaId = this.value;
+            if(!facturaId){
+                lineasFacturaActual = [];
+                actualizarInfoFactura(null);
+                return;
+            }
+            try{
+                const response = await fetch(detalleFacturaBaseUrl.replace("/0/detalle/", `/${facturaId}/detalle/`), {
+                    headers: {"X-Requested-With": "XMLHttpRequest"}
+                });
+                if(!response.ok){
+                    throw new Error("No se pudo cargar la factura.");
+                }
+                const data = await response.json();
+                lineasFacturaActual = (data.lineas || []).map(linea => ({
+                    ...linea,
+                    moneda: data.moneda
+                }));
+                actualizarInfoFactura(data);
+                renderizarSelectorProductos(lineasFacturaActual);
+                listaProductosSelector.style.display = obtenerModoCarga() === "parcial" ? "block" : "none";
+                cargarLineasSeleccionadas();
+            }catch(error){
+                console.error(error);
+                lineasFacturaActual = [];
+                actualizarInfoFactura(null);
+            }
+        });
+    }
+    {% else %}
+    actualizarInfoFactura({
+        numero_factura: "{{ nota_credito.factura_origen.numero_factura|default:nota_credito.factura_origen.id }}",
+        cliente: "{{ nota_credito.cliente.nombre|escapejs }}",
+        moneda: "{{ nota_credito.moneda }}",
+        total: "{{ nota_credito.factura_origen.total }}",
+        saldo_disponible: "{{ nota_credito.factura_origen.total_documento_ajustado }}",
+    });
+    {% endif %}
+});
+</script>
+</body>
+</html>

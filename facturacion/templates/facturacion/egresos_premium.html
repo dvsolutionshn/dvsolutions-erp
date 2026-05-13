@@ -1,0 +1,145 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Egresos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Pagos{% endblock %}
+{% block header_title %}Egresos{% endblock %}
+{% block header_description %}Comprobantes de egreso generados por pagos a proveedores con acceso rapido a compra, proveedor y PDF.{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-autocomplete{position:relative;}
+.erp-suggestion-list{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:20;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-soft);padding:8px;display:none;max-height:240px;overflow:auto;}
+.erp-suggestion-item{width:100%;border:none;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;cursor:pointer;color:var(--primary);}
+.erp-suggestion-item:hover{background:#f4f8fc;}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Comprobantes</div>
+        <div class="erp-stat-value">{{ resumen.total }}</div>
+        <p class="erp-card-muted">Documentos de egreso emitidos desde cuentas por pagar.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Monto Total</div>
+        <div class="erp-stat-value">L. {{ resumen.monto_total|floatformat:2|intcomma }}</div>
+        <p class="erp-card-muted">Total pagado a proveedores bajo comprobante formal.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Efectivo</div>
+        <div class="erp-stat-value">{{ resumen.efectivo }}</div>
+        <p class="erp-card-muted">Comprobantes liquidados por caja o efectivo.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Transferencia</div>
+        <div class="erp-stat-value">{{ resumen.transferencia }}</div>
+        <p class="erp-card-muted">Comprobantes generados por transferencia bancaria.</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Comprobantes de egreso</h3>
+            <div class="erp-card-muted">Cada pago registrado a proveedor genera automaticamente su comprobante de egreso.</div>
+        </div>
+    </div>
+    <form method="get" class="erp-toolbar" style="margin-bottom:18px; gap:12px; align-items:end;">
+        <div class="erp-field" style="min-width:240px; padding:0; background:transparent; border:none; box-shadow:none;">
+            <label for="q">Buscar</label>
+            <div class="erp-autocomplete">
+                <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Comprobante, proveedor, compra o referencia" autocomplete="off">
+                <div id="egresos-sugerencias" class="erp-suggestion-list"></div>
+            </div>
+        </div>
+        <div class="erp-field" style="min-width:180px; padding:0; background:transparent; border:none; box-shadow:none;">
+            <label for="metodo">Metodo</label>
+            <select id="metodo" name="metodo">
+                <option value="">Todos</option>
+                <option value="efectivo" {% if metodo == "efectivo" %}selected{% endif %}>Efectivo</option>
+                <option value="transferencia" {% if metodo == "transferencia" %}selected{% endif %}>Transferencia</option>
+                <option value="tarjeta" {% if metodo == "tarjeta" %}selected{% endif %}>Tarjeta</option>
+            </select>
+        </div>
+        <div class="erp-actions-right">
+            <button class="erp-btn-secondary" type="submit">Filtrar</button>
+            <a class="erp-btn-secondary" href="{% url 'egresos_dashboard' empresa.slug %}">Limpiar</a>
+        </div>
+    </form>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Comprobante</th>
+                    <th>Proveedor</th>
+                    <th>Compra</th>
+                    <th>Fecha</th>
+                    <th>Metodo</th>
+                    <th>Monto</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for egreso in egresos %}
+                <tr>
+                    <td>
+                        <strong>{{ egreso.numero_comprobante }}</strong>
+                        <div class="erp-card-muted">{{ egreso.referencia|default:"Sin referencia" }}</div>
+                    </td>
+                    <td>
+                        {% if egreso.proveedor %}
+                        <a class="erp-inline-link" href="{% url 'ver_proveedor_facturacion' empresa.slug egreso.proveedor.id %}">{{ egreso.proveedor_nombre }}</a>
+                        {% else %}
+                        {{ egreso.proveedor_nombre }}
+                        {% endif %}
+                    </td>
+                    <td><a class="erp-inline-link" href="{% url 'ver_compra' empresa.slug egreso.compra.id %}">{{ egreso.compra.numero_compra }}</a></td>
+                    <td>{{ egreso.fecha }}</td>
+                    <td>{{ egreso.get_metodo_display }}</td>
+                    <td class="amount">L. {{ egreso.monto|floatformat:2|intcomma }}</td>
+                    <td>
+                        <a class="erp-inline-link" href="{% url 'ver_comprobante_egreso' empresa.slug egreso.id %}">Ver</a>
+                        <span class="erp-card-muted"> · </span>
+                        <a class="erp-inline-link" href="{% url 'descargar_comprobante_egreso_pdf' empresa.slug egreso.id %}">PDF</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="erp-empty">Todavia no hay egresos generados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("egresos-sugerencias");
+    const sugerencias = [{% for egreso in egresos %}"{{ egreso.numero_comprobante|escapejs }}","{{ egreso.proveedor_nombre|escapejs }}","{{ egreso.compra.numero_compra|escapejs }}"{% if egreso.referencia %},"{{ egreso.referencia|escapejs }}"{% endif %},{% endfor %}];
+    if(!input || !panel){ return; }
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const uniques = [...new Set(sugerencias.filter(Boolean))];
+        const matches = (term ? uniques.filter(item => item.toLowerCase().includes(term)) : uniques).slice(0, 8);
+        panel.innerHTML = "";
+        if(!matches.length){ panel.style.display = "none"; return; }
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){ input.value = item; panel.style.display = "none"; });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", () => window.setTimeout(() => panel.style.display = "none", 120));
+});
+</script>
+{% endblock %}

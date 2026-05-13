@@ -1,111 +1,539 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - {{ empresa.nombre }}</title>
+    <style>
+        :root{
+            --bg-1:#0f1e30;
+            --bg-2:#1f3550;
+            --card:#ffffff;
+            --text:#102033;
+            --muted:#6a7a91;
+            --line:#d8e2ef;
+            --primary:#2f6df6;
+            --primary-2:#6d63ff;
+            --shadow:0 28px 70px rgba(8,18,36,.30);
+            --shadow-soft:0 16px 34px rgba(15,30,48,.14);
+        }
 
-<style>
-body{
-    margin:0;
-    font-family:"Segoe UI",Roboto,Arial,sans-serif;
-    background:linear-gradient(135deg,#1e2a38,#2f3e50);
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-}
+        *{box-sizing:border-box}
 
-.login-card{
-    background:white;
-    padding:40px;
-    width:400px;
-    border-radius:12px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.25);
-    text-align:center;
-}
+        body{
+            margin:0;
+            min-height:100vh;
+            font-family:"Segoe UI",Roboto,Arial,sans-serif;
+            color:var(--text);
+            background:
+                radial-gradient(circle at 18% 22%, rgba(109,99,255,.16), transparent 28%),
+                radial-gradient(circle at 82% 18%, rgba(47,109,246,.16), transparent 24%),
+                linear-gradient(135deg,var(--bg-1),var(--bg-2));
+            overflow:hidden;
+        }
 
-.logo{
-    margin-bottom:20px;
-}
+        .login-shell{
+            position:relative;
+            min-height:100vh;
+            display:grid;
+            grid-template-columns:minmax(320px, 1.1fr) minmax(380px, 520px);
+            align-items:center;
+            gap:48px;
+            padding:48px 64px;
+        }
 
-.logo img{
-    max-height:80px;
-}
+        .login-shell::before,
+        .login-shell::after{
+            content:"";
+            position:absolute;
+            border-radius:999px;
+            filter:blur(8px);
+            opacity:.55;
+            pointer-events:none;
+        }
 
-h2{
-    margin-bottom:20px;
-    font-weight:500;
-    color:#1e2a38;
-}
+        .login-shell::before{
+            width:320px;
+            height:320px;
+            background:radial-gradient(circle, rgba(109,99,255,.25), transparent 68%);
+            top:-80px;
+            left:-70px;
+            animation:floatAura 8s ease-in-out infinite;
+        }
 
-input{
-    width:100%;
-    padding:10px;
-    margin-bottom:15px;
-    border:1px solid #ddd;
-    border-radius:6px;
-    font-size:14px;
-}
+        .login-shell::after{
+            width:260px;
+            height:260px;
+            background:radial-gradient(circle, rgba(47,109,246,.22), transparent 68%);
+            bottom:-60px;
+            right:120px;
+            animation:floatAura 9s ease-in-out infinite reverse;
+        }
 
-input:focus{
-    border-color:#6c63ff;
-    outline:none;
-    box-shadow:0 0 0 2px rgba(108,99,255,0.15);
-}
+        .brand-side{
+            position:relative;
+            z-index:1;
+            color:#f8fbff;
+            animation:fadeLift .8s ease-out both;
+        }
 
-button{
-    width:100%;
-    background:#6c63ff;
-    color:white;
-    border:none;
-    padding:10px;
-    border-radius:6px;
-    font-weight:500;
-    cursor:pointer;
-    transition:.2s;
-}
+        .brand-badge{
+            display:inline-flex;
+            align-items:center;
+            gap:14px;
+            padding:14px 16px;
+            border:1px solid rgba(255,255,255,.14);
+            border-radius:18px;
+            background:rgba(255,255,255,.06);
+            backdrop-filter:blur(10px);
+            box-shadow:var(--shadow-soft);
+        }
 
-button:hover{
-    background:#574fd6;
-}
+        .brand-badge img{
+            width:52px;
+            height:52px;
+            object-fit:contain;
+            border-radius:14px;
+            background:rgba(255,255,255,.92);
+            padding:6px;
+        }
 
-.error{
-    color:red;
-    font-size:13px;
-    margin-bottom:15px;
-}
-</style>
+        .brand-badge-fallback{
+            width:52px;
+            height:52px;
+            display:none;
+            align-items:center;
+            justify-content:center;
+            border-radius:14px;
+            background:rgba(255,255,255,.15);
+            color:#fff;
+            font-weight:700;
+            letter-spacing:.08em;
+        }
+
+        .brand-badge-copy strong{
+            display:block;
+            font-size:17px;
+            line-height:1.1;
+            font-weight:700;
+        }
+
+        .brand-badge-copy span{
+            display:block;
+            margin-top:4px;
+            font-size:12px;
+            color:rgba(241,245,249,.78);
+            letter-spacing:.08em;
+            text-transform:uppercase;
+        }
+
+        .brand-copy{
+            max-width:640px;
+            margin-top:28px;
+        }
+
+        .brand-copy h1{
+            margin:0 0 14px;
+            font-size:44px;
+            line-height:1.05;
+            letter-spacing:-.04em;
+            font-weight:700;
+        }
+
+        .brand-copy p{
+            margin:0;
+            max-width:560px;
+            font-size:16px;
+            line-height:1.7;
+            color:rgba(241,245,249,.82);
+        }
+
+        .brand-points{
+            display:grid;
+            grid-template-columns:repeat(2,minmax(0,1fr));
+            gap:14px;
+            margin-top:26px;
+            max-width:620px;
+        }
+
+        .brand-point{
+            padding:14px 16px;
+            border-radius:16px;
+            border:1px solid rgba(255,255,255,.10);
+            background:rgba(255,255,255,.05);
+            color:#f8fbff;
+            font-size:14px;
+            line-height:1.45;
+        }
+
+        .login-panel{
+            position:relative;
+            z-index:1;
+            animation:fadeLift .9s ease-out .08s both;
+        }
+
+        .login-card{
+            background:rgba(255,255,255,.96);
+            border:1px solid rgba(255,255,255,.72);
+            border-radius:24px;
+            box-shadow:var(--shadow);
+            overflow:hidden;
+            backdrop-filter:blur(12px);
+        }
+
+        .login-card-head{
+            padding:22px 24px 18px;
+            background:
+                linear-gradient(135deg, rgba(47,109,246,.09), rgba(109,99,255,.08)),
+                #fff;
+            border-bottom:1px solid var(--line);
+        }
+
+        .tenant-row{
+            display:flex;
+            align-items:center;
+            gap:16px;
+        }
+
+        .tenant-logo{
+            width:72px;
+            height:72px;
+            border-radius:20px;
+            border:1px solid #d9e2ef;
+            background:#fff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            overflow:hidden;
+            box-shadow:0 12px 22px rgba(16,32,51,.08);
+            flex:0 0 72px;
+        }
+
+        .tenant-logo img{
+            max-width:100%;
+            max-height:100%;
+            object-fit:contain;
+        }
+
+        .tenant-logo-fallback{
+            width:100%;
+            height:100%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:22px;
+            font-weight:700;
+            color:#24446b;
+            background:linear-gradient(135deg,#eff6ff,#eef2ff);
+        }
+
+        .tenant-copy small{
+            display:block;
+            font-size:11px;
+            letter-spacing:.12em;
+            text-transform:uppercase;
+            color:#70839b;
+            margin-bottom:6px;
+        }
+
+        .tenant-copy h2{
+            margin:0 0 6px;
+            font-size:29px;
+            line-height:1.05;
+            letter-spacing:-.03em;
+            color:#11243b;
+        }
+
+        .tenant-copy p{
+            margin:0;
+            font-size:13px;
+            line-height:1.55;
+            color:var(--muted);
+        }
+
+        .login-card-body{
+            padding:24px;
+        }
+
+        .login-eyebrow{
+            font-size:11px;
+            letter-spacing:.12em;
+            text-transform:uppercase;
+            color:#6f84a0;
+            margin-bottom:8px;
+        }
+
+        .login-title{
+            margin:0 0 6px;
+            font-size:28px;
+            line-height:1.05;
+            color:#102033;
+        }
+
+        .login-subtitle{
+            margin:0 0 22px;
+            color:var(--muted);
+            line-height:1.55;
+            font-size:14px;
+        }
+
+        .message-stack{
+            display:grid;
+            gap:10px;
+            margin-bottom:16px;
+        }
+
+        .message{
+            border-radius:14px;
+            padding:12px 14px;
+            font-size:13px;
+            line-height:1.45;
+            border:1px solid #ffd7d7;
+            color:#8c1d1d;
+            background:#fff5f5;
+        }
+
+        .login-form{
+            display:grid;
+            gap:14px;
+        }
+
+        .field label{
+            display:block;
+            margin-bottom:7px;
+            font-size:11px;
+            font-weight:700;
+            letter-spacing:.1em;
+            text-transform:uppercase;
+            color:#5e748f;
+        }
+
+        .field input{
+            width:100%;
+            border:1px solid #d8e2ef;
+            background:#fff;
+            color:#102033;
+            border-radius:14px;
+            padding:14px 15px;
+            font-size:15px;
+            transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+
+        .field input:focus{
+            outline:none;
+            border-color:#5d77ff;
+            box-shadow:0 0 0 4px rgba(93,119,255,.13);
+            transform:translateY(-1px);
+        }
+
+        .login-actions{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:16px;
+            margin-top:6px;
+        }
+
+        .login-help{
+            font-size:12px;
+            line-height:1.55;
+            color:#6c8099;
+            max-width:230px;
+        }
+
+        .login-btn{
+            border:none;
+            border-radius:14px;
+            padding:14px 24px;
+            min-width:180px;
+            background:linear-gradient(135deg, var(--primary), var(--primary-2));
+            color:#fff;
+            font-size:15px;
+            font-weight:700;
+            cursor:pointer;
+            box-shadow:0 18px 36px rgba(47,109,246,.28);
+            transition:transform .2s ease, box-shadow .2s ease, filter .2s ease;
+        }
+
+        .login-btn:hover{
+            transform:translateY(-1px);
+            box-shadow:0 22px 40px rgba(47,109,246,.32);
+            filter:saturate(1.05);
+        }
+
+        .login-btn:active{
+            transform:translateY(0);
+        }
+
+        .login-card-foot{
+            padding:16px 24px 22px;
+            border-top:1px solid var(--line);
+            background:#fcfdff;
+            display:flex;
+            justify-content:space-between;
+            gap:16px;
+            font-size:12px;
+            color:#6d7f96;
+        }
+
+        .login-card-foot strong{
+            display:block;
+            color:#102033;
+            font-size:13px;
+            margin-bottom:3px;
+        }
+
+        @keyframes fadeLift{
+            from{
+                opacity:0;
+                transform:translateY(18px);
+            }
+            to{
+                opacity:1;
+                transform:translateY(0);
+            }
+        }
+
+        @keyframes floatAura{
+            0%,100%{ transform:translate3d(0,0,0) scale(1); }
+            50%{ transform:translate3d(12px,-10px,0) scale(1.04); }
+        }
+
+        @media (max-width: 1080px){
+            .login-shell{
+                grid-template-columns:1fr;
+                gap:28px;
+                padding:28px 20px;
+            }
+
+            .brand-copy h1{
+                font-size:34px;
+            }
+
+            .brand-points{
+                grid-template-columns:1fr;
+            }
+        }
+
+        @media (max-width: 640px){
+            .tenant-row{
+                align-items:flex-start;
+            }
+
+            .tenant-copy h2{
+                font-size:24px;
+            }
+
+            .login-title{
+                font-size:24px;
+            }
+
+            .login-actions{
+                flex-direction:column;
+                align-items:stretch;
+            }
+
+            .login-help{
+                max-width:none;
+            }
+
+            .login-btn{
+                width:100%;
+            }
+
+            .login-card-foot{
+                flex-direction:column;
+            }
+        }
+    </style>
 </head>
-
 <body>
+    <main class="login-shell">
+        <section class="brand-side">
+            <div class="brand-badge">
+                <img src="/media/logos/logo.jpg" alt="DV Solutions ERP" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="brand-badge-fallback">DV</div>
+                <div class="brand-badge-copy">
+                    <strong>DV Solutions ERP</strong>
+                    <span>Plataforma empresarial</span>
+                </div>
+            </div>
 
-<div class="login-card">
+            <div class="brand-copy">
+                <h1>Un solo acceso para operar toda la empresa con velocidad y control.</h1>
+                <p>Ingresa al entorno de {{ empresa.nombre }} y trabaja con facturación, contabilidad, recursos humanos y gestión comercial dentro de una experiencia más fluida, segura y profesional.</p>
+            </div>
 
-    <div class="logo">
-        {% if empresa.logo %}
-            <img src="{{ empresa.logo.url }}" alt="Logo">
-        {% else %}
-            <h3>{{ empresa.nombre }}</h3>
-        {% endif %}
-    </div>
+            <div class="brand-points">
+                <div class="brand-point">Captura comercial y financiera en un flujo más rápido, con documentos, reportes y controles integrados por empresa.</div>
+                <div class="brand-point">Cada compañía conserva su propia identidad visual, configuración fiscal y módulos activos dentro del mismo ERP.</div>
+            </div>
+        </section>
 
-    <h2>Iniciar Sesión</h2>
+        <section class="login-panel">
+            <div class="login-card">
+                <div class="login-card-head">
+                    <div class="tenant-row">
+                        <div class="tenant-logo">
+                            {% if empresa.logo %}
+                                <img src="{{ empresa.logo.url }}" alt="Logo {{ empresa.nombre }}">
+                            {% else %}
+                                <div class="tenant-logo-fallback">{{ empresa.nombre|first|upper }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="tenant-copy">
+                            <small>Acceso de empresa</small>
+                            <h2>{{ empresa.nombre }}</h2>
+                            <p>Ingresa con tu usuario operativo para continuar con la gestión diaria de esta compañía.</p>
+                        </div>
+                    </div>
+                </div>
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="error">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
+                <div class="login-card-body">
+                    <div class="login-eyebrow">Autenticación segura</div>
+                    <h1 class="login-title">Iniciar sesión</h1>
+                    <p class="login-subtitle">Usa tus credenciales asignadas. El acceso respeta la empresa, los permisos y los módulos habilitados para tu perfil.</p>
 
-    <form method="post">
-        {% csrf_token %}
+                    {% if messages %}
+                    <div class="message-stack">
+                        {% for message in messages %}
+                            <div class="message">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
 
-        <input type="text" name="username" placeholder="Usuario" required>
-        <input type="password" name="password" placeholder="Contraseña" required>
+                    <form method="post" class="login-form" autocomplete="off">
+                        {% csrf_token %}
 
-        <button type="submit">Ingresar</button>
-    </form>
+                        <div class="field">
+                            <label for="id_username">Usuario</label>
+                            <input id="id_username" type="text" name="username" placeholder="Ingresa tu usuario" required autofocus>
+                        </div>
 
-</div>
+                        <div class="field">
+                            <label for="id_password">Contraseña</label>
+                            <input id="id_password" type="password" name="password" placeholder="Ingresa tu contraseña" required>
+                        </div>
 
+                        <div class="login-actions">
+                            <div class="login-help">Si este acceso pertenece a otra empresa, vuelve a su enlace de ingreso para conservar el contexto correcto.</div>
+                            <button type="submit" class="login-btn">Entrar al sistema</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="login-card-foot">
+                    <div>
+                        <strong>Ambiente empresarial</strong>
+                        El sistema mantiene separados usuarios, documentos, módulos y configuraciones por cada empresa.
+                    </div>
+                    <div>
+                        <strong>Marca del cliente</strong>
+                        Conservamos la identidad visual de {{ empresa.nombre }} sin perder la presencia institucional de DV Solutions ERP.
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
 </body>
 </html>

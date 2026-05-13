@@ -1,0 +1,144 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Crear Libro de Compras Nuevo - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control Fiscal{% endblock %}
+{% block header_title %}Crear Libro de Compras Nuevo{% endblock %}
+{% block header_description %}Captura el libro compra por compra con flujo tipo Excel: fecha, proveedor, factura, montos y Tab para abrir una nueva linea.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'libro_compras_fiscal' empresa.slug %}">Volver al Libro</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="erp-card">
+    {% csrf_token %}
+    {% if errores %}
+    <div class="erp-alert danger">
+        {% for error in errores %}
+        <div>{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <section class="erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Lineas del libro</h3>
+                <p class="erp-card-muted">Escribe en horizontal. Al terminar una fila con Tab, se crea automaticamente una nueva linea abajo.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap erp-ledger-entry-wrap">
+            <table class="erp-table erp-ledger-entry-table" id="libro-compras-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Clasificacion</th>
+                        <th>Nombre proveedor</th>
+                        <th>Numero factura</th>
+                        <th>Sub total exento</th>
+                        <th>Sub total 15%</th>
+                        <th>Sub total 18%</th>
+                        <th>ISV 15%</th>
+                        <th>ISV 18%</th>
+                        <th>Total factura</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in filas %}
+                    <tr class="js-libro-row">
+                        <td><input type="date" name="fecha_documento[]" value="{{ fila.fecha_documento }}" class="js-fecha"></td>
+                        <td>
+                            <select name="clasificacion_id[]" class="js-clasificacion">
+                                <option value="">Sin clasificar</option>
+                                {% for clasificacion in clasificaciones %}
+                                <option value="{{ clasificacion.id }}" {% if fila.clasificacion_id|stringformat:"s" == clasificacion.id|stringformat:"s" %}selected{% endif %}>{{ clasificacion.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="text" name="proveedor_nombre[]" value="{{ fila.proveedor_nombre }}" class="js-proveedor" autocomplete="off" placeholder="Proveedor"></td>
+                        <td><input type="text" name="numero_factura[]" value="{{ fila.numero_factura }}" class="js-factura" autocomplete="off" placeholder="000-000-00-00000000"></td>
+                        <td><input type="number" name="exento[]" value="{{ fila.exento }}" class="js-exento" step="0.01" min="0" placeholder="0.00"></td>
+                        <td><input type="number" name="base_15[]" value="{{ fila.base_15 }}" class="js-base-15" step="0.01" min="0" placeholder="0.00"></td>
+                        <td><input type="number" name="base_18[]" value="{{ fila.base_18 }}" class="js-base-18 js-last-editable" step="0.01" min="0" placeholder="0.00"></td>
+                        <td><input type="number" value="{{ fila.isv_15 }}" class="js-isv-15" readonly tabindex="-1"></td>
+                        <td><input type="number" value="{{ fila.isv_18 }}" class="js-isv-18" readonly tabindex="-1"></td>
+                        <td><input type="number" value="{{ fila.total }}" class="js-total" readonly tabindex="-1"></td>
+                        <td><button type="button" class="erp-chip-btn danger js-remove-row">X</button></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="erp-actions-right">
+        <button type="button" class="erp-btn-secondary" id="agregar-linea-libro">Agregar linea</button>
+        <a class="erp-btn-secondary" href="{% url 'libro_compras_fiscal' empresa.slug %}">Cancelar</a>
+        <button class="erp-btn" type="submit">Guardar Libro</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const tableBody = document.querySelector("#libro-compras-table tbody");
+    const addButton = document.getElementById("agregar-linea-libro");
+    if(!tableBody){ return; }
+
+    function money(value){ return (Math.round(value * 100) / 100).toFixed(2); }
+    function numberOf(input){ return parseFloat((input && input.value) || "0") || 0; }
+    function rowHasData(row){
+        return Array.from(row.querySelectorAll("input:not([readonly])")).some(input => (input.value || "").trim() !== "");
+    }
+    function recalc(row){
+        const exento = numberOf(row.querySelector(".js-exento"));
+        const base15 = numberOf(row.querySelector(".js-base-15"));
+        const base18 = numberOf(row.querySelector(".js-base-18"));
+        const isv15 = base15 * 0.15;
+        const isv18 = base18 * 0.18;
+        const total = exento + base15 + base18 + isv15 + isv18;
+        row.querySelector(".js-isv-15").value = money(isv15);
+        row.querySelector(".js-isv-18").value = money(isv18);
+        row.querySelector(".js-total").value = money(total);
+    }
+    function bindRow(row){
+        row.querySelectorAll(".js-exento,.js-base-15,.js-base-18").forEach(input => {
+            input.addEventListener("input", () => recalc(row));
+        });
+        row.querySelector(".js-last-editable").addEventListener("keydown", function(event){
+            if(event.key === "Tab" && !event.shiftKey && row === tableBody.lastElementChild && rowHasData(row)){
+                event.preventDefault();
+                const nextRow = addRow();
+                nextRow.querySelector(".js-fecha").focus();
+            }
+        });
+        row.querySelector(".js-remove-row").addEventListener("click", function(){
+            if(tableBody.children.length > 1){ row.remove(); }
+        });
+        recalc(row);
+    }
+    function addRow(){
+        const template = tableBody.querySelector(".js-libro-row");
+        const row = template.cloneNode(true);
+        row.querySelectorAll("input").forEach(input => {
+            if(input.type === "date"){
+                input.value = "";
+            }else if(input.readOnly){
+                input.value = "0.00";
+            }else{
+                input.value = "";
+            }
+        });
+        row.querySelectorAll("select").forEach(select => { select.value = ""; });
+        tableBody.appendChild(row);
+        bindRow(row);
+        return row;
+    }
+
+    tableBody.querySelectorAll(".js-libro-row").forEach(bindRow);
+    if(addButton){ addButton.addEventListener("click", function(){ addRow().querySelector(".js-fecha").focus(); }); }
+});
+</script>
+{% endblock %}

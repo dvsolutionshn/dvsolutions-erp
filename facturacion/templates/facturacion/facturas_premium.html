@@ -1,0 +1,235 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Facturas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Comercial{% endblock %}
+{% block header_title %}Facturas{% endblock %}
+{% block header_description %}Visualiza y administra la cartera documental del negocio desde una experiencia mas ejecutiva, clara y uniforme con el resto del ERP.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_factura' empresa.slug %}">Nueva Factura</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-invoice-table{
+    min-width:1240px;
+}
+.erp-autocomplete{
+    position:relative;
+}
+.erp-suggestion-list{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:20;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow-soft);
+    padding:8px;
+    display:none;
+    max-height:260px;
+    overflow:auto;
+}
+.erp-suggestion-item{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    color:var(--primary);
+}
+.erp-suggestion-item:hover{
+    background:#f4f8fc;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-list-shell">
+    <section class="erp-list-kpis">
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Documentos</div>
+            <div class="erp-stat-value">{{ resumen.total_documentos }}</div>
+            <p class="erp-card-muted">Total de facturas registradas para la empresa.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Borradores</div>
+            <div class="erp-stat-value">{{ resumen.borradores }}</div>
+            <p class="erp-card-muted">Documentos pendientes de revision o emision.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Por cobrar</div>
+            <div class="erp-stat-value">{{ resumen.por_cobrar }}</div>
+            <p class="erp-card-muted">Facturas con saldo pendiente o cobro parcial.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Monto acumulado</div>
+            <div class="erp-stat-value erp-money">L. {{ resumen.monto_total|floatformat:2|intcomma }}</div>
+            <p class="erp-card-muted">Valor consolidado de la cartera documental actual.</p>
+        </article>
+    </section>
+
+    <section class="erp-card erp-list-filter-card">
+        <div class="erp-list-toolbar">
+            <div>
+                <h3 class="erp-panel-title" style="margin:0;">Listado de Facturas</h3>
+                <p>Consulta el estado comercial, fiscal y de cobro de cada documento desde una sola vista operativa.</p>
+            </div>
+            <a class="erp-btn-secondary" href="{% url 'reportes_facturacion' empresa.slug %}">Ver Reportes</a>
+        </div>
+        <form method="get" class="erp-list-filter-grid">
+            <div class="erp-filter-field">
+                <label for="q">Buscar cliente o numero</label>
+                <div class="erp-autocomplete">
+                    <input id="q" name="q" type="text" value="{{ q|default:'' }}" placeholder="Escribe el nombre del cliente o numero de factura" autocomplete="off">
+                    <div id="facturas-sugerencias" class="erp-suggestion-list"></div>
+                </div>
+            </div>
+            <div class="erp-list-filter-actions" style="grid-column:1 / -1;">
+                <button class="erp-btn" type="submit">Buscar</button>
+                <a class="erp-btn-secondary" href="{% url 'facturas_dashboard' empresa.slug %}">Limpiar</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-table-wrap">
+            <table class="erp-table erp-invoice-table erp-list-table">
+                <thead>
+                    <tr>
+                        <th>Numero</th>
+                        <th>Cliente</th>
+                        <th>Fecha</th>
+                        <th>Moneda</th>
+                        <th>Estado</th>
+                        <th>Pago</th>
+                        <th>Total</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for factura in facturas %}
+                    <tr>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ factura.numero_factura|default:"Sin numero" }}</div>
+                                <div class="erp-doc-subtext">
+                                    {% if factura.cai_numero %}
+                                        CAI {{ factura.cai_numero }}
+                                    {% elif factura.cai and factura.cai.numero_cai %}
+                                        CAI {{ factura.cai.numero_cai }}
+                                    {% else %}
+                                        Sin CAI asignado
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="erp-doc-cell">
+                                <div class="erp-doc-title">{{ factura.cliente.nombre }}</div>
+                                <div class="erp-doc-subtext">
+                                    {% if factura.vendedor %}
+                                        Vendedor: {{ factura.vendedor }}
+                                    {% else %}
+                                        Sin vendedor asignado
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ factura.fecha_emision }}</td>
+                        <td>{% if factura.moneda == "USD" %}<span class="erp-badge info">USD</span>{% else %}<span class="erp-badge neutral">Lempiras</span>{% endif %}</td>
+                        <td>
+                            {% if factura.estado == "borrador" %}
+                                <span class="erp-badge warning">Borrador</span>
+                            {% elif factura.estado == "emitida" %}
+                                <span class="erp-badge success">Emitida</span>
+                            {% else %}
+                                <span class="erp-badge danger">Anulada</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if factura.estado_pago == "pagado" %}
+                                <span class="erp-badge success">Pagada</span>
+                            {% elif factura.estado_pago == "parcial" %}
+                                <span class="erp-badge warning">Parcial</span>
+                            {% else %}
+                                <span class="erp-badge danger">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td class="amount">
+                            <span class="erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</span>
+                            <div class="erp-doc-subtext">Saldo: {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</div>
+                        </td>
+                        <td class="actions">
+                            <div class="erp-actions-cluster">
+                                <a class="erp-pill-link" href="{% url 'ver_factura' empresa.slug factura.id %}">Ver</a>
+                                {% if factura.puede_editar_emitida %}
+                                <a class="erp-pill-link" href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
+                                {% else %}
+                                <span class="erp-pill-btn muted" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
+                                {% endif %}
+                                <form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn" type="submit">Duplicar</button></form>
+                                <form method="post" action="{% url 'generar_nota_credito_desde_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn" type="submit">Nota de Credito</button></form>
+                                {% if factura.estado == "borrador" and not factura.numero_factura or permite_gestion_fiscal_historica %}
+                                <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn danger" type="submit" onclick="return confirm('Seguro que desea eliminar este borrador?');">Eliminar</button></form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="erp-empty">No hay facturas registradas.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const input = document.getElementById("q");
+    const panel = document.getElementById("facturas-sugerencias");
+    const sugerencias = [{% for cliente_nombre in clientes_sugeridos %}"{{ cliente_nombre|escapejs }}",{% endfor %}];
+
+    if(!input || !panel){
+        return;
+    }
+
+    function renderSuggestions(){
+        const term = (input.value || "").trim().toLowerCase();
+        const matches = term
+            ? sugerencias.filter(item => item.toLowerCase().includes(term)).slice(0, 8)
+            : sugerencias.slice(0, 8);
+
+        panel.innerHTML = "";
+        if(!matches.length){
+            panel.style.display = "none";
+            return;
+        }
+
+        matches.forEach(item => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-suggestion-item";
+            button.textContent = item;
+            button.addEventListener("click", function(){
+                input.value = item;
+                panel.style.display = "none";
+            });
+            panel.appendChild(button);
+        });
+        panel.style.display = "block";
+    }
+
+    input.addEventListener("focus", renderSuggestions);
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", function(){
+        window.setTimeout(() => panel.style.display = "none", 120);
+    });
+});
+</script>
+{% endblock %}

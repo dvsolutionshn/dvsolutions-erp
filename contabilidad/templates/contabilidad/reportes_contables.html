@@ -1,0 +1,106 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Reportes Contables{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}Reportes Contables{% endblock %}
+{% block header_description %}Resumen financiero inicial para validar que la base contable va quedando lista antes de entrar a reportes mayores mas avanzados.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'dashboard_bi_financiero' empresa.slug %}" class="erp-action-link">Dashboard BI</a>
+<a href="{% url 'auditoria_contable' empresa.slug %}" class="erp-action-link">Auditoria</a>
+<a href="{% url 'reporte_impuestos' empresa.slug %}" class="erp-action-link">Impuestos</a>
+<a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
+<a href="{% url 'mayor_cuenta' empresa.slug %}" class="erp-action-link">Mayor por Cuenta</a>
+<a href="{% url 'balance_comprobacion' empresa.slug %}" class="erp-action-link">Balance</a>
+<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Estado de Resultados</a>
+<a href="{% url 'balance_general' empresa.slug %}" class="erp-action-link">Balance General</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Asientos contabilizados</div><p class="erp-stat-value">{{ resumen.asientos_contabilizados }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas activas</div><p class="erp-stat-value">{{ resumen.cuentas_activas }}</p></article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Business Intelligence</div>
+        <h3>Dashboard BI Financiero</h3>
+        <p>Lectura gerencial de compras, pagos, bancos y cuentas por pagar desde un tablero visual construido dentro del ERP.</p>
+        <a class="erp-btn-secondary" href="{% url 'dashboard_bi_financiero' empresa.slug %}">Abrir Dashboard BI</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Trazabilidad</div>
+        <h3>Auditoria Contable</h3>
+        <p>Revisa quien creo cada asiento, su origen, documento relacionado, evento, estado y totales.</p>
+        <a class="erp-btn-secondary" href="{% url 'auditoria_contable' empresa.slug %}">Abrir Auditoria</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Fiscal</div>
+        <h3>Reporte de Impuestos</h3>
+        <p>Controla ISV facturado, notas de credito y neto fiscal del periodo desde documentos emitidos.</p>
+        <a class="erp-btn-secondary" href="{% url 'reporte_impuestos' empresa.slug %}">Abrir Impuestos</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Libro oficial</div>
+        <h3>Libro Diario</h3>
+        <p>Consulta todas las partidas contabilizadas por fecha, asiento, cuenta, debe y haber.</p>
+        <a class="erp-btn-secondary" href="{% url 'libro_diario' empresa.slug %}">Abrir Libro Diario</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Auxiliar</div>
+        <h3>Mayor por Cuenta</h3>
+        <p>Revisa el movimiento de una cuenta especifica con saldo acumulado por cada partida.</p>
+        <a class="erp-btn-secondary" href="{% url 'mayor_cuenta' empresa.slug %}">Abrir Mayor</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Control</div>
+        <h3>Balance de Comprobacion</h3>
+        <p>Valida saldos por cuenta y confirma que el debe y haber contable permanecen cuadrados.</p>
+        <a class="erp-btn-secondary" href="{% url 'balance_comprobacion' empresa.slug %}">Abrir Balance</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Gestion</div>
+        <h3>Estado de Resultados</h3>
+        <p>Consulta ingresos, gastos y utilidad del periodo con base en los asientos contabilizados.</p>
+        <a class="erp-btn-secondary" href="{% url 'estado_resultados' empresa.slug %}">Abrir Estado</a>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Financiero</div>
+        <h3>Balance General</h3>
+        <p>Consulta activos, pasivos y patrimonio a una fecha de corte para validar la posicion financiera.</p>
+        <a class="erp-btn-secondary" href="{% url 'balance_general' empresa.slug %}">Abrir Balance General</a>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Distribucion del catalogo por tipo</h3>
+            <p class="erp-card-muted">Lectura ejecutiva de la estructura del plan contable actual.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cuentas_por_tipo %}
+                <tr>
+                    <td>{{ item.tipo|capfirst }}</td>
+                    <td>{{ item.total }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="2" class="erp-empty">Todavia no hay cuentas registradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

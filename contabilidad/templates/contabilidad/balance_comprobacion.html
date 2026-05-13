@@ -1,0 +1,112 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Balance de Comprobacion - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Balance de Comprobacion{% endblock %}
+{% block header_description %}Valida el movimiento acumulado por cuenta contable y confirma que el debe y haber permanecen balanceados.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
+<a href="{% url 'mayor_cuenta' empresa.slug %}" class="erp-action-link">Mayor por Cuenta</a>
+<a href="{% url 'exportar_balance_comprobacion_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
+<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Filtros</h3>
+            <p class="erp-card-muted">Consulta el balance por periodo y tipo de cuenta.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="tipo">Tipo de cuenta</label>
+            <select id="tipo" name="tipo">
+                <option value="">Todos los tipos</option>
+                {% for value, label in tipos_cuenta %}
+                <option value="{{ value }}" {% if filtros.tipo == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="erp-filter-field">
+            <label for="incluir_ceros">Cuentas sin movimiento</label>
+            <select id="incluir_ceros" name="incluir_ceros">
+                <option value="">Ocultar sin movimiento</option>
+                <option value="1" {% if filtros.incluir_ceros %}selected{% endif %}>Mostrar todas</option>
+            </select>
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a href="{% url 'balance_comprobacion' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Estado</div>
+        <p class="erp-stat-value">{% if resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p>
+        <p class="erp-card-muted">{% if resumen.cuadrado %}Debe y haber coinciden.{% else %}Hay diferencia entre debe y haber.{% endif %}</p>
+    </article>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Saldos por cuenta</h3>
+            <p class="erp-card-muted">Incluye solo partidas contabilizadas dentro del periodo seleccionado.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Cuenta</th>
+                    <th>Tipo</th>
+                    <th>Debe</th>
+                    <th>Haber</th>
+                    <th>Saldo deudor</th>
+                    <th>Saldo acreedor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in filas %}
+                <tr>
+                    <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                    <td>{{ fila.cuenta.get_tipo_display }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_deudor }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_acreedor }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">No hay movimientos contabilizados con estos filtros.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2">Totales</th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.debe_total }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.haber_total }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_deudor_total }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_acreedor_total }}</span></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</section>
+{% endblock %}

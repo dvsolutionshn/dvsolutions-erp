@@ -1,0 +1,155 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Transferencia Rapida - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Farmaceutica{% endblock %}
+{% block header_title %}Transferencia Rapida{% endblock %}
+{% block header_description %}Mueve productos entre bodega principal, provisional y vitrina con la menor cantidad de pasos posible.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'inventario_farmaceutico' empresa.slug %}">Inventario Farmaceutico</a>
+<a class="erp-action-link" href="{% url 'traslado_inventario_farmaceutico' empresa.slug %}">Traslado Avanzado</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.quick-route-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:14px;
+}
+.quick-route{
+    display:block;
+    padding:18px;
+    border:1px solid var(--line);
+    border-radius:20px;
+    background:#fff;
+    text-decoration:none;
+    color:var(--ink);
+    box-shadow:var(--shadow-soft);
+}
+.quick-route.is-active{
+    border-color:rgba(15,43,71,.35);
+    background:linear-gradient(135deg,#f8fbff,#eef5fb);
+}
+.quick-route span{
+    display:block;
+    margin-bottom:8px;
+    color:var(--muted);
+    font-size:.72rem;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+}
+.quick-route strong{
+    font-size:1.02rem;
+}
+.quick-transfer-select option{
+    font-size:.95rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="quick-route-grid">
+    {% for key, item in rutas.items %}
+    <a class="quick-route {% if ruta_key == key %}is-active{% endif %}" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}?ruta={{ key }}">
+        <span>Ruta rapida</span>
+        <strong>{{ item.label }}</strong>
+        <p class="erp-card-muted" style="margin:8px 0 0;">Origen: {{ item.origen.nombre }} · Destino: {{ item.destino.nombre }}</p>
+    </a>
+    {% endfor %}
+</section>
+
+<section class="erp-form-card">
+    <div class="erp-form-actions">
+        <div>
+            <h3 style="margin:0 0 8px;">Mover producto</h3>
+            <p>Ruta seleccionada: <strong>{{ ruta.label }}</strong>. Solo aparecen lotes disponibles en la bodega origen.</p>
+        </div>
+    </div>
+    <form method="post" class="erp-form-grid three" style="margin-top:18px;">
+        {% csrf_token %}
+        <input type="hidden" name="ruta" value="{{ ruta_key }}">
+        <div class="erp-field" style="grid-column:1 / -1;">
+            <label for="existencia">Producto / lote disponible</label>
+            <select id="existencia" class="quick-transfer-select" name="existencia" required>
+                <option value="">Seleccione producto, lote y vencimiento</option>
+                {% for existencia in existencias %}
+                <option value="{{ existencia.id }}">
+                    {{ existencia.lote.producto.nombre }} | Lote {{ existencia.lote.numero_lote }} | Vence {{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"sin fecha" }} | Disponible {{ existencia.cantidad|floatformat:2 }}
+                </option>
+                {% endfor %}
+            </select>
+            <div class="erp-field-help">Para farmacia, recomendamos mover primero los lotes proximos a vencer.</div>
+        </div>
+        <div class="erp-field">
+            <label for="cantidad">Cantidad a mover</label>
+            <input id="cantidad" type="number" step="0.01" name="cantidad" required placeholder="0.00">
+        </div>
+        <div class="erp-field">
+            <label>Origen</label>
+            <div class="erp-info-value">{{ ruta.origen.nombre }}</div>
+            <div class="erp-field-help">Se descuenta automaticamente.</div>
+        </div>
+        <div class="erp-field">
+            <label>Destino</label>
+            <div class="erp-info-value">{{ ruta.destino.nombre }}</div>
+            <div class="erp-field-help">Se suma automaticamente.</div>
+        </div>
+        <div class="erp-field" style="grid-column:1 / -1;">
+            <label for="observacion">Observacion</label>
+            <input id="observacion" type="text" name="observacion" placeholder="Opcional: abastecimiento vitrina, producto por vencer, revision de bodega.">
+        </div>
+        <div class="erp-form-actions" style="grid-column:1 / -1;">
+            <div class="erp-field-help">Un solo guardado genera salida de origen y entrada al destino.</div>
+            <button class="erp-btn" type="submit">Mover Producto</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Disponible en {{ ruta.origen.nombre }}</h3>
+            <p>Lista rapida para confirmar antes de mover.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Lote</th>
+                    <th>Vencimiento</th>
+                    <th class="erp-money">Disponible</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for existencia in existencias %}
+                <tr>
+                    <td>
+                        <strong>{{ existencia.lote.producto.nombre }}</strong>
+                        <div class="erp-card-muted">{{ existencia.lote.producto.codigo|default:"Sin codigo" }}</div>
+                    </td>
+                    <td>{{ existencia.lote.numero_lote }}</td>
+                    <td>{{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"Sin vencimiento" }}</td>
+                    <td class="erp-money">{{ existencia.cantidad|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if existencia.lote.vencido %}
+                        <span class="erp-badge danger">Vencido</span>
+                        {% elif existencia.lote.por_vencer %}
+                        <span class="erp-badge warning">Priorizar</span>
+                        {% else %}
+                        <span class="erp-badge success">Disponible</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="erp-empty-row">No hay producto disponible en esta bodega origen.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

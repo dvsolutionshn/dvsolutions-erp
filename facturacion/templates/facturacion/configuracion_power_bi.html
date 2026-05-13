@@ -1,0 +1,359 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Configuracion Power BI - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Analitica Ejecutiva{% endblock %}
+{% block header_title %}Configuracion Power BI{% endblock %}
+{% block header_description %}Conecta dashboards gerenciales por empresa y decide como se mostraran dentro del modulo de reportes.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn erp-btn-secondary" href="{% url 'reportes_facturacion' empresa.slug %}">Volver a reportes</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-bi-config-shell{
+    display:grid;
+    grid-template-columns:minmax(0, 1.1fr) minmax(360px, .9fr);
+    gap:24px;
+    align-items:start;
+}
+.erp-bi-config-form{
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
+.erp-bi-preview-card{
+    position:sticky;
+    top:20px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+.erp-bi-preview-frame{
+    border:1px solid var(--line);
+    border-radius:18px;
+    overflow:hidden;
+    background:#fff;
+    box-shadow:var(--shadow-soft);
+}
+.erp-bi-preview-head{
+    padding:18px 20px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(135deg, rgba(32, 87, 196, .08), rgba(65, 153, 225, .02));
+}
+.erp-bi-preview-head small{
+    display:block;
+    margin-bottom:8px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:#58718f;
+}
+.erp-bi-preview-head strong{
+    display:block;
+    font-size:20px;
+    line-height:1.25;
+    color:#102338;
+}
+.erp-bi-preview-head p{
+    margin:10px 0 0;
+    color:var(--muted);
+    line-height:1.65;
+    font-size:13px;
+}
+.erp-bi-preview-body{
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+.erp-bi-preview-stat-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+}
+.erp-bi-preview-stat{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px;
+    background:#fbfdff;
+}
+.erp-bi-preview-stat small{
+    display:block;
+    margin-bottom:6px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    font-size:10px;
+    color:#71839a;
+}
+.erp-bi-preview-stat strong{
+    display:block;
+    font-size:18px;
+    color:#102338;
+}
+.erp-bi-preview-canvas{
+    border:1px dashed var(--line-strong);
+    border-radius:16px;
+    padding:18px;
+    background:
+        linear-gradient(180deg, rgba(41,104,242,.045), rgba(41,104,242,0)),
+        #f8fbff;
+}
+.erp-bi-preview-canvas[data-mode="inactive"]{
+    background:#fbfcfe;
+}
+.erp-bi-preview-canvas h4{
+    margin:0 0 10px;
+    color:#102338;
+    font-size:16px;
+}
+.erp-bi-preview-canvas p{
+    margin:0;
+    color:var(--muted);
+    line-height:1.7;
+    font-size:13px;
+}
+.erp-bi-inline-checks{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+    gap:12px;
+}
+.erp-bi-inline-checks label{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 14px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+}
+@media (max-width: 1120px){
+    .erp-bi-config-shell{
+        grid-template-columns:1fr;
+    }
+    .erp-bi-preview-card{
+        position:static;
+    }
+}
+@media (max-width: 700px){
+    .erp-bi-preview-stat-grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Estado del panel</div>
+        <div class="erp-stat-value">
+            {% if configuracion_power_bi.activo %}Activo{% else %}Inactivo{% endif %}
+        </div>
+        <p class="erp-card-muted">Activa o pausa el dashboard ejecutivo de Power BI para esta empresa.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Visualizacion interna</div>
+        <div class="erp-stat-value">
+            {% if configuracion_power_bi.mostrar_en_reportes %}Visible{% else %}Oculta{% endif %}
+        </div>
+        <p class="erp-card-muted">Controla si el bloque BI se muestra dentro de reportes o queda solo configurado.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Ultima actualizacion</div>
+        <div class="erp-stat-value">{{ configuracion_power_bi.fecha_actualizacion|date:"d/m/Y" }}</div>
+        <p class="erp-card-muted">Cada cambio se refleja en la vista de reportes de esta empresa.</p>
+    </article>
+</section>
+
+<section class="erp-bi-config-shell">
+    <article class="erp-card erp-bi-config-form">
+        <div>
+            <div class="erp-kpi-label">Conexion por empresa</div>
+            <h3 style="margin:8px 0 6px;">Panel ejecutivo embebido</h3>
+            <p class="erp-card-muted" style="max-width:760px;">Pega la URL embed generada desde Power BI y define como quieres presentar el dashboard gerencial dentro del ERP. La empresa mantiene su propio panel, sin mezclarse con otras companias.</p>
+        </div>
+
+        <form method="post" class="erp-form-grid" id="power-bi-config-form">
+            {% csrf_token %}
+
+            <div class="erp-card" style="grid-column:1 / -1; background:#f8fafc;">
+                <div class="erp-kpi-label">Controles de visualizacion</div>
+                <div class="erp-bi-inline-checks" style="margin-top:14px;">
+                    <label>
+                        {{ form.activo }}
+                        <span>Activar dashboard BI para esta empresa</span>
+                    </label>
+                    <label>
+                        {{ form.mostrar_en_reportes }}
+                        <span>Mostrar panel dentro de reportes</span>
+                    </label>
+                    <label>
+                        {{ form.usa_token_seguro }}
+                        <span>Reservar integracion con token seguro</span>
+                    </label>
+                </div>
+                {{ form.activo.errors }}
+                {{ form.mostrar_en_reportes.errors }}
+                {{ form.usa_token_seguro.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.titulo_panel.id_for_label }}">Titulo del panel</label>
+                {{ form.titulo_panel }}
+                <small>{{ form.titulo_panel.help_text }}</small>
+                {{ form.titulo_panel.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.alto_iframe.id_for_label }}">Altura del dashboard</label>
+                {{ form.alto_iframe }}
+                <small>{{ form.alto_iframe.help_text }}</small>
+                {{ form.alto_iframe.errors }}
+            </div>
+
+            <div class="erp-field" style="grid-column:1 / -1;">
+                <label for="{{ form.descripcion_panel.id_for_label }}">Descripcion visible</label>
+                {{ form.descripcion_panel }}
+                <small>{{ form.descripcion_panel.help_text }}</small>
+                {{ form.descripcion_panel.errors }}
+            </div>
+
+            <div class="erp-field" style="grid-column:1 / -1;">
+                <label for="{{ form.url_embed.id_for_label }}">URL embed de Power BI</label>
+                {{ form.url_embed }}
+                <small>{{ form.url_embed.help_text }}</small>
+                {{ form.url_embed.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.workspace_id.id_for_label }}">Workspace ID</label>
+                {{ form.workspace_id }}
+                <small>{{ form.workspace_id.help_text }}</small>
+                {{ form.workspace_id.errors }}
+            </div>
+
+            <div class="erp-field">
+                <label for="{{ form.report_id.id_for_label }}">Report ID</label>
+                {{ form.report_id }}
+                <small>{{ form.report_id.help_text }}</small>
+                {{ form.report_id.errors }}
+            </div>
+
+            <div style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
+                <a class="erp-btn erp-btn-secondary" href="{% url 'reportes_facturacion' empresa.slug %}">Cancelar</a>
+                <button class="erp-btn" type="submit">Guardar configuracion BI</button>
+            </div>
+        </form>
+    </article>
+
+    <aside class="erp-card erp-bi-preview-card">
+        <div>
+            <div class="erp-kpi-label">Preview operativo</div>
+            <h3 style="margin:8px 0 6px;">Como se vera dentro de reportes</h3>
+            <p class="erp-card-muted">Esta vista no sustituye el dashboard real de Power BI, pero te ayuda a definir nombre, descripcion y presencia visual antes de publicarlo.</p>
+        </div>
+
+        <div class="erp-bi-preview-frame">
+            <div class="erp-bi-preview-head">
+                <small>Dashboard embebido</small>
+                <strong data-bi-preview-title>{{ configuracion_power_bi.titulo_panel|default:"Dashboard ejecutivo" }}</strong>
+                <p data-bi-preview-description>
+                    {% if configuracion_power_bi.descripcion_panel %}
+                        {{ configuracion_power_bi.descripcion_panel }}
+                    {% else %}
+                        Tablero gerencial integrado para ventas, cartera y seguimiento fiscal desde una sola vista.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="erp-bi-preview-body">
+                <div class="erp-bi-preview-stat-grid">
+                    <div class="erp-bi-preview-stat">
+                        <small>Estado</small>
+                        <strong data-bi-preview-state>{% if configuracion_power_bi.activo %}Activo{% else %}Inactivo{% endif %}</strong>
+                    </div>
+                    <div class="erp-bi-preview-stat">
+                        <small>Altura</small>
+                        <strong><span data-bi-preview-height>{{ configuracion_power_bi.alto_iframe|default:760 }}</span> px</strong>
+                    </div>
+                </div>
+                <div class="erp-bi-preview-canvas" data-bi-preview-canvas data-mode="{% if configuracion_power_bi.activo and configuracion_power_bi.url_embed %}active{% else %}inactive{% endif %}">
+                    <h4 data-bi-preview-canvas-title>{% if configuracion_power_bi.activo and configuracion_power_bi.url_embed %}Panel listo para mostrarse{% else %}Pendiente de conexion{% endif %}</h4>
+                    <p data-bi-preview-canvas-copy>
+                        {% if configuracion_power_bi.activo and configuracion_power_bi.url_embed %}
+                            El modulo de reportes mostrara el dashboard embebido con esta configuracion para la empresa {{ empresa.nombre }}.
+                        {% else %}
+                            Activa el panel y pega una URL embed valida para habilitar la visualizacion dentro de reportes.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </aside>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const titulo = document.getElementById("id_titulo_panel");
+    const descripcion = document.getElementById("id_descripcion_panel");
+    const alto = document.getElementById("id_alto_iframe");
+    const activo = document.getElementById("id_activo");
+    const urlEmbed = document.getElementById("id_url_embed");
+
+    const titlePreview = document.querySelector("[data-bi-preview-title]");
+    const descriptionPreview = document.querySelector("[data-bi-preview-description]");
+    const statePreview = document.querySelector("[data-bi-preview-state]");
+    const heightPreview = document.querySelector("[data-bi-preview-height]");
+    const canvas = document.querySelector("[data-bi-preview-canvas]");
+    const canvasTitle = document.querySelector("[data-bi-preview-canvas-title]");
+    const canvasCopy = document.querySelector("[data-bi-preview-canvas-copy]");
+
+    function valueOrFallback(input, fallback) {
+        if (!input) return fallback;
+        const value = input.value.trim();
+        return value ? value : fallback;
+    }
+
+    function applyPreview() {
+        const isActive = !!(activo && activo.checked);
+        const hasUrl = !!valueOrFallback(urlEmbed, "");
+        const heightValue = valueOrFallback(alto, "760");
+
+        if (titlePreview) {
+            titlePreview.textContent = valueOrFallback(titulo, "Dashboard ejecutivo");
+        }
+        if (descriptionPreview) {
+            descriptionPreview.textContent = valueOrFallback(
+                descripcion,
+                "Tablero gerencial integrado para ventas, cartera y seguimiento fiscal desde una sola vista."
+            );
+        }
+        if (statePreview) {
+            statePreview.textContent = isActive ? "Activo" : "Inactivo";
+        }
+        if (heightPreview) {
+            heightPreview.textContent = heightValue;
+        }
+        if (canvas && canvasTitle && canvasCopy) {
+            if (isActive && hasUrl) {
+                canvas.dataset.mode = "active";
+                canvasTitle.textContent = "Panel listo para mostrarse";
+                canvasCopy.textContent = "El modulo de reportes cargara el dashboard embebido con esta configuracion para la empresa {{ empresa.nombre|escapejs }}.";
+            } else {
+                canvas.dataset.mode = "inactive";
+                canvasTitle.textContent = "Pendiente de conexion";
+                canvasCopy.textContent = "Activa el panel y pega una URL embed valida para habilitar la visualizacion dentro de reportes.";
+            }
+        }
+    }
+
+    [titulo, descripcion, alto, activo, urlEmbed].filter(Boolean).forEach((field) => {
+        field.addEventListener("input", applyPreview);
+        field.addEventListener("change", applyPreview);
+    });
+
+    applyPreview();
+});
+</script>
+{% endblock %}

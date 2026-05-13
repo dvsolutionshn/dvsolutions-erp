@@ -1,0 +1,86 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Importar Catalogo de Cuentas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad{% endblock %}
+{% block header_title %}Importar Catalogo de Cuentas{% endblock %}
+{% block header_description %}Carga un plan de cuentas desde Excel y crea cuentas padre, subcuentas y cuentas de movimiento para esta empresa.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-action-link">Volver al Catalogo</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Formato</div>
+        <p class="erp-stat-value">Excel</p>
+        <p class="erp-card-muted">Acepta archivos .xlsx o .xlsm con encabezados en la primera fila.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Columnas minimas</div>
+        <p class="erp-stat-value">3</p>
+        <p class="erp-card-muted">codigo, nombre y tipo son obligatorias.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Jerarquia</div>
+        <p class="erp-stat-value">Padre</p>
+        <p class="erp-card-muted">Usa codigo_padre para enlazar subcuentas.</p>
+    </article>
+</section>
+
+<form method="post" enctype="multipart/form-data" class="erp-form-shell">
+    {% csrf_token %}
+    <section class="erp-form-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Subir archivo</h3>
+                <p class="erp-card-muted">El sistema valida todo antes de guardar. Si detecta errores, no importa nada hasta corregir el Excel.</p>
+            </div>
+        </div>
+        <div class="erp-form-grid">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Columnas recomendadas</h3>
+                <p class="erp-card-muted">Puedes usar estos encabezados en tu Excel.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr>
+                        <th>Columna</th>
+                        <th>Obligatoria</th>
+                        <th>Ejemplo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>codigo</td><td>Si</td><td>1100</td></tr>
+                    <tr><td>nombre</td><td>Si</td><td>Activo Corriente</td></tr>
+                    <tr><td>tipo</td><td>Si</td><td>activo, pasivo, patrimonio, ingreso, costo o gasto</td></tr>
+                    <tr><td>codigo_padre</td><td>No</td><td>1100</td></tr>
+                    <tr><td>acepta_movimientos</td><td>No</td><td>si / no</td></tr>
+                    <tr><td>activa</td><td>No</td><td>si / no</td></tr>
+                    <tr><td>descripcion</td><td>No</td><td>Cuenta agrupadora de efectivo</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="erp-form-actions">
+        <a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" class="erp-btn">Importar Catalogo</button>
+    </div>
+</form>
+{% endblock %}
