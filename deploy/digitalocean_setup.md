@@ -141,6 +141,24 @@ python manage.py collectstatic --noinput
 sudo systemctl restart dvsolutions
 ```
 
+## 11.1 Reparar estaticos despues de subir a DigitalOcean
+
+Si el sistema carga sin diseno, con imagenes rotas o se esta usando `:8000` en la URL,
+el problema normalmente es que Nginx no esta sirviendo `/static/` y `/media/`.
+Usa el script de reparacion con tu dominio o IP:
+
+```bash
+cd /opt/dvsolutions/repo
+chmod +x deploy/repair_digitalocean_static.sh
+./deploy/repair_digitalocean_static.sh 159.89.48.29
+```
+
+Despues entra sin `:8000`:
+
+```text
+http://159.89.48.29/digital_planning/dashboard/
+```
+
 ## 12. Ruta de Hospital MIA
 
 Cuando el dominio este activo, la empresa puede entrar por:
