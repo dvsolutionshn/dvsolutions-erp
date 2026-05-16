@@ -1098,6 +1098,24 @@ class Factura(models.Model):
             raise ValueError("No existe un CAI disponible para la fecha seleccionada.")
 
         siguiente = cai.correlativo_actual + 1
+        correlativos_usados = set()
+        facturas_con_numero = Factura.objects.filter(
+            empresa=self.empresa,
+            cai=cai,
+        ).exclude(numero_factura__isnull=True).exclude(numero_factura__exact="")
+        if self.pk:
+            facturas_con_numero = facturas_con_numero.exclude(pk=self.pk)
+
+        for numero in facturas_con_numero.values_list("numero_factura", flat=True):
+            coincidencia = self.NUMERO_FACTURA_REGEX.match((numero or "").strip())
+            if coincidencia:
+                correlativos_usados.add(int(coincidencia.group("correlativo")))
+
+        while siguiente in correlativos_usados and siguiente <= cai.rango_final:
+            siguiente += 1
+
+        if siguiente > cai.rango_final:
+            raise ValueError("No existe un correlativo libre dentro del rango del CAI seleccionado.")
 
         self.numero_factura = (
             f"{cai.establecimiento}-"
@@ -1112,17 +1130,13 @@ class Factura(models.Model):
         cai.save(update_fields=['correlativo_actual'])
 
     def _aplicar_numero_factura_manual(self):
-        cai, correlativo = self._obtener_cai_para_numero_manual(usar_bloqueo=True)
+        cai, _correlativo = self._obtener_cai_para_numero_manual(usar_bloqueo=True)
         if not cai:
             raise ValueError("No existe un CAI que cubra este numero para la fecha de la factura.")
 
         self.numero_factura = self.numero_factura.strip()
         self.cai = cai
         self._guardar_snapshot_cai(cai)
-
-        if correlativo > cai.correlativo_actual:
-            cai.correlativo_actual = correlativo
-            cai.save(update_fields=['correlativo_actual'])
 
     def _guardar_snapshot_cai(self, cai):
         self.cai_numero = cai.numero_cai

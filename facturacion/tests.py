@@ -1945,10 +1945,56 @@ class FacturacionTests(TestCase):
         self.cai.refresh_from_db()
         self.assertEqual(factura.numero_factura, "001-001-01-00000005")
         self.assertEqual(factura.cai_id, self.cai.id)
-        self.assertEqual(self.cai.correlativo_actual, 5)
+        self.assertEqual(self.cai.correlativo_actual, 0)
 
         factura_auto = self.crear_factura_con_linea(estado="emitida", fecha_emision=date(2026, 4, 23))
-        self.assertEqual(factura_auto.numero_factura, "001-001-01-00000006")
+        self.assertEqual(factura_auto.numero_factura, "001-001-01-00000001")
+
+    def test_factura_historica_manual_no_empuja_correlativo_actual(self):
+        self.empresa.nombre = "Digital Planning"
+        self.empresa.slug = "digital_planning"
+        self.empresa.save(update_fields=["nombre", "slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.permite_cai_historico = True
+        configuracion.save(update_fields=["permite_cai_historico"])
+        self.cai.rango_inicial = 276
+        self.cai.rango_final = 1275
+        self.cai.correlativo_actual = 330
+        self.cai.save(update_fields=["rango_inicial", "rango_final", "correlativo_actual"])
+
+        factura = self.crear_factura_con_linea(estado="borrador", fecha_emision=date(2026, 4, 22))
+        factura.estado = "emitida"
+        factura.numero_factura = "001-001-01-00000380"
+        factura.save()
+
+        self.cai.refresh_from_db()
+        self.assertEqual(self.cai.correlativo_actual, 330)
+
+        factura_nueva = self.crear_factura_con_linea(estado="emitida", fecha_emision=date(2026, 5, 16))
+        self.assertEqual(factura_nueva.numero_factura, "001-001-01-00000331")
+
+    def test_factura_automatica_salta_numeros_historicos_ya_usados(self):
+        self.empresa.nombre = "Digital Planning"
+        self.empresa.slug = "digital_planning"
+        self.empresa.save(update_fields=["nombre", "slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.permite_cai_historico = True
+        configuracion.save(update_fields=["permite_cai_historico"])
+        self.cai.rango_inicial = 276
+        self.cai.rango_final = 1275
+        self.cai.correlativo_actual = 379
+        self.cai.save(update_fields=["rango_inicial", "rango_final", "correlativo_actual"])
+
+        factura_historica = self.crear_factura_con_linea(estado="borrador", fecha_emision=date(2026, 4, 22))
+        factura_historica.estado = "emitida"
+        factura_historica.numero_factura = "001-001-01-00000381"
+        factura_historica.save()
+
+        factura_380 = self.crear_factura_con_linea(estado="emitida", fecha_emision=date(2026, 5, 16))
+        self.assertEqual(factura_380.numero_factura, "001-001-01-00000380")
+
+        factura_382 = self.crear_factura_con_linea(estado="emitida", fecha_emision=date(2026, 5, 17))
+        self.assertEqual(factura_382.numero_factura, "001-001-01-00000382")
 
     def test_empresa_historica_bloquea_numero_manual_fuera_de_cai(self):
         self.empresa.nombre = "INTEGRATED SALES AND SERVICES S. DE R.L."
