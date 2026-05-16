@@ -590,6 +590,33 @@ class FacturacionTests(TestCase):
         factura_3 = self.crear_factura_con_linea(estado="emitida")
         self.assertEqual(factura_3.numero_factura, "001-001-01-00000002")
 
+    def test_recalculo_correlativo_ignora_borradores_y_anuladas(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.permite_cai_historico = True
+        configuracion.save(update_fields=["permite_cai_historico"])
+
+        factura_emitida = self.crear_factura_con_linea(estado="emitida")
+        self.assertEqual(factura_emitida.numero_factura, "001-001-01-00000001")
+
+        factura_anulada = self.crear_factura_con_linea(estado="borrador")
+        factura_anulada.fecha_emision = date.today()
+        factura_anulada.numero_factura = "001-001-01-00000002"
+        factura_anulada.estado = "anulada"
+        factura_anulada.save(update_fields=["fecha_emision", "numero_factura", "estado"])
+
+        factura_borrador = self.crear_factura_con_linea(estado="borrador")
+        factura_borrador.fecha_emision = date.today()
+        factura_borrador.numero_factura = "001-001-01-00000003"
+        factura_borrador.save(update_fields=["fecha_emision", "numero_factura"])
+
+        self.client.post(reverse("eliminar_factura", args=[self.empresa.slug, factura_emitida.id]))
+
+        self.cai.refresh_from_db()
+        self.assertEqual(self.cai.correlativo_actual, 0)
+
+        nueva = self.crear_factura_con_linea(estado="emitida")
+        self.assertEqual(nueva.numero_factura, "001-001-01-00000001")
+
     def test_empresa_especial_puede_editar_cai_usado(self):
         self.empresa.nombre = "INTEGRATED SALES AND SERVICES S. DE R.L."
         self.empresa.slug = "integrated-sales-and-services-s-de-r-l"

@@ -179,7 +179,7 @@ def _recalcular_correlativo_cai_factura(cai_id):
     maximo_utilizado = cai.rango_inicial - 1
 
     numeros = (
-        Factura.objects.filter(cai_id=cai_id)
+        Factura.objects.filter(cai_id=cai_id, estado="emitida")
         .exclude(numero_factura__isnull=True)
         .exclude(numero_factura__exact="")
         .values_list("numero_factura", flat=True)
