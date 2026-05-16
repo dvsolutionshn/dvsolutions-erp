@@ -28,7 +28,11 @@ body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f3f5;
         <p><strong>Factura:</strong> {{ recibo.factura.numero_factura|default:recibo.factura.id }}</p>
         <p><strong>Método:</strong> {{ recibo.get_metodo_display }}</p>
         <p><strong>Referencia:</strong> {{ recibo.referencia|default:"-" }}</p>
-        <p><strong>Monto:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</p>
+        <p><strong>Monto recibido:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</p>
+        <p><strong>Retenciones:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_retenciones|floatformat:2|intcomma }}</p>
+        <p><strong>Total aplicado:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_aplicado|floatformat:2|intcomma }}</p>
+        <p><strong>Base aplicada:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.subtotal_aplicado|floatformat:2|intcomma }}</p>
+        <p><strong>ISV aplicado:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.impuesto_aplicado|floatformat:2|intcomma }}</p>
     </div>
 
     <div class="card">

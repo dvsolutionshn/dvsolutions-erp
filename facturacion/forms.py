@@ -22,7 +22,7 @@ def configurar_campo_fecha(field, placeholder="dd/mm/aaaa"):
 class PagoFacturaForm(forms.ModelForm):
     class Meta:
         model = PagoFactura
-        fields = ['monto', 'metodo', 'referencia']
+        fields = ['monto', 'retencion_isr', 'retencion_isv', 'metodo', 'referencia']
 
 
 class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):

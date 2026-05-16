@@ -9,6 +9,8 @@ CUENTAS_BASE = {
     "caja": {"codigo": "1101", "nombre": "Caja General", "tipo": "activo"},
     "bancos": {"codigo": "1102", "nombre": "Bancos", "tipo": "activo"},
     "clientes": {"codigo": "1130", "nombre": "Cuentas por Cobrar Clientes", "tipo": "activo"},
+    "isr_retenido_clientes": {"codigo": "113003", "nombre": "ISR Retenido por Clientes", "tipo": "activo"},
+    "isv_retenido_clientes": {"codigo": "113005", "nombre": "ISV Retenido por Clientes", "tipo": "activo"},
     "inventario": {"codigo": "1140", "nombre": "Inventario de Mercaderia", "tipo": "activo"},
     "isv_por_pagar": {"codigo": "2101", "nombre": "ISV por Pagar", "tipo": "pasivo"},
     "proveedores": {"codigo": "2102", "nombre": "Cuentas por Pagar Proveedores", "tipo": "pasivo"},
@@ -38,6 +40,7 @@ CATALOGO_BASE_HONDURAS = [
     ("113002", "ISV Pagado 18%", "activo", "1130", True),
     ("113003", "ISR Retenido por Clientes", "activo", "1130", True),
     ("113004", "Pagos a Cuenta ISR", "activo", "1130", True),
+    ("113005", "ISV Retenido por Clientes", "activo", "1130", True),
     ("1140", "Anticipos", "activo", "11", False),
     ("114001", "Anticipos a Proveedores", "activo", "1140", True),
     ("114002", "Anticipos a Empleados", "activo", "1140", True),
@@ -433,6 +436,45 @@ def registrar_asiento_factura_emitida(factura):
 
 def registrar_asiento_pago_cliente(pago):
     cuenta_caja = pago.cuenta_financiera.cuenta_contable if pago.cuenta_financiera_id else metodo_a_clave_cuenta(pago.metodo)
+    lineas = []
+
+    if pago.monto > 0:
+        lineas.append(
+            {
+                "cuenta": cuenta_caja,
+                "detalle": "Ingreso de efectivo o banco",
+                "debe": pago.monto,
+                "haber": Decimal("0.00"),
+            }
+        )
+    if pago.retencion_isr > 0:
+        lineas.append(
+            {
+                "cuenta": "isr_retenido_clientes",
+                "detalle": f"ISR retenido por cliente {pago.factura.cliente.nombre}",
+                "debe": pago.retencion_isr,
+                "haber": Decimal("0.00"),
+            }
+        )
+    if pago.retencion_isv > 0:
+        lineas.append(
+            {
+                "cuenta": "isv_retenido_clientes",
+                "detalle": f"ISV retenido por cliente {pago.factura.cliente.nombre}",
+                "debe": pago.retencion_isv,
+                "haber": Decimal("0.00"),
+            }
+        )
+
+    lineas.append(
+        {
+            "cuenta": "clientes",
+            "detalle": f"Aplicacion a cliente {pago.factura.cliente.nombre}",
+            "debe": Decimal("0.00"),
+            "haber": pago.total_aplicado,
+        }
+    )
+
     return registrar_asiento_documento(
         empresa=pago.factura.empresa,
         documento_tipo="pago_factura",
@@ -443,20 +485,7 @@ def registrar_asiento_pago_cliente(pago):
         referencia=pago.referencia or (pago.factura.numero_factura or str(pago.factura.id)),
         origen_modulo="facturacion",
         creado_por=pago.factura.vendedor,
-        lineas=[
-            {
-                "cuenta": cuenta_caja,
-                "detalle": "Ingreso de efectivo o banco",
-                "debe": pago.monto,
-                "haber": Decimal("0.00"),
-            },
-            {
-                "cuenta": "clientes",
-                "detalle": f"Aplicacion a cliente {pago.factura.cliente.nombre}",
-                "debe": Decimal("0.00"),
-                "haber": pago.monto,
-            },
-        ],
+        lineas=lineas,
     )
 
 

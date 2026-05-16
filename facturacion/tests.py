@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -539,6 +540,86 @@ class FacturacionTests(TestCase):
         self.assertEqual(pago.cuenta_financiera, cuenta_financiera)
         asiento = AsientoContable.objects.get(documento_tipo="pago_factura", documento_id=pago.id, evento="cobro")
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, debe=Decimal("50.00")).exists())
+
+    def test_pago_con_retenciones_aplica_total_y_separa_componentes(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1102",
+            nombre="Banco Principal",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal Lempiras",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+        )
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "100.00",
+                "retencion_isr": "10.00",
+                "retencion_isv": "5.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(cuenta_financiera.id),
+                "referencia": "DEP-RET-001",
+            },
+        )
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        pago = PagoFactura.objects.get(factura=factura, referencia="DEP-RET-001")
+        self.assertEqual(pago.total_aplicado, Decimal("115.00"))
+        self.assertEqual(pago.total_retenciones, Decimal("15.00"))
+        self.assertEqual(pago.impuesto_aplicado, Decimal("15.00"))
+        self.assertEqual(pago.subtotal_aplicado, Decimal("100.00"))
+        factura.refresh_from_db()
+        self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+        asiento = AsientoContable.objects.get(documento_tipo="pago_factura", documento_id=pago.id, evento="cobro")
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="113003", debe=Decimal("10.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="113005", debe=Decimal("5.00")).exists())
+
+    def test_pago_fallido_no_deja_registro_guardado(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1102",
+            nombre="Banco Principal",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal Lempiras",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+        )
+        factura = self.crear_factura_con_linea()
+
+        with patch("facturacion.views.registrar_asiento_pago_cliente", side_effect=RuntimeError("fallo contable")):
+            response = self.client.post(
+                reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+                {
+                    "fecha": str(date.today()),
+                    "monto": "50.00",
+                    "metodo": "transferencia",
+                    "cuenta_financiera": str(cuenta_financiera.id),
+                    "referencia": "DEP-ERR-001",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PagoFactura.objects.filter(factura=factura, referencia="DEP-ERR-001").exists())
 
     def test_registrar_pago_prepara_cuentas_financieras_base(self):
         CuentaContable.objects.create(

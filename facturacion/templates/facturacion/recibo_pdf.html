@@ -37,6 +37,10 @@
 
     <div class="card">
         <div class="amount">Monto recibido: {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</div>
+        <div class="row"><strong>Retenciones:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_retenciones|floatformat:2|intcomma }}</div>
+        <div class="row"><strong>Total aplicado:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_aplicado|floatformat:2|intcomma }}</div>
+        <div class="row"><strong>Base aplicada:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.subtotal_aplicado|floatformat:2|intcomma }}</div>
+        <div class="row"><strong>ISV aplicado:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.impuesto_aplicado|floatformat:2|intcomma }}</div>
     </div>
 </body>
 </html>

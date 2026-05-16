@@ -58,6 +58,19 @@
             </div>
         </div>
 
+        <div class="erp-form-grid two" style="margin-bottom:18px;">
+            <div class="erp-field">
+                <label for="retencion_isr">Retencion ISR</label>
+                <input id="retencion_isr" type="number" step="0.01" min="0" name="retencion_isr" value="{{ form_data.retencion_isr|default:'0.00' }}" placeholder="0.00">
+                <div class="erp-field-help">Monto retenido por el cliente y aplicado al saldo de la factura.</div>
+            </div>
+            <div class="erp-field">
+                <label for="retencion_isv">Retencion ISV</label>
+                <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
+                <div class="erp-field-help">Usalo cuando el cliente retiene el impuesto y no entrega ese efectivo.</div>
+            </div>
+        </div>
+
         <div class="erp-grid">
             <article class="erp-card erp-payment-method-card">
                 <div class="erp-kpi-label">Efectivo</div>
@@ -140,10 +153,10 @@
             <div class="erp-field">
                 <label for="monto">Monto</label>
                 <div style="display:flex;gap:10px;align-items:center;">
-                    <input id="monto" type="number" step="0.01" name="monto" value="{{ form_data.monto|default:'' }}" required>
+                    <input id="monto" type="number" step="0.01" min="0" name="monto" value="{{ form_data.monto|default:'' }}" required>
                     <button type="button" class="erp-btn-secondary" style="white-space:nowrap;" onclick="pagarTodo()">Pagar todo</button>
                 </div>
-                <div class="erp-field-help">No puede superar el saldo pendiente.</div>
+                <div class="erp-field-help">Este es el dinero que realmente entro a caja o banco.</div>
             </div>
             <div class="erp-field">
                 <label for="metodo">Metodo de pago</label>
@@ -170,6 +183,20 @@
                 <label for="referencia">Referencia</label>
                 <input id="referencia" type="text" name="referencia" value="{{ form_data.referencia|default:'' }}" placeholder="Deposito, transferencia, voucher o comprobante">
             </div>
+            <div class="erp-field">
+                <label for="retencion_isr">Retencion ISR</label>
+                <input id="retencion_isr" type="number" step="0.01" min="0" name="retencion_isr" value="{{ form_data.retencion_isr|default:'0.00' }}" placeholder="0.00">
+                <div class="erp-field-help">Si el cliente retuvo ISR, registralo aqui para aplicarlo al saldo.</div>
+            </div>
+            <div class="erp-field">
+                <label for="retencion_isv">Retencion ISV</label>
+                <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
+                <div class="erp-field-help">Permite reflejar el ISV retenido sin inflar el efectivo recibido.</div>
+            </div>
+        </div>
+        <div class="erp-soft-panel">
+            <strong>Total aplicado:</strong> <span id="total-aplicado-simple">L. 0.00</span>
+            <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
         </div>
         {% endif %}
 
@@ -186,22 +213,45 @@
 <script>
 function pagarTodo(){
     const monto = document.getElementById("monto");
-    if(monto){ monto.value = "{{ factura.saldo_pendiente }}"; }
+    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
+    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
+    const saldo = parseFloat("{{ factura.saldo_pendiente }}");
+    if(monto){
+        const restante = saldo - (Number.isFinite(retIsr) ? retIsr : 0) - (Number.isFinite(retIsv) ? retIsv : 0);
+        monto.value = Math.max(restante, 0).toFixed(2);
+        actualizarTotalAplicadoSimple();
+    }
 }
 function actualizarTotalMixto(){
-    const total = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
+    const totalCobrado = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
         const input = document.getElementById(id);
         const value = input ? parseFloat(input.value || "0") : 0;
         return acc + (Number.isFinite(value) ? value : 0);
     }, 0);
+    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
+    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
+    const total = totalCobrado + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
     const target = document.getElementById("total-mixto");
+    if(target){ target.textContent = "L. " + total.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2}); }
+}
+function actualizarTotalAplicadoSimple(){
+    const monto = parseFloat(document.getElementById("monto")?.value || "0");
+    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
+    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
+    const total = (Number.isFinite(monto) ? monto : 0) + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
+    const target = document.getElementById("total-aplicado-simple");
     if(target){ target.textContent = "L. " + total.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2}); }
 }
 ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].forEach(id => {
     const input = document.getElementById(id);
     if(input){ input.addEventListener("input", actualizarTotalMixto); }
 });
+["monto", "retencion_isr", "retencion_isv"].forEach(id => {
+    const input = document.getElementById(id);
+    if(input){ input.addEventListener("input", () => { actualizarTotalMixto(); actualizarTotalAplicadoSimple(); }); }
+});
 actualizarTotalMixto();
+actualizarTotalAplicadoSimple();
 </script>
 {% endblock %}
 

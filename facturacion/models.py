@@ -1192,7 +1192,7 @@ class Factura(models.Model):
 
     @property
     def total_pagado(self):
-        return sum((p.monto for p in self.pagos_facturacion.all()), Decimal('0.00'))
+        return sum((p.total_aplicado for p in self.pagos_facturacion.all()), Decimal('0.00'))
 
     @property
     def tiene_pagos_registrados(self):
@@ -1683,6 +1683,10 @@ class PagoFactura(models.Model):
 
     fecha = models.DateField(default=timezone.now)
     monto = models.DecimalField(max_digits=12, decimal_places=2)
+    retencion_isr = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    retencion_isv = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    impuesto_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     metodo = models.CharField(
         max_length=20,
@@ -1708,23 +1712,58 @@ class PagoFactura(models.Model):
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def total_retenciones(self):
+        return (Decimal(self.retencion_isr or 0) + Decimal(self.retencion_isv or 0)).quantize(DOS_DECIMALES)
+
+    @property
+    def total_aplicado(self):
+        return (Decimal(self.monto or 0) + self.total_retenciones).quantize(DOS_DECIMALES)
+
+    def recalcular_componentes_pago(self):
+        total_aplicado = self.total_aplicado
+        total_factura = Decimal(self.factura.total or 0)
+        impuesto_factura = Decimal(self.factura.impuesto or 0)
+
+        if total_aplicado <= 0 or total_factura <= 0:
+            self.subtotal_aplicado = Decimal('0.00')
+            self.impuesto_aplicado = Decimal('0.00')
+            return
+
+        proporcion_impuesto = (impuesto_factura / total_factura) if total_factura else Decimal('0.00')
+        impuesto_aplicado = (total_aplicado * proporcion_impuesto).quantize(DOS_DECIMALES)
+        subtotal_aplicado = (total_aplicado - impuesto_aplicado).quantize(DOS_DECIMALES)
+
+        self.subtotal_aplicado = subtotal_aplicado
+        self.impuesto_aplicado = impuesto_aplicado
+
     def clean(self):
         super().clean()
         if self.monto is None:
             return
 
-        if self.monto <= 0:
-            raise ValidationError({'monto': 'El monto del pago debe ser mayor que cero.'})
+        self.retencion_isr = Decimal(self.retencion_isr or 0).quantize(DOS_DECIMALES)
+        self.retencion_isv = Decimal(self.retencion_isv or 0).quantize(DOS_DECIMALES)
+
+        if self.monto < 0:
+            raise ValidationError({'monto': 'El monto recibido no puede ser negativo.'})
+        if self.retencion_isr < 0:
+            raise ValidationError({'retencion_isr': 'La retencion ISR no puede ser negativa.'})
+        if self.retencion_isv < 0:
+            raise ValidationError({'retencion_isv': 'La retencion ISV no puede ser negativa.'})
+        if self.total_aplicado <= 0:
+            raise ValidationError('Debes registrar un monto recibido o una retencion mayor que cero.')
 
         total_pagado = self.factura.pagos_facturacion.exclude(pk=self.pk).aggregate(
-            total=models.Sum('monto')
+            total=models.Sum(models.F('monto') + models.F('retencion_isr') + models.F('retencion_isv'))
         )['total'] or Decimal('0.00')
 
         saldo_disponible = self.factura.total_documento_ajustado - total_pagado
-        if self.monto > saldo_disponible:
-            raise ValidationError({'monto': 'El pago no puede ser mayor que el saldo pendiente.'})
+        if self.total_aplicado > saldo_disponible:
+            raise ValidationError({'monto': 'El pago aplicado no puede ser mayor que el saldo pendiente.'})
         if self.cuenta_financiera_id and self.cuenta_financiera.empresa_id != self.factura.empresa_id:
             raise ValidationError({'cuenta_financiera': 'La cuenta financiera debe pertenecer a la misma empresa de la factura.'})
+        self.recalcular_componentes_pago()
 
     def save(self, *args, **kwargs):
         self.full_clean()

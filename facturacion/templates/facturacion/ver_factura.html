@@ -343,7 +343,9 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
             <tr>
                 <th>Fecha</th>
                 <th>Método</th>
-                <th>Monto</th>
+                <th>Cobro</th>
+                <th>Retenciones</th>
+                <th>Aplicado</th>
                 <th>Referencia</th>
                 <th>Recibo</th>
             </tr>
@@ -356,6 +358,14 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
                 <td>
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
                     {{ pago.monto|floatformat:2|intcomma }}
+                </td>
+                <td>
+                    {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                    {{ pago.total_retenciones|floatformat:2|intcomma }}
+                </td>
+                <td>
+                    {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
+                    {{ pago.total_aplicado|floatformat:2|intcomma }}
                 </td>
                 <td>{{ pago.referencia }}</td>
                 <td>

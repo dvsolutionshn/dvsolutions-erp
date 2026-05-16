@@ -24,6 +24,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.chart import BarChart, Reference
 import os
+import logging
 from pathlib import Path
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, Usuario
@@ -40,6 +41,8 @@ from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cierre
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, DATE_INPUT_FORMATS_LATAM, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import ClasificacionCompraFiscal, CuentaFinanciera
+
+logger = logging.getLogger(__name__)
 
 
 # =====================================================
@@ -2760,7 +2763,7 @@ def ver_recibo(request, empresa_slug, recibo_id):
         recibo.factura.pagos_facturacion.select_related("cuenta_financiera", "cajero").order_by("fecha", "id")
     )
     total_pagos_previos = sum(
-        (pago.monto for pago in pagos_factura if recibo.pago_id and pago.id != recibo.pago_id),
+        (pago.total_aplicado for pago in pagos_factura if recibo.pago_id and pago.id != recibo.pago_id),
         Decimal("0.00"),
     )
 
@@ -3855,7 +3858,17 @@ def registrar_pago(request, empresa_slug, factura_id):
         referencia = request.POST.get("referencia", "").strip()
         fecha_pago = request.POST.get("fecha")
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
+        retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
+        retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
         error = None
+
+        def _parsear_decimal(valor, etiqueta):
+            if not valor:
+                return Decimal('0.00')
+            try:
+                return Decimal(valor)
+            except InvalidOperation as exc:
+                raise ValidationError(f"El valor de {etiqueta} no es valido.") from exc
 
         if config_avanzada.usa_pagos_mixtos:
             try:
@@ -3871,6 +3884,15 @@ def registrar_pago(request, empresa_slug, factura_id):
             ]
             pagos_validos = []
             total_pago = Decimal('0.00')
+            retencion_isr = Decimal('0.00')
+            retencion_isv = Decimal('0.00')
+
+            if not error:
+                try:
+                    retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
+                    retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")
+                except ValidationError as exc:
+                    error = "; ".join(exc.messages)
 
             if not error:
                 for metodo_mixto, etiqueta, monto_raw, cuenta_id, referencia_mixta in pagos_solicitados:
@@ -3892,18 +3914,24 @@ def registrar_pago(request, empresa_slug, factura_id):
                     pagos_validos.append((metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta))
 
             if not error:
-                if not pagos_validos:
-                    error = "Ingresa al menos un monto para registrar el pago."
-                elif total_pago > factura.saldo_pendiente:
-                    error = "La suma de pagos no puede ser mayor que el saldo pendiente."
+                if not pagos_validos and retencion_isr <= 0 and retencion_isv <= 0:
+                    error = "Ingresa al menos un monto o una retencion para registrar el pago."
+                elif not pagos_validos:
+                    error = "Con pagos mixtos debes registrar al menos un cobro recibido. Si solo deseas aplicar retenciones, usa monto 0.00 en el flujo simple."
+                elif retencion_isr < 0 or retencion_isv < 0:
+                    error = "Las retenciones no pueden ser negativas."
+                elif total_pago + retencion_isr + retencion_isv > factura.saldo_pendiente:
+                    error = "La suma aplicada no puede ser mayor que el saldo pendiente."
                 else:
                     recibos = []
                     try:
                         with transaction.atomic():
-                            for metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta in pagos_validos:
+                            for indice, (metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta) in enumerate(pagos_validos, start=1):
                                 pago = PagoFactura.objects.create(
                                     factura=factura,
                                     monto=monto_decimal,
+                                    retencion_isr=retencion_isr if indice == 1 else Decimal('0.00'),
+                                    retencion_isv=retencion_isv if indice == 1 else Decimal('0.00'),
                                     metodo=metodo_mixto,
                                     referencia=referencia_mixta,
                                     cuenta_financiera=cuenta_mixta,
@@ -3915,11 +3943,14 @@ def registrar_pago(request, empresa_slug, factura_id):
                                     recibos.append(pago.recibo.numero_recibo)
                         messages.success(
                             request,
-                            f"Pago mixto registrado correctamente por L. {total_pago:.2f}. Recibos: {', '.join(recibos) or 'sin numero'}."
+                            f"Pago mixto registrado correctamente. Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}."
                         )
                         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
                     except ValidationError as exc:
                         error = "; ".join(exc.messages)
+                    except Exception as exc:
+                        logger.exception("Error registrando pago mixto en factura %s", factura.id)
+                        error = f"No se pudo completar el cobro: {exc}"
 
             messages.error(request, error)
             return render(request, "facturacion/registrar_pago.html", {
@@ -3934,24 +3965,32 @@ def registrar_pago(request, empresa_slug, factura_id):
                 "form_data": request.POST,
             })
 
-        if monto:
-            try:
-                monto_decimal = Decimal(monto)
+        try:
+            monto_decimal = _parsear_decimal(monto, "monto recibido")
+            retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
+            retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")
 
-                if monto_decimal <= 0:
-                    error = "El monto del pago debe ser mayor que cero."
-                elif monto_decimal > factura.saldo_pendiente:
-                    error = "El pago no puede ser mayor que el saldo pendiente."
-                else:
-                    cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first()
-                    if not cuenta_financiera:
-                        raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el pago.")
+            if monto_decimal < 0:
+                error = "El monto recibido no puede ser negativo."
+            elif retencion_isr < 0 or retencion_isv < 0:
+                error = "Las retenciones no pueden ser negativas."
+            elif monto_decimal + retencion_isr + retencion_isv <= 0:
+                error = "Debes registrar un monto o una retencion mayor que cero."
+            elif monto_decimal + retencion_isr + retencion_isv > factura.saldo_pendiente:
+                error = "El pago aplicado no puede ser mayor que el saldo pendiente."
+            else:
+                cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first()
+                if not cuenta_financiera:
+                    raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el pago.")
 
-                    fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
+                fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
 
+                with transaction.atomic():
                     pago = PagoFactura.objects.create(
                         factura=factura,
                         monto=monto_decimal,
+                        retencion_isr=retencion_isr,
+                        retencion_isv=retencion_isv,
                         metodo=metodo,
                         referencia=referencia,
                         cuenta_financiera=cuenta_financiera,
@@ -3959,18 +3998,19 @@ def registrar_pago(request, empresa_slug, factura_id):
                         fecha=fecha_convertida
                     )
                     registrar_asiento_pago_cliente(pago)
-                    recibo_numero = pago.recibo.numero_recibo if hasattr(pago, 'recibo') else None
-                    if recibo_numero:
-                        messages.success(request, f"Pago registrado correctamente. Recibo generado: {recibo_numero}.")
-                    else:
-                        messages.success(request, "Pago registrado correctamente.")
-                    return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
-            except (InvalidOperation, ValueError):
-                error = "Ingrese un monto y una fecha válidos."
-            except ValidationError as exc:
-                error = "; ".join(exc.messages)
-        else:
-            error = "Ingrese el monto del pago."
+                recibo_numero = pago.recibo.numero_recibo if hasattr(pago, 'recibo') else None
+                if recibo_numero:
+                    messages.success(request, f"Pago registrado correctamente. Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.")
+                else:
+                    messages.success(request, f"Pago registrado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
+                return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        except (InvalidOperation, ValueError):
+            error = "Ingrese un monto y una fecha validos."
+        except ValidationError as exc:
+            error = "; ".join(exc.messages)
+        except Exception as exc:
+            logger.exception("Error registrando pago en factura %s", factura.id)
+            error = f"No se pudo completar el cobro: {exc}"
 
         messages.error(request, error)
 

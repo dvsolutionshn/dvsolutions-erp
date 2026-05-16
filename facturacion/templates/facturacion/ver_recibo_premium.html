@@ -68,6 +68,7 @@
                     <div class="erp-receipt-side-item"><span>Método</span><strong><span class="erp-badge info">{{ recibo.get_metodo_display }}</span></strong></div>
                     <div class="erp-receipt-side-item"><span>Moneda</span><strong>{{ recibo.factura.moneda }}</strong></div>
                     <div class="erp-receipt-side-item"><span>Monto recibido</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
+                    <div class="erp-receipt-side-item"><span>Retenciones</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_retenciones|floatformat:2|intcomma }}</strong></div>
                     <div class="erp-receipt-side-item"><span>Empresa</span><strong>{{ empresa.nombre }}</strong></div>
                 </div>
             </aside>
@@ -90,7 +91,11 @@
                     <div class="erp-receipt-summary-list">
                         <div class="erp-receipt-summary-row"><span>Total factura</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.factura.total|floatformat:2|intcomma }}</strong></div>
                         <div class="erp-receipt-summary-row"><span>Pagos previos</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ total_pagos_previos|floatformat:2|intcomma }}</strong></div>
-                        <div class="erp-receipt-summary-row"><span>Pago documentado</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-receipt-summary-row"><span>Cobro recibido</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-receipt-summary-row"><span>Retenciones aplicadas</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_retenciones|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-receipt-summary-row"><span>Total aplicado</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_aplicado|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-receipt-summary-row"><span>Base aplicada</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.subtotal_aplicado|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-receipt-summary-row"><span>ISV aplicado</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.impuesto_aplicado|floatformat:2|intcomma }}</strong></div>
                         <div class="erp-receipt-summary-row total"><span>Saldo actual factura</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.factura.saldo_pendiente|floatformat:2|intcomma }}</strong></div>
                     </div>
                 </div>
@@ -107,7 +112,9 @@
                         <th>Referencia</th>
                         <th>Cuenta</th>
                         <th>Cajero</th>
-                        <th>Monto</th>
+                        <th>Cobro</th>
+                        <th>Retenciones</th>
+                        <th>Aplicado</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -130,9 +137,11 @@
                             {% endif %}
                         </td>
                         <td class="amount"><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto|floatformat:2|intcomma }}</strong></td>
+                        <td class="amount"><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_retenciones|floatformat:2|intcomma }}</strong></td>
+                        <td class="amount"><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_aplicado|floatformat:2|intcomma }}</strong></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="6" class="erp-empty">Esta factura todavía no tiene pagos registrados.</td></tr>
+                    <tr><td colspan="8" class="erp-empty">Esta factura todavía no tiene pagos registrados.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
