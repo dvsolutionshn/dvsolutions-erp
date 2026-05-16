@@ -101,7 +101,7 @@ td{ padding:9px 8px; border-bottom:1px solid #e7edf5; }
             <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.precio_unitario|floatformat:2|intcomma }}</td>
             <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</td>
             <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</td>
-            <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}</td>
+            <td class="text-right">{% if nota.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.total_linea|floatformat:2|intcomma }}</td>
         </tr>
     {% endfor %}
     </tbody>

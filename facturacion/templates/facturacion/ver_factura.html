@@ -271,7 +271,7 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
 
                 <td>
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
-                    {{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}
+                    {{ linea.total_linea|floatformat:2|intcomma }}
                 </td>
             </tr>
         {% endfor %}

@@ -125,6 +125,47 @@ class FacturacionTests(TestCase):
         factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
         return factura
 
+    def test_linea_factura_total_linea_conserva_centavos(self):
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            estado="emitida",
+            fecha_emision=date.today(),
+        )
+        linea = LineaFactura.objects.create(
+            factura=factura,
+            producto=self.producto,
+            cantidad=Decimal("1.01"),
+            precio_unitario=Decimal("46286.45"),
+            impuesto=self.impuesto,
+        )
+
+        self.assertEqual(linea.subtotal, Decimal("46749.31"))
+        self.assertEqual(linea.impuesto_monto, Decimal("7012.40"))
+        self.assertEqual(linea.total_linea, Decimal("53761.71"))
+
+    def test_ver_factura_muestra_total_linea_con_decimales_correctos(self):
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            estado="emitida",
+            fecha_emision=date.today(),
+        )
+        LineaFactura.objects.create(
+            factura=factura,
+            producto=self.producto,
+            cantidad=Decimal("1.01"),
+            precio_unitario=Decimal("46286.45"),
+            impuesto=self.impuesto,
+        )
+        factura.calcular_totales()
+        factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
+
+        response = self.client.get(reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "53,761.71")
+
     def test_libro_compras_fiscal_evita_duplicados_entre_meses(self):
         RegistroCompraFiscal.objects.create(
             empresa=self.empresa,

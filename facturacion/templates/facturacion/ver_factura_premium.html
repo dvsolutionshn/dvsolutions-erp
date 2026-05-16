@@ -556,7 +556,7 @@
                             <td>{{ linea.descuento_porcentaje|floatformat:2 }}%</td>
                             <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</td>
                             <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</td>
-                            <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.subtotal|add:linea.impuesto_monto|floatformat:2|intcomma }}</td>
+                            <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.total_linea|floatformat:2|intcomma }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>

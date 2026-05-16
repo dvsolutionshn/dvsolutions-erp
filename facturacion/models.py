@@ -1569,16 +1569,20 @@ class LineaFactura(models.Model):
         # descuento
         descuento = self.descuento_porcentaje or Decimal('0')
 
-        self.descuento_monto = subtotal_base * (descuento / Decimal('100'))
+        self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
 
-        subtotal_final = subtotal_base - self.descuento_monto
+        subtotal_final = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
 
         # impuesto sobre subtotal con descuento
-        self.impuesto_monto = subtotal_final * (self.impuesto.porcentaje / Decimal ('100'))
+        self.impuesto_monto = (subtotal_final * (self.impuesto.porcentaje / Decimal ('100'))).quantize(DOS_DECIMALES)
 
         self.subtotal = subtotal_final
 
         super().save(*args, **kwargs)
+
+    @property
+    def total_linea(self):
+        return ((self.subtotal or Decimal('0.00')) + (self.impuesto_monto or Decimal('0.00'))).quantize(DOS_DECIMALES)
 
     @property
     def descripcion_visual(self):
@@ -1623,12 +1627,16 @@ class LineaNotaCredito(models.Model):
 
         subtotal_base = self.cantidad * self.precio_unitario
         descuento = self.descuento_porcentaje or Decimal('0')
-        self.descuento_monto = subtotal_base * (descuento / Decimal('100'))
-        subtotal_final = subtotal_base - self.descuento_monto
-        self.impuesto_monto = subtotal_final * (self.impuesto.porcentaje / Decimal('100'))
+        self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
+        subtotal_final = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
+        self.impuesto_monto = (subtotal_final * (self.impuesto.porcentaje / Decimal('100'))).quantize(DOS_DECIMALES)
         self.subtotal = subtotal_final
 
         super().save(*args, **kwargs)
+
+    @property
+    def total_linea(self):
+        return ((self.subtotal or Decimal('0.00')) + (self.impuesto_monto or Decimal('0.00'))).quantize(DOS_DECIMALES)
 
     @property
     def descripcion_visual(self):
