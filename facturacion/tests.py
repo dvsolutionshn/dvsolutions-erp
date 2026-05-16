@@ -383,6 +383,28 @@ class FacturacionTests(TestCase):
             list(form.fields["plantilla_factura_pdf"].choices),
         )
 
+    def test_form_configuracion_oculta_plantilla_independiente_si_empresa_no_aplica(self):
+        configuracion = ConfiguracionFacturacionEmpresa.objects.create(empresa=self.empresa)
+        form = ConfiguracionFacturacionEmpresaForm(
+            instance=configuracion,
+            permite_plantilla_independiente=False,
+        )
+        self.assertNotIn(
+            ("independiente", "Factura independiente"),
+            list(form.fields["plantilla_factura_pdf"].choices),
+        )
+
+    def test_form_configuracion_muestra_plantilla_independiente_si_empresa_aplica(self):
+        configuracion = ConfiguracionFacturacionEmpresa.objects.create(empresa=self.empresa)
+        form = ConfiguracionFacturacionEmpresaForm(
+            instance=configuracion,
+            permite_plantilla_independiente=True,
+        )
+        self.assertIn(
+            ("independiente", "Factura independiente"),
+            list(form.fields["plantilla_factura_pdf"].choices),
+        )
+
     def test_facturas_dashboard_muestra_listado_facturas(self):
         factura = self.crear_factura_con_linea()
 

@@ -30,6 +30,17 @@
 >
     PDF Alternativo
 </button>
+{% if permite_plantilla_independiente %}
+<button
+    class="erp-action-link erp-print-button"
+    type="button"
+    data-preview-title="Factura independiente"
+    data-preview-url="{% url 'vista_previa_factura_pdf_independiente' empresa.slug factura.id %}"
+    data-download-url="{% url 'descargar_factura_pdf_independiente' empresa.slug factura.id %}"
+>
+    PDF Independiente
+</button>
+{% endif %}
 {% if permite_plantilla_notas_extensas %}
 <button
     class="erp-action-link erp-print-button"

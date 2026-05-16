@@ -74,10 +74,12 @@ def configuracion_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
     permite_plantilla_notas_extensas = _empresa_permite_plantilla_notas_extensas(empresa)
+    permite_plantilla_independiente = _empresa_permite_plantilla_independiente(empresa)
     form = ConfiguracionFacturacionEmpresaForm(
         request.POST or None,
         instance=configuracion,
         permite_plantilla_notas_extensas=permite_plantilla_notas_extensas,
+        permite_plantilla_independiente=permite_plantilla_independiente,
     )
 
     if request.method == "POST" and form.is_valid():
@@ -92,6 +94,7 @@ def configuracion_facturacion(request, empresa_slug):
         "form": form,
         "configuracion": configuracion,
         "permite_plantilla_notas_extensas": permite_plantilla_notas_extensas,
+        "permite_plantilla_independiente": permite_plantilla_independiente,
     })
 
 
@@ -349,8 +352,15 @@ def _empresa_permite_plantilla_notas_extensas(empresa):
     )
 
 
+def _empresa_permite_plantilla_independiente(empresa):
+    config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    return bool(config.permite_plantilla_factura_independiente)
+
+
 def _resolver_plantilla_factura(configuracion, empresa, plantilla_forzada=None):
     plantilla_activa = plantilla_forzada or configuracion.plantilla_factura_pdf
+    if plantilla_activa == "independiente" and _empresa_permite_plantilla_independiente(empresa):
+        return "facturacion/factura_pdf_independiente.html"
     if plantilla_activa == "alternativa":
         return "facturacion/factura_pdf_alternativa.html"
     if plantilla_activa == "notas_extensas" and _empresa_permite_plantilla_notas_extensas(empresa):
@@ -4142,6 +4152,7 @@ def ver_factura(request, empresa_slug, factura_id):
         "resumen_detallado": resumen_detallado,
         "permite_gestion_fiscal_historica": config_avanzada.permite_gestion_fiscal_historica,
         "permite_plantilla_notas_extensas": _empresa_permite_plantilla_notas_extensas(empresa),
+        "permite_plantilla_independiente": _empresa_permite_plantilla_independiente(empresa),
     })
 
 
@@ -4213,6 +4224,21 @@ def descargar_factura_pdf_notas_extensas(request, empresa_slug, factura_id):
 
 
 @login_required
+def descargar_factura_pdf_independiente(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not _empresa_permite_plantilla_independiente(empresa):
+        raise Http404("Esta plantilla no esta disponible para esta empresa.")
+    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    return _render_factura_pdf_response(
+        empresa=empresa,
+        factura=factura,
+        plantilla="facturacion/factura_pdf_independiente.html",
+        inline=False,
+        prefijo_archivo="Factura_Independiente",
+    )
+
+
+@login_required
 @xframe_options_sameorigin
 def vista_previa_factura_pdf(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
@@ -4255,6 +4281,22 @@ def vista_previa_factura_pdf_notas_extensas(request, empresa_slug, factura_id):
         plantilla="facturacion/factura_pdf_notas_extensas.html",
         inline=True,
         prefijo_archivo="Factura_Notas",
+    )
+
+
+@login_required
+@xframe_options_sameorigin
+def vista_previa_factura_pdf_independiente(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not _empresa_permite_plantilla_independiente(empresa):
+        raise Http404("Esta plantilla no esta disponible para esta empresa.")
+    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    return _render_factura_pdf_response(
+        empresa=empresa,
+        factura=factura,
+        plantilla="facturacion/factura_pdf_independiente.html",
+        inline=True,
+        prefijo_archivo="Factura_Independiente",
     )
 
 

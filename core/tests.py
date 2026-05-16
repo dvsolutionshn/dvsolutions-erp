@@ -372,6 +372,32 @@ class SuperAdminControlTests(TestCase):
         configuracion.refresh_from_db()
         self.assertFalse(configuracion.permite_cai_historico)
 
+    def test_empresa_control_form_puede_activar_plantilla_factura_independiente(self):
+        empresa = Empresa.objects.create(
+            nombre="Integrated Sales And Services",
+            slug="integrated-sales-and-services",
+            rtn="0801199900001702",
+        )
+        form = EmpresaControlForm(
+            data={
+                "nombre": empresa.nombre,
+                "slug": empresa.slug,
+                "rtn": empresa.rtn,
+                "pais": empresa.pais,
+                "condiciones_pago": empresa.condiciones_pago,
+                "estado_licencia": empresa.estado_licencia,
+                "fecha_inicio_plan": empresa.fecha_inicio_plan,
+                "fecha_vencimiento_plan": empresa.fecha_vencimiento_plan,
+                "activa": "on",
+                "permite_plantilla_factura_independiente": "on",
+            },
+            instance=empresa,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+        self.assertTrue(configuracion.permite_plantilla_factura_independiente)
+
     def test_asistente_consulta_responde_segun_contexto_facturacion(self):
         empresa = Empresa.objects.create(
             nombre="Empresa Asistente",

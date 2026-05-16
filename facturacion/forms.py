@@ -28,12 +28,19 @@ class PagoFacturaForm(forms.ModelForm):
 class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         permite_plantilla_notas_extensas = kwargs.pop("permite_plantilla_notas_extensas", False)
+        permite_plantilla_independiente = kwargs.pop("permite_plantilla_independiente", False)
         super().__init__(*args, **kwargs)
         if not permite_plantilla_notas_extensas:
             self.fields["plantilla_factura_pdf"].choices = [
                 choice
                 for choice in self.fields["plantilla_factura_pdf"].choices
                 if choice[0] != "notas_extensas"
+            ]
+        if not permite_plantilla_independiente:
+            self.fields["plantilla_factura_pdf"].choices = [
+                choice
+                for choice in self.fields["plantilla_factura_pdf"].choices
+                if choice[0] != "independiente"
             ]
 
     class Meta:

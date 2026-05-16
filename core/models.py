@@ -400,6 +400,7 @@ class ConfiguracionAvanzadaEmpresa(models.Model):
     usa_bodegas_internas = models.BooleanField(default=False)
     ventas_solo_desde_vitrina = models.BooleanField(default=False)
     permite_cai_historico = models.BooleanField(default=False)
+    permite_plantilla_factura_independiente = models.BooleanField(default=False)
     bodega_venta_predeterminada = models.CharField(max_length=80, default="Vitrina")
     notas = models.TextField(blank=True, null=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

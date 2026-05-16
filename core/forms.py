@@ -51,6 +51,11 @@ class EmpresaControlForm(forms.ModelForm):
         label="Permitir correccion fiscal historica",
         help_text="Activalo solo cuando necesites editar CAI usados, numeracion historica o correcciones fiscales especiales en esta empresa.",
     )
+    permite_plantilla_factura_independiente = forms.BooleanField(
+        required=False,
+        label="Permitir plantilla de factura independiente",
+        help_text="Activalo para habilitar un formato PDF exclusivo, mas sobrio y visualmente separado del resto del ERP.",
+    )
 
     class Meta:
         model = Empresa
@@ -91,6 +96,9 @@ class EmpresaControlForm(forms.ModelForm):
         self.fields["permite_cai_historico"].initial = bool(
             configuracion_avanzada and configuracion_avanzada.permite_cai_historico
         )
+        self.fields["permite_plantilla_factura_independiente"].initial = bool(
+            configuracion_avanzada and configuracion_avanzada.permite_plantilla_factura_independiente
+        )
         self.fields["modulos_activos"].help_text = "Sirve como activacion adicional o ajuste especial por empresa, ademas del plan comercial."
         textos = {
             "nombre": ("Nombre de la empresa", ""),
@@ -113,6 +121,7 @@ class EmpresaControlForm(forms.ModelForm):
             "logo": ("Logo", ""),
             "activa": ("Empresa activa", "Si la desactivas, toda la empresa queda fuera de operacion aunque tenga plan."),
             "permite_cai_historico": ("Permitir correccion fiscal historica", "Activalo solo cuando necesites ajustes especiales de CAI, facturacion historica o correcciones fiscales ya emitidas."),
+            "permite_plantilla_factura_independiente": ("Permitir plantilla de factura independiente", "Activalo solo cuando quieras habilitar un PDF de factura exclusivo para esta empresa, con una presentacion separada del estilo general del ERP."),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:
@@ -172,9 +181,16 @@ class EmpresaControlForm(forms.ModelForm):
     def _save_advanced_config(self, empresa):
         configuracion, _ = ConfiguracionAvanzadaEmpresa.objects.get_or_create(empresa=empresa)
         valor = bool(self.cleaned_data.get("permite_cai_historico"))
+        valor_plantilla_independiente = bool(self.cleaned_data.get("permite_plantilla_factura_independiente"))
+        campos_actualizar = []
         if configuracion.permite_cai_historico != valor:
             configuracion.permite_cai_historico = valor
-            configuracion.save(update_fields=["permite_cai_historico"])
+            campos_actualizar.append("permite_cai_historico")
+        if configuracion.permite_plantilla_factura_independiente != valor_plantilla_independiente:
+            configuracion.permite_plantilla_factura_independiente = valor_plantilla_independiente
+            campos_actualizar.append("permite_plantilla_factura_independiente")
+        if campos_actualizar:
+            configuracion.save(update_fields=campos_actualizar)
 
 
 class UsuarioControlCreateForm(UserCreationForm):

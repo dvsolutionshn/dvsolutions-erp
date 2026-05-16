@@ -28,6 +28,7 @@ class ConfiguracionFacturacionEmpresa(models.Model):
         ('normal', 'Factura clasica'),
         ('alternativa', 'Factura alternativa'),
         ('notas_extensas', 'Factura notas extensas'),
+        ('independiente', 'Factura independiente'),
     )
 
     empresa = models.OneToOneField(Empresa, on_delete=models.CASCADE, related_name='configuracion_facturacion')

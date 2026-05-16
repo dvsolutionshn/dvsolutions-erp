@@ -333,6 +333,12 @@
                         <strong>PDF alternativo</strong>
                         <p>Presentacion mas comercial y moderna para empresas que quieren una factura con identidad visual mas marcada.</p>
                     </div>
+                    {% if permite_plantilla_independiente %}
+                    <div class="erp-template-option{% if configuracion.plantilla_factura_pdf == 'independiente' %} is-active{% endif %}">
+                        <strong>Factura independiente</strong>
+                        <p>Formato fiscal elegante, sobrio y totalmente separado del estilo visual general del ERP para empresas que necesitan una identidad documental propia.</p>
+                    </div>
+                    {% endif %}
                     {% if permite_plantilla_notas_extensas %}
                     <div class="erp-template-option{% if configuracion.plantilla_factura_pdf == 'notas_extensas' %} is-active{% endif %}">
                         <strong>Factura notas extensas</strong>
