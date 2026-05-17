@@ -871,6 +871,17 @@
             color:var(--white);
             font-size:14px;
         }
+        .request-success-actions{
+            display:flex;
+            gap:12px;
+            flex-wrap:wrap;
+        }
+        .contact-direct-actions{
+            display:flex;
+            gap:12px;
+            flex-wrap:wrap;
+            margin-top:22px;
+        }
         .screen-metrics{
             display:grid;
             grid-template-columns:repeat(3, minmax(0,1fr));
@@ -1490,6 +1501,11 @@
                         <div>Solicitud de demo, propuesta o prueba comercial desde el mismo servidor.</div>
                         <div>Base lista para convertir prospectos en oportunidades reales dentro del control maestro.</div>
                     </div>
+                    {% if public_whatsapp_url %}
+                    <div class="contact-direct-actions">
+                        <a href="{{ public_whatsapp_url }}" class="btn btn-secondary" target="_blank" rel="noopener">Hablar por WhatsApp</a>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="form-shell">
@@ -1602,7 +1618,10 @@
                             {% endif %}
                         </p>
                     </div>
-                    <div>
+                    <div class="request-success-actions">
+                        {% if request_success and request_success.whatsapp_url %}
+                        <a href="{{ request_success.whatsapp_url }}" class="btn btn-secondary" target="_blank" rel="noopener">Continuar por WhatsApp</a>
+                        {% endif %}
                         <button type="button" class="btn btn-primary" data-request-close>Entendido</button>
                     </div>
                 </div>

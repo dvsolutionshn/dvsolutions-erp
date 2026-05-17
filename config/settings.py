@@ -199,6 +199,7 @@ EMAIL_BACKEND = os.environ.get(
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@dvsolutions.local")
 COMMERCIAL_REQUEST_RECIPIENTS = env_list("COMMERCIAL_REQUEST_RECIPIENTS", ["dv.solutionshn@gmail.com"])
+PUBLIC_WHATSAPP_NUMBER = os.environ.get("PUBLIC_WHATSAPP_NUMBER", "")
 
 
 # Cache

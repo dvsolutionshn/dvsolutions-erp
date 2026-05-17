@@ -1,6 +1,7 @@
 from functools import wraps
 import logging
 import re
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
@@ -182,6 +183,19 @@ def _client_ip(request):
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
+def _normalizar_whatsapp_number(raw_number):
+    if not raw_number:
+        return ""
+    return "".join(ch for ch in str(raw_number) if ch.isdigit())
+
+
+def _build_whatsapp_link(message, number=None):
+    target = _normalizar_whatsapp_number(number or getattr(settings, "PUBLIC_WHATSAPP_NUMBER", ""))
+    if not target:
+        return ""
+    return f"https://wa.me/{target}?text={quote(message)}"
+
+
 def _login_throttle_key(scope, request):
     return f"login-throttle:{scope}:{_client_ip(request)}"
 
@@ -332,10 +346,14 @@ def empresa_login(request, slug=None):
 
 def _public_site_context(form=None):
     demos_catalogo = list(_public_demo_catalog().values())
+    whatsapp_url = _build_whatsapp_link(
+        "Hola DV Solutions, quiero informacion sobre una propuesta o una demo del sistema."
+    )
     return {
         "public_form": form or SolicitudComercialPublicaForm(),
         "erp_login_url": "/acceso/",
         "control_login_url": "/control/login/",
+        "public_whatsapp_url": whatsapp_url,
         "eslogan_principal": "No te tienes que adaptar al sistema, el sistema se adapta a ti.",
         "servicios_destacados": [
             {
@@ -404,10 +422,15 @@ def public_home(request):
                     )
             else:
                 email_status = _notify_new_commercial_request(solicitud)
+                whatsapp_message = (
+                    f"Hola DV Solutions, ya envie una solicitud desde la web. "
+                    f"Mi nombre es {solicitud.nombre_contacto} y mi empresa es {solicitud.empresa_interesada or 'sin empresa registrada'}."
+                )
                 request.session["public_request_success"] = {
                     "nombre": solicitud.nombre_contacto,
                     "solicita_prueba": solicitud.solicita_prueba,
                     "email_status": email_status,
+                    "whatsapp_url": _build_whatsapp_link(whatsapp_message),
                 }
                 logger.info("Nueva solicitud comercial registrada: %s", solicitud.id)
                 return redirect(f"{reverse('public_home')}#contacto")
