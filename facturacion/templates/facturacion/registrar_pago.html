@@ -69,6 +69,22 @@
                 <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
                 <div class="erp-field-help">Usalo cuando el cliente retiene el impuesto y no entrega ese efectivo.</div>
             </div>
+            <div class="erp-field">
+                <label style="display:flex;gap:10px;align-items:center;">
+                    <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
+                    <span>Separar ISV automaticamente</span>
+                </label>
+                <div class="erp-field-help">Divide el cobro entre ingreso base e ingreso fiscal del impuesto.</div>
+            </div>
+            <div class="erp-field">
+                <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
+                <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
+                    <option value="">Seleccione cuenta para ISV</option>
+                    {% for cuenta in cuentas_financieras %}
+                    <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
 
         <div class="erp-grid">
@@ -192,6 +208,25 @@
                 <label for="retencion_isv">Retencion ISV</label>
                 <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
                 <div class="erp-field-help">Permite reflejar el ISV retenido sin inflar el efectivo recibido.</div>
+            </div>
+            <div class="erp-field">
+                <label style="display:flex;gap:10px;align-items:center;">
+                    <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
+                    <span>Separar ISV automaticamente</span>
+                </label>
+                <div class="erp-field-help">Cuando cobras el total, aparta el ISV y lo manda a otra cuenta financiera.</div>
+            </div>
+            <div class="erp-field">
+                <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
+                <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
+                    <option value="">Seleccione cuenta para ISV</option>
+                    {% for cuenta in cuentas_financieras %}
+                    <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>
+                        {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="erp-field-help">Usa una cuenta aparte para resguardar el impuesto cobrado.</div>
             </div>
         </div>
         <div class="erp-soft-panel">

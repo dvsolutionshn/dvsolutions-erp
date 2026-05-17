@@ -1702,6 +1702,14 @@ class PagoFactura(models.Model):
         blank=True,
         related_name='pagos_facturas',
     )
+    separar_isv = models.BooleanField(default=False)
+    cuenta_financiera_impuesto = models.ForeignKey(
+        'contabilidad.CuentaFinanciera',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='pagos_facturas_impuesto',
+    )
     cajero = models.ForeignKey(
         Usuario,
         on_delete=models.SET_NULL,
@@ -1719,6 +1727,16 @@ class PagoFactura(models.Model):
     @property
     def total_aplicado(self):
         return (Decimal(self.monto or 0) + self.total_retenciones).quantize(DOS_DECIMALES)
+
+    @property
+    def subtotal_recibido(self):
+        subtotal = (Decimal(self.subtotal_aplicado or 0) - Decimal(self.retencion_isr or 0)).quantize(DOS_DECIMALES)
+        return subtotal if subtotal > 0 else Decimal('0.00')
+
+    @property
+    def impuesto_recibido(self):
+        impuesto = (Decimal(self.impuesto_aplicado or 0) - Decimal(self.retencion_isv or 0)).quantize(DOS_DECIMALES)
+        return impuesto if impuesto > 0 else Decimal('0.00')
 
     def recalcular_componentes_pago(self):
         total_aplicado = self.total_aplicado
@@ -1763,7 +1781,15 @@ class PagoFactura(models.Model):
             raise ValidationError({'monto': 'El pago aplicado no puede ser mayor que el saldo pendiente.'})
         if self.cuenta_financiera_id and self.cuenta_financiera.empresa_id != self.factura.empresa_id:
             raise ValidationError({'cuenta_financiera': 'La cuenta financiera debe pertenecer a la misma empresa de la factura.'})
+        if self.cuenta_financiera_impuesto_id and self.cuenta_financiera_impuesto.empresa_id != self.factura.empresa_id:
+            raise ValidationError({'cuenta_financiera_impuesto': 'La cuenta financiera del ISV debe pertenecer a la misma empresa de la factura.'})
         self.recalcular_componentes_pago()
+        if self.retencion_isr > self.subtotal_aplicado:
+            raise ValidationError({'retencion_isr': 'La retencion ISR no puede exceder la base aplicada del pago.'})
+        if self.retencion_isv > self.impuesto_aplicado:
+            raise ValidationError({'retencion_isv': 'La retencion ISV no puede exceder el ISV aplicado del pago.'})
+        if self.separar_isv and self.impuesto_recibido > 0 and not self.cuenta_financiera_impuesto_id:
+            raise ValidationError({'cuenta_financiera_impuesto': 'Selecciona la cuenta financiera donde se separara el ISV.'})
 
     def save(self, *args, **kwargs):
         self.full_clean()

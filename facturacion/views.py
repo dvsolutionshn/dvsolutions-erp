@@ -3860,6 +3860,8 @@ def registrar_pago(request, empresa_slug, factura_id):
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
+        separar_isv = request.POST.get("separar_isv") == "on"
+        cuenta_financiera_impuesto_id = request.POST.get("cuenta_financiera_impuesto")
         error = None
 
         def _parsear_decimal(valor, etiqueta):
@@ -3920,18 +3922,23 @@ def registrar_pago(request, empresa_slug, factura_id):
                     error = "Con pagos mixtos debes registrar al menos un cobro recibido. Si solo deseas aplicar retenciones, usa monto 0.00 en el flujo simple."
                 elif retencion_isr < 0 or retencion_isv < 0:
                     error = "Las retenciones no pueden ser negativas."
+                elif separar_isv and not cuenta_financiera_impuesto_id:
+                    error = "Selecciona la cuenta financiera donde se separara el ISV."
                 elif total_pago + retencion_isr + retencion_isv > factura.saldo_pendiente:
                     error = "La suma aplicada no puede ser mayor que el saldo pendiente."
                 else:
                     recibos = []
                     try:
                         with transaction.atomic():
+                            cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                             for indice, (metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta) in enumerate(pagos_validos, start=1):
                                 pago = PagoFactura.objects.create(
                                     factura=factura,
                                     monto=monto_decimal,
                                     retencion_isr=retencion_isr if indice == 1 else Decimal('0.00'),
                                     retencion_isv=retencion_isv if indice == 1 else Decimal('0.00'),
+                                    separar_isv=separar_isv,
+                                    cuenta_financiera_impuesto=cuenta_financiera_impuesto,
                                     metodo=metodo_mixto,
                                     referencia=referencia_mixta,
                                     cuenta_financiera=cuenta_mixta,
@@ -3974,12 +3981,15 @@ def registrar_pago(request, empresa_slug, factura_id):
                 error = "El monto recibido no puede ser negativo."
             elif retencion_isr < 0 or retencion_isv < 0:
                 error = "Las retenciones no pueden ser negativas."
+            elif separar_isv and not cuenta_financiera_impuesto_id:
+                error = "Selecciona la cuenta financiera donde se separara el ISV."
             elif monto_decimal + retencion_isr + retencion_isv <= 0:
                 error = "Debes registrar un monto o una retencion mayor que cero."
             elif monto_decimal + retencion_isr + retencion_isv > factura.saldo_pendiente:
                 error = "El pago aplicado no puede ser mayor que el saldo pendiente."
             else:
                 cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first()
+                cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                 if not cuenta_financiera:
                     raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el pago.")
 
@@ -3991,6 +4001,8 @@ def registrar_pago(request, empresa_slug, factura_id):
                         monto=monto_decimal,
                         retencion_isr=retencion_isr,
                         retencion_isv=retencion_isv,
+                        separar_isv=separar_isv,
+                        cuenta_financiera_impuesto=cuenta_financiera_impuesto,
                         metodo=metodo,
                         referencia=referencia,
                         cuenta_financiera=cuenta_financiera,

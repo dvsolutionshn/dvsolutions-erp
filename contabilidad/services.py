@@ -438,12 +438,35 @@ def registrar_asiento_pago_cliente(pago):
     cuenta_caja = pago.cuenta_financiera.cuenta_contable if pago.cuenta_financiera_id else metodo_a_clave_cuenta(pago.metodo)
     lineas = []
 
-    if pago.monto > 0:
+    if pago.separar_isv and pago.subtotal_recibido > 0:
+        lineas.append(
+            {
+                "cuenta": cuenta_caja,
+                "detalle": "Ingreso neto sin ISV",
+                "debe": pago.subtotal_recibido,
+                "haber": Decimal("0.00"),
+            }
+        )
+    elif pago.monto > 0:
         lineas.append(
             {
                 "cuenta": cuenta_caja,
                 "detalle": "Ingreso de efectivo o banco",
                 "debe": pago.monto,
+                "haber": Decimal("0.00"),
+            }
+        )
+    if pago.separar_isv and pago.impuesto_recibido > 0:
+        cuenta_impuesto = (
+            pago.cuenta_financiera_impuesto.cuenta_contable
+            if pago.cuenta_financiera_impuesto_id
+            else "isv_por_pagar"
+        )
+        lineas.append(
+            {
+                "cuenta": cuenta_impuesto,
+                "detalle": "ISV separado del cobro",
+                "debe": pago.impuesto_recibido,
                 "haber": Decimal("0.00"),
             }
         )
