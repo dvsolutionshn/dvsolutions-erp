@@ -563,6 +563,9 @@
         }
         .showcase-card{
             display:block;
+            width:100%;
+            padding:0;
+            text-align:left;
             color:inherit;
             border-radius:26px;
             overflow:hidden;
@@ -572,6 +575,9 @@
             transition:transform .32s ease, border-color .32s ease;
             text-decoration:none;
             cursor:pointer;
+            appearance:none;
+            -webkit-appearance:none;
+            touch-action:manipulation;
         }
         .showcase-card:hover{
             transform:translateY(-8px);
@@ -766,6 +772,58 @@
         }
         .demo-modal-content{
             padding:26px;
+        }
+        .demo-detail-grid{
+            display:grid;
+            grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);
+            gap:22px;
+        }
+        .demo-detail-preview{
+            overflow:hidden;
+            border-radius:24px;
+            border:1px solid rgba(255,255,255,.08);
+        }
+        .demo-detail-canvas{
+            padding:22px;
+            background:#fff;
+            color:#18283b;
+        }
+        .demo-detail-header{
+            display:flex;
+            justify-content:space-between;
+            gap:18px;
+            align-items:flex-start;
+            margin-bottom:20px;
+        }
+        .demo-detail-brand{
+            width:78px;
+            height:78px;
+            object-fit:contain;
+        }
+        .demo-detail-blocks{
+            display:grid;
+            grid-template-columns:repeat(2, minmax(0,1fr));
+            gap:12px;
+            margin-bottom:18px;
+        }
+        .demo-detail-aside{
+            display:grid;
+            gap:18px;
+        }
+        .demo-detail-card{
+            padding:22px;
+            border-radius:24px;
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.04);
+        }
+        .demo-detail-card h3{
+            margin:0 0 10px;
+            font-size:24px;
+        }
+        .demo-detail-card p{
+            margin:0 0 16px;
+            color:var(--muted);
+            line-height:1.78;
         }
         .demo-modal-panel.compact{
             width:min(560px, 100%);
@@ -1064,12 +1122,26 @@
             .nav-links{
                 justify-content:flex-start;
             }
+            .brand img{
+                width:64px;
+                height:64px;
+            }
+            .brand-copy strong{
+                font-size:20px;
+            }
+            .brand-copy span{
+                font-size:9px;
+                letter-spacing:.18em;
+            }
             .hero{
                 padding:56px 0 44px;
             }
             .hero h1,
             .section-title{
                 font-size:42px;
+            }
+            .feature-copy h3{
+                font-size:34px;
             }
             .public-grid,
             .screen-metrics{
@@ -1081,6 +1153,42 @@
             }
             .form-shell{
                 padding:24px;
+            }
+            .showcase-card{
+                min-height:auto;
+            }
+            .showcase-screen{
+                min-height:auto;
+            }
+            .payroll-header,
+            .payroll-row{
+                grid-template-columns:1.4fr 1fr 1fr 1fr;
+                font-size:11px;
+            }
+            .demo-modal{
+                padding:14px;
+            }
+            .demo-modal-panel{
+                max-height:92vh;
+                border-radius:22px;
+            }
+            .demo-modal-content{
+                padding:18px;
+            }
+            .demo-detail-grid,
+            .demo-detail-blocks{
+                grid-template-columns:1fr !important;
+            }
+            .demo-detail-header{
+                flex-direction:column;
+                align-items:flex-start;
+            }
+            .demo-detail-brand{
+                width:64px;
+                height:64px;
+            }
+            .request-success h3{
+                font-size:28px;
             }
         }
     </style>
@@ -1508,18 +1616,18 @@
             <div class="section-kicker">{{ demo.subtitulo }}</div>
             <h2 id="demoModalTitle" class="section-title" style="margin-bottom:14px;">{{ demo.detalle_titulo }}</h2>
             <p class="section-copy" style="margin-bottom:28px;">{{ demo.detalle_intro }}</p>
-            <div style="display:grid; grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr); gap:22px;">
-                <div class="screen-shell" style="overflow:hidden; border-radius:24px; border:1px solid rgba(255,255,255,.08);">
+            <div class="demo-detail-grid">
+                <div class="screen-shell demo-detail-preview">
                     <div class="screen-top"><span></span><span></span><span></span></div>
-                    <div style="padding:22px; background:#fff; color:#18283b;">
-                        <div style="display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:20px;">
+                    <div class="demo-detail-canvas">
+                        <div class="demo-detail-header">
                             <div>
                                 <h3 style="margin:0 0 8px; font-size:28px; line-height:1;">{{ demo.titulo }}</h3>
                                 <p style="margin:0; color:#5d738d; line-height:1.6;">Demo comercial preparada por DV Solutions para mostrar una experiencia profesional y lista para nube.</p>
                             </div>
-                            <img src="{% static 'core/img/dv-solutions-brand.png' %}" alt="DV Solutions" style="width:78px;height:78px;object-fit:contain;">
+                            <img src="{% static 'core/img/dv-solutions-brand.png' %}" alt="DV Solutions" class="demo-detail-brand">
                         </div>
-                        <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; margin-bottom:18px;">
+                        <div class="demo-detail-blocks">
                             {% for bloque in demo.detalle_bloques %}
                             <div style="padding:14px 16px; border-radius:16px; background:#f4f7fb; border:1px solid #e4ebf4;">
                                 <div style="margin-bottom:6px; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#6a8099;">{{ bloque.0 }}</div>
@@ -1567,19 +1675,19 @@
                         </div>
                     </div>
                 </div>
-                <aside style="display:grid; gap:18px;">
-                    <div style="padding:22px; border-radius:24px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.04);">
-                        <h3 style="margin:0 0 10px; font-size:24px;">Que muestra esta demo</h3>
-                        <p style="margin:0 0 16px; color:var(--muted); line-height:1.78;">Esta vista esta pensada para que el visitante visualice como se veria una operacion real dentro del ecosistema DV Solutions.</p>
+                <aside class="demo-detail-aside">
+                    <div class="demo-detail-card">
+                        <h3>Que muestra esta demo</h3>
+                        <p>Esta vista esta pensada para que el visitante visualice como se veria una operacion real dentro del ecosistema DV Solutions.</p>
                         <div style="display:grid; gap:10px;">
                             {% for linea in demo.lineas %}
                             <div style="padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04); color:#dce8f8; font-size:14px; line-height:1.6;">{{ linea }}</div>
                             {% endfor %}
                         </div>
                     </div>
-                    <div style="padding:22px; border-radius:24px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.04);">
-                        <h3 style="margin:0 0 10px; font-size:24px;">Siguiente paso</h3>
-                        <p style="margin:0 0 16px; color:var(--muted); line-height:1.78;">Si esta demo se parece a lo que tu empresa necesita, podemos prepararte propuesta, demo guiada o prueba controlada del ERP.</p>
+                    <div class="demo-detail-card">
+                        <h3>Siguiente paso</h3>
+                        <p>Si esta demo se parece a lo que tu empresa necesita, podemos prepararte propuesta, demo guiada o prueba controlada del ERP.</p>
                         <a href="#contacto" class="btn btn-primary" data-demo-close>{{ demo.cta_label }}</a>
                     </div>
                 </aside>
@@ -1625,7 +1733,15 @@
             };
 
             document.querySelectorAll('[data-demo-target]').forEach((trigger) => {
-                trigger.addEventListener('click', () => openDemoModal(trigger.dataset.demoTarget));
+                const openFromTrigger = () => openDemoModal(trigger.dataset.demoTarget);
+                trigger.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    openFromTrigger();
+                });
+                trigger.addEventListener('touchend', (event) => {
+                    event.preventDefault();
+                    openFromTrigger();
+                }, { passive: false });
             });
 
             if (modal) {
