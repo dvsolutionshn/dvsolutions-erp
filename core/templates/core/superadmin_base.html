@@ -48,6 +48,10 @@
                     <span class="erp-nav-bullet"></span>
                     <span>Licencias</span>
                 </a>
+                <a class="erp-nav-link {% if '/control/solicitudes/' in request.path %}is-active{% endif %}" href="{{ superadmin_solicitudes_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Solicitudes</span>
+                </a>
                 {% if enable_django_admin and django_admin_url %}
                 <a class="erp-nav-link" href="{{ django_admin_url }}" target="_blank" rel="noopener">
                     <span class="erp-nav-bullet"></span>

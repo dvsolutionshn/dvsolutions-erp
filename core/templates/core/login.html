@@ -1,21 +1,25 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - {{ empresa.nombre }}</title>
+    <title>Acceso - {{ empresa.nombre }}</title>
     <style>
         :root{
-            --bg-1:#0f1e30;
-            --bg-2:#1f3550;
+            --bg:#07111f;
+            --bg-2:#0d1f36;
+            --panel:rgba(8,20,37,.88);
+            --panel-soft:rgba(255,255,255,.05);
+            --line:rgba(255,255,255,.12);
+            --text:#ecf3ff;
+            --muted:#a8b8cf;
+            --gold:#d8a157;
+            --gold-2:#f1ca7f;
+            --blue:#1b87ff;
             --card:#ffffff;
-            --text:#102033;
-            --muted:#6a7a91;
-            --line:#d8e2ef;
-            --primary:#2f6df6;
-            --primary-2:#6d63ff;
-            --shadow:0 28px 70px rgba(8,18,36,.30);
-            --shadow-soft:0 16px 34px rgba(15,30,48,.14);
+            --ink:#122236;
+            --shadow:0 32px 80px rgba(0,0,0,.38);
         }
 
         *{box-sizing:border-box}
@@ -26,187 +30,138 @@
             font-family:"Segoe UI",Roboto,Arial,sans-serif;
             color:var(--text);
             background:
-                radial-gradient(circle at 18% 22%, rgba(109,99,255,.16), transparent 28%),
-                radial-gradient(circle at 82% 18%, rgba(47,109,246,.16), transparent 24%),
-                linear-gradient(135deg,var(--bg-1),var(--bg-2));
-            overflow:hidden;
+                radial-gradient(circle at 20% 10%, rgba(27,135,255,.15), transparent 30%),
+                radial-gradient(circle at 80% 15%, rgba(216,161,87,.18), transparent 30%),
+                linear-gradient(135deg, var(--bg), var(--bg-2));
         }
 
-        .login-shell{
-            position:relative;
+        .shell{
             min-height:100vh;
             display:grid;
-            grid-template-columns:minmax(320px, 1.1fr) minmax(380px, 520px);
-            align-items:center;
+            grid-template-columns:minmax(360px, 1.2fr) minmax(360px, 520px);
             gap:48px;
-            padding:48px 64px;
-        }
-
-        .login-shell::before,
-        .login-shell::after{
-            content:"";
-            position:absolute;
-            border-radius:999px;
-            filter:blur(8px);
-            opacity:.55;
-            pointer-events:none;
-        }
-
-        .login-shell::before{
-            width:320px;
-            height:320px;
-            background:radial-gradient(circle, rgba(109,99,255,.25), transparent 68%);
-            top:-80px;
-            left:-70px;
-            animation:floatAura 8s ease-in-out infinite;
-        }
-
-        .login-shell::after{
-            width:260px;
-            height:260px;
-            background:radial-gradient(circle, rgba(47,109,246,.22), transparent 68%);
-            bottom:-60px;
-            right:120px;
-            animation:floatAura 9s ease-in-out infinite reverse;
+            align-items:center;
+            padding:42px;
         }
 
         .brand-side{
-            position:relative;
-            z-index:1;
-            color:#f8fbff;
-            animation:fadeLift .8s ease-out both;
+            padding-right:22px;
         }
 
-        .brand-badge{
+        .brand-chip{
             display:inline-flex;
             align-items:center;
-            gap:14px;
-            padding:14px 16px;
-            border:1px solid rgba(255,255,255,.14);
-            border-radius:18px;
-            background:rgba(255,255,255,.06);
+            gap:16px;
+            padding:16px 18px;
+            border:1px solid var(--line);
+            border-radius:22px;
+            background:rgba(255,255,255,.04);
             backdrop-filter:blur(10px);
-            box-shadow:var(--shadow-soft);
+            text-decoration:none;
         }
 
-        .brand-badge img{
-            width:52px;
-            height:52px;
+        .brand-chip img{
+            width:84px;
+            height:84px;
             object-fit:contain;
-            border-radius:14px;
-            background:rgba(255,255,255,.92);
-            padding:6px;
+            filter:drop-shadow(0 18px 34px rgba(0,0,0,.34));
         }
 
-        .brand-badge-fallback{
-            width:52px;
-            height:52px;
-            display:none;
-            align-items:center;
-            justify-content:center;
-            border-radius:14px;
-            background:rgba(255,255,255,.15);
-            color:#fff;
-            font-weight:700;
-            letter-spacing:.08em;
-        }
-
-        .brand-badge-copy strong{
+        .brand-chip-copy strong{
             display:block;
-            font-size:17px;
-            line-height:1.1;
-            font-weight:700;
+            font-size:24px;
+            letter-spacing:.02em;
         }
 
-        .brand-badge-copy span{
+        .brand-chip-copy span{
             display:block;
-            margin-top:4px;
-            font-size:12px;
-            color:rgba(241,245,249,.78);
-            letter-spacing:.08em;
+            margin-top:6px;
+            color:rgba(241,202,127,.84);
+            font-size:10px;
+            letter-spacing:.22em;
             text-transform:uppercase;
         }
 
-        .brand-copy{
-            max-width:640px;
+        .hero{
+            max-width:720px;
             margin-top:28px;
         }
 
-        .brand-copy h1{
-            margin:0 0 14px;
-            font-size:44px;
-            line-height:1.05;
-            letter-spacing:-.04em;
-            font-weight:700;
+        .hero h1{
+            margin:0 0 16px;
+            font-size:52px;
+            line-height:1.02;
+            letter-spacing:-.05em;
         }
 
-        .brand-copy p{
+        .hero h1 span{
+            color:var(--gold-2);
+        }
+
+        .hero p{
             margin:0;
-            max-width:560px;
-            font-size:16px;
-            line-height:1.7;
-            color:rgba(241,245,249,.82);
-        }
-
-        .brand-points{
-            display:grid;
-            grid-template-columns:repeat(2,minmax(0,1fr));
-            gap:14px;
-            margin-top:26px;
             max-width:620px;
+            color:var(--muted);
+            font-size:17px;
+            line-height:1.72;
         }
 
-        .brand-point{
-            padding:14px 16px;
-            border-radius:16px;
-            border:1px solid rgba(255,255,255,.10);
-            background:rgba(255,255,255,.05);
-            color:#f8fbff;
+        .hero-grid{
+            display:grid;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+            gap:16px;
+            margin-top:28px;
+        }
+
+        .hero-card{
+            padding:18px 18px 20px;
+            border-radius:18px;
+            border:1px solid var(--line);
+            background:var(--panel-soft);
+        }
+
+        .hero-card strong{
+            display:block;
+            margin-bottom:8px;
             font-size:14px;
-            line-height:1.45;
+            text-transform:uppercase;
+            letter-spacing:.12em;
+            color:var(--gold-2);
+        }
+
+        .hero-card p{
+            margin:0;
+            font-size:14px;
+            line-height:1.6;
         }
 
         .login-panel{
-            position:relative;
-            z-index:1;
-            animation:fadeLift .9s ease-out .08s both;
-        }
-
-        .login-card{
             background:rgba(255,255,255,.96);
-            border:1px solid rgba(255,255,255,.72);
-            border-radius:24px;
+            border:1px solid rgba(255,255,255,.68);
+            border-radius:28px;
             box-shadow:var(--shadow);
             overflow:hidden;
-            backdrop-filter:blur(12px);
         }
 
-        .login-card-head{
-            padding:22px 24px 18px;
-            background:
-                linear-gradient(135deg, rgba(47,109,246,.09), rgba(109,99,255,.08)),
-                #fff;
-            border-bottom:1px solid var(--line);
-        }
-
-        .tenant-row{
+        .tenant-head{
             display:flex;
             align-items:center;
-            gap:16px;
+            gap:18px;
+            padding:24px;
+            background:linear-gradient(135deg, rgba(216,161,87,.14), rgba(27,135,255,.08));
+            border-bottom:1px solid rgba(18,34,54,.08);
         }
 
         .tenant-logo{
-            width:72px;
-            height:72px;
-            border-radius:20px;
-            border:1px solid #d9e2ef;
+            width:78px;
+            height:78px;
+            border-radius:22px;
             background:#fff;
+            border:1px solid rgba(18,34,54,.10);
             display:flex;
             align-items:center;
             justify-content:center;
             overflow:hidden;
-            box-shadow:0 12px 22px rgba(16,32,51,.08);
-            flex:0 0 72px;
         }
 
         .tenant-logo img{
@@ -215,66 +170,59 @@
             object-fit:contain;
         }
 
-        .tenant-logo-fallback{
-            width:100%;
-            height:100%;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:22px;
+        .tenant-fallback{
+            font-size:26px;
             font-weight:700;
-            color:#24446b;
-            background:linear-gradient(135deg,#eff6ff,#eef2ff);
+            color:#1a3454;
         }
 
         .tenant-copy small{
             display:block;
             font-size:11px;
-            letter-spacing:.12em;
+            letter-spacing:.18em;
             text-transform:uppercase;
-            color:#70839b;
+            color:#6e8097;
             margin-bottom:6px;
         }
 
         .tenant-copy h2{
             margin:0 0 6px;
-            font-size:29px;
+            color:var(--ink);
+            font-size:30px;
             line-height:1.05;
-            letter-spacing:-.03em;
-            color:#11243b;
         }
 
         .tenant-copy p{
             margin:0;
-            font-size:13px;
-            line-height:1.55;
-            color:var(--muted);
-        }
-
-        .login-card-body{
-            padding:24px;
-        }
-
-        .login-eyebrow{
-            font-size:11px;
-            letter-spacing:.12em;
-            text-transform:uppercase;
-            color:#6f84a0;
-            margin-bottom:8px;
-        }
-
-        .login-title{
-            margin:0 0 6px;
-            font-size:28px;
-            line-height:1.05;
-            color:#102033;
-        }
-
-        .login-subtitle{
-            margin:0 0 22px;
-            color:var(--muted);
-            line-height:1.55;
+            color:#697c95;
             font-size:14px;
+            line-height:1.58;
+        }
+
+        .login-body{
+            padding:26px 24px 24px;
+            color:var(--ink);
+        }
+
+        .eyebrow{
+            margin-bottom:8px;
+            font-size:11px;
+            letter-spacing:.18em;
+            text-transform:uppercase;
+            color:#778aa2;
+        }
+
+        .title{
+            margin:0 0 8px;
+            font-size:29px;
+            line-height:1.05;
+        }
+
+        .subtitle{
+            margin:0 0 22px;
+            color:#6e8097;
+            font-size:14px;
+            line-height:1.6;
         }
 
         .message-stack{
@@ -284,16 +232,16 @@
         }
 
         .message{
-            border-radius:14px;
             padding:12px 14px;
+            border-radius:14px;
+            border:1px solid #ffd9d9;
+            background:#fff4f4;
+            color:#8a2020;
             font-size:13px;
             line-height:1.45;
-            border:1px solid #ffd7d7;
-            color:#8c1d1d;
-            background:#fff5f5;
         }
 
-        .login-form{
+        .form{
             display:grid;
             gap:14px;
         }
@@ -303,234 +251,197 @@
             margin-bottom:7px;
             font-size:11px;
             font-weight:700;
-            letter-spacing:.1em;
+            letter-spacing:.12em;
             text-transform:uppercase;
-            color:#5e748f;
+            color:#627792;
         }
 
         .field input{
             width:100%;
-            border:1px solid #d8e2ef;
-            background:#fff;
-            color:#102033;
-            border-radius:14px;
             padding:14px 15px;
+            border-radius:14px;
+            border:1px solid #d8e3ef;
+            background:#fff;
+            color:var(--ink);
             font-size:15px;
-            transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
         }
 
         .field input:focus{
             outline:none;
-            border-color:#5d77ff;
-            box-shadow:0 0 0 4px rgba(93,119,255,.13);
-            transform:translateY(-1px);
+            border-color:#3c80f0;
+            box-shadow:0 0 0 4px rgba(60,128,240,.12);
         }
 
-        .login-actions{
+        .actions{
             display:flex;
+            gap:14px;
             align-items:center;
             justify-content:space-between;
-            gap:16px;
             margin-top:6px;
         }
 
-        .login-help{
+        .actions p{
+            margin:0;
+            color:#70849b;
             font-size:12px;
             line-height:1.55;
-            color:#6c8099;
-            max-width:230px;
+            max-width:220px;
         }
 
-        .login-btn{
+        .btn{
             border:none;
-            border-radius:14px;
+            border-radius:15px;
             padding:14px 24px;
-            min-width:180px;
-            background:linear-gradient(135deg, var(--primary), var(--primary-2));
+            min-width:190px;
+            cursor:pointer;
             color:#fff;
             font-size:15px;
             font-weight:700;
-            cursor:pointer;
-            box-shadow:0 18px 36px rgba(47,109,246,.28);
-            transition:transform .2s ease, box-shadow .2s ease, filter .2s ease;
+            background:linear-gradient(135deg, var(--blue), #2756d8);
+            box-shadow:0 18px 36px rgba(27,135,255,.22);
         }
 
-        .login-btn:hover{
-            transform:translateY(-1px);
-            box-shadow:0 22px 40px rgba(47,109,246,.32);
-            filter:saturate(1.05);
-        }
-
-        .login-btn:active{
-            transform:translateY(0);
-        }
-
-        .login-card-foot{
-            padding:16px 24px 22px;
-            border-top:1px solid var(--line);
-            background:#fcfdff;
-            display:flex;
-            justify-content:space-between;
-            gap:16px;
+        .login-foot{
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:18px;
+            padding:18px 24px 24px;
+            border-top:1px solid rgba(18,34,54,.08);
+            background:#f9fbff;
+            color:#6f839a;
             font-size:12px;
-            color:#6d7f96;
+            line-height:1.55;
         }
 
-        .login-card-foot strong{
+        .login-foot strong{
             display:block;
-            color:#102033;
+            margin-bottom:4px;
+            color:var(--ink);
             font-size:13px;
-            margin-bottom:3px;
-        }
-
-        @keyframes fadeLift{
-            from{
-                opacity:0;
-                transform:translateY(18px);
-            }
-            to{
-                opacity:1;
-                transform:translateY(0);
-            }
-        }
-
-        @keyframes floatAura{
-            0%,100%{ transform:translate3d(0,0,0) scale(1); }
-            50%{ transform:translate3d(12px,-10px,0) scale(1.04); }
         }
 
         @media (max-width: 1080px){
-            .login-shell{
+            .shell{
                 grid-template-columns:1fr;
-                gap:28px;
-                padding:28px 20px;
+                padding:24px;
             }
 
-            .brand-copy h1{
-                font-size:34px;
-            }
-
-            .brand-points{
-                grid-template-columns:1fr;
+            .hero h1{
+                font-size:40px;
             }
         }
 
         @media (max-width: 640px){
-            .tenant-row{
+            .shell{
+                padding:18px;
+            }
+
+            .hero-grid,
+            .login-foot{
+                grid-template-columns:1fr;
+            }
+
+            .tenant-head{
                 align-items:flex-start;
             }
 
-            .tenant-copy h2{
-                font-size:24px;
-            }
-
-            .login-title{
-                font-size:24px;
-            }
-
-            .login-actions{
+            .actions{
                 flex-direction:column;
                 align-items:stretch;
             }
 
-            .login-help{
+            .actions p{
                 max-width:none;
             }
 
-            .login-btn{
+            .btn{
                 width:100%;
-            }
-
-            .login-card-foot{
-                flex-direction:column;
             }
         }
     </style>
 </head>
 <body>
-    <main class="login-shell">
+    <main class="shell">
         <section class="brand-side">
-            <div class="brand-badge">
-                <img src="/media/logos/logo.jpg" alt="DV Solutions ERP" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="brand-badge-fallback">DV</div>
-                <div class="brand-badge-copy">
-                    <strong>DV Solutions ERP</strong>
-                    <span>Plataforma empresarial</span>
+            <div class="brand-chip">
+                <img src="{% static 'core/img/dv-solutions-brand.png' %}" alt="DV Solutions">
+                <div class="brand-chip-copy">
+                    <strong>DV Solutions</strong>
+                    <span>Crecimiento y agilidad en la nube</span>
                 </div>
             </div>
 
-            <div class="brand-copy">
-                <h1>Un solo acceso para operar toda la empresa con velocidad y control.</h1>
-                <p>Ingresa al entorno de {{ empresa.nombre }} y trabaja con facturación, contabilidad, recursos humanos y gestión comercial dentro de una experiencia más fluida, segura y profesional.</p>
+            <div class="hero">
+                <h1>No te tienes que adaptar al sistema, <span>el sistema se adapta a ti.</span></h1>
+                <p>Ingresas a una plataforma construida por DV Solutions para operar con mas criterio, mas control y una experiencia empresarial lista para facturacion, contabilidad, CRM, RRHH y personalizaciones reales.</p>
             </div>
 
-            <div class="brand-points">
-                <div class="brand-point">Captura comercial y financiera en un flujo más rápido, con documentos, reportes y controles integrados por empresa.</div>
-                <div class="brand-point">Cada compañía conserva su propia identidad visual, configuración fiscal y módulos activos dentro del mismo ERP.</div>
+            <div class="hero-grid">
+                <div class="hero-card">
+                    <strong>Software a medida</strong>
+                    <p>Disenamos ERP, apps y portales alineados a la operacion exacta de cada cliente.</p>
+                </div>
+                <div class="hero-card">
+                    <strong>Arquitectura escalable</strong>
+                    <p>Tu empresa conserva identidad, flujos fiscales y modulos sin sacrificar control institucional.</p>
+                </div>
             </div>
         </section>
 
         <section class="login-panel">
-            <div class="login-card">
-                <div class="login-card-head">
-                    <div class="tenant-row">
-                        <div class="tenant-logo">
-                            {% if empresa.logo %}
-                                <img src="{{ empresa.logo.url }}" alt="Logo {{ empresa.nombre }}">
-                            {% else %}
-                                <div class="tenant-logo-fallback">{{ empresa.nombre|first|upper }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="tenant-copy">
-                            <small>Acceso de empresa</small>
-                            <h2>{{ empresa.nombre }}</h2>
-                            <p>Ingresa con tu usuario operativo para continuar con la gestión diaria de esta compañía.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="login-card-body">
-                    <div class="login-eyebrow">Autenticación segura</div>
-                    <h1 class="login-title">Iniciar sesión</h1>
-                    <p class="login-subtitle">Usa tus credenciales asignadas. El acceso respeta la empresa, los permisos y los módulos habilitados para tu perfil.</p>
-
-                    {% if messages %}
-                    <div class="message-stack">
-                        {% for message in messages %}
-                            <div class="message">{{ message }}</div>
-                        {% endfor %}
-                    </div>
+            <div class="tenant-head">
+                <div class="tenant-logo">
+                    {% if empresa.logo %}
+                        <img src="{{ empresa.logo.url }}" alt="Logo {{ empresa.nombre }}">
+                    {% else %}
+                        <div class="tenant-fallback">{{ empresa.nombre|first|upper }}</div>
                     {% endif %}
-
-                    <form method="post" class="login-form" autocomplete="off">
-                        {% csrf_token %}
-
-                        <div class="field">
-                            <label for="id_username">Usuario</label>
-                            <input id="id_username" type="text" name="username" placeholder="Ingresa tu usuario" required autofocus>
-                        </div>
-
-                        <div class="field">
-                            <label for="id_password">Contraseña</label>
-                            <input id="id_password" type="password" name="password" placeholder="Ingresa tu contraseña" required>
-                        </div>
-
-                        <div class="login-actions">
-                            <div class="login-help">Si este acceso pertenece a otra empresa, vuelve a su enlace de ingreso para conservar el contexto correcto.</div>
-                            <button type="submit" class="login-btn">Entrar al sistema</button>
-                        </div>
-                    </form>
                 </div>
+                <div class="tenant-copy">
+                    <small>Acceso de empresa</small>
+                    <h2>{{ empresa.nombre }}</h2>
+                    <p>Ingresa con tu usuario operativo para continuar con la gestion de esta empresa dentro del entorno DV Solutions.</p>
+                </div>
+            </div>
 
-                <div class="login-card-foot">
-                    <div>
-                        <strong>Ambiente empresarial</strong>
-                        El sistema mantiene separados usuarios, documentos, módulos y configuraciones por cada empresa.
+            <div class="login-body">
+                <div class="eyebrow">Autenticacion segura</div>
+                <h1 class="title">Iniciar sesion</h1>
+                <p class="subtitle">Tus credenciales respetan la empresa, sus permisos y los modulos habilitados para tu perfil.</p>
+
+                {% if messages %}
+                <div class="message-stack">
+                    {% for message in messages %}
+                        <div class="message">{{ message }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post" class="form" autocomplete="off">
+                    {% csrf_token %}
+                    <div class="field">
+                        <label for="id_username">Usuario</label>
+                        <input id="id_username" type="text" name="username" placeholder="Ingresa tu usuario" required autofocus>
                     </div>
-                    <div>
-                        <strong>Marca del cliente</strong>
-                        Conservamos la identidad visual de {{ empresa.nombre }} sin perder la presencia institucional de DV Solutions ERP.
+                    <div class="field">
+                        <label for="id_password">Contrasena</label>
+                        <input id="id_password" type="password" name="password" placeholder="Ingresa tu contrasena" required>
                     </div>
+                    <div class="actions">
+                        <p>Si este acceso pertenece a otra empresa, vuelve a su enlace de ingreso para conservar el contexto correcto.</p>
+                        <button type="submit" class="btn">Entrar al sistema</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="login-foot">
+                <div>
+                    <strong>Entorno empresarial</strong>
+                    Cada empresa mantiene separados usuarios, documentos, modulos y configuraciones dentro del mismo ecosistema.
+                </div>
+                <div>
+                    <strong>Marca del cliente</strong>
+                    Conservamos la identidad visual de {{ empresa.nombre }} sin perder la presencia institucional de DV Solutions.
                 </div>
             </div>
         </section>

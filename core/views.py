@@ -1,4 +1,5 @@
 from functools import wraps
+import logging
 import re
 
 from django.conf import settings
@@ -6,9 +7,12 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.core.mail import send_mail
+from django.db import OperationalError
 from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -18,13 +22,14 @@ from .forms import (
     PagoLicenciaEmpresaForm,
     PlanComercialForm,
     RolSistemaForm,
+    SolicitudComercialPublicaForm,
     SuperAdminLoginForm,
     UsuarioControlCreateForm,
     UsuarioControlUpdateForm,
 )
 from .models import Empresa
 from .models import EmpresaModulo
-from .models import PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, Usuario
+from .models import PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
 
 
 HOST_LOCAL_PATTERNS = {
@@ -32,6 +37,142 @@ HOST_LOCAL_PATTERNS = {
     "127.0.0.1",
     "::1",
 }
+logger = logging.getLogger(__name__)
+
+
+def _public_demo_catalog():
+    return {
+        "facturacion": {
+            "slug": "facturacion",
+            "titulo": "Facturacion y cobros",
+            "subtitulo": "Demo de factura",
+            "descripcion": "Visualizacion de facturas, cobros, impuestos, retenciones y lectura ejecutiva de la operacion comercial.",
+            "metricas": [
+                ("Factura", "000-001-01-00000364"),
+                ("Total", "L 53,229.42"),
+                ("Estado", "Emitida"),
+            ],
+            "lineas": [
+                "Factura premium con resumen fiscal, subtotal, impuesto y total final.",
+                "Historial de pagos, recibos y lectura de saldo pendiente.",
+                "Formato pensado para gestion comercial y control operativo.",
+            ],
+            "detalle_titulo": "Vista demo de factura empresarial",
+            "detalle_intro": "Esta demo reproduce la sensacion visual de una factura premium dentro del ecosistema DV Solutions, con lectura comercial, fiscal y financiera lista para presentar al cliente.",
+            "detalle_bloques": [
+                ("Cliente", "Constructora del Norte, S. de R.L."),
+                ("RTN", "08011999123456"),
+                ("Metodo de pago", "Transferencia bancaria"),
+                ("Estado", "Emitida y lista para cobro"),
+            ],
+            "detalle_items": [
+                ("Implementacion de modulo comercial", "L 28,950.00"),
+                ("Configuracion fiscal y CAI", "L 9,850.00"),
+                ("Capacitacion operativa", "L 7,486.45"),
+                ("ISV 15%", "L 6,942.97"),
+            ],
+            "detalle_total": "L 53,229.42",
+            "cta_label": "Solicitar una demo comercial de facturacion",
+        },
+        "rrhh": {
+            "slug": "rrhh",
+            "titulo": "Recursos humanos",
+            "subtitulo": "Demo RRHH",
+            "descripcion": "Gestion de empleados, planillas, vacaciones y estructura interna con una vista mas clara para operaciones administrativas.",
+            "metricas": [
+                ("Empleados", "128"),
+                ("Planilla", "Mensual"),
+                ("Alertas", "4"),
+            ],
+            "lineas": [
+                "Expedientes, vacaciones, bonos y deducciones en un solo flujo.",
+                "Panel preparado para seguimiento administrativo y soporte operativo.",
+                "Diseno pensado para empresas que necesitan control sin complejidad visual.",
+            ],
+            "detalle_titulo": "Vista demo de planilla y gestion de personal",
+            "detalle_intro": "Esta demo muestra como DV Solutions puede presentar planillas, equipo humano y alertas de RRHH con una lectura ejecutiva, limpia y lista para operacion real.",
+            "detalle_bloques": [
+                ("Periodo", "Mayo 2026"),
+                ("Empleados liquidados", "128"),
+                ("Neto a pagar", "L 1,284,540.20"),
+                ("Estado", "Planilla lista para aprobacion"),
+            ],
+            "detalle_items": [
+                ("Sueldos base", "L 1,020,000.00"),
+                ("Horas extra y bonos", "L 142,880.00"),
+                ("IHSS + RAP + ISR", "L 86,450.30"),
+                ("Neto a depositar", "L 1,076,429.70"),
+            ],
+            "detalle_total": "L 1,284,540.20",
+            "cta_label": "Solicitar demo de RRHH y planilla",
+        },
+        "crm": {
+            "slug": "crm",
+            "titulo": "CRM y seguimiento",
+            "subtitulo": "Demo comercial",
+            "descripcion": "Campanas, citas, prospectos y acciones comerciales coordinadas desde una capa mas estrategica del negocio.",
+            "metricas": [
+                ("Campanas", "12"),
+                ("Citas", "26"),
+                ("Prospectos", "41"),
+            ],
+            "lineas": [
+                "Seguimiento a leads, campanas y conversaciones desde el mismo ecosistema.",
+                "Ideal para equipos que venden, dan seguimiento o convierten demos en clientes.",
+                "Conexion natural entre marketing, operacion y ventas.",
+            ],
+            "detalle_titulo": "Vista demo de CRM y mensajes masivos",
+            "detalle_intro": "Esta demo muestra como un equipo comercial puede lanzar mensajes masivos, mover prospectos por etapa y coordinar citas sin salir del mismo sistema.",
+            "detalle_bloques": [
+                ("Campana activa", "Lanzamiento ERP regional"),
+                ("Mensajes enviados", "1,240"),
+                ("Respuestas recibidas", "214"),
+                ("Estado", "Seguimiento comercial en curso"),
+            ],
+            "detalle_items": [
+                ("WhatsApp masivo segmentado", "Campana enviada a prospectos filtrados por interes"),
+                ("Agenda de citas", "26 reuniones en ejecucion"),
+                ("Embudo comercial", "41 prospectos activos"),
+                ("Tablero de conversion", "12 oportunidades en propuesta"),
+            ],
+            "detalle_total": "Operacion comercial en tiempo real",
+            "cta_label": "Solicitar demo de CRM y automatizacion",
+        },
+    }
+
+
+def _notify_new_commercial_request(solicitud):
+    recipients = getattr(settings, "COMMERCIAL_REQUEST_RECIPIENTS", [])
+    if not recipients:
+        return "skipped"
+
+    subject = f"Nueva solicitud comercial - {solicitud.nombre_contacto}"
+    body = (
+        f"Nombre: {solicitud.nombre_contacto}\n"
+        f"Empresa: {solicitud.empresa_interesada or '-'}\n"
+        f"RTN: {solicitud.rtn_empresa or '-'}\n"
+        f"Correo: {solicitud.correo}\n"
+        f"Telefono: {solicitud.telefono or '-'}\n"
+        f"Servicio: {solicitud.get_servicio_interes_display()}\n"
+        f"Solicita prueba: {'Si' if solicitud.solicita_prueba else 'No'}\n"
+        f"Estado inicial: {solicitud.get_estado_display()}\n\n"
+        f"Mensaje:\n{solicitud.mensaje}\n"
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipients,
+            fail_silently=False,
+        )
+        if "console.EmailBackend" in settings.EMAIL_BACKEND:
+            return "console"
+        return "sent"
+    except Exception:
+        logger.exception("No se pudo enviar la notificacion de solicitud comercial %s", solicitud.id)
+        return "failed"
 
 
 def _client_ip(request):
@@ -179,7 +320,7 @@ def empresa_login(request, slug=None):
                     )
         else:
             bloqueo_restante = _register_login_failure(throttle_scope, request)
-            messages.error(request, "Usuario o contraseña incorrectos.")
+            messages.error(request, "Usuario o contrasena incorrectos.")
             if bloqueo_restante > 0:
                 messages.error(
                     request,
@@ -187,6 +328,132 @@ def empresa_login(request, slug=None):
                 )
 
     return render(request, 'core/login.html', {'empresa': empresa})
+
+
+def _public_site_context(form=None):
+    demos_catalogo = list(_public_demo_catalog().values())
+    return {
+        "public_form": form or SolicitudComercialPublicaForm(),
+        "erp_login_url": "/acceso/",
+        "control_login_url": "/control/login/",
+        "eslogan_principal": "No te tienes que adaptar al sistema, el sistema se adapta a ti.",
+        "servicios_destacados": [
+            {
+                "titulo": "Software a medida",
+                "descripcion": "Plataformas internas, sistemas administrativos y herramientas operativas hechas exactamente para el flujo del cliente.",
+            },
+            {
+                "titulo": "Sitios web y portales",
+                "descripcion": "Web corporativa, paginas comerciales, portales privados y experiencias digitales que proyectan una marca solida.",
+            },
+            {
+                "titulo": "Aplicaciones moviles",
+                "descripcion": "Apps para ventas, supervision, campo, autoservicio o continuidad operativa desde cualquier dispositivo.",
+            },
+            {
+                "titulo": "ERP, automatizacion e integraciones",
+                "descripcion": "Conectamos facturacion, contabilidad, CRM, RRHH, procesos internos y servicios externos en una sola arquitectura.",
+            },
+        ],
+        "capacidades_principales": [
+            "Analisis funcional y diseno de procesos",
+            "UX/UI para software profesional y productos digitales",
+            "Dashboards ejecutivos y paneles administrativos",
+            "Integraciones con APIs, bancos, WhatsApp y servicios externos",
+            "Infraestructura cloud, despliegue y soporte continuo",
+            "Automatizacion comercial y operativa",
+        ],
+        "proceso": [
+            "Entendemos la operacion, el cuello de botella y el contexto del negocio.",
+            "Disenamos la solucion con enfoque tecnico, visual y comercial.",
+            "Construimos, validamos y lanzamos con acompanamiento real.",
+            "Escalamos la plataforma contigo segun crecimiento, nuevos modulos o nuevas integraciones.",
+        ],
+        "demos": demos_catalogo,
+        "estadisticas": {
+            "clientes_activos": Empresa.objects.filter(activa=True).count(),
+            "empresas_prueba": Empresa.objects.filter(estado_licencia="prueba").count(),
+            "modulos_comerciales": EmpresaModulo.objects.filter(activo=True).count(),
+        },
+    }
+
+
+def public_home(request):
+    empresa_host = _empresa_desde_host(request)
+    if empresa_host:
+        return empresa_login(request, slug=empresa_host.slug)
+
+    form = SolicitudComercialPublicaForm(request.POST or None)
+    request_success = request.session.pop("public_request_success", None)
+    if request.method == "POST":
+        if form.is_valid():
+            try:
+                solicitud = form.save()
+            except OperationalError as exc:
+                if "core_solicitudcomercial" in str(exc):
+                    logger.exception("La tabla de solicitudes comerciales no existe en la base local.")
+                    messages.error(
+                        request,
+                        "La bandeja comercial aun no esta creada en tu base local. Ejecuta 'python manage.py migrate' y vuelve a intentarlo.",
+                    )
+                else:
+                    logger.exception("No se pudo guardar la solicitud comercial.")
+                    messages.error(
+                        request,
+                        "No pudimos registrar la solicitud por un problema interno. Revisa la base local o vuelve a intentarlo en un momento.",
+                    )
+            else:
+                email_status = _notify_new_commercial_request(solicitud)
+                request.session["public_request_success"] = {
+                    "nombre": solicitud.nombre_contacto,
+                    "solicita_prueba": solicitud.solicita_prueba,
+                    "email_status": email_status,
+                }
+                logger.info("Nueva solicitud comercial registrada: %s", solicitud.id)
+                return redirect(f"{reverse('public_home')}#contacto")
+        messages.error(request, "Revisa los datos del formulario para poder registrar tu solicitud correctamente.")
+
+    return render(
+        request,
+        "core/public_home.html",
+        {
+            **_public_site_context(form=form),
+            "request_success": request_success,
+        },
+    )
+
+
+def public_access(request):
+    empresa_host = _empresa_desde_host(request)
+    if empresa_host:
+        return empresa_login(request, slug=empresa_host.slug)
+
+    destino_slug = (request.POST.get("slug") or "").strip().strip("/")
+    if request.method == "POST" and destino_slug:
+        empresa = Empresa.objects.filter(slug=destino_slug, activa=True).first()
+        if empresa:
+            return redirect("empresa_login", slug=empresa.slug)
+        messages.error(request, "No encontramos una empresa activa con ese enlace. Verifica el slug o solicitanos ayuda desde el formulario comercial.")
+
+    return render(request, "core/public_access.html", {
+        "erp_login_url": "/acceso/",
+        "control_login_url": "/control/login/",
+    })
+
+
+def public_demo_detail(request, demo_slug):
+    empresa_host = _empresa_desde_host(request)
+    if empresa_host:
+        return empresa_login(request, slug=empresa_host.slug)
+
+    demo = _public_demo_catalog().get(demo_slug)
+    if not demo:
+        raise Http404("No se encontro la demo solicitada.")
+
+    return render(request, "core/public_demo.html", {
+        **_public_site_context(),
+        "demo": demo,
+    })
 
 
 def dashboard(request, slug=None):
@@ -265,6 +532,7 @@ def _superadmin_base_context():
         "superadmin_roles_url": "/control/roles/",
         "superadmin_modulos_url": "/control/modulos/",
         "superadmin_licencias_url": "/control/licencias/",
+        "superadmin_solicitudes_url": "/control/solicitudes/",
         "enable_django_admin": settings.ENABLE_DJANGO_ADMIN,
         "django_admin_url": f"/{settings.DJANGO_ADMIN_PATH.strip('/')}/" if settings.ENABLE_DJANGO_ADMIN else None,
     }
@@ -390,6 +658,9 @@ def superadmin_dashboard(request):
         "total_licencias_operativas": sum(1 for empresa in empresas if empresa.licencia_operativa_flag),
         "total_licencias_vencidas": Empresa.objects.filter(fecha_vencimiento_plan__lt=timezone.localdate()).count(),
         "total_licencias_prueba": Empresa.objects.filter(estado_licencia="prueba").count(),
+        "total_solicitudes_comerciales": SolicitudComercial.objects.count(),
+        "total_solicitudes_prueba": SolicitudComercial.objects.filter(solicita_prueba=True).count(),
+        "solicitudes_recientes": SolicitudComercial.objects.all()[:5],
         "empresas_recientes": empresas,
     }
     return render(request, "core/superadmin_dashboard.html", context)
@@ -562,6 +833,21 @@ def superadmin_licencias(request):
             "prueba": sum(1 for empresa in empresas if empresa.estado_licencia_resuelto == "prueba"),
             "suspendidas": sum(1 for empresa in empresas if empresa.estado_licencia_resuelto == "suspendida"),
             "vencidas": sum(1 for empresa in empresas if empresa.estado_licencia_resuelto == "vencida"),
+        },
+    })
+
+
+@superadmin_required
+def superadmin_solicitudes(request):
+    solicitudes = SolicitudComercial.objects.all()
+    return render(request, "core/superadmin_solicitudes.html", {
+        **_superadmin_base_context(),
+        "solicitudes": solicitudes,
+        "resumen": {
+            "total": solicitudes.count(),
+            "nuevas": solicitudes.filter(estado="nueva").count(),
+            "prueba": solicitudes.filter(solicita_prueba=True).count(),
+            "demo": solicitudes.filter(estado="demo").count(),
         },
     })
 

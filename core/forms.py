@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group
 
-from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, Usuario
+from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
 
 
 class SuperAdminLoginForm(forms.Form):
@@ -548,3 +548,53 @@ class PagoLicenciaEmpresaForm(forms.ModelForm):
         if cantidad <= 0:
             raise forms.ValidationError("La cantidad de meses debe ser mayor que cero.")
         return cantidad
+
+
+class SolicitudComercialPublicaForm(forms.ModelForm):
+    class Meta:
+        model = SolicitudComercial
+        fields = [
+            "nombre_contacto",
+            "empresa_interesada",
+            "rtn_empresa",
+            "correo",
+            "telefono",
+            "servicio_interes",
+            "mensaje",
+            "solicita_prueba",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        textos = {
+            "nombre_contacto": ("Nombre completo", "Persona principal para continuar la conversacion comercial."),
+            "empresa_interesada": ("Empresa o marca", "Opcional, pero nos ayuda a entender mejor el contexto del proyecto."),
+            "rtn_empresa": ("RTN de la empresa", "Nos ayuda a identificar mejor la empresa interesada y preparar una demo mas seria."),
+            "correo": ("Correo", "Te responderemos por aqui con propuesta, demo o siguiente paso."),
+            "telefono": ("Telefono / WhatsApp", "Ideal para acelerar la demo o la cotizacion."),
+            "servicio_interes": ("Que te interesa desarrollar", "Selecciona el tipo de solucion que mejor se parece a tu necesidad actual."),
+            "mensaje": ("Cuentanos tu proyecto", "Mientras mas detalle nos compartas, mas precisa sera nuestra propuesta."),
+            "solicita_prueba": ("Solicitar prueba de 7 dias", "Activalo si quieres que evaluemos tu acceso inicial al ERP con acompanamiento comercial."),
+        }
+        placeholders = {
+            "nombre_contacto": "Tu nombre",
+            "empresa_interesada": "Nombre de tu empresa",
+            "rtn_empresa": "RTN de la empresa interesada",
+            "correo": "tu@empresa.com",
+            "telefono": "+504 9999-9999",
+            "mensaje": "Describe lo que necesitas construir, mejorar o automatizar.",
+        }
+        for field_name, field in self.fields.items():
+            field.label = textos[field_name][0]
+            field.help_text = textos[field_name][1]
+            css = "public-form-input"
+            if isinstance(field.widget, forms.Textarea):
+                css = "public-form-textarea"
+            elif isinstance(field.widget, forms.CheckboxInput):
+                css = "public-form-checkbox"
+            elif isinstance(field.widget, forms.Select):
+                css = "public-form-select"
+            field.widget.attrs["class"] = css
+            if field_name in placeholders:
+                field.widget.attrs["placeholder"] = placeholders[field_name]
+        self.fields["mensaje"].widget.attrs["rows"] = 5

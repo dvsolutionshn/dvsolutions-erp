@@ -1,0 +1,88 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}Solicitudes Comerciales{% endblock %}
+{% block header_title %}Solicitudes Comerciales{% endblock %}
+{% block header_description %}Centraliza demos, propuestas y solicitudes de prueba llegadas desde la web publica de DV Solutions.{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Solicitudes totales</div>
+        <p class="erp-stat-value">{{ resumen.total }}</p>
+        <p class="erp-card-muted">Todos los prospectos registrados desde la web publica.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Nuevas</div>
+        <p class="erp-stat-value">{{ resumen.nuevas }}</p>
+        <p class="erp-card-muted">Oportunidades pendientes de primer contacto.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Solicitan prueba</div>
+        <p class="erp-stat-value">{{ resumen.prueba }}</p>
+        <p class="erp-card-muted">Prospectos interesados en evaluar el ERP con piloto de 7 dias.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">En demo</div>
+        <p class="erp-stat-value">{{ resumen.demo }}</p>
+        <p class="erp-card-muted">Solicitudes que ya pasaron a una demostracion comercial.</p>
+    </article>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Bandeja comercial</h3>
+            <p class="erp-card-muted">Usa esta vista para priorizar prospectos, preparar demos y convertir solicitudes en empresas de prueba o propuestas formales.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Contacto</th>
+                    <th>Empresa</th>
+                    <th>Servicio</th>
+                    <th>RTN</th>
+                    <th>Prueba</th>
+                    <th>Estado</th>
+                    <th>Datos</th>
+                    <th>Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solicitud in solicitudes %}
+                <tr>
+                    <td>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                    <td><strong>{{ solicitud.nombre_contacto }}</strong></td>
+                    <td>{{ solicitud.empresa_interesada|default:"-" }}</td>
+                    <td>{{ solicitud.get_servicio_interes_display }}</td>
+                    <td>{{ solicitud.rtn_empresa|default:"-" }}</td>
+                    <td>
+                        <span class="erp-badge {% if solicitud.solicita_prueba %}info{% else %}neutral{% endif %}">
+                            {% if solicitud.solicita_prueba %}Si{% else %}No{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="erp-badge {% if solicitud.estado == 'nueva' %}warning{% elif solicitud.estado == 'demo' %}info{% elif solicitud.estado == 'cerrada' %}success{% else %}neutral{% endif %}">
+                            {{ solicitud.get_estado_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <div>{{ solicitud.correo }}</div>
+                        <div class="erp-card-muted">{{ solicitud.telefono|default:"Sin telefono" }}</div>
+                    </td>
+                    <td style="max-width:320px;">
+                        <div class="erp-card-muted">{{ solicitud.mensaje }}</div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="erp-empty">Todavia no hay solicitudes registradas desde la web publica.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

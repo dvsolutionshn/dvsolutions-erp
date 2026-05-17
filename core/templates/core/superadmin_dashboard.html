@@ -49,6 +49,16 @@
         <p class="erp-stat-value">{{ total_licencias_prueba }}</p>
         <p class="erp-card-muted">Empresas en periodo de prueba listas para convertir a pago.</p>
     </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Solicitudes comerciales</div>
+        <p class="erp-stat-value">{{ total_solicitudes_comerciales }}</p>
+        <p class="erp-card-muted">Leads y proyectos entrantes captados desde la nueva web pública.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Pruebas solicitadas</div>
+        <p class="erp-stat-value">{{ total_solicitudes_prueba }}</p>
+        <p class="erp-card-muted">Prospectos que ya pidieron evaluar el ERP con una prueba guiada.</p>
+    </article>
 </section>
 
 <section class="erp-grid">
@@ -64,6 +74,52 @@
         <p>Crea usuarios, asigna empresa, define administradores empresariales y vincula roles basados en grupos.</p>
         <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Administrar Usuarios</a>
     </article>
+    <article class="erp-card erp-module-card">
+        <span class="erp-module-status">Comercial</span>
+        <h3>Solicitudes web</h3>
+        <p>Controla formularios de contacto, demos y pruebas de 7 días generadas desde la página pública de DV Solutions.</p>
+        <a href="{% url 'superadmin_solicitudes' %}" class="erp-btn-secondary">Revisar Solicitudes</a>
+    </article>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Solicitudes recientes</h3>
+            <p class="erp-card-muted">Este bloque te ayuda a detectar oportunidades que vienen directo desde la web sin salir del mismo ERP.</p>
+        </div>
+        <a href="{% url 'superadmin_solicitudes' %}" class="erp-action-link">Ver todas</a>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Contacto</th>
+                    <th>Empresa</th>
+                    <th>Servicio</th>
+                    <th>Prueba</th>
+                    <th>Mensaje</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solicitud in solicitudes_recientes %}
+                <tr>
+                    <td>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                    <td>{{ solicitud.nombre_contacto }}</td>
+                    <td>{{ solicitud.empresa_interesada|default:"-" }}</td>
+                    <td>{{ solicitud.get_servicio_interes_display }}</td>
+                    <td>{% if solicitud.solicita_prueba %}Si{% else %}No{% endif %}</td>
+                    <td class="erp-card-muted">{{ solicitud.mensaje }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="erp-empty">Todavía no han llegado solicitudes desde la web pública.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </section>
 
 <section class="erp-card">

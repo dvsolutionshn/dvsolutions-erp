@@ -1,0 +1,198 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso ERP | DV Solutions</title>
+    <style>
+        :root{
+            --bg:#08111c;
+            --bg-2:#102139;
+            --text:#eef5ff;
+            --muted:#a8b8ce;
+            --gold:#d6a25d;
+            --line:rgba(255,255,255,.12);
+            --white:#fff;
+            --ink:#142438;
+        }
+        *{box-sizing:border-box}
+        body{
+            margin:0;
+            min-height:100vh;
+            font-family:"Segoe UI",Roboto,Arial,sans-serif;
+            color:var(--text);
+            background:
+                radial-gradient(circle at 18% 14%, rgba(24,132,255,.16), transparent 24%),
+                radial-gradient(circle at 82% 16%, rgba(214,162,93,.16), transparent 24%),
+                linear-gradient(160deg, var(--bg), var(--bg-2));
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:24px;
+        }
+        .card{
+            width:min(760px, 100%);
+            padding:34px;
+            border-radius:30px;
+            border:1px solid var(--line);
+            background:rgba(255,255,255,.06);
+            backdrop-filter:blur(14px);
+            box-shadow:0 30px 80px rgba(0,0,0,.35);
+        }
+        .brand{
+            display:flex;
+            align-items:center;
+            gap:16px;
+            margin-bottom:20px;
+            text-decoration:none;
+        }
+        .brand img{
+            width:76px;
+            height:76px;
+            object-fit:contain;
+            filter:drop-shadow(0 18px 34px rgba(0,0,0,.28));
+        }
+        .brand strong{
+            display:block;
+            font-size:26px;
+        }
+        .brand span{
+            display:block;
+            margin-top:4px;
+            color:rgba(241,203,130,.82);
+            font-size:10px;
+            letter-spacing:.2em;
+            text-transform:uppercase;
+        }
+        h1{
+            margin:0 0 12px;
+            font-size:40px;
+            line-height:1.04;
+            letter-spacing:-.05em;
+        }
+        p{
+            margin:0 0 18px;
+            color:var(--muted);
+            line-height:1.72;
+            font-size:16px;
+        }
+        .message{
+            margin-bottom:14px;
+            padding:14px 16px;
+            border-radius:14px;
+            background:#fff2f2;
+            color:#902727;
+            border:1px solid #ffd7d7;
+        }
+        .form{
+            display:grid;
+            gap:14px;
+            margin:20px 0 22px;
+        }
+        label{
+            display:block;
+            margin-bottom:7px;
+            font-size:12px;
+            letter-spacing:.12em;
+            text-transform:uppercase;
+            color:#d4e1f5;
+            font-weight:700;
+        }
+        input{
+            width:100%;
+            padding:14px 15px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.12);
+            background:rgba(255,255,255,.07);
+            color:var(--white);
+            font-size:15px;
+        }
+        input:focus{
+            outline:none;
+            border-color:#d6a25d;
+            box-shadow:0 0 0 4px rgba(214,162,93,.12);
+        }
+        .actions{
+            display:flex;
+            gap:12px;
+            flex-wrap:wrap;
+        }
+        .btn{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            padding:14px 20px;
+            border-radius:14px;
+            border:1px solid transparent;
+            font-weight:700;
+            font-size:15px;
+            cursor:pointer;
+            text-decoration:none;
+        }
+        .btn-primary{
+            background:linear-gradient(135deg, var(--gold), #f1cb82);
+            color:#251905;
+        }
+        .btn-secondary{
+            background:rgba(255,255,255,.06);
+            border-color:var(--line);
+            color:var(--white);
+        }
+        .tips{
+            margin-top:18px;
+            padding:18px;
+            border-radius:20px;
+            background:rgba(255,255,255,.05);
+            border:1px solid var(--line);
+        }
+        .tips strong{
+            display:block;
+            margin-bottom:8px;
+        }
+        @media (max-width: 640px){
+            .card{padding:24px}
+            h1{font-size:32px}
+            .actions{flex-direction:column}
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="brand">
+            <img src="{% static 'core/img/dv-solutions-brand.png' %}" alt="DV Solutions">
+            <div>
+                <strong>DV Solutions</strong>
+                <span>Crecimiento y agilidad en la nube</span>
+            </div>
+        </div>
+
+        <h1>Acceso al ERP y plataformas de clientes</h1>
+        <p>Si ya eres cliente, escribe el slug privado de tu empresa para entrar a tu acceso operativo. Si eres parte del equipo DV Solutions, puedes usar el control maestro.</p>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" class="form">
+            {% csrf_token %}
+            <div>
+                <label for="id_slug">Slug o enlace privado de empresa</label>
+                <input id="id_slug" type="text" name="slug" placeholder="Ejemplo: digital-planning" required>
+            </div>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Entrar a mi empresa</button>
+                <a href="{{ control_login_url }}" class="btn btn-secondary">Control maestro</a>
+                <a href="{% url 'public_home' %}#contacto" class="btn btn-secondary">Solicitar demo</a>
+            </div>
+        </form>
+
+        <div class="tips">
+            <strong>Quieres probar el sistema?</strong>
+            <p>Puedes solicitar una prueba comercial guiada de 7 dias desde la web publica. Asi evaluamos tu operacion, definimos el enfoque correcto y te presentamos una propuesta mas seria.</p>
+        </div>
+    </main>
+</body>
+</html>

@@ -7,7 +7,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RolSistema, Usuario
+from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RolSistema, SolicitudComercial, Usuario
 from core.models import PagoLicenciaEmpresa
 from core.forms import EmpresaControlForm
 
@@ -38,6 +38,47 @@ class SuperAdminControlTests(TestCase):
     def test_dashboard_privado_redirige_a_login(self):
         response = self.client.get(reverse("superadmin_dashboard"))
         self.assertRedirects(response, "/control/login/?next=/control/")
+
+    def test_public_home_responde_en_raiz(self):
+        response = self.client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "DV Solutions")
+        self.assertContains(response, "Solicitar propuesta o demo")
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
+    def test_public_home_puede_registrar_solicitud_comercial(self):
+        response = self.client.post(
+            reverse("public_home"),
+            {
+                "nombre_contacto": "Daniela Rivera",
+                "empresa_interesada": "Rivera Logistics",
+                "rtn_empresa": "08011999111223",
+                "correo": "daniela@rivera.com",
+                "telefono": "9999-8888",
+                "servicio_interes": "erp",
+                "mensaje": "Necesitamos un ERP y una web corporativa.",
+                "solicita_prueba": "on",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(SolicitudComercial.objects.count(), 1)
+        solicitud = SolicitudComercial.objects.get()
+        self.assertTrue(solicitud.solicita_prueba)
+        self.assertEqual(solicitud.rtn_empresa, "08011999111223")
+        self.assertContains(response, "Tu solicitud ya fue registrada correctamente.")
+        self.assertContains(response, "En localhost la notificacion se genero en consola")
+
+    def test_public_demo_detalle_responde(self):
+        response = self.client.get(reverse("public_demo_detail", args=["facturacion"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vista demo de factura empresarial")
+        self.assertContains(response, "Solicitar una demo comercial de facturacion")
+
+    def test_public_access_redirige_a_empresa_por_slug(self):
+        empresa = Empresa.objects.create(nombre="Acceso Demo", slug="acceso-demo", rtn="08011999000040")
+        response = self.client.post(reverse("public_access"), {"slug": empresa.slug})
+        self.assertRedirects(response, reverse("empresa_login", args=[empresa.slug]), fetch_redirect_response=False)
 
     def test_usuario_no_superadmin_no_puede_entrar(self):
         self.client.login(username="operador", password="pass12345")

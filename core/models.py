@@ -437,6 +437,45 @@ class ConfiguracionAvanzadaEmpresa(models.Model):
         return config
 
 
+class SolicitudComercial(models.Model):
+    SERVICIO_CHOICES = [
+        ("erp", "ERP empresarial"),
+        ("web", "Sitio web corporativo"),
+        ("app", "Aplicacion movil"),
+        ("software", "Software a medida"),
+        ("integracion", "Integracion y automatizacion"),
+        ("branding", "Diseno digital y branding"),
+        ("otro", "Otro proyecto"),
+    ]
+    ESTADO_CHOICES = [
+        ("nueva", "Nueva"),
+        ("contactado", "Contactado"),
+        ("demo", "Demo programada"),
+        ("propuesta", "Propuesta enviada"),
+        ("cerrada", "Cerrada"),
+    ]
+
+    nombre_contacto = models.CharField(max_length=160)
+    empresa_interesada = models.CharField(max_length=180, blank=True, null=True)
+    rtn_empresa = models.CharField(max_length=20, blank=True, null=True)
+    correo = models.EmailField()
+    telefono = models.CharField(max_length=30, blank=True, null=True)
+    servicio_interes = models.CharField(max_length=20, choices=SERVICIO_CHOICES, default="software")
+    mensaje = models.TextField()
+    solicita_prueba = models.BooleanField(default=False)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="nueva")
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion"]
+        verbose_name = "Solicitud comercial"
+        verbose_name_plural = "Solicitudes comerciales"
+
+    def __str__(self):
+        empresa = f" - {self.empresa_interesada}" if self.empresa_interesada else ""
+        return f"{self.nombre_contacto}{empresa}"
+
+
 class PlanModulo(models.Model):
     plan = models.ForeignKey(PlanComercial, on_delete=models.CASCADE)
     modulo = models.ForeignKey(Modulo, on_delete=models.CASCADE)
