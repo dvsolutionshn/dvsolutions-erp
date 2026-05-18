@@ -3832,6 +3832,7 @@ def editar_factura(request, empresa_slug, factura_id):
 # =====================================================
 
 @login_required
+@xframe_options_sameorigin
 def registrar_pago(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
