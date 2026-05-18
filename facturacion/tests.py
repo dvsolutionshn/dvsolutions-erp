@@ -695,6 +695,8 @@ class FacturacionTests(TestCase):
         self.assertEqual(pago.impuesto_recibido, Decimal("15.00"))
         asiento = AsientoContable.objects.get(documento_tipo="pago_factura", documento_id=pago.id, evento="cobro")
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_isv, debe=Decimal("15.00")).exists())
+        self.assertFalse(asiento.lineas.filter(cuenta__codigo="1101", debe=Decimal("15.00")).exists())
+        self.assertFalse(asiento.lineas.filter(cuenta__codigo="1102", debe=Decimal("15.00")).exists())
 
     def test_pago_separar_isv_sin_cuenta_fiscal_usa_isv_por_pagar(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(

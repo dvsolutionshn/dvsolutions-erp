@@ -447,7 +447,7 @@ def registrar_asiento_pago_cliente(pago):
                 "haber": Decimal("0.00"),
             }
         )
-    elif pago.monto > 0:
+    elif pago.monto > 0 and not pago.separar_isv:
         lineas.append(
             {
                 "cuenta": cuenta_caja,
