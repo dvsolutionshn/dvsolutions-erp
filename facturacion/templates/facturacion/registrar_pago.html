@@ -28,6 +28,16 @@
         <p class="erp-card-muted">Monto disponible para aplicar pago.</p>
     </article>
     <article class="erp-card">
+        <div class="erp-kpi-label">Base Pendiente</div>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ subtotal_pendiente|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Saldo comercial sin impuesto.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">ISV Pendiente</div>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ impuesto_pendiente|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Impuesto aun pendiente de aplicar.</p>
+    </article>
+    <article class="erp-card">
         <div class="erp-kpi-label">Estado</div>
         <p class="erp-stat-value">{{ factura.get_estado_pago_display }}</p>
         <p class="erp-card-muted">Situacion actual de cobro.</p>
@@ -74,16 +84,17 @@
                     <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
                     <span>Separar ISV automaticamente</span>
                 </label>
-                <div class="erp-field-help">Divide el cobro entre ingreso base e ingreso fiscal del impuesto.</div>
+                <div class="erp-field-help">Divide el cobro entre ingreso base e ingreso fiscal del impuesto, incluso si solo queda pendiente el ISV.</div>
             </div>
             <div class="erp-field">
                 <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
                 <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
-                    <option value="">Seleccione cuenta para ISV</option>
+                    <option value="">ISV por pagar (automatico)</option>
                     {% for cuenta in cuentas_financieras %}
                     <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
                     {% endfor %}
                 </select>
+                <div class="erp-field-help">Si no eliges una cuenta financiera, el sistema aplicara el impuesto a la cuenta contable de ISV por pagar.</div>
             </div>
         </div>
 
@@ -160,6 +171,11 @@
             <strong>Total capturado:</strong> <span id="total-mixto">L. 0.00</span>
             <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
         </div>
+        <div class="erp-soft-panel" style="margin-top:12px;">
+            <strong>Proyeccion del cobro:</strong>
+            <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">L. 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta fiscal: <strong id="preview-isv-mixto">L. 0.00</strong></span>
+        </div>
         {% else %}
         <div class="erp-form-grid two">
             <div class="erp-field">
@@ -214,24 +230,29 @@
                     <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
                     <span>Separar ISV automaticamente</span>
                 </label>
-                <div class="erp-field-help">Cuando cobras el total, aparta el ISV y lo manda a otra cuenta financiera.</div>
+                <div class="erp-field-help">Cuando cobras el total o solo queda pendiente el ISV, aparta automaticamente el impuesto.</div>
             </div>
             <div class="erp-field">
                 <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
                 <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
-                    <option value="">Seleccione cuenta para ISV</option>
+                    <option value="">ISV por pagar (automatico)</option>
                     {% for cuenta in cuentas_financieras %}
                     <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>
                         {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
                     </option>
                     {% endfor %}
                 </select>
-                <div class="erp-field-help">Usa una cuenta aparte para resguardar el impuesto cobrado.</div>
+                <div class="erp-field-help">Usa una cuenta aparte para resguardar el impuesto cobrado. Si la dejas vacia, se aplicara a ISV por pagar automaticamente.</div>
             </div>
         </div>
         <div class="erp-soft-panel">
             <strong>Total aplicado:</strong> <span id="total-aplicado-simple">L. 0.00</span>
             <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+        </div>
+        <div class="erp-soft-panel" style="margin-top:12px;">
+            <strong>Proyeccion del cobro:</strong>
+            <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">L. 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta fiscal: <strong id="preview-isv-simple">L. 0.00</strong></span>
         </div>
         {% endif %}
 
@@ -246,6 +267,38 @@
 </section>
 
 <script>
+const subtotalPendienteCobro = parseFloat("{{ subtotal_pendiente }}");
+const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente }}");
+function moneyHN(value){
+    return "L. " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function calcularDistribucion(totalAplicado){
+    const subtotalPendiente = Number.isFinite(subtotalPendienteCobro) ? subtotalPendienteCobro : 0;
+    const impuestoPendiente = Number.isFinite(impuestoPendienteCobro) ? impuestoPendienteCobro : 0;
+    const totalPendiente = subtotalPendiente + impuestoPendiente;
+    if(!Number.isFinite(totalAplicado) || totalAplicado <= 0 || totalPendiente <= 0){
+        return {base: 0, isv: 0};
+    }
+    if(subtotalPendiente <= 0){
+        return {base: 0, isv: totalAplicado};
+    }
+    if(impuestoPendiente <= 0){
+        return {base: totalAplicado, isv: 0};
+    }
+    let isv = Math.min(Number((totalAplicado * (impuestoPendiente / totalPendiente)).toFixed(2)), impuestoPendiente);
+    let base = Number((totalAplicado - isv).toFixed(2));
+    if(base > subtotalPendiente){
+        const excedente = base - subtotalPendiente;
+        base = subtotalPendiente;
+        isv = Number((isv + excedente).toFixed(2));
+    }
+    if(isv > impuestoPendiente){
+        const excedente = isv - impuestoPendiente;
+        isv = impuestoPendiente;
+        base = Number((base + excedente).toFixed(2));
+    }
+    return {base, isv};
+}
 function pagarTodo(){
     const monto = document.getElementById("monto");
     const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
@@ -267,7 +320,12 @@ function actualizarTotalMixto(){
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
     const total = totalCobrado + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
     const target = document.getElementById("total-mixto");
-    if(target){ target.textContent = "L. " + total.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2}); }
+    if(target){ target.textContent = moneyHN(total); }
+    const distribucion = calcularDistribucion(total);
+    const baseTarget = document.getElementById("preview-base-mixto");
+    const isvTarget = document.getElementById("preview-isv-mixto");
+    if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
+    if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
 }
 function actualizarTotalAplicadoSimple(){
     const monto = parseFloat(document.getElementById("monto")?.value || "0");
@@ -275,7 +333,12 @@ function actualizarTotalAplicadoSimple(){
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
     const total = (Number.isFinite(monto) ? monto : 0) + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
     const target = document.getElementById("total-aplicado-simple");
-    if(target){ target.textContent = "L. " + total.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2}); }
+    if(target){ target.textContent = moneyHN(total); }
+    const distribucion = calcularDistribucion(total);
+    const baseTarget = document.getElementById("preview-base-simple");
+    const isvTarget = document.getElementById("preview-isv-simple");
+    if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
+    if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
 }
 ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].forEach(id => {
     const input = document.getElementById(id);

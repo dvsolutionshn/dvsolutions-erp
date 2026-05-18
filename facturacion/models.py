@@ -1195,6 +1195,14 @@ class Factura(models.Model):
         return sum((p.total_aplicado for p in self.pagos_facturacion.all()), Decimal('0.00'))
 
     @property
+    def subtotal_pagado(self):
+        return sum((Decimal(p.subtotal_aplicado or 0) for p in self.pagos_facturacion.all()), Decimal('0.00'))
+
+    @property
+    def impuesto_pagado(self):
+        return sum((Decimal(p.impuesto_aplicado or 0) for p in self.pagos_facturacion.all()), Decimal('0.00'))
+
+    @property
     def tiene_pagos_registrados(self):
         return self.pagos_facturacion.exists()
 
@@ -1213,6 +1221,34 @@ class Factura(models.Model):
     def total_documento_ajustado(self):
         ajustado = self.total - self.total_notas_credito
         return ajustado if ajustado > 0 else Decimal('0.00')
+
+    @property
+    def subtotal_documento_ajustado(self):
+        subtotal_creditos = sum(
+            (Decimal(n.subtotal or 0) for n in self.notas_credito.filter(estado='emitida')),
+            Decimal('0.00')
+        )
+        ajustado = Decimal(self.subtotal or 0) - subtotal_creditos
+        return ajustado if ajustado > 0 else Decimal('0.00')
+
+    @property
+    def impuesto_documento_ajustado(self):
+        impuesto_creditos = sum(
+            (Decimal(n.impuesto or 0) for n in self.notas_credito.filter(estado='emitida')),
+            Decimal('0.00')
+        )
+        ajustado = Decimal(self.impuesto or 0) - impuesto_creditos
+        return ajustado if ajustado > 0 else Decimal('0.00')
+
+    @property
+    def subtotal_pendiente_cobro(self):
+        pendiente = self.subtotal_documento_ajustado - self.subtotal_pagado
+        return pendiente if pendiente > 0 else Decimal('0.00')
+
+    @property
+    def impuesto_pendiente_cobro(self):
+        pendiente = self.impuesto_documento_ajustado - self.impuesto_pagado
+        return pendiente if pendiente > 0 else Decimal('0.00')
 
     @property
     def tiene_notas_credito_activas(self):
@@ -1740,17 +1776,41 @@ class PagoFactura(models.Model):
 
     def recalcular_componentes_pago(self):
         total_aplicado = self.total_aplicado
-        total_factura = Decimal(self.factura.total or 0)
-        impuesto_factura = Decimal(self.factura.impuesto or 0)
+        pagos_previos = self.factura.pagos_facturacion.exclude(pk=self.pk)
+        subtotal_pagado = sum((Decimal(p.subtotal_aplicado or 0) for p in pagos_previos), Decimal('0.00'))
+        impuesto_pagado = sum((Decimal(p.impuesto_aplicado or 0) for p in pagos_previos), Decimal('0.00'))
+        subtotal_pendiente = self.factura.subtotal_documento_ajustado - subtotal_pagado
+        impuesto_pendiente = self.factura.impuesto_documento_ajustado - impuesto_pagado
+        subtotal_pendiente = subtotal_pendiente if subtotal_pendiente > 0 else Decimal('0.00')
+        impuesto_pendiente = impuesto_pendiente if impuesto_pendiente > 0 else Decimal('0.00')
+        total_pendiente = (subtotal_pendiente + impuesto_pendiente).quantize(DOS_DECIMALES)
 
-        if total_aplicado <= 0 or total_factura <= 0:
+        if total_aplicado <= 0 or total_pendiente <= 0:
             self.subtotal_aplicado = Decimal('0.00')
             self.impuesto_aplicado = Decimal('0.00')
             return
 
-        proporcion_impuesto = (impuesto_factura / total_factura) if total_factura else Decimal('0.00')
-        impuesto_aplicado = (total_aplicado * proporcion_impuesto).quantize(DOS_DECIMALES)
-        subtotal_aplicado = (total_aplicado - impuesto_aplicado).quantize(DOS_DECIMALES)
+        if subtotal_pendiente <= 0:
+            subtotal_aplicado = Decimal('0.00')
+            impuesto_aplicado = total_aplicado
+        elif impuesto_pendiente <= 0:
+            subtotal_aplicado = total_aplicado
+            impuesto_aplicado = Decimal('0.00')
+        else:
+            proporcion_impuesto = impuesto_pendiente / total_pendiente
+            impuesto_aplicado = (total_aplicado * proporcion_impuesto).quantize(DOS_DECIMALES)
+            impuesto_aplicado = min(impuesto_aplicado, impuesto_pendiente)
+            subtotal_aplicado = (total_aplicado - impuesto_aplicado).quantize(DOS_DECIMALES)
+
+            if subtotal_aplicado > subtotal_pendiente:
+                excedente = subtotal_aplicado - subtotal_pendiente
+                subtotal_aplicado = subtotal_pendiente
+                impuesto_aplicado = (impuesto_aplicado + excedente).quantize(DOS_DECIMALES)
+
+            if impuesto_aplicado > impuesto_pendiente:
+                excedente = impuesto_aplicado - impuesto_pendiente
+                impuesto_aplicado = impuesto_pendiente
+                subtotal_aplicado = (subtotal_aplicado + excedente).quantize(DOS_DECIMALES)
 
         self.subtotal_aplicado = subtotal_aplicado
         self.impuesto_aplicado = impuesto_aplicado
@@ -1779,17 +1839,15 @@ class PagoFactura(models.Model):
         saldo_disponible = self.factura.total_documento_ajustado - total_pagado
         if self.total_aplicado > saldo_disponible:
             raise ValidationError({'monto': 'El pago aplicado no puede ser mayor que el saldo pendiente.'})
+        self.recalcular_componentes_pago()
         if self.cuenta_financiera_id and self.cuenta_financiera.empresa_id != self.factura.empresa_id:
             raise ValidationError({'cuenta_financiera': 'La cuenta financiera debe pertenecer a la misma empresa de la factura.'})
         if self.cuenta_financiera_impuesto_id and self.cuenta_financiera_impuesto.empresa_id != self.factura.empresa_id:
             raise ValidationError({'cuenta_financiera_impuesto': 'La cuenta financiera del ISV debe pertenecer a la misma empresa de la factura.'})
-        self.recalcular_componentes_pago()
         if self.retencion_isr > self.subtotal_aplicado:
             raise ValidationError({'retencion_isr': 'La retencion ISR no puede exceder la base aplicada del pago.'})
         if self.retencion_isv > self.impuesto_aplicado:
             raise ValidationError({'retencion_isv': 'La retencion ISV no puede exceder el ISV aplicado del pago.'})
-        if self.separar_isv and self.impuesto_recibido > 0 and not self.cuenta_financiera_impuesto_id:
-            raise ValidationError({'cuenta_financiera_impuesto': 'Selecciona la cuenta financiera donde se separara el ISV.'})
 
     def save(self, *args, **kwargs):
         self.full_clean()

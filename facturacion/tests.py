@@ -642,6 +642,101 @@ class FacturacionTests(TestCase):
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_operativa, debe=Decimal("100.00")).exists())
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_isv, debe=Decimal("15.00")).exists())
 
+    def test_pago_solo_isv_pendiente_permite_aplicar_a_cuenta_fiscal(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        cuenta_isv = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1103",
+            nombre="Banco Fiscal",
+            tipo="activo",
+        )
+        cuenta_financiera_impuesto = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Fiscal HNL",
+            tipo="banco",
+            cuenta_contable=cuenta_isv,
+        )
+        factura = self.crear_factura_con_linea()
+        pago_base = PagoFactura.objects.create(
+            factura=factura,
+            monto=Decimal("100.00"),
+            metodo="transferencia",
+            referencia="BASE-001",
+            fecha=date.today(),
+        )
+        PagoFactura.objects.filter(pk=pago_base.pk).update(
+            subtotal_aplicado=Decimal("100.00"),
+            impuesto_aplicado=Decimal("0.00"),
+        )
+        factura.refresh_from_db()
+
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "15.00",
+                "retencion_isr": "0.00",
+                "retencion_isv": "0.00",
+                "separar_isv": "on",
+                "cuenta_financiera_impuesto": str(cuenta_financiera_impuesto.id),
+                "metodo": "transferencia",
+                "referencia": "ISV-ONLY-001",
+            },
+        )
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        pago = PagoFactura.objects.get(factura=factura, referencia="ISV-ONLY-001")
+        self.assertEqual(pago.subtotal_aplicado, Decimal("0.00"))
+        self.assertEqual(pago.impuesto_aplicado, Decimal("15.00"))
+        self.assertEqual(pago.impuesto_recibido, Decimal("15.00"))
+        asiento = AsientoContable.objects.get(documento_tipo="pago_factura", documento_id=pago.id, evento="cobro")
+        self.assertTrue(asiento.lineas.filter(cuenta=cuenta_isv, debe=Decimal("15.00")).exists())
+
+    def test_pago_separar_isv_sin_cuenta_fiscal_usa_isv_por_pagar(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        cuenta_operativa = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1102",
+            nombre="Banco Operativo",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Operativo HNL",
+            tipo="banco",
+            cuenta_contable=cuenta_operativa,
+        )
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "115.00",
+                "retencion_isr": "0.00",
+                "retencion_isv": "0.00",
+                "separar_isv": "on",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(cuenta_financiera.id),
+                "referencia": "DEP-ISV-AUTO-001",
+            },
+        )
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        pago = PagoFactura.objects.get(factura=factura, referencia="DEP-ISV-AUTO-001")
+        self.assertTrue(pago.separar_isv)
+        self.assertIsNone(pago.cuenta_financiera_impuesto)
+        asiento = AsientoContable.objects.get(documento_tipo="pago_factura", documento_id=pago.id, evento="cobro")
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="2101", debe=Decimal("15.00")).exists())
+
     def test_pago_fallido_no_deja_registro_guardado(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
             codigo="contabilidad",
@@ -699,6 +794,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Caja General - 1101 Caja General")
         self.assertContains(response, "Banco Principal HNL - 110201 Banco Moneda Nacional")
+        self.assertContains(response, "ISV por pagar (automatico)")
         self.assertTrue(CuentaFinanciera.objects.filter(empresa=self.empresa, nombre="Caja General", tipo="caja").exists())
 
     def test_recibos_dashboard_muestra_recibo(self):

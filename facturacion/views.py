@@ -3922,8 +3922,6 @@ def registrar_pago(request, empresa_slug, factura_id):
                     error = "Con pagos mixtos debes registrar al menos un cobro recibido. Si solo deseas aplicar retenciones, usa monto 0.00 en el flujo simple."
                 elif retencion_isr < 0 or retencion_isv < 0:
                     error = "Las retenciones no pueden ser negativas."
-                elif separar_isv and not cuenta_financiera_impuesto_id:
-                    error = "Selecciona la cuenta financiera donde se separara el ISV."
                 elif total_pago + retencion_isr + retencion_isv > factura.saldo_pendiente:
                     error = "La suma aplicada no puede ser mayor que el saldo pendiente."
                 else:
@@ -3968,6 +3966,8 @@ def registrar_pago(request, empresa_slug, factura_id):
                 "bancos": bancos,
                 "cuentas_tarjeta": cuentas_tarjeta,
                 "usa_pagos_mixtos": config_avanzada.usa_pagos_mixtos,
+                "subtotal_pendiente": factura.subtotal_pendiente_cobro,
+                "impuesto_pendiente": factura.impuesto_pendiente_cobro,
                 "today": timezone.now().date(),
                 "form_data": request.POST,
             })
@@ -3981,8 +3981,6 @@ def registrar_pago(request, empresa_slug, factura_id):
                 error = "El monto recibido no puede ser negativo."
             elif retencion_isr < 0 or retencion_isv < 0:
                 error = "Las retenciones no pueden ser negativas."
-            elif separar_isv and not cuenta_financiera_impuesto_id:
-                error = "Selecciona la cuenta financiera donde se separara el ISV."
             elif monto_decimal + retencion_isr + retencion_isv <= 0:
                 error = "Debes registrar un monto o una retencion mayor que cero."
             elif monto_decimal + retencion_isr + retencion_isv > factura.saldo_pendiente:
@@ -3990,8 +3988,21 @@ def registrar_pago(request, empresa_slug, factura_id):
             else:
                 cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first()
                 cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
-                if not cuenta_financiera:
-                    raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el pago.")
+                pago_borrador = PagoFactura(
+                    factura=factura,
+                    monto=monto_decimal,
+                    retencion_isr=retencion_isr,
+                    retencion_isv=retencion_isv,
+                    separar_isv=separar_isv,
+                    cuenta_financiera=cuenta_financiera,
+                    cuenta_financiera_impuesto=cuenta_financiera_impuesto,
+                    metodo=metodo,
+                    referencia=referencia,
+                    cajero=request.user,
+                )
+                pago_borrador.recalcular_componentes_pago()
+                if pago_borrador.subtotal_recibido > 0 and not cuenta_financiera:
+                    raise ValidationError("Selecciona la cuenta bancaria o caja donde entro la base o el efectivo recibido.")
 
                 fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
 
@@ -4034,6 +4045,8 @@ def registrar_pago(request, empresa_slug, factura_id):
         "bancos": bancos,
         "cuentas_tarjeta": cuentas_tarjeta,
         "usa_pagos_mixtos": config_avanzada.usa_pagos_mixtos,
+        "subtotal_pendiente": factura.subtotal_pendiente_cobro,
+        "impuesto_pendiente": factura.impuesto_pendiente_cobro,
         "today": timezone.now().date(),
         "form_data": request.POST if request.method == "POST" else {},
     })
