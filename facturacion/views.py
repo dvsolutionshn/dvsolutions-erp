@@ -3838,6 +3838,7 @@ def registrar_pago(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     es_modal = request.GET.get("modal") == "1"
+    template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     asegurar_cuentas_financieras_base_honduras(empresa)
     cuentas_financieras = CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related('cuenta_contable').order_by('nombre')
@@ -4036,7 +4037,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                         error = f"No se pudo completar el cobro: {exc}"
 
             messages.error(request, error)
-            return render(request, "facturacion/registrar_pago.html", _contexto_pago(request.POST))
+            return render(request, template_name, _contexto_pago(request.POST))
 
         try:
             monto_decimal = _parsear_decimal(monto, "monto recibido")
@@ -4111,7 +4112,7 @@ def registrar_pago(request, empresa_slug, factura_id):
 
         messages.error(request, error)
 
-    return render(request, "facturacion/registrar_pago.html", _contexto_pago(request.POST if request.method == "POST" else {}))
+    return render(request, template_name, _contexto_pago(request.POST if request.method == "POST" else {}))
 
 
 @login_required

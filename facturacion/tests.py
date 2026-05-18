@@ -809,6 +809,18 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "erp-pago-guardado")
         self.assertTrue(PagoFactura.objects.filter(factura=factura, referencia="DEP-MODAL-001").exists())
 
+    def test_registrar_pago_modal_no_renderiza_shell_completo_del_erp(self):
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.get(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]) + "?modal=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pago rapido")
+        self.assertNotContains(response, "Panel Principal")
+        self.assertNotContains(response, "DV Solutions ERP")
+
     def test_registrar_pago_prepara_cuentas_financieras_base(self):
         CuentaContable.objects.create(
             empresa=self.empresa,

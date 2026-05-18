@@ -33,6 +33,7 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
 {% endblock %}
 
 {% block content %}
+{% if not es_modal %}
 <section class="erp-grid">
     <article class="erp-card">
         <div class="erp-kpi-label">Factura</div>
@@ -65,6 +66,7 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
         <p class="erp-card-muted">Situacion actual de cobro.</p>
     </article>
 </section>
+{% endif %}
 
 <section class="erp-form-card">
     <div class="erp-payment-compact">

@@ -1,0 +1,365 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Pago - {{ empresa.nombre }}</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    <style>
+    body{margin:0;background:#f5f8fc;font-family:"Segoe UI",Roboto,Arial,sans-serif;}
+    .erp-payment-compact{display:flex;flex-direction:column;gap:18px;}
+    .erp-payment-shell{padding:22px;}
+    .erp-payment-hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap;}
+    .erp-payment-hero-copy h3{margin:0 0 8px;font-size:24px;color:#102338;}
+    .erp-payment-hero-copy p{margin:0;color:#5a6b80;line-height:1.6;max-width:760px;}
+    .erp-payment-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+    .erp-payment-advanced{margin-top:18px;border:1px solid var(--line);border-radius:16px;background:#fbfcfe;overflow:hidden;}
+    .erp-payment-advanced summary{cursor:pointer;list-style:none;padding:16px 18px;font-weight:700;color:#102338;display:flex;align-items:center;justify-content:space-between;}
+    .erp-payment-advanced summary::-webkit-details-marker{display:none;}
+    .erp-payment-advanced summary::after{content:"+";font-size:22px;line-height:1;color:#46627d;}
+    .erp-payment-advanced[open] summary::after{content:"−";}
+    .erp-payment-advanced-body{padding:0 18px 18px;border-top:1px solid var(--line);}
+    .erp-payment-advanced-copy{margin:0 0 14px;color:#5a6b80;line-height:1.55;}
+    .erp-payment-modal-note{padding:14px 16px;border-radius:14px;background:#f7faff;border:1px solid #d8e4f2;color:#334a63;}
+    @media (max-width: 760px){
+        .erp-payment-shell{padding:14px;}
+        .erp-payment-quick-grid{grid-template-columns:1fr;}
+    }
+    </style>
+</head>
+<body>
+{% if messages %}
+<div class="erp-message-stack" style="padding:18px 18px 0;">
+    {% for message in messages %}
+        <div class="erp-message">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+<section class="erp-form-card erp-payment-shell">
+    <div class="erp-payment-compact">
+        <div class="erp-payment-hero">
+            <div class="erp-payment-hero-copy">
+                <h3>Pago rapido</h3>
+                <p>Registra solo el dinero que entro, la cuenta donde cayo y la referencia. El sistema aplica el saldo, genera el recibo y registra la contabilidad automaticamente.</p>
+            </div>
+            <div class="erp-payment-modal-note">
+                Esta ventana se cerrara sola al guardar y la factura se actualizara en vivo.
+            </div>
+        </div>
+
+        <form method="post" class="erp-form-shell" style="margin-top:0;">
+            {% csrf_token %}
+
+            {% if usa_pagos_mixtos %}
+            <div class="erp-form-grid two">
+                <div class="erp-field">
+                    <label for="fecha">Fecha de pago</label>
+                    <input id="fecha" type="date" name="fecha" value="{{ form_data.fecha|default:today }}">
+                </div>
+                <div class="erp-field">
+                    <label>Modo de cobro</label>
+                    <div class="erp-info-value">Pago mixto</div>
+                    <div class="erp-field-help">Puedes dividir el cobro entre efectivo, tarjeta y transferencia.</div>
+                </div>
+            </div>
+
+            <div class="erp-grid">
+                <article class="erp-card erp-payment-method-card">
+                    <div class="erp-kpi-label">Efectivo</div>
+                    <div class="erp-field" style="margin-top:14px;">
+                        <label for="monto_efectivo">Monto efectivo</label>
+                        <input id="monto_efectivo" type="number" step="0.01" name="monto_efectivo" value="{{ form_data.monto_efectivo|default:'' }}" placeholder="0.00">
+                    </div>
+                    <div class="erp-field">
+                        <label for="cuenta_efectivo">Caja destino</label>
+                        <select id="cuenta_efectivo" name="cuenta_efectivo">
+                            <option value="">Seleccione caja</option>
+                            {% for cuenta in cajas %}
+                            <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
+                            {% endfor %}
+                            {% if not cajas %}
+                            {% for cuenta in cuentas_financieras %}
+                            <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
+                            {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="erp-field">
+                        <label for="referencia_efectivo">Referencia</label>
+                        <input id="referencia_efectivo" type="text" name="referencia_efectivo" value="{{ form_data.referencia_efectivo|default:'' }}" placeholder="Opcional">
+                    </div>
+                </article>
+
+                <article class="erp-card erp-payment-method-card">
+                    <div class="erp-kpi-label">Tarjeta</div>
+                    <div class="erp-field" style="margin-top:14px;">
+                        <label for="monto_tarjeta">Monto tarjeta</label>
+                        <input id="monto_tarjeta" type="number" step="0.01" name="monto_tarjeta" value="{{ form_data.monto_tarjeta|default:'' }}" placeholder="0.00">
+                    </div>
+                    <div class="erp-field">
+                        <label for="cuenta_tarjeta">Cuenta / POS destino</label>
+                        <select id="cuenta_tarjeta" name="cuenta_tarjeta">
+                            <option value="">Seleccione cuenta</option>
+                            {% for cuenta in cuentas_tarjeta %}
+                            <option value="{{ cuenta.id }}" {% if form_data.cuenta_tarjeta == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="erp-field">
+                        <label for="referencia_tarjeta">Voucher / autorizacion</label>
+                        <input id="referencia_tarjeta" type="text" name="referencia_tarjeta" value="{{ form_data.referencia_tarjeta|default:'' }}" placeholder="Numero de voucher">
+                    </div>
+                </article>
+
+                <article class="erp-card erp-payment-method-card">
+                    <div class="erp-kpi-label">Transferencia</div>
+                    <div class="erp-field" style="margin-top:14px;">
+                        <label for="monto_transferencia">Monto transferencia</label>
+                        <input id="monto_transferencia" type="number" step="0.01" name="monto_transferencia" value="{{ form_data.monto_transferencia|default:'' }}" placeholder="0.00">
+                    </div>
+                    <div class="erp-field">
+                        <label for="cuenta_transferencia">Banco donde cayo</label>
+                        <select id="cuenta_transferencia" name="cuenta_transferencia">
+                            <option value="">Seleccione banco</option>
+                            {% for cuenta in bancos %}
+                            <option value="{{ cuenta.id }}" {% if form_data.cuenta_transferencia == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}{% if cuenta.numero %} - {{ cuenta.numero }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="erp-field">
+                        <label for="referencia_transferencia">Referencia bancaria</label>
+                        <input id="referencia_transferencia" type="text" name="referencia_transferencia" value="{{ form_data.referencia_transferencia|default:'' }}" placeholder="Numero de transferencia">
+                    </div>
+                </article>
+            </div>
+            <div class="erp-soft-panel">
+                <strong>Total capturado:</strong> <span id="total-mixto">L. 0.00</span>
+                <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+            </div>
+            <div class="erp-soft-panel" style="margin-top:12px;">
+                <strong>Proyeccion del cobro:</strong>
+                <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">L. 0.00</strong></span>
+                <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-mixto">L. 0.00</strong></span>
+            </div>
+            <details class="erp-payment-advanced">
+                <summary>Opciones avanzadas</summary>
+                <div class="erp-payment-advanced-body">
+                    <p class="erp-payment-advanced-copy">Abre esta seccion solo cuando haya retenciones o quieras resguardar el ISV en otra cuenta financiera.</p>
+                    <div class="erp-form-grid two">
+                        <div class="erp-field">
+                            <label for="retencion_isr">Retencion ISR</label>
+                            <input id="retencion_isr" type="number" step="0.01" min="0" name="retencion_isr" value="{{ form_data.retencion_isr|default:'0.00' }}" placeholder="0.00">
+                            <div class="erp-field-help">Monto retenido por el cliente y aplicado al saldo de la factura.</div>
+                        </div>
+                        <div class="erp-field">
+                            <label for="retencion_isv">Retencion ISV</label>
+                            <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
+                            <div class="erp-field-help">Usalo cuando el cliente retiene el impuesto y no entrega ese efectivo.</div>
+                        </div>
+                        <div class="erp-field">
+                            <label style="display:flex;gap:10px;align-items:center;">
+                                <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
+                                <span>Separar ISV automaticamente</span>
+                            </label>
+                            <div class="erp-field-help">Divide el cobro entre base e impuesto, incluso si solo queda pendiente el ISV.</div>
+                        </div>
+                        <div class="erp-field">
+                            <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
+                            <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
+                                <option value="">Misma cuenta del cobro</option>
+                                {% for cuenta in cuentas_financieras %}
+                                <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="erp-field-help">Si eliges una cuenta aparte, el ISV cobrado quedara resguardado ahi.</div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            {% else %}
+            <div class="erp-payment-quick-grid">
+                <div class="erp-field">
+                    <label for="fecha">Fecha de pago</label>
+                    <input id="fecha" type="date" name="fecha" value="{{ form_data.fecha|default:today }}">
+                </div>
+                <div class="erp-field">
+                    <label for="monto">Monto</label>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <input id="monto" type="number" step="0.01" min="0" name="monto" value="{{ form_data.monto|default:'' }}" required>
+                        <button type="button" class="erp-btn-secondary" style="white-space:nowrap;" onclick="pagarTodo()">Pagar todo</button>
+                    </div>
+                    <div class="erp-field-help">Este es el dinero que realmente entro a caja o banco.</div>
+                </div>
+                <div class="erp-field">
+                    <label for="metodo">Metodo de pago</label>
+                    <select id="metodo" name="metodo" required>
+                        <option value="" disabled {% if not form_data.metodo %}selected{% endif %}>Seleccione metodo</option>
+                        <option value="efectivo" {% if form_data.metodo == "efectivo" %}selected{% endif %}>Efectivo</option>
+                        <option value="transferencia" {% if form_data.metodo == "transferencia" %}selected{% endif %}>Transferencia</option>
+                        <option value="tarjeta" {% if form_data.metodo == "tarjeta" %}selected{% endif %}>Tarjeta</option>
+                    </select>
+                </div>
+                <div class="erp-field">
+                    <label for="cuenta_financiera">Cuenta donde ingreso el pago</label>
+                    <select id="cuenta_financiera" name="cuenta_financiera" required>
+                        <option value="" disabled {% if not form_data.cuenta_financiera %}selected{% endif %}>Seleccione cuenta o caja</option>
+                        {% for cuenta in cuentas_financieras %}
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera == cuenta.id|stringformat:"s" %}selected{% endif %}>
+                            {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="erp-field-help">Esta cuenta define el Debe del asiento contable del cobro.</div>
+                </div>
+                <div class="erp-field" style="grid-column:1 / -1;">
+                    <label for="referencia">Referencia</label>
+                    <input id="referencia" type="text" name="referencia" value="{{ form_data.referencia|default:'' }}" placeholder="Deposito, transferencia, voucher o comprobante">
+                </div>
+            </div>
+            <div class="erp-soft-panel">
+                <strong>Total aplicado:</strong> <span id="total-aplicado-simple">L. 0.00</span>
+                <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+            </div>
+            <div class="erp-soft-panel" style="margin-top:12px;">
+                <strong>Proyeccion del cobro:</strong>
+                <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">L. 0.00</strong></span>
+                <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-simple">L. 0.00</strong></span>
+            </div>
+            <details class="erp-payment-advanced">
+                <summary>Opciones avanzadas</summary>
+                <div class="erp-payment-advanced-body">
+                    <p class="erp-payment-advanced-copy">Usa esta seccion solo si hay retenciones o si deseas que el ISV cobrado quede resguardado en otra cuenta financiera.</p>
+                    <div class="erp-form-grid two">
+                        <div class="erp-field">
+                            <label for="retencion_isr">Retencion ISR</label>
+                            <input id="retencion_isr" type="number" step="0.01" min="0" name="retencion_isr" value="{{ form_data.retencion_isr|default:'0.00' }}" placeholder="0.00">
+                            <div class="erp-field-help">Si el cliente retuvo ISR, registralo aqui para aplicarlo al saldo.</div>
+                        </div>
+                        <div class="erp-field">
+                            <label for="retencion_isv">Retencion ISV</label>
+                            <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
+                            <div class="erp-field-help">Permite reflejar el ISV retenido sin inflar el efectivo recibido.</div>
+                        </div>
+                        <div class="erp-field">
+                            <label style="display:flex;gap:10px;align-items:center;">
+                                <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
+                                <span>Separar ISV automaticamente</span>
+                            </label>
+                            <div class="erp-field-help">Cuando quieras ver base e impuesto por separado en el mismo cobro, activalo aqui.</div>
+                        </div>
+                        <div class="erp-field">
+                            <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
+                            <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
+                                <option value="">Misma cuenta del cobro</option>
+                                {% for cuenta in cuentas_financieras %}
+                                <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="erp-field-help">Si la dejas vacia, el ISV se registra en la misma cuenta financiera donde entro el cobro.</div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            {% endif %}
+
+            <div class="erp-form-actions" style="margin-top:22px;">
+                <div class="erp-field-help">Al guardar, se genera el recibo y se registra el asiento contable del cobro.</div>
+                <div class="erp-actions-right">
+                    <button type="button" class="erp-btn-secondary" onclick="window.parent.postMessage({type:'erp-pago-cerrar'}, '*')">Cancelar</button>
+                    <button type="submit" class="erp-btn">Guardar Pago</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<script>
+const subtotalPendienteCobro = parseFloat("{{ subtotal_pendiente }}");
+const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente }}");
+function moneyHN(value){
+    return "L. " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function calcularDistribucion(totalAplicado){
+    const subtotalPendiente = Number.isFinite(subtotalPendienteCobro) ? subtotalPendienteCobro : 0;
+    const impuestoPendiente = Number.isFinite(impuestoPendienteCobro) ? impuestoPendienteCobro : 0;
+    const totalPendiente = subtotalPendiente + impuestoPendiente;
+    if(!Number.isFinite(totalAplicado) || totalAplicado <= 0 || totalPendiente <= 0){
+        return {base: 0, isv: 0};
+    }
+    if(subtotalPendiente <= 0){
+        return {base: 0, isv: totalAplicado};
+    }
+    if(impuestoPendiente <= 0){
+        return {base: totalAplicado, isv: 0};
+    }
+    let isv = Math.min(Number((totalAplicado * (impuestoPendiente / totalPendiente)).toFixed(2)), impuestoPendiente);
+    let base = Number((totalAplicado - isv).toFixed(2));
+    if(base > subtotalPendiente){
+        const excedente = base - subtotalPendiente;
+        base = subtotalPendiente;
+        isv = Number((isv + excedente).toFixed(2));
+    }
+    if(isv > impuestoPendiente){
+        const excedente = isv - impuestoPendiente;
+        isv = impuestoPendiente;
+        base = Number((base + excedente).toFixed(2));
+    }
+    return {base, isv};
+}
+function pagarTodo(){
+    const monto = document.getElementById("monto");
+    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
+    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
+    const saldo = parseFloat("{{ factura.saldo_pendiente }}");
+    if(monto){
+        const restante = saldo - (Number.isFinite(retIsr) ? retIsr : 0) - (Number.isFinite(retIsv) ? retIsv : 0);
+        monto.value = Math.max(restante, 0).toFixed(2);
+        actualizarTotalAplicadoSimple();
+    }
+}
+function actualizarTotalMixto(){
+    const totalCobrado = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
+        const input = document.getElementById(id);
+        const value = input ? parseFloat(input.value || "0") : 0;
+        return acc + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
+    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
+    const total = totalCobrado + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
+    const target = document.getElementById("total-mixto");
+    if(target){ target.textContent = moneyHN(total); }
+    const distribucion = calcularDistribucion(total);
+    const baseTarget = document.getElementById("preview-base-mixto");
+    const isvTarget = document.getElementById("preview-isv-mixto");
+    if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
+    if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
+}
+function actualizarTotalAplicadoSimple(){
+    const monto = parseFloat(document.getElementById("monto")?.value || "0");
+    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
+    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
+    const total = (Number.isFinite(monto) ? monto : 0) + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
+    const target = document.getElementById("total-aplicado-simple");
+    if(target){ target.textContent = moneyHN(total); }
+    const distribucion = calcularDistribucion(total);
+    const baseTarget = document.getElementById("preview-base-simple");
+    const isvTarget = document.getElementById("preview-isv-simple");
+    if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
+    if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
+}
+["monto_efectivo", "monto_tarjeta", "monto_transferencia"].forEach(id => {
+    const input = document.getElementById(id);
+    if(input){ input.addEventListener("input", actualizarTotalMixto); }
+});
+["monto", "retencion_isr", "retencion_isv"].forEach(id => {
+    const input = document.getElementById(id);
+    if(input){ input.addEventListener("input", () => { actualizarTotalMixto(); actualizarTotalAplicadoSimple(); }); }
+});
+actualizarTotalMixto();
+actualizarTotalAplicadoSimple();
+</script>
+</body>
+</html>
