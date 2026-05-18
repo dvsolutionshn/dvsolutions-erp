@@ -41,7 +41,7 @@ from contabilidad.services import (
 from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, DATE_INPUT_FORMATS_LATAM, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
-from contabilidad.models import ClasificacionCompraFiscal, CuentaFinanciera
+from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 
 logger = logging.getLogger(__name__)
 
@@ -4116,6 +4116,210 @@ def registrar_pago(request, empresa_slug, factura_id):
 
 
 @login_required
+@xframe_options_sameorigin
+def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    pago = get_object_or_404(
+        PagoFactura.objects.select_related("cuenta_financiera", "cuenta_financiera_impuesto"),
+        id=pago_id,
+        factura=factura,
+    )
+    es_modal = request.GET.get("modal") == "1"
+    template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
+
+    if factura.estado == "anulada":
+        messages.error(request, "No se pueden editar pagos de una factura anulada.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    ultimo_pago = factura.pagos_facturacion.order_by("fecha", "id").last()
+    if not ultimo_pago or ultimo_pago.id != pago.id:
+        messages.error(request, "Por seguridad solo puedes editar el ultimo pago registrado de esta factura.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    asegurar_cuentas_financieras_base_honduras(empresa)
+    cuentas_financieras = CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related('cuenta_contable').order_by('nombre')
+
+    def _form_data_base():
+        return {
+            "fecha": pago.fecha.isoformat() if pago.fecha else timezone.now().date().isoformat(),
+            "monto": f"{Decimal(pago.monto or 0):.2f}",
+            "metodo": pago.metodo,
+            "cuenta_financiera": str(pago.cuenta_financiera_id or ""),
+            "referencia": pago.referencia or "",
+            "retencion_isr": f"{Decimal(pago.retencion_isr or 0):.2f}",
+            "retencion_isv": f"{Decimal(pago.retencion_isv or 0):.2f}",
+            "separar_isv": pago.separar_isv,
+            "cuenta_financiera_impuesto": str(pago.cuenta_financiera_impuesto_id or ""),
+        }
+
+    def _contexto_pago(form_data=None):
+        tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
+        return {
+            "factura": factura,
+            "empresa": empresa,
+            "cuentas_financieras": cuentas_financieras,
+            "cajas": cuentas_financieras.filter(tipo='caja'),
+            "bancos": cuentas_financieras.filter(tipo='banco'),
+            "cuentas_tarjeta": tarjetas if tarjetas.exists() else cuentas_financieras,
+            "usa_pagos_mixtos": False,
+            "subtotal_pendiente": factura.subtotal_pendiente_cobro,
+            "impuesto_pendiente": factura.impuesto_pendiente_cobro,
+            "today": timezone.now().date(),
+            "form_data": form_data or _form_data_base(),
+            "es_modal": es_modal,
+            "modo_edicion": True,
+            "pago_edicion": pago,
+            "modal_heading": "Editar pago",
+            "modal_description": "Ajusta el monto, la cuenta o la referencia del ultimo cobro. El sistema reconstruira recibo y contabilidad automaticamente.",
+        }
+
+    def _respuesta_modal_exito(mensaje):
+        if not es_modal:
+            return None
+        mensaje_seguro = json.dumps(mensaje)
+        html = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Pago actualizado</title>
+    <style>
+        body {{
+            margin: 0;
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background: #f5f8fc;
+            color: #102338;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }}
+        .card {{
+            max-width: 460px;
+            margin: 24px;
+            padding: 28px;
+            border-radius: 18px;
+            background: #ffffff;
+            border: 1px solid #d9e3f0;
+            box-shadow: 0 16px 50px rgba(12, 28, 48, 0.12);
+            text-align: center;
+        }}
+        h2 {{ margin: 0 0 10px; font-size: 24px; }}
+        p {{ margin: 0; line-height: 1.6; color: #51657d; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Pago actualizado</h2>
+        <p>{mensaje}</p>
+    </div>
+    <script>
+        if (window.parent && window.parent !== window) {{
+            window.parent.postMessage({{
+                type: "erp-pago-guardado",
+                facturaId: "{factura.id}",
+                mensaje: {mensaje_seguro}
+            }}, "*");
+        }}
+    </script>
+</body>
+</html>
+        """.strip()
+        return HttpResponse(html)
+
+    if request.method == "POST":
+        monto = request.POST.get("monto", "").strip()
+        metodo = request.POST.get("metodo")
+        referencia = request.POST.get("referencia", "").strip()
+        fecha_pago = request.POST.get("fecha")
+        cuenta_financiera_id = request.POST.get("cuenta_financiera")
+        retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
+        retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
+        separar_isv = request.POST.get("separar_isv") == "on"
+        cuenta_financiera_impuesto_id = request.POST.get("cuenta_financiera_impuesto")
+        error = None
+
+        def _parsear_decimal(valor, etiqueta):
+            if not valor:
+                return Decimal('0.00')
+            try:
+                return Decimal(valor)
+            except InvalidOperation as exc:
+                raise ValidationError(f"El valor de {etiqueta} no es valido.") from exc
+
+        try:
+            monto_decimal = _parsear_decimal(monto, "monto recibido")
+            retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
+            retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")
+            cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first()
+            cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
+
+            pago_borrador = PagoFactura(
+                pk=pago.pk,
+                factura=factura,
+                monto=monto_decimal,
+                retencion_isr=retencion_isr,
+                retencion_isv=retencion_isv,
+                separar_isv=separar_isv,
+                cuenta_financiera=cuenta_financiera,
+                cuenta_financiera_impuesto=cuenta_financiera_impuesto,
+                metodo=metodo,
+                referencia=referencia,
+                cajero=pago.cajero,
+                fecha=pago.fecha,
+            )
+            pago_borrador.recalcular_componentes_pago()
+            requiere_cuenta_principal = pago_borrador.subtotal_recibido > 0 or (
+                pago_borrador.impuesto_recibido > 0 and not cuenta_financiera_impuesto
+            )
+            if requiere_cuenta_principal and not cuenta_financiera:
+                raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el dinero recibido.")
+
+            fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
+
+            with transaction.atomic():
+                AsientoContable.objects.filter(
+                    empresa=empresa,
+                    documento_tipo="pago_factura",
+                    documento_id=pago.id,
+                    evento="cobro",
+                ).delete()
+
+                pago.fecha = fecha_convertida
+                pago.monto = monto_decimal
+                pago.retencion_isr = retencion_isr
+                pago.retencion_isv = retencion_isv
+                pago.separar_isv = separar_isv
+                pago.cuenta_financiera = cuenta_financiera
+                pago.cuenta_financiera_impuesto = cuenta_financiera_impuesto
+                pago.metodo = metodo
+                pago.referencia = referencia
+                pago.save()
+                registrar_asiento_pago_cliente(pago)
+
+            messages.success(request, f"Pago actualizado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
+            respuesta_modal = _respuesta_modal_exito(
+                f"Cobro actualizado por L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
+            )
+            if respuesta_modal:
+                return respuesta_modal
+            return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        except (InvalidOperation, ValueError):
+            error = "Ingrese un monto y una fecha validos."
+        except ValidationError as exc:
+            error = "; ".join(exc.messages)
+        except Exception as exc:
+            logger.exception("Error editando pago %s de factura %s", pago.id, factura.id)
+            error = f"No se pudo actualizar el cobro: {exc}"
+
+        messages.error(request, error)
+        return render(request, template_name, _contexto_pago(request.POST))
+
+    return render(request, template_name, _contexto_pago())
+
+
+@login_required
 @require_POST
 def anular_factura(request, empresa_slug, factura_id):
 
@@ -4272,12 +4476,14 @@ def ver_factura(request, empresa_slug, factura_id):
 
     resumen = factura.resumen_fiscal()
     resumen_detallado = _resumen_detallado(factura.subtotal, resumen)
+    ultimo_pago_factura_id = factura.pagos_facturacion.order_by("fecha", "id").values_list("id", flat=True).last()
 
     return render(request, "facturacion/ver_factura_premium.html", {
         "empresa": empresa,
         "factura": factura,
         "resumen": resumen,
         "resumen_detallado": resumen_detallado,
+        "ultimo_pago_factura_id": ultimo_pago_factura_id,
         "permite_gestion_fiscal_historica": config_avanzada.permite_gestion_fiscal_historica,
         "permite_plantilla_notas_extensas": _empresa_permite_plantilla_notas_extensas(empresa),
         "permite_plantilla_independiente": _empresa_permite_plantilla_independiente(empresa),

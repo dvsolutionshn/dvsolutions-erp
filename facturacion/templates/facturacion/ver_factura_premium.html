@@ -592,7 +592,7 @@
                                     <th>Aplicado</th>
                                     <th>ISV separado</th>
                                     <th>Referencia</th>
-                                    <th>Recibo</th>
+                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -606,7 +606,15 @@
                                     <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_aplicado|floatformat:2|intcomma }}</td>
                                     <td>{% if pago.separar_isv %}{% if pago.cuenta_financiera_impuesto %}{{ pago.cuenta_financiera_impuesto.nombre }} - {{ pago.cuenta_financiera_impuesto.cuenta_contable.codigo }} {{ pago.cuenta_financiera_impuesto.cuenta_contable.nombre }}{% else %}Misma cuenta del cobro{% endif %}{% else %}-{% endif %}</td>
                                     <td>{{ pago.referencia|default:"-" }}</td>
-                                    <td>{% if pago.recibo %}<a class="erp-link" href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver recibo</a>{% else %}-{% endif %}</td>
+                                    <td>
+                                        {% if pago.recibo %}<a class="erp-link" href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver recibo</a>{% endif %}
+                                        {% if pago.id == ultimo_pago_factura_id %}
+                                        {% if pago.recibo %}<span class="erp-card-muted"> · </span>{% endif %}
+                                        <button class="erp-link" type="button" style="background:none;border:none;padding:0;cursor:pointer;" data-payment-url="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/{{ pago.id }}/editar/?modal=1">Editar</button>
+                                        {% elif not pago.recibo %}
+                                        -
+                                        {% endif %}
+                                    </td>
                                 </tr>
                             {% endfor %}
                             </tbody>

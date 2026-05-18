@@ -13,6 +13,7 @@ from openpyxl import Workbook
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, EmpresaModulo, Modulo, RolSistema
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
+from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm
 from .models import CAI, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, MovimientoInventario, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
@@ -820,6 +821,85 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Pago rapido")
         self.assertNotContains(response, "Panel Principal")
         self.assertNotContains(response, "DV Solutions ERP")
+
+    def test_editar_ultimo_pago_actualiza_recibo_y_asiento(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110201",
+            nombre="Banco Moneda Nacional",
+            tipo="activo",
+            acepta_movimientos=True,
+        )
+        cuenta_clientes = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1110",
+            nombre="Cuentas por Cobrar Clientes",
+            tipo="activo",
+            acepta_movimientos=True,
+        )
+        cuenta_isv = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="2102",
+            nombre="Impuestos por Pagar",
+            tipo="pasivo",
+            acepta_movimientos=True,
+        )
+        banco = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal HNL",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+            activa=True,
+        )
+        factura = self.crear_factura_con_linea()
+        pago = PagoFactura.objects.create(
+            factura=factura,
+            fecha=date.today(),
+            monto=Decimal("50.00"),
+            metodo="transferencia",
+            referencia="DEP-EDIT-001",
+            cuenta_financiera=banco,
+            cajero=self.user,
+        )
+        registrar_asiento_pago_cliente(pago)
+
+        response = self.client.post(
+            reverse("editar_pago_factura", args=[self.empresa.slug, factura.id, pago.id]) + "?modal=1",
+            {
+                "fecha": str(date.today()),
+                "monto": "60.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(banco.id),
+                "referencia": "DEP-EDIT-002",
+                "retencion_isr": "0.00",
+                "retencion_isv": "0.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "erp-pago-guardado")
+
+        pago.refresh_from_db()
+        self.assertEqual(pago.monto, Decimal("60.00"))
+        self.assertEqual(pago.referencia, "DEP-EDIT-002")
+        self.assertEqual(pago.recibo.monto, Decimal("60.00"))
+        self.assertEqual(pago.recibo.referencia, "DEP-EDIT-002")
+
+        asientos = AsientoContable.objects.filter(
+            empresa=self.empresa,
+            documento_tipo="pago_factura",
+            documento_id=pago.id,
+            evento="cobro",
+        )
+        self.assertEqual(asientos.count(), 1)
+        asiento = asientos.first()
+        self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, debe=Decimal("60.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta=cuenta_clientes, haber=Decimal("60.00")).exists())
 
     def test_registrar_pago_prepara_cuentas_financieras_base(self):
         CuentaContable.objects.create(

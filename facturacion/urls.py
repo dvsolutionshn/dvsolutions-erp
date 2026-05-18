@@ -85,6 +85,7 @@ urlpatterns = [
 
     # 🔥 NUEVO
     path('<int:factura_id>/pago/', views.registrar_pago, name='registrar_pago'),
+    path('<int:factura_id>/pago/<int:pago_id>/editar/', views.editar_pago_factura, name='editar_pago_factura'),
     path('<int:factura_id>/anular/', views.anular_factura, name='anular_factura'),
     path('<int:factura_id>/eliminar/', views.eliminar_factura_historica, name='eliminar_factura'),
     path('<int:factura_id>/eliminar-borrador/', views.eliminar_factura, name='eliminar_factura_borrador'),

@@ -72,8 +72,8 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
     <div class="erp-payment-compact">
         <div class="erp-payment-hero">
             <div class="erp-payment-hero-copy">
-                <h3>Pago rapido</h3>
-                <p>Registra solo el dinero que entro, la cuenta donde cayo y la referencia. El sistema aplica el saldo, genera el recibo y registra la contabilidad automaticamente.</p>
+                <h3>{{ modal_heading|default:"Pago rapido" }}</h3>
+                <p>{{ modal_description|default:"Registra solo el dinero que entro, la cuenta donde cayo y la referencia. El sistema aplica el saldo, genera el recibo y registra la contabilidad automaticamente." }}</p>
             </div>
             {% if es_modal %}
             <div class="erp-payment-modal-note">
@@ -221,7 +221,9 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
                 <label for="monto">Monto</label>
                 <div style="display:flex;gap:10px;align-items:center;">
                     <input id="monto" type="number" step="0.01" min="0" name="monto" value="{{ form_data.monto|default:'' }}" required>
+                    {% if not modo_edicion %}
                     <button type="button" class="erp-btn-secondary" style="white-space:nowrap;" onclick="pagarTodo()">Pagar todo</button>
+                    {% endif %}
                 </div>
                 <div class="erp-field-help">Este es el dinero que realmente entro a caja o banco.</div>
             </div>
@@ -300,14 +302,14 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
         {% endif %}
 
         <div class="erp-form-actions" style="margin-top:22px;">
-            <div class="erp-field-help">Al guardar, se genera el recibo y se registra el asiento contable del cobro.</div>
+            <div class="erp-field-help">{% if modo_edicion %}Al actualizar, se sincronizan el recibo y el asiento contable del cobro.{% else %}Al guardar, se genera el recibo y se registra el asiento contable del cobro.{% endif %}</div>
             <div class="erp-actions-right">
                 {% if es_modal %}
                 <button type="button" class="erp-btn-secondary" onclick="window.parent.postMessage({type:'erp-pago-cerrar'}, '*')">Cancelar</button>
                 {% else %}
                 <a class="erp-btn-secondary" href="{% url 'ver_factura' empresa.slug factura.id %}">Cancelar</a>
                 {% endif %}
-                <button type="submit" class="erp-btn">Guardar Pago</button>
+                <button type="submit" class="erp-btn">{% if modo_edicion %}Actualizar pago{% else %}Guardar Pago{% endif %}</button>
             </div>
         </div>
     </form>

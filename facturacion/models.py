@@ -1852,7 +1852,7 @@ class PagoFactura(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-        ReciboPago.objects.get_or_create(
+        recibo, _creado = ReciboPago.objects.get_or_create(
             pago=self,
             defaults={
                 'empresa': self.factura.empresa,
@@ -1864,6 +1864,21 @@ class PagoFactura(models.Model):
                 'referencia': self.referencia,
             }
         )
+        cambios_recibo = []
+        for campo, valor in {
+            'empresa': self.factura.empresa,
+            'factura': self.factura,
+            'cliente': self.factura.cliente,
+            'fecha': self.fecha,
+            'monto': self.monto,
+            'metodo': self.metodo,
+            'referencia': self.referencia,
+        }.items():
+            if getattr(recibo, campo) != valor:
+                setattr(recibo, campo, valor)
+                cambios_recibo.append(campo)
+        if cambios_recibo:
+            recibo.save(update_fields=cambios_recibo)
         self.factura.actualizar_estado_pago()
 
     def __str__(self):
