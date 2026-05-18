@@ -110,11 +110,11 @@
                     <select id="cuenta_efectivo" name="cuenta_efectivo">
                         <option value="">Seleccione caja</option>
                         {% for cuenta in cajas %}
-                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
                         {% endfor %}
                         {% if not cajas %}
                         {% for cuenta in cuentas_financieras %}
-                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_efectivo == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
                         {% endfor %}
                         {% endif %}
                     </select>
@@ -136,7 +136,7 @@
                     <select id="cuenta_tarjeta" name="cuenta_tarjeta">
                         <option value="">Seleccione cuenta</option>
                         {% for cuenta in cuentas_tarjeta %}
-                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_tarjeta == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_tarjeta == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -157,7 +157,7 @@
                     <select id="cuenta_transferencia" name="cuenta_transferencia">
                         <option value="">Seleccione banco</option>
                         {% for cuenta in bancos %}
-                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_transferencia == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}{% if cuenta.numero %} - {{ cuenta.numero }}{% endif %}</option>
+                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_transferencia == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}{% if cuenta.numero %} - {{ cuenta.numero }}{% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>

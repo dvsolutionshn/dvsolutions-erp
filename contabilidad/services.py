@@ -176,9 +176,21 @@ def asegurar_cuentas_financieras_base_honduras(empresa):
             creadas += 1
         else:
             existentes += 1
+            cambios = []
             if not cuenta_financiera.activa:
                 cuenta_financiera.activa = True
-                cuenta_financiera.save(update_fields=["activa"])
+                cambios.append("activa")
+            if cuenta_financiera.cuenta_contable_id != cuenta_contable.id:
+                cuenta_financiera.cuenta_contable = cuenta_contable
+                cambios.append("cuenta_contable")
+            if cuenta_financiera.tipo != tipo:
+                cuenta_financiera.tipo = tipo
+                cambios.append("tipo")
+            if cuenta_financiera.institucion != institucion:
+                cuenta_financiera.institucion = institucion
+                cambios.append("institucion")
+            if cambios:
+                cuenta_financiera.save(update_fields=cambios)
 
     return {"creadas": creadas, "existentes": existentes}
 

@@ -600,11 +600,11 @@
                                 <tr>
                                     <td>{{ pago.fecha|date:"d/m/Y" }}</td>
                                     <td>{{ pago.get_metodo_display }}</td>
-                                    <td>{{ pago.cuenta_financiera.nombre|default:"-" }}</td>
+                                    <td>{% if pago.cuenta_financiera %}{{ pago.cuenta_financiera.nombre }} - {{ pago.cuenta_financiera.cuenta_contable.codigo }} {{ pago.cuenta_financiera.cuenta_contable.nombre }}{% else %}-{% endif %}</td>
                                     <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto|floatformat:2|intcomma }}</td>
                                     <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_retenciones|floatformat:2|intcomma }}</td>
                                     <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_aplicado|floatformat:2|intcomma }}</td>
-                                    <td>{% if pago.separar_isv %}{{ pago.cuenta_financiera_impuesto.nombre|default:"Automatico" }}{% else %}-{% endif %}</td>
+                                    <td>{% if pago.separar_isv %}{% if pago.cuenta_financiera_impuesto %}{{ pago.cuenta_financiera_impuesto.nombre }} - {{ pago.cuenta_financiera_impuesto.cuenta_contable.codigo }} {{ pago.cuenta_financiera_impuesto.cuenta_contable.nombre }}{% else %}Automatico (2102 - Impuestos por Pagar){% endif %}{% else %}-{% endif %}</td>
                                     <td>{{ pago.referencia|default:"-" }}</td>
                                     <td>{% if pago.recibo %}<a class="erp-link" href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver recibo</a>{% else %}-{% endif %}</td>
                                 </tr>

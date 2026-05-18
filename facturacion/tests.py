@@ -799,6 +799,35 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "ISV por pagar (automatico)")
         self.assertTrue(CuentaFinanciera.objects.filter(empresa=self.empresa, nombre="Caja General", tipo="caja").exists())
 
+    def test_registrar_pago_repara_banco_principal_hnl_a_110201(self):
+        cuenta_padre_bancos = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1102",
+            nombre="Bancos",
+            tipo="activo",
+            acepta_movimientos=True,
+        )
+        cuenta_banco_correcta = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110201",
+            nombre="Banco Moneda Nacional",
+            tipo="activo",
+            cuenta_padre=cuenta_padre_bancos,
+            acepta_movimientos=True,
+        )
+        CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal HNL",
+            tipo="banco",
+            cuenta_contable=cuenta_padre_bancos,
+        )
+        factura = self.crear_factura_con_linea()
+
+        self.client.get(reverse("registrar_pago", args=[self.empresa.slug, factura.id]))
+
+        banco = CuentaFinanciera.objects.get(empresa=self.empresa, nombre="Banco Principal HNL")
+        self.assertEqual(banco.cuenta_contable, cuenta_banco_correcta)
+
     def test_recibos_dashboard_muestra_recibo(self):
         factura = self.crear_factura_con_linea()
         pago = PagoFactura.objects.create(
