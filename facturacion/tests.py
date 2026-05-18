@@ -737,7 +737,7 @@ class FacturacionTests(TestCase):
         self.assertTrue(pago.separar_isv)
         self.assertIsNone(pago.cuenta_financiera_impuesto)
         asiento = AsientoContable.objects.get(documento_tipo="pago_factura", documento_id=pago.id, evento="cobro")
-        self.assertTrue(asiento.lineas.filter(cuenta__codigo="2101", debe=Decimal("15.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="2102", debe=Decimal("15.00")).exists())
 
     def test_pago_fallido_no_deja_registro_guardado(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(

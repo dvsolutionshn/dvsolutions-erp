@@ -12,8 +12,8 @@ CUENTAS_BASE = {
     "isr_retenido_clientes": {"codigo": "113003", "nombre": "ISR Retenido por Clientes", "tipo": "activo"},
     "isv_retenido_clientes": {"codigo": "113005", "nombre": "ISV Retenido por Clientes", "tipo": "activo"},
     "inventario": {"codigo": "1140", "nombre": "Inventario de Mercaderia", "tipo": "activo"},
-    "isv_por_pagar": {"codigo": "2101", "nombre": "ISV por Pagar", "tipo": "pasivo"},
-    "proveedores": {"codigo": "2102", "nombre": "Cuentas por Pagar Proveedores", "tipo": "pasivo"},
+    "isv_por_pagar": {"codigo": "2102", "nombre": "Impuestos por Pagar", "tipo": "pasivo"},
+    "proveedores": {"codigo": "2101", "nombre": "Cuentas por Pagar Proveedores", "tipo": "pasivo"},
     "ventas": {"codigo": "4101", "nombre": "Ventas", "tipo": "ingreso"},
     "devoluciones_ventas": {"codigo": "5101", "nombre": "Devoluciones sobre Ventas", "tipo": "gasto"},
 }
