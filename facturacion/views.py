@@ -4115,6 +4115,72 @@ def registrar_pago(request, empresa_slug, factura_id):
     return render(request, template_name, _contexto_pago(request.POST if request.method == "POST" else {}))
 
 
+def _recalcular_y_recontabilizar_pagos_factura(factura):
+    pagos = list(
+        factura.pagos_facturacion.select_related(
+            "cuenta_financiera",
+            "cuenta_financiera_impuesto",
+            "factura__cliente",
+            "factura__vendedor",
+        ).order_by("fecha", "id")
+    )
+    if not pagos:
+        factura.actualizar_estado_pago()
+        return
+
+    subtotal_pendiente = Decimal(factura.subtotal_documento_ajustado or 0).quantize(Decimal("0.01"))
+    impuesto_pendiente = Decimal(factura.impuesto_documento_ajustado or 0).quantize(Decimal("0.01"))
+    ids_pagos = [p.id for p in pagos]
+
+    AsientoContable.objects.filter(
+        empresa=factura.empresa,
+        documento_tipo="pago_factura",
+        documento_id__in=ids_pagos,
+        evento="cobro",
+    ).delete()
+
+    for pago in pagos:
+        total_aplicado = Decimal(pago.total_aplicado or 0).quantize(Decimal("0.01"))
+        total_pendiente = (subtotal_pendiente + impuesto_pendiente).quantize(Decimal("0.01"))
+
+        if total_aplicado <= 0 or total_pendiente <= 0:
+            subtotal_aplicado = Decimal("0.00")
+            impuesto_aplicado = Decimal("0.00")
+        elif subtotal_pendiente <= 0:
+            subtotal_aplicado = Decimal("0.00")
+            impuesto_aplicado = min(total_aplicado, impuesto_pendiente).quantize(Decimal("0.01"))
+        elif impuesto_pendiente <= 0:
+            subtotal_aplicado = min(total_aplicado, subtotal_pendiente).quantize(Decimal("0.01"))
+            impuesto_aplicado = Decimal("0.00")
+        else:
+            proporcion_impuesto = impuesto_pendiente / total_pendiente
+            impuesto_aplicado = min((total_aplicado * proporcion_impuesto).quantize(Decimal("0.01")), impuesto_pendiente)
+            subtotal_aplicado = (total_aplicado - impuesto_aplicado).quantize(Decimal("0.01"))
+
+            if subtotal_aplicado > subtotal_pendiente:
+                excedente = subtotal_aplicado - subtotal_pendiente
+                subtotal_aplicado = subtotal_pendiente
+                impuesto_aplicado = (impuesto_aplicado + excedente).quantize(Decimal("0.01"))
+
+            if impuesto_aplicado > impuesto_pendiente:
+                excedente = impuesto_aplicado - impuesto_pendiente
+                impuesto_aplicado = impuesto_pendiente
+                subtotal_aplicado = (subtotal_aplicado + excedente).quantize(Decimal("0.01"))
+
+        PagoFactura.objects.filter(pk=pago.pk).update(
+            subtotal_aplicado=subtotal_aplicado,
+            impuesto_aplicado=impuesto_aplicado,
+        )
+        pago.subtotal_aplicado = subtotal_aplicado
+        pago.impuesto_aplicado = impuesto_aplicado
+        registrar_asiento_pago_cliente(pago)
+
+        subtotal_pendiente = max((subtotal_pendiente - subtotal_aplicado).quantize(Decimal("0.01")), Decimal("0.00"))
+        impuesto_pendiente = max((impuesto_pendiente - impuesto_aplicado).quantize(Decimal("0.01")), Decimal("0.00"))
+
+    factura.actualizar_estado_pago()
+
+
 @login_required
 @xframe_options_sameorigin
 def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
@@ -4130,11 +4196,6 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
 
     if factura.estado == "anulada":
         messages.error(request, "No se pueden editar pagos de una factura anulada.")
-        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
-
-    ultimo_pago = factura.pagos_facturacion.order_by("fecha", "id").last()
-    if not ultimo_pago or ultimo_pago.id != pago.id:
-        messages.error(request, "Por seguridad solo puedes editar el ultimo pago registrado de esta factura.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
     asegurar_cuentas_financieras_base_honduras(empresa)
@@ -4171,7 +4232,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "modo_edicion": True,
             "pago_edicion": pago,
             "modal_heading": "Editar pago",
-            "modal_description": "Ajusta el monto, la cuenta o la referencia del ultimo cobro. El sistema reconstruira recibo y contabilidad automaticamente.",
+            "modal_description": "Ajusta el monto, la cuenta o la referencia de este cobro. El sistema reconstruira recibo y contabilidad automaticamente.",
         }
 
     def _respuesta_modal_exito(mensaje):
@@ -4279,13 +4340,6 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
 
             with transaction.atomic():
-                AsientoContable.objects.filter(
-                    empresa=empresa,
-                    documento_tipo="pago_factura",
-                    documento_id=pago.id,
-                    evento="cobro",
-                ).delete()
-
                 pago.fecha = fecha_convertida
                 pago.monto = monto_decimal
                 pago.retencion_isr = retencion_isr
@@ -4296,7 +4350,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 pago.metodo = metodo
                 pago.referencia = referencia
                 pago.save()
-                registrar_asiento_pago_cliente(pago)
+                _recalcular_y_recontabilizar_pagos_factura(factura)
 
             messages.success(request, f"Pago actualizado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
             respuesta_modal = _respuesta_modal_exito(

@@ -901,6 +901,111 @@ class FacturacionTests(TestCase):
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, debe=Decimal("60.00")).exists())
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_clientes, haber=Decimal("60.00")).exists())
 
+    def test_editar_pago_anterior_recontabiliza_todos_los_pagos(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110201",
+            nombre="Banco Moneda Nacional",
+            tipo="activo",
+            acepta_movimientos=True,
+        )
+        cuenta_clientes = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1110",
+            nombre="Cuentas por Cobrar Clientes",
+            tipo="activo",
+            acepta_movimientos=True,
+        )
+        CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="2102",
+            nombre="Impuestos por Pagar",
+            tipo="pasivo",
+            acepta_movimientos=True,
+        )
+        banco = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal HNL",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+            activa=True,
+        )
+        factura = self.crear_factura_con_linea()
+        pago_1 = PagoFactura.objects.create(
+            factura=factura,
+            fecha=date.today(),
+            monto=Decimal("40.00"),
+            metodo="transferencia",
+            referencia="DEP-EDIT-A",
+            cuenta_financiera=banco,
+            cajero=self.user,
+        )
+        registrar_asiento_pago_cliente(pago_1)
+        pago_2 = PagoFactura.objects.create(
+            factura=factura,
+            fecha=date.today(),
+            monto=Decimal("50.00"),
+            metodo="transferencia",
+            referencia="DEP-EDIT-B",
+            cuenta_financiera=banco,
+            cajero=self.user,
+        )
+        registrar_asiento_pago_cliente(pago_2)
+
+        response = self.client.post(
+            reverse("editar_pago_factura", args=[self.empresa.slug, factura.id, pago_1.id]) + "?modal=1",
+            {
+                "fecha": str(date.today()),
+                "monto": "45.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(banco.id),
+                "referencia": "DEP-EDIT-A2",
+                "retencion_isr": "0.00",
+                "retencion_isv": "0.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "erp-pago-guardado")
+
+        pago_1.refresh_from_db()
+        pago_2.refresh_from_db()
+        self.assertEqual(pago_1.monto, Decimal("45.00"))
+        self.assertEqual(pago_1.recibo.referencia, "DEP-EDIT-A2")
+
+        asientos = AsientoContable.objects.filter(
+            empresa=self.empresa,
+            documento_tipo="pago_factura",
+            documento_id__in=[pago_1.id, pago_2.id],
+            evento="cobro",
+        )
+        self.assertEqual(asientos.count(), 2)
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="pago_factura",
+                documento_id=pago_1.id,
+                evento="cobro",
+                lineas__cuenta=cuenta_banco,
+                lineas__debe=Decimal("45.00"),
+            ).exists()
+        )
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="pago_factura",
+                documento_id=pago_2.id,
+                evento="cobro",
+                lineas__cuenta=cuenta_clientes,
+                lineas__haber=Decimal("50.00"),
+            ).exists()
+        )
+
     def test_registrar_pago_prepara_cuentas_financieras_base(self):
         CuentaContable.objects.create(
             empresa=self.empresa,
