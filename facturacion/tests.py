@@ -811,6 +811,43 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, pago.recibo.numero_recibo)
 
+    def test_recibo_pago_usa_consecutivo_global_y_no_repite_entre_empresas(self):
+        otra_empresa = Empresa.objects.create(nombre="Otra empresa", slug="otra-empresa")
+        ConfiguracionAvanzadaEmpresa.objects.create(empresa=otra_empresa)
+        cliente_otro = Cliente.objects.create(
+            empresa=otra_empresa,
+            nombre="Cliente Global",
+            rtn="08011999123456",
+            telefono="9999-9999",
+            correo="global@example.com",
+            direccion="Centro",
+        )
+        factura_otra = Factura.objects.create(
+            empresa=otra_empresa,
+            cliente=cliente_otro,
+            subtotal=Decimal("100.00"),
+            impuesto=Decimal("15.00"),
+            total=Decimal("115.00"),
+            total_lempiras=Decimal("115.00"),
+            estado="borrador",
+        )
+        pago_otro = PagoFactura.objects.create(
+            factura=factura_otra,
+            monto=Decimal("50.00"),
+            metodo="efectivo",
+            fecha=date.today(),
+        )
+        factura_local = self.crear_factura_con_linea()
+        pago_local = PagoFactura.objects.create(
+            factura=factura_local,
+            monto=Decimal("50.00"),
+            metodo="efectivo",
+            fecha=date.today(),
+        )
+
+        self.assertEqual(pago_otro.recibo.numero_recibo, "REC-00000001")
+        self.assertEqual(pago_local.recibo.numero_recibo, "REC-00000002")
+
     def test_anular_factura_cambia_estado(self):
         factura = self.crear_factura_con_linea()
 

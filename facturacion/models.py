@@ -1932,11 +1932,26 @@ class ReciboPago(models.Model):
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
+    @staticmethod
+    def _siguiente_numero_global():
+        ultimo_numero = (
+            ReciboPago.objects.exclude(numero_recibo__isnull=True)
+            .exclude(numero_recibo__exact="")
+            .order_by("-numero_recibo")
+            .values_list("numero_recibo", flat=True)
+            .first()
+        )
+        if not ultimo_numero:
+            return "REC-00000001"
+        try:
+            consecutivo = int(str(ultimo_numero).split("-")[-1])
+        except (TypeError, ValueError):
+            consecutivo = 0
+        return f"REC-{str(consecutivo + 1).zfill(8)}"
+
     def save(self, *args, **kwargs):
         if not self.numero_recibo:
-            ultimo = ReciboPago.objects.filter(empresa=self.empresa).order_by('-id').first()
-            siguiente = 1 if not ultimo else ultimo.id + 1
-            self.numero_recibo = f"REC-{str(siguiente).zfill(8)}"
+            self.numero_recibo = self._siguiente_numero_global()
         super().save(*args, **kwargs)
 
     def __str__(self):
