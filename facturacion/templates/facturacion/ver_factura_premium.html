@@ -652,7 +652,7 @@
                 </form>
                 {% endif %}
                 {% if factura.total > 0 and factura.estado != "anulada" and factura.saldo_pendiente > 0 %}
-                <a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/">Registrar pago</a>
+                <button class="erp-btn" type="button" data-payment-url="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/?modal=1">Registrar pago</button>
                 {% endif %}
             </div>
 
@@ -687,6 +687,23 @@
         </div>
     </div>
 </div>
+
+<div class="erp-preview-modal" id="paymentModal" aria-hidden="true">
+    <div class="erp-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
+        <div class="erp-preview-toolbar">
+            <div>
+                <h4 id="paymentModalTitle">Registrar pago</h4>
+                <p>Cobro rapido de la factura sin salir de esta vista.</p>
+            </div>
+            <div class="erp-preview-toolbar-actions">
+                <button class="erp-btn erp-btn-secondary" type="button" id="closePaymentModal">Cerrar</button>
+            </div>
+        </div>
+        <div class="erp-preview-frame-shell">
+            <iframe id="paymentModalFrame" src="about:blank" title="Registrar pago"></iframe>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -698,8 +715,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const downloadLink = document.querySelector(".erp-preview-download");
     const closeBtn = document.getElementById("closePdfPreview");
     const triggerButtons = document.querySelectorAll("[data-preview-url]");
+    const paymentModal = document.getElementById("paymentModal");
+    const paymentFrame = document.getElementById("paymentModalFrame");
+    const paymentCloseBtn = document.getElementById("closePaymentModal");
+    const paymentButtons = document.querySelectorAll("[data-payment-url]");
 
-    if (!modal || !frame || !title || !downloadLink || !closeBtn || !triggerButtons.length) {
+    if (!modal || !frame || !title || !downloadLink || !closeBtn) {
         return;
     }
 
@@ -723,8 +744,32 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.style.overflow = "";
     };
 
+    const openPayment = (button) => {
+        if (!paymentModal || !paymentFrame) {
+            window.location.href = button.dataset.paymentUrl;
+            return;
+        }
+        paymentFrame.src = button.dataset.paymentUrl;
+        paymentModal.classList.add("is-visible");
+        paymentModal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+    };
+
+    const closePayment = () => {
+        if (!paymentModal || !paymentFrame) {
+            return;
+        }
+        paymentModal.classList.remove("is-visible");
+        paymentModal.setAttribute("aria-hidden", "true");
+        paymentFrame.src = "about:blank";
+        document.body.style.overflow = "";
+    };
+
     triggerButtons.forEach((button) => {
         button.addEventListener("click", () => openPreview(button));
+    });
+    paymentButtons.forEach((button) => {
+        button.addEventListener("click", () => openPayment(button));
     });
 
     closeBtn.addEventListener("click", closePreview);
@@ -733,9 +778,34 @@ document.addEventListener("DOMContentLoaded", () => {
             closePreview();
         }
     });
+    if (paymentCloseBtn) {
+        paymentCloseBtn.addEventListener("click", closePayment);
+    }
+    if (paymentModal) {
+        paymentModal.addEventListener("click", (event) => {
+            if (event.target === paymentModal) {
+                closePayment();
+            }
+        });
+    }
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && modal.classList.contains("is-visible")) {
             closePreview();
+        }
+        if (event.key === "Escape" && paymentModal && paymentModal.classList.contains("is-visible")) {
+            closePayment();
+        }
+    });
+    window.addEventListener("message", (event) => {
+        if (!event.data || typeof event.data !== "object") {
+            return;
+        }
+        if (event.data.type === "erp-pago-guardado") {
+            closePayment();
+            window.location.reload();
+        }
+        if (event.data.type === "erp-pago-cerrar") {
+            closePayment();
         }
     });
 });

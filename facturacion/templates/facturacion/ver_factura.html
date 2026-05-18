@@ -152,6 +152,68 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
     background:#e7f3ff;
     color:#084298;
 }
+
+.modal-overlay{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(10,18,30,.55);
+    z-index:250;
+    padding:20px;
+}
+
+.modal-overlay.visible{
+    display:flex;
+}
+
+.modal-dialog{
+    width:min(980px,100%);
+    height:min(88vh,860px);
+    background:white;
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 22px 60px rgba(0,0,0,.2);
+    display:flex;
+    flex-direction:column;
+}
+
+.modal-toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:14px 18px;
+    border-bottom:1px solid #e5e7eb;
+    background:#f8fafc;
+}
+
+.modal-toolbar h3{
+    margin:0;
+    color:#1e2a38;
+}
+
+.modal-toolbar p{
+    margin:4px 0 0;
+    color:#64748b;
+    font-size:13px;
+}
+
+.modal-close{
+    border:none;
+    background:#e2e8f0;
+    color:#1e2a38;
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.modal-frame{
+    flex:1;
+    width:100%;
+    border:0;
+}
 </style>
 </head>
 
@@ -328,9 +390,9 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
     <br><br>
 
     {% if factura.total > 0 and factura.estado != "anulada" %}
-    <a class="btn" href="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/">
+    <button class="btn" type="button" id="abrirPagoModal" data-payment-url="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/?modal=1" style="border:none;cursor:pointer;">
         Registrar Pago
-    </a>
+    </button>
     {% endif %}
 </div>
 
@@ -423,5 +485,69 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
 </div>
 
 </div>
+
+<div class="modal-overlay" id="paymentModal" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
+        <div class="modal-toolbar">
+            <div>
+                <h3 id="paymentModalTitle">Registrar pago</h3>
+                <p>Cobro rapido sin salir de la factura.</p>
+            </div>
+            <button type="button" class="modal-close" id="cerrarPagoModal">Cerrar</button>
+        </div>
+        <iframe id="paymentModalFrame" class="modal-frame" src="about:blank" title="Registrar pago"></iframe>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const modal = document.getElementById("paymentModal");
+    const frame = document.getElementById("paymentModalFrame");
+    const openBtn = document.getElementById("abrirPagoModal");
+    const closeBtn = document.getElementById("cerrarPagoModal");
+
+    if (!modal || !frame || !openBtn || !closeBtn) {
+        return;
+    }
+
+    const closeModal = () => {
+        modal.classList.remove("visible");
+        modal.setAttribute("aria-hidden", "true");
+        frame.src = "about:blank";
+        document.body.style.overflow = "";
+    };
+
+    openBtn.addEventListener("click", () => {
+        frame.src = openBtn.dataset.paymentUrl;
+        modal.classList.add("visible");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+    });
+
+    closeBtn.addEventListener("click", closeModal);
+    modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("visible")) {
+            closeModal();
+        }
+    });
+    window.addEventListener("message", (event) => {
+        if (!event.data || typeof event.data !== "object") {
+            return;
+        }
+        if (event.data.type === "erp-pago-guardado") {
+            closeModal();
+            window.location.reload();
+        }
+        if (event.data.type === "erp-pago-cerrar") {
+            closeModal();
+        }
+    });
+});
+</script>
 </body>
 </html>

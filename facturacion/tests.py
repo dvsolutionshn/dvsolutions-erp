@@ -774,6 +774,41 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(PagoFactura.objects.filter(factura=factura, referencia="DEP-ERR-001").exists())
 
+    def test_registrar_pago_modal_responde_con_postmessage_al_guardar(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1102",
+            nombre="Banco Principal",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal Lempiras",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+        )
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]) + "?modal=1",
+            {
+                "fecha": str(date.today()),
+                "monto": "50.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(cuenta_financiera.id),
+                "referencia": "DEP-MODAL-001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "erp-pago-guardado")
+        self.assertTrue(PagoFactura.objects.filter(factura=factura, referencia="DEP-MODAL-001").exists())
+
     def test_registrar_pago_prepara_cuentas_financieras_base(self):
         CuentaContable.objects.create(
             empresa=self.empresa,

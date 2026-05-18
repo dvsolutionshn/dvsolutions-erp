@@ -25,6 +25,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.chart import BarChart, Reference
 import os
 import logging
+import json
 from pathlib import Path
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, Usuario
@@ -3835,6 +3836,7 @@ def registrar_pago(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    es_modal = request.GET.get("modal") == "1"
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     asegurar_cuentas_financieras_base_honduras(empresa)
     cuentas_financieras = CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related('cuenta_contable').order_by('nombre')
@@ -3842,6 +3844,76 @@ def registrar_pago(request, empresa_slug, factura_id):
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
     cuentas_tarjeta = tarjetas if tarjetas.exists() else cuentas_financieras
+
+    def _contexto_pago(form_data=None):
+        return {
+            "factura": factura,
+            "empresa": empresa,
+            "cuentas_financieras": cuentas_financieras,
+            "cajas": cajas,
+            "bancos": bancos,
+            "cuentas_tarjeta": cuentas_tarjeta,
+            "usa_pagos_mixtos": config_avanzada.usa_pagos_mixtos,
+            "subtotal_pendiente": factura.subtotal_pendiente_cobro,
+            "impuesto_pendiente": factura.impuesto_pendiente_cobro,
+            "today": timezone.now().date(),
+            "form_data": form_data or {},
+            "es_modal": es_modal,
+        }
+
+    def _respuesta_modal_exito(mensaje):
+        if not es_modal:
+            return None
+        mensaje_seguro = json.dumps(mensaje)
+        html = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Pago registrado</title>
+    <style>
+        body {{
+            margin: 0;
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background: #f5f8fc;
+            color: #102338;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }}
+        .card {{
+            max-width: 460px;
+            margin: 24px;
+            padding: 28px;
+            border-radius: 18px;
+            background: #ffffff;
+            border: 1px solid #d9e3f0;
+            box-shadow: 0 16px 50px rgba(12, 28, 48, 0.12);
+            text-align: center;
+        }}
+        h2 {{ margin: 0 0 10px; font-size: 24px; }}
+        p {{ margin: 0; line-height: 1.6; color: #51657d; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Pago registrado</h2>
+        <p>{mensaje}</p>
+    </div>
+    <script>
+        if (window.parent && window.parent !== window) {{
+            window.parent.postMessage({{
+                type: "erp-pago-guardado",
+                facturaId: "{factura.id}",
+                mensaje: {mensaje_seguro}
+            }}, "*");
+        }}
+    </script>
+</body>
+</html>
+        """.strip()
+        return HttpResponse(html)
 
     if factura.estado == 'anulada':
         messages.error(request, "No se pueden registrar pagos en una factura anulada.")
@@ -3950,6 +4022,11 @@ def registrar_pago(request, empresa_slug, factura_id):
                             request,
                             f"Pago mixto registrado correctamente. Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}."
                         )
+                        respuesta_modal = _respuesta_modal_exito(
+                            f"Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}."
+                        )
+                        if respuesta_modal:
+                            return respuesta_modal
                         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
                     except ValidationError as exc:
                         error = "; ".join(exc.messages)
@@ -3958,19 +4035,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                         error = f"No se pudo completar el cobro: {exc}"
 
             messages.error(request, error)
-            return render(request, "facturacion/registrar_pago.html", {
-                "factura": factura,
-                "empresa": empresa,
-                "cuentas_financieras": cuentas_financieras,
-                "cajas": cajas,
-                "bancos": bancos,
-                "cuentas_tarjeta": cuentas_tarjeta,
-                "usa_pagos_mixtos": config_avanzada.usa_pagos_mixtos,
-                "subtotal_pendiente": factura.subtotal_pendiente_cobro,
-                "impuesto_pendiente": factura.impuesto_pendiente_cobro,
-                "today": timezone.now().date(),
-                "form_data": request.POST,
-            })
+            return render(request, "facturacion/registrar_pago.html", _contexto_pago(request.POST))
 
         try:
             monto_decimal = _parsear_decimal(monto, "monto recibido")
@@ -4029,6 +4094,11 @@ def registrar_pago(request, empresa_slug, factura_id):
                     messages.success(request, f"Pago registrado correctamente. Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.")
                 else:
                     messages.success(request, f"Pago registrado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
+                respuesta_modal = _respuesta_modal_exito(
+                    f"Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
+                )
+                if respuesta_modal:
+                    return respuesta_modal
                 return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
         except (InvalidOperation, ValueError):
             error = "Ingrese un monto y una fecha validos."
@@ -4040,19 +4110,7 @@ def registrar_pago(request, empresa_slug, factura_id):
 
         messages.error(request, error)
 
-    return render(request, "facturacion/registrar_pago.html", {
-        "factura": factura,
-        "empresa": empresa,
-        "cuentas_financieras": cuentas_financieras,
-        "cajas": cajas,
-        "bancos": bancos,
-        "cuentas_tarjeta": cuentas_tarjeta,
-        "usa_pagos_mixtos": config_avanzada.usa_pagos_mixtos,
-        "subtotal_pendiente": factura.subtotal_pendiente_cobro,
-        "impuesto_pendiente": factura.impuesto_pendiente_cobro,
-        "today": timezone.now().date(),
-        "form_data": request.POST if request.method == "POST" else {},
-    })
+    return render(request, "facturacion/registrar_pago.html", _contexto_pago(request.POST if request.method == "POST" else {}))
 
 
 @login_required
