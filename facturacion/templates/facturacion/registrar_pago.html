@@ -89,12 +89,12 @@
             <div class="erp-field">
                 <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
                 <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
-                    <option value="">ISV por pagar (automatico)</option>
+                    <option value="">Misma cuenta del cobro</option>
                     {% for cuenta in cuentas_financieras %}
                     <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }}</option>
                     {% endfor %}
                 </select>
-                <div class="erp-field-help">Si no eliges una cuenta financiera, el sistema aplicara el impuesto a la cuenta contable de ISV por pagar.</div>
+                <div class="erp-field-help">Si no eliges una cuenta financiera aparte, el ISV cobrado se registrara en la misma cuenta donde entro el pago.</div>
             </div>
         </div>
 
@@ -174,7 +174,7 @@
         <div class="erp-soft-panel" style="margin-top:12px;">
             <strong>Proyeccion del cobro:</strong>
             <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">L. 0.00</strong></span>
-            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta fiscal: <strong id="preview-isv-mixto">L. 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-mixto">L. 0.00</strong></span>
         </div>
         {% else %}
         <div class="erp-form-grid two">
@@ -235,14 +235,14 @@
             <div class="erp-field">
                 <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
                 <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
-                    <option value="">ISV por pagar (automatico)</option>
+                    <option value="">Misma cuenta del cobro</option>
                     {% for cuenta in cuentas_financieras %}
                     <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>
                         {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
                     </option>
                     {% endfor %}
                 </select>
-                <div class="erp-field-help">Usa una cuenta aparte para resguardar el impuesto cobrado. Si la dejas vacia, se aplicara a ISV por pagar automaticamente.</div>
+                <div class="erp-field-help">Usa una cuenta financiera aparte solo si deseas resguardar el ISV en otro banco o caja. Si la dejas vacia, se quedara en la misma cuenta del cobro.</div>
             </div>
         </div>
         <div class="erp-soft-panel">
@@ -252,7 +252,7 @@
         <div class="erp-soft-panel" style="margin-top:12px;">
             <strong>Proyeccion del cobro:</strong>
             <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">L. 0.00</strong></span>
-            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta fiscal: <strong id="preview-isv-simple">L. 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-simple">L. 0.00</strong></span>
         </div>
         {% endif %}
 

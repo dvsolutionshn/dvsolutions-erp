@@ -69,7 +69,7 @@
                     <div class="erp-receipt-side-item"><span>Moneda</span><strong>{{ recibo.factura.moneda }}</strong></div>
                     <div class="erp-receipt-side-item"><span>Monto recibido</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
                     <div class="erp-receipt-side-item"><span>Retenciones</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_retenciones|floatformat:2|intcomma }}</strong></div>
-                    <div class="erp-receipt-side-item"><span>Cuenta ISV</span><strong>{% if recibo.pago.separar_isv %}{{ recibo.pago.cuenta_financiera_impuesto.nombre|default:"Automatico" }}{% else %}-{% endif %}</strong></div>
+                    <div class="erp-receipt-side-item"><span>Cuenta ISV</span><strong>{% if recibo.pago.separar_isv %}{{ recibo.pago.cuenta_financiera_impuesto.nombre|default:"Misma cuenta del cobro" }}{% else %}-{% endif %}</strong></div>
                     <div class="erp-receipt-side-item"><span>Empresa</span><strong>{{ empresa.nombre }}</strong></div>
                 </div>
             </aside>
@@ -141,7 +141,7 @@
                         <td class="amount"><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto|floatformat:2|intcomma }}</strong></td>
                         <td class="amount"><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_retenciones|floatformat:2|intcomma }}</strong></td>
                         <td class="amount"><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_aplicado|floatformat:2|intcomma }}</strong></td>
-                        <td>{% if pago.separar_isv %}{{ pago.cuenta_financiera_impuesto.nombre|default:"Automatico" }}{% else %}-{% endif %}</td>
+                        <td>{% if pago.separar_isv %}{{ pago.cuenta_financiera_impuesto.nombre|default:"Misma cuenta del cobro" }}{% else %}-{% endif %}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="9" class="erp-empty">Esta factura todavía no tiene pagos registrados.</td></tr>

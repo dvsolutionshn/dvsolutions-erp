@@ -604,7 +604,7 @@
                                     <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto|floatformat:2|intcomma }}</td>
                                     <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_retenciones|floatformat:2|intcomma }}</td>
                                     <td class="amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.total_aplicado|floatformat:2|intcomma }}</td>
-                                    <td>{% if pago.separar_isv %}{% if pago.cuenta_financiera_impuesto %}{{ pago.cuenta_financiera_impuesto.nombre }} - {{ pago.cuenta_financiera_impuesto.cuenta_contable.codigo }} {{ pago.cuenta_financiera_impuesto.cuenta_contable.nombre }}{% else %}Automatico (2102 - Impuestos por Pagar){% endif %}{% else %}-{% endif %}</td>
+                                    <td>{% if pago.separar_isv %}{% if pago.cuenta_financiera_impuesto %}{{ pago.cuenta_financiera_impuesto.nombre }} - {{ pago.cuenta_financiera_impuesto.cuenta_contable.codigo }} {{ pago.cuenta_financiera_impuesto.cuenta_contable.nombre }}{% else %}Misma cuenta del cobro{% endif %}{% else %}-{% endif %}</td>
                                     <td>{{ pago.referencia|default:"-" }}</td>
                                     <td>{% if pago.recibo %}<a class="erp-link" href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver recibo</a>{% else %}-{% endif %}</td>
                                 </tr>

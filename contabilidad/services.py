@@ -8,7 +8,7 @@ from .models import AsientoContable, ClasificacionMovimientoBanco, Configuracion
 CUENTAS_BASE = {
     "caja": {"codigo": "1101", "nombre": "Caja General", "tipo": "activo"},
     "bancos": {"codigo": "1102", "nombre": "Bancos", "tipo": "activo"},
-    "clientes": {"codigo": "1130", "nombre": "Cuentas por Cobrar Clientes", "tipo": "activo"},
+    "clientes": {"codigo": "1110", "nombre": "Cuentas por Cobrar Clientes", "tipo": "activo"},
     "isr_retenido_clientes": {"codigo": "113003", "nombre": "ISR Retenido por Clientes", "tipo": "activo"},
     "isv_retenido_clientes": {"codigo": "113005", "nombre": "ISV Retenido por Clientes", "tipo": "activo"},
     "inventario": {"codigo": "1140", "nombre": "Inventario de Mercaderia", "tipo": "activo"},
@@ -472,12 +472,12 @@ def registrar_asiento_pago_cliente(pago):
         cuenta_impuesto = (
             pago.cuenta_financiera_impuesto.cuenta_contable
             if pago.cuenta_financiera_impuesto_id
-            else "isv_por_pagar"
+            else cuenta_caja
         )
         lineas.append(
             {
                 "cuenta": cuenta_impuesto,
-                "detalle": "ISV separado del cobro",
+                "detalle": "ISV cobrado separado",
                 "debe": pago.impuesto_recibido,
                 "haber": Decimal("0.00"),
             }

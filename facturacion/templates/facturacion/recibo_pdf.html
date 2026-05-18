@@ -41,7 +41,7 @@
         <div class="row"><strong>Total aplicado:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_aplicado|floatformat:2|intcomma }}</div>
         <div class="row"><strong>Base aplicada:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.subtotal_aplicado|floatformat:2|intcomma }}</div>
         <div class="row"><strong>ISV aplicado:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.impuesto_aplicado|floatformat:2|intcomma }}</div>
-        <div class="row"><strong>Cuenta ISV:</strong> {% if recibo.pago.separar_isv %}{{ recibo.pago.cuenta_financiera_impuesto.nombre|default:"Automatico" }}{% else %}-{% endif %}</div>
+        <div class="row"><strong>Cuenta ISV:</strong> {% if recibo.pago.separar_isv %}{{ recibo.pago.cuenta_financiera_impuesto.nombre|default:"Misma cuenta del cobro" }}{% else %}-{% endif %}</div>
     </div>
 </body>
 </html>

@@ -1556,6 +1556,9 @@ class ContabilidadTests(TestCase):
         asiento = registrar_asiento_factura_emitida(factura)
         self.assertEqual(asiento.estado, "contabilizado")
         self.assertEqual(asiento.lineas.count(), 3)
+        self.assertTrue(
+            asiento.lineas.filter(cuenta__codigo="1110", debe=Decimal("115.00")).exists()
+        )
 
     def test_emision_factura_usa_cuenta_configurada(self):
         cuenta_ventas = CuentaContable.objects.create(
@@ -1638,7 +1641,9 @@ class ContabilidadTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(AsientoContable.objects.filter(documento_tipo="pago_factura", evento="cobro").exists())
+        asiento = AsientoContable.objects.get(documento_tipo="pago_factura", evento="cobro")
+        self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, debe=Decimal("115.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="1110", haber=Decimal("115.00")).exists())
 
     def test_enlazar_deposito_bancario_a_factura_registra_pago_y_asiento(self):
         factura = Factura.objects.create(

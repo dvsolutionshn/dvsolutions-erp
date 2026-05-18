@@ -4001,8 +4001,11 @@ def registrar_pago(request, empresa_slug, factura_id):
                     cajero=request.user,
                 )
                 pago_borrador.recalcular_componentes_pago()
-                if pago_borrador.subtotal_recibido > 0 and not cuenta_financiera:
-                    raise ValidationError("Selecciona la cuenta bancaria o caja donde entro la base o el efectivo recibido.")
+                requiere_cuenta_principal = pago_borrador.subtotal_recibido > 0 or (
+                    pago_borrador.impuesto_recibido > 0 and not cuenta_financiera_impuesto
+                )
+                if requiere_cuenta_principal and not cuenta_financiera:
+                    raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el dinero recibido.")
 
                 fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
 

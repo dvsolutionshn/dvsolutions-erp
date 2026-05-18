@@ -698,7 +698,7 @@ class FacturacionTests(TestCase):
         self.assertFalse(asiento.lineas.filter(cuenta__codigo="1101", debe=Decimal("15.00")).exists())
         self.assertFalse(asiento.lineas.filter(cuenta__codigo="1102", debe=Decimal("15.00")).exists())
 
-    def test_pago_separar_isv_sin_cuenta_fiscal_usa_isv_por_pagar(self):
+    def test_pago_separar_isv_sin_cuenta_fiscal_usa_misma_cuenta_del_cobro(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
@@ -737,7 +737,7 @@ class FacturacionTests(TestCase):
         self.assertTrue(pago.separar_isv)
         self.assertIsNone(pago.cuenta_financiera_impuesto)
         asiento = AsientoContable.objects.get(documento_tipo="pago_factura", documento_id=pago.id, evento="cobro")
-        self.assertTrue(asiento.lineas.filter(cuenta__codigo="2102", debe=Decimal("15.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta=cuenta_operativa, debe=Decimal("15.00")).exists())
 
     def test_pago_fallido_no_deja_registro_guardado(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
@@ -796,7 +796,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Caja General - 1101 Caja General")
         self.assertContains(response, "Banco Principal HNL - 110201 Banco Moneda Nacional")
-        self.assertContains(response, "ISV por pagar (automatico)")
+        self.assertContains(response, "Misma cuenta del cobro")
         self.assertTrue(CuentaFinanciera.objects.filter(empresa=self.empresa, nombre="Caja General", tipo="caja").exists())
 
     def test_registrar_pago_repara_banco_principal_hnl_a_110201(self):
