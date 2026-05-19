@@ -425,6 +425,104 @@ def _filtrar_facturas_reporte(empresa, params):
     return facturas
 
 
+def _construir_reporte_cxc(empresa, params):
+    facturas = (
+        Factura.objects.filter(empresa=empresa, estado="emitida")
+        .select_related("cliente")
+        .order_by("fecha_vencimiento", "fecha_emision", "id")
+    )
+
+    hoy = date.today()
+    cliente_id = (params.get("cliente") or "").strip()
+    q = (params.get("q") or "").strip()
+    q_normalizado = q.lower()
+
+    facturas_con_saldo = []
+    for factura in facturas:
+        saldo = factura.saldo_pendiente
+        if saldo <= 0:
+            continue
+        if cliente_id and str(factura.cliente_id) != cliente_id:
+            continue
+        if q_normalizado and q_normalizado not in factura.cliente.nombre.lower():
+            continue
+        facturas_con_saldo.append(factura)
+
+    data = {}
+    for factura in facturas_con_saldo:
+        saldo = factura.saldo_pendiente
+        cliente = factura.cliente
+        dias = (hoy - (factura.fecha_vencimiento or factura.fecha_emision)).days
+
+        if cliente.id not in data:
+            data[cliente.id] = {
+                "cliente": cliente,
+                "0_30": Decimal("0.00"),
+                "31_60": Decimal("0.00"),
+                "61_90": Decimal("0.00"),
+                "90_mas": Decimal("0.00"),
+                "total": Decimal("0.00"),
+            }
+
+        if dias <= 30:
+            data[cliente.id]["0_30"] += saldo
+        elif dias <= 60:
+            data[cliente.id]["31_60"] += saldo
+        elif dias <= 90:
+            data[cliente.id]["61_90"] += saldo
+        else:
+            data[cliente.id]["90_mas"] += saldo
+
+        data[cliente.id]["total"] += saldo
+
+    cliente_seleccionado = None
+    facturas_pendientes_cliente = None
+    cliente_resumen = None
+
+    if cliente_id:
+        try:
+            cliente_id_int = int(cliente_id)
+            cliente_seleccionado = Cliente.objects.filter(id=cliente_id_int, empresa=empresa).first()
+            if cliente_seleccionado:
+                facturas_pendientes_cliente = [f for f in facturas_con_saldo if f.cliente_id == cliente_id_int]
+                if facturas_pendientes_cliente:
+                    cliente_resumen = {
+                        "facturas": len(facturas_pendientes_cliente),
+                        "saldo_total": sum((f.saldo_pendiente for f in facturas_pendientes_cliente), Decimal("0.00")),
+                        "vencidas": sum(1 for f in facturas_pendientes_cliente if (f.fecha_vencimiento or f.fecha_emision) < hoy),
+                        "proxima_fecha": min((f.fecha_vencimiento or f.fecha_emision for f in facturas_pendientes_cliente)),
+                    }
+        except (TypeError, ValueError):
+            cliente_seleccionado = None
+            facturas_pendientes_cliente = None
+            cliente_resumen = None
+
+    data_lista = list(data.values())
+    total_cartera = sum((item["total"] for item in data_lista), Decimal("0.00"))
+    resumen = {
+        "clientes_con_saldo": len(data_lista),
+        "total_cartera": total_cartera,
+        "facturas_pendientes": len(facturas_con_saldo),
+    }
+
+    return {
+        "data": data_lista,
+        "resumen": resumen,
+        "cliente_seleccionado": cliente_seleccionado,
+        "cliente_resumen": cliente_resumen,
+        "facturas_pendientes_cliente": facturas_pendientes_cliente,
+        "facturas_con_saldo": facturas_con_saldo,
+        "q": q,
+        "cliente_id": cliente_id,
+        "clientes_sugeridos": list(
+            Cliente.objects.filter(empresa=empresa)
+            .order_by("nombre")
+            .values_list("nombre", flat=True)
+            .distinct()
+        ),
+    }
+
+
 def _actualizar_totales_factura(factura):
     factura.calcular_totales()
     factura.save(update_fields=[
@@ -782,6 +880,21 @@ def _revertir_entrada_nota_credito(nota):
             observacion='Reversion automatica por anulacion de nota de credito.',
             nota_credito=nota,
         )
+
+
+def _reconstruir_nota_credito_emitida(nota):
+    MovimientoInventario.objects.filter(
+        nota_credito=nota,
+        tipo__in=["devolucion_nota_credito", "reversion_nota_credito"],
+    ).delete()
+    AsientoContable.objects.filter(
+        empresa=nota.empresa,
+        documento_tipo="nota_credito",
+        documento_id=nota.id,
+        evento="emision",
+    ).delete()
+    _registrar_entrada_nota_credito(nota)
+    registrar_asiento_nota_credito(nota)
 
 
 def _aplicar_entrada_documento(entrada):
@@ -3126,6 +3239,8 @@ def editar_nota_credito(request, empresa_slug, nota_id):
                     if estado_original != 'emitida' and estado_destino == 'emitida':
                         _registrar_entrada_nota_credito(nota)
                         registrar_asiento_nota_credito(nota)
+                    elif estado_original == 'emitida' and estado_destino == 'emitida':
+                        _reconstruir_nota_credito_emitida(nota)
                     elif estado_original == 'emitida' and estado_destino == 'anulada':
                         _revertir_entrada_nota_credito(nota)
                         registrar_reversion_documento(
@@ -5306,102 +5421,10 @@ def resumen_diario_caja(request, empresa_slug):
 
 @login_required
 def reporte_cxc(request, empresa_slug):
-
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-
-    facturas = Factura.objects.filter(
-        empresa=empresa,
-        estado='emitida'
-    )
-
-    hoy = date.today()
-    cliente_id = request.GET.get("cliente")
-    q = request.GET.get("q", "").strip()
-
-    data = {}
-    facturas_pendientes_cliente = None
-    cliente_seleccionado = None
-    cliente_resumen = None
-    total_cartera = Decimal('0.00')
-
-    for f in facturas:
-
-        saldo = f.saldo_pendiente
-
-        if saldo <= 0:
-            continue
-
-        total_cartera += saldo
-        cliente = f.cliente
-
-        dias = (hoy - (f.fecha_vencimiento or f.fecha_emision)).days
-
-        if cliente.id not in data:
-            data[cliente.id] = {
-                "cliente": cliente,
-                "0_30": 0,
-                "31_60": 0,
-                "61_90": 0,
-                "90_mas": 0,
-                "total": 0
-            }
-
-        if dias <= 30:
-            data[cliente.id]["0_30"] += saldo
-        elif dias <= 60:
-            data[cliente.id]["31_60"] += saldo
-        elif dias <= 90:
-            data[cliente.id]["61_90"] += saldo
-        else:
-            data[cliente.id]["90_mas"] += saldo
-
-        data[cliente.id]["total"] += saldo
-
-    if cliente_id:
-        try:
-            cliente_id_int = int(cliente_id)
-            cliente_seleccionado = get_object_or_404(Cliente, id=cliente_id_int, empresa=empresa)
-            facturas_pendientes_cliente = (
-                facturas.filter(cliente_id=cliente_id_int)
-                .select_related('cliente')
-                .order_by('fecha_vencimiento', 'fecha_emision')
-            )
-            facturas_cliente_lista = [f for f in facturas_pendientes_cliente if f.saldo_pendiente > 0]
-            if facturas_cliente_lista:
-                cliente_resumen = {
-                    "facturas": len(facturas_cliente_lista),
-                    "saldo_total": sum((f.saldo_pendiente for f in facturas_cliente_lista), Decimal('0.00')),
-                    "vencidas": sum(1 for f in facturas_cliente_lista if (f.fecha_vencimiento or f.fecha_emision) < hoy),
-                    "proxima_fecha": min((f.fecha_vencimiento or f.fecha_emision for f in facturas_cliente_lista)),
-                }
-        except (TypeError, ValueError):
-            cliente_seleccionado = None
-            facturas_pendientes_cliente = None
-            cliente_resumen = None
-
-    data_lista = list(data.values())
-    if q:
-        data_lista = [
-            item for item in data_lista
-            if q.lower() in item["cliente"].nombre.lower()
-        ]
-
-    resumen = {
-        "clientes_con_saldo": len(data_lista),
-        "total_cartera": total_cartera,
-        "facturas_pendientes": sum(1 for f in facturas if f.saldo_pendiente > 0),
-    }
-
-    return render(request, "facturacion/reporte_cxc_premium.html", {
-        "empresa": empresa,
-        "data": data_lista,
-        "resumen": resumen,
-        "cliente_seleccionado": cliente_seleccionado,
-        "cliente_resumen": cliente_resumen,
-        "facturas_pendientes_cliente": facturas_pendientes_cliente,
-        "q": q,
-        "clientes_sugeridos": Cliente.objects.filter(empresa=empresa).values_list('nombre', flat=True).distinct(),
-    })
+    contexto = _construir_reporte_cxc(empresa, request.GET)
+    contexto["empresa"] = empresa
+    return render(request, "facturacion/reporte_cxc_premium.html", contexto)
 
 
 @login_required
@@ -5532,6 +5555,65 @@ def reporte_cxp(request, empresa_slug):
 def exportar_excel_reportes(request, empresa_slug):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if request.GET.get("reporte") == "cxc":
+        contexto_cxc = _construir_reporte_cxc(empresa, request.GET)
+        wb = Workbook()
+
+        ws_resumen = wb.active
+        ws_resumen.title = "Resumen CxC"
+        ws_resumen["A1"] = f"EMPRESA: {empresa.nombre}"
+        ws_resumen["A3"] = "REPORTE DE CUENTAS POR COBRAR"
+        ws_resumen["A5"] = "Clientes con saldo"
+        ws_resumen["B5"] = contexto_cxc["resumen"]["clientes_con_saldo"]
+        ws_resumen["A6"] = "Facturas pendientes"
+        ws_resumen["B6"] = contexto_cxc["resumen"]["facturas_pendientes"]
+        ws_resumen["A7"] = "Total cartera"
+        ws_resumen["B7"] = float(contexto_cxc["resumen"]["total_cartera"])
+
+        ws_cxc = wb.create_sheet("Antiguedad Cartera")
+        ws_cxc.append(["Cliente", "0-30", "31-60", "61-90", "90+", "Total"])
+        for item in contexto_cxc["data"]:
+            ws_cxc.append([
+                item["cliente"].nombre,
+                float(item["0_30"]),
+                float(item["31_60"]),
+                float(item["61_90"]),
+                float(item["90_mas"]),
+                float(item["total"]),
+            ])
+
+        ws_detalle = wb.create_sheet("Detalle Facturas")
+        ws_detalle.append(["Cliente", "Factura", "Fecha", "Vencimiento", "Estado", "Total", "Saldo"])
+        for factura in contexto_cxc["facturas_con_saldo"]:
+            ws_detalle.append([
+                factura.cliente.nombre,
+                factura.numero_factura or str(factura.id),
+                str(factura.fecha_emision),
+                str(factura.fecha_vencimiento or ""),
+                factura.estado_pago,
+                float(factura.total),
+                float(factura.saldo_pendiente),
+            ])
+
+        for sheet in wb.worksheets:
+            for col in sheet.columns:
+                max_length = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+                    try:
+                        if cell.value not in (None, ""):
+                            max_length = max(max_length, len(str(cell.value)))
+                    except Exception:
+                        pass
+                sheet.column_dimensions[col_letter].width = max_length + 3
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="Reporte_CxC.xlsx"'
+        wb.save(response)
+        return response
+
     facturas = _filtrar_facturas_reporte(empresa, request.GET)
 
     wb = Workbook()

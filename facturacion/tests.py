@@ -9,7 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, EmpresaModulo, Modulo, RolSistema
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
@@ -26,8 +26,10 @@ class FacturacionTests(TestCase):
             slug="demo",
             rtn="08011999123456",
         )
-        self.modulo_facturacion = Modulo.objects.create(nombre="Facturacion", codigo="facturacion")
+        self.modulo_facturacion, _ = Modulo.objects.get_or_create(nombre="Facturacion", codigo="facturacion")
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=self.modulo_facturacion, activo=True)
+        self.modulo_contabilidad, _ = Modulo.objects.get_or_create(nombre="Contabilidad", codigo="contabilidad")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=self.modulo_contabilidad, activo=True)
         self.rol_total = RolSistema.objects.create(
             nombre="Administrador Operativo",
             codigo="admin-operativo",
@@ -113,6 +115,24 @@ class FacturacionTests(TestCase):
         factura = Factura.objects.create(
             empresa=self.empresa,
             cliente=self.cliente,
+            estado=estado,
+            fecha_emision=fecha_emision or date.today(),
+        )
+        LineaFactura.objects.create(
+            factura=factura,
+            producto=self.producto,
+            cantidad=Decimal("1.00"),
+            precio_unitario=Decimal("100.00"),
+            impuesto=self.impuesto,
+        )
+        factura.calcular_totales()
+        factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
+        return factura
+
+    def crear_factura_para_cliente(self, cliente, *, estado="emitida", fecha_emision=None):
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=cliente,
             estado=estado,
             fecha_emision=fecha_emision or date.today(),
         )
@@ -329,6 +349,56 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Notas de Crédito")
         self.assertContains(response, "Recibos")
         self.assertContains(response, "Cuentas por Cobrar")
+
+    def test_reporte_cxc_filtra_por_busqueda_cliente(self):
+        cliente_extra = Cliente.objects.create(empresa=self.empresa, nombre="Alchemia Digital Lab")
+        self.crear_factura_para_cliente(self.cliente)
+        self.crear_factura_para_cliente(cliente_extra)
+
+        response = self.client.get(
+            reverse("reporte_cxc", args=[self.empresa.slug]),
+            {"q": "Alchemia"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alchemia Digital Lab")
+        self.assertNotContains(response, f'?cliente={self.cliente.id}')
+        self.assertContains(response, 'list="clientes-cxc-sugeridos"', html=False)
+
+    def test_exportar_excel_cxc_respeta_busqueda_actual(self):
+        cliente_extra = Cliente.objects.create(empresa=self.empresa, nombre="Alchemia Digital Lab")
+        self.crear_factura_para_cliente(self.cliente)
+        self.crear_factura_para_cliente(cliente_extra)
+
+        response = self.client.get(
+            reverse("exportar_excel", args=[self.empresa.slug]),
+            {"reporte": "cxc", "q": "Alchemia"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        workbook = load_workbook(BytesIO(response.content))
+        ws = workbook["Antiguedad Cartera"]
+        nombres = [ws.cell(row=row, column=1).value for row in range(2, ws.max_row + 1)]
+        self.assertEqual(nombres, ["Alchemia Digital Lab"])
+
+    def test_exportar_excel_cxc_respeta_cliente_seleccionado(self):
+        cliente_extra = Cliente.objects.create(empresa=self.empresa, nombre="Cliente Secundario")
+        self.crear_factura_para_cliente(self.cliente)
+        self.crear_factura_para_cliente(cliente_extra)
+
+        response = self.client.get(
+            reverse("exportar_excel", args=[self.empresa.slug]),
+            {"reporte": "cxc", "cliente": str(cliente_extra.id)},
+        )
+
+        workbook = load_workbook(BytesIO(response.content))
+        ws = workbook["Detalle Facturas"]
+        clientes = [ws.cell(row=row, column=1).value for row in range(2, ws.max_row + 1)]
+        self.assertEqual(clientes, ["Cliente Secundario"])
 
     def test_configuracion_facturacion_guarda_preferencias_por_empresa(self):
         response = self.client.post(
@@ -2322,6 +2392,67 @@ class FacturacionTests(TestCase):
                 metodo="efectivo",
                 fecha=date.today(),
             )
+
+    def test_editar_nota_credito_emitida_reconstruye_asiento_contable(self):
+        factura = self.crear_factura_con_linea(estado="emitida")
+        nota = NotaCredito.objects.create(
+            empresa=self.empresa,
+            factura_origen=factura,
+            cliente=factura.cliente,
+            vendedor=self.user,
+            moneda=factura.moneda,
+            tipo_cambio=factura.tipo_cambio,
+            fecha_emision=date.today(),
+            motivo="Ajuste inicial",
+            estado="borrador",
+        )
+        linea = LineaNotaCredito.objects.create(
+            nota_credito=nota,
+            producto=self.producto,
+            cantidad=Decimal("1.00"),
+            precio_unitario=Decimal("100.00"),
+            impuesto=self.impuesto,
+        )
+        nota.calcular_totales()
+        nota.estado = "emitida"
+        nota.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras", "estado"])
+
+        response = self.client.post(
+            reverse("editar_nota_credito", args=[self.empresa.slug, nota.id]),
+            {
+                "factura_origen": str(factura.id),
+                "fecha_emision": str(date.today()),
+                "motivo": "Ajuste parcial",
+                "estado": "emitida",
+                "lineas-TOTAL_FORMS": "1",
+                "lineas-INITIAL_FORMS": "1",
+                "lineas-MIN_NUM_FORMS": "0",
+                "lineas-MAX_NUM_FORMS": "1000",
+                "lineas-0-id": str(linea.id),
+                "lineas-0-producto": str(self.producto.id),
+                "lineas-0-cantidad": "0.50",
+                "lineas-0-precio_unitario": "100.00",
+                "lineas-0-descuento_porcentaje": "0",
+                "lineas-0-comentario": "",
+                "lineas-0-impuesto": str(self.impuesto.id),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        nota.refresh_from_db()
+        factura.refresh_from_db()
+        self.assertEqual(nota.total, Decimal("57.50"))
+        self.assertEqual(factura.saldo_pendiente, Decimal("57.50"))
+
+        asientos = AsientoContable.objects.filter(
+            empresa=self.empresa,
+            documento_tipo="nota_credito",
+            documento_id=nota.id,
+            evento="emision",
+        )
+        self.assertEqual(asientos.count(), 1)
+        asiento = asientos.get()
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="1110", haber=Decimal("57.50")).exists())
 
     def test_crear_factura_emitida_descuenta_inventario(self):
         InventarioProducto.objects.create(
