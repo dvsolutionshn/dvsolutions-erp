@@ -363,7 +363,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Alchemia Digital Lab")
         self.assertNotContains(response, f'?cliente={self.cliente.id}')
-        self.assertContains(response, 'list="clientes-cxc-sugeridos"', html=False)
+        self.assertContains(response, 'id="cxc-sugerencias"', html=False)
 
     def test_exportar_excel_cxc_respeta_busqueda_actual(self):
         cliente_extra = Cliente.objects.create(empresa=self.empresa, nombre="Alchemia Digital Lab")
