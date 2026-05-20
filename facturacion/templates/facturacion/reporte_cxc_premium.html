@@ -46,10 +46,10 @@
     font-weight:700;
     box-shadow:var(--shadow-soft);
 }
-.erp-autocomplete{
+.cxc-autocomplete{
     position:relative;
 }
-.erp-suggestion-list{
+.cxc-suggestion-list{
     position:absolute;
     top:calc(100% + 8px);
     left:0;
@@ -64,7 +64,7 @@
     max-height:240px;
     overflow:auto;
 }
-.erp-suggestion-item{
+.cxc-suggestion-item{
     width:100%;
     border:none;
     background:transparent;
@@ -74,7 +74,7 @@
     cursor:pointer;
     color:var(--primary);
 }
-.erp-suggestion-item:hover{
+.cxc-suggestion-item:hover{
     background:#f4f8fc;
 }
 .erp-search-toolbar{
@@ -86,7 +86,8 @@
 }
 .erp-search-toolbar .erp-field{
     min-width:320px;
-    flex:1 1 320px;
+    flex:1 1 520px;
+    max-width:620px;
 }
 </style>
 {% endblock %}
@@ -126,9 +127,9 @@
     <form method="get" class="erp-search-toolbar">
         <div class="erp-field">
             <label for="q">Buscar cliente</label>
-            <div class="erp-autocomplete">
+            <div class="cxc-autocomplete">
                 <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Escribe el nombre del cliente" autocomplete="off">
-                <div id="cxc-sugerencias" class="erp-suggestion-list"></div>
+                <div id="cxc-sugerencias" class="cxc-suggestion-list"></div>
             </div>
         </div>
         <div class="erp-actions-right">
@@ -266,7 +267,7 @@ document.addEventListener("DOMContentLoaded", function(){
         matches.forEach(item => {
             const button = document.createElement("button");
             button.type = "button";
-            button.className = "erp-suggestion-item";
+            button.className = "cxc-suggestion-item";
             button.textContent = item;
             button.addEventListener("click", function(){ input.value = item; panel.style.display = "none"; });
             panel.appendChild(button);
