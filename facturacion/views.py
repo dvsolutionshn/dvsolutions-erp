@@ -520,6 +520,11 @@ def _construir_reporte_cxc(empresa, params):
             .values_list("nombre", flat=True)
             .distinct()
         ),
+        "clientes_preview": list(
+            Cliente.objects.filter(empresa=empresa)
+            .order_by("nombre")
+            .values("id", "nombre", "rtn")
+        ),
     }
 
 
