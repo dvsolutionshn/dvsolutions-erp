@@ -146,6 +146,16 @@
 .erp-suggestion-item:hover{
     background:#f7f9fc;
 }
+.erp-suggestion-item.is-create{
+    margin-top:6px;
+    border:1px dashed #c8d6e8;
+    background:#f8fbff;
+    color:#173b68;
+    font-weight:700;
+}
+.erp-suggestion-item.is-create:hover{
+    background:#eef5ff;
+}
 .erp-native-select-hidden{
     display:none;
 }
@@ -451,6 +461,54 @@
 .erp-lines-footer .erp-btn{
     min-width:180px;
 }
+.erp-inline-modal{
+    position:fixed;
+    inset:0;
+    z-index:250;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:rgba(10,20,35,.48);
+}
+.erp-inline-modal.is-open{
+    display:flex;
+}
+.erp-inline-modal-dialog{
+    width:min(860px, 100%);
+    max-height:calc(100vh - 48px);
+    border-radius:20px;
+    overflow:hidden;
+    background:#fff;
+    box-shadow:0 28px 64px rgba(15,39,66,.25);
+    display:flex;
+    flex-direction:column;
+}
+.erp-inline-modal-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:18px 22px;
+    border-bottom:1px solid var(--line);
+    background:#f8fbff;
+}
+.erp-inline-modal-head h3{
+    margin:0;
+    font-size:1.1rem;
+    color:#102338;
+}
+.erp-inline-modal-head p{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:.92rem;
+}
+.erp-inline-modal-frame{
+    width:100%;
+    height:min(74vh, 720px);
+    border:0;
+    background:#f5f8fc;
+}
 @media (max-width: 1100px){
     .erp-form-split{
         grid-template-columns:1fr;
@@ -474,6 +532,12 @@
     .erp-preview-grid{
         grid-template-columns:1fr;
     }
+    .erp-inline-modal{
+        padding:12px;
+    }
+    .erp-inline-modal-frame{
+        height:78vh;
+    }
 }
 </style>
 {% endblock %}
@@ -489,8 +553,8 @@
                 <p>Define cliente, fechas, moneda y condiciones generales del documento.</p>
             </div>
             <div class="erp-quick-links">
-                <a id="nuevo-cliente-link" class="erp-btn-secondary" href="{% url 'crear_cliente_facturacion' empresa.slug %}?next={% if modo_edicion %}{% url 'editar_factura' empresa.slug factura.id %}{% else %}{% url 'crear_factura' empresa.slug %}{% endif %}" target="_blank" rel="noopener">Nuevo Cliente</a>
-                <a id="nuevo-producto-link" class="erp-btn-secondary" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% if modo_edicion %}{% url 'editar_factura' empresa.slug factura.id %}{% else %}{% url 'crear_factura' empresa.slug %}{% endif %}" target="_blank" rel="noopener">Nuevo Producto</a>
+                <a id="nuevo-cliente-link" class="erp-btn-secondary" href="{% url 'crear_cliente_facturacion' empresa.slug %}">Nuevo Cliente</a>
+                <a id="nuevo-producto-link" class="erp-btn-secondary" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto</a>
             </div>
         </div>
     </section>
@@ -751,6 +815,18 @@
         </aside>
     </div>
 </form>
+<div id="inline-create-modal" class="erp-inline-modal" aria-hidden="true">
+    <div class="erp-inline-modal-dialog">
+        <div class="erp-inline-modal-head">
+            <div>
+                <h3 id="inline-create-modal-title">Crear rapido</h3>
+                <p id="inline-create-modal-copy">Completa lo minimo necesario y seguimos dentro de la factura.</p>
+            </div>
+            <button type="button" class="erp-btn-secondary" id="inline-create-modal-close">Cerrar</button>
+        </div>
+        <iframe id="inline-create-modal-frame" class="erp-inline-modal-frame" src="about:blank" title="Crear rapido"></iframe>
+    </div>
+</div>
 {{ clientes_preview|json_script:"clientes-preview-data" }}
 {% endblock %}
 
@@ -783,9 +859,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const clienteSelect = document.getElementById("id_cliente");
     const nuevoClienteLink = document.getElementById("nuevo-cliente-link");
     const nuevoProductoLink = document.getElementById("nuevo-producto-link");
+    const inlineCreateModal = document.getElementById("inline-create-modal");
+    const inlineCreateModalFrame = document.getElementById("inline-create-modal-frame");
+    const inlineCreateModalClose = document.getElementById("inline-create-modal-close");
+    const inlineCreateModalTitle = document.getElementById("inline-create-modal-title");
+    const inlineCreateModalCopy = document.getElementById("inline-create-modal-copy");
     const facturaDraftKey = "dvsolutions_factura_draft__{{ empresa.slug }}__{% if modo_edicion %}edit_{{ factura.id }}{% else %}new{% endif %}";
     const clientesPreviewData = JSON.parse(document.getElementById("clientes-preview-data").textContent || "[]");
     const clientesPreviewMap = {};
+    let pendingProductLine = null;
     clientesPreviewData.forEach(cliente => {
         clientesPreviewMap[String(cliente.id)] = cliente;
     });
@@ -942,6 +1024,107 @@ document.addEventListener("DOMContentLoaded", function () {
         actualizarPreviewFactura();
     }
 
+    function buildInlineCreateUrl(baseUrl, nombre){
+        const url = new URL(baseUrl, window.location.origin);
+        url.searchParams.set("modal", "1");
+        if(nombre){
+            url.searchParams.set("nombre", nombre.trim());
+        }
+        return url.toString();
+    }
+
+    function openInlineCreateModal({url, title, copy, productLine = null}){
+        if(!inlineCreateModal || !inlineCreateModalFrame){
+            window.open(url, "_blank", "noopener");
+            return;
+        }
+        pendingProductLine = productLine;
+        inlineCreateModalTitle.textContent = title;
+        inlineCreateModalCopy.textContent = copy;
+        inlineCreateModalFrame.src = url;
+        inlineCreateModal.classList.add("is-open");
+        inlineCreateModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeInlineCreateModal(){
+        if(!inlineCreateModal || !inlineCreateModalFrame){
+            return;
+        }
+        inlineCreateModal.classList.remove("is-open");
+        inlineCreateModal.setAttribute("aria-hidden", "true");
+        inlineCreateModalFrame.src = "about:blank";
+        pendingProductLine = null;
+    }
+
+    function upsertSelectOption(select, value, label){
+        if(!select || !value){
+            return;
+        }
+        let option = Array.from(select.options).find(item => String(item.value) === String(value));
+        if(!option){
+            option = document.createElement("option");
+            option.value = String(value);
+            option.text = label;
+            select.appendChild(option);
+        } else {
+            option.text = label;
+        }
+    }
+
+    function refreshSearchableSelectOptions(wrapper){
+        const select = wrapper?.querySelector("select");
+        if(!select){
+            return;
+        }
+        wrapper._allOptions = Array.from(select.options).map(option => ({
+            value: option.value,
+            text: option.text,
+            disabled: option.disabled,
+        }));
+    }
+
+    function agregarClienteCreado(cliente){
+        if(!clienteSelect || !cliente){
+            return;
+        }
+        upsertSelectOption(clienteSelect, cliente.id, cliente.nombre);
+        clienteSelect.value = String(cliente.id);
+        clientesPreviewMap[String(cliente.id)] = cliente;
+        syncClienteSearchFromSelect();
+        actualizarPreviewFactura();
+    }
+
+    function agregarProductoCreado(producto){
+        if(!producto){
+            return;
+        }
+        productos[String(producto.id)] = {
+            precio: parseFloat(producto.precio || 0) || 0,
+            impuesto: producto.impuesto_id || "",
+            tipo: producto.tipo_item || "producto",
+            unidad: producto.unidad_medida || "unidad"
+        };
+        document.querySelectorAll(".producto").forEach(select => {
+            upsertSelectOption(select, producto.id, producto.nombre);
+            const wrapper = select.closest(".erp-search-select");
+            if(wrapper){
+                refreshSearchableSelectOptions(wrapper);
+            }
+        });
+        if(pendingProductLine){
+            const select = pendingProductLine.querySelector(".producto");
+            const searchInput = pendingProductLine.querySelector(".erp-select-search");
+            if(select){
+                select.value = String(producto.id);
+                if(searchInput){
+                    searchInput.value = producto.nombre;
+                }
+                select.dispatchEvent(new Event("change", {bubbles: true}));
+            }
+        }
+        actualizarPreviewFactura();
+    }
+
     function renderClienteSuggestions(){
         if(!clienteSearchInput || !clienteSuggestionsPanel || !clienteSelect){
             return;
@@ -954,11 +1137,6 @@ document.addEventListener("DOMContentLoaded", function () {
             .slice(0, 8);
 
         clienteSuggestionsPanel.innerHTML = "";
-        if(!options.length){
-            clienteSuggestionsPanel.style.display = "none";
-            return;
-        }
-
         options.forEach(option => {
             const button = document.createElement("button");
             button.type = "button";
@@ -972,6 +1150,27 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             clienteSuggestionsPanel.appendChild(button);
         });
+
+        const exactMatch = options.some(option => option.text.trim().toLowerCase() === term && term);
+        if(term && !exactMatch){
+            const createButton = document.createElement("button");
+            createButton.type = "button";
+            createButton.className = "erp-suggestion-item is-create";
+            createButton.textContent = `Crear cliente "${clienteSearchInput.value.trim()}"`;
+            createButton.addEventListener("click", function(){
+                openInlineCreateModal({
+                    url: buildInlineCreateUrl(nuevoClienteLink?.href || "{{ request.path }}", clienteSearchInput.value),
+                    title: "Crear cliente rapido",
+                    copy: "Guardalo aqui mismo y lo dejaremos seleccionado en la factura."
+                });
+            });
+            clienteSuggestionsPanel.appendChild(createButton);
+        }
+
+        if(!clienteSuggestionsPanel.childElementCount){
+            clienteSuggestionsPanel.style.display = "none";
+            return;
+        }
 
         clienteSuggestionsPanel.style.display = "block";
     }
@@ -1018,11 +1217,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             suggestionsPanel.innerHTML = "";
 
-            if(!visibles.length){
-                suggestionsPanel.style.display = "none";
-                return;
-            }
-
             visibles.forEach(optionData => {
                 const button = document.createElement("button");
                 button.type = "button";
@@ -1039,6 +1233,29 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
                 suggestionsPanel.appendChild(button);
             });
+
+            const puedeCrearProducto = select.classList.contains("producto");
+            const exactMatch = visibles.some(optionData => optionData.text.trim().toLowerCase() === filtro && filtro);
+            if(puedeCrearProducto && filtro && !exactMatch){
+                const createButton = document.createElement("button");
+                createButton.type = "button";
+                createButton.className = "erp-suggestion-item is-create";
+                createButton.textContent = `Crear producto "${searchInput.value.trim()}"`;
+                createButton.addEventListener("click", function(){
+                    openInlineCreateModal({
+                        url: buildInlineCreateUrl(nuevoProductoLink?.href || "{{ request.path }}", searchInput.value),
+                        title: "Crear producto rapido",
+                        copy: "Lo registramos aqui mismo y lo dejamos listo para esta linea.",
+                        productLine: wrapper.closest(".tabla-row")
+                    });
+                });
+                suggestionsPanel.appendChild(createButton);
+            }
+
+            if(!suggestionsPanel.childElementCount){
+                suggestionsPanel.style.display = "none";
+                return;
+            }
 
             suggestionsPanel.style.display = "block";
         }
@@ -1374,20 +1591,26 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function prepararAccesosRapidosConBorrador(){
-        const returnUrl = `${window.location.pathname}?restore_draft=1`;
-        [nuevoClienteLink, nuevoProductoLink].forEach(link => {
-            if(!link){
-                return;
-            }
-            try{
-                const url = new URL(link.href, window.location.origin);
-                url.searchParams.set("next", returnUrl);
-                link.href = url.toString();
-            }catch(error){
-                console.warn("No se pudo preparar el retorno con borrador.", error);
-            }
-            link.addEventListener("click", guardarBorradorFactura);
-        });
+        if(nuevoClienteLink){
+            nuevoClienteLink.addEventListener("click", function(event){
+                event.preventDefault();
+                openInlineCreateModal({
+                    url: buildInlineCreateUrl(this.href, clienteSearchInput?.value || ""),
+                    title: "Crear cliente rapido",
+                    copy: "Completa los datos esenciales y lo asignaremos enseguida a la factura."
+                });
+            });
+        }
+        if(nuevoProductoLink){
+            nuevoProductoLink.addEventListener("click", function(event){
+                event.preventDefault();
+                openInlineCreateModal({
+                    url: buildInlineCreateUrl(this.href, ""),
+                    title: "Crear producto rapido",
+                    copy: "Crea el producto sin salir de la factura y luego lo podras usar en cualquier linea."
+                });
+            });
+        }
     }
 
     document.querySelectorAll(".tabla-row").forEach(l => {
@@ -1487,6 +1710,32 @@ document.addEventListener("DOMContentLoaded", function () {
             }, 120);
         });
     }
+    if(inlineCreateModalClose){
+        inlineCreateModalClose.addEventListener("click", closeInlineCreateModal);
+    }
+    if(inlineCreateModal){
+        inlineCreateModal.addEventListener("click", function(event){
+            if(event.target === inlineCreateModal){
+                closeInlineCreateModal();
+            }
+        });
+    }
+    window.addEventListener("message", function(event){
+        const data = event.data || {};
+        if(data.type === "erp-inline-modal-close"){
+            closeInlineCreateModal();
+            return;
+        }
+        if(data.type === "erp-cliente-creado" && data.cliente){
+            agregarClienteCreado(data.cliente);
+            closeInlineCreateModal();
+            return;
+        }
+        if(data.type === "erp-producto-creado" && data.producto){
+            agregarProductoCreado(data.producto);
+            closeInlineCreateModal();
+        }
+    });
     if(clienteSelect){
         clienteSelect.addEventListener("change", syncClienteSearchFromSelect);
     }

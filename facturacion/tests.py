@@ -1356,6 +1356,23 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente Nuevo").exists())
 
+    def test_crear_cliente_rapido_desde_factura_retorna_payload(self):
+        response = self.client.post(
+            f"{reverse('crear_cliente_facturacion', args=[self.empresa.slug])}?modal=1",
+            {
+                "quick_mode": "1",
+                "nombre": "Cliente Modal",
+                "rtn": "08011999112233",
+                "direccion": "Tegucigalpa",
+                "ciudad": "Tegucigalpa",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "erp-cliente-creado")
+        self.assertTrue(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente Modal").exists())
+
     def test_no_permite_cliente_duplicado_por_nombre(self):
         Cliente.objects.create(empresa=self.empresa, nombre="Cliente Unico")
 
@@ -1460,6 +1477,26 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Producto.objects.filter(empresa=self.empresa, nombre="Producto Nuevo").exists())
+
+    def test_crear_producto_rapido_desde_factura_retorna_payload(self):
+        response = self.client.post(
+            f"{reverse('crear_producto_facturacion', args=[self.empresa.slug])}?modal=1",
+            {
+                "quick_mode": "1",
+                "nombre": "Producto Modal",
+                "codigo": "PM-001",
+                "tipo_item": "producto",
+                "unidad_medida": "unidad",
+                "precio": "325.50",
+                "impuesto_predeterminado": str(self.impuesto.id),
+                "activo": "on",
+                "controla_inventario": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "erp-producto-creado")
+        self.assertTrue(Producto.objects.filter(empresa=self.empresa, nombre="Producto Modal").exists())
 
     def test_crear_producto_oculta_perfil_farmaceutico_en_empresa_base(self):
         response = self.client.get(reverse("crear_producto_facturacion", args=[self.empresa.slug]))
@@ -2500,6 +2537,7 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Buscar cliente por nombre")
         self.assertContains(response, 'id="clientes-sugerencias"', html=False)
         self.assertContains(response, "Buscar producto")
+        self.assertContains(response, 'id="inline-create-modal"', html=False)
 
     def test_crear_factura_usd_acepta_tipo_cambio_con_cuatro_decimales(self):
         response = self.client.post(

@@ -1054,6 +1054,7 @@ def clientes_facturacion(request, empresa_slug):
 @login_required
 def crear_cliente(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
 
     if request.method == "POST":
         form = ClienteForm(request.POST)
@@ -1062,6 +1063,19 @@ def crear_cliente(request, empresa_slug):
                 cliente = form.save(commit=False)
                 cliente.empresa = empresa
                 cliente.save()
+                if quick_mode:
+                    return render(request, "facturacion/crear_cliente_rapido_modal.html", {
+                        "empresa": empresa,
+                        "success_payload": {
+                            "type": "erp-cliente-creado",
+                            "cliente": {
+                                "id": cliente.id,
+                                "nombre": cliente.nombre,
+                                "rtn": cliente.rtn or "",
+                                "direccion": cliente.direccion or "",
+                            },
+                        },
+                    })
                 messages.success(request, "Cliente creado correctamente.")
                 return _redirect_seguro(request, "clientes_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
@@ -1074,10 +1088,15 @@ def crear_cliente(request, empresa_slug):
                     form.add_error(None, str(exc))
     else:
         form = ClienteForm()
+        nombre_prefill = (request.GET.get("nombre") or "").strip()
+        if nombre_prefill:
+            form.fields["nombre"].initial = nombre_prefill
 
-    return render(request, "facturacion/crear_cliente.html", {
+    template_name = "facturacion/crear_cliente_rapido_modal.html" if quick_mode else "facturacion/crear_cliente.html"
+    return render(request, template_name, {
         "empresa": empresa,
         "form": form,
+        "quick_mode": quick_mode,
         "next": request.GET.get("next", ""),
         "titulo": "Nuevo Cliente",
         "texto_boton": "Guardar Cliente",
@@ -2722,6 +2741,7 @@ def editar_impuesto(request, empresa_slug, impuesto_id):
 @login_required
 def crear_producto(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
 
     if request.method == "POST":
         form = ProductoForm(request.POST, empresa=empresa)
@@ -2731,6 +2751,21 @@ def crear_producto(request, empresa_slug):
                 producto.empresa = empresa
                 producto.save()
                 form.guardar_perfil_farmaceutico(producto)
+                if quick_mode:
+                    return render(request, "facturacion/crear_producto_rapido_modal.html", {
+                        "empresa": empresa,
+                        "success_payload": {
+                            "type": "erp-producto-creado",
+                            "producto": {
+                                "id": producto.id,
+                                "nombre": producto.nombre,
+                                "precio": str(producto.precio or "0"),
+                                "impuesto_id": str(producto.impuesto_predeterminado_id or ""),
+                                "tipo_item": producto.tipo_item,
+                                "unidad_medida": producto.unidad_medida,
+                            },
+                        },
+                    })
                 messages.success(request, "Producto creado correctamente.")
                 return _redirect_seguro(request, "productos_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
@@ -2743,10 +2778,15 @@ def crear_producto(request, empresa_slug):
                     form.add_error(None, str(exc))
     else:
         form = ProductoForm(empresa=empresa)
+        nombre_prefill = (request.GET.get("nombre") or "").strip()
+        if nombre_prefill:
+            form.fields["nombre"].initial = nombre_prefill
 
-    return render(request, "facturacion/crear_producto.html", {
+    template_name = "facturacion/crear_producto_rapido_modal.html" if quick_mode else "facturacion/crear_producto.html"
+    return render(request, template_name, {
         "empresa": empresa,
         "form": form,
+        "quick_mode": quick_mode,
         "mostrar_perfil_farmaceutico": getattr(form, "mostrar_perfil_farmaceutico", False),
         "next": request.GET.get("next", ""),
         "titulo": "Nuevo Producto",

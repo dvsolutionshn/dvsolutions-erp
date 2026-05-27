@@ -1,0 +1,127 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear producto rapido - {{ empresa.nombre }}</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    <style>
+    body{margin:0;background:#f5f8fc;font-family:"Segoe UI",Roboto,Arial,sans-serif;}
+    .erp-quick-modal-shell{padding:22px;}
+    .erp-quick-modal-shell .erp-form-card{margin:0;}
+    .erp-quick-modal-header h3{margin:0 0 8px;font-size:24px;color:#102338;}
+    .erp-quick-modal-header p{margin:0;color:#5a6b80;line-height:1.6;}
+    .erp-quick-success{padding:18px;border-radius:16px;background:#f4fbf7;border:1px solid #cfe8d9;color:#1f4d35;}
+    @media (max-width:760px){.erp-quick-modal-shell{padding:14px;}}
+    </style>
+</head>
+<body>
+<section class="erp-quick-modal-shell">
+    <article class="erp-form-card">
+        {% if success_payload %}
+        <div class="erp-quick-success">
+            Producto creado correctamente. Lo dejaremos disponible en la factura enseguida.
+        </div>
+        {{ success_payload|json_script:"quick-producto-success-data" }}
+        <script>
+        window.parent.postMessage(JSON.parse(document.getElementById("quick-producto-success-data").textContent), "*");
+        </script>
+        {% else %}
+        <div class="erp-quick-modal-header">
+            <h3>Crear producto rapido</h3>
+            <p>Crea el producto sin salir de la factura. Al guardar lo podremos seleccionar de inmediato.</p>
+        </div>
+        {% if form.non_field_errors %}
+        <ul class="erp-field-errors" style="margin-top:16px;">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <form method="post" class="erp-form-shell" style="margin-top:18px;">
+            {% csrf_token %}
+            <input type="hidden" name="quick_mode" value="1">
+            <div class="erp-form-grid two">
+                <div class="erp-field">
+                    {{ form.nombre.label_tag }}
+                    {{ form.nombre }}
+                    {% if form.nombre.errors %}<ul class="erp-field-errors">{% for error in form.nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.codigo.label_tag }}
+                    {{ form.codigo }}
+                    {% if form.codigo.errors %}<ul class="erp-field-errors">{% for error in form.codigo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.tipo_item.label_tag }}
+                    {{ form.tipo_item }}
+                    {% if form.tipo_item.errors %}<ul class="erp-field-errors">{% for error in form.tipo_item.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.unidad_medida.label_tag }}
+                    {{ form.unidad_medida }}
+                    {% if form.unidad_medida.errors %}<ul class="erp-field-errors">{% for error in form.unidad_medida.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.precio.label_tag }}
+                    {{ form.precio }}
+                    {% if form.precio.errors %}<ul class="erp-field-errors">{% for error in form.precio.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.impuesto_predeterminado.label_tag }}
+                    {{ form.impuesto_predeterminado }}
+                    {% if form.impuesto_predeterminado.errors %}<ul class="erp-field-errors">{% for error in form.impuesto_predeterminado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label style="display:flex;gap:10px;align-items:center;">
+                        {{ form.controla_inventario }}
+                        <span>Controla inventario</span>
+                    </label>
+                    {% if form.controla_inventario.errors %}<ul class="erp-field-errors">{% for error in form.controla_inventario.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label style="display:flex;gap:10px;align-items:center;">
+                        {{ form.activo }}
+                        <span>Producto activo</span>
+                    </label>
+                    {% if form.activo.errors %}<ul class="erp-field-errors">{% for error in form.activo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field" style="grid-column:1 / -1;">
+                    {{ form.descripcion.label_tag }}
+                    {{ form.descripcion }}
+                    {% if form.descripcion.errors %}<ul class="erp-field-errors">{% for error in form.descripcion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+            </div>
+            <div class="erp-form-actions" style="margin-top:22px;">
+                <div class="erp-field-help">Al guardar, el producto se suma al catalogo y quedara disponible para esta factura.</div>
+                <div class="erp-actions-right">
+                    <button type="button" class="erp-btn-secondary" onclick="window.parent.postMessage({type:'erp-inline-modal-close'}, '*')">Cancelar</button>
+                    <button type="submit" class="erp-btn">Guardar producto</button>
+                </div>
+            </div>
+        </form>
+        <script>
+        (function(){
+            const tipoItem = document.getElementById("id_tipo_item");
+            const controlaInventario = document.getElementById("id_controla_inventario");
+            if(!tipoItem || !controlaInventario){
+                return;
+            }
+            function syncInventario(){
+                if(tipoItem.value === "servicio"){
+                    controlaInventario.checked = false;
+                    controlaInventario.disabled = true;
+                } else {
+                    controlaInventario.disabled = false;
+                }
+            }
+            tipoItem.addEventListener("change", syncInventario);
+            syncInventario();
+        })();
+        </script>
+        {% endif %}
+    </article>
+</section>
+</body>
+</html>

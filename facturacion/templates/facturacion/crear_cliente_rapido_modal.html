@@ -1,0 +1,96 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear cliente rapido - {{ empresa.nombre }}</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    <style>
+    body{margin:0;background:#f5f8fc;font-family:"Segoe UI",Roboto,Arial,sans-serif;}
+    .erp-quick-modal-shell{padding:22px;}
+    .erp-quick-modal-shell .erp-form-card{margin:0;}
+    .erp-quick-modal-header h3{margin:0 0 8px;font-size:24px;color:#102338;}
+    .erp-quick-modal-header p{margin:0;color:#5a6b80;line-height:1.6;}
+    .erp-quick-success{padding:18px;border-radius:16px;background:#f4fbf7;border:1px solid #cfe8d9;color:#1f4d35;}
+    @media (max-width:760px){.erp-quick-modal-shell{padding:14px;}}
+    </style>
+</head>
+<body>
+<section class="erp-quick-modal-shell">
+    <article class="erp-form-card">
+        {% if success_payload %}
+        <div class="erp-quick-success">
+            Cliente creado correctamente. Estamos actualizando la factura.
+        </div>
+        {{ success_payload|json_script:"quick-cliente-success-data" }}
+        <script>
+        window.parent.postMessage(JSON.parse(document.getElementById("quick-cliente-success-data").textContent), "*");
+        </script>
+        {% else %}
+        <div class="erp-quick-modal-header">
+            <h3>Crear cliente rapido</h3>
+            <p>Registra el cliente sin salir de la factura. Al guardar lo seleccionaremos automaticamente.</p>
+        </div>
+        {% if form.non_field_errors %}
+        <ul class="erp-field-errors" style="margin-top:16px;">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <form method="post" class="erp-form-shell" style="margin-top:18px;">
+            {% csrf_token %}
+            <input type="hidden" name="quick_mode" value="1">
+            <div class="erp-form-grid two">
+                <div class="erp-field">
+                    {{ form.nombre.label_tag }}
+                    {{ form.nombre }}
+                    {% if form.nombre.errors %}<ul class="erp-field-errors">{% for error in form.nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.rtn.label_tag }}
+                    {{ form.rtn }}
+                    {% if form.rtn.errors %}<ul class="erp-field-errors">{% for error in form.rtn.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.telefono.label_tag }}
+                    {{ form.telefono }}
+                    {% if form.telefono.errors %}<ul class="erp-field-errors">{% for error in form.telefono.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.correo.label_tag }}
+                    {{ form.correo }}
+                    {% if form.correo.errors %}<ul class="erp-field-errors">{% for error in form.correo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.ciudad.label_tag }}
+                    {{ form.ciudad }}
+                    {% if form.ciudad.errors %}<ul class="erp-field-errors">{% for error in form.ciudad.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label style="display:flex;gap:10px;align-items:center;">
+                        {{ form.activo }}
+                        <span>Cliente activo</span>
+                    </label>
+                    {% if form.activo.errors %}<ul class="erp-field-errors">{% for error in form.activo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field" style="grid-column:1 / -1;">
+                    {{ form.direccion.label_tag }}
+                    {{ form.direccion }}
+                    {% if form.direccion.errors %}<ul class="erp-field-errors">{% for error in form.direccion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+            </div>
+            <div class="erp-form-actions" style="margin-top:22px;">
+                <div class="erp-field-help">Al guardar, el cliente quedara listo para usarse en esta factura.</div>
+                <div class="erp-actions-right">
+                    <button type="button" class="erp-btn-secondary" onclick="window.parent.postMessage({type:'erp-inline-modal-close'}, '*')">Cancelar</button>
+                    <button type="submit" class="erp-btn">Guardar cliente</button>
+                </div>
+            </div>
+        </form>
+        {% endif %}
+    </article>
+</section>
+</body>
+</html>
