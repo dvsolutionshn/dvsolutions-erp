@@ -1371,6 +1371,7 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "erp-cliente-creado")
+        self.assertEqual(response.headers.get("X-Frame-Options"), "SAMEORIGIN")
         self.assertTrue(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente Modal").exists())
 
     def test_no_permite_cliente_duplicado_por_nombre(self):
@@ -1496,6 +1497,7 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "erp-producto-creado")
+        self.assertEqual(response.headers.get("X-Frame-Options"), "SAMEORIGIN")
         self.assertTrue(Producto.objects.filter(empresa=self.empresa, nombre="Producto Modal").exists())
 
     def test_crear_producto_oculta_perfil_farmaceutico_en_empresa_base(self):

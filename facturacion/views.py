@@ -1052,6 +1052,7 @@ def clientes_facturacion(request, empresa_slug):
 
 
 @login_required
+@xframe_options_sameorigin
 def crear_cliente(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
@@ -2739,6 +2740,7 @@ def editar_impuesto(request, empresa_slug, impuesto_id):
 
 
 @login_required
+@xframe_options_sameorigin
 def crear_producto(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
