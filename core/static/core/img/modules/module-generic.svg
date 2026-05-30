@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" role="img" aria-label="Modulo empresarial">
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f5f8ff"/><stop offset="1" stop-color="#f8f5ee"/></linearGradient></defs>
+  <rect width="640" height="260" rx="26" fill="url(#bg)"/>
+  <rect x="120" y="64" width="130" height="130" rx="24" fill="#2256d8"/>
+  <rect x="274" y="64" width="130" height="130" rx="24" fill="#17a6a1"/>
+  <rect x="428" y="64" width="92" height="130" rx="24" fill="#c8a96a"/>
+  <path d="M154 130h62M339 96v68M306 130h66M458 112h32M458 146h32" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
+</svg>

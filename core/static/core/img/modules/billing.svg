@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" role="img" aria-label="Facturacion">
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f2f8ff"/><stop offset="1" stop-color="#edf8f5"/></linearGradient><linearGradient id="a" x1="0" x2="1"><stop stop-color="#2f6df2"/><stop offset="1" stop-color="#234a9f"/></linearGradient></defs>
+  <rect width="640" height="260" rx="26" fill="url(#bg)"/>
+  <rect x="116" y="38" width="256" height="184" rx="18" fill="#fff" stroke="#c8d7ea" stroke-width="3"/>
+  <path d="M318 38v52h54" fill="#dce9ff"/>
+  <rect x="144" y="76" width="112" height="18" rx="9" fill="url(#a)"/>
+  <rect x="144" y="122" width="180" height="12" rx="6" fill="#d6e3f4"/>
+  <rect x="144" y="152" width="150" height="12" rx="6" fill="#d6e3f4"/>
+  <rect x="144" y="182" width="200" height="12" rx="6" fill="#d6e3f4"/>
+  <circle cx="455" cy="136" r="66" fill="#dff3f1"/>
+  <path d="M428 138l18 18 40-48" fill="none" stroke="#17a6a1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

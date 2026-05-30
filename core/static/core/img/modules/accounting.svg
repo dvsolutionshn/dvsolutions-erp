@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" role="img" aria-label="Contabilidad">
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eef6ff"/><stop offset="1" stop-color="#f8efe2"/></linearGradient><linearGradient id="a" x1="0" x2="1"><stop stop-color="#2256d8"/><stop offset="1" stop-color="#17a6a1"/></linearGradient></defs>
+  <rect width="640" height="260" rx="26" fill="url(#bg)"/>
+  <circle cx="548" cy="54" r="64" fill="#dff3f1"/>
+  <rect x="70" y="54" width="250" height="158" rx="18" fill="#fff" stroke="#c8d7ea" stroke-width="3"/>
+  <rect x="96" y="82" width="120" height="14" rx="7" fill="#9bb3d4"/>
+  <rect x="96" y="118" width="184" height="12" rx="6" fill="#dbe6f5"/>
+  <rect x="96" y="148" width="164" height="12" rx="6" fill="#dbe6f5"/>
+  <rect x="96" y="178" width="194" height="12" rx="6" fill="#dbe6f5"/>
+  <rect x="365" y="66" width="160" height="146" rx="20" fill="#102338"/>
+  <rect x="388" y="92" width="114" height="28" rx="10" fill="url(#a)"/>
+  <g fill="#fff"><rect x="388" y="138" width="26" height="22" rx="6"/><rect x="432" y="138" width="26" height="22" rx="6"/><rect x="476" y="138" width="26" height="22" rx="6"/><rect x="388" y="174" width="26" height="22" rx="6"/><rect x="432" y="174" width="26" height="22" rx="6"/><rect x="476" y="174" width="26" height="22" rx="6"/></g>
+</svg>

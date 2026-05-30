@@ -1,4 +1,5 @@
 {% extends "core/erp_base.html" %}
+{% load static %}
 
 {% block title %}Panel Principal - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Centro de Control{% endblock %}
@@ -78,6 +79,50 @@
     transition:transform .22s ease, border-color .22s ease, box-shadow .22s ease;
     animation:erpCardRise .48s ease both;
 }
+.erp-dashboard-module-content{
+    position:relative;
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    flex:1;
+}
+.erp-module-visual{
+    position:relative;
+    z-index:1;
+    height:116px;
+    margin:-6px -6px 18px;
+    border-radius:14px;
+    overflow:hidden;
+    background:linear-gradient(135deg, #f8fbff, #eef6ff);
+    border:1px solid rgba(190, 207, 232, .7);
+}
+.erp-module-visual::before{
+    content:"";
+    position:absolute;
+    inset:-40% auto auto -20%;
+    width:70%;
+    height:130%;
+    transform:rotate(18deg);
+    background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.62), rgba(255,255,255,0));
+    opacity:.54;
+    animation:erpModuleSweep 5.8s ease-in-out infinite;
+}
+.erp-module-visual img{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    transform:scale(1.01);
+    transition:transform .42s ease, filter .42s ease;
+}
+.erp-dashboard-module:hover .erp-module-visual img{
+    transform:scale(1.07) translateY(-3px);
+    filter:saturate(1.08);
+}
+.erp-dashboard-module:hover .erp-module-visual::before{
+    animation-duration:2.4s;
+}
 .erp-dashboard-module:nth-child(2){ animation-delay:.05s; }
 .erp-dashboard-module:nth-child(3){ animation-delay:.1s; }
 .erp-dashboard-module:nth-child(4){ animation-delay:.15s; }
@@ -91,6 +136,10 @@
     bottom:0;
     width:4px;
     background:linear-gradient(180deg, var(--primary), rgba(31,94,168,.12));
+}
+.erp-dashboard-module > *{
+    position:relative;
+    z-index:1;
 }
 .erp-dashboard-module:hover{
     transform:translateY(-4px);
@@ -339,6 +388,10 @@
         transform:translateY(0);
     }
 }
+@keyframes erpModuleSweep{
+    0%, 58%{transform:translateX(-120%) rotate(18deg);}
+    100%{transform:translateX(260%) rotate(18deg);}
+}
 @media (max-width: 980px){
     .erp-dashboard-hero{
         grid-template-columns:1fr;
@@ -395,6 +448,7 @@
             {% if modulo.codigo == "facturacion" %}
                 {% if erp_access.modulo_facturacion %}
             <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div>
                 <div class="erp-kpi-label">Modulo Financiero</div>
                 <h3>Facturacion</h3>
                 <p>Facturas, notas de credito, recibos, clientes, productos y control fiscal dentro de una misma operacion integrada.</p>
@@ -404,15 +458,27 @@
             {% elif modulo.codigo == "contabilidad" %}
                 {% if erp_access.modulo_contabilidad %}
             <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/accounting.svg' %}" alt="" aria-hidden="true"></div>
                 <div class="erp-kpi-label">Modulo Financiero</div>
                 <h3>Contabilidad</h3>
                 <p>Catalogo contable, asientos, partidas y base financiera institucional conectada con el crecimiento del ERP.</p>
                 <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/contabilidad/">Ingresar al modulo</a></div>
             </article>
                 {% endif %}
+            {% elif modulo.codigo == "recibos" %}
+                {% if erp_access.recibos %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/receipts.svg' %}" alt="" aria-hidden="true"></div>
+                <div class="erp-kpi-label">Cobranza</div>
+                <h3>Recibos</h3>
+                <p>Comprobantes de pago formales con concepto, PDF y trazabilidad directa hacia facturas y clientes.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/recibos/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
             {% elif modulo.codigo == "rrhh" %}
                 {% if erp_access.modulo_rrhh %}
             <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/hr.svg' %}" alt="" aria-hidden="true"></div>
                 <div class="erp-kpi-label">Talento</div>
                 <h3>Recursos Humanos</h3>
                 <p>Expedientes, planillas, deducciones, vacaciones, vouchers PDF y comunicacion con empleados.</p>
@@ -422,6 +488,7 @@
             {% elif modulo.codigo == "crm_marketing" %}
                 {% if erp_access.modulo_crm %}
             <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/crm.svg' %}" alt="" aria-hidden="true"></div>
                 <div class="erp-kpi-label">Relacion Comercial</div>
                 <h3>CRM y Marketing</h3>
                 <p>Campanias, cumpleanos, WhatsApp Business, promociones y fechas de producto.</p>
@@ -431,6 +498,7 @@
             {% elif modulo.codigo == "agenda_citas" %}
                 {% if erp_access.modulo_citas %}
             <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/appointments.svg' %}" alt="" aria-hidden="true"></div>
                 <div class="erp-kpi-label">Agenda</div>
                 <h3>Citas</h3>
                 <p>Calendario de citas por cliente, producto o servicio, con recordatorios por WhatsApp.</p>
@@ -439,6 +507,7 @@
                 {% endif %}
             {% else %}
             <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/module-generic.svg' %}" alt="" aria-hidden="true"></div>
                 <div class="erp-kpi-label">Modulo Empresarial</div>
                 <h3>{{ modulo.nombre }}</h3>
                 <p>Espacio preparado para futuras capacidades del ERP con una linea visual unificada.</p>
@@ -449,6 +518,7 @@
         {% endfor %}
         {% if not erp_access.modulo_contabilidad %}
         <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-module-visual"><img src="{% static 'core/img/modules/accounting.svg' %}" alt="" aria-hidden="true"></div>
             <div class="erp-kpi-label">Finanzas</div>
             <div class="erp-module-status upgrade">Actualiza tu plan</div>
             <h3>Contabilidad</h3>
@@ -461,6 +531,7 @@
         {% endif %}
         {% if not erp_access.modulo_rrhh %}
         <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-module-visual"><img src="{% static 'core/img/modules/hr.svg' %}" alt="" aria-hidden="true"></div>
             <div class="erp-kpi-label">Talento</div>
             <div class="erp-module-status upgrade">Actualiza tu plan</div>
             <h3>Recursos Humanos</h3>
@@ -473,6 +544,7 @@
         {% endif %}
         {% if not erp_access.modulo_crm %}
         <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-module-visual"><img src="{% static 'core/img/modules/crm.svg' %}" alt="" aria-hidden="true"></div>
             <div class="erp-kpi-label">Clientes</div>
             <div class="erp-module-status upgrade">Escala tu alcance</div>
             <h3>CRM y Marketing</h3>
@@ -485,6 +557,7 @@
         {% endif %}
         {% if not erp_access.modulo_citas %}
         <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-module-visual"><img src="{% static 'core/img/modules/appointments.svg' %}" alt="" aria-hidden="true"></div>
             <div class="erp-kpi-label">Agenda</div>
             <div class="erp-module-status upgrade">Escala tu alcance</div>
             <h3>Citas</h3>
