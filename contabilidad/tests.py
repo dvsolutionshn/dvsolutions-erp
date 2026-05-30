@@ -874,6 +874,31 @@ class ContabilidadTests(TestCase):
         self.assertRedirects(response, reverse("catalogo_cuentas", args=[self.empresa.slug]))
         self.assertTrue(CuentaContable.objects.filter(empresa=self.empresa, codigo="1101").exists())
 
+    def test_crear_cuenta_contable_duplicada_no_genera_error_500(self):
+        CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="1101",
+            nombre="Caja Existente",
+            tipo="activo",
+        )
+        self.client.login(username="contador", password="pass12345")
+
+        response = self.client.post(
+            reverse("crear_cuenta_contable", args=[self.empresa.slug]),
+            {
+                "codigo": "1101",
+                "nombre": "Caja Duplicada",
+                "tipo": "activo",
+                "descripcion": "",
+                "acepta_movimientos": "on",
+                "activa": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ya existe una cuenta contable con este codigo")
+        self.assertEqual(CuentaContable.objects.filter(empresa=self.empresa, codigo="1101").count(), 1)
+
     def test_puede_cargar_catalogo_base_honduras_sin_duplicar_existentes(self):
         CuentaContable.objects.create(
             empresa=self.empresa,

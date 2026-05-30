@@ -3,7 +3,7 @@ from collections import defaultdict
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from decimal import Decimal
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -979,15 +979,33 @@ def crear_cuenta_contable(request, empresa_slug):
     if request.method == "POST" and form.is_valid():
         cuenta = form.save(commit=False)
         cuenta.empresa = empresa
-        cuenta.full_clean()
-        cuenta.save()
-        messages.success(request, f"Cuenta {cuenta.codigo} creada correctamente.")
-        return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
+        try:
+            cuenta.full_clean()
+            cuenta.save()
+        except ValidationError as error:
+            _agregar_errores_validacion_form(form, error)
+        except IntegrityError:
+            form.add_error("codigo", "Ya existe una cuenta contable con este codigo en esta empresa.")
+        else:
+            messages.success(request, f"Cuenta {cuenta.codigo} creada correctamente.")
+            return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
     return render(request, "contabilidad/cuenta_form.html", {
         "empresa": empresa,
         "form": form,
         "titulo": "Nueva Cuenta Contable",
     })
+
+
+def _agregar_errores_validacion_form(form, error):
+    if hasattr(error, "message_dict"):
+        for campo, mensajes in error.message_dict.items():
+            destino = campo if campo in form.fields else None
+            for mensaje in mensajes:
+                form.add_error(destino, mensaje)
+        return
+    mensajes = error.messages if hasattr(error, "messages") else [str(error)]
+    for mensaje in mensajes:
+        form.add_error(None, mensaje)
 
 
 @login_required
@@ -1024,10 +1042,16 @@ def editar_cuenta_contable(request, empresa_slug, cuenta_id):
     form = CuentaContableForm(request.POST or None, instance=cuenta, empresa=empresa)
     if request.method == "POST" and form.is_valid():
         cuenta = form.save(commit=False)
-        cuenta.full_clean()
-        cuenta.save()
-        messages.success(request, f"Cuenta {cuenta.codigo} actualizada correctamente.")
-        return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
+        try:
+            cuenta.full_clean()
+            cuenta.save()
+        except ValidationError as error:
+            _agregar_errores_validacion_form(form, error)
+        except IntegrityError:
+            form.add_error("codigo", "Ya existe una cuenta contable con este codigo en esta empresa.")
+        else:
+            messages.success(request, f"Cuenta {cuenta.codigo} actualizada correctamente.")
+            return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
     return render(request, "contabilidad/cuenta_form.html", {
         "empresa": empresa,
         "form": form,

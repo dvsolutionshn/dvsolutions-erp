@@ -38,6 +38,15 @@ class CuentaContableForm(forms.ModelForm):
             if help_text:
                 self.fields[field_name].help_text = help_text
 
+    def clean_codigo(self):
+        codigo = (self.cleaned_data.get("codigo") or "").strip()
+        empresa = getattr(self.instance, "empresa", None)
+        if empresa and codigo:
+            existe = CuentaContable.objects.filter(empresa=empresa, codigo__iexact=codigo).exclude(pk=self.instance.pk)
+            if existe.exists():
+                raise forms.ValidationError("Ya existe una cuenta contable con este codigo en esta empresa.")
+        return codigo
+
 
 class ImportarCatalogoCuentasForm(forms.Form):
     archivo = forms.FileField(
