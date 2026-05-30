@@ -41,6 +41,7 @@ urlpatterns = [
     path("asientos/", views.asientos_contables, name="asientos_contables"),
     path("asientos/crear/", views.crear_asiento_contable, name="crear_asiento_contable"),
     path("asientos/<int:asiento_id>/", views.ver_asiento_contable, name="ver_asiento_contable"),
+    path("asientos/<int:asiento_id>/editar/", views.editar_asiento_contable, name="editar_asiento_contable"),
     path("asientos/<int:asiento_id>/duplicar/", views.duplicar_asiento_contable, name="duplicar_asiento_contable"),
     path("asientos/<int:asiento_id>/reversar/", views.reversar_asiento_contable, name="reversar_asiento_contable"),
     path("asientos/<int:asiento_id>/contabilizar/", views.contabilizar_asiento_contable, name="contabilizar_asiento_contable"),

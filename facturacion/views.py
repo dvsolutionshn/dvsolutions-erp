@@ -30,7 +30,9 @@ from pathlib import Path
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, Usuario
 from contabilidad.services import (
+    asegurar_cuenta_contable_cliente,
     asegurar_cuentas_financieras_base_honduras,
+    cargar_catalogo_base_honduras,
     registrar_asiento_compra_aplicada,
     registrar_asiento_factura_emitida,
     registrar_asiento_nota_credito,
@@ -44,6 +46,36 @@ from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 
 logger = logging.getLogger(__name__)
+
+
+def _cuentas_financieras_activas_para_pago(empresa):
+    asegurar_cuentas_financieras_base_honduras(empresa)
+    cuentas = CuentaFinanciera.objects.filter(
+        empresa=empresa,
+        activa=True,
+    ).select_related("cuenta_contable").order_by("nombre")
+    if not cuentas.exists():
+        cargar_catalogo_base_honduras(empresa)
+        cuentas = CuentaFinanciera.objects.filter(
+            empresa=empresa,
+            activa=True,
+        ).select_related("cuenta_contable").order_by("nombre")
+    return cuentas
+
+
+def _form_data_pago_por_defecto(cuentas_financieras):
+    cuenta = cuentas_financieras.first()
+    return {
+        "cuenta_financiera": str(cuenta.id) if cuenta else "",
+    }
+
+
+def _cuenta_financiera_por_defecto(cuentas_financieras, metodo=None):
+    if metodo == "efectivo":
+        return cuentas_financieras.filter(tipo="caja").first() or cuentas_financieras.first()
+    if metodo == "tarjeta":
+        return cuentas_financieras.filter(tipo="tarjeta_credito").first() or cuentas_financieras.first()
+    return cuentas_financieras.filter(tipo="banco").first() or cuentas_financieras.first()
 
 
 # =====================================================
@@ -1064,6 +1096,7 @@ def crear_cliente(request, empresa_slug):
                 cliente = form.save(commit=False)
                 cliente.empresa = empresa
                 cliente.save()
+                asegurar_cuenta_contable_cliente(cliente)
                 if quick_mode:
                     return render(request, "facturacion/crear_cliente_rapido_modal.html", {
                         "empresa": empresa,
@@ -1113,7 +1146,8 @@ def editar_cliente(request, empresa_slug, cliente_id):
         form = ClienteForm(request.POST, instance=cliente)
         if form.is_valid():
             try:
-                form.save()
+                cliente = form.save()
+                asegurar_cuenta_contable_cliente(cliente)
                 messages.success(request, "Cliente actualizado correctamente.")
                 return redirect("clientes_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
@@ -2426,7 +2460,7 @@ def anular_compra(request, empresa_slug, compra_id):
 @login_required
 def registrar_pago_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    asegurar_cuentas_financieras_base_honduras(empresa)
+    _cuentas_financieras_activas_para_pago(empresa)
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related('pagos_compra'),
         id=compra_id,
@@ -4002,8 +4036,7 @@ def registrar_pago(request, empresa_slug, factura_id):
     es_modal = request.GET.get("modal") == "1"
     template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    asegurar_cuentas_financieras_base_honduras(empresa)
-    cuentas_financieras = CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related('cuenta_contable').order_by('nombre')
+    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
     cajas = cuentas_financieras.filter(tipo='caja')
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
@@ -4021,7 +4054,7 @@ def registrar_pago(request, empresa_slug, factura_id):
             "subtotal_pendiente": factura.subtotal_pendiente_cobro,
             "impuesto_pendiente": factura.impuesto_pendiente_cobro,
             "today": timezone.now().date(),
-            "form_data": form_data or {},
+            "form_data": form_data or _form_data_pago_por_defecto(cuentas_financieras),
             "es_modal": es_modal,
         }
 
@@ -4144,7 +4177,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                     if monto_decimal <= 0:
                         error = f"El monto de {etiqueta} debe ser mayor que cero."
                         break
-                    cuenta_mixta = cuentas_financieras.filter(id=cuenta_id).first()
+                    cuenta_mixta = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo_mixto)
                     if not cuenta_mixta:
                         error = f"Selecciona la cuenta financiera para {etiqueta}."
                         break
@@ -4215,7 +4248,7 @@ def registrar_pago(request, empresa_slug, factura_id):
             elif monto_decimal + retencion_isr + retencion_isv > factura.saldo_pendiente:
                 error = "El pago aplicado no puede ser mayor que el saldo pendiente."
             else:
-                cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first()
+                cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
                 cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                 pago_borrador = PagoFactura(
                     factura=factura,
@@ -4360,8 +4393,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         messages.error(request, "No se pueden editar pagos de una factura anulada.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
-    asegurar_cuentas_financieras_base_honduras(empresa)
-    cuentas_financieras = CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related('cuenta_contable').order_by('nombre')
+    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
 
     def _form_data_base():
         return {
@@ -4475,7 +4507,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             monto_decimal = _parsear_decimal(monto, "monto recibido")
             retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
             retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")
-            cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first()
+            cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
             cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
 
             pago_borrador = PagoFactura(

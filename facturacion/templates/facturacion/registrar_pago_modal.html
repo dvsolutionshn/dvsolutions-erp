@@ -208,10 +208,10 @@
                 </div>
                 <div class="erp-field">
                     <label for="cuenta_financiera">Cuenta donde ingreso el pago</label>
-                    <select id="cuenta_financiera" name="cuenta_financiera" required>
+                    <select id="cuenta_financiera" name="cuenta_financiera">
                         <option value="" disabled {% if not form_data.cuenta_financiera %}selected{% endif %}>Seleccione cuenta o caja</option>
                         {% for cuenta in cuentas_financieras %}
-                        <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera == cuenta.id|stringformat:"s" %}selected{% endif %}>
+                        <option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}" {% if form_data.cuenta_financiera == cuenta.id|stringformat:"s" %}selected{% endif %}>
                             {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
                         </option>
                         {% endfor %}
@@ -356,6 +356,15 @@ function actualizarTotalAplicadoSimple(){
     if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
     if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
 }
+function seleccionarCuentaPagoPorMetodo(){
+    const metodo = document.getElementById("metodo");
+    const cuenta = document.getElementById("cuenta_financiera");
+    if(!metodo || !cuenta || cuenta.value){ return; }
+    const tipoPreferido = metodo.value === "efectivo" ? "caja" : (metodo.value === "tarjeta" ? "tarjeta_credito" : "banco");
+    const opciones = Array.from(cuenta.options).filter(option => option.value);
+    const preferida = opciones.find(option => option.dataset.tipo === tipoPreferido) || opciones[0];
+    if(preferida){ cuenta.value = preferida.value; }
+}
 ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].forEach(id => {
     const input = document.getElementById(id);
     if(input){ input.addEventListener("input", actualizarTotalMixto); }
@@ -364,6 +373,9 @@ function actualizarTotalAplicadoSimple(){
     const input = document.getElementById(id);
     if(input){ input.addEventListener("input", () => { actualizarTotalMixto(); actualizarTotalAplicadoSimple(); }); }
 });
+const metodoPago = document.getElementById("metodo");
+if(metodoPago){ metodoPago.addEventListener("change", seleccionarCuentaPagoPorMetodo); }
+seleccionarCuentaPagoPorMetodo();
 actualizarTotalMixto();
 actualizarTotalAplicadoSimple();
 </script>

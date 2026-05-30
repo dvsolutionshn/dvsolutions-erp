@@ -1101,6 +1101,17 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Misma cuenta del cobro")
         self.assertTrue(CuentaFinanciera.objects.filter(empresa=self.empresa, nombre="Caja General", tipo="caja").exists())
 
+    def test_registrar_pago_carga_catalogo_base_si_no_hay_cuentas(self):
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.get(reverse("registrar_pago", args=[self.empresa.slug, factura.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Caja General - 1101 Caja General")
+        self.assertContains(response, "Banco Principal HNL - 110201 Banco Moneda Nacional")
+        self.assertTrue(CuentaContable.objects.filter(empresa=self.empresa, codigo="110201").exists())
+        self.assertTrue(CuentaFinanciera.objects.filter(empresa=self.empresa, nombre="Banco Principal HNL", tipo="banco").exists())
+
     def test_registrar_pago_repara_banco_principal_hnl_a_110201(self):
         cuenta_padre_bancos = CuentaContable.objects.create(
             empresa=self.empresa,
@@ -1355,6 +1366,25 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente Nuevo").exists())
+
+    def test_crear_cliente_genera_cuenta_contable(self):
+        response = self.client.post(
+            reverse("crear_cliente_facturacion", args=[self.empresa.slug]),
+            {
+                "nombre": "Cliente con Cuenta",
+                "rtn": "08011999111112",
+                "direccion": "Tegucigalpa",
+                "ciudad": "Tegucigalpa",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        cliente = Cliente.objects.get(empresa=self.empresa, nombre="Cliente con Cuenta")
+        self.assertIsNotNone(cliente.cuenta_contable_id)
+        self.assertEqual(cliente.cuenta_contable.tipo, "activo")
+        self.assertTrue(cliente.cuenta_contable.acepta_movimientos)
+        self.assertTrue(cliente.cuenta_contable.codigo.startswith("1110."))
 
     def test_crear_cliente_rapido_desde_factura_retorna_payload(self):
         response = self.client.post(

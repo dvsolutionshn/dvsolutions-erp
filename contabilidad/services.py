@@ -332,6 +332,41 @@ def cargar_catalogo_base_honduras(empresa):
     }
 
 
+
+
+def asegurar_cuenta_contable_cliente(cliente):
+    if not cliente or not getattr(cliente, "empresa_id", None):
+        return None
+    if getattr(cliente, "cuenta_contable_id", None):
+        return cliente.cuenta_contable
+
+    cuenta_padre = obtener_o_crear_cuenta_base(cliente.empresa, "clientes")
+    prefijo = f"{cuenta_padre.codigo}."
+    usados = set(
+        CuentaContable.objects.filter(empresa=cliente.empresa, codigo__startswith=prefijo)
+        .values_list("codigo", flat=True)
+    )
+    consecutivo = 1
+    while True:
+        codigo = f"{prefijo}{consecutivo:04d}"
+        if codigo not in usados:
+            break
+        consecutivo += 1
+
+    cuenta = CuentaContable.objects.create(
+        empresa=cliente.empresa,
+        cuenta_padre=cuenta_padre,
+        codigo=codigo,
+        nombre=f"Cliente - {cliente.nombre}",
+        tipo="activo",
+        descripcion=f"Cuenta por cobrar individual del cliente {cliente.nombre}.",
+        acepta_movimientos=True,
+        activa=True,
+    )
+    type(cliente).objects.filter(pk=cliente.pk).update(cuenta_contable=cuenta)
+    cliente.cuenta_contable = cuenta
+    return cuenta
+
 def obtener_configuracion_contable(empresa):
     configuracion, _ = ConfiguracionContableEmpresa.objects.get_or_create(empresa=empresa)
     return configuracion

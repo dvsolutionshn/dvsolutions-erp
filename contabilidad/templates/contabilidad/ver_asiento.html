@@ -11,8 +11,14 @@
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Duplicar</button>
 </form>
+{% if asiento.estado == "borrador" %}
+<a href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Editar</a>
+{% endif %}
 {% if asiento.estado == "borrador" and erp_access.contabilizar_asientos %}
-<a href="{% url 'contabilizar_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Contabilizar</a>
+<form method="post" action="{% url 'contabilizar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button class="erp-action-link" type="submit">Contabilizar</button>
+</form>
 {% endif %}
 {% if asiento.estado == "contabilizado" %}
 <form method="post" action="{% url 'reversar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">

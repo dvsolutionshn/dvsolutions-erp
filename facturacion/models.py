@@ -158,6 +158,13 @@ class Cliente(models.Model):
     )
     direccion = models.TextField(blank=True, null=True)
     ciudad = models.CharField(max_length=100, blank=True, null=True)
+    cuenta_contable = models.ForeignKey(
+        "contabilidad.CuentaContable",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="clientes_cxc",
+    )
 
     activo = models.BooleanField(default=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -359,6 +366,13 @@ class Proveedor(models.Model):
     correo = models.EmailField(blank=True, null=True)
     direccion = models.TextField(blank=True, null=True)
     ciudad = models.CharField(max_length=100, blank=True, null=True)
+    cuenta_contable = models.ForeignKey(
+        "contabilidad.CuentaContable",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="proveedores_cxp",
+    )
     condicion_pago = models.CharField(max_length=20, choices=CONDICIONES_PAGO, default='contado')
     dias_credito = models.PositiveIntegerField(default=0)
 

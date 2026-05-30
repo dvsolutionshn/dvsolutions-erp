@@ -1134,6 +1134,37 @@ class ContabilidadTests(TestCase):
         self.assertEqual(asiento.estado, "contabilizado")
         self.assertTrue(asiento.numero.startswith("ASI-"))
 
+
+    def test_no_guarda_asiento_descuadrado(self):
+        cuenta_debe = CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja", tipo="activo")
+        cuenta_haber = CuentaContable.objects.create(empresa=self.empresa, codigo="4101", nombre="Ventas", tipo="ingreso")
+        self.client.login(username="contador", password="pass12345")
+        response = self.client.post(
+            reverse("crear_asiento_contable", args=[self.empresa.slug]),
+            {
+                "fecha": "2026-04-10",
+                "descripcion": "Registro descuadrado",
+                "referencia": "DOC-002",
+                "origen_modulo": "manual",
+                "estado": "borrador",
+                "lineas-TOTAL_FORMS": "2",
+                "lineas-INITIAL_FORMS": "0",
+                "lineas-MIN_NUM_FORMS": "0",
+                "lineas-MAX_NUM_FORMS": "1000",
+                "lineas-0-cuenta": str(cuenta_debe.id),
+                "lineas-0-detalle": "Debe",
+                "lineas-0-debe": "100.00",
+                "lineas-0-haber": "0.00",
+                "lineas-1-cuenta": str(cuenta_haber.id),
+                "lineas-1-detalle": "Haber",
+                "lineas-1-debe": "0.00",
+                "lineas-1-haber": "90.00",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(AsientoContable.objects.filter(empresa=self.empresa, descripcion="Registro descuadrado").exists())
+        self.assertContains(response, "No se puede guardar el asiento")
+
     def test_formulario_asiento_muestra_busqueda_rapida_de_cuentas(self):
         CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja General", tipo="activo")
         self.client.login(username="contador", password="pass12345")

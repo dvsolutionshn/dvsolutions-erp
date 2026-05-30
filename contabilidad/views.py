@@ -1070,6 +1070,46 @@ def asientos_contables(request, empresa_slug):
     return render(request, "contabilidad/asientos_contables.html", context)
 
 
+
+
+def _totales_lineas_formset(formset):
+    total_debe = Decimal("0.00")
+    total_haber = Decimal("0.00")
+    lineas_validas = 0
+    for form in formset.forms:
+        if not getattr(form, "cleaned_data", None):
+            continue
+        if form.cleaned_data.get("DELETE"):
+            continue
+        cuenta = form.cleaned_data.get("cuenta")
+        debe = form.cleaned_data.get("debe") or Decimal("0.00")
+        haber = form.cleaned_data.get("haber") or Decimal("0.00")
+        if not cuenta and debe == 0 and haber == 0:
+            continue
+        lineas_validas += 1
+        total_debe += debe
+        total_haber += haber
+    return lineas_validas, total_debe, total_haber
+
+
+def _formset_asiento_balanceado(formset):
+    lineas_validas, total_debe, total_haber = _totales_lineas_formset(formset)
+    return lineas_validas >= 2 and total_debe > 0 and total_debe == total_haber
+
+
+def _contexto_form_asiento(empresa, form, formset, titulo, cuentas_disponibles):
+    return {
+        "empresa": empresa,
+        "form": form,
+        "formset": formset,
+        "titulo": titulo,
+        "cuentas_busqueda": [
+            {"id": cuenta.id, "codigo": cuenta.codigo, "nombre": cuenta.nombre}
+            for cuenta in cuentas_disponibles
+        ],
+    }
+
+
 @login_required
 def crear_asiento_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
@@ -1080,11 +1120,7 @@ def crear_asiento_contable(request, empresa_slug):
         activa=True,
         acepta_movimientos=True,
     ).order_by("codigo")
-    formset = LineaAsientoFormSet(
-        request.POST or None,
-        instance=asiento,
-        form_kwargs=None,
-    )
+    formset = LineaAsientoFormSet(request.POST or None, instance=asiento)
     for child_form in formset.forms:
         if "cuenta" in child_form.fields:
             child_form.fields["cuenta"].queryset = cuentas_disponibles
@@ -1094,16 +1130,16 @@ def crear_asiento_contable(request, empresa_slug):
     if request.method == "POST" and form.is_valid() and formset.is_valid():
         if PeriodoContable.fecha_bloqueada(empresa, form.cleaned_data["fecha"]):
             messages.error(request, "No se puede crear el asiento porque el periodo contable esta cerrado.")
-            return render(request, "contabilidad/asiento_form.html", {
-                "empresa": empresa,
-                "form": form,
-                "formset": formset,
-                "titulo": "Nuevo Asiento Contable",
-            })
+            return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Nuevo Asiento Contable", cuentas_disponibles))
+        if not _formset_asiento_balanceado(formset):
+            messages.error(request, "No se puede guardar el asiento: el total del Debe debe ser igual al total del Haber y debe tener al menos dos lineas validas.")
+            return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Nuevo Asiento Contable", cuentas_disponibles))
+
         with transaction.atomic():
             asiento = form.save(commit=False)
             asiento.empresa = empresa
             asiento.creado_por = request.user
+            asiento.estado = "borrador"
             asiento.save()
             formset.instance = asiento
             lineas = formset.save(commit=False)
@@ -1113,40 +1149,70 @@ def crear_asiento_contable(request, empresa_slug):
                 linea.asiento = asiento
                 linea.full_clean()
                 linea.save()
-            if not asiento.lineas.exists():
-                messages.error(request, "Debes agregar al menos una linea al asiento.")
-                return render(request, "contabilidad/asiento_form.html", {
-                    "empresa": empresa,
-                    "form": form,
-                    "formset": formset,
-                    "titulo": "Nuevo Asiento Contable",
-                })
-            if form.cleaned_data.get("contabilizar_ahora"):
-                if asiento.esta_balanceado:
-                    asiento.generar_numero()
-                    asiento.estado = "contabilizado"
-                    asiento.save(update_fields=["numero", "estado"])
-                    messages.success(request, f"Asiento {asiento.numero} contabilizado correctamente.")
-                else:
-                    messages.warning(request, "El asiento se guardo en borrador porque no esta balanceado.")
+            if form.cleaned_data.get("contabilizar_ahora") or form.cleaned_data.get("estado") == "contabilizado":
+                asiento.generar_numero()
+                asiento.estado = "contabilizado"
+                asiento.save(update_fields=["numero", "estado"])
+                messages.success(request, f"Asiento {asiento.numero} contabilizado correctamente.")
             else:
                 messages.success(request, "Asiento guardado correctamente.")
             return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
-    return render(request, "contabilidad/asiento_form.html", {
-        "empresa": empresa,
-        "form": form,
-        "formset": formset,
-        "titulo": "Nuevo Asiento Contable",
-        "cuentas_busqueda": [
-            {
-                "id": cuenta.id,
-                "codigo": cuenta.codigo,
-                "nombre": cuenta.nombre,
-            }
-            for cuenta in cuentas_disponibles
-        ],
-    })
+    return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Nuevo Asiento Contable", cuentas_disponibles))
+
+
+@login_required
+def editar_asiento_contable(request, empresa_slug, asiento_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    asiento = get_object_or_404(AsientoContable.objects.prefetch_related("lineas"), id=asiento_id, empresa=empresa)
+    if asiento.estado != "borrador":
+        messages.error(request, "Solo se pueden editar asientos en borrador. Para corregir un asiento contabilizado, reversalo o duplicalo.")
+        return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
+
+    form = AsientoContableForm(request.POST or None, instance=asiento)
+    cuentas_disponibles = CuentaContable.objects.filter(
+        empresa=empresa,
+        activa=True,
+        acepta_movimientos=True,
+    ).order_by("codigo")
+    formset = LineaAsientoFormSet(request.POST or None, instance=asiento)
+    for child_form in formset.forms:
+        if "cuenta" in child_form.fields:
+            child_form.fields["cuenta"].queryset = cuentas_disponibles
+    if hasattr(formset, "empty_form") and "cuenta" in formset.empty_form.fields:
+        formset.empty_form.fields["cuenta"].queryset = cuentas_disponibles
+
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        if PeriodoContable.fecha_bloqueada(empresa, form.cleaned_data["fecha"]):
+            messages.error(request, "No se puede editar el asiento porque el periodo contable esta cerrado.")
+            return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Editar Asiento Contable", cuentas_disponibles))
+        if not _formset_asiento_balanceado(formset):
+            messages.error(request, "No se puede guardar el asiento: el total del Debe debe ser igual al total del Haber y debe tener al menos dos lineas validas.")
+            return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Editar Asiento Contable", cuentas_disponibles))
+
+        with transaction.atomic():
+            asiento = form.save(commit=False)
+            asiento.empresa = empresa
+            asiento.estado = "borrador"
+            asiento.save()
+            formset.instance = asiento
+            lineas = formset.save(commit=False)
+            for deleted in formset.deleted_objects:
+                deleted.delete()
+            for linea in lineas:
+                linea.asiento = asiento
+                linea.full_clean()
+                linea.save()
+            if form.cleaned_data.get("contabilizar_ahora") or form.cleaned_data.get("estado") == "contabilizado":
+                asiento.generar_numero()
+                asiento.estado = "contabilizado"
+                asiento.save(update_fields=["numero", "estado"])
+                messages.success(request, f"Asiento {asiento.numero} contabilizado correctamente.")
+            else:
+                messages.success(request, "Asiento actualizado correctamente.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
+
+    return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Editar Asiento Contable", cuentas_disponibles))
 
 
 @login_required
