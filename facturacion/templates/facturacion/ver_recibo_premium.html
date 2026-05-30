@@ -7,6 +7,7 @@
 {% block header_description %}Vista documental del comprobante de pago enlazado con su factura, cliente, método y referencia operativa.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'recibos_dashboard' empresa.slug %}">Volver a Recibos</a>
+<a class="erp-action-link" href="{% url 'editar_recibo' empresa.slug recibo.id %}">Editar recibo</a>
 <a class="erp-action-link" href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">Descargar PDF</a>
 {% endblock %}
 
@@ -61,6 +62,7 @@
                     <div class="erp-receipt-meta-item"><span>Factura origen</span><strong><a class="erp-inline-link" href="{% url 'ver_factura' empresa.slug recibo.factura.id %}">{{ recibo.factura.numero_factura|default:recibo.factura.id }}</a></strong></div>
                     <div class="erp-receipt-meta-item"><span>Fecha de pago</span><strong>{{ recibo.fecha }}</strong></div>
                     <div class="erp-receipt-meta-item"><span>Referencia</span><strong>{{ recibo.referencia|default:"-" }}</strong></div>
+                    <div class="erp-receipt-meta-item"><span>Concepto</span><strong>{{ recibo.concepto|default:"Pago de factura" }}</strong></div>
                 </div>
             </div>
             <aside class="erp-receipt-side">
@@ -83,6 +85,7 @@
                     <p>
                         Pago asociado a la factura {{ recibo.factura.numero_factura|default:recibo.factura.id }} para el cliente {{ recibo.cliente.nombre }}.
                         {% if recibo.referencia %}<br>Referencia registrada: {{ recibo.referencia }}.{% endif %}
+                        {% if recibo.concepto %}<br>Concepto: {{ recibo.concepto }}{% endif %}
                     </p>
                 </div>
             </div>

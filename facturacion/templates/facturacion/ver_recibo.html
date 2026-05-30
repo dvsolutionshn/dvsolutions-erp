@@ -17,6 +17,7 @@ body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f3f5;
 <div class="topbar">
     <h2>Recibo {{ recibo.numero_recibo }}</h2>
     <a href="{% url 'recibos_dashboard' empresa.slug %}">Volver</a>
+    <a href="{% url 'editar_recibo' empresa.slug recibo.id %}">Editar</a>
 </div>
 <div class="container">
     <div class="card">
@@ -28,6 +29,7 @@ body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f3f5;
         <p><strong>Factura:</strong> {{ recibo.factura.numero_factura|default:recibo.factura.id }}</p>
         <p><strong>Método:</strong> {{ recibo.get_metodo_display }}</p>
         <p><strong>Referencia:</strong> {{ recibo.referencia|default:"-" }}</p>
+        <p><strong>Concepto:</strong> {{ recibo.concepto|default:"Pago de factura" }}</p>
         <p><strong>Monto recibido:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</p>
         <p><strong>Retenciones:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_retenciones|floatformat:2|intcomma }}</p>
         <p><strong>Total aplicado:</strong> {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.pago.total_aplicado|floatformat:2|intcomma }}</p>

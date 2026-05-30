@@ -1,6 +1,6 @@
 from django import forms
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
-from .models import CAI, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
 
@@ -23,6 +23,16 @@ class PagoFacturaForm(forms.ModelForm):
     class Meta:
         model = PagoFactura
         fields = ['monto', 'retencion_isr', 'retencion_isv', 'metodo', 'referencia']
+
+
+class ReciboPagoForm(forms.ModelForm):
+    class Meta:
+        model = ReciboPago
+        fields = ['fecha', 'referencia', 'concepto']
+        widgets = {
+            'fecha': forms.DateInput(attrs={'type': 'date'}),
+            'concepto': forms.Textarea(attrs={'rows': 4}),
+        }
 
 
 class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):

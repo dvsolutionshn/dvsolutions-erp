@@ -1876,6 +1876,7 @@ class PagoFactura(models.Model):
                 'monto': self.monto,
                 'metodo': self.metodo,
                 'referencia': self.referencia,
+                'concepto': f"Pago aplicado a factura {self.factura.numero_factura or self.factura.id}",
             }
         )
         cambios_recibo = []
@@ -1958,6 +1959,7 @@ class ReciboPago(models.Model):
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     metodo = models.CharField(max_length=20, choices=PagoFactura.METODOS, default='efectivo')
     referencia = models.CharField(max_length=100, blank=True, null=True)
+    concepto = models.TextField(blank=True, null=True)
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 

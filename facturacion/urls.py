@@ -55,6 +55,7 @@ urlpatterns = [
     path('notas-credito/', views.notas_credito_dashboard, name='notas_credito_dashboard'),
     path('recibos/', views.recibos_dashboard, name='recibos_dashboard'),
     path('recibos/<int:recibo_id>/', views.ver_recibo, name='ver_recibo'),
+    path('recibos/<int:recibo_id>/editar/', views.editar_recibo, name='editar_recibo'),
     path('recibos/<int:recibo_id>/pdf/', views.descargar_recibo_pdf, name='descargar_recibo_pdf'),
     path('egresos/', views.egresos_dashboard, name='egresos_dashboard'),
     path('egresos/<int:comprobante_id>/', views.ver_comprobante_egreso, name='ver_comprobante_egreso'),

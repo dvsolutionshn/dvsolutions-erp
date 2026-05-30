@@ -55,6 +55,7 @@ td{padding:8px 10px;border-bottom:1px solid #eee;font-size:14px;}
             <td class="monto">{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</td>
             <td class="actions">
                 <a href="{% url 'ver_recibo' empresa.slug recibo.id %}">Ver</a>
+                <a href="{% url 'editar_recibo' empresa.slug recibo.id %}">Editar</a>
                 <a href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">PDF</a>
             </td>
         </tr>

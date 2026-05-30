@@ -104,6 +104,7 @@
                     <td>
                         <div class="erp-receipt-number">{{ recibo.numero_recibo }}</div>
                         <div class="erp-receipt-meta">Referencia: {{ recibo.referencia|default:"Sin referencia" }}</div>
+                        <div class="erp-receipt-meta">Concepto: {{ recibo.concepto|default:"Pago de factura" }}</div>
                     </td>
                     <td>{{ recibo.fecha }}</td>
                     <td>
@@ -116,7 +117,7 @@
                     </td>
                     <td><span class="erp-badge info">{{ recibo.get_metodo_display }}</span></td>
                     <td class="amount"><span class="erp-money">{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</span></td>
-                    <td class="actions"><a class="erp-chip-link" href="{% url 'ver_recibo' empresa.slug recibo.id %}">Ver</a><a class="erp-chip-link" href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">PDF</a></td>
+                    <td class="actions"><a class="erp-chip-link" href="{% url 'ver_recibo' empresa.slug recibo.id %}">Ver</a><a class="erp-chip-link" href="{% url 'editar_recibo' empresa.slug recibo.id %}">Editar</a><a class="erp-chip-link" href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">PDF</a></td>
                 </tr>
             {% empty %}
                 <tr><td colspan="7" class="erp-empty">No hay recibos registrados.</td></tr>
@@ -132,7 +133,7 @@
 document.addEventListener("DOMContentLoaded", function(){
     const input = document.getElementById("q");
     const panel = document.getElementById("recibos-sugerencias");
-    const sugerencias = [{% for recibo in recibos %}"{{ recibo.numero_recibo|escapejs }}","{{ recibo.cliente.nombre|escapejs }}","{{ recibo.factura.numero_factura|default:recibo.factura.id|escapejs }}"{% if recibo.referencia %},"{{ recibo.referencia|escapejs }}"{% endif %},{% endfor %}];
+    const sugerencias = [{% for recibo in recibos %}"{{ recibo.numero_recibo|escapejs }}","{{ recibo.cliente.nombre|escapejs }}","{{ recibo.factura.numero_factura|default:recibo.factura.id|escapejs }}"{% if recibo.referencia %},"{{ recibo.referencia|escapejs }}"{% endif %}{% if recibo.concepto %},"{{ recibo.concepto|escapejs }}"{% endif %},{% endfor %}];
     if(!input || !panel){ return; }
     function renderSuggestions(){
         const term = (input.value || "").trim().toLowerCase();

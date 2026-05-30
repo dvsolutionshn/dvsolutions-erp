@@ -574,6 +574,10 @@ class FacturacionTests(TestCase):
         self.assertEqual(pago.recibo.factura, factura)
         self.assertEqual(pago.recibo.cliente, factura.cliente)
         self.assertEqual(pago.recibo.monto, Decimal("50.00"))
+        self.assertEqual(
+            pago.recibo.concepto,
+            f"Pago aplicado a factura {factura.numero_factura or factura.id}",
+        )
 
     def test_pago_cliente_usa_cuenta_financiera_en_asiento(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
@@ -1149,11 +1153,41 @@ class FacturacionTests(TestCase):
             metodo="efectivo",
             fecha=date.today(),
         )
+        pago.recibo.concepto = "Abono parcial por transferencia"
+        pago.recibo.save(update_fields=["concepto"])
 
         response = self.client.get(reverse("recibos_dashboard", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, pago.recibo.numero_recibo)
+        self.assertContains(response, "Abono parcial por transferencia")
+
+    def test_editar_recibo_actualiza_concepto_documental(self):
+        factura = self.crear_factura_con_linea()
+        pago = PagoFactura.objects.create(
+            factura=factura,
+            monto=Decimal("50.00"),
+            metodo="efectivo",
+            fecha=date.today(),
+            referencia="REF-001",
+        )
+
+        response = self.client.post(
+            reverse("editar_recibo", args=[self.empresa.slug, pago.recibo.id]),
+            {
+                "fecha": "2026-05-30",
+                "referencia": "REF-EDITADA",
+                "concepto": "Cancelacion parcial de factura segun acuerdo",
+            },
+        )
+
+        self.assertRedirects(response, reverse("ver_recibo", args=[self.empresa.slug, pago.recibo.id]))
+        pago.recibo.refresh_from_db()
+        self.assertEqual(str(pago.recibo.fecha), "2026-05-30")
+        self.assertEqual(pago.recibo.referencia, "REF-EDITADA")
+        self.assertEqual(pago.recibo.concepto, "Cancelacion parcial de factura segun acuerdo")
+        pago.refresh_from_db()
+        self.assertEqual(pago.monto, Decimal("50.00"))
 
     def test_recibo_pago_usa_consecutivo_global_y_no_repite_entre_empresas(self):
         otra_empresa = Empresa.objects.create(nombre="Otra empresa", slug="otra-empresa")

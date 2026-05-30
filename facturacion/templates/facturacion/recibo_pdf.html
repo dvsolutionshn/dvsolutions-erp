@@ -33,6 +33,7 @@
         <div class="row"><strong>Factura:</strong> {{ recibo.factura.numero_factura|default:recibo.factura.id }}</div>
         <div class="row"><strong>Método:</strong> {{ recibo.get_metodo_display }}</div>
         <div class="row"><strong>Referencia:</strong> {{ recibo.referencia|default:"-" }}</div>
+        <div class="row"><strong>Concepto:</strong> {{ recibo.concepto|default:"Pago de factura" }}</div>
     </div>
 
     <div class="card">

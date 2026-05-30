@@ -41,7 +41,7 @@ from contabilidad.services import (
     registrar_reversion_documento,
 )
 from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
-from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, DATE_INPUT_FORMATS_LATAM, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
+from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, DATE_INPUT_FORMATS_LATAM, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 
@@ -2927,6 +2927,7 @@ def recibos_dashboard(request, empresa_slug):
             Q(numero_recibo__icontains=q) |
             Q(cliente__nombre__icontains=q) |
             Q(referencia__icontains=q) |
+            Q(concepto__icontains=q) |
             Q(factura__numero_factura__icontains=q)
         )
     resumen = {
@@ -2967,6 +2968,27 @@ def ver_recibo(request, empresa_slug, recibo_id):
         "recibo": recibo,
         "pagos_factura": pagos_factura,
         "total_pagos_previos": total_pagos_previos,
+    })
+
+
+@login_required
+def editar_recibo(request, empresa_slug, recibo_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    recibo = get_object_or_404(
+        ReciboPago.objects.select_related('cliente', 'factura', 'pago'),
+        id=recibo_id,
+        empresa=empresa,
+    )
+    form = ReciboPagoForm(request.POST or None, instance=recibo)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Recibo {recibo.numero_recibo} actualizado correctamente.")
+        return redirect("ver_recibo", empresa_slug=empresa.slug, recibo_id=recibo.id)
+
+    return render(request, "facturacion/editar_recibo_premium.html", {
+        "empresa": empresa,
+        "recibo": recibo,
+        "form": form,
     })
 
 

@@ -1,0 +1,78 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Editar recibo {{ recibo.numero_recibo }}{% endblock %}
+{% block header_kicker %}Cobranza{% endblock %}
+{% block header_title %}Editar recibo {{ recibo.numero_recibo }}{% endblock %}
+{% block header_description %}Ajusta los datos documentales del comprobante sin alterar el pago ni su asiento contable.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'ver_recibo' empresa.slug recibo.id %}">Volver al recibo</a>
+<a class="erp-action-link" href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">Descargar PDF</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-receipt-edit .erp-field-span-full{grid-column:1 / -1;}
+.erp-receipt-edit textarea{min-height:118px;}
+.erp-receipt-lock-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:12px;}
+.erp-receipt-lock-item{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fbfcfe;}
+.erp-receipt-lock-item span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px;}
+.erp-receipt-lock-item strong{color:#102338;}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-compact-form erp-receipt-edit is-dense">
+    <form method="post" class="erp-compact-form is-dense">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <section class="erp-compact-card is-slim">
+            <ul class="erp-field-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        </section>
+        {% endif %}
+
+        <section class="erp-compact-card is-slim">
+            <h3>Datos documentales</h3>
+            <p>Estos campos salen en la vista y PDF del recibo. El monto, metodo y cuenta se controlan desde el pago para mantener la contabilidad consistente.</p>
+            <div class="erp-compact-grid two-col is-tight" style="margin-top:12px;">
+                <div class="erp-field">
+                    {{ form.fecha.label_tag }}
+                    {{ form.fecha }}
+                    {% if form.fecha.errors %}<ul class="erp-field-errors">{% for error in form.fecha.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field">
+                    {{ form.referencia.label_tag }}
+                    {{ form.referencia }}
+                    {% if form.referencia.errors %}<ul class="erp-field-errors">{% for error in form.referencia.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field erp-field-span-full">
+                    {{ form.concepto.label_tag }}
+                    {{ form.concepto }}
+                    {% if form.concepto.help_text %}<div class="erp-field-help">{{ form.concepto.help_text }}</div>{% endif %}
+                    {% if form.concepto.errors %}<ul class="erp-field-errors">{% for error in form.concepto.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="erp-compact-card is-slim">
+            <h3>Datos bloqueados del pago</h3>
+            <div class="erp-receipt-lock-grid">
+                <div class="erp-receipt-lock-item"><span>Cliente</span><strong>{{ recibo.cliente.nombre }}</strong></div>
+                <div class="erp-receipt-lock-item"><span>Factura</span><strong>{{ recibo.factura.numero_factura|default:recibo.factura.id }}</strong></div>
+                <div class="erp-receipt-lock-item"><span>Metodo</span><strong>{{ recibo.get_metodo_display }}</strong></div>
+                <div class="erp-receipt-lock-item"><span>Monto recibido</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
+            </div>
+        </section>
+
+        <section class="erp-compact-card is-slim">
+            <div class="erp-form-actions">
+                <div class="erp-field-help">Para cambiar monto, metodo o cuenta, edita el pago de la factura.</div>
+                <div class="erp-actions-right">
+                    <a class="erp-btn-secondary" href="{% url 'ver_recibo' empresa.slug recibo.id %}">Cancelar</a>
+                    <button type="submit" class="erp-btn">Guardar recibo</button>
+                </div>
+            </div>
+        </section>
+    </form>
+</section>
+{% endblock %}
