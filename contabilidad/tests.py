@@ -1159,6 +1159,54 @@ class ContabilidadTests(TestCase):
         self.assertEqual(asiento.estado, "contabilizado")
         self.assertTrue(asiento.numero.startswith("ASI-"))
 
+    def test_puede_regresar_asiento_contabilizado_a_borrador_para_editar(self):
+        cuenta_debe = CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja", tipo="activo")
+        cuenta_haber = CuentaContable.objects.create(empresa=self.empresa, codigo="4101", nombre="Ventas", tipo="ingreso")
+        asiento = AsientoContable.objects.create(
+            empresa=self.empresa,
+            numero="ASI-00000001",
+            fecha=date(2026, 4, 10),
+            descripcion="Asiento corregible",
+            referencia="DOC-003",
+            estado="contabilizado",
+            creado_por=self.usuario,
+        )
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_debe, debe=Decimal("100.00"))
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_haber, haber=Decimal("100.00"))
+        self.client.login(username="contador", password="pass12345")
+
+        response = self.client.post(reverse("regresar_asiento_borrador", args=[self.empresa.slug, asiento.id]))
+
+        self.assertRedirects(response, reverse("ver_asiento_contable", args=[self.empresa.slug, asiento.id]))
+        asiento.refresh_from_db()
+        self.assertEqual(asiento.estado, "borrador")
+        self.assertEqual(asiento.numero, "ASI-00000001")
+        response = self.client.get(reverse("ver_asiento_contable", args=[self.empresa.slug, asiento.id]))
+        self.assertContains(response, "Editar")
+
+    def test_no_regresa_asiento_a_borrador_si_periodo_esta_cerrado(self):
+        cuenta_debe = CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja", tipo="activo")
+        cuenta_haber = CuentaContable.objects.create(empresa=self.empresa, codigo="4101", nombre="Ventas", tipo="ingreso")
+        asiento = AsientoContable.objects.create(
+            empresa=self.empresa,
+            numero="ASI-00000002",
+            fecha=date(2026, 4, 10),
+            descripcion="Asiento protegido",
+            referencia="DOC-004",
+            estado="contabilizado",
+            creado_por=self.usuario,
+        )
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_debe, debe=Decimal("100.00"))
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_haber, haber=Decimal("100.00"))
+        PeriodoContable.objects.create(empresa=self.empresa, anio=2026, mes=4, estado="cerrado")
+        self.client.login(username="contador", password="pass12345")
+
+        response = self.client.post(reverse("regresar_asiento_borrador", args=[self.empresa.slug, asiento.id]))
+
+        self.assertRedirects(response, reverse("ver_asiento_contable", args=[self.empresa.slug, asiento.id]))
+        asiento.refresh_from_db()
+        self.assertEqual(asiento.estado, "contabilizado")
+
 
     def test_no_guarda_asiento_descuadrado(self):
         cuenta_debe = CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja", tipo="activo")

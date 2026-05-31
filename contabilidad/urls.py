@@ -44,6 +44,7 @@ urlpatterns = [
     path("asientos/<int:asiento_id>/editar/", views.editar_asiento_contable, name="editar_asiento_contable"),
     path("asientos/<int:asiento_id>/duplicar/", views.duplicar_asiento_contable, name="duplicar_asiento_contable"),
     path("asientos/<int:asiento_id>/reversar/", views.reversar_asiento_contable, name="reversar_asiento_contable"),
+    path("asientos/<int:asiento_id>/regresar-borrador/", views.regresar_asiento_borrador, name="regresar_asiento_borrador"),
     path("asientos/<int:asiento_id>/contabilizar/", views.contabilizar_asiento_contable, name="contabilizar_asiento_contable"),
     path("reportes/", views.reportes_contables, name="reportes_contables"),
     path("reportes/dashboard-bi/", views.dashboard_bi_financiero, name="dashboard_bi_financiero"),

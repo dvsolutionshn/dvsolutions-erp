@@ -1342,6 +1342,24 @@ def reversar_asiento_contable(request, empresa_slug, asiento_id):
 
 @login_required
 @require_POST
+def regresar_asiento_borrador(request, empresa_slug, asiento_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    asiento = get_object_or_404(AsientoContable, id=asiento_id, empresa=empresa)
+    if asiento.estado != "contabilizado":
+        messages.warning(request, "Solo los asientos contabilizados pueden regresar a borrador.")
+        return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
+    if PeriodoContable.fecha_bloqueada(empresa, asiento.fecha):
+        messages.error(request, "No se puede regresar a borrador porque el periodo contable esta cerrado.")
+        return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
+
+    asiento.estado = "borrador"
+    asiento.save(update_fields=["estado"])
+    messages.success(request, f"Asiento {asiento.numero or asiento.id} regresado a borrador. Ya puedes editarlo y volver a contabilizarlo.")
+    return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
+
+
+@login_required
+@require_POST
 def contabilizar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
     asiento = get_object_or_404(AsientoContable, id=asiento_id, empresa=empresa)

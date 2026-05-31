@@ -21,6 +21,12 @@
 </form>
 {% endif %}
 {% if asiento.estado == "contabilizado" %}
+{% if erp_access.contabilizar_asientos %}
+<form method="post" action="{% url 'regresar_asiento_borrador' empresa.slug asiento.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button class="erp-action-link" type="submit">Regresar a borrador</button>
+</form>
+{% endif %}
 <form method="post" action="{% url 'reversar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Reversar</button>

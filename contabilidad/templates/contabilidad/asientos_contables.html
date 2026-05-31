@@ -77,7 +77,7 @@
                     <td><span class="erp-badge {% if asiento.estado == 'contabilizado' %}success{% elif asiento.estado == 'borrador' %}warning{% else %}danger{% endif %}">{{ asiento.get_estado_display }}</span></td>
                     <td>L. {{ asiento.total_debe }}</td>
                     <td>L. {{ asiento.total_haber }}</td>
-                    <td class="actions"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a>{% if asiento.estado == "borrador" %}<a class="erp-link" href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}">Editar</a>{% endif %}</td>
+                    <td class="actions"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a>{% if asiento.estado == "borrador" %}<a class="erp-link" href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}">Editar</a>{% elif asiento.estado == "contabilizado" and erp_access.contabilizar_asientos %}<form method="post" action="{% url 'regresar_asiento_borrador' empresa.slug asiento.id %}" style="display:inline;">{% csrf_token %}<button class="erp-link" type="submit">A borrador</button></form>{% endif %}</td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="8" class="erp-empty">Todavia no hay asientos creados.</td></tr>
