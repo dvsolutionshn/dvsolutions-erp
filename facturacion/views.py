@@ -165,6 +165,168 @@ def facturas_dashboard(request, empresa_slug):
 
 
 @login_required
+def punto_venta(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not empresa.tiene_modulo_activo("punto_venta"):
+        messages.error(request, "El modulo Punto de Venta no esta activo para esta empresa.")
+        return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
+
+    productos_qs = (
+        Producto.objects.filter(empresa=empresa, activo=True)
+        .select_related("impuesto_predeterminado", "inventario")
+        .order_by("nombre")
+    )
+    impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")
+    impuesto_default = impuestos_qs.first()
+    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+
+    if request.method == "POST":
+        try:
+            payload = json.loads(request.POST.get("payload") or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+
+        items = payload.get("items") or []
+        metodo = (payload.get("metodo") or "efectivo").strip()
+        cuenta_id = payload.get("cuenta_financiera")
+        referencia = (payload.get("referencia") or "").strip()
+        fecha_venta = _parsear_fecha_latam(payload.get("fecha")) or timezone.localdate()
+
+        try:
+            if metodo not in dict(PagoFactura.METODOS):
+                raise ValidationError("Selecciona un metodo de pago valido.")
+            if not impuesto_default and any(not p.impuesto_predeterminado_id for p in productos_qs):
+                raise ValidationError("Configura al menos un impuesto activo antes de usar el punto de venta.")
+            if not items:
+                raise ValidationError("Agrega al menos un producto al carrito.")
+
+            cuenta_financiera = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
+            if not cuenta_financiera:
+                raise ValidationError("Configura una caja o cuenta bancaria activa para cobrar en punto de venta.")
+
+            producto_ids = []
+            for item in items:
+                try:
+                    producto_ids.append(int(item.get("producto_id")))
+                except (TypeError, ValueError):
+                    raise ValidationError("El carrito contiene un producto invalido.")
+
+            productos = {producto.id: producto for producto in productos_qs.filter(id__in=producto_ids)}
+            lineas_preparadas = []
+            for item in items:
+                producto_id = int(item.get("producto_id"))
+                producto = productos.get(producto_id)
+                if not producto:
+                    raise ValidationError("Uno de los productos del carrito ya no esta disponible.")
+                cantidad = Decimal(str(item.get("cantidad") or "0")).quantize(Decimal("0.01"))
+                precio_unitario = Decimal(str(item.get("precio_unitario") or producto.precio)).quantize(Decimal("0.01"))
+                if cantidad <= 0:
+                    raise ValidationError(f"La cantidad de {producto.nombre} debe ser mayor que cero.")
+                if precio_unitario < 0:
+                    raise ValidationError(f"El precio de {producto.nombre} no puede ser negativo.")
+                impuesto = producto.impuesto_predeterminado or impuesto_default
+                if not impuesto:
+                    raise ValidationError(f"El producto {producto.nombre} no tiene impuesto asignado.")
+                lineas_preparadas.append({
+                    "producto": producto,
+                    "cantidad": cantidad,
+                    "precio_unitario": precio_unitario,
+                    "impuesto": impuesto,
+                })
+
+            with transaction.atomic():
+                cliente = Cliente.objects.filter(
+                    empresa=empresa,
+                    nombre__iexact="Consumidor Final",
+                ).first()
+                if not cliente:
+                    cliente = Cliente.objects.create(
+                        empresa=empresa,
+                        nombre="Consumidor Final",
+                        rtn="",
+                        ciudad=empresa.ciudad or "",
+                    )
+                asegurar_cuenta_contable_cliente(cliente)
+
+                factura = Factura.objects.create(
+                    empresa=empresa,
+                    cliente=cliente,
+                    vendedor=request.user,
+                    estado="emitida",
+                    fecha_emision=fecha_venta,
+                    fecha_vencimiento=fecha_venta,
+                    moneda="HNL",
+                    tipo_cambio=Decimal("1.0000"),
+                )
+
+                lineas = [
+                    LineaFactura(
+                        factura=factura,
+                        producto=linea["producto"],
+                        cantidad=linea["cantidad"],
+                        precio_unitario=linea["precio_unitario"],
+                        impuesto=linea["impuesto"],
+                    )
+                    for linea in lineas_preparadas
+                ]
+                for linea in lineas:
+                    linea.save()
+
+                _validar_stock_disponible_para_lineas(lineas)
+                _actualizar_totales_factura(factura)
+                _registrar_salida_factura(factura)
+                registrar_asiento_factura_emitida(factura)
+
+                pago = PagoFactura.objects.create(
+                    factura=factura,
+                    fecha=fecha_venta,
+                    monto=factura.total_documento_ajustado,
+                    metodo=metodo,
+                    referencia=referencia or f"POS {factura.numero_factura or factura.id}",
+                    cuenta_financiera=cuenta_financiera,
+                    cajero=request.user,
+                )
+                registrar_asiento_pago_cliente(pago)
+
+            recibo_numero = pago.recibo.numero_recibo if hasattr(pago, "recibo") else "sin numero"
+            messages.success(
+                request,
+                f"Venta POS registrada. Factura {factura.numero_factura}; recibo {recibo_numero}; total L. {factura.total:.2f}.",
+            )
+            return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        except (InvalidOperation, ValueError) as exc:
+            messages.error(request, f"No se pudo registrar la venta: {exc}")
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        except Exception as exc:
+            logger.exception("Error registrando venta POS para empresa %s", empresa.id)
+            messages.error(request, f"No se pudo registrar la venta POS: {exc}")
+
+    productos_payload = []
+    for producto in productos_qs:
+        impuesto = producto.impuesto_predeterminado or impuesto_default
+        productos_payload.append({
+            "id": producto.id,
+            "nombre": producto.nombre,
+            "codigo": producto.codigo or "",
+            "precio": float(producto.precio or Decimal("0.00")),
+            "impuesto": float(impuesto.porcentaje if impuesto else Decimal("0.00")),
+            "stock": float(producto.stock_actual),
+            "unidad": producto.get_unidad_medida_display(),
+            "controla_inventario": producto.controla_inventario,
+        })
+
+    return render(request, "facturacion/punto_venta.html", {
+        "empresa": empresa,
+        "productos_payload": productos_payload,
+        "productos_count": len(productos_payload),
+        "cuentas_financieras": cuentas_financieras,
+        "fecha_hoy": timezone.localdate().strftime("%Y-%m-%d"),
+        "metodos_pago": PagoFactura.METODOS,
+    })
+
+
+@login_required
 def prefijo_factura_manual(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)

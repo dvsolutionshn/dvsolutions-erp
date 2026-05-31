@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
+import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -187,6 +188,55 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "53,761.71")
+
+    def test_punto_venta_crea_factura_pago_recibo_y_asientos(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "efectivo",
+                    "referencia": "Caja 1",
+                    "items": [
+                        {
+                            "producto_id": self.producto.id,
+                            "cantidad": "2",
+                            "precio_unitario": "100.00",
+                        }
+                    ],
+                })
+            },
+        )
+
+        factura = Factura.objects.get(cliente__nombre="Consumidor Final")
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        self.assertEqual(factura.estado, "emitida")
+        self.assertEqual(factura.total, Decimal("230.00"))
+        self.assertEqual(factura.estado_pago, "pagado")
+        pago = PagoFactura.objects.get(factura=factura)
+        self.assertEqual(pago.monto, Decimal("230.00"))
+        self.assertTrue(ReciboPago.objects.filter(pago=pago, monto=Decimal("230.00")).exists())
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="factura",
+                documento_id=factura.id,
+                estado="contabilizado",
+            ).exists()
+        )
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="pago_factura",
+                documento_id=pago.id,
+                estado="contabilizado",
+            ).exists()
+        )
 
     def test_libro_compras_fiscal_evita_duplicados_entre_meses(self):
         RegistroCompraFiscal.objects.create(

@@ -475,6 +475,16 @@
                 <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/recibos/">Ingresar al modulo</a></div>
             </article>
                 {% endif %}
+            {% elif modulo.codigo == "punto_venta" %}
+                {% if erp_access.modulo_pos %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/pos.svg' %}" alt="" aria-hidden="true"></div>
+                <div class="erp-kpi-label">Venta Directa</div>
+                <h3>Punto de Venta</h3>
+                <p>Caja rapida para tiendas y supermercados, conectada con factura, recibo, inventario y contabilidad.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/pos/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
             {% elif modulo.codigo == "rrhh" %}
                 {% if erp_access.modulo_rrhh %}
             <article class="erp-card erp-module-card erp-dashboard-module">

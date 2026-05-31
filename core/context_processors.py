@@ -10,12 +10,14 @@ def erp_access(request):
 
     facturacion_activa = bool(empresa and empresa.tiene_modulo_activo("facturacion"))
     contabilidad_activa = bool(empresa and empresa.tiene_modulo_activo("contabilidad"))
+    pos_activa = bool(empresa and empresa.tiene_modulo_activo("punto_venta"))
     rrhh_activa = bool(empresa and empresa.tiene_modulo_activo("rrhh"))
     crm_activa = bool(empresa and empresa.tiene_modulo_activo("crm_marketing"))
     citas_activa = bool(empresa and empresa.tiene_modulo_activo("agenda_citas"))
     base = {
         "modulo_facturacion": facturacion_activa and getattr(user, "tiene_alguna_permision_facturacion", False),
         "modulo_contabilidad": contabilidad_activa and getattr(user, "tiene_alguna_permision_contabilidad", False),
+        "modulo_pos": facturacion_activa and pos_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_facturas") and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_productos"),
         "modulo_rrhh": rrhh_activa and getattr(user, "tiene_alguna_permision_rrhh", False),
         "modulo_crm": crm_activa and getattr(user, "tiene_alguna_permision_crm", False),
         "modulo_citas": citas_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_citas"),
