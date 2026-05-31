@@ -1,22 +1,40 @@
 {% extends "core/erp_base.html" %}
+{% load static %}
 
-{% block title %}Facturación - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Módulo Financiero{% endblock %}
-{% block header_title %}Facturación{% endblock %}
-{% block header_description %}Gestión comercial y fiscal con una interfaz coherente, operativa y lista para una ejecución de alto nivel.{% endblock %}
+{% block title %}Facturacion - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Modulo Financiero{% endblock %}
+{% block header_title %}Facturacion{% endblock %}
+{% block header_description %}Gestion comercial y fiscal con una interfaz coherente, operativa y lista para una ejecucion de alto nivel.{% endblock %}
+
+{% block extra_head %}
+<style>
+.erp-facturacion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:stretch;}
+.erp-facturacion-module{position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:360px;animation:erpFacturacionRise .48s ease both;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;}
+.erp-facturacion-module:nth-child(2){animation-delay:.04s}.erp-facturacion-module:nth-child(3){animation-delay:.08s}.erp-facturacion-module:nth-child(4){animation-delay:.12s}.erp-facturacion-module:nth-child(5){animation-delay:.16s}.erp-facturacion-module:nth-child(6){animation-delay:.2s}.erp-facturacion-module:nth-child(7){animation-delay:.24s}.erp-facturacion-module:nth-child(8){animation-delay:.28s}
+.erp-facturacion-module:hover{transform:translateY(-5px);border-color:#c8d7ea;box-shadow:0 20px 42px rgba(12,34,56,.09);}
+.erp-facturacion-visual{position:relative;height:118px;margin:-6px -6px 18px;border-radius:14px;overflow:hidden;border:1px solid rgba(190,207,232,.7);background:#f8fbff;}
+.erp-facturacion-visual::after{content:"";position:absolute;inset:-40% auto auto -20%;width:70%;height:130%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.62),rgba(255,255,255,0));opacity:.55;transform:rotate(18deg);animation:erpFacturacionSweep 5.8s ease-in-out infinite;}
+.erp-facturacion-visual img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.01);transition:transform .42s ease,filter .42s ease;}
+.erp-facturacion-module:hover .erp-facturacion-visual img{transform:scale(1.07) translateY(-3px);filter:saturate(1.08);}
+.erp-facturacion-module h3{margin:8px 0 10px;font-size:22px;color:#102338;}
+.erp-facturacion-module p{margin:0;color:var(--muted);line-height:1.7;}
+@keyframes erpFacturacionRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes erpFacturacionSweep{0%,58%{transform:translateX(-120%) rotate(18deg)}100%{transform:translateX(260%) rotate(18deg)}}
+</style>
+{% endblock %}
 
 {% block content %}
-<div style="display:none;">Facturación Notas de Crédito</div>
+<div style="display:none;">Facturacion Notas de Credito</div>
 <section class="erp-grid">
     <article class="erp-card">
-        <div class="erp-kpi-label">Operación</div>
+        <div class="erp-kpi-label">Operacion</div>
         <div class="erp-stat-value">360</div>
-        <p class="erp-card-muted">Facturación, ajustes, cobranza y reportes integrados en un mismo entorno operativo.</p>
+        <p class="erp-card-muted">Facturacion, ajustes, cobranza y reportes integrados en un mismo entorno operativo.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Fiscal</div>
         <div class="erp-stat-value">CAI</div>
-        <p class="erp-card-muted">Control documental y trazabilidad histórica listos para crecimiento regulado.</p>
+        <p class="erp-card-muted">Control documental y trazabilidad historica listos para crecimiento regulado.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Cobranza</div>
@@ -25,18 +43,18 @@
     </article>
 </section>
 
-<section class="erp-grid">
-    <a class="erp-card erp-module-card" href="{% url 'facturas_dashboard' empresa.slug %}"><div class="erp-kpi-label">Operación</div><h3>Facturación</h3><p>Crear, emitir, revisar y administrar facturas con máxima claridad operativa.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'clientes_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catálogo</div><h3>Clientes</h3><p>Gestión de clientes y datos fiscales bajo un estándar visual institucional.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'productos_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catálogo</div><h3>Productos</h3><p>Base comercial lista para evolucionar hacia inventario y control de costos.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'proveedores_facturacion' empresa.slug %}"><div class="erp-kpi-label">Catálogo</div><h3>Proveedores</h3><p>Base de abastecimiento para compras, contactos y crecimiento hacia cuentas por pagar.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'inventario_facturacion' empresa.slug %}"><div class="erp-kpi-label">Inventario</div><h3>Inventario</h3><p>Existencias, ajustes y movimientos iniciales conectados con facturación.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'compras_dashboard' empresa.slug %}"><div class="erp-kpi-label">Abastecimiento</div><h3>Compras</h3><p>Documentos de compra conectados con el ingreso real de existencias al inventario.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'cai_facturacion' empresa.slug %}"><div class="erp-kpi-label">Fiscal</div><h3>CAI</h3><p>Administración fina de rangos fiscales y correlativos con trazabilidad histórica.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'impuestos_facturacion' empresa.slug %}"><div class="erp-kpi-label">Fiscal</div><h3>Impuestos</h3><p>Configuración tributaria lista para facturación, ajustes y evolución contable.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'notas_credito_dashboard' empresa.slug %}"><div class="erp-kpi-label">Ajustes</div><h3>Notas de Crédito</h3><p>Documentos de ajuste conectados con factura origen y saldo disponible real.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'recibos_dashboard' empresa.slug %}"><div class="erp-kpi-label">Cobranza</div><h3>Recibos</h3><p>Comprobantes de pago formales vinculados con facturas y clientes.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'reportes_facturacion' empresa.slug %}"><div class="erp-kpi-label">Analítica</div><h3>Reportes</h3><p>Lectura ejecutiva de ventas, impuestos y desempeño financiero.</p></a>
-    <a class="erp-card erp-module-card" href="{% url 'reporte_cxc' empresa.slug %}"><div class="erp-kpi-label">Cobranza</div><h3>Cuentas por Cobrar</h3><p>Seguimiento a saldos pendientes y antigüedad de cartera por cliente.</p></a>
+<section class="erp-facturacion-grid">
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'facturas_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Operacion</div><h3>Facturacion</h3><p>Crear, emitir, revisar y administrar facturas con maxima claridad operativa.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'clientes_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/customers.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Catalogo</div><h3>Clientes</h3><p>Gestion de clientes y datos fiscales bajo un estandar visual institucional.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'productos_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/products.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Catalogo</div><h3>Productos</h3><p>Base comercial lista para evolucionar hacia inventario y control de costos.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'proveedores_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/suppliers.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Catalogo</div><h3>Proveedores</h3><p>Base de abastecimiento para compras, contactos y crecimiento hacia cuentas por pagar.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'inventario_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/inventory.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Inventario</div><h3>Inventario</h3><p>Existencias, ajustes y movimientos iniciales conectados con facturacion.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'compras_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/purchases.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Abastecimiento</div><h3>Compras</h3><p>Documentos de compra conectados con el ingreso real de existencias al inventario.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'cai_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/credit-notes.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Fiscal</div><h3>CAI</h3><p>Administracion fina de rangos fiscales y correlativos con trazabilidad historica.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'impuestos_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/tax.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Fiscal</div><h3>Impuestos</h3><p>Configuracion tributaria lista para facturacion, ajustes y evolucion contable.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'notas_credito_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/credit-notes.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Ajustes</div><h3>Notas de Credito</h3><p>Documentos de ajuste conectados con factura origen y saldo disponible real.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'recibos_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/receipts.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Cobranza</div><h3>Recibos</h3><p>Comprobantes de pago formales vinculados con facturas y clientes.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'reportes_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/reports.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Analitica</div><h3>Reportes</h3><p>Lectura ejecutiva de ventas, impuestos y desempeno financiero.</p></a>
+    <a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'reporte_cxc' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/receivables.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Cobranza</div><h3>Cuentas por Cobrar</h3><p>Seguimiento a saldos pendientes y antiguedad de cartera por cliente.</p></a>
 </section>
 {% endblock %}
