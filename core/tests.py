@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -79,6 +79,24 @@ class SuperAdminControlTests(TestCase):
         empresa = Empresa.objects.create(nombre="Acceso Demo", slug="acceso-demo", rtn="08011999000040")
         response = self.client.post(reverse("public_access"), {"slug": empresa.slug})
         self.assertRedirects(response, reverse("empresa_login", args=[empresa.slug]), fetch_redirect_response=False)
+
+    def test_csrf_vencido_en_control_redirige_a_login_con_mensaje(self):
+        empresa = Empresa.objects.create(nombre="Empresa CSRF", slug="empresa-csrf", rtn="08011999000041")
+        csrf_client = Client(enforce_csrf_checks=True)
+
+        response = csrf_client.post(reverse("superadmin_empresa_activar_licencia", args=[empresa.id]), follow=True)
+
+        self.assertRedirects(response, reverse("superadmin_login"))
+        self.assertContains(response, "Vuelve a iniciar sesion para continuar.")
+
+    def test_csrf_vencido_en_empresa_redirige_a_login_con_mensaje(self):
+        empresa = Empresa.objects.create(nombre="Empresa Sesion", slug="empresa-sesion", rtn="08011999000042")
+        csrf_client = Client(enforce_csrf_checks=True)
+
+        response = csrf_client.post(reverse("dashboard", args=[empresa.slug]), follow=True)
+
+        self.assertRedirects(response, reverse("empresa_login", args=[empresa.slug]))
+        self.assertContains(response, "Vuelve a iniciar sesion para continuar.")
 
     def test_usuario_no_superadmin_no_puede_entrar(self):
         self.client.login(username="operador", password="pass12345")

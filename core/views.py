@@ -39,6 +39,8 @@ HOST_LOCAL_PATTERNS = {
     "::1",
 }
 logger = logging.getLogger(__name__)
+SESSION_EXPIRED_MESSAGE_KEY = "dvsolutions_session_expired_message"
+SESSION_EXPIRED_MESSAGE = "Vuelve a iniciar sesion para continuar."
 
 
 def _public_demo_catalog():
@@ -289,6 +291,31 @@ def _redirect_login_empresa(request, empresa):
     return redirect("empresa_login", slug=empresa.slug)
 
 
+def _flash_session_expired_message(request):
+    mensaje = request.session.pop(SESSION_EXPIRED_MESSAGE_KEY, None)
+    if mensaje:
+        messages.warning(request, mensaje)
+
+
+def csrf_failure(request, reason=""):
+    request.session[SESSION_EXPIRED_MESSAGE_KEY] = SESSION_EXPIRED_MESSAGE
+    path = request.path or ""
+    if path.startswith("/control/"):
+        return redirect("superadmin_login")
+
+    empresa_host = _empresa_desde_host(request)
+    if empresa_host:
+        return redirect("empresa_login_host")
+
+    partes = [parte for parte in path.split("/") if parte]
+    if partes:
+        empresa = Empresa.objects.filter(slug=partes[0]).first()
+        if empresa:
+            return redirect("empresa_login", slug=empresa.slug)
+
+    return redirect("public_access")
+
+
 def _redirect_dashboard_empresa(request, empresa):
     if _usa_host_empresa(request, empresa):
         return redirect("dashboard_host")
@@ -303,6 +330,7 @@ def _minutes_remaining(seconds):
 
 def empresa_login(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
+    _flash_session_expired_message(request)
     throttle_scope = f"empresa:{empresa.slug}"
 
     if request.method == 'POST':
@@ -630,6 +658,7 @@ def superadmin_required(view_func):
 
 
 def superadmin_login(request):
+    _flash_session_expired_message(request)
     if request.user.is_authenticated and request.user.is_superuser:
         return redirect("superadmin_dashboard")
 
