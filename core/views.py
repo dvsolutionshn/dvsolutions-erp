@@ -489,7 +489,7 @@ def dashboard(request, slug=None):
         return _redirect_login_empresa(request, empresa)
 
     if not request.user.is_superuser and not empresa.licencia_operativa:
-        messages.error(request, "La licencia comercial de esta empresa no se encuentra operativa. Revisa el plan o su estado en control maestro.")
+        messages.error(request, "La licencia comercial de esta empresa no se encuentra operativa. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
         logout(request)
         return _redirect_login_empresa(request, empresa)
 

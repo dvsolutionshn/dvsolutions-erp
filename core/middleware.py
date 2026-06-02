@@ -29,7 +29,7 @@ class EmpresaAccessMiddleware:
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not request.user.is_superuser and not empresa.licencia_operativa:
-                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida.")
+                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not empresa.tiene_modulo_activo("facturacion"):
@@ -59,7 +59,7 @@ class EmpresaAccessMiddleware:
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not request.user.is_superuser and not empresa.licencia_operativa:
-                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida.")
+                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not empresa.tiene_modulo_activo("contabilidad"):
@@ -89,7 +89,7 @@ class EmpresaAccessMiddleware:
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not request.user.is_superuser and not empresa.licencia_operativa:
-                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida.")
+                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not empresa.tiene_modulo_activo("rrhh"):
@@ -115,7 +115,7 @@ class EmpresaAccessMiddleware:
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not request.user.is_superuser and not empresa.licencia_operativa:
-                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida.")
+                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not empresa.tiene_modulo_activo("crm_marketing"):
@@ -141,7 +141,7 @@ class EmpresaAccessMiddleware:
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not request.user.is_superuser and not empresa.licencia_operativa:
-                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida.")
+                    messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
 
                 if not empresa.tiene_modulo_activo("agenda_citas"):
