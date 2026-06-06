@@ -76,6 +76,11 @@ class RolSistema(models.Model):
     puede_campanias = models.BooleanField(default=False)
     puede_citas = models.BooleanField(default=False)
     puede_configuracion_crm = models.BooleanField(default=False)
+    puede_clinica = models.BooleanField(default=False)
+    puede_pacientes = models.BooleanField(default=False)
+    puede_expediente_clinico = models.BooleanField(default=False)
+    puede_tratamientos_clinicos = models.BooleanField(default=False)
+    puede_configuracion_clinica = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["nombre"]
@@ -142,6 +147,19 @@ class RolSistema(models.Model):
                 "puede_campanias",
                 "puede_citas",
                 "puede_configuracion_crm",
+            ]
+        )
+
+    @property
+    def tiene_algun_acceso_clinica(self):
+        return any(
+            getattr(self, permiso)
+            for permiso in [
+                "puede_clinica",
+                "puede_pacientes",
+                "puede_expediente_clinico",
+                "puede_tratamientos_clinicos",
+                "puede_configuracion_clinica",
             ]
         )
 
@@ -365,6 +383,12 @@ class Usuario(AbstractUser):
         if self.is_superuser or self.es_administrador_empresa:
             return True
         return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_crm)
+
+    @property
+    def tiene_alguna_permision_clinica(self):
+        if self.is_superuser or self.es_administrador_empresa:
+            return True
+        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_clinica)
     
 class Modulo(models.Model):
     nombre = models.CharField(max_length=100)

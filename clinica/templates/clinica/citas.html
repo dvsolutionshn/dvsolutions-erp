@@ -1,0 +1,31 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Citas clinicas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Agenda Hospitalaria{% endblock %}
+{% block header_title %}Citas clinicas{% endblock %}
+{% block header_description %}Control de consulta, evaluacion, procedimiento, control y seguimiento por paciente.{% endblock %}
+{% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}">Nueva cita</a>{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Fecha</th><th>Paciente</th><th>Servicio</th><th>Profesional</th><th>Estado</th><th>Canal</th></tr></thead>
+            <tbody>
+                {% for cita in citas %}
+                <tr>
+                    <td>{{ cita.fecha_hora|date:"d/m/Y H:i" }}</td>
+                    <td><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug cita.paciente.id %}">{{ cita.paciente.nombre }}</a></td>
+                    <td>{{ cita.servicio.nombre|default:cita.motivo }}</td>
+                    <td>{{ cita.profesional.nombre|default:"-" }}</td>
+                    <td>{{ cita.get_estado_display }}</td>
+                    <td>{{ cita.get_canal_display }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">No hay citas clinicas registradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

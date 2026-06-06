@@ -1,0 +1,67 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ paciente.nombre }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}{{ paciente.nombre }}{% endblock %}
+{% block header_description %}Vista integral del paciente: datos generales, citas, tratamientos y bitacora medica.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>
+<a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar evento</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Datos generales</div>
+        <h3 class="erp-panel-title">{{ paciente.expediente_codigo }}</h3>
+        <p><strong>Identidad:</strong> {{ paciente.identidad|default:"-" }}</p>
+        <p><strong>Edad:</strong> {% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</p>
+        <p><strong>Telefono:</strong> {{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</p>
+        <p><strong>Correo:</strong> {{ paciente.correo|default:"-" }}</p>
+        <p><strong>Emergencia:</strong> {{ paciente.contacto_emergencia|default:"-" }} {{ paciente.telefono_emergencia|default:"" }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Riesgos clinicos</div>
+        <p><strong>Alergias:</strong> {{ paciente.alergias|default:"Sin alergias registradas" }}</p>
+        <p><strong>Antecedentes:</strong> {{ paciente.antecedentes_medicos|default:"Sin antecedentes registrados" }}</p>
+        <p><strong>Medicamentos actuales:</strong> {{ paciente.medicamentos_actuales|default:"Sin medicamentos actuales registrados" }}</p>
+    </article>
+</section>
+
+<section class="erp-grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);">
+    <article class="erp-card">
+        <h3 class="erp-panel-title">Tratamientos</h3>
+        {% for tratamiento in tratamientos %}
+        <div style="border-bottom:1px solid var(--line);padding:12px 0;">
+            <strong>{{ tratamiento.nombre }}</strong>
+            <p class="erp-card-muted">{{ tratamiento.get_estado_display }} - {{ tratamiento.fecha_inicio|date:"d/m/Y" }}</p>
+        </div>
+        {% empty %}<div class="erp-empty">Sin tratamientos registrados.</div>{% endfor %}
+    </article>
+    <article class="erp-card">
+        <h3 class="erp-panel-title">Citas</h3>
+        {% for cita in citas %}
+        <div style="border-bottom:1px solid var(--line);padding:12px 0;">
+            <strong>{{ cita.fecha_hora|date:"d/m/Y H:i" }} - {{ cita.motivo }}</strong>
+            <p class="erp-card-muted">{{ cita.get_estado_display }}{% if cita.profesional %} con {{ cita.profesional.nombre }}{% endif %}</p>
+        </div>
+        {% empty %}<div class="erp-empty">Sin citas registradas.</div>{% endfor %}
+    </article>
+</section>
+
+<section class="erp-card">
+    <h3 class="erp-panel-title">Bitacora medica</h3>
+    {% for evento in eventos %}
+    <div style="border-bottom:1px solid var(--line);padding:16px 0;">
+        <div class="erp-kpi-label">{{ evento.get_tipo_display }} - {{ evento.fecha|date:"d/m/Y H:i" }}</div>
+        <h4 style="margin:6px 0;">{{ evento.titulo }}</h4>
+        <p style="margin:0;line-height:1.7;">{{ evento.descripcion }}</p>
+        {% if evento.diagnostico %}<p class="erp-card-muted"><strong>Diagnostico:</strong> {{ evento.diagnostico }}</p>{% endif %}
+        {% if evento.plan %}<p class="erp-card-muted"><strong>Plan:</strong> {{ evento.plan }}</p>{% endif %}
+    </div>
+    {% empty %}
+    <div class="erp-empty">Aun no hay eventos en el expediente.</div>
+    {% endfor %}
+</section>
+{% endblock %}

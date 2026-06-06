@@ -65,6 +65,12 @@
     {% url 'crm_plantillas' empresa.slug as crm_plantillas_url %}
     {% url 'crm_campanias' empresa.slug as crm_campanias_url %}
     {% url 'agenda_citas' empresa.slug as agenda_citas_url %}
+    {% url 'clinica_dashboard' empresa.slug as clinica_url %}
+    {% url 'clinica_pacientes' empresa.slug as clinica_pacientes_url %}
+    {% url 'clinica_citas' empresa.slug as clinica_citas_url %}
+    {% url 'clinica_tratamientos' empresa.slug as clinica_tratamientos_url %}
+    {% url 'clinica_profesionales' empresa.slug as clinica_profesionales_url %}
+    {% url 'clinica_servicios' empresa.slug as clinica_servicios_url %}
     {% url 'asistente_consulta' empresa.slug as asistente_consulta_url %}
 {% endif %}
 <div class="erp-shell">
@@ -138,6 +144,12 @@
                 <a class="erp-nav-link {% if '/dashboard/citas/' in request.path %}is-active{% endif %}" href="{{ agenda_citas_url }}">
                     <span class="erp-nav-bullet"></span>
                     <span>Citas</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_clinica %}
+                <a class="erp-nav-link {% if '/dashboard/clinica/' in request.path %}is-active{% endif %}" href="{{ clinica_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Clinica</span>
                 </a>
                 {% endif %}
             </nav>
@@ -236,6 +248,20 @@
         </div>
         {% endif %}
 
+        {% if '/dashboard/clinica/' in request.path %}
+        <div>
+            <div class="erp-nav-group-title">Clinica</div>
+            <nav class="erp-nav">
+                {% if erp_access.clinica %}<a class="erp-nav-link {% if request.path == clinica_url %}is-active{% endif %}" href="{{ clinica_url }}"><span class="erp-nav-bullet"></span><span>Resumen clinico</span></a>{% endif %}
+                {% if erp_access.pacientes %}<a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}"><span class="erp-nav-bullet"></span><span>Pacientes</span></a>{% endif %}
+                {% if erp_access.clinica %}<a class="erp-nav-link {% if '/dashboard/clinica/citas/' in request.path %}is-active{% endif %}" href="{{ clinica_citas_url }}"><span class="erp-nav-bullet"></span><span>Citas clinicas</span></a>{% endif %}
+                {% if erp_access.tratamientos_clinicos %}<a class="erp-nav-link {% if '/dashboard/clinica/tratamientos/' in request.path %}is-active{% endif %}" href="{{ clinica_tratamientos_url }}"><span class="erp-nav-bullet"></span><span>Tratamientos</span></a>{% endif %}
+                {% if erp_access.configuracion_clinica %}<a class="erp-nav-link {% if '/dashboard/clinica/profesionales/' in request.path %}is-active{% endif %}" href="{{ clinica_profesionales_url }}"><span class="erp-nav-bullet"></span><span>Profesionales</span></a>{% endif %}
+                {% if erp_access.configuracion_clinica %}<a class="erp-nav-link {% if '/dashboard/clinica/servicios/' in request.path %}is-active{% endif %}" href="{{ clinica_servicios_url }}"><span class="erp-nav-bullet"></span><span>Servicios</span></a>{% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
         <div class="erp-sidebar-footer">
             <div><strong>Usuario:</strong> {{ request.user.username|default:"Invitado" }}</div>
             {% if empresa %}
@@ -328,6 +354,11 @@
     {% if erp_access.modulo_citas %}
     <a class="{% if '/dashboard/citas/' in request.path %}is-active{% endif %}" href="{{ agenda_citas_url }}">
         <span>Citas</span>
+    </a>
+    {% endif %}
+    {% if erp_access.modulo_clinica %}
+    <a class="{% if '/dashboard/clinica/' in request.path %}is-active{% endif %}" href="{{ clinica_url }}">
+        <span>Clinica</span>
     </a>
     {% endif %}
     <button type="button" data-mobile-menu-toggle>

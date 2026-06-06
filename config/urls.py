@@ -15,6 +15,7 @@ urlpatterns += [
     path('<slug:empresa_slug>/dashboard/rrhh/', include('rrhh.urls')),
     path('<slug:empresa_slug>/dashboard/crm/', include('crm.urls')),
     path('<slug:empresa_slug>/dashboard/citas/', include('crm.agenda_urls')),
+    path('<slug:empresa_slug>/dashboard/clinica/', include('clinica.urls')),
 
     # Core (login, home, etc)
     path('', include('core.urls')),

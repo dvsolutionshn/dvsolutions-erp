@@ -515,6 +515,16 @@
                 <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/citas/">Ingresar al modulo</a></div>
             </article>
                 {% endif %}
+            {% elif modulo.codigo == "clinica_medica" %}
+                {% if erp_access.modulo_clinica %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/clinic.svg' %}" alt="" aria-hidden="true"></div>
+                <div class="erp-kpi-label">Salud Especializada</div>
+                <h3>Clinica Medica</h3>
+                <p>Pacientes, expediente clinico, citas, tratamientos, medicamentos, consentimientos y seguimiento postoperatorio.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/clinica/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
             {% else %}
             <article class="erp-card erp-module-card erp-dashboard-module">
                 <div class="erp-module-visual"><img src="{% static 'core/img/modules/module-generic.svg' %}" alt="" aria-hidden="true"></div>
@@ -574,6 +584,19 @@
             <p>Calendario de citas por cliente con recordatorios y seguimiento operativo.</p>
             <div class="erp-upsell-note">
                 <span class="erp-card-muted">Ideal para operaciones que necesitan agendar servicios, seguimientos o atencion comercial estructurada.</span>
+                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
+            </div>
+        </article>
+        {% endif %}
+        {% if not erp_access.modulo_clinica %}
+        <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-module-visual"><img src="{% static 'core/img/modules/clinic.svg' %}" alt="" aria-hidden="true"></div>
+            <div class="erp-kpi-label">Salud Especializada</div>
+            <div class="erp-module-status upgrade">Vertical premium</div>
+            <h3>Clinica Medica</h3>
+            <p>Expediente, agenda hospitalaria, tratamientos, consentimientos y seguimiento medico para clinicas especializadas.</p>
+            <div class="erp-upsell-note">
+                <span class="erp-card-muted">Pensado para hospitales, clinicas esteticas y centros medicos que necesitan trazabilidad profesional por paciente.</span>
                 <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
             </div>
         </article>

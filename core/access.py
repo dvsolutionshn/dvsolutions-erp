@@ -48,6 +48,15 @@ CRM_PERMISSION_MAP = [
     ("citas/", "puede_citas"),
 ]
 
+CLINICA_PERMISSION_MAP = [
+    ("pacientes/", "puede_pacientes"),
+    ("citas/", "puede_clinica"),
+    ("expediente/", "puede_expediente_clinico"),
+    ("tratamientos/", "puede_tratamientos_clinicos"),
+    ("profesionales/", "puede_configuracion_clinica"),
+    ("servicios/", "puede_configuracion_clinica"),
+]
+
 
 def permiso_facturacion_desde_ruta(path_suffix):
     if not path_suffix:
@@ -205,6 +214,18 @@ def permiso_crm_desde_ruta(path_suffix):
     if normalized.startswith(tuple(str(i) for i in range(10))):
         return "puede_crm"
     for prefix, permiso in CRM_PERMISSION_MAP:
+        if normalized.startswith(prefix):
+            return permiso
+    return None
+
+
+def permiso_clinica_desde_ruta(path_suffix):
+    if not path_suffix:
+        return None
+    normalized = path_suffix if path_suffix.endswith("/") else f"{path_suffix}/"
+    if normalized.startswith(tuple(str(i) for i in range(10))):
+        return "puede_clinica"
+    for prefix, permiso in CLINICA_PERMISSION_MAP:
         if normalized.startswith(prefix):
             return permiso
     return None

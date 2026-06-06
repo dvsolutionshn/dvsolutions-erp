@@ -14,6 +14,7 @@ def erp_access(request):
     rrhh_activa = bool(empresa and empresa.tiene_modulo_activo("rrhh"))
     crm_activa = bool(empresa and empresa.tiene_modulo_activo("crm_marketing"))
     citas_activa = bool(empresa and empresa.tiene_modulo_activo("agenda_citas"))
+    clinica_activa = bool(empresa and empresa.tiene_modulo_activo("clinica_medica"))
     base = {
         "modulo_facturacion": facturacion_activa and getattr(user, "tiene_alguna_permision_facturacion", False),
         "modulo_contabilidad": contabilidad_activa and getattr(user, "tiene_alguna_permision_contabilidad", False),
@@ -21,6 +22,7 @@ def erp_access(request):
         "modulo_rrhh": rrhh_activa and getattr(user, "tiene_alguna_permision_rrhh", False),
         "modulo_crm": crm_activa and getattr(user, "tiene_alguna_permision_crm", False),
         "modulo_citas": citas_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_citas"),
+        "modulo_clinica": clinica_activa and getattr(user, "tiene_alguna_permision_clinica", False),
         "facturas": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_facturas"),
         "clientes": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_clientes"),
         "productos": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_productos"),
@@ -49,6 +51,11 @@ def erp_access(request):
         "campanias": crm_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_campanias"),
         "citas": citas_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_citas"),
         "configuracion_crm": crm_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_configuracion_crm"),
+        "clinica": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_clinica"),
+        "pacientes": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_pacientes"),
+        "expediente_clinico": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_expediente_clinico"),
+        "tratamientos_clinicos": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_tratamientos_clinicos"),
+        "configuracion_clinica": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_configuracion_clinica"),
         "usa_cierre_caja": bool(config_avanzada and config_avanzada.usa_cierre_caja),
         "usa_pagos_mixtos": bool(config_avanzada and config_avanzada.usa_pagos_mixtos),
         "usa_reporte_bancos": bool(config_avanzada and config_avanzada.usa_reporte_bancos),

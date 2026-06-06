@@ -1,0 +1,36 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Pacientes - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Expediente Clinico{% endblock %}
+{% block header_title %}Pacientes{% endblock %}
+{% block header_description %}Base maestra de pacientes con datos generales, contacto, riesgos y acceso directo al expediente.{% endblock %}
+
+{% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <input type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, expediente, identidad o telefono" style="flex:1;min-width:260px;">
+        <button class="erp-btn-secondary" type="submit">Buscar</button>
+    </form>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Expediente</th><th>Paciente</th><th>Identidad</th><th>Telefono</th><th>Edad</th><th></th></tr></thead>
+            <tbody>
+                {% for paciente in pacientes %}
+                <tr>
+                    <td>{{ paciente.expediente_codigo }}</td>
+                    <td><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">{{ paciente.nombre }}</a></td>
+                    <td>{{ paciente.identidad|default:"-" }}</td>
+                    <td>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</td>
+                    <td>{% if paciente.edad is not None %}{{ paciente.edad }}{% else %}-{% endif %}</td>
+                    <td><a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">No hay pacientes registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

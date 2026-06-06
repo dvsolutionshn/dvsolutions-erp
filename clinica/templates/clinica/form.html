@@ -1,0 +1,27 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Modulo Clinico{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Registro estructurado para mantener la operacion medica clara, trazable y lista para seguimiento.{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <form method="post" enctype="multipart/form-data" class="erp-form-grid">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="erp-form-group {% if field.field.widget.input_type == 'checkbox' %}erp-form-check{% endif %}" {% if field.name in "direccion alergias antecedentes_medicos medicamentos_actuales notas_privadas objetivo plan_clinico descripcion diagnostico plan signos_vitales contenido observaciones" %}style="grid-column:1/-1;"{% endif %}>
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+            {% for error in field.errors %}<div class="erp-form-error">{{ error }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+        {% if form.non_field_errors %}<div class="erp-form-error" style="grid-column:1/-1;">{{ form.non_field_errors }}</div>{% endif %}
+        <div style="grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end;">
+            <a class="erp-btn-secondary" href="{% url 'clinica_dashboard' empresa.slug %}">Cancelar</a>
+            <button class="erp-btn" type="submit">Guardar</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

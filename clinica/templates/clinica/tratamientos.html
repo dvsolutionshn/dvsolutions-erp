@@ -1,0 +1,31 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Tratamientos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Plan Clinico{% endblock %}
+{% block header_title %}Tratamientos{% endblock %}
+{% block header_description %}Seguimiento de procedimientos, planes esteticos, cirugias y controles postoperatorios.{% endblock %}
+{% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Nuevo tratamiento</a>{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Paciente</th><th>Tratamiento</th><th>Profesional</th><th>Inicio</th><th>Estado</th><th>Monto estimado</th></tr></thead>
+            <tbody>
+                {% for tratamiento in tratamientos %}
+                <tr>
+                    <td><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug tratamiento.paciente.id %}">{{ tratamiento.paciente.nombre }}</a></td>
+                    <td>{{ tratamiento.nombre }}</td>
+                    <td>{{ tratamiento.profesional.nombre|default:"-" }}</td>
+                    <td>{{ tratamiento.fecha_inicio|date:"d/m/Y" }}</td>
+                    <td>{{ tratamiento.get_estado_display }}</td>
+                    <td>L. {{ tratamiento.monto_estimado }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">No hay tratamientos registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

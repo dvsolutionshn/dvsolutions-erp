@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" role="img" aria-label="Modulo clinico">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#effaf8"/>
+      <stop offset=".58" stop-color="#f7fbff"/>
+      <stop offset="1" stop-color="#fff5f7"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17a6a1"/>
+      <stop offset="1" stop-color="#2968f2"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="260" rx="28" fill="url(#bg)"/>
+  <path d="M44 184h90l24-42 35 70 42-116 30 88h66" fill="none" stroke="url(#line)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="382" y="46" width="170" height="160" rx="24" fill="#fff" stroke="#c9dde9" stroke-width="3"/>
+  <rect x="426" y="72" width="82" height="22" rx="11" fill="#dff5f2"/>
+  <path d="M467 112v54M440 139h54" stroke="#17a6a1" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="108" cy="78" r="34" fill="#fff" stroke="#c9dde9" stroke-width="3"/>
+  <path d="M108 60v36M90 78h36" stroke="#2968f2" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="560" cy="48" r="16" fill="#ffd9df"/>
+  <circle cx="586" cy="82" r="10" fill="#dff5f2"/>
+</svg>
