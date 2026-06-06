@@ -330,6 +330,7 @@ def _minutes_remaining(seconds):
 
 def empresa_login(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
+    template_name = "core/login_hospital_mia.html" if empresa.slug == "hospital_mia" else "core/login.html"
     _flash_session_expired_message(request)
     throttle_scope = f"empresa:{empresa.slug}"
 
@@ -340,7 +341,7 @@ def empresa_login(request, slug=None):
                 request,
                 f"Por seguridad bloqueamos temporalmente este acceso. Intenta nuevamente en {_minutes_remaining(bloqueo_restante)} minuto(s).",
             )
-            return render(request, 'core/login.html', {'empresa': empresa})
+            return render(request, template_name, {'empresa': empresa})
 
         username = request.POST.get('username')
         password = request.POST.get('password')
@@ -369,7 +370,7 @@ def empresa_login(request, slug=None):
                     f"Por seguridad bloqueamos temporalmente este acceso. Intenta nuevamente en {_minutes_remaining(bloqueo_restante)} minuto(s).",
                 )
 
-    return render(request, 'core/login.html', {'empresa': empresa})
+    return render(request, template_name, {'empresa': empresa})
 
 
 def _public_site_context(form=None):
