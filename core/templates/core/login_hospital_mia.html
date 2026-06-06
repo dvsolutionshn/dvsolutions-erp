@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hospital MIA - Acceso Clinico</title>
+    <title>Acceso - {{ empresa.nombre }}</title>
     <style>
         :root{
             --ink:#101827;
@@ -536,7 +536,7 @@
     </div>
 
     <main class="mia-login">
-        <section class="brand-stage" aria-label="Hospital MIA">
+        <section class="brand-stage" aria-label="{{ empresa.nombre }}">
             <div class="halo"></div>
             <div class="halo"></div>
             <div class="halo"></div>
@@ -551,25 +551,31 @@
                     {% if empresa.logo %}
                         <img src="{{ empresa.logo.url }}" alt="Logo {{ empresa.nombre }}">
                     {% else %}
-                        <div class="mia-logo-fallback">MIA</div>
+                        <div class="mia-logo-fallback">{{ empresa.nombre|slice:":3"|upper }}</div>
                     {% endif %}
                 </div>
-                <small>Acceso clinico privado</small>
+                <small>{% if empresa.slug == "hospital_mia" %}Acceso clinico privado{% else %}Acceso empresarial privado{% endif %}</small>
                 <h1>{{ empresa.nombre }}</h1>
-                <p>Un entorno digital premium para agenda, pacientes, tratamientos, expediente clinico y seguimiento especializado.</p>
+                <p>{% if empresa.slug == "hospital_mia" %}Un entorno digital premium para agenda, pacientes, tratamientos, expediente clinico y seguimiento especializado.{% else %}Un entorno digital premium para operar facturacion, finanzas, clientes, inventario, reportes y crecimiento empresarial.{% endif %}</p>
                 <div class="signal-row">
+                    {% if empresa.slug == "hospital_mia" %}
                     <div class="signal"><strong>Pacientes</strong>Expediente centralizado</div>
                     <div class="signal"><strong>Agenda</strong>Citas y controles</div>
                     <div class="signal"><strong>Clinica</strong>Operacion especializada</div>
+                    {% else %}
+                    <div class="signal"><strong>Control</strong>Operacion centralizada</div>
+                    <div class="signal"><strong>Gestion</strong>Modulos conectados</div>
+                    <div class="signal"><strong>ERP</strong>Vision empresarial</div>
+                    {% endif %}
                 </div>
             </div>
         </section>
 
         <section class="login-card">
             <div class="login-head">
-                <div class="login-kicker">Sistema Hospitalario</div>
+                <div class="login-kicker">{% if empresa.slug == "hospital_mia" %}Sistema Hospitalario{% else %}Sistema Empresarial{% endif %}</div>
                 <h2>Bienvenido de nuevo</h2>
-                <p>Ingresa con tu usuario de Hospital MIA para continuar dentro de una experiencia creada especialmente para su operacion clinica.</p>
+                <p>Ingresa con tu usuario de {{ empresa.nombre }} para continuar dentro de una experiencia creada especialmente para su operacion.</p>
             </div>
 
             {% if messages %}
@@ -598,7 +604,7 @@
 
                 <div class="access-note">
                     <span></span>
-                    <div>Este acceso respeta la empresa, los permisos del usuario y los modulos activados para Hospital MIA.</div>
+                    <div>Este acceso respeta la empresa, los permisos del usuario y los modulos activados para {{ empresa.nombre }}.</div>
                 </div>
 
                 <button class="submit" type="submit">Entrar al sistema</button>
@@ -606,8 +612,8 @@
 
             <div class="login-footer">
                 <div>
-                    <strong>Hospital MIA</strong>
-                    Experiencia visual exclusiva para su equipo.
+                    <strong>{{ empresa.nombre }}</strong>
+                    Experiencia visual personalizada para su equipo.
                 </div>
                 <div>
                     <strong>DV Solutions</strong>

@@ -330,7 +330,7 @@ def _minutes_remaining(seconds):
 
 def empresa_login(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
-    template_name = "core/login_hospital_mia.html" if empresa.slug == "hospital_mia" else "core/login.html"
+    template_name = "core/login_hospital_mia.html"
     _flash_session_expired_message(request)
     throttle_scope = f"empresa:{empresa.slug}"
 
