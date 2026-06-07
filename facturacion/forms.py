@@ -208,6 +208,7 @@ class ProductoForm(forms.ModelForm):
             'fecha_referencia',
             'fecha_alerta',
             'nota_fecha',
+            'foto',
             'impuesto_predeterminado',
             'controla_inventario',
             'categoria_farmaceutica',
@@ -234,10 +235,12 @@ class ProductoForm(forms.ModelForm):
             'fecha_referencia': 'Fecha especial del producto o servicio: vencimiento, garantia, revision o seguimiento.',
             'fecha_alerta': 'Fecha en que el CRM debe alertar sobre este producto.',
             'nota_fecha': 'Detalle de la fecha: vencimiento, garantia, control medico, revision, etc.',
+            'foto': 'Imagen del producto para catalogo, punto de venta y reconocimiento rapido en el ERP.',
         }
         widgets = {
             'fecha_referencia': forms.DateInput(attrs={'type': 'date'}),
             'fecha_alerta': forms.DateInput(attrs={'type': 'date'}),
+            'foto': forms.ClearableFileInput(attrs={'accept': 'image/*'}),
         }
 
     def __init__(self, *args, **kwargs):

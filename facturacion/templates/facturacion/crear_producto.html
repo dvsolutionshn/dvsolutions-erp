@@ -17,6 +17,37 @@
     min-height:62px;
     height:62px;
 }
+.erp-product-photo-preview{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    min-height:74px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:#fff;
+}
+.erp-product-photo-preview img,
+.erp-product-photo-placeholder{
+    width:58px;
+    height:58px;
+    border-radius:12px;
+    object-fit:cover;
+    border:1px solid var(--line);
+    background:#f4f8fc;
+    flex:0 0 58px;
+}
+.erp-product-photo-placeholder{
+    display:grid;
+    place-items:center;
+    color:var(--primary);
+    font-weight:900;
+}
+.erp-product-photo-preview strong{
+    display:block;
+    margin-bottom:4px;
+    color:#102338;
+}
 @media (max-width: 760px){
     .erp-compact-grid.three-col,
     .erp-compact-grid.two-col{
@@ -28,7 +59,7 @@
 
 {% block content %}
 <section class="erp-compact-form erp-product-form is-dense">
-    <form method="post" class="erp-compact-form is-dense">
+    <form method="post" enctype="multipart/form-data" class="erp-compact-form is-dense">
         {% csrf_token %}
         {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
         {% if form.non_field_errors %}
@@ -47,6 +78,23 @@
                 <div class="erp-field">{{ form.unidad_medida.label_tag }}{{ form.unidad_medida }}{% if form.unidad_medida.errors %}<ul class="erp-field-errors">{% for error in form.unidad_medida.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field">{{ form.precio.label_tag }}{{ form.precio }}{% if form.precio.help_text %}<div class="erp-field-help">{{ form.precio.help_text }}</div>{% endif %}{% if form.precio.errors %}<ul class="erp-field-errors">{% for error in form.precio.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field">{{ form.impuesto_predeterminado.label_tag }}{{ form.impuesto_predeterminado }}{% if form.impuesto_predeterminado.help_text %}<div class="erp-field-help">{{ form.impuesto_predeterminado.help_text }}</div>{% endif %}{% if form.impuesto_predeterminado.errors %}<ul class="erp-field-errors">{% for error in form.impuesto_predeterminado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field erp-field-span-full">
+                    {{ form.foto.label_tag }}
+                    <div class="erp-product-photo-preview">
+                        {% if form.instance.foto %}
+                        <img src="{{ form.instance.foto.url }}" alt="{{ form.instance.nombre|default:'Producto' }}">
+                        {% else %}
+                        <div class="erp-product-photo-placeholder">IMG</div>
+                        {% endif %}
+                        <div>
+                            <strong>Foto del producto</strong>
+                            <div class="erp-field-help">Se vera en catalogo, punto de venta, busquedas y flujos comerciales.</div>
+                        </div>
+                    </div>
+                    {{ form.foto }}
+                    {% if form.foto.help_text %}<div class="erp-field-help">{{ form.foto.help_text }}</div>{% endif %}
+                    {% if form.foto.errors %}<ul class="erp-field-errors">{% for error in form.foto.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
                 <div class="erp-field erp-field-span-full">{{ form.descripcion.label_tag }}{{ form.descripcion }}{% if form.descripcion.help_text %}<div class="erp-field-help">{{ form.descripcion.help_text }}</div>{% endif %}{% if form.descripcion.errors %}<ul class="erp-field-errors">{% for error in form.descripcion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
             </div>
         </section>

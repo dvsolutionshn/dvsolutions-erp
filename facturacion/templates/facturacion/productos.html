@@ -72,6 +72,30 @@ td{
     text-decoration:none;
     font-weight:500;
 }
+.product-cell{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+.product-thumb,
+.product-thumb-placeholder{
+    width:44px;
+    height:44px;
+    border-radius:10px;
+    border:1px solid #e5e7eb;
+    background:#f8f9fa;
+    flex:0 0 44px;
+}
+.product-thumb{
+    object-fit:cover;
+}
+.product-thumb-placeholder{
+    display:grid;
+    place-items:center;
+    color:#6c63ff;
+    font-size:10px;
+    font-weight:800;
+}
 .messages{
     margin-bottom:20px;
 }
@@ -115,7 +139,16 @@ td{
         <tbody>
             {% for producto in productos %}
             <tr>
-                <td>{{ producto.nombre }}</td>
+                <td>
+                    <div class="product-cell">
+                        {% if producto.foto %}
+                        <img class="product-thumb" src="{{ producto.foto.url }}" alt="{{ producto.nombre }}">
+                        {% else %}
+                        <div class="product-thumb-placeholder">IMG</div>
+                        {% endif %}
+                        <span>{{ producto.nombre }}</span>
+                    </div>
+                </td>
                 <td>{{ producto.descripcion|default:"-" }}</td>
                 <td class="monto">L. {{ producto.precio|floatformat:2|intcomma }}</td>
                 <td>

@@ -39,7 +39,7 @@
             {% endfor %}
         </ul>
         {% endif %}
-        <form method="post" class="erp-form-shell" style="margin-top:18px;">
+        <form method="post" enctype="multipart/form-data" class="erp-form-shell" style="margin-top:18px;">
             {% csrf_token %}
             <input type="hidden" name="quick_mode" value="1">
             <div class="erp-form-grid two">
@@ -72,6 +72,12 @@
                     {{ form.impuesto_predeterminado.label_tag }}
                     {{ form.impuesto_predeterminado }}
                     {% if form.impuesto_predeterminado.errors %}<ul class="erp-field-errors">{% for error in form.impuesto_predeterminado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="erp-field" style="grid-column:1 / -1;">
+                    {{ form.foto.label_tag }}
+                    {{ form.foto }}
+                    {% if form.foto.help_text %}<div class="erp-field-help">{{ form.foto.help_text }}</div>{% endif %}
+                    {% if form.foto.errors %}<ul class="erp-field-errors">{% for error in form.foto.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
                 </div>
                 <div class="erp-field">
                     <label style="display:flex;gap:10px;align-items:center;">

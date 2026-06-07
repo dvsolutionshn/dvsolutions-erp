@@ -309,6 +309,7 @@ def punto_venta(request, empresa_slug):
             "id": producto.id,
             "nombre": producto.nombre,
             "codigo": producto.codigo or "",
+            "foto_url": producto.foto.url if producto.foto else "",
             "precio": float(producto.precio or Decimal("0.00")),
             "impuesto": float(impuesto.porcentaje if impuesto else Decimal("0.00")),
             "stock": float(producto.stock_actual),
@@ -1372,6 +1373,7 @@ def productos_facturacion(request, empresa_slug):
         "inactivos": productos.filter(activo=False).count(),
         "valor_catalogo": sum((producto.precio for producto in productos), Decimal('0.00')),
         "servicios": productos.filter(tipo_item='servicio').count(),
+        "con_foto": productos.exclude(foto__isnull=True).exclude(foto__exact="").count(),
         "con_inventario": productos.filter(controla_inventario=True).count(),
         "controlados": productos.filter(perfil_farmaceutico__producto_controlado=True).count(),
         "refrigerados": productos.filter(perfil_farmaceutico__requiere_refrigeracion=True).count(),
@@ -2942,7 +2944,7 @@ def crear_producto(request, empresa_slug):
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
 
     if request.method == "POST":
-        form = ProductoForm(request.POST, empresa=empresa)
+        form = ProductoForm(request.POST, request.FILES, empresa=empresa)
         if form.is_valid():
             try:
                 producto = form.save(commit=False)
@@ -2958,6 +2960,7 @@ def crear_producto(request, empresa_slug):
                                 "id": producto.id,
                                 "nombre": producto.nombre,
                                 "precio": str(producto.precio or "0"),
+                                "foto_url": producto.foto.url if producto.foto else "",
                                 "impuesto_id": str(producto.impuesto_predeterminado_id or ""),
                                 "tipo_item": producto.tipo_item,
                                 "unidad_medida": producto.unidad_medida,
@@ -2998,7 +3001,7 @@ def editar_producto(request, empresa_slug, producto_id):
     producto = get_object_or_404(Producto, id=producto_id, empresa=empresa)
 
     if request.method == "POST":
-        form = ProductoForm(request.POST, instance=producto, empresa=empresa)
+        form = ProductoForm(request.POST, request.FILES, instance=producto, empresa=empresa)
         if form.is_valid():
             form.save()
             messages.success(request, "Producto actualizado correctamente.")

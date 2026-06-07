@@ -253,6 +253,7 @@ class Producto(models.Model):
     fecha_referencia = models.DateField(blank=True, null=True)
     fecha_alerta = models.DateField(blank=True, null=True)
     nota_fecha = models.CharField(max_length=200, blank=True, null=True)
+    foto = models.ImageField(upload_to='productos/fotos/', blank=True, null=True)
     controla_inventario = models.BooleanField(default=True)
     impuesto_predeterminado = models.ForeignKey(
         TipoImpuesto,

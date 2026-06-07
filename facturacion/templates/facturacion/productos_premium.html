@@ -43,6 +43,32 @@
 .erp-suggestion-item:hover{
     background:#f4f8fc;
 }
+.erp-product-identity{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:0;
+}
+.erp-product-thumb,
+.erp-product-thumb-placeholder{
+    width:54px;
+    height:54px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:#f4f8fc;
+    flex:0 0 54px;
+}
+.erp-product-thumb{
+    object-fit:cover;
+}
+.erp-product-thumb-placeholder{
+    display:grid;
+    place-items:center;
+    color:var(--primary);
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.08em;
+}
 </style>
 {% endblock %}
 
@@ -63,6 +89,11 @@
             <div class="erp-kpi-label">Servicios</div>
             <div class="erp-stat-value">{{ resumen.servicios }}</div>
             <p class="erp-card-muted">Elementos que no requieren movimiento fisico.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Con foto</div>
+            <div class="erp-stat-value">{{ resumen.con_foto }}</div>
+            <p class="erp-card-muted">Productos listos para venta visual y busqueda rapida.</p>
         </article>
         <article class="erp-card erp-list-kpi-card">
             <div class="erp-kpi-label">Valor catalogo</div>
@@ -147,9 +178,16 @@
                 {% for producto in productos %}
                     <tr>
                         <td>
-                            <div class="erp-doc-cell">
-                                <div class="erp-doc-title">{{ producto.nombre }}</div>
-                                <div class="erp-doc-subtext">{{ producto.descripcion|default:"Sin descripcion comercial"|truncatechars:88 }}</div>
+                            <div class="erp-product-identity">
+                                {% if producto.foto %}
+                                <img class="erp-product-thumb" src="{{ producto.foto.url }}" alt="{{ producto.nombre }}">
+                                {% else %}
+                                <div class="erp-product-thumb-placeholder">IMG</div>
+                                {% endif %}
+                                <div class="erp-doc-cell">
+                                    <div class="erp-doc-title">{{ producto.nombre }}</div>
+                                    <div class="erp-doc-subtext">{{ producto.descripcion|default:"Sin descripcion comercial"|truncatechars:88 }}</div>
+                                </div>
                             </div>
                         </td>
                         <td>

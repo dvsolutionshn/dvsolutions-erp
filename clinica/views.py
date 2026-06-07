@@ -13,6 +13,7 @@ from .models import (
     ExpedienteEvento,
     Paciente,
     ProfesionalSalud,
+    SeguimientoPostOperatorio,
     ServicioClinico,
     TratamientoPaciente,
 )
@@ -38,8 +39,14 @@ def clinica_dashboard(request, empresa_slug):
     hoy = timezone.localdate()
     inicio_mes = hoy.replace(day=1)
     citas_hoy = CitaClinica.objects.filter(empresa=empresa, fecha_hora__date=hoy)
+    citas_mes = CitaClinica.objects.filter(empresa=empresa, fecha_hora__date__gte=inicio_mes)
     pacientes = Paciente.objects.filter(empresa=empresa)
     tratamientos_activos = TratamientoPaciente.objects.filter(empresa=empresa, estado__in=["planificado", "en_proceso"])
+    seguimientos_pendientes = SeguimientoPostOperatorio.objects.filter(
+        empresa=empresa,
+        estado__in=["pendiente", "requiere_revision"],
+        fecha_programada__gte=hoy,
+    )
     ultimos_eventos = ExpedienteEvento.objects.filter(empresa=empresa).select_related("paciente", "profesional")[:8]
     proximas_citas = (
         CitaClinica.objects.filter(empresa=empresa, fecha_hora__date__gte=hoy)
@@ -47,11 +54,34 @@ def clinica_dashboard(request, empresa_slug):
         .order_by("fecha_hora")[:8]
     )
     embudo_citas = (
-        CitaClinica.objects.filter(empresa=empresa, fecha_hora__date__gte=inicio_mes)
+        citas_mes
         .values("estado")
         .annotate(total=Count("id"))
         .order_by("estado")
     )
+    agenda_estado = {
+        "solicitadas": citas_mes.filter(estado="solicitada").count(),
+        "confirmadas": citas_mes.filter(estado="confirmada").count(),
+        "en_atencion": citas_hoy.filter(estado="en_atencion").count(),
+        "completadas": citas_mes.filter(estado="completada").count(),
+    }
+    automatizaciones = [
+        {
+            "titulo": "Preconsulta inteligente",
+            "estado": "Activa",
+            "detalle": "Nuevo paciente, ficha base, cita y expediente en una sola secuencia.",
+        },
+        {
+            "titulo": "Confirmacion de agenda",
+            "estado": "Pendiente" if agenda_estado["solicitadas"] else "Lista",
+            "detalle": f"{agenda_estado['solicitadas']} cita(s) del mes esperando confirmacion.",
+        },
+        {
+            "titulo": "Seguimiento postoperatorio",
+            "estado": "Pendiente" if seguimientos_pendientes.exists() else "Listo",
+            "detalle": f"{seguimientos_pendientes.count()} control(es) proximos o con revision requerida.",
+        },
+    ]
     return render(
         request,
         "clinica/dashboard.html",
@@ -63,10 +93,13 @@ def clinica_dashboard(request, empresa_slug):
                 "citas_hoy": citas_hoy.count(),
                 "tratamientos_activos": tratamientos_activos.count(),
                 "eventos_mes": ExpedienteEvento.objects.filter(empresa=empresa, fecha__date__gte=inicio_mes).count(),
+                "seguimientos_pendientes": seguimientos_pendientes.count(),
             },
             "proximas_citas": proximas_citas,
             "ultimos_eventos": ultimos_eventos,
             "embudo_citas": embudo_citas,
+            "agenda_estado": agenda_estado,
+            "automatizaciones": automatizaciones,
         },
     )
 
