@@ -250,7 +250,10 @@ class ProductoForm(forms.ModelForm):
         self.fields['impuesto_predeterminado'].queryset = TipoImpuesto.objects.filter(activo=True).order_by('porcentaje', 'nombre')
         if self.empresa:
             configuracion_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
-            self.mostrar_perfil_farmaceutico = bool(configuracion_avanzada.usa_inventario_farmaceutico)
+            self.mostrar_perfil_farmaceutico = bool(
+                self.empresa.tiene_modulo_activo("clinica_medica")
+                and configuracion_avanzada.usa_inventario_farmaceutico
+            )
         if self.empresa:
             self.fields['categoria_farmaceutica'].queryset = CategoriaProductoFarmaceutico.objects.filter(
                 empresa=self.empresa,

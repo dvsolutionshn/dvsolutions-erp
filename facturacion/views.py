@@ -78,6 +78,14 @@ def _cuenta_financiera_por_defecto(cuentas_financieras, metodo=None):
     return cuentas_financieras.filter(tipo="banco").first() or cuentas_financieras.first()
 
 
+def _empresa_usa_perfil_farmaceutico(empresa):
+    config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    return bool(
+        empresa.tiene_modulo_activo("clinica_medica")
+        and config.usa_inventario_farmaceutico
+    )
+
+
 # =====================================================
 # DASHBOARD
 # =====================================================
@@ -862,8 +870,7 @@ def _registrar_movimiento_lote_bodega(*, empresa, bodega, lote, tipo, cantidad, 
 
 
 def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", observacion=""):
-    config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config.usa_inventario_farmaceutico or not producto.controla_inventario:
+    if not _empresa_usa_perfil_farmaceutico(empresa) or not producto.controla_inventario:
         return
     bodega = _asegurar_bodegas_farmaceuticas(empresa)["principal"]
     lote = _obtener_lote_generico(producto)
@@ -1578,8 +1585,7 @@ def inventario_facturacion(request, empresa_slug):
 @login_required
 def inventario_farmaceutico(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_inventario_farmaceutico:
+    if not _empresa_usa_perfil_farmaceutico(empresa):
         messages.error(request, "El inventario farmaceutico no esta activo para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
@@ -1618,8 +1624,7 @@ def inventario_farmaceutico(request, empresa_slug):
 @login_required
 def crear_lote_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_inventario_farmaceutico:
+    if not _empresa_usa_perfil_farmaceutico(empresa):
         messages.error(request, "El inventario farmaceutico no esta activo para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
@@ -3065,8 +3070,7 @@ def eliminar_producto(request, empresa_slug, producto_id):
 @login_required
 def categorias_farmaceuticas(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_inventario_farmaceutico:
+    if not _empresa_usa_perfil_farmaceutico(empresa):
         messages.error(request, "Las categorias farmaceuticas no estan activas para esta empresa.")
         return redirect("productos_facturacion", empresa_slug=empresa.slug)
 
