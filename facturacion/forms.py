@@ -310,6 +310,14 @@ class ProductoForm(forms.ModelForm):
         )
 
 
+class EliminarProductoForm(forms.Form):
+    motivo = forms.CharField(
+        label='Motivo de eliminacion',
+        min_length=8,
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Indica por que se elimina este producto del catalogo operativo.'}),
+    )
+
+
 class CategoriaProductoFarmaceuticoForm(forms.ModelForm):
     class Meta:
         model = CategoriaProductoFarmaceutico

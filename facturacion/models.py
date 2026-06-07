@@ -264,6 +264,16 @@ class Producto(models.Model):
     )
 
     activo = models.BooleanField(default=True)
+    eliminado = models.BooleanField(default=False)
+    fecha_eliminacion = models.DateTimeField(blank=True, null=True)
+    eliminado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='productos_eliminados',
+    )
+    motivo_eliminacion = models.TextField(blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
@@ -297,6 +307,28 @@ class Producto(models.Model):
             return Decimal('0.00')
         inventario = getattr(self, 'inventario', None)
         return inventario.existencias if inventario else Decimal('0.00')
+
+
+class BitacoraProductoEliminado(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='bitacora_productos_eliminados')
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='bitacora_eliminaciones')
+    usuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
+    motivo = models.TextField()
+    nombre_producto = models.CharField(max_length=200)
+    codigo_producto = models.CharField(max_length=50, blank=True, null=True)
+    tipo_item = models.CharField(max_length=15)
+    precio = models.DecimalField(max_digits=12, decimal_places=2)
+    controlaba_inventario = models.BooleanField(default=False)
+    stock_al_momento = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fecha_eliminacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-fecha_eliminacion']
+        verbose_name = 'Bitacora de producto eliminado'
+        verbose_name_plural = 'Bitacora de productos eliminados'
+
+    def __str__(self):
+        return f"{self.nombre_producto} - {self.fecha_eliminacion:%d/%m/%Y %H:%M}"
 
 
 class CategoriaProductoFarmaceutico(models.Model):

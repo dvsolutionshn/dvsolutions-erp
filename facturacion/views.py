@@ -40,8 +40,8 @@ from contabilidad.services import (
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
-from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, DATE_INPUT_FORMATS_LATAM, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 
@@ -172,7 +172,7 @@ def punto_venta(request, empresa_slug):
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
 
     productos_qs = (
-        Producto.objects.filter(empresa=empresa, activo=True)
+        Producto.objects.filter(empresa=empresa, activo=True, eliminado=False)
         .select_related("impuesto_predeterminado", "inventario")
         .order_by("nombre")
     )
@@ -1352,7 +1352,7 @@ def productos_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     q = request.GET.get("q", "").strip()
     categoria_id = request.GET.get("categoria", "").strip()
-    productos = Producto.objects.filter(empresa=empresa).select_related(
+    productos = Producto.objects.filter(empresa=empresa, eliminado=False).select_related(
         'impuesto_predeterminado',
         'perfil_farmaceutico__categoria',
     ).order_by('nombre')
@@ -1386,7 +1386,8 @@ def productos_facturacion(request, empresa_slug):
         "q": q,
         "categoria_id": categoria_id,
         "categorias_farmaceuticas": CategoriaProductoFarmaceutico.objects.filter(empresa=empresa, activa=True).order_by('nombre'),
-        "productos_sugeridos": Producto.objects.filter(empresa=empresa).order_by('nombre').values_list('nombre', flat=True).distinct(),
+        "productos_sugeridos": Producto.objects.filter(empresa=empresa, eliminado=False).order_by('nombre').values_list('nombre', flat=True).distinct(),
+        "ultimas_bajas": BitacoraProductoEliminado.objects.filter(empresa=empresa).select_related('usuario', 'producto')[:8],
     })
 
 
@@ -1518,7 +1519,8 @@ def inventario_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     productos = Producto.objects.filter(
         empresa=empresa,
-        controla_inventario=True
+        controla_inventario=True,
+        eliminado=False,
     ).select_related('impuesto_predeterminado').order_by('nombre')
 
     for producto in productos:
@@ -1526,7 +1528,8 @@ def inventario_facturacion(request, empresa_slug):
 
     productos = Producto.objects.filter(
         empresa=empresa,
-        controla_inventario=True
+        controla_inventario=True,
+        eliminado=False,
     ).select_related('impuesto_predeterminado', 'inventario').order_by('nombre')
 
     producto_id = request.GET.get('producto')
@@ -2998,7 +3001,7 @@ def crear_producto(request, empresa_slug):
 @login_required
 def editar_producto(request, empresa_slug, producto_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    producto = get_object_or_404(Producto, id=producto_id, empresa=empresa)
+    producto = get_object_or_404(Producto, id=producto_id, empresa=empresa, eliminado=False)
 
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, instance=producto, empresa=empresa)
@@ -3016,6 +3019,47 @@ def editar_producto(request, empresa_slug, producto_id):
         "titulo": "Editar Producto",
         "texto_boton": "Guardar Cambios",
     })
+
+
+@login_required
+@require_POST
+def eliminar_producto(request, empresa_slug, producto_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    producto = get_object_or_404(Producto, id=producto_id, empresa=empresa, eliminado=False)
+    form = EliminarProductoForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Indica un motivo claro para dejar registrada la baja del producto.")
+        return redirect("productos_facturacion", empresa_slug=empresa.slug)
+
+    motivo = form.cleaned_data["motivo"].strip()
+    with transaction.atomic():
+        BitacoraProductoEliminado.objects.create(
+            empresa=empresa,
+            producto=producto,
+            usuario=request.user,
+            motivo=motivo,
+            nombre_producto=producto.nombre,
+            codigo_producto=producto.codigo,
+            tipo_item=producto.tipo_item,
+            precio=producto.precio,
+            controlaba_inventario=producto.controla_inventario,
+            stock_al_momento=producto.stock_actual,
+        )
+        producto.activo = False
+        producto.eliminado = True
+        producto.fecha_eliminacion = timezone.now()
+        producto.eliminado_por = request.user
+        producto.motivo_eliminacion = motivo
+        producto.save(update_fields=[
+            "activo",
+            "eliminado",
+            "fecha_eliminacion",
+            "eliminado_por",
+            "motivo_eliminacion",
+        ])
+
+    messages.success(request, f"Producto {producto.nombre} eliminado del catalogo operativo y registrado en bitacora.")
+    return redirect("productos_facturacion", empresa_slug=empresa.slug)
 
 
 @login_required

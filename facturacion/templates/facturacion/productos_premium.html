@@ -230,12 +230,55 @@
                         <td class="actions">
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'editar_producto_facturacion' empresa.slug producto.id %}">Editar</a>
+                                <form method="post" action="{% url 'eliminar_producto_facturacion' empresa.slug producto.id %}" class="erp-inline-form js-delete-product-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="motivo" value="">
+                                    <button class="erp-pill-btn danger" type="submit">Eliminar</button>
+                                </form>
                             </div>
                         </td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="9" class="erp-empty">No hay productos registrados.</td></tr>
                 {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="erp-card erp-table-card">
+        <div class="erp-list-toolbar">
+            <div>
+                <div class="erp-kpi-label">Bitacora de bajas</div>
+                <h3 class="erp-panel-title" style="margin:6px 0 0;">Productos eliminados recientemente</h3>
+                <p>Estos productos ya no aparecen en el punto de venta ni en operaciones, pero quedan documentados para auditoria.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Producto</th>
+                        <th>Codigo</th>
+                        <th>Stock</th>
+                        <th>Usuario</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for baja in ultimas_bajas %}
+                    <tr>
+                        <td>{{ baja.fecha_eliminacion|date:"d/m/Y H:i" }}</td>
+                        <td>{{ baja.nombre_producto }}</td>
+                        <td>{{ baja.codigo_producto|default:"-" }}</td>
+                        <td>{{ baja.stock_al_momento|floatformat:2 }}</td>
+                        <td>{{ baja.usuario.username|default:"Sistema" }}</td>
+                        <td>{{ baja.motivo|truncatechars:120 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="erp-empty">Todavia no hay productos eliminados.</td></tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
@@ -284,6 +327,19 @@ document.addEventListener("DOMContentLoaded", function(){
     input.addEventListener("input", renderSuggestions);
     input.addEventListener("blur", function(){
         window.setTimeout(() => panel.style.display = "none", 120);
+    });
+
+    document.querySelectorAll(".js-delete-product-form").forEach(form => {
+        form.addEventListener("submit", function(event){
+            const motivoInput = form.querySelector("input[name='motivo']");
+            const motivo = window.prompt("Motivo de eliminacion del producto:");
+            if(!motivo || motivo.trim().length < 8){
+                event.preventDefault();
+                window.alert("Debes escribir un motivo de al menos 8 caracteres para dejar bitacora.");
+                return;
+            }
+            motivoInput.value = motivo.trim();
+        });
     });
 });
 </script>

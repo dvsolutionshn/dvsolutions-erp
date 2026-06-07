@@ -72,6 +72,16 @@ td{
     text-decoration:none;
     font-weight:500;
 }
+.actions form{display:inline;}
+.actions button{
+    border:none;
+    background:transparent;
+    color:#dc3545;
+    font:inherit;
+    font-weight:600;
+    cursor:pointer;
+    margin-left:10px;
+}
 .product-cell{
     display:flex;
     align-items:center;
@@ -160,6 +170,11 @@ td{
                 </td>
                 <td class="actions">
                     <a href="{% url 'editar_producto_facturacion' empresa.slug producto.id %}">Editar</a>
+                    <form method="post" action="{% url 'eliminar_producto_facturacion' empresa.slug producto.id %}" class="js-delete-product-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="motivo" value="">
+                        <button type="submit">Eliminar</button>
+                    </form>
                 </td>
             </tr>
             {% empty %}
@@ -171,5 +186,19 @@ td{
     </table>
 </div>
 </div>
+<script>
+document.querySelectorAll(".js-delete-product-form").forEach(form => {
+    form.addEventListener("submit", function(event){
+        const motivoInput = form.querySelector("input[name='motivo']");
+        const motivo = window.prompt("Motivo de eliminacion del producto:");
+        if(!motivo || motivo.trim().length < 8){
+            event.preventDefault();
+            window.alert("Debes escribir un motivo de al menos 8 caracteres para dejar bitacora.");
+            return;
+        }
+        motivoInput.value = motivo.trim();
+    });
+});
+</script>
 </body>
 </html>
