@@ -804,11 +804,18 @@ def _obtener_inventario_producto(producto):
 
 
 def _asegurar_bodegas_farmaceuticas(empresa):
-    bodegas_base = [
-        ("Bodega principal", "principal"),
-        ("Bodega provisional", "provisional"),
-        ("Vitrina", "vitrina"),
-    ]
+    if empresa.slug in {"hospital_mia", "medical_spa"}:
+        bodegas_base = [
+            ("Bodega General", "principal"),
+            ("Bodega Hospital", "provisional"),
+            ("Vitrina", "vitrina"),
+        ]
+    else:
+        bodegas_base = [
+            ("Bodega principal", "principal"),
+            ("Bodega provisional", "provisional"),
+            ("Vitrina", "vitrina"),
+        ]
     bodegas = {}
     for nombre, tipo in bodegas_base:
         bodega, _ = BodegaInventario.objects.get_or_create(
@@ -882,6 +889,37 @@ def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", o
         cantidad=cantidad,
         referencia=referencia,
         observacion=observacion or "Entrada automatica a bodega principal.",
+    )
+
+
+def _registrar_entrada_inicial_producto(producto, *, bodega, cantidad, numero_lote="", fecha_vencimiento=None):
+    if not producto.controla_inventario or not bodega or cantidad <= 0:
+        return
+    inventario = _obtener_inventario_producto(producto)
+    inventario.existencias += cantidad
+    inventario.save(update_fields=["existencias", "fecha_actualizacion"])
+
+    lote, _ = LoteInventario.objects.get_or_create(
+        empresa=producto.empresa,
+        producto=producto,
+        numero_lote=numero_lote or f"INICIAL-{producto.id}",
+        defaults={
+            "fecha_vencimiento": fecha_vencimiento,
+            "activo": True,
+        },
+    )
+    if fecha_vencimiento and lote.fecha_vencimiento != fecha_vencimiento:
+        lote.fecha_vencimiento = fecha_vencimiento
+        lote.save(update_fields=["fecha_vencimiento"])
+
+    _registrar_movimiento_lote_bodega(
+        empresa=producto.empresa,
+        bodega=bodega,
+        lote=lote,
+        tipo="entrada",
+        cantidad=cantidad,
+        referencia=f"Producto {producto.id}",
+        observacion="Entrada inicial registrada al crear producto.",
     )
 
 
@@ -2950,15 +2988,27 @@ def editar_impuesto(request, empresa_slug, impuesto_id):
 def crear_producto(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
+    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    if config_avanzada.usa_bodegas_internas:
+        _asegurar_bodegas_farmaceuticas(empresa)
 
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, empresa=empresa)
         if form.is_valid():
             try:
-                producto = form.save(commit=False)
-                producto.empresa = empresa
-                producto.save()
-                form.guardar_perfil_farmaceutico(producto)
+                with transaction.atomic():
+                    producto = form.save(commit=False)
+                    producto.empresa = empresa
+                    producto.save()
+                    form.guardar_perfil_farmaceutico(producto)
+                    if getattr(form, "mostrar_bodega_inicial", False):
+                        _registrar_entrada_inicial_producto(
+                            producto,
+                            bodega=form.cleaned_data.get("bodega_inicial"),
+                            cantidad=form.cleaned_data.get("cantidad_inicial") or Decimal("0.00"),
+                            numero_lote=(form.cleaned_data.get("lote_inicial") or "").strip(),
+                            fecha_vencimiento=form.cleaned_data.get("vencimiento_lote_inicial"),
+                        )
                 if quick_mode:
                     return render(request, "facturacion/crear_producto_rapido_modal.html", {
                         "empresa": empresa,
@@ -2997,6 +3047,7 @@ def crear_producto(request, empresa_slug):
         "form": form,
         "quick_mode": quick_mode,
         "mostrar_perfil_farmaceutico": getattr(form, "mostrar_perfil_farmaceutico", False),
+        "mostrar_bodega_inicial": getattr(form, "mostrar_bodega_inicial", False),
         "next": request.GET.get("next", ""),
         "titulo": "Nuevo Producto",
         "texto_boton": "Guardar Producto",

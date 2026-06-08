@@ -121,6 +121,20 @@
             {% endfor %}
         </section>
 
+        {% if mostrar_bodega_inicial %}
+        <section class="erp-compact-card is-slim">
+            <h3>Ubicacion inicial</h3>
+            <p>Indica en que bodega esta el producto al momento de crearlo. Esto deja inventario general, lote y existencia por bodega conectados desde el inicio.</p>
+            <div class="erp-compact-grid four-col is-tight" style="margin-top:12px;">
+                <div class="erp-field">{{ form.bodega_inicial.label_tag }}{{ form.bodega_inicial }}{% if form.bodega_inicial.errors %}<ul class="erp-field-errors">{% for error in form.bodega_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.cantidad_inicial.label_tag }}{{ form.cantidad_inicial }}{% if form.cantidad_inicial.errors %}<ul class="erp-field-errors">{% for error in form.cantidad_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.lote_inicial.label_tag }}{{ form.lote_inicial }}{% if form.lote_inicial.errors %}<ul class="erp-field-errors">{% for error in form.lote_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                <div class="erp-field">{{ form.vencimiento_lote_inicial.label_tag }}{{ form.vencimiento_lote_inicial }}{% if form.vencimiento_lote_inicial.errors %}<ul class="erp-field-errors">{% for error in form.vencimiento_lote_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            </div>
+            <div class="erp-field-help" style="margin-top:10px;">Si dejas cantidad en cero, solo se crea el producto y podras cargar existencias despues desde inventario.</div>
+        </section>
+        {% endif %}
+
         {% if mostrar_perfil_farmaceutico %}
         <section class="erp-compact-card is-slim">
             <h3>Perfil farmaceutico</h3>

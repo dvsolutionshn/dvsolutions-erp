@@ -16,7 +16,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpres
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm
-from .models import CAI, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, MovimientoInventario, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -1592,6 +1592,56 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Producto.objects.filter(empresa=self.empresa, nombre="Producto Nuevo").exists())
+
+    def test_crear_producto_registra_existencia_en_bodega_inicial(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        bodega = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega Hospital",
+            tipo="provisional",
+        )
+
+        response = self.client.post(
+            reverse("crear_producto_facturacion", args=[self.empresa.slug]),
+            {
+                "nombre": "Jeringa 10ml",
+                "codigo": "JER-10",
+                "tipo_item": "producto",
+                "unidad_medida": "unidad",
+                "descripcion": "Insumo medico",
+                "precio": "12.50",
+                "impuesto_predeterminado": str(self.impuesto.id),
+                "activo": "on",
+                "controla_inventario": "on",
+                "bodega_inicial": str(bodega.id),
+                "cantidad_inicial": "25.00",
+                "lote_inicial": "L-001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        producto = Producto.objects.get(empresa=self.empresa, codigo="JER-10")
+        self.assertEqual(producto.stock_actual, Decimal("25.00"))
+        self.assertTrue(
+            ExistenciaLoteBodega.objects.filter(
+                empresa=self.empresa,
+                bodega=bodega,
+                lote__producto=producto,
+                lote__numero_lote="L-001",
+                cantidad=Decimal("25.00"),
+            ).exists()
+        )
+        self.assertTrue(
+            MovimientoLoteBodega.objects.filter(
+                empresa=self.empresa,
+                bodega=bodega,
+                lote__producto=producto,
+                tipo="entrada",
+                cantidad=Decimal("25.00"),
+            ).exists()
+        )
 
     def test_crear_producto_rapido_desde_factura_retorna_payload(self):
         response = self.client.post(
