@@ -923,6 +923,136 @@ def _registrar_entrada_inicial_producto(producto, *, bodega, cantidad, numero_lo
     )
 
 
+def _sincronizar_existencia_general_producto(producto):
+    inventario = _obtener_inventario_producto(producto)
+    total = ExistenciaLoteBodega.objects.filter(
+        empresa=producto.empresa,
+        lote__producto=producto,
+    ).aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00")
+    inventario.existencias = total
+    inventario.save(update_fields=["existencias", "fecha_actualizacion"])
+    return total
+
+
+def _registrar_ajuste_existencia_bodega(*, empresa, bodega, lote, cantidad_resultante, referencia, observacion):
+    existencia, _ = ExistenciaLoteBodega.objects.get_or_create(
+        empresa=empresa,
+        bodega=bodega,
+        lote=lote,
+        defaults={"cantidad": Decimal("0.00")},
+    )
+    anterior = existencia.cantidad
+    if cantidad_resultante < 0:
+        raise ValidationError(f"La existencia en {bodega.nombre} no puede quedar negativa.")
+    delta = cantidad_resultante - anterior
+    if delta == 0:
+        return None
+    existencia.cantidad = cantidad_resultante
+    existencia.save(update_fields=["cantidad", "fecha_actualizacion"])
+    return MovimientoLoteBodega.objects.create(
+        empresa=empresa,
+        bodega=bodega,
+        lote=lote,
+        tipo="ajuste",
+        cantidad=delta,
+        existencia_anterior=anterior,
+        existencia_resultante=cantidad_resultante,
+        referencia=referencia,
+        observacion=observacion,
+    )
+
+
+def _ajustar_existencia_producto_bodega(producto, bodega, cantidad_objetivo, *, numero_lote="", fecha_vencimiento=None, observacion=""):
+    cantidad_objetivo = cantidad_objetivo or Decimal("0.00")
+    if cantidad_objetivo < 0:
+        raise ValidationError("La cantidad por bodega no puede ser negativa.")
+
+    actual = ExistenciaLoteBodega.objects.filter(
+        empresa=producto.empresa,
+        bodega=bodega,
+        lote__producto=producto,
+    ).aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00")
+    delta = cantidad_objetivo - actual
+    if delta == 0:
+        return
+
+    referencia = f"Producto {producto.id}"
+    observacion = observacion or "Ajuste de distribucion por bodega desde producto."
+    if delta > 0:
+        lote, _ = LoteInventario.objects.get_or_create(
+            empresa=producto.empresa,
+            producto=producto,
+            numero_lote=numero_lote or f"AJUSTE-{producto.id}",
+            defaults={
+                "fecha_vencimiento": fecha_vencimiento,
+                "activo": True,
+            },
+        )
+        if fecha_vencimiento and lote.fecha_vencimiento != fecha_vencimiento:
+            lote.fecha_vencimiento = fecha_vencimiento
+            lote.save(update_fields=["fecha_vencimiento"])
+        existencia, _ = ExistenciaLoteBodega.objects.get_or_create(
+            empresa=producto.empresa,
+            bodega=bodega,
+            lote=lote,
+            defaults={"cantidad": Decimal("0.00")},
+        )
+        _registrar_ajuste_existencia_bodega(
+            empresa=producto.empresa,
+            bodega=bodega,
+            lote=lote,
+            cantidad_resultante=existencia.cantidad + delta,
+            referencia=referencia,
+            observacion=observacion,
+        )
+        return
+
+    restante = abs(delta)
+    existencias = (
+        ExistenciaLoteBodega.objects.filter(
+            empresa=producto.empresa,
+            bodega=bodega,
+            lote__producto=producto,
+            cantidad__gt=0,
+        )
+        .select_related("lote")
+        .order_by("lote__fecha_vencimiento", "lote__fecha_creacion", "id")
+    )
+    for existencia in existencias:
+        if restante <= 0:
+            break
+        salida = min(restante, existencia.cantidad)
+        _registrar_ajuste_existencia_bodega(
+            empresa=producto.empresa,
+            bodega=bodega,
+            lote=existencia.lote,
+            cantidad_resultante=existencia.cantidad - salida,
+            referencia=referencia,
+            observacion=observacion,
+        )
+        restante -= salida
+    if restante > 0:
+        raise ValidationError(f"No hay suficiente existencia en {bodega.nombre} para ajustar {producto.nombre}.")
+
+
+def _aplicar_distribucion_bodegas_producto(producto, form):
+    if not getattr(form, "mostrar_bodega_inicial", False):
+        return
+    if not producto.controla_inventario:
+        return
+    numero_lote = (form.cleaned_data.get("lote_inicial") or "").strip()
+    fecha_vencimiento = form.cleaned_data.get("vencimiento_lote_inicial")
+    for item in form.distribucion_bodegas():
+        _ajustar_existencia_producto_bodega(
+            producto,
+            item["bodega"],
+            item["cantidad"] or Decimal("0.00"),
+            numero_lote=numero_lote,
+            fecha_vencimiento=fecha_vencimiento,
+        )
+    _sincronizar_existencia_general_producto(producto)
+
+
 def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
     config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     if not config.ventas_solo_desde_vitrina:
@@ -1655,6 +1785,85 @@ def inventario_farmaceutico(request, empresa_slug):
             "bodegas": BodegaInventario.objects.filter(empresa=empresa, activa=True).count(),
             "unidades": existencias.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00"),
             "por_vencer": lotes_alerta.count(),
+        },
+    })
+
+
+@login_required
+def bodegas_dashboard(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    if not config_avanzada.usa_bodegas_internas:
+        messages.error(request, "El modulo de bodegas internas no esta activo para esta empresa.")
+        return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+
+    _asegurar_bodegas_farmaceuticas(empresa)
+    bodegas = BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre")
+    resumen_bodegas = []
+    for bodega in bodegas:
+        existencias = ExistenciaLoteBodega.objects.filter(
+            empresa=empresa,
+            bodega=bodega,
+            cantidad__gt=0,
+        )
+        resumen_bodegas.append({
+            "bodega": bodega,
+            "unidades": existencias.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00"),
+            "productos": existencias.values("lote__producto").distinct().count(),
+            "lotes": existencias.values("lote").distinct().count(),
+        })
+
+    return render(request, "facturacion/bodegas_dashboard.html", {
+        "empresa": empresa,
+        "resumen_bodegas": resumen_bodegas,
+        "resumen": {
+            "bodegas": bodegas.count(),
+            "unidades": sum((item["unidades"] for item in resumen_bodegas), Decimal("0.00")),
+            "productos": sum((item["productos"] for item in resumen_bodegas), 0),
+            "lotes": sum((item["lotes"] for item in resumen_bodegas), 0),
+        },
+    })
+
+
+@login_required
+def ver_bodega_inventario(request, empresa_slug, bodega_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    if not config_avanzada.usa_bodegas_internas:
+        messages.error(request, "El modulo de bodegas internas no esta activo para esta empresa.")
+        return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+
+    _asegurar_bodegas_farmaceuticas(empresa)
+    bodega = get_object_or_404(BodegaInventario, empresa=empresa, id=bodega_id, activa=True)
+    existencias = (
+        ExistenciaLoteBodega.objects.filter(
+            empresa=empresa,
+            bodega=bodega,
+            cantidad__gt=0,
+        )
+        .select_related("lote", "lote__producto")
+        .order_by("lote__producto__nombre", "lote__fecha_vencimiento", "lote__numero_lote")
+    )
+    productos = (
+        existencias.values(
+            "lote__producto",
+            "lote__producto__nombre",
+            "lote__producto__codigo",
+            "lote__producto__unidad_medida",
+        )
+        .annotate(total=Sum("cantidad"), lotes=Count("lote", distinct=True))
+        .order_by("lote__producto__nombre")
+    )
+
+    return render(request, "facturacion/ver_bodega_inventario.html", {
+        "empresa": empresa,
+        "bodega": bodega,
+        "productos": productos,
+        "existencias": existencias,
+        "resumen": {
+            "unidades": existencias.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00"),
+            "productos": productos.count(),
+            "lotes": existencias.values("lote").distinct().count(),
         },
     })
 
@@ -3000,15 +3209,9 @@ def crear_producto(request, empresa_slug):
                     producto = form.save(commit=False)
                     producto.empresa = empresa
                     producto.save()
-                    form.guardar_perfil_farmaceutico(producto)
-                    if getattr(form, "mostrar_bodega_inicial", False):
-                        _registrar_entrada_inicial_producto(
-                            producto,
-                            bodega=form.cleaned_data.get("bodega_inicial"),
-                            cantidad=form.cleaned_data.get("cantidad_inicial") or Decimal("0.00"),
-                            numero_lote=(form.cleaned_data.get("lote_inicial") or "").strip(),
-                            fecha_vencimiento=form.cleaned_data.get("vencimiento_lote_inicial"),
-                        )
+                    if getattr(form, "mostrar_perfil_farmaceutico", False):
+                        form.guardar_perfil_farmaceutico(producto)
+                    _aplicar_distribucion_bodegas_producto(producto, form)
                 if quick_mode:
                     return render(request, "facturacion/crear_producto_rapido_modal.html", {
                         "empresa": empresa,
@@ -3048,6 +3251,7 @@ def crear_producto(request, empresa_slug):
         "quick_mode": quick_mode,
         "mostrar_perfil_farmaceutico": getattr(form, "mostrar_perfil_farmaceutico", False),
         "mostrar_bodega_inicial": getattr(form, "mostrar_bodega_inicial", False),
+        "distribucion_bodegas": form.distribucion_bodegas() if getattr(form, "mostrar_bodega_inicial", False) else [],
         "next": request.GET.get("next", ""),
         "titulo": "Nuevo Producto",
         "texto_boton": "Guardar Producto",
@@ -3062,9 +3266,22 @@ def editar_producto(request, empresa_slug, producto_id):
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, instance=producto, empresa=empresa)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Producto actualizado correctamente.")
-            return redirect("productos_facturacion", empresa_slug=empresa.slug)
+            try:
+                with transaction.atomic():
+                    producto = form.save()
+                    if getattr(form, "mostrar_perfil_farmaceutico", False):
+                        form.guardar_perfil_farmaceutico(producto)
+                    _aplicar_distribucion_bodegas_producto(producto, form)
+                messages.success(request, "Producto actualizado correctamente.")
+                return redirect("productos_facturacion", empresa_slug=empresa.slug)
+            except ValidationError as exc:
+                if hasattr(exc, "message_dict"):
+                    for campo, errores in exc.message_dict.items():
+                        destino = campo if campo in form.fields else None
+                        for error in errores:
+                            form.add_error(destino, error)
+                else:
+                    form.add_error(None, str(exc))
     else:
         form = ProductoForm(instance=producto, empresa=empresa)
 
@@ -3072,6 +3289,8 @@ def editar_producto(request, empresa_slug, producto_id):
         "empresa": empresa,
         "form": form,
         "mostrar_perfil_farmaceutico": getattr(form, "mostrar_perfil_farmaceutico", False),
+        "mostrar_bodega_inicial": getattr(form, "mostrar_bodega_inicial", False),
+        "distribucion_bodegas": form.distribucion_bodegas() if getattr(form, "mostrar_bodega_inicial", False) else [],
         "titulo": "Editar Producto",
         "texto_boton": "Guardar Cambios",
     })

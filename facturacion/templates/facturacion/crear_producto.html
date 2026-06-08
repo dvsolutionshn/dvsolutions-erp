@@ -123,15 +123,21 @@
 
         {% if mostrar_bodega_inicial %}
         <section class="erp-compact-card is-slim">
-            <h3>Ubicacion inicial</h3>
-            <p>Indica en que bodega esta el producto al momento de crearlo. Esto deja inventario general, lote y existencia por bodega conectados desde el inicio.</p>
-            <div class="erp-compact-grid four-col is-tight" style="margin-top:12px;">
-                <div class="erp-field">{{ form.bodega_inicial.label_tag }}{{ form.bodega_inicial }}{% if form.bodega_inicial.errors %}<ul class="erp-field-errors">{% for error in form.bodega_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
-                <div class="erp-field">{{ form.cantidad_inicial.label_tag }}{{ form.cantidad_inicial }}{% if form.cantidad_inicial.errors %}<ul class="erp-field-errors">{% for error in form.cantidad_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+            <h3>Distribucion por bodegas</h3>
+            <p>Registra la cantidad real del mismo producto en cada ubicacion. El stock general sera la suma de todas las bodegas.</p>
+            <div class="erp-compact-grid three-col is-tight" style="margin-top:12px;">
+                {% for item in distribucion_bodegas %}
+                <div class="erp-field">
+                    {{ item.field.label_tag }}{{ item.field }}
+                    {% if item.field.errors %}<ul class="erp-field-errors">{% for error in item.field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="erp-compact-grid two-col is-tight" style="margin-top:12px;">
                 <div class="erp-field">{{ form.lote_inicial.label_tag }}{{ form.lote_inicial }}{% if form.lote_inicial.errors %}<ul class="erp-field-errors">{% for error in form.lote_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field">{{ form.vencimiento_lote_inicial.label_tag }}{{ form.vencimiento_lote_inicial }}{% if form.vencimiento_lote_inicial.errors %}<ul class="erp-field-errors">{% for error in form.vencimiento_lote_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
             </div>
-            <div class="erp-field-help" style="margin-top:10px;">Si dejas cantidad en cero, solo se crea el producto y podras cargar existencias despues desde inventario.</div>
+            <div class="erp-field-help" style="margin-top:10px;">Ejemplo: Bodega General 2, Vitrina 3 y Bodega Hospital 1. Si dejas todo en cero, solo se guarda el producto.</div>
         </section>
         {% endif %}
 

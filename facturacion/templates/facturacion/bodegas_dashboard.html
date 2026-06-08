@@ -1,0 +1,54 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Bodegas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Inventario por ubicacion{% endblock %}
+{% block header_title %}Bodegas{% endblock %}
+{% block header_description %}Controla el mismo producto dividido entre Bodega General, Bodega Hospital y Vitrina sin duplicar el catalogo.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'bodegas_dashboard' empresa.slug %}">Nuevo Producto</a>
+<a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
+<a class="erp-action-link" href="{% url 'inventario_farmaceutico' empresa.slug %}">Inventario Farmaceutico</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Bodegas activas</div>
+        <p class="erp-stat-value">{{ resumen.bodegas }}</p>
+        <p class="erp-card-muted">Ubicaciones operativas para inventario.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Unidades</div>
+        <p class="erp-stat-value">{{ resumen.unidades|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Suma de todas las bodegas.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Productos ubicados</div>
+        <p class="erp-stat-value">{{ resumen.productos }}</p>
+        <p class="erp-card-muted">Conteo operativo por ubicacion.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Lotes</div>
+        <p class="erp-stat-value">{{ resumen.lotes }}</p>
+        <p class="erp-card-muted">Separacion para vencimientos y trazabilidad.</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    {% for item in resumen_bodegas %}
+    <a class="erp-card erp-module-card" href="{% url 'ver_bodega_inventario' empresa.slug item.bodega.id %}">
+        <div class="erp-kpi-label">{{ item.bodega.get_tipo_display }}</div>
+        <h3>{{ item.bodega.nombre }}</h3>
+        <p class="erp-stat-value">{{ item.unidades|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">{{ item.productos }} productos y {{ item.lotes }} lotes disponibles.</p>
+    </a>
+    {% empty %}
+    <article class="erp-card">
+        <h3>Sin bodegas</h3>
+        <p class="erp-card-muted">Activa bodegas internas para esta empresa y vuelve a entrar.</p>
+    </article>
+    {% endfor %}
+</section>
+{% endblock %}

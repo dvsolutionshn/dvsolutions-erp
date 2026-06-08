@@ -1,7 +1,8 @@
 from django import forms
+from django.db.models import Sum
 from decimal import Decimal
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, ExistenciaLoteBodega, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
 
@@ -183,18 +184,6 @@ class ClienteForm(forms.ModelForm):
 
 
 class ProductoForm(forms.ModelForm):
-    bodega_inicial = forms.ModelChoiceField(
-        queryset=BodegaInventario.objects.none(),
-        required=False,
-        label='Bodega inicial',
-    )
-    cantidad_inicial = forms.DecimalField(
-        required=False,
-        min_value=0,
-        max_digits=12,
-        decimal_places=2,
-        label='Cantidad inicial',
-    )
     lote_inicial = forms.CharField(required=False, label='Lote inicial')
     vencimiento_lote_inicial = forms.DateField(required=False, label='Vencimiento del lote')
     categoria_farmaceutica = forms.ModelChoiceField(
@@ -263,6 +252,7 @@ class ProductoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.mostrar_perfil_farmaceutico = False
         self.mostrar_bodega_inicial = False
+        self.bodega_stock_fields = []
         self.fields['impuesto_predeterminado'].queryset = TipoImpuesto.objects.filter(activo=True).order_by('porcentaje', 'nombre')
         if self.empresa:
             configuracion_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
@@ -271,10 +261,8 @@ class ProductoForm(forms.ModelForm):
                 self.empresa.tiene_modulo_activo("clinica_medica")
                 and configuracion_avanzada.usa_inventario_farmaceutico
             )
-            self.fields['bodega_inicial'].queryset = BodegaInventario.objects.filter(
-                empresa=self.empresa,
-                activa=True,
-            ).order_by('tipo', 'nombre')
+            if self.mostrar_bodega_inicial:
+                self._agregar_campos_stock_bodega()
         if self.empresa:
             self.fields['categoria_farmaceutica'].queryset = CategoriaProductoFarmaceutico.objects.filter(
                 empresa=self.empresa,
@@ -282,8 +270,6 @@ class ProductoForm(forms.ModelForm):
             ).order_by('nombre')
         if not self.mostrar_bodega_inicial:
             for field_name in [
-                'bodega_inicial',
-                'cantidad_inicial',
                 'lote_inicial',
                 'vencimiento_lote_inicial',
             ]:
@@ -316,18 +302,57 @@ class ProductoForm(forms.ModelForm):
                 self.fields['producto_controlado'].initial = perfil.producto_controlado
                 self.fields['alerta_vencimiento_dias'].initial = perfil.alerta_vencimiento_dias
 
+    def _agregar_campos_stock_bodega(self):
+        bodegas = BodegaInventario.objects.filter(
+            empresa=self.empresa,
+            activa=True,
+        ).order_by('tipo', 'nombre')
+        existencias_por_bodega = {}
+        if self.instance and self.instance.pk:
+            existencias_por_bodega = {
+                item['bodega']: item['total'] or Decimal('0.00')
+                for item in ExistenciaLoteBodega.objects.filter(
+                    empresa=self.empresa,
+                    lote__producto=self.instance,
+                ).values('bodega').annotate(total=Sum('cantidad'))
+            }
+        for bodega in bodegas:
+            field_name = f'stock_bodega_{bodega.id}'
+            self.fields[field_name] = forms.DecimalField(
+                required=False,
+                min_value=0,
+                max_digits=12,
+                decimal_places=2,
+                label=bodega.nombre,
+                initial=existencias_por_bodega.get(bodega.id, Decimal('0.00')),
+            )
+            self.bodega_stock_fields.append((bodega, field_name))
+
     def clean(self):
         cleaned_data = super().clean()
         if not self.mostrar_bodega_inicial:
             return cleaned_data
-        cantidad = cleaned_data.get('cantidad_inicial') or Decimal('0.00')
-        bodega = cleaned_data.get('bodega_inicial')
         controla_inventario = cleaned_data.get('controla_inventario')
-        if cantidad > 0 and not bodega:
-            self.add_error('bodega_inicial', 'Selecciona la bodega donde esta esta existencia inicial.')
-        if cantidad > 0 and not controla_inventario:
-            self.add_error('cantidad_inicial', 'Activa Controla inventario para registrar cantidad inicial.')
+        total_bodegas = sum(
+            (cleaned_data.get(field_name) or Decimal('0.00'))
+            for _, field_name in self.bodega_stock_fields
+        )
+        if total_bodegas > 0 and not controla_inventario:
+            for _, field_name in self.bodega_stock_fields:
+                if cleaned_data.get(field_name):
+                    self.add_error(field_name, 'Activa Controla inventario para registrar existencias por bodega.')
         return cleaned_data
+
+    def distribucion_bodegas(self):
+        distribucion = []
+        for bodega, field_name in self.bodega_stock_fields:
+            distribucion.append({
+                'bodega': bodega,
+                'field_name': field_name,
+                'field': self[field_name],
+                'cantidad': self.cleaned_data.get(field_name) if hasattr(self, 'cleaned_data') else self.fields[field_name].initial,
+            })
+        return distribucion
 
     def save(self, commit=True):
         producto = super().save(commit=commit)

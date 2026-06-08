@@ -1,0 +1,114 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}{{ bodega.nombre }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Bodega{% endblock %}
+{% block header_title %}{{ bodega.nombre }}{% endblock %}
+{% block header_description %}Productos, cantidades y lotes disponibles dentro de esta ubicacion.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'bodegas_dashboard' empresa.slug %}">Volver a bodegas</a>
+<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={{ request.path }}">Nuevo Producto</a>
+<a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Unidades</div>
+        <p class="erp-stat-value">{{ resumen.unidades|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Existencia total en {{ bodega.nombre }}.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Productos</div>
+        <p class="erp-stat-value">{{ resumen.productos }}</p>
+        <p class="erp-card-muted">Productos con existencia en esta bodega.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Lotes</div>
+        <p class="erp-stat-value">{{ resumen.lotes }}</p>
+        <p class="erp-card-muted">Lotes disponibles para trazabilidad.</p>
+    </article>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Productos en {{ bodega.nombre }}</h3>
+            <p>Vista resumida para revisar cantidades por producto.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Codigo</th>
+                    <th>Unidad</th>
+                    <th class="erp-money">Cantidad</th>
+                    <th>Lotes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for producto in productos %}
+                <tr>
+                    <td><strong>{{ producto.lote__producto__nombre }}</strong></td>
+                    <td>{{ producto.lote__producto__codigo|default:"Sin codigo" }}</td>
+                    <td>{{ producto.lote__producto__unidad_medida }}</td>
+                    <td class="erp-money">{{ producto.total|floatformat:2|intcomma }}</td>
+                    <td>{{ producto.lotes }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="erp-empty-row">Esta bodega aun no tiene productos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Detalle por lote</h3>
+            <p>Usa esta lectura para vencimientos, revision medica e inventario fisico.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Lote</th>
+                    <th>Vencimiento</th>
+                    <th class="erp-money">Cantidad</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for existencia in existencias %}
+                <tr>
+                    <td>
+                        <strong>{{ existencia.lote.producto.nombre }}</strong>
+                        <div class="erp-card-muted">{{ existencia.lote.producto.codigo|default:"Sin codigo" }}</div>
+                    </td>
+                    <td>{{ existencia.lote.numero_lote }}</td>
+                    <td>{{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"Sin vencimiento" }}</td>
+                    <td class="erp-money">{{ existencia.cantidad|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if existencia.lote.vencido %}
+                        <span class="erp-badge danger">Vencido</span>
+                        {% elif existencia.lote.por_vencer %}
+                        <span class="erp-badge warning">Por vencer</span>
+                        {% else %}
+                        <span class="erp-badge success">Disponible</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="erp-empty-row">No hay lotes disponibles en esta bodega.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

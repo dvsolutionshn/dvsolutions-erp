@@ -20,6 +20,7 @@
     {% url 'categorias_farmaceuticas' empresa.slug as categorias_farmaceuticas_url %}
     {% url 'proveedores_facturacion' empresa.slug as proveedores_url %}
     {% url 'inventario_facturacion' empresa.slug as inventario_url %}
+    {% url 'bodegas_dashboard' empresa.slug as bodegas_url %}
     {% url 'inventario_farmaceutico' empresa.slug as inventario_farmaceutico_url %}
     {% url 'traslado_rapido_farmaceutico' empresa.slug as traslado_rapido_farmaceutico_url %}
     {% url 'entrada_inventario' empresa.slug as entrada_inventario_url %}
@@ -166,7 +167,8 @@
                 {% if erp_access.productos %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/' in request.path %}is-active{% endif %}" href="{{ productos_url }}"><span class="erp-nav-bullet"></span><span>Productos</span></a>{% endif %}
                 {% if erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/categorias-farmaceuticas/' in request.path %}is-active{% endif %}" href="{{ categorias_farmaceuticas_url }}"><span class="erp-nav-bullet"></span><span>Categorias Farmaceuticas</span></a>{% endif %}
                 {% if erp_access.proveedores %}<a class="erp-nav-link {% if '/dashboard/facturacion/proveedores/' in request.path %}is-active{% endif %}" href="{{ proveedores_url }}"><span class="erp-nav-bullet"></span><span>Proveedores</span></a>{% endif %}
-                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/' in request.path %}is-active{% endif %}" href="{{ inventario_url }}"><span class="erp-nav-bullet"></span><span>Inventario</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/' in request.path and '/dashboard/facturacion/inventario/bodegas/' not in request.path %}is-active{% endif %}" href="{{ inventario_url }}"><span class="erp-nav-bullet"></span><span>Inventario</span></a>{% endif %}
+                {% if erp_access.usa_bodegas_internas %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/bodegas/' in request.path %}is-active{% endif %}" href="{{ bodegas_url }}"><span class="erp-nav-bullet"></span><span>Bodegas</span></a>{% endif %}
                 {% if erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/' in request.path %}is-active{% endif %}" href="{{ inventario_farmaceutico_url }}"><span class="erp-nav-bullet"></span><span>Inventario Farmaceutico</span></a>{% endif %}
                 {% if erp_access.usa_bodegas_internas %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/traslado-rapido/' in request.path %}is-active{% endif %}" href="{{ traslado_rapido_farmaceutico_url }}"><span class="erp-nav-bullet"></span><span>Transferencia Rapida</span></a>{% endif %}
                 {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/entrada/' in request.path %}is-active{% endif %}" href="{{ entrada_inventario_url }}"><span class="erp-nav-bullet"></span><span>Entrada Inventario</span></a>{% endif %}

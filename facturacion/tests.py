@@ -7,6 +7,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Sum
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -1593,14 +1594,24 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Producto.objects.filter(empresa=self.empresa, nombre="Producto Nuevo").exists())
 
-    def test_crear_producto_registra_existencia_en_bodega_inicial(self):
+    def test_crear_producto_registra_existencia_distribuida_por_bodega(self):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
         configuracion.usa_bodegas_internas = True
         configuracion.save(update_fields=["usa_bodegas_internas"])
-        bodega = BodegaInventario.objects.create(
+        bodega_general = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega General",
+            tipo="principal",
+        )
+        bodega_hospital = BodegaInventario.objects.create(
             empresa=self.empresa,
             nombre="Bodega Hospital",
             tipo="provisional",
+        )
+        vitrina = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Vitrina",
+            tipo="vitrina",
         )
 
         response = self.client.post(
@@ -1615,33 +1626,84 @@ class FacturacionTests(TestCase):
                 "impuesto_predeterminado": str(self.impuesto.id),
                 "activo": "on",
                 "controla_inventario": "on",
-                "bodega_inicial": str(bodega.id),
-                "cantidad_inicial": "25.00",
+                f"stock_bodega_{bodega_general.id}": "2.00",
+                f"stock_bodega_{vitrina.id}": "3.00",
+                f"stock_bodega_{bodega_hospital.id}": "1.00",
                 "lote_inicial": "L-001",
             },
         )
 
         self.assertEqual(response.status_code, 302)
         producto = Producto.objects.get(empresa=self.empresa, codigo="JER-10")
-        self.assertEqual(producto.stock_actual, Decimal("25.00"))
-        self.assertTrue(
+        self.assertEqual(producto.stock_actual, Decimal("6.00"))
+        self.assertEqual(
             ExistenciaLoteBodega.objects.filter(
                 empresa=self.empresa,
-                bodega=bodega,
                 lote__producto=producto,
-                lote__numero_lote="L-001",
-                cantidad=Decimal("25.00"),
-            ).exists()
+            ).aggregate(total=Sum("cantidad"))["total"],
+            Decimal("6.00"),
         )
-        self.assertTrue(
-            MovimientoLoteBodega.objects.filter(
-                empresa=self.empresa,
-                bodega=bodega,
-                lote__producto=producto,
-                tipo="entrada",
-                cantidad=Decimal("25.00"),
-            ).exists()
+        self.assertEqual(
+            ExistenciaLoteBodega.objects.get(empresa=self.empresa, bodega=vitrina, lote__producto=producto).cantidad,
+            Decimal("3.00"),
         )
+        self.assertEqual(
+            MovimientoLoteBodega.objects.filter(empresa=self.empresa, lote__producto=producto, tipo="ajuste").count(),
+            3,
+        )
+
+    def test_editar_producto_actualiza_distribucion_por_bodega(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        bodega_general = BodegaInventario.objects.create(empresa=self.empresa, nombre="Bodega General", tipo="principal")
+        bodega_hospital = BodegaInventario.objects.create(empresa=self.empresa, nombre="Bodega Hospital", tipo="provisional")
+        vitrina = BodegaInventario.objects.create(empresa=self.empresa, nombre="Vitrina", tipo="vitrina")
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Guantes",
+            codigo="GUA-001",
+            tipo_item="producto",
+            unidad_medida="unidad",
+            precio=Decimal("1.50"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=True,
+        )
+
+        response = self.client.post(
+            reverse("editar_producto_facturacion", args=[self.empresa.slug, producto.id]),
+            {
+                "nombre": producto.nombre,
+                "codigo": producto.codigo,
+                "tipo_item": producto.tipo_item,
+                "unidad_medida": producto.unidad_medida,
+                "descripcion": "",
+                "precio": "1.50",
+                "impuesto_predeterminado": str(self.impuesto.id),
+                "activo": "on",
+                "controla_inventario": "on",
+                f"stock_bodega_{bodega_general.id}": "2.00",
+                f"stock_bodega_{vitrina.id}": "3.00",
+                f"stock_bodega_{bodega_hospital.id}": "1.00",
+                "lote_inicial": "AJ-001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        producto.refresh_from_db()
+        self.assertEqual(producto.stock_actual, Decimal("6.00"))
+        self.assertEqual(
+            ExistenciaLoteBodega.objects.get(empresa=self.empresa, bodega=bodega_hospital, lote__producto=producto).cantidad,
+            Decimal("1.00"),
+        )
+
+        response = self.client.get(reverse("bodegas_dashboard", args=[self.empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bodega General")
+
+        response = self.client.get(reverse("ver_bodega_inventario", args=[self.empresa.slug, vitrina.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Guantes")
 
     def test_crear_producto_rapido_desde_factura_retorna_payload(self):
         response = self.client.post(

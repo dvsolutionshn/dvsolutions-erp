@@ -5,6 +5,7 @@ FACTURACION_PERMISSION_MAP = [
     ("inventario/entrada/", "puede_inventario"),
     ("inventario/entradas/", "puede_inventario"),
     ("inventario/ajuste/", "puede_inventario"),
+    ("inventario/bodegas/", "puede_inventario"),
     ("inventario/kardex/", "puede_inventario"),
     ("inventario/", "puede_inventario"),
     ("clientes/", "puede_clientes"),
