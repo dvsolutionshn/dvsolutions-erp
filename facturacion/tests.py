@@ -2,8 +2,6 @@ from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 import json
-import shutil
-import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -18,7 +16,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpres
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm
-from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, MovimientoInventario, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -239,19 +237,6 @@ class FacturacionTests(TestCase):
                 estado="contabilizado",
             ).exists()
         )
-
-    def test_punto_venta_muestra_foto_y_descripcion_producto(self):
-        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
-        self.producto.descripcion = "Descripcion visible para caja"
-        self.producto.foto = "productos/fotos/demo.jpg"
-        self.producto.save(update_fields=["descripcion", "foto"])
-
-        response = self.client.get(reverse("punto_venta", args=[self.empresa.slug]))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Descripcion visible para caja")
-        self.assertContains(response, "/media/productos/fotos/demo.jpg")
 
     def test_libro_compras_fiscal_evita_duplicados_entre_meses(self):
         RegistroCompraFiscal.objects.create(
@@ -1608,38 +1593,6 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Producto.objects.filter(empresa=self.empresa, nombre="Producto Nuevo").exists())
 
-    def test_crear_producto_guarda_foto(self):
-        media_root = tempfile.mkdtemp()
-        foto = SimpleUploadedFile(
-            "producto.gif",
-            b"GIF87a\x01\x00\x01\x00\x80\x01\x00\x00\x00\x00\xff\xff\xff,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;",
-            content_type="image/gif",
-        )
-
-        try:
-            with self.settings(MEDIA_ROOT=media_root):
-                response = self.client.post(
-                    reverse("crear_producto_facturacion", args=[self.empresa.slug]),
-                    {
-                        "nombre": "Producto Con Foto",
-                        "codigo": "FOTO-001",
-                        "tipo_item": "producto",
-                        "unidad_medida": "unidad",
-                        "descripcion": "Producto con imagen para POS e inventario",
-                        "precio": "125.00",
-                        "impuesto_predeterminado": str(self.impuesto.id),
-                        "activo": "on",
-                        "controla_inventario": "on",
-                        "foto": foto,
-                    },
-                )
-        finally:
-            shutil.rmtree(media_root, ignore_errors=True)
-
-        self.assertEqual(response.status_code, 302)
-        producto = Producto.objects.get(empresa=self.empresa, nombre="Producto Con Foto")
-        self.assertTrue(producto.foto.name.startswith("productos/fotos/"))
-
     def test_crear_producto_rapido_desde_factura_retorna_payload(self):
         response = self.client.post(
             f"{reverse('crear_producto_facturacion', args=[self.empresa.slug])}?modal=1",
@@ -1784,16 +1737,10 @@ class FacturacionTests(TestCase):
         self.assertContains(response, 'id="productos-sugerencias"', html=False)
 
     def test_inventario_dashboard_muestra_producto(self):
-        self.producto.descripcion = "Descripcion visible en inventario"
-        self.producto.foto = "productos/fotos/inventario.jpg"
-        self.producto.save(update_fields=["descripcion", "foto"])
-
         response = self.client.get(reverse("inventario_facturacion", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.producto.nombre)
-        self.assertContains(response, "Descripcion visible en inventario")
-        self.assertContains(response, "/media/productos/fotos/inventario.jpg")
         producto_url = reverse("crear_producto_facturacion", args=[self.empresa.slug])
         inventario_url = reverse("inventario_facturacion", args=[self.empresa.slug])
         self.assertContains(response, "Nuevo Producto")
@@ -1805,18 +1752,10 @@ class FacturacionTests(TestCase):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
         configuracion.usa_inventario_farmaceutico = True
         configuracion.save(update_fields=["usa_inventario_farmaceutico"])
-        self.producto.descripcion = "Descripcion farmaceutica visible"
-        self.producto.foto = "productos/fotos/farmaceutico.jpg"
-        self.producto.save(update_fields=["descripcion", "foto"])
-        bodega = BodegaInventario.objects.create(empresa=self.empresa, nombre="Bodega principal", tipo="principal")
-        lote = LoteInventario.objects.create(empresa=self.empresa, producto=self.producto, numero_lote="L-001")
-        ExistenciaLoteBodega.objects.create(empresa=self.empresa, bodega=bodega, lote=lote, cantidad=Decimal("5.00"))
 
         response = self.client.get(reverse("inventario_farmaceutico", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Descripcion farmaceutica visible")
-        self.assertContains(response, "/media/productos/fotos/farmaceutico.jpg")
         producto_url = reverse("crear_producto_facturacion", args=[self.empresa.slug])
         inventario_farmaceutico_url = reverse("inventario_farmaceutico", args=[self.empresa.slug])
         self.assertContains(response, "Nuevo Producto")

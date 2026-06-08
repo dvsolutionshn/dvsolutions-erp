@@ -36,30 +36,6 @@
     color:var(--primary);
     font-weight:700;
 }
-.erp-inventory-product{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    min-width:260px;
-}
-.erp-inventory-photo,
-.erp-inventory-photo-placeholder{
-    width:46px;
-    height:46px;
-    border-radius:10px;
-    border:1px solid var(--line);
-    background:#eef4fb;
-    object-fit:cover;
-    flex:0 0 46px;
-}
-.erp-inventory-photo-placeholder{
-    display:grid;
-    place-items:center;
-    color:var(--primary);
-    font-size:.68rem;
-    font-weight:900;
-    letter-spacing:.08em;
-}
 .erp-alert-banner{
     display:flex;
     align-items:flex-start;
@@ -210,17 +186,8 @@
             {% for producto in productos %}
                 <tr>
                     <td>
-                        <div class="erp-inventory-product">
-                            {% if producto.foto %}
-                            <img class="erp-inventory-photo" src="{{ producto.foto.url }}" alt="{{ producto.nombre }}">
-                            {% else %}
-                            <div class="erp-inventory-photo-placeholder">IMG</div>
-                            {% endif %}
-                            <div>
-                                <a class="erp-inline-link" href="{% url 'inventario_facturacion' empresa.slug %}?producto={{ producto.id }}">{{ producto.nombre }}</a>
-                                <div class="erp-card-muted">{{ producto.descripcion|default:"Sin descripción"|truncatechars:90 }}</div>
-                            </div>
-                        </div>
+                        <a class="erp-inline-link" href="{% url 'inventario_facturacion' empresa.slug %}?producto={{ producto.id }}">{{ producto.nombre }}</a>
+                        <div class="erp-card-muted">{{ producto.descripcion|default:"Sin descripción"|truncatechars:70 }}</div>
                     </td>
                     <td>{{ producto.codigo|default:"-" }}</td>
                     <td>{{ producto.get_unidad_medida_display }}</td>
