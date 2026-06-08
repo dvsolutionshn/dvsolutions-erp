@@ -1741,6 +1741,10 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.producto.nombre)
+        producto_url = reverse("crear_producto_facturacion", args=[self.empresa.slug])
+        inventario_url = reverse("inventario_facturacion", args=[self.empresa.slug])
+        self.assertContains(response, "Nuevo Producto")
+        self.assertContains(response, f'href="{producto_url}?next={inventario_url}"', html=False)
 
     def test_kardex_inventario_muestra_movimientos(self):
         InventarioProducto.objects.create(

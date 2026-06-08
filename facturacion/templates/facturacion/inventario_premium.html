@@ -6,6 +6,7 @@
 {% block header_title %}Inventario{% endblock %}
 {% block header_description %}Control inicial de existencias, movimientos y ajustes manuales conectado con facturación.{% endblock %}
 {% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'inventario_facturacion' empresa.slug %}">Nuevo Producto</a>
 <a class="erp-action-link" href="{% url 'entrada_inventario' empresa.slug %}">Nueva Entrada</a>
 <a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras</a>
 <a class="erp-action-link" href="{% url 'entradas_inventario_dashboard' empresa.slug %}">Entradas</a>
