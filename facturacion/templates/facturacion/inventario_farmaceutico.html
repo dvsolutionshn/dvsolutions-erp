@@ -14,6 +14,35 @@
 <a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Inventario Base</a>
 {% endblock %}
 
+{% block extra_head %}
+<style>
+.erp-pharma-product{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:280px;
+}
+.erp-pharma-product-photo,
+.erp-pharma-product-placeholder{
+    width:46px;
+    height:46px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:#eef4fb;
+    object-fit:cover;
+    flex:0 0 46px;
+}
+.erp-pharma-product-placeholder{
+    display:grid;
+    place-items:center;
+    color:var(--primary);
+    font-size:.68rem;
+    font-weight:900;
+    letter-spacing:.08em;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="erp-grid">
     <article class="erp-card">
@@ -80,8 +109,18 @@
                 {% for existencia in existencias %}
                 <tr>
                     <td>
-                        <strong>{{ existencia.lote.producto.nombre }}</strong>
-                        <div class="erp-card-muted">{{ existencia.lote.producto.codigo|default:"Sin codigo" }}</div>
+                        <div class="erp-pharma-product">
+                            {% if existencia.lote.producto.foto %}
+                            <img class="erp-pharma-product-photo" src="{{ existencia.lote.producto.foto.url }}" alt="{{ existencia.lote.producto.nombre }}">
+                            {% else %}
+                            <div class="erp-pharma-product-placeholder">IMG</div>
+                            {% endif %}
+                            <div>
+                                <strong>{{ existencia.lote.producto.nombre }}</strong>
+                                <div class="erp-card-muted">{{ existencia.lote.producto.descripcion|default:"Sin descripcion"|truncatechars:90 }}</div>
+                                <div class="erp-card-muted">{{ existencia.lote.producto.codigo|default:"Sin codigo" }}</div>
+                            </div>
+                        </div>
                     </td>
                     <td>{{ existencia.lote.numero_lote }}</td>
                     <td>{{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"Sin vencimiento" }}</td>

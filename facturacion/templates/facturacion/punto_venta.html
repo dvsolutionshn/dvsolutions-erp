@@ -13,10 +13,11 @@
 .pos-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:12px;margin-bottom:16px}
 .pos-search,.pos-input,.pos-select{width:100%;min-height:48px;border:1px solid #bfd0e8;border-radius:10px;padding:0 14px;background:#fff;color:#102338;font-size:15px}
 .pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;max-height:620px;overflow:auto;padding-right:4px}
-.pos-product{min-height:244px;text-align:left;border:1px solid #d4e0f1;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:10px;padding:12px;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.pos-product{min-height:278px;text-align:left;border:1px solid #d4e0f1;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:10px;padding:12px;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
 .pos-product:hover{transform:translateY(-3px);border-color:#9eb8df;box-shadow:0 16px 32px rgba(12,34,56,.08)}
 .pos-product strong{display:block;font-size:15px;line-height:1.25;color:#102338}
 .pos-product span{display:block;margin-top:8px;color:#5b6f8e;font-size:13px;line-height:1.35}
+.pos-product .description{min-height:35px;color:#3f516b}
 .pos-product .price{margin-top:12px;font-size:20px;font-weight:800;color:#1f5fd7}
 .pos-product-photo,.pos-product-photo-placeholder{width:100%;aspect-ratio:1.18;border-radius:9px;border:1px solid #dbe6f4;background:#eef4fb;margin-bottom:12px}
 .pos-product-photo{object-fit:cover;display:block}
@@ -50,7 +51,7 @@
 <section class="pos-shell">
     <article class="erp-card pos-panel">
         <div class="pos-toolbar">
-            <input class="pos-search" id="posSearch" type="search" placeholder="Buscar por codigo, barra o nombre" autocomplete="off" autofocus>
+            <input class="pos-search" id="posSearch" type="search" placeholder="Buscar por codigo, nombre o descripcion" autocomplete="off" autofocus>
             <button class="erp-btn" type="button" id="clearSearch">Limpiar</button>
         </div>
         <div class="erp-card-muted" style="margin-bottom:12px;">{{ productos_count }} productos disponibles para venta rapida.</div>
@@ -109,7 +110,7 @@
     function renderProducts(){
         const term = normalized(search.value);
         const visible = products.filter(product => {
-            return !term || normalized(product.nombre).includes(term) || normalized(product.codigo).includes(term);
+            return !term || normalized(product.nombre).includes(term) || normalized(product.codigo).includes(term) || normalized(product.descripcion).includes(term);
         }).slice(0, 120);
         grid.innerHTML = visible.map(product => `
             <button class="pos-product" type="button" data-id="${product.id}">
@@ -117,6 +118,7 @@
                     ? `<img class="pos-product-photo" src="${product.foto_url}" alt="${product.nombre}">`
                     : `<div class="pos-product-photo-placeholder">IMG</div>`}
                 <strong>${product.nombre}</strong>
+                <span class="description">${product.descripcion || "Sin descripcion"}</span>
                 <span>${product.codigo || "Sin codigo"} - ${product.unidad}</span>
                 <span>${product.controla_inventario ? `Stock ${Number(product.stock).toFixed(2)}` : "Servicio o sin inventario"}</span>
                 <div class="price">${money(product.precio)}</div>

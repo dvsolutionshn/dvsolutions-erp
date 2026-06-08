@@ -317,6 +317,7 @@ def punto_venta(request, empresa_slug):
             "id": producto.id,
             "nombre": producto.nombre,
             "codigo": producto.codigo or "",
+            "descripcion": producto.descripcion or "",
             "foto_url": producto.foto.url if producto.foto else "",
             "precio": float(producto.precio or Decimal("0.00")),
             "impuesto": float(impuesto.porcentaje if impuesto else Decimal("0.00")),
