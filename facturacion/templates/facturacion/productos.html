@@ -151,8 +151,8 @@ td{
             <tr>
                 <td>
                     <div class="product-cell">
-                        {% if producto.foto %}
-                        <img class="product-thumb" src="{{ producto.foto.url }}" alt="{{ producto.nombre }}">
+                        {% if producto.foto_url %}
+                        <img class="product-thumb" src="{{ producto.foto_url }}" alt="{{ producto.nombre }}">
                         {% else %}
                         <div class="product-thumb-placeholder">IMG</div>
                         {% endif %}

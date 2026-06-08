@@ -90,8 +90,8 @@
                 <div class="erp-field erp-field-span-full">
                     {{ form.foto.label_tag }}
                     <div class="erp-product-photo-preview">
-                        {% if form.instance.foto %}
-                        <img id="product-photo-preview-img" src="{{ form.instance.foto.url }}" alt="{{ form.instance.nombre|default:'Producto' }}">
+                        {% if form.instance.foto_url %}
+                        <img id="product-photo-preview-img" src="{{ form.instance.foto_url }}" alt="{{ form.instance.nombre|default:'Producto' }}">
                         {% else %}
                         <div id="product-photo-preview-img" class="erp-product-photo-placeholder">IMG</div>
                         {% endif %}
