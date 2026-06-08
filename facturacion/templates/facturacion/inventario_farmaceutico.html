@@ -7,6 +7,7 @@
 {% block header_description %}Existencias por lote, vencimiento y ubicacion: bodega principal, provisional y vitrina.{% endblock %}
 
 {% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'inventario_farmaceutico' empresa.slug %}">Nuevo Producto</a>
 <a class="erp-action-link" href="{% url 'crear_lote_inventario' empresa.slug %}">Nuevo Lote</a>
 <a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
 <a class="erp-action-link" href="{% url 'traslado_inventario_farmaceutico' empresa.slug %}">Trasladar</a>

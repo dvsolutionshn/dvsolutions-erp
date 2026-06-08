@@ -1746,6 +1746,21 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Nuevo Producto")
         self.assertContains(response, f'href="{producto_url}?next={inventario_url}"', html=False)
 
+    def test_inventario_farmaceutico_tiene_acceso_a_crear_producto(self):
+        modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_clinica, activo=True)
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_inventario_farmaceutico = True
+        configuracion.save(update_fields=["usa_inventario_farmaceutico"])
+
+        response = self.client.get(reverse("inventario_farmaceutico", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        producto_url = reverse("crear_producto_facturacion", args=[self.empresa.slug])
+        inventario_farmaceutico_url = reverse("inventario_farmaceutico", args=[self.empresa.slug])
+        self.assertContains(response, "Nuevo Producto")
+        self.assertContains(response, f'href="{producto_url}?next={inventario_farmaceutico_url}"', html=False)
+
     def test_kardex_inventario_muestra_movimientos(self):
         InventarioProducto.objects.create(
             empresa=self.empresa,
