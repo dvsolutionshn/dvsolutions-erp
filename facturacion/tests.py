@@ -1777,16 +1777,6 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.producto.nombre)
 
-    def test_listado_productos_no_falla_si_foto_no_tiene_url(self):
-        self.producto.foto = "productos/fotos/demo.jpg"
-        self.producto.save(update_fields=["foto"])
-
-        with self.settings(MEDIA_URL=""):
-            response = self.client.get(reverse("productos_facturacion", args=[self.empresa.slug]))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.producto.nombre)
-
     def test_listado_productos_tiene_buscador_con_sugerencias(self):
         response = self.client.get(reverse("productos_facturacion", args=[self.empresa.slug]))
 

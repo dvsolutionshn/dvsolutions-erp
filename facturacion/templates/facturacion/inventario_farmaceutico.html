@@ -110,8 +110,8 @@
                 <tr>
                     <td>
                         <div class="erp-pharma-product">
-                            {% if existencia.lote.producto.foto_url %}
-                            <img class="erp-pharma-product-photo" src="{{ existencia.lote.producto.foto_url }}" alt="{{ existencia.lote.producto.nombre }}">
+                            {% if existencia.lote.producto.foto %}
+                            <img class="erp-pharma-product-photo" src="{{ existencia.lote.producto.foto.url }}" alt="{{ existencia.lote.producto.nombre }}">
                             {% else %}
                             <div class="erp-pharma-product-placeholder">IMG</div>
                             {% endif %}

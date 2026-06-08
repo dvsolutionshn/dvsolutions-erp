@@ -276,15 +276,6 @@ class Producto(models.Model):
     motivo_eliminacion = models.TextField(blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
-    @property
-    def foto_url(self):
-        if not self.foto:
-            return ""
-        try:
-            return self.foto.url
-        except ValueError:
-            return ""
-
     def clean(self):
         super().clean()
 

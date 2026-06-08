@@ -211,8 +211,8 @@
                 <tr>
                     <td>
                         <div class="erp-inventory-product">
-                            {% if producto.foto_url %}
-                            <img class="erp-inventory-photo" src="{{ producto.foto_url }}" alt="{{ producto.nombre }}">
+                            {% if producto.foto %}
+                            <img class="erp-inventory-photo" src="{{ producto.foto.url }}" alt="{{ producto.nombre }}">
                             {% else %}
                             <div class="erp-inventory-photo-placeholder">IMG</div>
                             {% endif %}
