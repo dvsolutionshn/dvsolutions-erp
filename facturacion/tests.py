@@ -16,7 +16,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpres
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm
-from .models import CAI, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, MovimientoInventario, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, MovimientoInventario, NotaCredito, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -1730,11 +1730,38 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.producto.nombre)
 
+    def test_listado_productos_no_falla_con_foto_sin_url_o_perfil_sin_categoria(self):
+        self.producto.foto = "productos/fotos/demo.jpg"
+        self.producto.save(update_fields=["foto"])
+        PerfilFarmaceuticoProducto.objects.create(
+            empresa=self.empresa,
+            producto=self.producto,
+            categoria=None,
+            principio_activo="Activo demo",
+        )
+
+        with self.settings(MEDIA_URL=""):
+            response = self.client.get(reverse("productos_facturacion", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.producto.nombre)
+        self.assertContains(response, "Sin categoria")
+
     def test_listado_productos_tiene_buscador_con_sugerencias(self):
         response = self.client.get(reverse("productos_facturacion", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="productos-sugerencias"', html=False)
+
+    def test_crear_factura_no_falla_con_producto_con_foto_sin_url(self):
+        self.producto.foto = "productos/fotos/demo.jpg"
+        self.producto.save(update_fields=["foto"])
+
+        with self.settings(MEDIA_URL=""):
+            response = self.client.get(reverse("crear_factura", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.producto.nombre)
 
     def test_inventario_dashboard_muestra_producto(self):
         response = self.client.get(reverse("inventario_facturacion", args=[self.empresa.slug]))

@@ -179,8 +179,8 @@
                     <tr>
                         <td>
                             <div class="erp-product-identity">
-                                {% if producto.foto %}
-                                <img class="erp-product-thumb" src="{{ producto.foto.url }}" alt="{{ producto.nombre }}">
+                                {% if producto.foto_url %}
+                                <img class="erp-product-thumb" src="{{ producto.foto_url }}" alt="{{ producto.nombre }}">
                                 {% else %}
                                 <div class="erp-product-thumb-placeholder">IMG</div>
                                 {% endif %}
@@ -197,18 +197,20 @@
                             </div>
                         </td>
                         <td>
-                            {% if producto.perfil_farmaceutico %}
+                            {% with perfil=producto.perfil_farmaceutico_seguro %}
+                            {% if perfil %}
                             <div class="erp-doc-cell">
-                                <div class="erp-doc-title">{{ producto.perfil_farmaceutico.categoria.nombre|default:"Sin categoria" }}</div>
+                                <div class="erp-doc-title">{% if perfil.categoria %}{{ perfil.categoria.nombre }}{% else %}Sin categoria{% endif %}</div>
                                 <div class="erp-doc-subtext">
-                                    {{ producto.perfil_farmaceutico.principio_activo|default:"Sin principio activo" }}
-                                    {% if producto.perfil_farmaceutico.producto_controlado %} | Controlado{% endif %}
-                                    {% if producto.perfil_farmaceutico.requiere_refrigeracion %} | Refrigerado{% endif %}
+                                    {{ perfil.principio_activo|default:"Sin principio activo" }}
+                                    {% if perfil.producto_controlado %} | Controlado{% endif %}
+                                    {% if perfil.requiere_refrigeracion %} | Refrigerado{% endif %}
                                 </div>
                             </div>
                             {% else %}
                             <span class="erp-badge neutral">Sin perfil</span>
                             {% endif %}
+                            {% endwith %}
                         </td>
                         <td>{{ producto.get_unidad_medida_display }}</td>
                         <td>{% if producto.impuesto_predeterminado %}{{ producto.impuesto_predeterminado.nombre }}{% else %}-{% endif %}</td>
