@@ -1,4 +1,5 @@
 {% extends "core/erp_base.html" %}
+{% load humanize %}
 
 {% block title %}{{ titulo|default:"Nuevo producto" }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Catalogo comercial{% endblock %}
@@ -138,6 +139,53 @@
                 <div class="erp-field">{{ form.vencimiento_lote_inicial.label_tag }}{{ form.vencimiento_lote_inicial }}{% if form.vencimiento_lote_inicial.errors %}<ul class="erp-field-errors">{% for error in form.vencimiento_lote_inicial.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
             </div>
             <div class="erp-field-help" style="margin-top:10px;">Ejemplo: Bodega General 2, Vitrina 3 y Bodega Hospital 1. Si dejas todo en cero, solo se guarda el producto.</div>
+        </section>
+        {% endif %}
+
+        {% if producto_actual and mostrar_bodega_inicial %}
+        <section class="erp-table-card">
+            <div class="erp-section-heading">
+                <div>
+                    <h3>Lotes, vencimientos y cantidades</h3>
+                    <p>Usa esta tabla cuando el mismo producto tiene fechas de expiracion distintas.</p>
+                </div>
+                <a class="erp-action-link" href="{% url 'crear_lote_inventario' empresa.slug %}?producto={{ producto_actual.id }}&next={{ request.path|urlencode }}">Agregar lote/vencimiento</a>
+            </div>
+            <div class="erp-table-wrap">
+                <table class="erp-table">
+                    <thead>
+                        <tr>
+                            <th>Bodega</th>
+                            <th>Lote</th>
+                            <th>Vencimiento</th>
+                            <th class="erp-money">Cantidad</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for existencia in lotes_producto %}
+                        <tr>
+                            <td><span class="erp-badge neutral">{{ existencia.bodega.nombre }}</span></td>
+                            <td>{{ existencia.lote.numero_lote }}</td>
+                            <td>{{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"Sin vencimiento" }}</td>
+                            <td class="erp-money">{{ existencia.cantidad|floatformat:2|intcomma }}</td>
+                            <td>
+                                {% if existencia.lote.vencido %}
+                                <span class="erp-badge danger">Vencido</span>
+                                {% elif existencia.lote.por_vencer %}
+                                <span class="erp-badge warning">Por vencer</span>
+                                {% else %}
+                                <span class="erp-badge success">Disponible</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="erp-empty-row">Este producto todavia no tiene lotes con vencimiento.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="erp-field-help" style="margin-top:10px;">Ejemplo profesional: Brightening Cream Dia puede tener un lote que vence ago-27 y otro que vence dic-26, cada uno con su propia cantidad y bodega.</div>
         </section>
         {% endif %}
 

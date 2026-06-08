@@ -19,12 +19,13 @@
     <section class="erp-compact-card">
     <form method="post" class="erp-compact-grid three-col">
         {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
         <div class="erp-field">
             <label for="producto">Producto</label>
             <select id="producto" name="producto" required>
                 <option value="">Seleccione producto</option>
                 {% for producto in productos %}
-                <option value="{{ producto.id }}">{{ producto.nombre }}{% if producto.codigo %} - {{ producto.codigo }}{% endif %}</option>
+                <option value="{{ producto.id }}" {% if producto_preseleccionado and producto.id == producto_preseleccionado.id %}selected{% endif %}>{{ producto.nombre }}{% if producto.codigo %} - {{ producto.codigo }}{% endif %}</option>
                 {% endfor %}
             </select>
         </div>
@@ -35,6 +36,11 @@
         <div class="erp-field">
             <label for="fecha_vencimiento">Fecha de vencimiento</label>
             <input id="fecha_vencimiento" type="date" name="fecha_vencimiento">
+        </div>
+        <div class="erp-field">
+            <label for="fecha_vencimiento_rapida">Vencimiento rapido</label>
+            <input id="fecha_vencimiento_rapida" type="text" name="fecha_vencimiento_rapida" placeholder="Ejemplo: ago-27 o dic-26">
+            <div class="erp-field-help">Si no sabes el dia exacto, usa mes-anio; se guardara el ultimo dia del mes.</div>
         </div>
         <div class="erp-field">
             <label for="bodega">Bodega inicial</label>

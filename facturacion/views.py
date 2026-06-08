@@ -26,6 +26,7 @@ from openpyxl.chart import BarChart, Reference
 import os
 import logging
 import json
+import calendar
 from pathlib import Path
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, Usuario
@@ -1053,6 +1054,40 @@ def _aplicar_distribucion_bodegas_producto(producto, form):
     _sincronizar_existencia_general_producto(producto)
 
 
+def _parse_vencimiento_lote_rapido(valor):
+    valor = (valor or "").strip().lower().replace(".", "").replace("/", "-").replace(" ", "-")
+    if not valor:
+        return None
+    meses = {
+        "ene": 1, "enero": 1,
+        "feb": 2, "febrero": 2,
+        "mar": 3, "marzo": 3,
+        "abr": 4, "abril": 4,
+        "may": 5, "mayo": 5,
+        "jun": 6, "junio": 6,
+        "jul": 7, "julio": 7,
+        "ago": 8, "agos": 8, "agosto": 8,
+        "sep": 9, "sept": 9, "septiembre": 9,
+        "oct": 10, "octubre": 10,
+        "nov": 11, "noviembre": 11,
+        "dic": 12, "diciembre": 12,
+    }
+    partes = [parte for parte in valor.split("-") if parte]
+    if len(partes) != 2:
+        raise ValidationError("Usa el formato de vencimiento rapido como ago-27 o dic-26.")
+    mes = meses.get(partes[0])
+    if not mes:
+        raise ValidationError("El mes del vencimiento rapido no es valido.")
+    try:
+        anio = int(partes[1])
+    except ValueError as exc:
+        raise ValidationError("El anio del vencimiento rapido no es valido.") from exc
+    if anio < 100:
+        anio += 2000
+    ultimo_dia = calendar.monthrange(anio, mes)[1]
+    return date(anio, mes, ultimo_dia)
+
+
 def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
     config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     if not config.ventas_solo_desde_vitrina:
@@ -1878,19 +1913,29 @@ def crear_lote_inventario(request, empresa_slug):
     bodegas = _asegurar_bodegas_farmaceuticas(empresa)
     productos = Producto.objects.filter(empresa=empresa, activo=True, controla_inventario=True).order_by("nombre")
     proveedores = Proveedor.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+    producto_preseleccionado = productos.filter(id=request.GET.get("producto")).first()
+    next_url = request.POST.get("next") or request.GET.get("next") or ""
     if request.method == "POST":
         producto = productos.filter(id=request.POST.get("producto")).first()
         bodega = BodegaInventario.objects.filter(empresa=empresa, id=request.POST.get("bodega")).first()
         numero_lote = request.POST.get("numero_lote", "").strip()
         cantidad_raw = request.POST.get("cantidad", "").strip()
         fecha_vencimiento = request.POST.get("fecha_vencimiento") or None
+        vencimiento_rapido = request.POST.get("fecha_vencimiento_rapida", "").strip()
         proveedor = proveedores.filter(id=request.POST.get("proveedor")).first()
         try:
             cantidad = Decimal(cantidad_raw)
         except InvalidOperation:
             cantidad = Decimal("0.00")
+        try:
+            fecha_vencimiento = fecha_vencimiento or _parse_vencimiento_lote_rapido(vencimiento_rapido)
+        except ValidationError as exc:
+            messages.error(request, str(exc))
+            fecha_vencimiento = "__invalida__"
 
-        if not producto or not bodega or not numero_lote or cantidad <= 0:
+        if fecha_vencimiento == "__invalida__":
+            pass
+        elif not producto or not bodega or not numero_lote or cantidad <= 0:
             messages.error(request, "Completa producto, bodega, lote y cantidad mayor que cero.")
         else:
             lote, _ = LoteInventario.objects.get_or_create(
@@ -1925,6 +1970,8 @@ def crear_lote_inventario(request, empresa_slug):
                 observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
             )
             messages.success(request, "Lote registrado correctamente.")
+            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
             return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
 
     return render(request, "facturacion/crear_lote_inventario.html", {
@@ -1933,6 +1980,8 @@ def crear_lote_inventario(request, empresa_slug):
         "proveedores": proveedores,
         "bodegas": BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
         "bodega_principal": bodegas["principal"],
+        "producto_preseleccionado": producto_preseleccionado,
+        "next": next_url,
     })
 
 
@@ -3285,12 +3334,23 @@ def editar_producto(request, empresa_slug, producto_id):
     else:
         form = ProductoForm(instance=producto, empresa=empresa)
 
+    lotes_producto = (
+        ExistenciaLoteBodega.objects.filter(
+            empresa=empresa,
+            lote__producto=producto,
+        )
+        .select_related("bodega", "lote")
+        .order_by("lote__fecha_vencimiento", "bodega__tipo", "bodega__nombre")
+    )
+
     return render(request, "facturacion/crear_producto.html", {
         "empresa": empresa,
         "form": form,
         "mostrar_perfil_farmaceutico": getattr(form, "mostrar_perfil_farmaceutico", False),
         "mostrar_bodega_inicial": getattr(form, "mostrar_bodega_inicial", False),
         "distribucion_bodegas": form.distribucion_bodegas() if getattr(form, "mostrar_bodega_inicial", False) else [],
+        "lotes_producto": lotes_producto,
+        "producto_actual": producto,
         "titulo": "Editar Producto",
         "texto_boton": "Guardar Cambios",
     })

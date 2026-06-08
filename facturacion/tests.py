@@ -17,7 +17,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpres
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm
-from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -1704,6 +1704,73 @@ class FacturacionTests(TestCase):
         response = self.client.get(reverse("ver_bodega_inventario", args=[self.empresa.slug, vitrina.id]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Guantes")
+
+    def test_crear_lotes_del_mismo_producto_con_vencimientos_rapidos(self):
+        modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.usa_inventario_farmaceutico = True
+        configuracion.save(update_fields=["usa_bodegas_internas", "usa_inventario_farmaceutico"])
+        bodega_general = BodegaInventario.objects.create(empresa=self.empresa, nombre="Bodega General", tipo="principal")
+        vitrina = BodegaInventario.objects.create(empresa=self.empresa, nombre="Vitrina", tipo="vitrina")
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Brightening Cream Dia",
+            codigo="BCD-001",
+            tipo_item="producto",
+            unidad_medida="unidad",
+            precio=Decimal("850.00"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=True,
+        )
+
+        response = self.client.post(
+            reverse("crear_lote_inventario", args=[self.empresa.slug]),
+            {
+                "producto": str(producto.id),
+                "numero_lote": "BRIGHT-AGO27",
+                "fecha_vencimiento_rapida": "agos-27",
+                "bodega": str(vitrina.id),
+                "cantidad": "3.00",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        response = self.client.post(
+            reverse("crear_lote_inventario", args=[self.empresa.slug]),
+            {
+                "producto": str(producto.id),
+                "numero_lote": "BRIGHT-DIC26",
+                "fecha_vencimiento_rapida": "dic-26",
+                "bodega": str(bodega_general.id),
+                "cantidad": "2.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        producto.refresh_from_db()
+        self.assertEqual(producto.stock_actual, Decimal("5.00"))
+        self.assertTrue(
+            LoteInventario.objects.filter(
+                empresa=self.empresa,
+                producto=producto,
+                numero_lote="BRIGHT-AGO27",
+                fecha_vencimiento=date(2027, 8, 31),
+            ).exists()
+        )
+        self.assertTrue(
+            LoteInventario.objects.filter(
+                empresa=self.empresa,
+                producto=producto,
+                numero_lote="BRIGHT-DIC26",
+                fecha_vencimiento=date(2026, 12, 31),
+            ).exists()
+        )
+        response = self.client.get(reverse("editar_producto_facturacion", args=[self.empresa.slug, producto.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BRIGHT-AGO27")
+        self.assertContains(response, "BRIGHT-DIC26")
 
     def test_crear_producto_rapido_desde_factura_retorna_payload(self):
         response = self.client.post(
