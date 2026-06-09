@@ -26,14 +26,49 @@ class PacienteForm(BaseClinicaForm):
         model = Paciente
         fields = [
             "expediente_codigo",
+            "tipo_id",
             "identidad",
+            "primer_apellido",
+            "segundo_apellido",
+            "primer_nombre",
+            "segundo_nombre",
             "nombre",
             "fecha_nacimiento",
+            "rh",
             "sexo",
+            "estado_civil",
+            "genero",
+            "foto_perfil",
             "telefono",
+            "prefijo_telefono",
             "whatsapp",
+            "celular_2",
             "correo",
+            "recibir_email",
+            "extranjero",
             "direccion",
+            "departamento",
+            "municipio",
+            "zona_residencial",
+            "codigo_postal",
+            "barrio",
+            "pais",
+            "lugar_nacimiento",
+            "ocupacion",
+            "otra_ocupacion",
+            "comentarios",
+            "acompanante_nombre",
+            "acompanante_relacion",
+            "acompanante_telefono",
+            "acompanante_celular",
+            "acompanante_email",
+            "responsable_nombre",
+            "responsable_telefono",
+            "responsable_relacion",
+            "escolaridad",
+            "pertenencia_etnica",
+            "procedencia",
+            "nacionalidad",
             "contacto_emergencia",
             "telefono_emergencia",
             "alergias",
@@ -45,7 +80,70 @@ class PacienteForm(BaseClinicaForm):
         ]
         widgets = {
             "fecha_nacimiento": forms.DateInput(attrs={"type": "date"}),
+            "foto_perfil": forms.ClearableFileInput(attrs={"accept": "image/*"}),
+            "nombre": forms.HiddenInput(),
         }
+        labels = {
+            "tipo_id": "Tipo de ID",
+            "identidad": "No. de documento",
+            "primer_apellido": "1er apellido",
+            "segundo_apellido": "2do apellido",
+            "primer_nombre": "1er nombre",
+            "segundo_nombre": "2do nombre",
+            "fecha_nacimiento": "Fecha de nacimiento",
+            "rh": "RH",
+            "estado_civil": "Estado civil",
+            "genero": "Genero",
+            "foto_perfil": "Foto inicial del paciente",
+            "prefijo_telefono": "Prefijo",
+            "telefono": "Telefono",
+            "whatsapp": "Celular",
+            "celular_2": "Celular 2",
+            "correo": "Email",
+            "recibir_email": "Recibir email",
+            "extranjero": "Extranjero",
+            "direccion": "Direccion",
+            "lugar_nacimiento": "Lugar de nacimiento",
+            "otra_ocupacion": "Otra ocupacion",
+            "zona_residencial": "Zona residencial",
+            "codigo_postal": "Codigo postal",
+            "pais": "Pais",
+            "acompanante_nombre": "Nombre",
+            "acompanante_relacion": "Relacion",
+            "acompanante_telefono": "Telefono",
+            "acompanante_celular": "Celular",
+            "acompanante_email": "Email",
+            "responsable_nombre": "Nombre responsable",
+            "responsable_telefono": "Telefono responsable",
+            "responsable_relacion": "Relacion responsable",
+            "pertenencia_etnica": "Pertenencia etnica",
+        }
+        help_texts = {
+            "foto_perfil": "Se guardara como primera foto de evolucion del expediente.",
+            "expediente_codigo": "Codigo automatico del expediente clinico.",
+            "comentarios": "Notas administrativas de ingreso o recepcion.",
+        }
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, empresa=empresa, **kwargs)
+        self.fields["nombre"].required = False
+        self.fields["expediente_codigo"].widget.attrs["readonly"] = "readonly"
+        self.fields["prefijo_telefono"].initial = self.fields["prefijo_telefono"].initial or "Honduras (+504)"
+        for field_name in ["primer_nombre", "primer_apellido", "identidad"]:
+            self.fields[field_name].required = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        partes_nombre = [
+            cleaned_data.get("primer_nombre"),
+            cleaned_data.get("segundo_nombre"),
+            cleaned_data.get("primer_apellido"),
+            cleaned_data.get("segundo_apellido"),
+        ]
+        nombre = " ".join(parte.strip() for parte in partes_nombre if parte and parte.strip())
+        if nombre:
+            cleaned_data["nombre"] = nombre
+        return cleaned_data
 
 
 class ProfesionalSaludForm(BaseClinicaForm):

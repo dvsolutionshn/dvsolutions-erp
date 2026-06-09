@@ -12,6 +12,7 @@ from .models import (
     ConfiguracionClinica,
     ExpedienteEvento,
     Paciente,
+    PacienteFotoEvolucion,
     ProfesionalSalud,
     SeguimientoPostOperatorio,
     ServicioClinico,
@@ -120,27 +121,49 @@ def pacientes(request, empresa_slug):
 def crear_paciente(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     initial = {"expediente_codigo": _proximo_codigo_expediente(empresa)}
-    form = PacienteForm(request.POST or None, empresa=empresa, initial=initial)
+    form = PacienteForm(request.POST or None, request.FILES or None, empresa=empresa, initial=initial)
     if request.method == "POST" and form.is_valid():
         paciente = form.save(commit=False)
         paciente.empresa = empresa
         paciente.creado_por = request.user
         paciente.save()
+        if paciente.foto_perfil:
+            PacienteFotoEvolucion.objects.create(
+                empresa=empresa,
+                paciente=paciente,
+                imagen=paciente.foto_perfil,
+                tipo="ingreso",
+                titulo="Foto de ingreso",
+                descripcion="Foto registrada al crear el expediente del paciente.",
+                creado_por=request.user,
+            )
         messages.success(request, "Paciente creado correctamente.")
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
-    return render(request, "clinica/form.html", {"empresa": empresa, "form": form, "titulo": "Nuevo paciente"})
+    return render(request, "clinica/paciente_form.html", {"empresa": empresa, "form": form, "titulo": "Nuevo paciente"})
 
 
 @login_required
 def editar_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    form = PacienteForm(request.POST or None, empresa=empresa, instance=paciente)
+    foto_anterior = paciente.foto_perfil.name if paciente.foto_perfil else ""
+    form = PacienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=paciente)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        paciente = form.save()
+        foto_nueva = paciente.foto_perfil.name if paciente.foto_perfil else ""
+        if foto_nueva and foto_nueva != foto_anterior:
+            PacienteFotoEvolucion.objects.create(
+                empresa=empresa,
+                paciente=paciente,
+                imagen=paciente.foto_perfil,
+                tipo="evolucion",
+                titulo="Actualizacion de foto de perfil",
+                descripcion="Foto registrada desde la edicion del paciente.",
+                creado_por=request.user,
+            )
         messages.success(request, "Paciente actualizado correctamente.")
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
-    return render(request, "clinica/form.html", {"empresa": empresa, "form": form, "titulo": f"Editar paciente: {paciente.nombre}"})
+    return render(request, "clinica/paciente_form.html", {"empresa": empresa, "form": form, "titulo": f"Editar paciente: {paciente.nombre}"})
 
 
 @login_required
@@ -150,6 +173,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
     eventos = paciente.eventos_expediente.select_related("profesional", "tratamiento")[:20]
     citas = paciente.citas.select_related("profesional", "servicio")[:10]
     tratamientos = paciente.tratamientos.select_related("profesional", "servicio")[:10]
+    fotos_evolucion = paciente.fotos_evolucion.select_related("creado_por")[:12]
     return render(
         request,
         "clinica/paciente_detalle.html",
@@ -159,6 +183,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "eventos": eventos,
             "citas": citas,
             "tratamientos": tratamientos,
+            "fotos_evolucion": fotos_evolucion,
         },
     )
 

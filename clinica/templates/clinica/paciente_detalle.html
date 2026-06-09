@@ -10,23 +10,83 @@
 <a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar evento</a>
 {% endblock %}
 
+{% block extra_head %}
+<style>
+.patient-profile-card{display:grid;grid-template-columns:120px minmax(0,1fr);gap:18px;align-items:start}
+.patient-profile-photo{width:120px;height:120px;border-radius:22px;border:1px solid var(--line);background:#f4f8fc;display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:42px;font-weight:900}
+.patient-profile-photo img{width:100%;height:100%;object-fit:cover}
+.patient-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.patient-info-item{padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.patient-info-item span{display:block;margin-bottom:5px;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:800}
+.patient-info-item strong{font-size:14px;color:#102338}
+.patient-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.patient-evolution-photo{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
+.patient-evolution-photo img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.patient-evolution-photo div{padding:11px}
+.patient-evolution-photo strong{display:block;font-size:13px}
+.patient-evolution-photo span{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+@media (max-width:760px){
+    .patient-profile-card,
+    .patient-info-grid{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="erp-grid">
     <article class="erp-card">
-        <div class="erp-kpi-label">Datos generales</div>
-        <h3 class="erp-panel-title">{{ paciente.expediente_codigo }}</h3>
-        <p><strong>Identidad:</strong> {{ paciente.identidad|default:"-" }}</p>
-        <p><strong>Edad:</strong> {% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</p>
-        <p><strong>Telefono:</strong> {{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</p>
-        <p><strong>Correo:</strong> {{ paciente.correo|default:"-" }}</p>
-        <p><strong>Emergencia:</strong> {{ paciente.contacto_emergencia|default:"-" }} {{ paciente.telefono_emergencia|default:"" }}</p>
+        <div class="patient-profile-card">
+            <div class="patient-profile-photo">
+                {% if paciente.foto_perfil %}
+                <img src="{{ paciente.foto_perfil.url }}" alt="{{ paciente.nombre }}">
+                {% else %}
+                ?
+                {% endif %}
+            </div>
+            <div>
+                <div class="erp-kpi-label">Datos generales</div>
+                <h3 class="erp-panel-title">{{ paciente.expediente_codigo }}</h3>
+                <div class="patient-info-grid">
+                    <div class="patient-info-item"><span>Documento</span><strong>{{ paciente.identidad|default:"-" }}</strong></div>
+                    <div class="patient-info-item"><span>Edad</span><strong>{% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</strong></div>
+                    <div class="patient-info-item"><span>Telefono</span><strong>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</strong></div>
+                    <div class="patient-info-item"><span>Email</span><strong>{{ paciente.correo|default:"-" }}</strong></div>
+                    <div class="patient-info-item"><span>RH</span><strong>{{ paciente.rh|default:"-" }}</strong></div>
+                    <div class="patient-info-item"><span>Zona</span><strong>{{ paciente.get_zona_residencial_display|default:"-" }}</strong></div>
+                </div>
+            </div>
+        </div>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Riesgos clinicos</div>
         <p><strong>Alergias:</strong> {{ paciente.alergias|default:"Sin alergias registradas" }}</p>
         <p><strong>Antecedentes:</strong> {{ paciente.antecedentes_medicos|default:"Sin antecedentes registrados" }}</p>
         <p><strong>Medicamentos actuales:</strong> {{ paciente.medicamentos_actuales|default:"Sin medicamentos actuales registrados" }}</p>
+        <p><strong>Acompanante:</strong> {{ paciente.acompanante_nombre|default:"-" }}{% if paciente.acompanante_celular %} - {{ paciente.acompanante_celular }}{% endif %}</p>
+        <p><strong>Responsable:</strong> {{ paciente.responsable_nombre|default:"-" }}{% if paciente.responsable_telefono %} - {{ paciente.responsable_telefono }}{% endif %}</p>
     </article>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <div class="erp-kpi-label">Bitacora fotografica</div>
+            <h3 class="erp-panel-title" style="margin:6px 0 0;">Evolucion visual del paciente</h3>
+        </div>
+    </div>
+    <div class="patient-photo-grid">
+        {% for foto in fotos_evolucion %}
+        <article class="patient-evolution-photo">
+            <img src="{{ foto.imagen.url }}" alt="{{ foto.titulo }}">
+            <div>
+                <strong>{{ foto.titulo }}</strong>
+                <span>{{ foto.get_tipo_display }} - {{ foto.fecha|date:"d/m/Y H:i" }}</span>
+            </div>
+        </article>
+        {% empty %}
+        <div class="erp-empty">Aun no hay fotos de evolucion registradas.</div>
+        {% endfor %}
+    </div>
 </section>
 
 <section class="erp-grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);">

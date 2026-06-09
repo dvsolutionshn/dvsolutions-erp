@@ -1,0 +1,235 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Ingreso de paciente{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Captura completa del paciente: identidad, contacto, responsable, demografia y foto inicial para trazabilidad clinica.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.patient-form-shell{display:flex;flex-direction:column;gap:18px}
+.patient-section{padding:0;overflow:hidden}
+.patient-section-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:16px 20px;
+    background:linear-gradient(135deg, rgba(16,32,42,.94), rgba(19,75,91,.9));
+    color:#fff;
+}
+.patient-section-head h3{margin:0;font-size:18px}
+.patient-section-head span{font-size:12px;color:rgba(255,255,255,.72)}
+.patient-section-body{padding:18px 20px}
+.patient-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.patient-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.patient-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.patient-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.patient-field.span-2{grid-column:span 2}
+.patient-field.span-3{grid-column:span 3}
+.patient-field.span-full{grid-column:1/-1}
+.patient-check.span-full,
+.patient-checks.span-full{grid-column:1/-1}
+.patient-field label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    color:var(--muted);
+    font-weight:800;
+}
+.patient-field input,
+.patient-field select,
+.patient-field textarea{
+    width:100%;
+    min-height:44px;
+    border:1px solid var(--line-strong);
+    border-radius:10px;
+    padding:10px 12px;
+    background:#fff;
+    color:var(--text);
+    font:inherit;
+}
+.patient-field textarea{min-height:74px}
+.patient-checks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:end}
+.patient-check{
+    min-height:44px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 12px;
+    background:#fff;
+}
+.patient-check label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:800}
+.patient-photo-card{
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    gap:14px;
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:16px;
+    background:#fff;
+}
+.patient-photo-preview{
+    aspect-ratio:1;
+    border-radius:16px;
+    border:1px solid var(--line);
+    background:#f4f8fc;
+    display:grid;
+    place-items:center;
+    overflow:hidden;
+    color:var(--muted);
+    font-size:44px;
+    font-weight:900;
+}
+.patient-photo-preview img{width:100%;height:100%;object-fit:cover}
+.patient-actions{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+.patient-error{color:var(--danger);font-size:12px;font-weight:700}
+@media (max-width:1180px){
+    .patient-grid,
+    .patient-grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+    .patient-grid,
+    .patient-grid.three,
+    .patient-grid.two,
+    .patient-checks{grid-template-columns:1fr}
+    .patient-field.span-2,
+    .patient-field.span-3{grid-column:1/-1}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="patient-form-shell">
+    {% csrf_token %}
+    {{ form.nombre }}
+    {% if form.non_field_errors %}
+    <section class="erp-card">
+        <div class="patient-error">{{ form.non_field_errors }}</div>
+    </section>
+    {% endif %}
+
+    <section class="erp-card patient-section">
+        <div class="patient-section-head">
+            <h3>Datos personales</h3>
+            <span>Identidad, nombre, contacto y fotografia inicial</span>
+        </div>
+        <div class="patient-section-body">
+            <div class="patient-grid">
+                <div class="patient-field">{{ form.tipo_id.label_tag }}{{ form.tipo_id }}{% for error in form.tipo_id.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.identidad.label_tag }}{{ form.identidad }}{% for error in form.identidad.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.expediente_codigo.label_tag }}{{ form.expediente_codigo }}{% for error in form.expediente_codigo.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field" style="grid-row:span 5;">
+                    <div class="patient-photo-card">
+                        <div class="patient-photo-preview">
+                            {% if form.instance.foto_perfil %}
+                            <img src="{{ form.instance.foto_perfil.url }}" alt="{{ form.instance.nombre }}">
+                            {% else %}
+                            ?
+                            {% endif %}
+                        </div>
+                        <div class="patient-field">{{ form.foto_perfil.label_tag }}{{ form.foto_perfil }}{% if form.foto_perfil.help_text %}<small>{{ form.foto_perfil.help_text }}</small>{% endif %}{% for error in form.foto_perfil.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                    </div>
+                </div>
+
+                <div class="patient-field">{{ form.primer_apellido.label_tag }}{{ form.primer_apellido }}{% for error in form.primer_apellido.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.segundo_apellido.label_tag }}{{ form.segundo_apellido }}{% for error in form.segundo_apellido.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.primer_nombre.label_tag }}{{ form.primer_nombre }}{% for error in form.primer_nombre.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.segundo_nombre.label_tag }}{{ form.segundo_nombre }}{% for error in form.segundo_nombre.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.sexo.label_tag }}{{ form.sexo }}{% for error in form.sexo.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.fecha_nacimiento.label_tag }}{{ form.fecha_nacimiento }}{% for error in form.fecha_nacimiento.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.rh.label_tag }}{{ form.rh }}{% for error in form.rh.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.estado_civil.label_tag }}{{ form.estado_civil }}{% for error in form.estado_civil.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.genero.label_tag }}{{ form.genero }}{% for error in form.genero.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field span-2">{{ form.comentarios.label_tag }}{{ form.comentarios }}{% for error in form.comentarios.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field span-2">{{ form.direccion.label_tag }}{{ form.direccion }}{% for error in form.direccion.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.prefijo_telefono.label_tag }}{{ form.prefijo_telefono }}{% for error in form.prefijo_telefono.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.telefono.label_tag }}{{ form.telefono }}{% for error in form.telefono.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.whatsapp.label_tag }}{{ form.whatsapp }}{% for error in form.whatsapp.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field">{{ form.celular_2.label_tag }}{{ form.celular_2 }}{% for error in form.celular_2.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field span-2">{{ form.correo.label_tag }}{{ form.correo }}{% for error in form.correo.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field span-2">{{ form.lugar_nacimiento.label_tag }}{{ form.lugar_nacimiento }}{% for error in form.lugar_nacimiento.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field span-2">{{ form.ocupacion.label_tag }}{{ form.ocupacion }}{% for error in form.ocupacion.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field span-2">{{ form.otra_ocupacion.label_tag }}{{ form.otra_ocupacion }}{% for error in form.otra_ocupacion.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-checks span-full">
+                    <div class="patient-check"><label for="{{ form.recibir_email.id_for_label }}">{{ form.recibir_email.label }}</label>{{ form.recibir_email }}</div>
+                    <div class="patient-check"><label for="{{ form.extranjero.id_for_label }}">{{ form.extranjero.label }}</label>{{ form.extranjero }}</div>
+                    <div class="patient-check"><label for="{{ form.acepta_promociones.id_for_label }}">Acepta promociones</label>{{ form.acepta_promociones }}</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-card patient-section">
+        <div class="patient-section-head"><h3>Ubicacion</h3><span>Direccion administrativa y procedencia</span></div>
+        <div class="patient-section-body">
+            <div class="patient-grid three">
+                <div class="patient-field">{{ form.departamento.label_tag }}{{ form.departamento }}</div>
+                <div class="patient-field">{{ form.municipio.label_tag }}{{ form.municipio }}</div>
+                <div class="patient-field">{{ form.zona_residencial.label_tag }}{{ form.zona_residencial }}</div>
+                <div class="patient-field">{{ form.codigo_postal.label_tag }}{{ form.codigo_postal }}</div>
+                <div class="patient-field">{{ form.barrio.label_tag }}{{ form.barrio }}</div>
+                <div class="patient-field">{{ form.pais.label_tag }}{{ form.pais }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-card patient-section">
+        <div class="patient-section-head"><h3>Datos acompanante</h3><span>Persona que acompana al paciente en recepcion</span></div>
+        <div class="patient-section-body">
+            <div class="patient-grid three">
+                <div class="patient-field span-2">{{ form.acompanante_nombre.label_tag }}{{ form.acompanante_nombre }}</div>
+                <div class="patient-field">{{ form.acompanante_relacion.label_tag }}{{ form.acompanante_relacion }}</div>
+                <div class="patient-field">{{ form.acompanante_telefono.label_tag }}{{ form.acompanante_telefono }}</div>
+                <div class="patient-field">{{ form.acompanante_celular.label_tag }}{{ form.acompanante_celular }}</div>
+                <div class="patient-field">{{ form.acompanante_email.label_tag }}{{ form.acompanante_email }}</div>
+                <div class="patient-field span-2">{{ form.responsable_nombre.label_tag }}{{ form.responsable_nombre }}</div>
+                <div class="patient-field">{{ form.responsable_telefono.label_tag }}{{ form.responsable_telefono }}</div>
+                <div class="patient-field">{{ form.responsable_relacion.label_tag }}{{ form.responsable_relacion }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-card patient-section">
+        <div class="patient-section-head"><h3>Datos demograficos y clinicos base</h3><span>Contexto social, origen y riesgos iniciales</span></div>
+        <div class="patient-section-body">
+            <div class="patient-grid two">
+                <div class="patient-field">{{ form.escolaridad.label_tag }}{{ form.escolaridad }}</div>
+                <div class="patient-field">{{ form.pertenencia_etnica.label_tag }}{{ form.pertenencia_etnica }}</div>
+                <div class="patient-field">{{ form.procedencia.label_tag }}{{ form.procedencia }}</div>
+                <div class="patient-field">{{ form.nacionalidad.label_tag }}{{ form.nacionalidad }}</div>
+                <div class="patient-field span-full">{{ form.alergias.label_tag }}{{ form.alergias }}</div>
+                <div class="patient-field span-full">{{ form.antecedentes_medicos.label_tag }}{{ form.antecedentes_medicos }}</div>
+                <div class="patient-field span-full">{{ form.medicamentos_actuales.label_tag }}{{ form.medicamentos_actuales }}</div>
+                <div class="patient-field span-full">{{ form.notas_privadas.label_tag }}{{ form.notas_privadas }}</div>
+                <div class="patient-check span-full"><label for="{{ form.activo.id_for_label }}">Paciente activo</label>{{ form.activo }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="erp-card">
+        <div class="patient-actions">
+            <span class="erp-card-muted">Al guardar, el expediente queda listo para citas, tratamientos, eventos y bitacora fotografica.</span>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Cancelar</a>
+                <button class="erp-btn" type="submit">Guardar paciente</button>
+            </div>
+        </div>
+    </section>
+</form>
+{% endblock %}

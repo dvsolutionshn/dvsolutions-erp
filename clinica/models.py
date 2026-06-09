@@ -43,24 +43,119 @@ class ProfesionalSalud(models.Model):
 
 
 class Paciente(models.Model):
+    TIPO_ID_CHOICES = [
+        ("cc", "CC Cedula ciudadania"),
+        ("dni", "DNI"),
+        ("pasaporte", "Pasaporte"),
+        ("rtn", "RTN"),
+        ("otro", "Otro"),
+    ]
     SEXO_CHOICES = [
         ("femenino", "Femenino"),
         ("masculino", "Masculino"),
         ("otro", "Otro"),
         ("no_indicado", "No indicado"),
     ]
+    ESTADO_CIVIL_CHOICES = [
+        ("soltero", "Soltero/a"),
+        ("casado", "Casado/a"),
+        ("union_libre", "Union libre"),
+        ("divorciado", "Divorciado/a"),
+        ("viudo", "Viudo/a"),
+        ("no_indicado", "No indicado"),
+    ]
+    GENERO_CHOICES = [
+        ("femenino", "Femenino"),
+        ("masculino", "Masculino"),
+        ("no_binario", "No binario"),
+        ("otro", "Otro"),
+        ("no_indicado", "No indicado"),
+    ]
+    ZONA_RESIDENCIAL_CHOICES = [
+        ("urbana", "Urbana"),
+        ("rural", "Rural"),
+        ("no_indicada", "No indicada"),
+    ]
+    RELACION_CHOICES = [
+        ("madre", "Madre"),
+        ("padre", "Padre"),
+        ("hijo", "Hijo/a"),
+        ("conyuge", "Conyuge"),
+        ("familiar", "Familiar"),
+        ("amigo", "Amigo/a"),
+        ("tutor", "Tutor/a"),
+        ("otro", "Otro"),
+        ("no_indicada", "No indicada"),
+    ]
+    ESCOLARIDAD_CHOICES = [
+        ("ninguna", "Ninguna"),
+        ("primaria", "Primaria"),
+        ("secundaria", "Secundaria"),
+        ("tecnica", "Tecnica"),
+        ("universitaria", "Universitaria"),
+        ("postgrado", "Postgrado"),
+        ("no_indicada", "No indicada"),
+    ]
+    ETNIA_CHOICES = [
+        ("mestizo", "Mestizo"),
+        ("garifuna", "Garifuna"),
+        ("lenca", "Lenca"),
+        ("miskito", "Miskito"),
+        ("tolupan", "Tolupan"),
+        ("chorti", "Chorti"),
+        ("pech", "Pech"),
+        ("tawahka", "Tawahka"),
+        ("nahua", "Nahua"),
+        ("otra", "Otra"),
+        ("no_indicada", "No indicada"),
+    ]
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="pacientes")
     cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name="pacientes_clinicos")
     expediente_codigo = models.CharField(max_length=40)
+    tipo_id = models.CharField(max_length=20, choices=TIPO_ID_CHOICES, default="cc")
     identidad = models.CharField(max_length=30, blank=True, null=True)
     nombre = models.CharField(max_length=160)
+    primer_nombre = models.CharField(max_length=80, blank=True, null=True)
+    segundo_nombre = models.CharField(max_length=80, blank=True, null=True)
+    primer_apellido = models.CharField(max_length=80, blank=True, null=True)
+    segundo_apellido = models.CharField(max_length=80, blank=True, null=True)
     fecha_nacimiento = models.DateField(blank=True, null=True)
     sexo = models.CharField(max_length=20, choices=SEXO_CHOICES, default="no_indicado")
+    genero = models.CharField(max_length=20, choices=GENERO_CHOICES, default="no_indicado")
+    estado_civil = models.CharField(max_length=20, choices=ESTADO_CIVIL_CHOICES, default="no_indicado")
+    rh = models.CharField(max_length=6, blank=True, null=True)
+    foto_perfil = models.ImageField(upload_to="clinica/pacientes/perfil/", blank=True, null=True)
     telefono = models.CharField(max_length=30, blank=True, null=True)
+    prefijo_telefono = models.CharField(max_length=20, default="Honduras (+504)")
     whatsapp = models.CharField(max_length=30, blank=True, null=True)
+    celular_2 = models.CharField(max_length=30, blank=True, null=True)
     correo = models.EmailField(blank=True, null=True)
+    recibir_email = models.BooleanField(default=False)
+    extranjero = models.BooleanField(default=False)
     direccion = models.TextField(blank=True, null=True)
+    departamento = models.CharField(max_length=120, blank=True, null=True)
+    municipio = models.CharField(max_length=120, blank=True, null=True)
+    zona_residencial = models.CharField(max_length=20, choices=ZONA_RESIDENCIAL_CHOICES, default="urbana")
+    codigo_postal = models.CharField(max_length=20, blank=True, null=True)
+    barrio = models.CharField(max_length=120, blank=True, null=True)
+    pais = models.CharField(max_length=120, default="Honduras")
+    lugar_nacimiento = models.CharField(max_length=160, blank=True, null=True)
+    ocupacion = models.CharField(max_length=160, blank=True, null=True)
+    otra_ocupacion = models.CharField(max_length=160, blank=True, null=True)
+    comentarios = models.TextField(blank=True, null=True)
+    acompanante_nombre = models.CharField(max_length=180, blank=True, null=True)
+    acompanante_relacion = models.CharField(max_length=20, choices=RELACION_CHOICES, default="no_indicada")
+    acompanante_telefono = models.CharField(max_length=30, blank=True, null=True)
+    acompanante_celular = models.CharField(max_length=30, blank=True, null=True)
+    acompanante_email = models.EmailField(blank=True, null=True)
+    responsable_nombre = models.CharField(max_length=180, blank=True, null=True)
+    responsable_telefono = models.CharField(max_length=30, blank=True, null=True)
+    responsable_relacion = models.CharField(max_length=20, choices=RELACION_CHOICES, default="no_indicada")
+    escolaridad = models.CharField(max_length=20, choices=ESCOLARIDAD_CHOICES, default="no_indicada")
+    pertenencia_etnica = models.CharField(max_length=20, choices=ETNIA_CHOICES, default="no_indicada")
+    procedencia = models.CharField(max_length=160, blank=True, null=True)
+    nacionalidad = models.CharField(max_length=120, default="Honduras")
     contacto_emergencia = models.CharField(max_length=180, blank=True, null=True)
     telefono_emergencia = models.CharField(max_length=30, blank=True, null=True)
     alergias = models.TextField(blank=True, null=True)
@@ -82,6 +177,18 @@ class Paciente(models.Model):
     def __str__(self):
         return f"{self.expediente_codigo} - {self.nombre}"
 
+    def save(self, *args, **kwargs):
+        partes_nombre = [
+            self.primer_nombre,
+            self.segundo_nombre,
+            self.primer_apellido,
+            self.segundo_apellido,
+        ]
+        nombre_compuesto = " ".join(parte.strip() for parte in partes_nombre if parte and parte.strip())
+        if nombre_compuesto:
+            self.nombre = nombre_compuesto
+        super().save(*args, **kwargs)
+
     @property
     def edad(self):
         if not self.fecha_nacimiento:
@@ -90,6 +197,36 @@ class Paciente(models.Model):
         return hoy.year - self.fecha_nacimiento.year - (
             (hoy.month, hoy.day) < (self.fecha_nacimiento.month, self.fecha_nacimiento.day)
         )
+
+
+class PacienteFotoEvolucion(models.Model):
+    TIPO_CHOICES = [
+        ("ingreso", "Ingreso"),
+        ("preoperatorio", "Preoperatorio"),
+        ("procedimiento", "Procedimiento"),
+        ("postoperatorio", "Postoperatorio"),
+        ("control", "Control"),
+        ("evolucion", "Evolucion"),
+        ("otro", "Otro"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="fotos_evolucion_pacientes")
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="fotos_evolucion")
+    imagen = models.ImageField(upload_to="clinica/pacientes/evolucion/")
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="ingreso")
+    titulo = models.CharField(max_length=160, default="Foto de ingreso")
+    descripcion = models.TextField(blank=True, null=True)
+    fecha = models.DateTimeField(default=timezone.now)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-id"]
+        verbose_name = "Foto de evolucion del paciente"
+        verbose_name_plural = "Fotos de evolucion del paciente"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} - {self.titulo}"
 
 
 class ServicioClinico(models.Model):
