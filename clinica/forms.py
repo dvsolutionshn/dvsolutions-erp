@@ -145,9 +145,21 @@ class PacienteForm(BaseClinicaForm):
         super().__init__(*args, empresa=empresa, **kwargs)
         self.fields["nombre"].required = False
         self.fields["expediente_codigo"].widget.attrs["readonly"] = "readonly"
+        self.fields["identidad"].widget.attrs.update({
+            "inputmode": "numeric",
+            "pattern": "[0-9]*",
+            "autocomplete": "off",
+            "placeholder": "Solo numeros, sin guiones",
+        })
         self.fields["prefijo_telefono"].initial = self.fields["prefijo_telefono"].initial or "Honduras (+504)"
         for field_name in ["primer_nombre", "primer_apellido", "identidad"]:
             self.fields[field_name].required = True
+
+    def clean_identidad(self):
+        identidad = (self.cleaned_data.get("identidad") or "").strip()
+        if identidad and not identidad.isdigit():
+            raise forms.ValidationError("El No. de documento solo debe contener numeros, sin guiones ni espacios.")
+        return identidad
 
     def clean(self):
         cleaned_data = super().clean()

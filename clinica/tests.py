@@ -69,3 +69,31 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Alergico")
+
+    def test_no_permite_identidad_con_guiones_o_espacios(self):
+        response = self.client.post(
+            reverse("clinica_crear_paciente", args=[self.empresa.slug]),
+            {
+                "expediente_codigo": "HM-0002",
+                "tipo_id": "cc",
+                "identidad": "0801-1994-13996",
+                "primer_nombre": "Luis",
+                "primer_apellido": "Lopez",
+                "sexo": "masculino",
+                "genero": "masculino",
+                "estado_civil": "soltero",
+                "prefijo_telefono": "Honduras (+504)",
+                "zona_residencial": "urbana",
+                "pais": "Honduras",
+                "acompanante_relacion": "no_indicada",
+                "responsable_relacion": "no_indicada",
+                "escolaridad": "no_indicada",
+                "pertenencia_etnica": "no_indicada",
+                "nacionalidad": "Honduras",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "solo debe contener numeros")
+        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-0002").exists())
