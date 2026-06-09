@@ -3,76 +3,166 @@
 {% block title %}{{ paciente.nombre }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
 {% block header_title %}{{ paciente.nombre }}{% endblock %}
-{% block header_description %}Vista integral del paciente: datos generales, citas, tratamientos y bitacora medica.{% endblock %}
+{% block header_description %}Centro clinico del paciente: historial, tratamiento, evolucion fotografica, citas, anexos y consentimientos.{% endblock %}
 
 {% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>
-<a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar evento</a>
+<a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar historial</a>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-.patient-profile-card{display:grid;grid-template-columns:120px minmax(0,1fr);gap:18px;align-items:start}
-.patient-profile-photo{width:120px;height:120px;border-radius:22px;border:1px solid var(--line);background:#f4f8fc;display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:42px;font-weight:900}
+.patient-hero{display:grid;grid-template-columns:150px minmax(0,1fr);gap:20px;align-items:start}
+.patient-profile-photo{width:150px;height:150px;border-radius:18px;border:1px solid var(--line);background:#f4f8fc;display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:46px;font-weight:900}
 .patient-profile-photo img{width:100%;height:100%;object-fit:cover}
-.patient-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.patient-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
 .patient-info-item{padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
 .patient-info-item span{display:block;margin-bottom:5px;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:800}
 .patient-info-item strong{font-size:14px;color:#102338}
-.patient-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.patient-entry-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.patient-entry-card{position:relative;overflow:hidden;min-height:150px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.patient-entry-card:hover{transform:translateY(-3px);border-color:#b7cae8;box-shadow:0 18px 36px rgba(12,34,56,.08)}
+.patient-entry-card h3{margin:8px 0;color:#102338}
+.patient-entry-card p{margin:0;color:var(--muted);line-height:1.55}
+.patient-section-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.patient-mini-card{padding:13px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.patient-mini-card strong{display:block;color:#102338;margin-bottom:5px}
+.patient-timeline-item{border-bottom:1px solid var(--line);padding:15px 0}
+.patient-timeline-item:last-child{border-bottom:0}
+.patient-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
 .patient-evolution-photo{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
 .patient-evolution-photo img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
 .patient-evolution-photo div{padding:11px}
-.patient-evolution-photo strong{display:block;font-size:13px}
+.patient-evolution-photo strong{display:block;font-size:13px;color:#102338}
 .patient-evolution-photo span{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:14px;padding:12px 14px;font-weight:800}
+.patient-anchor-offset{scroll-margin-top:100px}
+@media (max-width:1180px){
+    .patient-entry-grid,.patient-quick-grid,.patient-section-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media (max-width:760px){
-    .patient-profile-card,
-    .patient-info-grid{grid-template-columns:1fr}
+    .patient-hero,.patient-entry-grid,.patient-quick-grid,.patient-section-grid{grid-template-columns:1fr}
+    .patient-profile-photo{width:120px;height:120px}
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="patient-profile-card">
-            <div class="patient-profile-photo">
-                {% if paciente.foto_perfil %}
-                <img src="{{ paciente.foto_perfil.url }}" alt="{{ paciente.nombre }}">
-                {% else %}
-                ?
-                {% endif %}
-            </div>
-            <div>
-                <div class="erp-kpi-label">Datos generales</div>
-                <h3 class="erp-panel-title">{{ paciente.expediente_codigo }}</h3>
-                <div class="patient-info-grid">
-                    <div class="patient-info-item"><span>Documento</span><strong>{{ paciente.identidad|default:"-" }}</strong></div>
-                    <div class="patient-info-item"><span>Edad</span><strong>{% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</strong></div>
-                    <div class="patient-info-item"><span>Telefono</span><strong>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</strong></div>
-                    <div class="patient-info-item"><span>Email</span><strong>{{ paciente.correo|default:"-" }}</strong></div>
-                    <div class="patient-info-item"><span>RH</span><strong>{{ paciente.rh|default:"-" }}</strong></div>
-                    <div class="patient-info-item"><span>Zona</span><strong>{{ paciente.get_zona_residencial_display|default:"-" }}</strong></div>
-                </div>
+<section class="erp-card">
+    <div class="patient-hero">
+        <div class="patient-profile-photo">
+            {% if paciente.foto_perfil %}
+            <img src="{{ paciente.foto_perfil.url }}" alt="{{ paciente.nombre }}">
+            {% else %}
+            ?
+            {% endif %}
+        </div>
+        <div>
+            <div class="erp-kpi-label">Datos generales</div>
+            <h3 class="erp-panel-title" style="margin:6px 0 0;">{{ paciente.expediente_codigo }}</h3>
+            {% if paciente.es_alergico %}
+            <div class="patient-alert" style="margin-top:12px;">Paciente alergico{% if paciente.alergias %}: {{ paciente.alergias }}{% endif %}</div>
+            {% endif %}
+            <div class="patient-quick-grid">
+                <div class="patient-info-item"><span>Documento</span><strong>{{ paciente.identidad|default:"-" }}</strong></div>
+                <div class="patient-info-item"><span>Edad</span><strong>{% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</strong></div>
+                <div class="patient-info-item"><span>Telefono</span><strong>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</strong></div>
+                <div class="patient-info-item"><span>RH</span><strong>{{ paciente.rh|default:"No indicado" }}</strong></div>
             </div>
         </div>
+    </div>
+</section>
+
+<section class="patient-entry-grid">
+    <a class="erp-card patient-entry-card" href="#historial-clinico"><div class="erp-kpi-label">Expediente</div><h3>Historial Clinico</h3><p>Antecedentes, funciones, examen fisico, diagnosticos, plan y tricopigmentacion.</p></a>
+    <a class="erp-card patient-entry-card" href="#plan-tratamiento"><div class="erp-kpi-label">Ruta medica</div><h3>Plan de tratamiento</h3><p>Tratamientos activos, objetivos, plan clinico, costos y seguimiento profesional.</p></a>
+    <a class="erp-card patient-entry-card" href="#evolucion"><div class="erp-kpi-label">Bitacora visual</div><h3>Evolucion</h3><p>Fotos, fechas, procedimiento aplicado y registro cronologico del avance.</p></a>
+    <a class="erp-card patient-entry-card" href="#citas"><div class="erp-kpi-label">Agenda</div><h3>Citas</h3><p>Citas pasadas, programadas y acceso rapido para agendar nuevas atenciones.</p></a>
+</section>
+
+<section id="historial-clinico" class="erp-card patient-anchor-offset">
+    <div class="erp-section-heading">
+        <div>
+            <div class="erp-kpi-label">Historial clinico</div>
+            <h3>Evaluacion medica integral</h3>
+        </div>
+        <a class="erp-action-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar entrada</a>
+    </div>
+    <div class="patient-section-grid">
+        <div class="patient-mini-card"><strong>Antecedentes</strong><span>{{ paciente.antecedentes_medicos|default:"Sin antecedentes registrados." }}</span></div>
+        <div class="patient-mini-card"><strong>Funciones</strong><span>Funciones vitales, habitos y sistemas se registran como eventos del expediente.</span></div>
+        <div class="patient-mini-card"><strong>Examen Fisico</strong><span>Documenta hallazgos en descripcion y signos vitales del evento clinico.</span></div>
+        <div class="patient-mini-card"><strong>Diagnosticos</strong><span>Diagnosticos consolidados desde las entradas del expediente.</span></div>
+        <div class="patient-mini-card"><strong>Plan</strong><span>Plan medico registrado por evento o tratamiento activo.</span></div>
+        <div class="patient-mini-card"><strong>Historial Clinica Tricopigmentacion</strong><span>Espacio preparado para controles, pigmentos, zonas tratadas y sesiones.</span></div>
+    </div>
+    <div style="margin-top:14px;">
+        {% for evento in eventos %}
+        <div class="patient-timeline-item">
+            <div class="erp-kpi-label">{{ evento.get_tipo_display }} - {{ evento.fecha|date:"d/m/Y H:i" }}</div>
+            <h4 style="margin:6px 0;">{{ evento.titulo }}</h4>
+            <p style="margin:0;line-height:1.7;">{{ evento.descripcion }}</p>
+            {% if evento.signos_vitales %}<p class="erp-card-muted"><strong>Funciones / signos:</strong> {{ evento.signos_vitales }}</p>{% endif %}
+            {% if evento.diagnostico %}<p class="erp-card-muted"><strong>Diagnostico:</strong> {{ evento.diagnostico }}</p>{% endif %}
+            {% if evento.plan %}<p class="erp-card-muted"><strong>Plan:</strong> {{ evento.plan }}</p>{% endif %}
+        </div>
+        {% empty %}
+        <div class="erp-empty">Aun no hay historial clinico registrado.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="erp-grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);">
+    <article class="erp-card patient-anchor-offset" id="anexos">
+        <div class="erp-kpi-label">Anexos</div>
+        <h3 class="erp-panel-title">Documentos clinicos</h3>
+        <div class="patient-section-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:12px;">
+            <div class="patient-mini-card"><strong>Examenes</strong><span>Preparado para cargas y resultados.</span></div>
+            <div class="patient-mini-card"><strong>Trabajos de laboratorio</strong><span>Resultados y solicitudes por fecha.</span></div>
+            <div class="patient-mini-card"><strong>Solicitud Estudio Radiologico</strong><span>Ordenes e imagenologia.</span></div>
+            <div class="patient-mini-card"><strong>Documentos</strong><span>Adjuntos generales del paciente.</span></div>
+            <div class="patient-mini-card"><strong>Remision y contraremision</strong><span>Control de referencias externas.</span></div>
+            <div class="patient-mini-card"><strong>Detalle Remisiones</strong><span>Seguimiento de cada remision.</span></div>
+            <div class="patient-mini-card"><strong>Prescripciones</strong><span>{% if medicamentos %}{{ medicamentos|length }} prescripciones registradas.{% else %}Sin prescripciones registradas.{% endif %}</span></div>
+            <div class="patient-mini-card"><strong>Incapacidades</strong><span>Certificados e incapacidades emitidas.</span></div>
+        </div>
     </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Riesgos clinicos</div>
-        <p><strong>Alergias:</strong> {{ paciente.alergias|default:"Sin alergias registradas" }}</p>
-        <p><strong>Antecedentes:</strong> {{ paciente.antecedentes_medicos|default:"Sin antecedentes registrados" }}</p>
-        <p><strong>Medicamentos actuales:</strong> {{ paciente.medicamentos_actuales|default:"Sin medicamentos actuales registrados" }}</p>
-        <p><strong>Acompanante:</strong> {{ paciente.acompanante_nombre|default:"-" }}{% if paciente.acompanante_celular %} - {{ paciente.acompanante_celular }}{% endif %}</p>
-        <p><strong>Responsable:</strong> {{ paciente.responsable_nombre|default:"-" }}{% if paciente.responsable_telefono %} - {{ paciente.responsable_telefono }}{% endif %}</p>
+    <article class="erp-card patient-anchor-offset" id="consentimientos">
+        <div class="erp-kpi-label">Consentimiento</div>
+        <h3 class="erp-panel-title">Consentimientos impresos</h3>
+        {% for consentimiento in consentimientos %}
+        <div class="patient-timeline-item">
+            <strong>{{ consentimiento.titulo }}</strong>
+            <p class="erp-card-muted">{{ consentimiento.get_estado_display }} - Version {{ consentimiento.version }}</p>
+        </div>
+        {% empty %}
+        <div class="erp-empty">Sin consentimientos impresos registrados.</div>
+        {% endfor %}
     </article>
 </section>
 
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <div class="erp-kpi-label">Bitacora fotografica</div>
-            <h3 class="erp-panel-title" style="margin:6px 0 0;">Evolucion visual del paciente</h3>
-        </div>
+<section id="plan-tratamiento" class="erp-card patient-anchor-offset">
+    <div class="erp-section-heading">
+        <div><div class="erp-kpi-label">Plan de tratamiento</div><h3>Tratamientos del paciente</h3></div>
+        <a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>
+    </div>
+    {% for tratamiento in tratamientos %}
+    <div class="patient-timeline-item">
+        <strong>{{ tratamiento.nombre }}</strong>
+        <p class="erp-card-muted">{{ tratamiento.get_estado_display }} - Inicio {{ tratamiento.fecha_inicio|date:"d/m/Y" }}{% if tratamiento.profesional %} - {{ tratamiento.profesional.nombre }}{% endif %}</p>
+        {% if tratamiento.objetivo %}<p><strong>Objetivo:</strong> {{ tratamiento.objetivo }}</p>{% endif %}
+        {% if tratamiento.plan_clinico %}<p><strong>Plan clinico:</strong> {{ tratamiento.plan_clinico }}</p>{% endif %}
+    </div>
+    {% empty %}
+    <div class="erp-empty">Sin tratamientos registrados.</div>
+    {% endfor %}
+</section>
+
+<section id="evolucion" class="erp-card patient-anchor-offset">
+    <div class="erp-section-heading">
+        <div><div class="erp-kpi-label">Evolucion</div><h3>Fotos, fechas y procedimientos</h3></div>
+        <a class="erp-action-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Registrar evolucion</a>
     </div>
     <div class="patient-photo-grid">
         {% for foto in fotos_evolucion %}
@@ -81,6 +171,7 @@
             <div>
                 <strong>{{ foto.titulo }}</strong>
                 <span>{{ foto.get_tipo_display }} - {{ foto.fecha|date:"d/m/Y H:i" }}</span>
+                {% if foto.descripcion %}<span>{{ foto.descripcion }}</span>{% endif %}
             </div>
         </article>
         {% empty %}
@@ -89,39 +180,19 @@
     </div>
 </section>
 
-<section class="erp-grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);">
-    <article class="erp-card">
-        <h3 class="erp-panel-title">Tratamientos</h3>
-        {% for tratamiento in tratamientos %}
-        <div style="border-bottom:1px solid var(--line);padding:12px 0;">
-            <strong>{{ tratamiento.nombre }}</strong>
-            <p class="erp-card-muted">{{ tratamiento.get_estado_display }} - {{ tratamiento.fecha_inicio|date:"d/m/Y" }}</p>
-        </div>
-        {% empty %}<div class="erp-empty">Sin tratamientos registrados.</div>{% endfor %}
-    </article>
-    <article class="erp-card">
-        <h3 class="erp-panel-title">Citas</h3>
-        {% for cita in citas %}
-        <div style="border-bottom:1px solid var(--line);padding:12px 0;">
-            <strong>{{ cita.fecha_hora|date:"d/m/Y H:i" }} - {{ cita.motivo }}</strong>
-            <p class="erp-card-muted">{{ cita.get_estado_display }}{% if cita.profesional %} con {{ cita.profesional.nombre }}{% endif %}</p>
-        </div>
-        {% empty %}<div class="erp-empty">Sin citas registradas.</div>{% endfor %}
-    </article>
-</section>
-
-<section class="erp-card">
-    <h3 class="erp-panel-title">Bitacora medica</h3>
-    {% for evento in eventos %}
-    <div style="border-bottom:1px solid var(--line);padding:16px 0;">
-        <div class="erp-kpi-label">{{ evento.get_tipo_display }} - {{ evento.fecha|date:"d/m/Y H:i" }}</div>
-        <h4 style="margin:6px 0;">{{ evento.titulo }}</h4>
-        <p style="margin:0;line-height:1.7;">{{ evento.descripcion }}</p>
-        {% if evento.diagnostico %}<p class="erp-card-muted"><strong>Diagnostico:</strong> {{ evento.diagnostico }}</p>{% endif %}
-        {% if evento.plan %}<p class="erp-card-muted"><strong>Plan:</strong> {{ evento.plan }}</p>{% endif %}
+<section id="citas" class="erp-card patient-anchor-offset">
+    <div class="erp-section-heading">
+        <div><div class="erp-kpi-label">Citas</div><h3>Agenda del paciente</h3></div>
+        <a class="erp-action-link" href="{% url 'clinica_crear_cita' empresa.slug %}">Programar cita</a>
+    </div>
+    {% for cita in citas %}
+    <div class="patient-timeline-item">
+        <strong>{{ cita.fecha_hora|date:"d/m/Y H:i" }} - {{ cita.motivo }}</strong>
+        <p class="erp-card-muted">{{ cita.get_estado_display }}{% if cita.profesional %} con {{ cita.profesional.nombre }}{% endif %}{% if cita.servicio %} - {{ cita.servicio.nombre }}{% endif %}</p>
+        {% if cita.observaciones %}<p>{{ cita.observaciones }}</p>{% endif %}
     </div>
     {% empty %}
-    <div class="erp-empty">Aun no hay eventos en el expediente.</div>
+    <div class="erp-empty">Sin citas registradas para este paciente.</div>
     {% endfor %}
 </section>
 {% endblock %}

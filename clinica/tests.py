@@ -69,6 +69,16 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Alergico")
+        self.assertContains(response, "Ver")
+
+        response = self.client.get(reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Historial Clinico")
+        self.assertContains(response, "Plan de tratamiento")
+        self.assertContains(response, "Evolucion")
+        self.assertContains(response, "Citas")
+        self.assertContains(response, "Anexos")
+        self.assertContains(response, "Consentimientos impresos")
 
     def test_no_permite_identidad_con_guiones_o_espacios(self):
         response = self.client.post(

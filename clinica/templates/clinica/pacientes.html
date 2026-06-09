@@ -15,7 +15,7 @@
     </form>
     <div class="erp-table-wrap">
         <table class="erp-table">
-            <thead><tr><th>Expediente</th><th>Paciente</th><th>Riesgo</th><th>Identidad</th><th>Telefono</th><th>Edad</th><th></th></tr></thead>
+            <thead><tr><th>Expediente</th><th>Paciente</th><th>Riesgo</th><th>Identidad</th><th>Telefono</th><th>Edad</th><th>Acciones</th></tr></thead>
             <tbody>
                 {% for paciente in pacientes %}
                 <tr>
@@ -31,7 +31,12 @@
                     <td>{{ paciente.identidad|default:"-" }}</td>
                     <td>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</td>
                     <td>{% if paciente.edad is not None %}{{ paciente.edad }}{% else %}-{% endif %}</td>
-                    <td><a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a></td>
+                    <td>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Ver</a>
+                            <a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a>
+                        </div>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="7" class="erp-empty">No hay pacientes registrados.</td></tr>

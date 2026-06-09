@@ -9,8 +9,10 @@ from core.models import Empresa
 from .forms import CitaClinicaForm, ExpedienteEventoForm, PacienteForm, ProfesionalSaludForm, ServicioClinicoForm, TratamientoPacienteForm
 from .models import (
     CitaClinica,
+    ConsentimientoClinico,
     ConfiguracionClinica,
     ExpedienteEvento,
+    MedicamentoPrescrito,
     Paciente,
     PacienteFotoEvolucion,
     ProfesionalSalud,
@@ -174,6 +176,8 @@ def paciente_detalle(request, empresa_slug, paciente_id):
     citas = paciente.citas.select_related("profesional", "servicio")[:10]
     tratamientos = paciente.tratamientos.select_related("profesional", "servicio")[:10]
     fotos_evolucion = paciente.fotos_evolucion.select_related("creado_por")[:12]
+    medicamentos = MedicamentoPrescrito.objects.filter(empresa=empresa, paciente=paciente)[:10]
+    consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10]
     return render(
         request,
         "clinica/paciente_detalle.html",
@@ -184,6 +188,8 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "citas": citas,
             "tratamientos": tratamientos,
             "fotos_evolucion": fotos_evolucion,
+            "medicamentos": medicamentos,
+            "consentimientos": consentimientos,
         },
     )
 
