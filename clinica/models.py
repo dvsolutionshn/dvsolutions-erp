@@ -158,6 +158,7 @@ class Paciente(models.Model):
     nacionalidad = models.CharField(max_length=120, default="Honduras")
     contacto_emergencia = models.CharField(max_length=180, blank=True, null=True)
     telefono_emergencia = models.CharField(max_length=30, blank=True, null=True)
+    es_alergico = models.BooleanField(default=False)
     alergias = models.TextField(blank=True, null=True)
     antecedentes_medicos = models.TextField(blank=True, null=True)
     medicamentos_actuales = models.TextField(blank=True, null=True)

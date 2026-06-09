@@ -14,6 +14,9 @@
 .patient-form-shell{display:flex;flex-direction:column;gap:18px}
 .patient-section{padding:0;overflow:hidden}
 .patient-section-head{
+    width:100%;
+    border:0;
+    cursor:pointer;
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -21,10 +24,16 @@
     padding:16px 20px;
     background:linear-gradient(135deg, rgba(16,32,42,.94), rgba(19,75,91,.9));
     color:#fff;
+    text-align:left;
+    font:inherit;
 }
 .patient-section-head h3{margin:0;font-size:18px}
 .patient-section-head span{font-size:12px;color:rgba(255,255,255,.72)}
-.patient-section-body{padding:18px 20px}
+.patient-section-toggle{font-size:22px;font-weight:900;line-height:1;transition:transform .24s ease}
+.patient-section.is-collapsed .patient-section-toggle{transform:rotate(-90deg)}
+.patient-section-body{padding:18px 20px;display:grid;grid-template-rows:1fr;transition:grid-template-rows .28s ease,padding .28s ease,opacity .22s ease}
+.patient-section-body-inner{overflow:hidden}
+.patient-section.is-collapsed .patient-section-body{grid-template-rows:0fr;padding-top:0;padding-bottom:0;opacity:.35}
 .patient-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .patient-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .patient-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -91,6 +100,13 @@
     font-weight:900;
 }
 .patient-photo-preview img{width:100%;height:100%;object-fit:cover}
+.patient-photo-actions{display:flex;gap:8px;flex-wrap:wrap}
+.patient-camera-panel{display:none;gap:10px;flex-direction:column}
+.patient-camera-panel.is-open{display:flex}
+.patient-camera-panel video{width:100%;border-radius:14px;border:1px solid var(--line);background:#06111a}
+.patient-comment-panel,.patient-allergy-panel{display:none;animation:patientPanelIn .22s ease both}
+.patient-comment-panel.is-open,.patient-allergy-panel.is-open{display:flex}
+.patient-alert-note{border:1px solid rgba(220,38,38,.25);background:#fff5f5;color:#9f1239;border-radius:12px;padding:10px 12px;font-weight:800}
 .patient-actions{
     display:flex;
     justify-content:space-between;
@@ -99,6 +115,7 @@
     flex-wrap:wrap;
 }
 .patient-error{color:var(--danger);font-size:12px;font-weight:700}
+@keyframes patientPanelIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 @media (max-width:1180px){
     .patient-grid,
     .patient-grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -125,11 +142,12 @@
     {% endif %}
 
     <section class="erp-card patient-section">
-        <div class="patient-section-head">
-            <h3>Datos personales</h3>
-            <span>Identidad, nombre, contacto y fotografia inicial</span>
-        </div>
+        <button class="patient-section-head" type="button" data-section-toggle>
+            <div><h3>Datos personales</h3><span>Identidad, nombre, contacto y fotografia inicial</span></div>
+            <span class="patient-section-toggle">v</span>
+        </button>
         <div class="patient-section-body">
+            <div class="patient-section-body-inner">
             <div class="patient-grid">
                 <div class="patient-field">{{ form.tipo_id.label_tag }}{{ form.tipo_id }}{% for error in form.tipo_id.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
                 <div class="patient-field">{{ form.identidad.label_tag }}{{ form.identidad }}{% for error in form.identidad.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
@@ -143,7 +161,18 @@
                             ?
                             {% endif %}
                         </div>
+                        <div class="patient-camera-panel" data-camera-panel>
+                            <video data-camera-video autoplay playsinline></video>
+                            <div class="patient-photo-actions">
+                                <button type="button" class="erp-btn-secondary" data-camera-capture>Capturar foto</button>
+                                <button type="button" class="erp-btn-secondary" data-camera-close>Cerrar camara</button>
+                            </div>
+                            <canvas data-camera-canvas style="display:none;"></canvas>
+                        </div>
                         <div class="patient-field">{{ form.foto_perfil.label_tag }}{{ form.foto_perfil }}{% if form.foto_perfil.help_text %}<small>{{ form.foto_perfil.help_text }}</small>{% endif %}{% for error in form.foto_perfil.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                        <div class="patient-photo-actions">
+                            <button type="button" class="erp-btn-secondary" data-camera-open>Tomar foto</button>
+                        </div>
                     </div>
                 </div>
 
@@ -156,7 +185,10 @@
                 <div class="patient-field">{{ form.rh.label_tag }}{{ form.rh }}{% for error in form.rh.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
                 <div class="patient-field">{{ form.estado_civil.label_tag }}{{ form.estado_civil }}{% for error in form.estado_civil.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
                 <div class="patient-field">{{ form.genero.label_tag }}{{ form.genero }}{% for error in form.genero.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
-                <div class="patient-field span-2">{{ form.comentarios.label_tag }}{{ form.comentarios }}{% for error in form.comentarios.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                <div class="patient-field span-2">
+                    <button type="button" class="erp-btn-secondary" data-comment-toggle>Agregar comentario</button>
+                    <div class="patient-field patient-comment-panel {% if form.comentarios.value %}is-open{% endif %}" data-comment-panel>{{ form.comentarios.label_tag }}{{ form.comentarios }}{% for error in form.comentarios.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
+                </div>
                 <div class="patient-field span-2">{{ form.direccion.label_tag }}{{ form.direccion }}{% for error in form.direccion.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
                 <div class="patient-field">{{ form.prefijo_telefono.label_tag }}{{ form.prefijo_telefono }}{% for error in form.prefijo_telefono.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
                 <div class="patient-field">{{ form.telefono.label_tag }}{{ form.telefono }}{% for error in form.telefono.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}</div>
@@ -172,12 +204,14 @@
                     <div class="patient-check"><label for="{{ form.acepta_promociones.id_for_label }}">Acepta promociones</label>{{ form.acepta_promociones }}</div>
                 </div>
             </div>
+            </div>
         </div>
     </section>
 
     <section class="erp-card patient-section">
-        <div class="patient-section-head"><h3>Ubicacion</h3><span>Direccion administrativa y procedencia</span></div>
+        <button class="patient-section-head" type="button" data-section-toggle><div><h3>Ubicacion</h3><span>Direccion administrativa y procedencia</span></div><span class="patient-section-toggle">v</span></button>
         <div class="patient-section-body">
+            <div class="patient-section-body-inner">
             <div class="patient-grid three">
                 <div class="patient-field">{{ form.departamento.label_tag }}{{ form.departamento }}</div>
                 <div class="patient-field">{{ form.municipio.label_tag }}{{ form.municipio }}</div>
@@ -186,12 +220,14 @@
                 <div class="patient-field">{{ form.barrio.label_tag }}{{ form.barrio }}</div>
                 <div class="patient-field">{{ form.pais.label_tag }}{{ form.pais }}</div>
             </div>
+            </div>
         </div>
     </section>
 
     <section class="erp-card patient-section">
-        <div class="patient-section-head"><h3>Datos acompanante</h3><span>Persona que acompana al paciente en recepcion</span></div>
+        <button class="patient-section-head" type="button" data-section-toggle><div><h3>Datos acompanante</h3><span>Persona que acompana al paciente en recepcion</span></div><span class="patient-section-toggle">v</span></button>
         <div class="patient-section-body">
+            <div class="patient-section-body-inner">
             <div class="patient-grid three">
                 <div class="patient-field span-2">{{ form.acompanante_nombre.label_tag }}{{ form.acompanante_nombre }}</div>
                 <div class="patient-field">{{ form.acompanante_relacion.label_tag }}{{ form.acompanante_relacion }}</div>
@@ -202,22 +238,29 @@
                 <div class="patient-field">{{ form.responsable_telefono.label_tag }}{{ form.responsable_telefono }}</div>
                 <div class="patient-field">{{ form.responsable_relacion.label_tag }}{{ form.responsable_relacion }}</div>
             </div>
+            </div>
         </div>
     </section>
 
     <section class="erp-card patient-section">
-        <div class="patient-section-head"><h3>Datos demograficos y clinicos base</h3><span>Contexto social, origen y riesgos iniciales</span></div>
+        <button class="patient-section-head" type="button" data-section-toggle><div><h3>Datos demograficos y clinicos base</h3><span>Contexto social, origen y riesgos iniciales</span></div><span class="patient-section-toggle">v</span></button>
         <div class="patient-section-body">
+            <div class="patient-section-body-inner">
             <div class="patient-grid two">
                 <div class="patient-field">{{ form.escolaridad.label_tag }}{{ form.escolaridad }}</div>
                 <div class="patient-field">{{ form.pertenencia_etnica.label_tag }}{{ form.pertenencia_etnica }}</div>
                 <div class="patient-field">{{ form.procedencia.label_tag }}{{ form.procedencia }}</div>
                 <div class="patient-field">{{ form.nacionalidad.label_tag }}{{ form.nacionalidad }}</div>
-                <div class="patient-field span-full">{{ form.alergias.label_tag }}{{ form.alergias }}</div>
+                <div class="patient-check span-full"><label for="{{ form.es_alergico.id_for_label }}">{{ form.es_alergico.label }}</label>{{ form.es_alergico }}</div>
+                <div class="patient-field span-full patient-allergy-panel {% if form.es_alergico.value or form.alergias.value %}is-open{% endif %}" data-allergy-panel>
+                    <div class="patient-alert-note">Paciente alergico: registra el detalle para que aparezca como alerta en recepcion y expediente.</div>
+                    {{ form.alergias.label_tag }}{{ form.alergias }}{% for error in form.alergias.errors %}<div class="patient-error">{{ error }}</div>{% endfor %}
+                </div>
                 <div class="patient-field span-full">{{ form.antecedentes_medicos.label_tag }}{{ form.antecedentes_medicos }}</div>
                 <div class="patient-field span-full">{{ form.medicamentos_actuales.label_tag }}{{ form.medicamentos_actuales }}</div>
                 <div class="patient-field span-full">{{ form.notas_privadas.label_tag }}{{ form.notas_privadas }}</div>
                 <div class="patient-check span-full"><label for="{{ form.activo.id_for_label }}">Paciente activo</label>{{ form.activo }}</div>
+            </div>
             </div>
         </div>
     </section>
@@ -232,4 +275,101 @@
         </div>
     </section>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+    const sections = document.querySelectorAll("[data-section-toggle]");
+    sections.forEach((button, index) => {
+        const section = button.closest(".patient-section");
+        if (!section) return;
+        if (index > 0) section.classList.add("is-collapsed");
+        button.addEventListener("click", () => {
+            section.classList.toggle("is-collapsed");
+        });
+    });
+
+    const commentButton = document.querySelector("[data-comment-toggle]");
+    const commentPanel = document.querySelector("[data-comment-panel]");
+    if (commentButton && commentPanel) {
+        commentButton.addEventListener("click", () => {
+            commentPanel.classList.toggle("is-open");
+            const textarea = commentPanel.querySelector("textarea");
+            if (commentPanel.classList.contains("is-open") && textarea) textarea.focus();
+        });
+    }
+
+    const allergyCheck = document.getElementById("{{ form.es_alergico.id_for_label }}");
+    const allergyPanel = document.querySelector("[data-allergy-panel]");
+    if (allergyCheck && allergyPanel) {
+        const syncAllergy = () => {
+            allergyPanel.classList.toggle("is-open", allergyCheck.checked);
+        };
+        allergyCheck.addEventListener("change", syncAllergy);
+        syncAllergy();
+    }
+
+    const openCamera = document.querySelector("[data-camera-open]");
+    const closeCamera = document.querySelector("[data-camera-close]");
+    const captureCamera = document.querySelector("[data-camera-capture]");
+    const cameraPanel = document.querySelector("[data-camera-panel]");
+    const video = document.querySelector("[data-camera-video]");
+    const canvas = document.querySelector("[data-camera-canvas]");
+    const fileInput = document.getElementById("{{ form.foto_perfil.id_for_label }}");
+    const preview = document.querySelector(".patient-photo-preview");
+    let stream = null;
+
+    const stopCamera = () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        if (cameraPanel) cameraPanel.classList.remove("is-open");
+    };
+
+    if (openCamera && cameraPanel && video && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        openCamera.addEventListener("click", async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                video.srcObject = stream;
+                cameraPanel.classList.add("is-open");
+            } catch (error) {
+                alert("No se pudo abrir la camara. Revisa permisos del navegador o conecta una webcam.");
+            }
+        });
+    } else if (openCamera) {
+        openCamera.addEventListener("click", () => {
+            alert("Este navegador no permite abrir la camara desde esta pagina.");
+        });
+    }
+
+    if (closeCamera) closeCamera.addEventListener("click", stopCamera);
+
+    if (captureCamera && video && canvas && fileInput) {
+        captureCamera.addEventListener("click", () => {
+            const width = video.videoWidth || 640;
+            const height = video.videoHeight || 480;
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext("2d").drawImage(video, 0, 0, width, height);
+            canvas.toBlob(blob => {
+                if (!blob) return;
+                const file = new File([blob], "foto-paciente.jpg", { type: "image/jpeg" });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+                if (preview) {
+                    preview.innerHTML = "";
+                    const image = document.createElement("img");
+                    image.src = URL.createObjectURL(file);
+                    image.alt = "Foto capturada";
+                    preview.appendChild(image);
+                }
+                stopCamera();
+            }, "image/jpeg", 0.92);
+        });
+    }
+})();
+</script>
 {% endblock %}

@@ -11,6 +11,18 @@ from .models import (
     TratamientoPaciente,
 )
 
+RH_CHOICES = [
+    ("", "No indicado"),
+    ("O+", "O+"),
+    ("O-", "O-"),
+    ("A+", "A+"),
+    ("A-", "A-"),
+    ("B+", "B+"),
+    ("B-", "B-"),
+    ("AB+", "AB+"),
+    ("AB-", "AB-"),
+]
+
 
 class BaseClinicaForm(forms.ModelForm):
     def __init__(self, *args, empresa=None, **kwargs):
@@ -71,6 +83,7 @@ class PacienteForm(BaseClinicaForm):
             "nacionalidad",
             "contacto_emergencia",
             "telefono_emergencia",
+            "es_alergico",
             "alergias",
             "antecedentes_medicos",
             "medicamentos_actuales",
@@ -82,6 +95,7 @@ class PacienteForm(BaseClinicaForm):
             "fecha_nacimiento": forms.DateInput(attrs={"type": "date"}),
             "foto_perfil": forms.ClearableFileInput(attrs={"accept": "image/*"}),
             "nombre": forms.HiddenInput(),
+            "rh": forms.Select(choices=RH_CHOICES),
         }
         labels = {
             "tipo_id": "Tipo de ID",
@@ -117,11 +131,14 @@ class PacienteForm(BaseClinicaForm):
             "responsable_telefono": "Telefono responsable",
             "responsable_relacion": "Relacion responsable",
             "pertenencia_etnica": "Pertenencia etnica",
+            "es_alergico": "Alergico",
+            "alergias": "Detalle de alergias",
         }
         help_texts = {
             "foto_perfil": "Se guardara como primera foto de evolucion del expediente.",
             "expediente_codigo": "Codigo automatico del expediente clinico.",
             "comentarios": "Notas administrativas de ingreso o recepcion.",
+            "alergias": "Indica medicamento, alimento, material o sustancia que provoca reaccion.",
         }
 
     def __init__(self, *args, empresa=None, **kwargs):
@@ -143,6 +160,10 @@ class PacienteForm(BaseClinicaForm):
         nombre = " ".join(parte.strip() for parte in partes_nombre if parte and parte.strip())
         if nombre:
             cleaned_data["nombre"] = nombre
+        if not cleaned_data.get("es_alergico"):
+            cleaned_data["alergias"] = ""
+        elif not (cleaned_data.get("alergias") or "").strip():
+            self.add_error("alergias", "Indica a que es alergico el paciente.")
         return cleaned_data
 
 
