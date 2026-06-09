@@ -5,24 +5,109 @@
 {% block header_title %}{{ titulo }}{% endblock %}
 {% block header_description %}Catalogos operativos para ordenar la agenda, servicios y responsables medicos.{% endblock %}
 
+{% block extra_head %}
+<style>
+.clinic-catalog-grid{
+    display:grid;
+    grid-template-columns:minmax(320px,.8fr) minmax(0,1.2fr);
+    gap:18px;
+    align-items:start;
+}
+.clinic-catalog-card{padding:0;overflow:hidden}
+.clinic-catalog-head{
+    padding:18px 20px;
+    background:linear-gradient(135deg, rgba(16,32,42,.95), rgba(18,75,91,.9));
+    color:#fff;
+}
+.clinic-catalog-head h3{margin:0;font-size:19px}
+.clinic-catalog-head p{margin:7px 0 0;color:rgba(255,255,255,.74);line-height:1.5}
+.clinic-catalog-body{padding:20px}
+.clinic-catalog-form{display:grid;grid-template-columns:1fr;gap:14px}
+.clinic-field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.clinic-field label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    color:var(--muted);
+    font-weight:800;
+}
+.clinic-field input,
+.clinic-field select,
+.clinic-field textarea{
+    width:100%;
+    min-height:46px;
+    border:1px solid var(--line-strong);
+    border-radius:10px;
+    padding:11px 13px;
+    background:#fff;
+    color:var(--text);
+    font:inherit;
+    outline:none;
+}
+.clinic-field textarea{min-height:92px;resize:vertical}
+.clinic-field input:focus,
+.clinic-field select:focus,
+.clinic-field textarea:focus{
+    border-color:rgba(39,101,232,.46);
+    box-shadow:0 0 0 4px rgba(39,101,232,.08);
+}
+.clinic-check{
+    min-height:46px;
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:11px 13px;
+    background:#fff;
+}
+.clinic-check input{width:auto;min-height:auto}
+.clinic-error{color:var(--danger);font-size:12px;font-weight:800}
+@media (max-width:980px){
+    .clinic-catalog-grid{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="erp-grid" style="grid-template-columns:minmax(320px,.75fr) minmax(0,1.25fr);">
-    <article class="erp-card">
-        <h3 class="erp-panel-title">Agregar</h3>
-        <form method="post" class="erp-form-grid" style="grid-template-columns:1fr;">
+<section class="clinic-catalog-grid">
+    <article class="erp-card clinic-catalog-card">
+        <div class="clinic-catalog-head">
+            <h3>Agregar</h3>
+            <p>Configura este registro para agenda, tratamientos y operacion clinica.</p>
+        </div>
+        <div class="clinic-catalog-body">
+        <form method="post" class="clinic-catalog-form">
             {% csrf_token %}
-            {{ form.as_p }}
+            {% for field in form %}
+            <div class="clinic-field {% if field.field.widget.input_type == 'checkbox' %}clinic-check{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<small class="erp-card-muted">{{ field.help_text }}</small>{% endif %}
+                {% for error in field.errors %}<div class="clinic-error">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            {% if form.non_field_errors %}<div class="clinic-error">{{ form.non_field_errors }}</div>{% endif %}
             <button class="erp-btn" type="submit">Guardar</button>
         </form>
+        </div>
     </article>
     <article class="erp-card">
-        <h3 class="erp-panel-title">Registros</h3>
+        <div class="erp-toolbar">
+            <div>
+                <div class="erp-kpi-label">Catalogo clinico</div>
+                <h3 class="erp-panel-title" style="margin:6px 0 0;">Registros</h3>
+            </div>
+        </div>
         <div class="erp-table-wrap">
             <table class="erp-table">
                 <thead><tr><th>Nombre</th><th>Estado</th></tr></thead>
                 <tbody>
                     {% for item in items %}
-                    <tr><td>{{ item }}</td><td>{% if item.activo %}Activo{% else %}Inactivo{% endif %}</td></tr>
+                    <tr>
+                        <td><strong>{{ item }}</strong></td>
+                        <td>{% if item.activo %}<span class="erp-badge success">Activo</span>{% else %}<span class="erp-badge danger">Inactivo</span>{% endif %}</td>
+                    </tr>
                     {% empty %}
                     <tr><td colspan="2" class="erp-empty">No hay registros.</td></tr>
                     {% endfor %}

@@ -5,22 +5,143 @@
 {% block header_title %}{{ titulo }}{% endblock %}
 {% block header_description %}Registro estructurado para mantener la operacion medica clara, trazable y lista para seguimiento.{% endblock %}
 
+{% block extra_head %}
+<style>
+.clinic-form-shell{display:flex;flex-direction:column;gap:18px}
+.clinic-form-card{padding:0;overflow:hidden}
+.clinic-form-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:18px;
+    padding:18px 22px;
+    background:linear-gradient(135deg, rgba(16,32,42,.95), rgba(18,75,91,.9));
+    color:#fff;
+}
+.clinic-form-head h3{margin:0;font-size:20px}
+.clinic-form-head p{margin:7px 0 0;color:rgba(255,255,255,.74);line-height:1.5}
+.clinic-form-badge{
+    display:inline-flex;
+    align-items:center;
+    min-height:32px;
+    padding:7px 11px;
+    border-radius:999px;
+    background:rgba(118,239,211,.14);
+    border:1px solid rgba(118,239,211,.24);
+    color:#dffcf8;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    white-space:nowrap;
+}
+.clinic-form-body{padding:22px}
+.clinic-form-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:16px;
+}
+.clinic-field{
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+.clinic-field.is-wide{grid-column:1/-1}
+.clinic-field label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    color:var(--muted);
+    font-weight:800;
+}
+.clinic-field input,
+.clinic-field select,
+.clinic-field textarea{
+    width:100%;
+    min-height:46px;
+    border:1px solid var(--line-strong);
+    border-radius:10px;
+    padding:11px 13px;
+    background:#fff;
+    color:var(--text);
+    font:inherit;
+    outline:none;
+    box-shadow:none;
+}
+.clinic-field textarea{min-height:98px;resize:vertical}
+.clinic-field input:focus,
+.clinic-field select:focus,
+.clinic-field textarea:focus{
+    border-color:rgba(39,101,232,.46);
+    box-shadow:0 0 0 4px rgba(39,101,232,.08);
+}
+.clinic-check{
+    min-height:46px;
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:11px 13px;
+    background:#fff;
+}
+.clinic-check input{width:auto;min-height:auto}
+.clinic-help{color:var(--muted);font-size:12px;line-height:1.5}
+.clinic-error{color:var(--danger);font-size:12px;font-weight:800}
+.clinic-form-actions{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    align-items:center;
+    flex-wrap:wrap;
+    padding-top:18px;
+    margin-top:4px;
+    border-top:1px solid var(--line);
+}
+@media (max-width:1180px){
+    .clinic-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+    .clinic-form-head{flex-direction:column}
+    .clinic-form-grid{grid-template-columns:1fr}
+    .clinic-form-body{padding:16px}
+    .clinic-form-actions{align-items:stretch;flex-direction:column}
+    .clinic-form-actions .erp-btn,
+    .clinic-form-actions .erp-btn-secondary{width:100%}
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="erp-card">
-    <form method="post" enctype="multipart/form-data" class="erp-form-grid">
+<section class="erp-card clinic-form-card">
+    <div class="clinic-form-head">
+        <div>
+            <h3>{{ titulo }}</h3>
+            <p>Formulario clinico guiado para capturar informacion limpia, consistente y facil de consultar.</p>
+        </div>
+        <span class="clinic-form-badge">Modulo clinico</span>
+    </div>
+    <form method="post" enctype="multipart/form-data" class="clinic-form-body">
         {% csrf_token %}
+        <div class="clinic-form-grid">
         {% for field in form %}
-        <div class="erp-form-group {% if field.field.widget.input_type == 'checkbox' %}erp-form-check{% endif %}" {% if field.name in "direccion alergias antecedentes_medicos medicamentos_actuales notas_privadas objetivo plan_clinico descripcion diagnostico plan signos_vitales contenido observaciones" %}style="grid-column:1/-1;"{% endif %}>
+        <div class="clinic-field {% if field.field.widget.input_type == 'checkbox' %}clinic-check{% endif %} {% if field.name in 'direccion alergias antecedentes_medicos medicamentos_actuales notas_privadas objetivo plan_clinico descripcion diagnostico plan signos_vitales contenido observaciones' %}is-wide{% endif %}">
             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
             {{ field }}
-            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
-            {% for error in field.errors %}<div class="erp-form-error">{{ error }}</div>{% endfor %}
+            {% if field.help_text %}<small class="clinic-help">{{ field.help_text }}</small>{% endif %}
+            {% for error in field.errors %}<div class="clinic-error">{{ error }}</div>{% endfor %}
         </div>
         {% endfor %}
-        {% if form.non_field_errors %}<div class="erp-form-error" style="grid-column:1/-1;">{{ form.non_field_errors }}</div>{% endif %}
-        <div style="grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end;">
+        </div>
+        {% if form.non_field_errors %}<div class="clinic-error" style="margin-top:16px;">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="clinic-form-actions">
+            <span class="clinic-help">Al guardar, la informacion queda integrada al expediente y a los flujos clinicos.</span>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <a class="erp-btn-secondary" href="{% url 'clinica_dashboard' empresa.slug %}">Cancelar</a>
             <button class="erp-btn" type="submit">Guardar</button>
+            </div>
         </div>
     </form>
 </section>
