@@ -14,6 +14,74 @@
 .patient-name-stack strong{display:block;color:#102338}
 .patient-name-stack span{display:block;margin-top:3px;color:var(--muted);font-size:12px}
 .patient-action-strip{display:flex;gap:8px;flex-wrap:wrap}
+.patient-search-panel{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    gap:12px;
+    align-items:center;
+    margin-bottom:18px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:linear-gradient(135deg,#ffffff,#f7fbff);
+    box-shadow:0 14px 34px rgba(12,34,56,.06);
+}
+.patient-search-box{
+    position:relative;
+    min-width:0;
+}
+.patient-search-icon{
+    position:absolute;
+    left:16px;
+    top:50%;
+    transform:translateY(-50%);
+    width:34px;
+    height:34px;
+    border-radius:12px;
+    display:grid;
+    place-items:center;
+    color:#0f8f8c;
+    background:#e8fbfa;
+    font-weight:900;
+    pointer-events:none;
+}
+.patient-search-input{
+    width:100%;
+    min-height:54px;
+    border:1px solid transparent;
+    border-radius:15px;
+    padding:12px 16px 12px 62px;
+    background:#fff;
+    color:var(--text);
+    font:inherit;
+    box-shadow:inset 0 0 0 1px #d9e5f1;
+    transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.patient-search-input:focus{
+    outline:none;
+    border-color:rgba(19,169,164,.55);
+    box-shadow:0 0 0 4px rgba(19,169,164,.12), inset 0 0 0 1px rgba(19,169,164,.55);
+}
+.patient-search-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.patient-search-chip{
+    display:inline-flex;
+    align-items:center;
+    min-height:42px;
+    padding:0 14px;
+    border-radius:999px;
+    border:1px solid #d7e5f2;
+    background:#fff;
+    color:#516981;
+    font-weight:800;
+    font-size:13px;
+    text-decoration:none;
+    white-space:nowrap;
+}
+@media (max-width:900px){
+    .patient-search-panel{grid-template-columns:1fr}
+    .patient-search-actions{justify-content:stretch}
+    .patient-search-actions .erp-btn,.patient-search-actions .erp-btn-secondary,.patient-search-chip{flex:1;justify-content:center}
+}
 </style>
 {% endblock %}
 
@@ -32,9 +100,15 @@
 </section>
 
 <section class="erp-card">
-    <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-        <input type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, expediente, identidad o telefono" style="flex:1;min-width:260px;">
-        <button class="erp-btn-secondary" type="submit">Buscar</button>
+    <form method="get" class="patient-search-panel">
+        <div class="patient-search-box">
+            <span class="patient-search-icon">ID</span>
+            <input class="patient-search-input" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, expediente, documento, celular o correo" autocomplete="off">
+        </div>
+        <a class="patient-search-chip" href="{% url 'clinica_pacientes' empresa.slug %}">Limpiar</a>
+        <div class="patient-search-actions">
+            <button class="erp-btn" type="submit">Buscar</button>
+        </div>
     </form>
     <div class="erp-table-wrap">
         <table class="erp-table patient-list-table">
