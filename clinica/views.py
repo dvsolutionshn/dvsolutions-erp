@@ -2,7 +2,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from core.models import Empresa
@@ -138,6 +140,42 @@ def pacientes(request, empresa_slug):
         "mes_actual": hoy,
         "cumpleaneros_mes": cumpleaneros_mes,
     })
+
+
+@login_required
+def pacientes_sugerencias(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    q = (request.GET.get("q") or "").strip()
+    if len(q) < 2:
+        return JsonResponse({"results": []})
+
+    pacientes_qs = (
+        Paciente.objects.filter(empresa=empresa)
+        .filter(
+            Q(identidad__icontains=q)
+            | Q(nombre__icontains=q)
+            | Q(expediente_codigo__icontains=q)
+            | Q(telefono__icontains=q)
+            | Q(whatsapp__icontains=q)
+            | Q(correo__icontains=q)
+        )
+        .order_by("identidad", "nombre")[:8]
+    )
+    results = [
+        {
+            "id": paciente.id,
+            "nombre": paciente.nombre,
+            "documento": paciente.identidad or "",
+            "expediente": paciente.expediente_codigo,
+            "telefono": paciente.whatsapp or paciente.telefono or "",
+            "url": request.build_absolute_uri(
+                reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id])
+            ),
+            "alergico": paciente.es_alergico,
+        }
+        for paciente in pacientes_qs
+    ]
+    return JsonResponse({"results": results})
 
 
 @login_required

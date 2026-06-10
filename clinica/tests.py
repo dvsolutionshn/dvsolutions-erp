@@ -140,3 +140,31 @@ class ClinicaPacienteTests(TestCase):
         nombres = list(response.context["pacientes"])
         self.assertEqual(nombres[0], cumpleanero)
         self.assertIn(paciente_normal, nombres)
+
+    def test_sugerencias_pacientes_busca_por_documento(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0200",
+            primer_nombre="Maria",
+            primer_apellido="Reyes",
+            nombre="Maria Reyes",
+            identidad="0801199413996",
+            whatsapp="99991111",
+        )
+
+        response = self.client.get(
+            reverse("clinica_pacientes_sugerencias", args=[self.empresa.slug]),
+            {"q": "08011994"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["id"], paciente.id)
+        self.assertEqual(data["results"][0]["documento"], "0801199413996")
+
+        response = self.client.get(
+            reverse("clinica_pacientes_sugerencias", args=[self.empresa.slug]),
+            {"q": "0"},
+        )
+        self.assertEqual(response.json()["results"], [])

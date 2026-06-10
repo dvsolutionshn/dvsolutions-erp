@@ -62,6 +62,49 @@
     border-color:rgba(19,169,164,.55);
     box-shadow:0 0 0 4px rgba(19,169,164,.12), inset 0 0 0 1px rgba(19,169,164,.55);
 }
+.patient-suggestions{
+    position:absolute;
+    z-index:40;
+    left:0;
+    right:0;
+    top:calc(100% + 8px);
+    display:none;
+    padding:8px;
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:#fff;
+    box-shadow:0 22px 50px rgba(12,34,56,.16);
+    max-height:330px;
+    overflow:auto;
+}
+.patient-suggestions.is-open{display:block}
+.patient-suggestion-item{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:10px;
+    align-items:center;
+    width:100%;
+    padding:11px 12px;
+    border:0;
+    border-radius:12px;
+    background:transparent;
+    text-align:left;
+    cursor:pointer;
+    color:var(--text);
+    text-decoration:none;
+}
+.patient-suggestion-item:hover{background:#f4fbff}
+.patient-suggestion-item strong{display:block;color:#102338}
+.patient-suggestion-item span{display:block;margin-top:3px;color:var(--muted);font-size:12px}
+.patient-suggestion-badge{
+    padding:7px 10px;
+    border-radius:999px;
+    background:#e8fbfa;
+    color:#087875;
+    font-size:12px;
+    font-weight:900;
+}
+.patient-suggestion-empty{padding:12px;color:var(--muted);font-size:13px}
 .patient-search-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .patient-search-chip{
     display:inline-flex;
@@ -103,7 +146,8 @@
     <form method="get" class="patient-search-panel">
         <div class="patient-search-box">
             <span class="patient-search-icon">ID</span>
-            <input class="patient-search-input" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, expediente, documento, celular o correo" autocomplete="off">
+            <input class="patient-search-input" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, expediente, documento, celular o correo" autocomplete="off" data-suggestions-url="{% url 'clinica_pacientes_sugerencias' empresa.slug %}">
+            <div class="patient-suggestions" data-patient-suggestions></div>
         </div>
         <a class="patient-search-chip" href="{% url 'clinica_pacientes' empresa.slug %}">Limpiar</a>
         <div class="patient-search-actions">
@@ -156,4 +200,82 @@
         </table>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+    const input = document.querySelector("[data-suggestions-url]");
+    const panel = document.querySelector("[data-patient-suggestions]");
+    if (!input || !panel) return;
+
+    let timer = null;
+    let controller = null;
+
+    const closePanel = () => {
+        panel.classList.remove("is-open");
+        panel.innerHTML = "";
+    };
+
+    const renderResults = (results) => {
+        if (!results.length) {
+            panel.innerHTML = '<div class="patient-suggestion-empty">No hay coincidencias con ese dato.</div>';
+            panel.classList.add("is-open");
+            return;
+        }
+        panel.innerHTML = "";
+        results.forEach((item) => {
+            const link = document.createElement("a");
+            link.className = "patient-suggestion-item";
+            link.href = item.url;
+
+            const body = document.createElement("span");
+            const name = document.createElement("strong");
+            name.textContent = item.nombre;
+            const meta = document.createElement("span");
+            meta.textContent = `Doc: ${item.documento || "-"} | Exp: ${item.expediente}${item.telefono ? " | " + item.telefono : ""}`;
+            body.appendChild(name);
+            body.appendChild(meta);
+
+            const badge = document.createElement("span");
+            badge.className = "patient-suggestion-badge";
+            badge.textContent = item.alergico ? "Alergico" : "Ver";
+
+            link.appendChild(body);
+            link.appendChild(badge);
+            panel.appendChild(link);
+        });
+        panel.classList.add("is-open");
+    };
+
+    input.addEventListener("input", () => {
+        const value = input.value.trim();
+        window.clearTimeout(timer);
+        if (value.length < 2) {
+            closePanel();
+            return;
+        }
+        timer = window.setTimeout(async () => {
+            if (controller) controller.abort();
+            controller = new AbortController();
+            try {
+                const url = `${input.dataset.suggestionsUrl}?q=${encodeURIComponent(value)}`;
+                const response = await fetch(url, {
+                    headers: {"X-Requested-With": "XMLHttpRequest"},
+                    signal: controller.signal,
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                renderResults(data.results || []);
+            } catch (error) {
+                if (error.name !== "AbortError") closePanel();
+            }
+        }, 180);
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!event.target.closest(".patient-search-box")) closePanel();
+    });
+})();
+</script>
 {% endblock %}
