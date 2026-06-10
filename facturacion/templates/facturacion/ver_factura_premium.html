@@ -315,18 +315,21 @@
     inset:0;
     z-index:250;
     display:none;
-    align-items:center;
+    align-items:flex-start;
     justify-content:center;
-    padding:22px;
+    padding:clamp(10px, 2vh, 22px);
     background:rgba(8,18,31,.52);
     backdrop-filter:blur(4px);
+    overflow:auto;
+    overscroll-behavior:contain;
 }
 .erp-preview-modal.is-visible{
     display:flex;
 }
 .erp-preview-dialog{
     width:min(1180px, 100%);
-    height:min(88vh, 940px);
+    height:calc(100dvh - clamp(20px, 4vh, 44px));
+    max-height:940px;
     display:flex;
     flex-direction:column;
     background:#fff;
@@ -334,8 +337,10 @@
     border-radius:20px;
     overflow:hidden;
     box-shadow:0 30px 80px rgba(7,20,36,.16);
+    margin:auto 0;
 }
 .erp-preview-toolbar{
+    flex:0 0 auto;
     display:flex;
     justify-content:space-between;
     gap:14px;
@@ -364,10 +369,12 @@
     flex:1;
     min-height:0;
     background:#dbe4ef;
+    overflow:auto;
 }
 .erp-preview-frame-shell iframe{
     width:100%;
     height:100%;
+    min-height:0;
     border:0;
     background:#fff;
 }
@@ -404,7 +411,10 @@
         padding:10px;
     }
     .erp-preview-dialog{
-        height:92vh;
+        height:calc(100dvh - 20px);
+        max-height:none;
+        margin:0;
+        border-radius:16px;
     }
     .erp-preview-toolbar{
         flex-direction:column;
@@ -681,6 +691,7 @@
                 <p>Revisa el documento antes de descargarlo o compartirlo.</p>
             </div>
             <div class="erp-preview-toolbar-actions">
+                <a class="erp-btn-secondary erp-preview-open" href="#" target="_blank" rel="noopener">Abrir</a>
                 <a class="erp-btn erp-preview-download" href="#" target="_blank" rel="noopener">Descargar PDF</a>
                 <button class="erp-btn erp-btn-secondary" type="button" id="closePdfPreview">Cerrar</button>
             </div>
@@ -716,6 +727,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const frame = document.getElementById("pdfPreviewFrame");
     const title = document.getElementById("pdfPreviewTitle");
     const downloadLink = document.querySelector(".erp-preview-download");
+    const openLink = document.querySelector(".erp-preview-open");
     const closeBtn = document.getElementById("closePdfPreview");
     const triggerButtons = document.querySelectorAll("[data-preview-url]");
     const paymentModal = document.getElementById("paymentModal");
@@ -723,7 +735,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const paymentCloseBtn = document.getElementById("closePaymentModal");
     const paymentButtons = document.querySelectorAll("[data-payment-url]");
 
-    if (!modal || !frame || !title || !downloadLink || !closeBtn) {
+    if (!modal || !frame || !title || !downloadLink || !openLink || !closeBtn) {
         return;
     }
 
@@ -735,6 +747,7 @@ document.addEventListener("DOMContentLoaded", () => {
         title.textContent = previewTitle;
         frame.src = previewUrl;
         downloadLink.href = downloadUrl;
+        openLink.href = previewUrl;
         modal.classList.add("is-visible");
         modal.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
