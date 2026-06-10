@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q
+from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.db.models.functions import ExtractDay, ExtractMonth
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -110,13 +111,33 @@ def clinica_dashboard(request, empresa_slug):
 @login_required
 def pacientes(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    hoy = timezone.localdate()
     q = (request.GET.get("q") or "").strip()
-    pacientes_qs = Paciente.objects.filter(empresa=empresa).order_by("nombre")
+    pacientes_qs = (
+        Paciente.objects.filter(empresa=empresa)
+        .annotate(
+            cumple_mes=Case(
+                When(fecha_nacimiento__month=hoy.month, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+            mes_nacimiento=ExtractMonth("fecha_nacimiento"),
+            dia_nacimiento=ExtractDay("fecha_nacimiento"),
+        )
+        .order_by("cumple_mes", "dia_nacimiento", "primer_nombre", "primer_apellido", "nombre")
+    )
     if q:
         pacientes_qs = pacientes_qs.filter(
             Q(nombre__icontains=q) | Q(expediente_codigo__icontains=q) | Q(identidad__icontains=q) | Q(telefono__icontains=q)
         )
-    return render(request, "clinica/pacientes.html", {"empresa": empresa, "pacientes": pacientes_qs, "q": q})
+    cumpleaneros_mes = pacientes_qs.filter(fecha_nacimiento__month=hoy.month).count()
+    return render(request, "clinica/pacientes.html", {
+        "empresa": empresa,
+        "pacientes": pacientes_qs,
+        "q": q,
+        "mes_actual": hoy,
+        "cumpleaneros_mes": cumpleaneros_mes,
+    })
 
 
 @login_required

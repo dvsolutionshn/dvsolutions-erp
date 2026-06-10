@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from .models import Paciente
@@ -107,3 +108,35 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "solo debe contener numeros")
         self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-0002").exists())
+
+    def test_lista_pacientes_prioriza_cumpleaneros_del_mes(self):
+        hoy = timezone.localdate()
+        paciente_normal = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0100",
+            primer_nombre="Carlos",
+            primer_apellido="Zuniga",
+            nombre="Carlos Zuniga",
+            identidad="0801199000001",
+            fecha_nacimiento=hoy.replace(month=1 if hoy.month != 1 else 2, day=10),
+        )
+        cumpleanero = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0101",
+            primer_nombre="Beatriz",
+            primer_apellido="Aguilar",
+            nombre="Beatriz Aguilar",
+            identidad="0801199000002",
+            fecha_nacimiento=hoy.replace(day=1),
+            correo="beatriz@example.com",
+            whatsapp="99990000",
+        )
+
+        response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cumpleanos del mes")
+        self.assertContains(response, "Promo")
+        nombres = list(response.context["pacientes"])
+        self.assertEqual(nombres[0], cumpleanero)
+        self.assertIn(paciente_normal, nombres)

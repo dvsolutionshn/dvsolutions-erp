@@ -7,20 +7,53 @@
 
 {% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>{% endblock %}
 
+{% block extra_head %}
+<style>
+.patient-list-table{min-width:1120px}
+.patient-birthday-row{background:#fffaf0}
+.patient-name-stack strong{display:block;color:#102338}
+.patient-name-stack span{display:block;margin-top:3px;color:var(--muted);font-size:12px}
+.patient-action-strip{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+{% endblock %}
+
 {% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Pacientes</div>
+        <p class="erp-stat-value">{{ pacientes|length }}</p>
+        <p class="erp-card-muted">Resultados visibles segun busqueda actual.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cumpleanos del mes</div>
+        <p class="erp-stat-value">{{ cumpleaneros_mes }}</p>
+        <p class="erp-card-muted">Aparecen primero para promociones y seguimiento.</p>
+    </article>
+</section>
+
 <section class="erp-card">
     <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
         <input type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, expediente, identidad o telefono" style="flex:1;min-width:260px;">
         <button class="erp-btn-secondary" type="submit">Buscar</button>
     </form>
     <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead><tr><th>Expediente</th><th>Paciente</th><th>Riesgo</th><th>Identidad</th><th>Telefono</th><th>Edad</th><th>Acciones</th></tr></thead>
+        <table class="erp-table patient-list-table">
+            <thead><tr><th>Nombres</th><th>Apellidos</th><th>Documento</th><th>Edad</th><th>Celular</th><th>E-mail</th><th>Sucursal</th><th>Riesgo</th><th>Cumple</th><th>Acciones</th></tr></thead>
             <tbody>
                 {% for paciente in pacientes %}
-                <tr>
-                    <td>{{ paciente.expediente_codigo }}</td>
-                    <td><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">{{ paciente.nombre }}</a></td>
+                <tr class="{% if paciente.cumple_mes == 0 %}patient-birthday-row{% endif %}">
+                    <td>
+                        <div class="patient-name-stack">
+                            <strong><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">{{ paciente.primer_nombre|default:paciente.nombre }}{% if paciente.segundo_nombre %} {{ paciente.segundo_nombre }}{% endif %}</a></strong>
+                            <span>{{ paciente.expediente_codigo }}</span>
+                        </div>
+                    </td>
+                    <td>{{ paciente.primer_apellido|default:"" }}{% if paciente.segundo_apellido %} {{ paciente.segundo_apellido }}{% endif %}</td>
+                    <td>{{ paciente.identidad|default:"-" }}</td>
+                    <td>{% if paciente.edad is not None %}{{ paciente.edad }}{% else %}-{% endif %}</td>
+                    <td>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</td>
+                    <td>{% if paciente.correo %}<a class="erp-inline-link" href="mailto:{{ paciente.correo }}">{{ paciente.correo }}</a>{% else %}-{% endif %}</td>
+                    <td>Principal</td>
                     <td>
                         {% if paciente.es_alergico %}
                         <span class="erp-badge danger">Alergico</span>
@@ -28,18 +61,22 @@
                         <span class="erp-card-muted">-</span>
                         {% endif %}
                     </td>
-                    <td>{{ paciente.identidad|default:"-" }}</td>
-                    <td>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</td>
-                    <td>{% if paciente.edad is not None %}{{ paciente.edad }}{% else %}-{% endif %}</td>
                     <td>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        {% if paciente.cumple_mes == 0 %}
+                        <span class="erp-badge success">{{ paciente.fecha_nacimiento|date:"d/m" }} Promo</span>
+                        {% else %}
+                        <span class="erp-card-muted">{{ paciente.fecha_nacimiento|date:"d/m"|default:"-" }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="patient-action-strip">
                             <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Ver</a>
                             <a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a>
                         </div>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="erp-empty">No hay pacientes registrados.</td></tr>
+                <tr><td colspan="10" class="erp-empty">No hay pacientes registrados.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
