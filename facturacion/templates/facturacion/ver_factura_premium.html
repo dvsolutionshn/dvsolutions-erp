@@ -326,6 +326,9 @@
 .erp-preview-modal.is-visible{
     display:flex;
 }
+.erp-preview-modal.is-nonblocking{
+    pointer-events:none;
+}
 .erp-preview-dialog{
     width:min(1180px, 100%);
     height:calc(100dvh - clamp(20px, 4vh, 44px));
@@ -338,6 +341,7 @@
     overflow:hidden;
     box-shadow:0 30px 80px rgba(7,20,36,.16);
     margin:auto 0;
+    pointer-events:auto;
 }
 .erp-preview-toolbar{
     flex:0 0 auto;
@@ -683,7 +687,7 @@
     </section>
 </div>
 
-<div class="erp-preview-modal" id="pdfPreviewModal" aria-hidden="true">
+<div class="erp-preview-modal is-nonblocking" id="pdfPreviewModal" aria-hidden="true">
     <div class="erp-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="pdfPreviewTitle">
         <div class="erp-preview-toolbar">
             <div>
@@ -750,14 +754,12 @@ document.addEventListener("DOMContentLoaded", () => {
         openLink.href = previewUrl;
         modal.classList.add("is-visible");
         modal.setAttribute("aria-hidden", "false");
-        document.body.style.overflow = "hidden";
     };
 
     const closePreview = () => {
         modal.classList.remove("is-visible");
         modal.setAttribute("aria-hidden", "true");
         frame.src = "about:blank";
-        document.body.style.overflow = "";
     };
 
     const openPayment = (button) => {
