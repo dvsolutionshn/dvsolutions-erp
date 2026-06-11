@@ -1,86 +1,145 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Clinica - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Modulo Clinico{% endblock %}
+{% block header_kicker %}Centro clinico inteligente{% endblock %}
 {% block header_title %}Clinica Medica{% endblock %}
-{% block header_description %}Expediente, agenda, tratamientos y seguimiento medico para una operacion clinica especializada.{% endblock %}
+{% block header_description %}Agenda, pacientes, expediente, tratamientos y seguimiento en una vista operativa clara.{% endblock %}
 
 {% block extra_head %}
 <style>
 .clinic-command{
     display:grid;
-    grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);
     gap:18px;
-    align-items:stretch;
 }
 
 .clinic-hero{
-    min-height:360px;
+    position:relative;
+    overflow:hidden;
+    min-height:390px;
     display:grid;
-    grid-template-columns:minmax(0,1fr) 310px;
-    gap:24px;
+    grid-template-columns:minmax(0,1fr) 360px;
+    gap:26px;
     align-items:stretch;
     padding:28px;
     border-radius:26px;
     background:
-        linear-gradient(135deg, rgba(255,255,255,.92), rgba(242,252,255,.74) 48%, rgba(255,248,251,.86)),
-        radial-gradient(circle at 88% 12%, rgba(19,169,164,.18), transparent 32%);
+        linear-gradient(135deg, rgba(255,255,255,.96), rgba(236,252,255,.9) 52%, rgba(255,246,250,.94)),
+        radial-gradient(circle at 84% 16%, rgba(19,169,164,.26), transparent 34%);
+}
+
+.clinic-hero::before{
+    content:"";
+    position:absolute;
+    inset:auto -12% -36% 42%;
+    height:280px;
+    background:linear-gradient(90deg, rgba(19,169,164,.16), rgba(39,101,232,.18), rgba(242,154,177,.16));
+    filter:blur(18px);
+    transform:rotate(-7deg);
+    pointer-events:none;
+}
+
+.clinic-hero > *{
+    position:relative;
+    z-index:1;
 }
 
 .clinic-hero h3{
-    margin:10px 0 12px;
-    max-width:820px;
-    font-size:clamp(28px, 3vw, 44px);
-    line-height:1.04;
+    margin:10px 0 14px;
+    max-width:780px;
+    font-size:clamp(31px, 3.2vw, 50px);
+    line-height:1.02;
     letter-spacing:0;
+    color:#102338;
 }
 
 .clinic-hero-copy{
-    max-width:780px;
+    max-width:760px;
     color:var(--muted);
     line-height:1.72;
     font-size:15px;
 }
 
-.clinic-primary-actions{
-    display:flex;
-    gap:12px;
-    flex-wrap:wrap;
+.clinic-focus-strip{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
     margin-top:22px;
 }
 
-.clinic-quick-flow{
-    margin-top:28px;
-    display:grid;
-    grid-template-columns:repeat(4,minmax(0,1fr));
-    gap:10px;
-}
-
-.clinic-flow-step{
-    min-height:94px;
-    padding:14px;
+.clinic-focus-item{
+    padding:13px;
+    border:1px solid rgba(129,170,188,.34);
     border-radius:16px;
-    border:1px solid rgba(129,170,188,.38);
-    background:rgba(255,255,255,.72);
+    background:rgba(255,255,255,.76);
 }
 
-.clinic-flow-step span{
-    display:inline-grid;
-    place-items:center;
-    width:28px;
-    height:28px;
-    margin-bottom:10px;
-    border-radius:999px;
-    background:linear-gradient(135deg, var(--primary), var(--primary-2));
-    color:#fff;
-    font-weight:800;
-    font-size:12px;
-}
-
-.clinic-flow-step strong{
+.clinic-focus-item span{
     display:block;
-    font-size:13px;
+    margin-bottom:7px;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+}
+
+.clinic-focus-item strong{
+    display:block;
+    color:#102338;
     line-height:1.35;
+}
+
+.clinic-action-deck{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+    margin-top:24px;
+}
+
+.clinic-action-card{
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    min-height:142px;
+    padding:17px;
+    border-radius:18px;
+    border:1px solid rgba(129,170,188,.38);
+    background:rgba(255,255,255,.84);
+    color:#102338;
+    text-decoration:none;
+    box-shadow:0 18px 44px rgba(35,72,105,.08);
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.clinic-action-card:hover{
+    transform:translateY(-3px);
+    border-color:rgba(19,169,164,.5);
+    box-shadow:0 22px 56px rgba(19,169,164,.14);
+}
+
+.clinic-action-icon{
+    width:42px;
+    height:42px;
+    display:grid;
+    place-items:center;
+    border-radius:15px;
+    background:linear-gradient(135deg, rgba(19,169,164,.18), rgba(39,101,232,.14));
+    color:#087875;
+    font-weight:900;
+}
+
+.clinic-action-card strong{
+    display:block;
+    margin-top:14px;
+    font-size:16px;
+}
+
+.clinic-action-card span{
+    display:block;
+    margin-top:7px;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.45;
 }
 
 .clinic-pulse-card{
@@ -89,11 +148,11 @@
     justify-content:space-between;
     min-height:100%;
     padding:22px;
-    border-radius:22px;
-    border:1px solid rgba(39,101,232,.18);
+    border-radius:24px;
+    border:1px solid rgba(118,239,211,.28);
     background:
-        linear-gradient(180deg, rgba(16,32,42,.94), rgba(12,45,58,.92)),
-        linear-gradient(135deg, rgba(19,169,164,.22), rgba(39,101,232,.22));
+        linear-gradient(180deg, rgba(13,31,42,.96), rgba(9,58,68,.92)),
+        linear-gradient(135deg, rgba(19,169,164,.28), rgba(39,101,232,.2));
     color:#fff;
     overflow:hidden;
     position:relative;
@@ -102,10 +161,22 @@
 .clinic-pulse-card::before{
     content:"";
     position:absolute;
-    inset:12px;
+    inset:14px;
     border:1px solid rgba(255,255,255,.12);
-    border-radius:18px;
+    border-radius:20px;
     pointer-events:none;
+}
+
+.clinic-pulse-card::after{
+    content:"";
+    position:absolute;
+    width:180px;
+    height:180px;
+    right:-60px;
+    top:-42px;
+    border-radius:999px;
+    border:1px solid rgba(118,239,211,.35);
+    box-shadow:0 0 46px rgba(118,239,211,.22);
 }
 
 .clinic-pulse-card .erp-kpi-label,
@@ -113,36 +184,82 @@
     color:rgba(235,246,255,.72);
 }
 
+.clinic-orbit-wrap{
+    position:relative;
+    width:160px;
+    height:160px;
+    margin:16px auto 18px;
+}
+
 .clinic-ai-orbit{
-    width:150px;
-    aspect-ratio:1;
-    margin:10px auto 18px;
+    position:absolute;
+    inset:0;
     border-radius:999px;
     border:1px solid rgba(118,239,211,.38);
     background:
-        radial-gradient(circle, rgba(118,239,211,.42) 0 9%, transparent 10% 100%),
+        radial-gradient(circle, rgba(118,239,211,.42) 0 8%, transparent 9% 100%),
         conic-gradient(from 80deg, rgba(118,239,211,.76), rgba(39,101,232,.18), rgba(242,154,177,.44), rgba(118,239,211,.76));
     box-shadow:0 0 44px rgba(19,169,164,.28);
     animation:clinicOrbit 9s linear infinite;
 }
 
-.clinic-ai-score{
-    position:relative;
-    z-index:1;
+.clinic-orbit-core{
+    position:absolute;
+    inset:34px;
+    display:grid;
+    place-items:center;
+    border-radius:999px;
+    background:rgba(9,30,42,.9);
+    border:1px solid rgba(255,255,255,.14);
     text-align:center;
 }
 
-.clinic-ai-score strong{
+.clinic-orbit-core strong{
     display:block;
     font-size:42px;
     line-height:1;
 }
 
+.clinic-orbit-core span{
+    display:block;
+    margin-top:4px;
+    font-size:11px;
+    color:rgba(235,246,255,.72);
+    text-transform:uppercase;
+    letter-spacing:.1em;
+}
+
+.clinic-next-step{
+    position:relative;
+    z-index:1;
+    padding:14px;
+    border-radius:18px;
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12);
+}
+
+.clinic-next-step strong{
+    display:block;
+    margin:6px 0;
+}
+
+.clinic-metric-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:14px;
+}
+
 .clinic-kpi{
-    min-height:150px;
+    min-height:144px;
     display:flex;
     flex-direction:column;
     justify-content:space-between;
+    transition:transform .18s ease, box-shadow .18s ease;
+}
+
+.clinic-kpi:hover{
+    transform:translateY(-2px);
+    box-shadow:0 18px 48px rgba(35,72,105,.12);
 }
 
 .clinic-kpi-top{
@@ -153,45 +270,32 @@
 }
 
 .clinic-kpi-icon{
-    width:38px;
-    height:38px;
+    min-width:40px;
+    height:40px;
     border-radius:14px;
     display:grid;
     place-items:center;
     background:rgba(19,169,164,.12);
     color:var(--primary);
     font-weight:900;
+    font-size:12px;
 }
 
-.clinic-automation-grid{
+.clinic-status-board{
     display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:14px;
-}
-
-.clinic-automation-card{
-    padding:18px;
-    border:1px solid var(--line);
-    border-radius:18px;
-    background:rgba(255,255,255,.72);
-}
-
-.clinic-automation-card strong{
-    display:block;
-    margin:12px 0 8px;
-    font-size:16px;
+    grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);
+    gap:18px;
 }
 
 .clinic-status-lane{
     display:grid;
-    grid-template-columns:repeat(4,minmax(0,1fr));
+    grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;
-    margin-top:14px;
 }
 
 .clinic-status-item{
-    padding:14px;
-    border-radius:14px;
+    padding:15px;
+    border-radius:16px;
     border:1px solid var(--line);
     background:#fff;
 }
@@ -206,13 +310,54 @@
 }
 
 .clinic-status-item strong{
-    font-size:24px;
+    font-size:26px;
+}
+
+.clinic-automation-grid{
+    display:grid;
+    gap:10px;
+}
+
+.clinic-automation-card{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:12px;
+    align-items:center;
+    padding:14px;
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:rgba(255,255,255,.74);
+}
+
+.clinic-automation-dot{
+    width:12px;
+    height:12px;
+    border-radius:999px;
+    background:#13a9a4;
+    box-shadow:0 0 0 7px rgba(19,169,164,.1);
+}
+
+.clinic-automation-card strong{
+    display:block;
+    color:#102338;
+}
+
+.clinic-automation-card p{
+    margin:4px 0 0;
 }
 
 .clinic-worklist{
     display:grid;
-    grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);
+    grid-template-columns:minmax(0,1.12fr) minmax(320px,.88fr);
     gap:18px;
+}
+
+.clinic-section-head{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    align-items:center;
+    margin-bottom:14px;
 }
 
 .clinic-timeline{
@@ -223,17 +368,23 @@
 
 .clinic-timeline-item{
     display:grid;
-    grid-template-columns:110px minmax(0,1fr) auto;
+    grid-template-columns:92px minmax(0,1fr) auto;
     gap:14px;
     align-items:center;
     padding:14px;
     border:1px solid var(--line);
     border-radius:16px;
     background:#fff;
+    transition:transform .18s ease, border-color .18s ease;
+}
+
+.clinic-timeline-item:hover{
+    transform:translateX(3px);
+    border-color:rgba(19,169,164,.42);
 }
 
 .clinic-time{
-    font-weight:800;
+    font-weight:900;
     color:#0f2d56;
     font-variant-numeric:tabular-nums;
 }
@@ -258,14 +409,13 @@
 }
 
 @media (max-width: 1180px){
-    .clinic-command,
     .clinic-hero,
+    .clinic-status-board,
     .clinic-worklist{
         grid-template-columns:1fr;
     }
-    .clinic-automation-grid,
-    .clinic-quick-flow,
-    .clinic-status-lane{
+    .clinic-metric-grid,
+    .clinic-action-deck{
         grid-template-columns:repeat(2,minmax(0,1fr));
     }
 }
@@ -275,17 +425,14 @@
         min-height:auto;
         padding:18px;
     }
-    .clinic-primary-actions,
-    .clinic-automation-grid,
-    .clinic-quick-flow,
+    .clinic-focus-strip,
+    .clinic-action-deck,
+    .clinic-metric-grid,
     .clinic-status-lane{
         grid-template-columns:1fr;
     }
-    .clinic-quick-flow,
-    .clinic-status-lane{
-        display:grid;
-    }
-    .clinic-timeline-item{
+    .clinic-timeline-item,
+    .clinic-automation-card{
         grid-template-columns:1fr;
         align-items:start;
     }
@@ -298,99 +445,148 @@
     <article class="erp-card clinic-hero">
         <div>
             <div class="erp-kpi-label">{{ config.especialidad_principal }}</div>
-            <h3>Operacion clinica automatizada desde una sola pantalla.</h3>
-            <p class="clinic-hero-copy">El equipo puede iniciar preconsulta, agendar, abrir expediente, crear tratamiento y dejar seguimiento postoperatorio sin saltar entre procesos. La pantalla propone el siguiente paso para que recepcion y medico trabajen con menos friccion.</p>
-            <div class="clinic-primary-actions">
-                <a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Iniciar flujo de paciente</a>
-                <a class="erp-btn-secondary" href="{% url 'clinica_crear_cita' empresa.slug %}">Agendar rapido</a>
-                <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento' empresa.slug %}">Registrar evento</a>
+            <h3>Todo el dia clinico, ordenado por prioridad.</h3>
+            <p class="clinic-hero-copy">Recepcion ve que hacer ahora. El medico entra al expediente correcto. Administracion entiende la agenda sin pedir reportes. Esta pantalla conecta paciente, cita, tratamiento y seguimiento en un solo flujo.</p>
+
+            <div class="clinic-focus-strip">
+                <div class="clinic-focus-item"><span>Ahora</span><strong>{{ resumen.citas_hoy }} cita(s) para atender hoy</strong></div>
+                <div class="clinic-focus-item"><span>Prioridad</span><strong>{{ resumen.seguimientos_pendientes }} seguimiento(s) por revisar</strong></div>
+                <div class="clinic-focus-item"><span>Proceso</span><strong>{{ resumen.tratamientos_activos }} tratamiento(s) activos</strong></div>
             </div>
-            <div class="clinic-quick-flow" aria-label="Flujo clinico recomendado">
-                <div class="clinic-flow-step"><span>1</span><strong>Paciente y datos criticos</strong></div>
-                <div class="clinic-flow-step"><span>2</span><strong>Cita, sala y profesional</strong></div>
-                <div class="clinic-flow-step"><span>3</span><strong>Tratamiento y expediente</strong></div>
-                <div class="clinic-flow-step"><span>4</span><strong>Control postoperatorio</strong></div>
+
+            <div class="clinic-action-deck" aria-label="Acciones rapidas clinicas">
+                <a class="clinic-action-card" href="{% url 'clinica_crear_paciente' empresa.slug %}">
+                    <div class="clinic-action-icon">01</div>
+                    <div>
+                        <strong>Nuevo paciente</strong>
+                        <span>Crear expediente con datos criticos, foto, contacto y alertas.</span>
+                    </div>
+                </a>
+                <a class="clinic-action-card" href="{% url 'clinica_crear_cita' empresa.slug %}">
+                    <div class="clinic-action-icon">02</div>
+                    <div>
+                        <strong>Agendar cita</strong>
+                        <span>Registrar motivo, servicio, profesional y estado de atencion.</span>
+                    </div>
+                </a>
+                <a class="clinic-action-card" href="{% url 'clinica_crear_evento' empresa.slug %}">
+                    <div class="clinic-action-icon">03</div>
+                    <div>
+                        <strong>Nota clinica</strong>
+                        <span>Agregar diagnostico, evolucion, plan o indicacion al expediente.</span>
+                    </div>
+                </a>
             </div>
         </div>
+
         <aside class="clinic-pulse-card">
             <div>
-                <div class="erp-kpi-label">Asistente clinico</div>
-                <div class="clinic-ai-orbit" aria-hidden="true"></div>
-                <div class="clinic-ai-score">
-                    <strong>{{ resumen.citas_hoy }}</strong>
-                    <p class="erp-card-muted">citas requieren foco hoy</p>
+                <div class="erp-kpi-label">Centro de mando</div>
+                <div class="clinic-orbit-wrap" aria-hidden="true">
+                    <div class="clinic-ai-orbit"></div>
+                    <div class="clinic-orbit-core"><strong>{{ resumen.citas_hoy }}</strong><span>Hoy</span></div>
                 </div>
             </div>
-            <a class="erp-btn" href="{% url 'clinica_citas' empresa.slug %}">Ver cola del dia</a>
+            <div class="clinic-next-step">
+                <div class="erp-kpi-label">Siguiente accion sugerida</div>
+                {% if resumen.citas_hoy %}
+                <strong>Revisar cola del dia</strong>
+                <p class="erp-card-muted">Confirma llegada, abre expediente y registra la atencion.</p>
+                <a class="erp-btn" href="{% url 'clinica_citas' empresa.slug %}">Ver cola</a>
+                {% elif resumen.seguimientos_pendientes %}
+                <strong>Atender seguimientos</strong>
+                <p class="erp-card-muted">Hay controles pendientes que necesitan revision.</p>
+                <a class="erp-btn" href="{% url 'clinica_tratamientos' empresa.slug %}">Ver tratamientos</a>
+                {% else %}
+                <strong>Capturar nuevo paciente</strong>
+                <p class="erp-card-muted">La agenda esta estable. Puedes preparar el siguiente expediente.</p>
+                <a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Crear paciente</a>
+                {% endif %}
+            </div>
         </aside>
     </article>
 </section>
 
-<section class="erp-grid">
+<section class="clinic-metric-grid">
     <article class="erp-card clinic-kpi">
         <div class="clinic-kpi-top">
             <div><div class="erp-kpi-label">Pacientes activos</div><div class="erp-stat-value">{{ resumen.pacientes }}</div></div>
             <div class="clinic-kpi-icon">PX</div>
         </div>
-        <p class="erp-card-muted">Expedientes listos para atencion y seguimiento.</p>
+        <p class="erp-card-muted">Expedientes disponibles para atencion, ventas medicas y seguimiento.</p>
     </article>
     <article class="erp-card clinic-kpi">
         <div class="clinic-kpi-top">
             <div><div class="erp-kpi-label">Citas de hoy</div><div class="erp-stat-value">{{ resumen.citas_hoy }}</div></div>
             <div class="clinic-kpi-icon">HOY</div>
         </div>
-        <p class="erp-card-muted">Recepcion, consulta, control o procedimiento.</p>
+        <p class="erp-card-muted">Lo que recepcion y equipo medico deben atender primero.</p>
     </article>
     <article class="erp-card clinic-kpi">
         <div class="clinic-kpi-top">
             <div><div class="erp-kpi-label">Tratamientos activos</div><div class="erp-stat-value">{{ resumen.tratamientos_activos }}</div></div>
             <div class="clinic-kpi-icon">TR</div>
         </div>
-        <p class="erp-card-muted">Procesos clinicos abiertos o planificados.</p>
+        <p class="erp-card-muted">Procedimientos abiertos, planificados o en proceso.</p>
     </article>
     <article class="erp-card clinic-kpi">
         <div class="clinic-kpi-top">
-            <div><div class="erp-kpi-label">Seguimientos pendientes</div><div class="erp-stat-value">{{ resumen.seguimientos_pendientes }}</div></div>
-            <div class="clinic-kpi-icon">QA</div>
+            <div><div class="erp-kpi-label">Actividad del mes</div><div class="erp-stat-value">{{ resumen.eventos_mes }}</div></div>
+            <div class="clinic-kpi-icon">LOG</div>
         </div>
-        <p class="erp-card-muted">Controles proximos o con revision requerida.</p>
+        <p class="erp-card-muted">Notas, evoluciones y movimientos registrados en expedientes.</p>
     </article>
 </section>
 
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <div class="erp-kpi-label">Automatizacion recomendada</div>
-            <h3 class="erp-panel-title" style="margin:6px 0 0;">El sistema te dice que hacer despues</h3>
+<section class="clinic-status-board">
+    <article class="erp-card">
+        <div class="clinic-section-head">
+            <div>
+                <div class="erp-kpi-label">Agenda del mes</div>
+                <h3 class="erp-panel-title" style="margin:6px 0 0;">Estados operativos</h3>
+            </div>
+            <a class="erp-action-link" href="{% url 'clinica_citas' empresa.slug %}">Ver agenda</a>
         </div>
-        <a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>
-    </div>
-    <div class="clinic-automation-grid">
-        {% for item in automatizaciones %}
-        <article class="clinic-automation-card">
-            {% if item.estado == "Activa" or item.estado == "Lista" or item.estado == "Listo" %}
-            <span class="erp-badge success">{{ item.estado }}</span>
-            {% else %}
-            <span class="erp-badge warning">{{ item.estado }}</span>
-            {% endif %}
-            <strong>{{ item.titulo }}</strong>
-            <p class="erp-card-muted">{{ item.detalle }}</p>
-        </article>
-        {% endfor %}
-    </div>
-    <div class="clinic-status-lane">
-        <div class="clinic-status-item"><span>Solicitadas</span><strong>{{ agenda_estado.solicitadas }}</strong></div>
-        <div class="clinic-status-item"><span>Confirmadas</span><strong>{{ agenda_estado.confirmadas }}</strong></div>
-        <div class="clinic-status-item"><span>En atencion</span><strong>{{ agenda_estado.en_atencion }}</strong></div>
-        <div class="clinic-status-item"><span>Completadas</span><strong>{{ agenda_estado.completadas }}</strong></div>
-    </div>
+        <div class="clinic-status-lane">
+            <div class="clinic-status-item"><span>Solicitadas</span><strong>{{ agenda_estado.solicitadas }}</strong></div>
+            <div class="clinic-status-item"><span>Confirmadas</span><strong>{{ agenda_estado.confirmadas }}</strong></div>
+            <div class="clinic-status-item"><span>En atencion</span><strong>{{ agenda_estado.en_atencion }}</strong></div>
+            <div class="clinic-status-item"><span>Completadas</span><strong>{{ agenda_estado.completadas }}</strong></div>
+        </div>
+    </article>
+
+    <article class="erp-card">
+        <div class="clinic-section-head">
+            <div>
+                <div class="erp-kpi-label">Automatizaciones</div>
+                <h3 class="erp-panel-title" style="margin:6px 0 0;">Alertas que guian al equipo</h3>
+            </div>
+            <a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>
+        </div>
+        <div class="clinic-automation-grid">
+            {% for item in automatizaciones %}
+            <article class="clinic-automation-card">
+                <span class="clinic-automation-dot"></span>
+                <div>
+                    <strong>{{ item.titulo }}</strong>
+                    <p class="erp-card-muted">{{ item.detalle }}</p>
+                </div>
+                {% if item.estado == "Activa" or item.estado == "Lista" or item.estado == "Listo" %}
+                <span class="erp-badge success">{{ item.estado }}</span>
+                {% else %}
+                <span class="erp-badge warning">{{ item.estado }}</span>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+    </article>
 </section>
 
 <section class="clinic-worklist">
     <article class="erp-card">
-        <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:14px;">
+        <div class="clinic-section-head">
             <div>
-                <div class="erp-kpi-label">Cola inteligente</div>
+                <div class="erp-kpi-label">Cola de trabajo</div>
                 <h3 class="erp-panel-title" style="margin:6px 0 0;">Proximas citas</h3>
             </div>
             <a class="erp-action-link" href="{% url 'clinica_citas' empresa.slug %}">Ver agenda</a>
@@ -422,8 +618,13 @@
     </article>
 
     <article class="erp-card">
-        <div class="erp-kpi-label">Trazabilidad</div>
-        <h3 class="erp-panel-title" style="margin-top:6px;">Ultima actividad clinica</h3>
+        <div class="clinic-section-head">
+            <div>
+                <div class="erp-kpi-label">Expediente vivo</div>
+                <h3 class="erp-panel-title" style="margin:6px 0 0;">Ultima actividad clinica</h3>
+            </div>
+            <a class="erp-action-link" href="{% url 'clinica_crear_evento' empresa.slug %}">Registrar nota</a>
+        </div>
         {% for evento in ultimos_eventos %}
         <div class="clinic-event">
             <div class="erp-kpi-label">{{ evento.get_tipo_display }} - {{ evento.fecha|date:"d/m/Y H:i" }}</div>
