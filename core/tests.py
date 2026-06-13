@@ -13,7 +13,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RolSistema, SolicitudComercial, Usuario
-from core.models import PagoLicenciaEmpresa, RespaldoEmpresa
+from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenRespaldoEmpresa
+from core.backup_tokens import hash_token_respaldo
 from core.forms import EmpresaControlForm
 
 
@@ -166,6 +167,126 @@ class SuperAdminControlTests(TestCase):
             self.assertGreater(registro.registros_incluidos, 0)
             self.assertEqual(registro.archivos_incluidos, 1)
             self.assertEqual(len(registro.sha256), 64)
+
+    def test_superadmin_emite_token_sin_guardar_el_codigo_visible(self):
+        empresa = Empresa.objects.create(nombre="Empresa Token", slug="empresa-token", rtn="08011999000058")
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_empresa_generar_token_respaldo", args=[empresa.id]),
+            {"horas_vigencia": "24", "referencia_pago": "TRX-45821"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        token = TokenRespaldoEmpresa.objects.get()
+        self.assertEqual(len(token.token_hash), 64)
+        self.assertNotContains(response, token.token_hash)
+        self.assertContains(response, "DVS-RSP-")
+        self.assertEqual(token.referencia_pago, "TRX-45821")
+
+    def test_nuevo_token_revoca_autorizacion_anterior_sin_usar(self):
+        empresa = Empresa.objects.create(nombre="Empresa Renovacion", slug="empresa-renovacion", rtn="08011999000063")
+        anterior = TokenRespaldoEmpresa.objects.create(
+            empresa=empresa,
+            token_hash=hash_token_respaldo("DVS-RSP-anterior"),
+            token_preview="DVS-RSP-ante...rior",
+            creado_por=self.superadmin,
+            fecha_expiracion=timezone.now() + timedelta(hours=24),
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_empresa_generar_token_respaldo", args=[empresa.id]),
+            {"horas_vigencia": "48"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        anterior.refresh_from_db()
+        self.assertTrue(anterior.revocado)
+        self.assertIsNotNone(anterior.fecha_revocacion)
+        self.assertEqual(TokenRespaldoEmpresa.objects.filter(empresa=empresa).count(), 2)
+
+    def test_administrador_empresa_descarga_respaldo_con_token_una_sola_vez(self):
+        empresa = Empresa.objects.create(nombre="Empresa Cliente", slug="empresa-cliente", rtn="08011999000059")
+        administrador = Usuario.objects.create_user(
+            username="admin-cliente",
+            password="pass12345",
+            empresa=empresa,
+            es_administrador_empresa=True,
+        )
+        token_raw = "DVS-RSP-token-prueba-seguro"
+        autorizacion = TokenRespaldoEmpresa.objects.create(
+            empresa=empresa,
+            token_hash=hash_token_respaldo(token_raw),
+            token_preview="DVS-RSP-toke...guro",
+            creado_por=self.superadmin,
+            fecha_expiracion=timezone.now() + timedelta(hours=24),
+        )
+        self.client.force_login(administrador)
+
+        page_response = self.client.get(reverse("empresa_respaldo", args=[empresa.slug]))
+        self.assertEqual(page_response.status_code, 200)
+        self.assertContains(page_response, "Mi respaldo empresarial")
+
+        response = self.client.post(
+            reverse("empresa_respaldo", args=[empresa.slug]),
+            {"token_respaldo": token_raw},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        b"".join(response.streaming_content)
+        autorizacion.refresh_from_db()
+        self.assertIsNotNone(autorizacion.fecha_uso)
+        self.assertEqual(autorizacion.usado_por, administrador)
+        self.assertEqual(RespaldoEmpresa.objects.filter(empresa=empresa, estado="exitoso").count(), 1)
+
+        segundo_intento = self.client.post(
+            reverse("empresa_respaldo", args=[empresa.slug]),
+            {"token_respaldo": token_raw},
+        )
+        self.assertRedirects(segundo_intento, reverse("empresa_respaldo", args=[empresa.slug]))
+        self.assertEqual(RespaldoEmpresa.objects.filter(empresa=empresa, estado="exitoso").count(), 1)
+
+    def test_token_respaldo_no_funciona_para_otra_empresa(self):
+        empresa = Empresa.objects.create(nombre="Empresa A", slug="empresa-a", rtn="08011999000060")
+        otra_empresa = Empresa.objects.create(nombre="Empresa B", slug="empresa-b", rtn="08011999000061")
+        administrador = Usuario.objects.create_user(
+            username="admin-b",
+            password="pass12345",
+            empresa=otra_empresa,
+            es_administrador_empresa=True,
+        )
+        token_raw = "DVS-RSP-token-empresa-a"
+        TokenRespaldoEmpresa.objects.create(
+            empresa=empresa,
+            token_hash=hash_token_respaldo(token_raw),
+            token_preview="DVS-RSP-toke...sa-a",
+            creado_por=self.superadmin,
+            fecha_expiracion=timezone.now() + timedelta(hours=24),
+        )
+        self.client.force_login(administrador)
+
+        response = self.client.post(
+            reverse("empresa_respaldo", args=[otra_empresa.slug]),
+            {"token_respaldo": token_raw},
+        )
+
+        self.assertRedirects(response, reverse("empresa_respaldo", args=[otra_empresa.slug]))
+        self.assertEqual(RespaldoEmpresa.objects.count(), 0)
+
+    def test_usuario_empresa_sin_permiso_no_puede_ver_respaldos(self):
+        empresa = Empresa.objects.create(nombre="Empresa Operador", slug="empresa-operador", rtn="08011999000062")
+        operador = Usuario.objects.create_user(
+            username="operador-empresa",
+            password="pass12345",
+            empresa=empresa,
+        )
+        self.client.force_login(operador)
+
+        response = self.client.get(reverse("empresa_respaldo", args=[empresa.slug]))
+
+        self.assertRedirects(response, reverse("dashboard", args=[empresa.slug]))
 
     def test_superadmin_puede_crear_empresa_con_modulo(self):
         self.client.login(username="master", password="pass12345")

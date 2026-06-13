@@ -13,11 +13,12 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.db.models import FileField
 from django.utils import timezone
 
-from .models import Empresa, RespaldoEmpresa
+from .models import Empresa, RespaldoEmpresa, TokenRespaldoEmpresa
 
 
 BACKUP_FORMAT_VERSION = "1.0"
 EXCLUDED_REVERSE_APPS = {"admin", "sessions"}
+EXCLUDED_BACKUP_MODELS = (RespaldoEmpresa, TokenRespaldoEmpresa)
 
 
 def _key(obj):
@@ -33,7 +34,7 @@ def _empresa_fields(model):
 
 
 def _add_object(obj, objects, queue):
-    if obj is None or obj.pk is None or isinstance(obj, RespaldoEmpresa):
+    if obj is None or obj.pk is None or isinstance(obj, EXCLUDED_BACKUP_MODELS):
         return False
     key = _key(obj)
     if key in objects:
@@ -49,7 +50,7 @@ def _collect_owned_objects(empresa):
     _add_object(empresa, objects, queue)
 
     for model in apps.get_models():
-        if model is RespaldoEmpresa or model._meta.proxy or not model._meta.managed:
+        if model in EXCLUDED_BACKUP_MODELS or model._meta.proxy or not model._meta.managed:
             continue
         for field in _empresa_fields(model):
             for obj in model._default_manager.filter(**{field.name: empresa}).iterator():
@@ -65,7 +66,7 @@ def _collect_owned_objects(empresa):
             related_model = relation.related_model
             if (
                 related_model is None
-                or related_model is RespaldoEmpresa
+                or related_model in EXCLUDED_BACKUP_MODELS
                 or related_model._meta.app_label in EXCLUDED_REVERSE_APPS
             ):
                 continue

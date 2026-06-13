@@ -591,6 +591,58 @@ class RespaldoEmpresa(models.Model):
 
     def __str__(self):
         return f"{self.empresa.nombre} - {self.fecha_creacion:%d/%m/%Y %H:%M}"
+
+
+class TokenRespaldoEmpresa(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="tokens_respaldo",
+    )
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    token_preview = models.CharField(max_length=24)
+    creado_por = models.ForeignKey(
+        "core.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tokens_respaldo_creados",
+    )
+    usado_por = models.ForeignKey(
+        "core.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tokens_respaldo_usados",
+    )
+    referencia_pago = models.CharField(max_length=160, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_expiracion = models.DateTimeField()
+    fecha_uso = models.DateTimeField(blank=True, null=True)
+    revocado = models.BooleanField(default=False)
+    fecha_revocacion = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion", "-id"]
+        verbose_name = "Token de respaldo empresarial"
+        verbose_name_plural = "Tokens de respaldo empresarial"
+
+    @property
+    def vigente(self):
+        return not self.revocado and self.fecha_uso is None and self.fecha_expiracion > timezone.now()
+
+    @property
+    def estado_display(self):
+        if self.revocado:
+            return "Revocado"
+        if self.fecha_uso:
+            return "Utilizado"
+        if self.fecha_expiracion <= timezone.now():
+            return "Vencido"
+        return "Disponible"
+
+    def __str__(self):
+        return f"{self.empresa.nombre} - {self.token_preview}"
     
 # ============================================
 # PAGOS - CUENTAS POR COBRAR

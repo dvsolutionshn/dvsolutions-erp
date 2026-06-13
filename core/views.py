@@ -9,7 +9,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.core.mail import send_mail
-from django.db import OperationalError
+from django.db import OperationalError, transaction
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -19,6 +19,7 @@ from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
 from .backup_service import generar_respaldo_empresa
+from .backup_tokens import generar_token_respaldo, hash_token_respaldo
 from .forms import (
     EmpresaControlForm,
     PagoLicenciaEmpresaForm,
@@ -31,7 +32,16 @@ from .forms import (
 )
 from .models import Empresa
 from .models import EmpresaModulo
-from .models import PagoLicenciaEmpresa, PlanComercial, PlanModulo, RespaldoEmpresa, RolSistema, SolicitudComercial, Usuario
+from .models import (
+    PagoLicenciaEmpresa,
+    PlanComercial,
+    PlanModulo,
+    RespaldoEmpresa,
+    RolSistema,
+    SolicitudComercial,
+    TokenRespaldoEmpresa,
+    Usuario,
+)
 
 
 HOST_LOCAL_PATTERNS = {
@@ -42,6 +52,8 @@ HOST_LOCAL_PATTERNS = {
 logger = logging.getLogger(__name__)
 SESSION_EXPIRED_MESSAGE_KEY = "dvsolutions_session_expired_message"
 SESSION_EXPIRED_MESSAGE = "Vuelve a iniciar sesion para continuar."
+BACKUP_TOKEN_MAX_ATTEMPTS = 5
+BACKUP_TOKEN_WINDOW_SECONDS = 15 * 60
 
 
 def _public_demo_catalog():
@@ -248,6 +260,25 @@ def _register_login_failure(scope, request):
 
 def _clear_login_failures(scope, request):
     cache.delete(_login_throttle_key(scope, request))
+
+
+def _backup_token_throttle_key(empresa, request):
+    return f"backup-token:{empresa.pk}:{_client_ip(request)}"
+
+
+def _backup_token_attempts(empresa, request):
+    return cache.get(_backup_token_throttle_key(empresa, request), 0)
+
+
+def _register_backup_token_failure(empresa, request):
+    key = _backup_token_throttle_key(empresa, request)
+    attempts = cache.get(key, 0) + 1
+    cache.set(key, attempts, timeout=BACKUP_TOKEN_WINDOW_SECONDS)
+    return attempts
+
+
+def _clear_backup_token_failures(empresa, request):
+    cache.delete(_backup_token_throttle_key(empresa, request))
 
 
 def _host_sin_puerto(request):
@@ -531,6 +562,121 @@ def dashboard(request, slug=None):
     })
 
 
+def empresa_respaldo(request, slug=None):
+    empresa = _resolver_empresa_request(request, slug)
+
+    if not request.user.is_authenticated:
+        return _redirect_login_empresa(request, empresa)
+    if not request.user.is_superuser and request.user.empresa != empresa:
+        return _redirect_login_empresa(request, empresa)
+    if not request.user.is_superuser and not request.user.es_administrador_empresa:
+        messages.error(request, "Solo el administrador de la empresa puede descargar respaldos.")
+        return _redirect_dashboard_empresa(request, empresa)
+    if not request.user.is_superuser and not empresa.licencia_operativa:
+        messages.error(
+            request,
+            "La licencia comercial no se encuentra operativa. Contactate con el administrador de DV Solutions.",
+        )
+        return _redirect_dashboard_empresa(request, empresa)
+
+    if request.method == "POST":
+        if _backup_token_attempts(empresa, request) >= BACKUP_TOKEN_MAX_ATTEMPTS:
+            messages.error(
+                request,
+                "Se alcanzó el limite de intentos. Espera 15 minutos antes de probar otro codigo.",
+            )
+            return redirect("empresa_respaldo", slug=empresa.slug)
+
+        token_raw = (request.POST.get("token_respaldo") or "").strip()
+        token_hash = hash_token_respaldo(token_raw)
+
+        try:
+            with transaction.atomic():
+                autorizacion = (
+                    TokenRespaldoEmpresa.objects.select_for_update()
+                    .filter(
+                        empresa=empresa,
+                        token_hash=token_hash,
+                        revocado=False,
+                        fecha_uso__isnull=True,
+                        fecha_expiracion__gt=timezone.now(),
+                    )
+                    .first()
+                )
+                if not autorizacion:
+                    _register_backup_token_failure(empresa, request)
+                    messages.error(
+                        request,
+                        "El codigo no es valido, ya fue utilizado o ha vencido.",
+                    )
+                    return redirect("empresa_respaldo", slug=empresa.slug)
+
+                registro = RespaldoEmpresa.objects.create(
+                    empresa=empresa,
+                    generado_por=request.user,
+                    estado="generando",
+                )
+                try:
+                    resultado = generar_respaldo_empresa(empresa)
+                except Exception as exc:
+                    logger.exception("No se pudo generar el respaldo autorizado de la empresa %s", empresa.pk)
+                    registro.estado = "fallido"
+                    registro.detalle_error = str(exc)[:4000]
+                    registro.fecha_finalizacion = timezone.now()
+                    registro.save(update_fields=["estado", "detalle_error", "fecha_finalizacion"])
+                    messages.error(
+                        request,
+                        "No se pudo preparar el respaldo. El codigo sigue disponible para volver a intentarlo.",
+                    )
+                    return redirect("empresa_respaldo", slug=empresa.slug)
+
+                registro.estado = "exitoso"
+                registro.nombre_archivo = resultado["nombre"]
+                registro.registros_incluidos = resultado["registros"]
+                registro.archivos_incluidos = resultado["archivos"]
+                registro.tamano_bytes = resultado["tamano_bytes"]
+                registro.sha256 = resultado["sha256"]
+                registro.fecha_finalizacion = timezone.now()
+                registro.save(
+                    update_fields=[
+                        "estado",
+                        "nombre_archivo",
+                        "registros_incluidos",
+                        "archivos_incluidos",
+                        "tamano_bytes",
+                        "sha256",
+                        "fecha_finalizacion",
+                    ]
+                )
+
+                autorizacion.fecha_uso = timezone.now()
+                autorizacion.usado_por = request.user
+                autorizacion.save(update_fields=["fecha_uso", "usado_por"])
+                _clear_backup_token_failures(empresa, request)
+        except Exception:
+            logger.exception("Fallo inesperado al validar el token de respaldo de la empresa %s", empresa.pk)
+            messages.error(request, "No fue posible validar el codigo en este momento.")
+            return redirect("empresa_respaldo", slug=empresa.slug)
+
+        response = FileResponse(
+            resultado["archivo"],
+            as_attachment=True,
+            filename=resultado["nombre"],
+            content_type="application/zip",
+        )
+        response["X-DVSolutions-Backup-SHA256"] = resultado["sha256"]
+        return response
+
+    return render(
+        request,
+        "core/empresa_respaldo.html",
+        {
+            "empresa": empresa,
+            "respaldos_empresa": empresa.respaldos.filter(estado="exitoso").select_related("generado_por")[:10],
+        },
+    )
+
+
 @login_required
 @require_POST
 def asistente_consulta(request, slug=None):
@@ -755,6 +901,7 @@ def superadmin_empresa_detail(request, empresa_id):
         "matriz_modulos": matriz_modulos,
         "pagos_licencia": empresa.pagos_licencia.select_related("plan_comercial"),
         "respaldos_empresa": empresa.respaldos.select_related("generado_por")[:8],
+        "tokens_respaldo": empresa.tokens_respaldo.select_related("creado_por", "usado_por")[:8],
     }
     return render(request, "core/superadmin_empresa_detalle.html", context)
 
@@ -767,6 +914,9 @@ def superadmin_respaldos(request):
         **_superadmin_base_context(),
         "empresas": empresas,
         "respaldos": respaldos,
+        "tokens_respaldo": TokenRespaldoEmpresa.objects.select_related(
+            "empresa", "creado_por", "usado_por"
+        )[:100],
         "resumen": {
             "total": RespaldoEmpresa.objects.count(),
             "exitosos": RespaldoEmpresa.objects.filter(estado="exitoso").count(),
@@ -778,6 +928,45 @@ def superadmin_respaldos(request):
         },
     }
     return render(request, "core/superadmin_respaldos.html", context)
+
+
+@superadmin_required
+@require_POST
+def superadmin_empresa_generar_token_respaldo(request, empresa_id):
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    try:
+        horas_vigencia = int(request.POST.get("horas_vigencia") or 24)
+    except (TypeError, ValueError):
+        horas_vigencia = 24
+    horas_vigencia = min(max(horas_vigencia, 1), 168)
+    referencia_pago = (request.POST.get("referencia_pago") or "").strip()[:160]
+    ahora = timezone.now()
+
+    token_raw, token_hash, token_preview = generar_token_respaldo()
+    with transaction.atomic():
+        empresa.tokens_respaldo.filter(
+            revocado=False,
+            fecha_uso__isnull=True,
+        ).update(revocado=True, fecha_revocacion=ahora)
+        autorizacion = TokenRespaldoEmpresa.objects.create(
+            empresa=empresa,
+            token_hash=token_hash,
+            token_preview=token_preview,
+            creado_por=request.user,
+            referencia_pago=referencia_pago,
+            fecha_expiracion=ahora + timezone.timedelta(hours=horas_vigencia),
+        )
+
+    return render(
+        request,
+        "core/superadmin_respaldo_token.html",
+        {
+            **_superadmin_base_context(),
+            "empresa_obj": empresa,
+            "token_respaldo": token_raw,
+            "autorizacion": autorizacion,
+        },
+    )
 
 
 @superadmin_required

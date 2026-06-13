@@ -1,0 +1,85 @@
+{% extends 'core/erp_base.html' %}
+
+{% block title %}Mi respaldo{% endblock %}
+{% block header_kicker %}Proteccion de informacion{% endblock %}
+{% block header_title %}Mi respaldo empresarial{% endblock %}
+{% block header_description %}Descarga una copia privada de los datos y documentos pertenecientes a {{ empresa.nombre }}.{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cobertura</div>
+        <p class="erp-stat-value" style="font-size:26px;">Datos + archivos</p>
+        <p class="erp-card-muted">Incluye registros de la empresa, relaciones necesarias, documentos, imagenes y manifiesto de integridad.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Seguridad</div>
+        <p class="erp-stat-value" style="font-size:26px;">Codigo de un solo uso</p>
+        <p class="erp-card-muted">La autorizacion pertenece solamente a tu empresa, vence automaticamente y no puede reutilizarse.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Respaldos realizados</div>
+        <p class="erp-stat-value">{{ respaldos_empresa|length }}</p>
+        <p class="erp-card-muted">Ultimas descargas exitosas registradas para esta empresa.</p>
+    </article>
+</section>
+
+<section class="erp-form-card">
+    <h3>Descargar respaldo autorizado</h3>
+    <p>Solicita el codigo temporal al administrador de DV Solutions. Cuando la descarga finalice, el codigo quedara consumido automaticamente.</p>
+    <form method="post" class="erp-compact-form" style="margin-top:20px;">
+        {% csrf_token %}
+        <div class="erp-field">
+            <label for="token_respaldo">Codigo de autorizacion</label>
+            <input
+                id="token_respaldo"
+                name="token_respaldo"
+                type="password"
+                required
+                autocomplete="one-time-code"
+                placeholder="DVS-RSP-..."
+            >
+            <span class="erp-field-help">No compartas el codigo con otros usuarios. La preparacion puede tardar unos segundos segun el volumen de informacion.</span>
+        </div>
+        <div class="erp-form-actions">
+            <span class="erp-field-help">Guarda el ZIP en un disco cifrado y conserva una segunda copia fuera del equipo principal.</span>
+            <button type="submit" class="erp-btn">Validar y descargar ZIP</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Historial de descargas</h3>
+            <p class="erp-card-muted">Registro de respaldos exitosos preparados para {{ empresa.nombre }}.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Registros</th>
+                    <th>Archivos</th>
+                    <th>Tamano</th>
+                    <th>Integridad</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for respaldo in respaldos_empresa %}
+                <tr>
+                    <td>{{ respaldo.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                    <td>{{ respaldo.registros_incluidos }}</td>
+                    <td>{{ respaldo.archivos_incluidos }}</td>
+                    <td>{{ respaldo.tamano_bytes|filesizeformat }}</td>
+                    <td><code title="{{ respaldo.sha256 }}">{{ respaldo.sha256|slice:":12" }}...</code></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="erp-empty">Todavia no se ha descargado un respaldo autorizado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

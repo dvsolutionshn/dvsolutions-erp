@@ -16,6 +16,7 @@ from .views import (
     superadmin_empresa_registrar_pago_licencia,
     superadmin_empresa_suspender_licencia,
     superadmin_empresa_generar_respaldo,
+    superadmin_empresa_generar_token_respaldo,
     superadmin_login,
     superadmin_licencias,
     superadmin_modulos,
@@ -31,6 +32,7 @@ from .views import (
     superadmin_usuario_edit,
     superadmin_usuarios,
     asistente_consulta,
+    empresa_respaldo,
 )
 
 urlpatterns = [
@@ -46,6 +48,7 @@ urlpatterns = [
     path('control/empresas/<int:empresa_id>/licencia/pago/', superadmin_empresa_registrar_pago_licencia, name='superadmin_empresa_registrar_pago_licencia'),
     path('control/empresas/<int:empresa_id>/licencia/suspender/', superadmin_empresa_suspender_licencia, name='superadmin_empresa_suspender_licencia'),
     path('control/empresas/<int:empresa_id>/respaldo/', superadmin_empresa_generar_respaldo, name='superadmin_empresa_generar_respaldo'),
+    path('control/empresas/<int:empresa_id>/respaldo/token/', superadmin_empresa_generar_token_respaldo, name='superadmin_empresa_generar_token_respaldo'),
     path('control/respaldos/', superadmin_respaldos, name='superadmin_respaldos'),
     path('control/usuarios/', superadmin_usuarios, name='superadmin_usuarios'),
     path('control/usuarios/nuevo/', superadmin_usuario_create, name='superadmin_usuario_create'),
@@ -62,10 +65,12 @@ urlpatterns = [
     path('acceso/', public_access, name='public_access'),
     path('demo/<slug:demo_slug>/', public_demo_detail, name='public_demo_detail'),
     path('dashboard/asistente/consulta/', asistente_consulta, name='asistente_consulta_host'),
+    path('dashboard/respaldo/', empresa_respaldo, name='empresa_respaldo_host'),
     path('dashboard/', dashboard, name='dashboard_host'),
     path('logout/', cerrar_sesion, name='cerrar_sesion_host'),
     path('<slug:slug>/', empresa_login, name='empresa_login'),
     path('<slug:slug>/dashboard/asistente/consulta/', asistente_consulta, name='asistente_consulta'),
+    path('<slug:slug>/dashboard/respaldo/', empresa_respaldo, name='empresa_respaldo'),
     path('<slug:slug>/dashboard/', dashboard, name='dashboard'),
     path('<slug:slug>/logout/', cerrar_sesion, name='cerrar_sesion'),
 ]

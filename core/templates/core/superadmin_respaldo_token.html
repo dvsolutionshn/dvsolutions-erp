@@ -1,0 +1,53 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}Codigo de respaldo{% endblock %}
+{% block header_title %}Codigo temporal generado{% endblock %}
+{% block header_description %}Comparte este codigo exclusivamente con el administrador autorizado de {{ empresa_obj.nombre }}.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_empresa_detail' empresa_obj.id %}" class="erp-action-link">Volver a la empresa</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-shell">
+    <article class="erp-form-card">
+        <div class="erp-kpi-label">Autorizacion de un solo uso</div>
+        <h3>{{ empresa_obj.nombre }}</h3>
+        <p>Este es el unico momento en que DV Solutions muestra el codigo completo. La base de datos conserva solamente su huella criptografica.</p>
+
+        <div class="erp-soft-panel" style="margin-top:20px;">
+            <div class="erp-field">
+                <label for="tokenRespaldoGenerado">Codigo para el cliente</label>
+                <input id="tokenRespaldoGenerado" value="{{ token_respaldo }}" readonly style="font-family:monospace;font-size:18px;font-weight:700;">
+            </div>
+            <div class="erp-inline-actions" style="margin-top:14px;">
+                <button type="button" class="erp-btn" data-copy-token>Copiar codigo</button>
+                <span class="erp-field-help" data-copy-status>Vence el {{ autorizacion.fecha_expiracion|date:"d/m/Y" }} a las {{ autorizacion.fecha_expiracion|date:"H:i" }}.</span>
+            </div>
+        </div>
+    </article>
+
+    <article class="erp-card">
+        <h3 class="erp-panel-title">Condiciones de seguridad</h3>
+        <p class="erp-card-muted">El codigo solo funciona para {{ empresa_obj.nombre }}, puede utilizarse una vez y queda invalidado al completar la descarga. Crear otro codigo revoca este si todavia no se ha utilizado.</p>
+        {% if autorizacion.referencia_pago %}
+        <p class="erp-card-muted"><strong>Referencia:</strong> {{ autorizacion.referencia_pago }}</p>
+        {% endif %}
+    </article>
+</section>
+
+<script>
+document.querySelector("[data-copy-token]").addEventListener("click", async function () {
+    const input = document.getElementById("tokenRespaldoGenerado");
+    const status = document.querySelector("[data-copy-status]");
+    try {
+        await navigator.clipboard.writeText(input.value);
+        status.textContent = "Codigo copiado. Compartelo por un canal privado.";
+    } catch (error) {
+        input.select();
+        document.execCommand("copy");
+        status.textContent = "Codigo copiado. Compartelo por un canal privado.";
+    }
+});
+</script>
+{% endblock %}

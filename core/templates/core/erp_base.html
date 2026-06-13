@@ -73,6 +73,7 @@
     {% url 'clinica_profesionales' empresa.slug as clinica_profesionales_url %}
     {% url 'clinica_servicios' empresa.slug as clinica_servicios_url %}
     {% url 'asistente_consulta' empresa.slug as asistente_consulta_url %}
+    {% url 'empresa_respaldo' empresa.slug as empresa_respaldo_url %}
 {% endif %}
 <div class="erp-shell">
     <div class="erp-mobile-topbar">
@@ -151,6 +152,12 @@
                 <a class="erp-nav-link {% if '/dashboard/clinica/' in request.path %}is-active{% endif %}" href="{{ clinica_url }}">
                     <span class="erp-nav-bullet"></span>
                     <span>Clinica</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or request.user.es_administrador_empresa %}
+                <a class="erp-nav-link {% if '/dashboard/respaldo/' in request.path %}is-active{% endif %}" href="{{ empresa_respaldo_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Mi respaldo</span>
                 </a>
                 {% endif %}
             </nav>

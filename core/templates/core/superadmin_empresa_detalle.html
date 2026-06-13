@@ -158,6 +158,65 @@
     </div>
 </section>
 
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Autorizar respaldo al cliente</h3>
+            <p class="erp-card-muted">Genera un codigo temporal y de un solo uso para que el administrador de esta empresa descargue su informacion.</p>
+        </div>
+    </div>
+    <form method="post" action="{% url 'superadmin_empresa_generar_token_respaldo' empresa_obj.id %}" class="erp-compact-form">
+        {% csrf_token %}
+        <div class="erp-form-grid">
+            <div class="erp-field">
+                <label for="horas_vigencia">Vigencia del codigo</label>
+                <select id="horas_vigencia" name="horas_vigencia">
+                    <option value="24">24 horas</option>
+                    <option value="48">48 horas</option>
+                    <option value="72">72 horas</option>
+                    <option value="168">7 dias</option>
+                </select>
+            </div>
+            <div class="erp-field">
+                <label for="referencia_pago">Referencia de pago o autorizacion</label>
+                <input id="referencia_pago" name="referencia_pago" maxlength="160" placeholder="Ej. Transferencia 45821">
+            </div>
+        </div>
+        <div class="erp-form-actions">
+            <span class="erp-field-help">Al crear uno nuevo se revocan los codigos anteriores que no hayan sido utilizados.</span>
+            <button type="submit" class="erp-btn">Generar codigo temporal</button>
+        </div>
+    </form>
+    <div class="erp-table-wrap" style="margin-top:18px;">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Creado</th>
+                    <th>Codigo</th>
+                    <th>Estado</th>
+                    <th>Vence</th>
+                    <th>Referencia</th>
+                    <th>Utilizado por</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for token in tokens_respaldo %}
+                <tr>
+                    <td>{{ token.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                    <td><code>{{ token.token_preview }}</code></td>
+                    <td><span class="erp-badge {% if token.vigente %}success{% elif token.fecha_uso %}info{% else %}neutral{% endif %}">{{ token.estado_display }}</span></td>
+                    <td>{{ token.fecha_expiracion|date:"d/m/Y H:i" }}</td>
+                    <td>{{ token.referencia_pago|default:"-" }}</td>
+                    <td>{{ token.usado_por.username|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">No se han emitido codigos de respaldo.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
 <section class="erp-card">
     <h3 class="erp-panel-title">Modulos habilitados</h3>
     <div class="erp-inline-actions">

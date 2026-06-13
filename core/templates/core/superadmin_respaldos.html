@@ -47,10 +47,13 @@
             <div class="erp-kpi-label">{{ empresa.slug }}</div>
             <h3 class="erp-panel-title">{{ empresa.nombre }}</h3>
             <p class="erp-card-muted">RTN {{ empresa.rtn }}</p>
-            <form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa.id %}">
-                {% csrf_token %}
-                <button type="submit" class="erp-btn">Generar y descargar ZIP</button>
-            </form>
+            <div class="erp-inline-actions">
+                <form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="erp-btn">Descarga directa</button>
+                </form>
+                <a href="{% url 'superadmin_empresa_detail' empresa.id %}" class="erp-btn-secondary">Autorizar cliente</a>
+            </div>
         </article>
         {% empty %}
         <div class="erp-empty">No hay empresas disponibles.</div>
@@ -93,6 +96,47 @@
                 </tr>
                 {% empty %}
                 <tr><td colspan="8" class="erp-empty">Todavia no hay respaldos registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Codigos autorizados</h3>
+            <p class="erp-card-muted">Auditoria de autorizaciones temporales emitidas para administradores empresariales.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Creado</th>
+                    <th>Empresa</th>
+                    <th>Codigo</th>
+                    <th>Estado</th>
+                    <th>Vencimiento</th>
+                    <th>Referencia</th>
+                    <th>Emitido por</th>
+                    <th>Utilizado por</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for token in tokens_respaldo %}
+                <tr>
+                    <td>{{ token.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                    <td><a class="erp-link" href="{% url 'superadmin_empresa_detail' token.empresa.id %}">{{ token.empresa.nombre }}</a></td>
+                    <td><code>{{ token.token_preview }}</code></td>
+                    <td><span class="erp-badge {% if token.vigente %}success{% elif token.fecha_uso %}info{% else %}neutral{% endif %}">{{ token.estado_display }}</span></td>
+                    <td>{{ token.fecha_expiracion|date:"d/m/Y H:i" }}</td>
+                    <td>{{ token.referencia_pago|default:"-" }}</td>
+                    <td>{{ token.creado_por.username|default:"Sistema" }}</td>
+                    <td>{{ token.usado_por.username|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty">Todavia no se han emitido codigos para clientes.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
