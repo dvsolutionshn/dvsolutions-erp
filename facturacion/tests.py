@@ -17,7 +17,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpres
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm
-from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -3246,6 +3246,81 @@ class FacturacionTests(TestCase):
         )
         self.assertContains(response, "No se puede editar esta factura emitida")
         self.assertContains(response, "pagos registrados")
+
+    def test_permite_corregir_solo_numero_fiscal_en_factura_pagada(self):
+        factura = self.crear_factura_con_linea(estado="emitida")
+        pago = PagoFactura.objects.create(
+            factura=factura,
+            monto=Decimal("25.00"),
+            metodo="efectivo",
+            fecha=date.today(),
+        )
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.permite_cai_historico = True
+        configuracion.save(update_fields=["permite_cai_historico"])
+        total_original = factura.total
+        linea_original = factura.lineas.get()
+
+        response = self.client.post(
+            reverse("corregir_numero_factura", args=[self.empresa.slug, factura.id]),
+            {
+                "numero_factura": "001-001-01-00000002",
+                "motivo": "Correccion del correlativo fiscal digitado.",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("ver_factura", args=[self.empresa.slug, factura.id]),
+        )
+        factura.refresh_from_db()
+        pago.refresh_from_db()
+        linea_original.refresh_from_db()
+        self.assertEqual(factura.numero_factura, "001-001-01-00000002")
+        self.assertEqual(factura.total, total_original)
+        self.assertEqual(linea_original.cantidad, Decimal("1.00"))
+        self.assertEqual(pago.monto, Decimal("25.00"))
+        self.assertTrue(PagoFactura.objects.filter(id=pago.id, factura=factura).exists())
+
+        correccion = CorreccionNumeroFactura.objects.get(factura=factura)
+        self.assertEqual(correccion.numero_anterior, "001-001-01-00000001")
+        self.assertEqual(correccion.numero_nuevo, "001-001-01-00000002")
+        self.assertEqual(correccion.realizado_por, self.user)
+
+    def test_no_permite_correccion_numero_sin_configuracion_historica(self):
+        factura = self.crear_factura_con_linea(estado="emitida")
+
+        response = self.client.get(
+            reverse("corregir_numero_factura", args=[self.empresa.slug, factura.id]),
+            follow=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("ver_factura", args=[self.empresa.slug, factura.id]),
+        )
+        self.assertContains(response, "correccion fiscal historica no esta habilitada")
+        self.assertFalse(CorreccionNumeroFactura.objects.filter(factura=factura).exists())
+
+    def test_correccion_numero_rechaza_correlativo_fuera_del_cai(self):
+        factura = self.crear_factura_con_linea(estado="emitida")
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.permite_cai_historico = True
+        configuracion.save(update_fields=["permite_cai_historico"])
+
+        response = self.client.post(
+            reverse("corregir_numero_factura", args=[self.empresa.slug, factura.id]),
+            {
+                "numero_factura": "001-001-01-00000099",
+                "motivo": "Prueba de numero fuera de rango.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No existe un CAI que cubra este numero")
+        factura.refresh_from_db()
+        self.assertEqual(factura.numero_factura, "001-001-01-00000001")
+        self.assertFalse(CorreccionNumeroFactura.objects.filter(factura=factura).exists())
 
     def test_no_permite_editar_factura_emitida_con_nota_credito(self):
         factura = self.crear_factura_con_linea(estado="emitida")

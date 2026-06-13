@@ -2,7 +2,7 @@ from django import forms
 from django.db.models import Sum
 from decimal import Decimal
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, ExistenciaLoteBodega, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
 
@@ -35,6 +35,34 @@ class ReciboPagoForm(forms.ModelForm):
             'fecha': forms.DateInput(attrs={'type': 'date'}),
             'concepto': forms.Textarea(attrs={'rows': 4}),
         }
+
+
+class CorreccionNumeroFacturaForm(forms.Form):
+    numero_factura = forms.RegexField(
+        regex=Factura.NUMERO_FACTURA_REGEX,
+        max_length=20,
+        label="Nuevo numero de factura",
+        error_messages={
+            "invalid": "Usa el formato 000-000-00-00000000.",
+        },
+        widget=forms.TextInput(attrs={
+            "placeholder": "000-000-00-00000000",
+            "autocomplete": "off",
+            "inputmode": "numeric",
+        }),
+    )
+    motivo = forms.CharField(
+        label="Motivo de la correccion",
+        min_length=5,
+        max_length=500,
+        widget=forms.Textarea(attrs={
+            "rows": 4,
+            "placeholder": "Indica por que debe corregirse el numero fiscal.",
+        }),
+    )
+
+    def clean_numero_factura(self):
+        return self.cleaned_data["numero_factura"].strip()
 
 
 class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):

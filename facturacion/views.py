@@ -41,8 +41,8 @@ from contabilidad.services import (
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
-from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 
@@ -4335,6 +4335,107 @@ def crear_factura(request, empresa_slug):
 # =====================================================
 # EDITAR FACTURA
 # =====================================================
+
+@login_required
+def corregir_numero_factura(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+
+    if not config_avanzada.permite_gestion_fiscal_historica:
+        messages.error(request, "La correccion fiscal historica no esta habilitada para esta empresa.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    if factura.estado != "emitida":
+        messages.info(request, "Los borradores se corrigen desde la edicion normal de la factura.")
+        return redirect("editar_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    form = CorreccionNumeroFacturaForm(
+        request.POST or None,
+        initial={"numero_factura": factura.numero_factura},
+    )
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                factura_bloqueada = Factura.objects.select_for_update().get(
+                    id=factura.id,
+                    empresa=empresa,
+                )
+                numero_anterior = (factura_bloqueada.numero_factura or "").strip()
+                numero_nuevo = form.cleaned_data["numero_factura"]
+
+                if numero_nuevo == numero_anterior:
+                    form.add_error("numero_factura", "El nuevo numero es igual al numero actual.")
+                else:
+                    cai_anterior = factura_bloqueada.cai_numero_historico
+                    factura_bloqueada.numero_factura = numero_nuevo
+                    factura_bloqueada.save(update_fields=[
+                        "numero_factura",
+                        "cai",
+                        "cai_numero",
+                        "cai_establecimiento",
+                        "cai_punto_emision",
+                        "cai_tipo_documento",
+                        "cai_rango_inicial",
+                        "cai_rango_final",
+                        "cai_fecha_limite",
+                    ])
+
+                    AsientoContable.objects.filter(
+                        empresa=empresa,
+                        documento_tipo="factura",
+                        documento_id=factura_bloqueada.id,
+                        evento="emision",
+                    ).update(
+                        referencia=numero_nuevo,
+                        descripcion=f"Emision factura {numero_nuevo}",
+                    )
+                    MovimientoInventario.objects.filter(
+                        empresa=empresa,
+                        factura=factura_bloqueada,
+                    ).update(referencia=numero_nuevo)
+
+                    CorreccionNumeroFactura.objects.create(
+                        empresa=empresa,
+                        factura=factura_bloqueada,
+                        numero_anterior=numero_anterior,
+                        numero_nuevo=numero_nuevo,
+                        cai_anterior=cai_anterior,
+                        cai_nuevo=factura_bloqueada.cai_numero_historico,
+                        motivo=form.cleaned_data["motivo"],
+                        realizado_por=request.user,
+                    )
+
+                    messages.success(
+                        request,
+                        f"Numero fiscal corregido de {numero_anterior} a {numero_nuevo}. "
+                        "Los pagos, totales y recibos no fueron modificados.",
+                    )
+                    return redirect(
+                        "ver_factura",
+                        empresa_slug=empresa.slug,
+                        factura_id=factura_bloqueada.id,
+                    )
+        except ValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                for error in exc.message_dict.get("numero_factura", []):
+                    form.add_error("numero_factura", error)
+                for campo, errores in exc.message_dict.items():
+                    if campo != "numero_factura":
+                        for error in errores:
+                            form.add_error(None, error)
+            else:
+                form.add_error("numero_factura", str(exc))
+        except ValueError as exc:
+            form.add_error("numero_factura", str(exc))
+
+    return render(request, "facturacion/corregir_numero_factura.html", {
+        "empresa": empresa,
+        "factura": factura,
+        "form": form,
+    })
+
 
 @login_required
 def editar_factura(request, empresa_slug, factura_id):

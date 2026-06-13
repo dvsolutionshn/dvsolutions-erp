@@ -170,6 +170,9 @@
                                 {% else %}
                                 <span class="erp-pill-btn muted" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
                                 {% endif %}
+                                {% if permite_gestion_fiscal_historica and factura.estado == "emitida" %}
+                                <a class="erp-pill-link" href="{% url 'corregir_numero_factura' empresa.slug factura.id %}">Corregir numero</a>
+                                {% endif %}
                                 <form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn" type="submit">Duplicar</button></form>
                                 <form method="post" action="{% url 'generar_nota_credito_desde_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn" type="submit">Nota de Credito</button></form>
                                 {% if factura.estado == "borrador" and not factura.numero_factura or permite_gestion_fiscal_historica %}

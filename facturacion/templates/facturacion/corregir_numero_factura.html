@@ -1,0 +1,147 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Corregir numero fiscal{% endblock %}
+{% block header_kicker %}Control fiscal{% endblock %}
+{% block header_title %}Corregir numero de factura{% endblock %}
+{% block header_description %}Modifica exclusivamente el numero fiscal sin alterar pagos, productos, totales, inventario ni recibos.{% endblock %}
+
+{% block extra_head %}
+<style>
+.fiscal-correction-layout{
+    display:grid;
+    grid-template-columns:minmax(0, 1.15fr) minmax(280px, .85fr);
+    gap:18px;
+    align-items:start;
+}
+.fiscal-panel{
+    background:#fff;
+    border:1px solid #d8e3f0;
+    border-radius:8px;
+    padding:24px;
+    box-shadow:0 14px 32px rgba(15, 45, 75, .07);
+}
+.fiscal-panel h3{
+    margin:0 0 8px;
+    color:#12243b;
+    font-size:20px;
+}
+.fiscal-panel p{
+    margin:0;
+    color:#60738c;
+    line-height:1.6;
+}
+.fiscal-form{
+    display:grid;
+    gap:18px;
+    margin-top:22px;
+}
+.fiscal-field label{
+    display:block;
+    margin-bottom:7px;
+    color:#304761;
+    font-size:12px;
+    font-weight:800;
+    text-transform:uppercase;
+}
+.fiscal-field input,
+.fiscal-field textarea{
+    width:100%;
+    box-sizing:border-box;
+    border:1px solid #b9cde3;
+    border-radius:7px;
+    padding:13px 14px;
+    color:#14243a;
+    background:#fbfdff;
+    font:inherit;
+}
+.fiscal-field input:focus,
+.fiscal-field textarea:focus{
+    outline:3px solid rgba(37, 99, 235, .12);
+    border-color:#2563eb;
+}
+.fiscal-error{
+    margin-top:6px;
+    color:#b42318;
+    font-size:13px;
+}
+.fiscal-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+.fiscal-summary{
+    display:grid;
+    gap:12px;
+    margin-top:20px;
+}
+.fiscal-summary div{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    padding-bottom:12px;
+    border-bottom:1px solid #e8eef5;
+}
+.fiscal-summary span{color:#6a7d94;}
+.fiscal-summary strong{
+    color:#162941;
+    text-align:right;
+}
+.fiscal-warning{
+    margin-top:18px;
+    padding:14px;
+    border-left:4px solid #f59e0b;
+    background:#fffbeb;
+    color:#7c4a03;
+    line-height:1.5;
+}
+@media (max-width:820px){
+    .fiscal-correction-layout{grid-template-columns:1fr;}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="fiscal-correction-layout">
+    <div class="fiscal-panel">
+        <h3>Nuevo numero autorizado</h3>
+        <p>El sistema comprobara que el numero pertenezca a un CAI vigente para la fecha original de la factura.</p>
+
+        <form method="post" class="fiscal-form">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="fiscal-error">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="fiscal-field">
+                <label for="{{ form.numero_factura.id_for_label }}">{{ form.numero_factura.label }}</label>
+                {{ form.numero_factura }}
+                {% for error in form.numero_factura.errors %}<div class="fiscal-error">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="fiscal-field">
+                <label for="{{ form.motivo.id_for_label }}">{{ form.motivo.label }}</label>
+                {{ form.motivo }}
+                {% for error in form.motivo.errors %}<div class="fiscal-error">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="fiscal-actions">
+                <button class="erp-btn" type="submit">Guardar correccion</button>
+                <a class="erp-btn-secondary" href="{% url 'ver_factura' empresa.slug factura.id %}">Cancelar</a>
+            </div>
+        </form>
+    </div>
+
+    <aside class="fiscal-panel">
+        <h3>Documento protegido</h3>
+        <p>Estos datos se conservaran sin cambios.</p>
+        <div class="fiscal-summary">
+            <div><span>Numero actual</span><strong>{{ factura.numero_factura|default:"Sin numero" }}</strong></div>
+            <div><span>Cliente</span><strong>{{ factura.cliente.nombre }}</strong></div>
+            <div><span>Fecha</span><strong>{{ factura.fecha_emision|date:"d/m/Y" }}</strong></div>
+            <div><span>Total</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
+            <div><span>Estado de pago</span><strong>{{ factura.get_estado_pago_display }}</strong></div>
+        </div>
+        <div class="fiscal-warning">
+            La correccion quedara en bitacora con el usuario, fecha, motivo, numero anterior y numero nuevo.
+        </div>
+    </aside>
+</section>
+{% endblock %}

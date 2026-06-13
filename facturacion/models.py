@@ -1627,6 +1627,40 @@ class NotaCredito(models.Model):
 # LINEA FACTURA
 # ==========================
 
+class CorreccionNumeroFactura(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="correcciones_numero_factura",
+    )
+    factura = models.ForeignKey(
+        Factura,
+        on_delete=models.PROTECT,
+        related_name="correcciones_numero",
+    )
+    numero_anterior = models.CharField(max_length=20)
+    numero_nuevo = models.CharField(max_length=20)
+    cai_anterior = models.CharField(max_length=50, blank=True, null=True)
+    cai_nuevo = models.CharField(max_length=50, blank=True, null=True)
+    motivo = models.TextField()
+    realizado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="correcciones_numero_factura",
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha"]
+        verbose_name = "Correccion de numero de factura"
+        verbose_name_plural = "Correcciones de numero de factura"
+
+    def __str__(self):
+        return f"{self.numero_anterior} -> {self.numero_nuevo}"
+
+
 class LineaFactura(models.Model):
 
     factura = models.ForeignKey(

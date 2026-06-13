@@ -662,6 +662,9 @@
                 {% else %}
                 <span class="erp-btn-secondary disabled" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
                 {% endif %}
+                {% if permite_gestion_fiscal_historica and factura.estado == "emitida" %}
+                <a class="erp-btn-secondary" href="{% url 'corregir_numero_factura' empresa.slug factura.id %}">Corregir numero fiscal</a>
+                {% endif %}
                 {% if factura.estado == "borrador" %}
                 <form method="post" action="{% url 'validar_factura' empresa.slug factura.id %}" class="erp-inline-form">
                     {% csrf_token %}
