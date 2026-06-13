@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import OperationalError, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -18,6 +18,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
+from .access_tokens import emitir_token_acceso, enviar_correo_acceso, hash_token_acceso
 from .backup_service import generar_respaldo_empresa
 from .backup_tokens import generar_token_respaldo, hash_token_respaldo
 from .forms import (
@@ -26,6 +27,8 @@ from .forms import (
     PlanComercialForm,
     RolSistemaForm,
     SolicitudComercialPublicaForm,
+    SolicitarRecuperacionForm,
+    EstablecerAccesoForm,
     SuperAdminLoginForm,
     UsuarioControlCreateForm,
     UsuarioControlUpdateForm,
@@ -40,6 +43,7 @@ from .models import (
     RolSistema,
     SolicitudComercial,
     TokenRespaldoEmpresa,
+    TokenAccesoUsuario,
     Usuario,
 )
 
@@ -375,10 +379,10 @@ def empresa_login(request, slug=None):
             )
             return render(request, template_name, {'empresa': empresa})
 
-        username = request.POST.get('username')
+        username = (request.POST.get('username') or "").strip()
         password = request.POST.get('password')
 
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=username, password=password, empresa=empresa)
 
         if user is not None:
             if user.empresa == empresa:
@@ -387,7 +391,7 @@ def empresa_login(request, slug=None):
                 return _redirect_dashboard_empresa(request, empresa)
             else:
                 bloqueo_restante = _register_login_failure(throttle_scope, request)
-                messages.error(request, "Usuario no pertenece a esta empresa.")
+                messages.error(request, "El correo no pertenece a esta empresa.")
                 if bloqueo_restante > 0:
                     messages.error(
                         request,
@@ -395,7 +399,7 @@ def empresa_login(request, slug=None):
                     )
         else:
             bloqueo_restante = _register_login_failure(throttle_scope, request)
-            messages.error(request, "Usuario o contrasena incorrectos.")
+            messages.error(request, "Correo o contrasena incorrectos.")
             if bloqueo_restante > 0:
                 messages.error(
                     request,
@@ -403,6 +407,91 @@ def empresa_login(request, slug=None):
                 )
 
     return render(request, template_name, {'empresa': empresa})
+
+
+def solicitar_recuperacion(request, slug=None):
+    empresa = _resolver_empresa_request(request, slug)
+    form = SolicitarRecuperacionForm(request.POST or None)
+    enviado = False
+
+    if request.method == "POST" and form.is_valid():
+        throttle_key = f"password-recovery:{empresa.pk}:{_client_ip(request)}"
+        intentos = cache.get(throttle_key, 0)
+        if intentos < 3:
+            cache.set(throttle_key, intentos + 1, timeout=15 * 60)
+            usuario = Usuario.objects.filter(
+                empresa=empresa,
+                email__iexact=form.cleaned_data["email"],
+                is_active=True,
+            ).first()
+            if usuario:
+                token_raw, token = emitir_token_acceso(
+                    usuario,
+                    TokenAccesoUsuario.TIPO_RECUPERACION,
+                    request=request,
+                    horas=2,
+                )
+                try:
+                    enviar_correo_acceso(
+                        request,
+                        usuario,
+                        token_raw,
+                        token,
+                        TokenAccesoUsuario.TIPO_RECUPERACION,
+                    )
+                except Exception:
+                    logger.exception("No se pudo enviar la recuperacion de acceso para el usuario %s", usuario.pk)
+        enviado = True
+
+    return render(
+        request,
+        "core/solicitar_recuperacion.html",
+        {"empresa": empresa, "form": form, "enviado": enviado},
+    )
+
+
+def establecer_acceso(request, token_raw):
+    token = (
+        TokenAccesoUsuario.objects.select_related("usuario", "usuario__empresa")
+        .filter(
+            token_hash=hash_token_acceso(token_raw),
+            revocado=False,
+            fecha_uso__isnull=True,
+            fecha_expiracion__gt=timezone.now(),
+        )
+        .first()
+    )
+    if not token:
+        return render(request, "core/establecer_acceso.html", {"token_invalido": True}, status=400)
+
+    usuario = token.usuario
+    form = EstablecerAccesoForm(usuario, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            form.save()
+            usuario.is_active = True
+            usuario.save(update_fields=["password", "is_active"])
+            token.fecha_uso = timezone.now()
+            token.save(update_fields=["fecha_uso"])
+            TokenAccesoUsuario.objects.filter(
+                usuario=usuario,
+                fecha_uso__isnull=True,
+                revocado=False,
+            ).exclude(pk=token.pk).update(
+                revocado=True,
+                fecha_revocacion=timezone.now(),
+            )
+
+        messages.success(request, "Tu contrasena fue creada correctamente. Ya puedes iniciar sesion con tu correo.")
+        if usuario.empresa_id:
+            return redirect("empresa_login", slug=usuario.empresa.slug)
+        return redirect("superadmin_login")
+
+    return render(
+        request,
+        "core/establecer_acceso.html",
+        {"form": form, "usuario_obj": usuario, "token_obj": token},
+    )
 
 
 def _public_site_context(form=None):
@@ -1051,7 +1140,16 @@ def superadmin_empresa_edit(request, empresa_id):
 
 @superadmin_required
 def superadmin_usuarios(request):
-    usuarios = Usuario.objects.select_related("empresa").prefetch_related("groups").order_by("username")
+    usuarios = Usuario.objects.select_related("empresa").prefetch_related(
+        "groups",
+        Prefetch(
+            "tokens_acceso",
+            queryset=TokenAccesoUsuario.objects.filter(
+                tipo=TokenAccesoUsuario.TIPO_INVITACION
+            ).order_by("-fecha_creacion"),
+            to_attr="invitaciones_recientes",
+        ),
+    ).order_by("email", "username")
     context = {
         **_superadmin_base_context(),
         "usuarios": usuarios,
@@ -1248,7 +1346,32 @@ def superadmin_usuario_create(request):
     form = UsuarioControlCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         usuario = form.save()
-        messages.success(request, f"Usuario {usuario.username} creado correctamente.")
+        token_raw, token = emitir_token_acceso(
+            usuario,
+            TokenAccesoUsuario.TIPO_INVITACION,
+            creado_por=request.user,
+            request=request,
+            horas=48,
+        )
+        try:
+            enviar_correo_acceso(
+                request,
+                usuario,
+                token_raw,
+                token,
+                TokenAccesoUsuario.TIPO_INVITACION,
+            )
+        except Exception:
+            logger.exception("No se pudo enviar la invitacion del usuario %s", usuario.pk)
+            messages.warning(
+                request,
+                f"El usuario fue creado, pero no se pudo enviar el correo a {usuario.email}. Puedes reenviarlo desde Usuarios.",
+            )
+        else:
+            messages.success(
+                request,
+                f"Invitacion enviada a {usuario.email}. El enlace sera valido durante 48 horas.",
+            )
         return redirect("superadmin_usuarios")
 
     return render(request, "core/superadmin_usuario_form.html", {
@@ -1261,9 +1384,20 @@ def superadmin_usuario_create(request):
 @superadmin_required
 def superadmin_usuario_edit(request, usuario_id):
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    email_anterior = usuario.email
     form = UsuarioControlUpdateForm(request.POST or None, instance=usuario)
     if request.method == "POST" and form.is_valid():
         usuario = form.save()
+        if not usuario.is_active and email_anterior.lower() != usuario.email.lower():
+            TokenAccesoUsuario.objects.filter(
+                usuario=usuario,
+                fecha_uso__isnull=True,
+                revocado=False,
+            ).update(revocado=True, fecha_revocacion=timezone.now())
+            messages.warning(
+                request,
+                "El correo fue actualizado. Reenvia la invitacion para entregar un enlace valido a la nueva direccion.",
+            )
         messages.success(request, f"Usuario {usuario.username} actualizado correctamente.")
         return redirect("superadmin_usuarios")
 
@@ -1272,3 +1406,43 @@ def superadmin_usuario_edit(request, usuario_id):
         "form": form,
         "titulo": f"Editar Usuario: {usuario.username}",
     })
+
+
+@superadmin_required
+@require_POST
+def superadmin_usuario_reenviar_invitacion(request, usuario_id):
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.email:
+        messages.error(request, "El usuario necesita un correo antes de poder recibir una invitacion.")
+        return redirect("superadmin_usuario_edit", usuario_id=usuario.id)
+    if usuario.is_active and usuario.has_usable_password():
+        messages.error(
+            request,
+            "Este usuario ya activo debe utilizar la opcion 'Olvide mi contrasena' desde el login de su empresa.",
+        )
+        return redirect("superadmin_usuarios")
+
+    usuario.is_active = False
+    usuario.set_unusable_password()
+    usuario.save(update_fields=["is_active", "password"])
+    token_raw, token = emitir_token_acceso(
+        usuario,
+        TokenAccesoUsuario.TIPO_INVITACION,
+        creado_por=request.user,
+        request=request,
+        horas=48,
+    )
+    try:
+        enviar_correo_acceso(
+            request,
+            usuario,
+            token_raw,
+            token,
+            TokenAccesoUsuario.TIPO_INVITACION,
+        )
+    except Exception:
+        logger.exception("No se pudo reenviar la invitacion del usuario %s", usuario.pk)
+        messages.error(request, f"No se pudo enviar el correo a {usuario.email}. Revisa la configuracion SMTP.")
+    else:
+        messages.success(request, f"Invitacion reenviada a {usuario.email}.")
+    return redirect("superadmin_usuarios")

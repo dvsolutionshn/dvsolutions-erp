@@ -1,7 +1,8 @@
 from django import forms
 from django.contrib.auth import authenticate
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import Group
+from django.utils.text import slugify
 
 from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
 
@@ -193,7 +194,18 @@ class EmpresaControlForm(forms.ModelForm):
             configuracion.save(update_fields=campos_actualizar)
 
 
-class UsuarioControlCreateForm(UserCreationForm):
+def generar_username_tecnico(email):
+    base = slugify((email or "").split("@")[0])[:120] or "usuario"
+    candidato = base
+    consecutivo = 2
+    while Usuario.objects.filter(username__iexact=candidato).exists():
+        sufijo = f"-{consecutivo}"
+        candidato = f"{base[:150 - len(sufijo)]}{sufijo}"
+        consecutivo += 1
+    return candidato
+
+
+class UsuarioControlCreateForm(forms.ModelForm):
     groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all().order_by("name"),
         required=False,
@@ -202,17 +214,15 @@ class UsuarioControlCreateForm(UserCreationForm):
         help_text="Asigna uno o varios roles basados en grupos de Django.",
     )
 
-    class Meta(UserCreationForm.Meta):
+    class Meta:
         model = Usuario
         fields = [
-            "username",
             "first_name",
             "last_name",
             "email",
             "empresa",
             "rol_sistema",
             "es_administrador_empresa",
-            "is_active",
             "is_staff",
             "is_superuser",
             "groups",
@@ -220,19 +230,16 @@ class UsuarioControlCreateForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["email"].required = True
         textos = {
-            "username": ("Usuario", "Nombre con el que la persona iniciara sesion."),
             "first_name": ("Nombres", ""),
             "last_name": ("Apellidos", ""),
-            "email": ("Correo electronico", ""),
+            "email": ("Correo electronico", "La invitacion y el acceso al ERP se realizaran con este correo."),
             "empresa": ("Empresa", "Empresa a la que pertenecera este usuario."),
             "rol_sistema": ("Rol del sistema", "Perfil funcional que define a que areas del ERP podra entrar."),
             "es_administrador_empresa": ("Es administrador de empresa", "Activalo solo si esta persona puede ver todo dentro de su empresa."),
-            "is_active": ("Usuario activo", "Si lo desactivas, el usuario ya no podra entrar al sistema."),
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si realmente quieres permitir acceso al admin tecnico."),
             "is_superuser": ("Es superadministrador", "Reserva esta opcion solo para ti o para cuentas maestras internas."),
-            "password1": ("Contrasena", "Define una contrasena segura para esta cuenta."),
-            "password2": ("Confirmar contrasena", "Repite la contrasena para confirmar."),
             "groups": ("Roles complementarios", "Roles adicionales basados en grupos de Django, utiles para crecer despues."),
         }
         for field_name, (label, help_text) in textos.items():
@@ -241,9 +248,20 @@ class UsuarioControlCreateForm(UserCreationForm):
                 if help_text:
                     self.fields[field_name].help_text = help_text
 
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if Usuario.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Ya existe un usuario registrado con este correo.")
+        return email
+
     def save(self, commit=True):
-        usuario = super().save(commit=commit)
+        usuario = super().save(commit=False)
+        usuario.username = generar_username_tecnico(self.cleaned_data["email"])
+        usuario.email = self.cleaned_data["email"]
+        usuario.is_active = False
+        usuario.set_unusable_password()
         if commit:
+            usuario.save()
             usuario.groups.set(self.cleaned_data.get("groups", []))
         return usuario
 
@@ -255,18 +273,6 @@ class UsuarioControlUpdateForm(forms.ModelForm):
         label="Roles",
         widget=forms.CheckboxSelectMultiple,
     )
-    nueva_password = forms.CharField(
-        required=False,
-        widget=forms.PasswordInput,
-        label="Nueva contrasena",
-        help_text="Dejalo vacio si no deseas cambiar la contrasena actual.",
-    )
-    confirmar_password = forms.CharField(
-        required=False,
-        widget=forms.PasswordInput,
-        label="Confirmar contrasena",
-    )
-
     class Meta:
         model = Usuario
         fields = [
@@ -285,10 +291,11 @@ class UsuarioControlUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["email"].required = True
         if self.instance.pk:
             self.fields["groups"].initial = self.instance.groups.all()
         textos = {
-            "username": ("Usuario", "Nombre con el que la persona iniciara sesion."),
+            "username": ("Identificador interno", "Se conserva por compatibilidad tecnica; el acceso normal se realiza con correo."),
             "first_name": ("Nombres", ""),
             "last_name": ("Apellidos", ""),
             "email": ("Correo electronico", ""),
@@ -299,8 +306,6 @@ class UsuarioControlUpdateForm(forms.ModelForm):
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si quieres permitir el ingreso al admin tecnico."),
             "is_superuser": ("Es superadministrador", "Esta opcion da control total del sistema."),
             "groups": ("Roles complementarios", "Roles adicionales basados en grupos de Django."),
-            "nueva_password": ("Nueva contrasena", "Dejalo vacio si no deseas cambiar la contrasena actual."),
-            "confirmar_password": ("Confirmar contrasena", ""),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:
@@ -308,26 +313,35 @@ class UsuarioControlUpdateForm(forms.ModelForm):
                 if help_text:
                     self.fields[field_name].help_text = help_text
 
-    def clean(self):
-        cleaned_data = super().clean()
-        nueva = cleaned_data.get("nueva_password")
-        confirmar = cleaned_data.get("confirmar_password")
-        if nueva or confirmar:
-            if nueva != confirmar:
-                raise forms.ValidationError("Las contrasenas no coinciden.")
-            if not nueva:
-                raise forms.ValidationError("Debes escribir la nueva contrasena.")
-        return cleaned_data
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if Usuario.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("Ya existe otro usuario registrado con este correo.")
+        return email
 
     def save(self, commit=True):
         usuario = super().save(commit=commit)
         if commit:
             usuario.groups.set(self.cleaned_data.get("groups", []))
-            nueva = self.cleaned_data.get("nueva_password")
-            if nueva:
-                usuario.set_password(nueva)
-                usuario.save(update_fields=["password"])
         return usuario
+
+
+class SolicitarRecuperacionForm(forms.Form):
+    email = forms.EmailField(
+        label="Correo electronico",
+        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "nombre@empresa.com"}),
+    )
+
+
+class EstablecerAccesoForm(SetPasswordForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["new_password1"].label = "Nueva contrasena"
+        self.fields["new_password1"].help_text = (
+            "Usa una contrasena segura que no sea comun, totalmente numerica ni similar a tus datos."
+        )
+        self.fields["new_password2"].label = "Confirmar contrasena"
+        self.fields["new_password2"].help_text = "Escribe nuevamente la misma contrasena."
 
 
 class PlanComercialForm(forms.ModelForm):

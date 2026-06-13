@@ -1,0 +1,12 @@
+Hola {{ usuario.get_full_name|default:usuario.email }},
+
+{% if es_invitacion %}Has sido invitado a acceder a {{ empresa.nombre|default:"DV Solutions ERP" }}.{% else %}Recibimos una solicitud para restablecer tu acceso a {{ empresa.nombre|default:"DV Solutions ERP" }}.{% endif %}
+
+Abre este enlace seguro para crear tu contrasena:
+{{ url_acceso }}
+
+El enlace vence el {{ fecha_expiracion|date:"d/m/Y" }} a las {{ fecha_expiracion|date:"H:i" }} y solo puede utilizarse una vez.
+
+Si no esperabas este mensaje, puedes ignorarlo.
+
+DV Solutions

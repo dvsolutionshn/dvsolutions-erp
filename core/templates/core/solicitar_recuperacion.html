@@ -1,0 +1,38 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recuperar acceso - {{ empresa.nombre }}</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+</head>
+<body style="margin:0;min-height:100vh;background:#eef4f8;display:grid;place-items:center;padding:24px;">
+    <main class="erp-form-card" style="width:min(520px,100%);box-shadow:0 24px 70px rgba(14,34,56,.14);">
+        <div class="erp-kpi-label">Acceso seguro</div>
+        <h3>Recuperar contrasena</h3>
+        {% if enviado %}
+            <div class="erp-soft-panel">
+                Si el correo corresponde a una cuenta activa de {{ empresa.nombre }}, recibiras un enlace valido durante 2 horas.
+            </div>
+            <div class="erp-form-actions" style="margin-top:20px;">
+                <a class="erp-btn-secondary" href="{% url 'empresa_login' empresa.slug %}">Volver al login</a>
+            </div>
+        {% else %}
+            <p>Escribe el correo con el que ingresas al ERP. Por seguridad no confirmaremos si existe o no una cuenta.</p>
+            <form method="post" class="erp-compact-form" style="margin-top:20px;">
+                {% csrf_token %}
+                <div class="erp-field">
+                    <label for="{{ form.email.id_for_label }}">Correo electronico</label>
+                    {{ form.email }}
+                    {{ form.email.errors }}
+                </div>
+                <div class="erp-form-actions">
+                    <a class="erp-btn-secondary" href="{% url 'empresa_login' empresa.slug %}">Cancelar</a>
+                    <button class="erp-btn" type="submit">Enviar enlace seguro</button>
+                </div>
+            </form>
+        {% endif %}
+    </main>
+</body>
+</html>

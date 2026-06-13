@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<body style="margin:0;background:#edf3f7;font-family:Arial,sans-serif;color:#102338;padding:32px 16px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #dce7ef;border-radius:14px;overflow:hidden;">
+                    <tr><td style="height:6px;background:#16a9a4;"></td></tr>
+                    <tr>
+                        <td style="padding:34px;">
+                            <div style="font-size:12px;font-weight:bold;letter-spacing:1.5px;color:#168b88;text-transform:uppercase;">DV Solutions ERP</div>
+                            <h1 style="font-size:28px;margin:14px 0 12px;">{% if es_invitacion %}Tu acceso esta listo{% else %}Recupera tu acceso{% endif %}</h1>
+                            <p style="line-height:1.7;color:#52687c;">Hola {{ usuario.get_full_name|default:usuario.email }}. {% if es_invitacion %}Has sido invitado a formar parte de {{ empresa.nombre|default:"DV Solutions ERP" }}.{% else %}Usa el siguiente enlace para crear una nueva contrasena.{% endif %}</p>
+                            <p style="margin:28px 0;">
+                                <a href="{{ url_acceso }}" style="display:inline-block;background:#1769e0;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 22px;border-radius:9px;">Crear mi contrasena</a>
+                            </p>
+                            <p style="font-size:13px;line-height:1.6;color:#6e8192;">Este enlace vence el {{ fecha_expiracion|date:"d/m/Y" }} a las {{ fecha_expiracion|date:"H:i" }} y funciona una sola vez. Si no esperabas este correo, puedes ignorarlo.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

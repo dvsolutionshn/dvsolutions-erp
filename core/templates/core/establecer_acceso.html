@@ -1,0 +1,39 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear contrasena - DV Solutions ERP</title>
+    <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+</head>
+<body style="margin:0;min-height:100vh;background:#eef4f8;display:grid;place-items:center;padding:24px;">
+    <main class="erp-form-card" style="width:min(560px,100%);box-shadow:0 24px 70px rgba(14,34,56,.14);">
+        {% if token_invalido %}
+            <div class="erp-kpi-label">Enlace no disponible</div>
+            <h3>Este enlace vencio o ya fue utilizado</h3>
+            <p>Solicita una nueva invitacion al administrador de DV Solutions o utiliza la recuperacion de contrasena desde el acceso de tu empresa.</p>
+        {% else %}
+            <div class="erp-kpi-label">{% if token_obj.tipo == 'invitacion' %}Invitacion empresarial{% else %}Recuperacion de acceso{% endif %}</div>
+            <h3>Crea tu contrasena</h3>
+            <p>{{ usuario_obj.get_full_name|default:usuario_obj.email }}, define una contrasena privada para acceder a {{ usuario_obj.empresa.nombre|default:"DV Solutions ERP" }}.</p>
+            <form method="post" class="erp-compact-form" style="margin-top:20px;">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="erp-field-errors">{{ form.non_field_errors }}</div>{% endif %}
+                {% for field in form %}
+                <div class="erp-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="erp-field-help">{{ field.help_text|safe }}</div>{% endif %}
+                    {{ field.errors }}
+                </div>
+                {% endfor %}
+                <div class="erp-form-actions">
+                    <span class="erp-field-help">El enlace se invalidara inmediatamente despues de guardar.</span>
+                    <button class="erp-btn" type="submit">Guardar contrasena</button>
+                </div>
+            </form>
+        {% endif %}
+    </main>
+</body>
+</html>

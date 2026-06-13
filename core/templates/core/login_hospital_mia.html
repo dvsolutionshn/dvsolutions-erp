@@ -575,7 +575,7 @@
             <div class="login-head">
                 <div class="login-kicker">{% if empresa.slug == "hospital_mia" %}Sistema Hospitalario{% else %}Sistema Empresarial{% endif %}</div>
                 <h2>Bienvenido de nuevo</h2>
-                <p>Ingresa con tu usuario de {{ empresa.nombre }} para continuar dentro de una experiencia creada especialmente para su operacion.</p>
+                <p>Ingresa con tu correo de {{ empresa.nombre }} para continuar dentro de una experiencia creada especialmente para su operacion.</p>
             </div>
 
             {% if messages %}
@@ -589,9 +589,9 @@
             <form method="post" class="login-form" autocomplete="off">
                 {% csrf_token %}
                 <div class="field">
-                    <label for="id_username">Usuario</label>
+                    <label for="id_username">Correo electronico</label>
                     <div class="input-shell">
-                        <input id="id_username" type="text" name="username" placeholder="Usuario autorizado" required autofocus>
+                        <input id="id_username" type="text" name="username" placeholder="nombre@empresa.com" autocomplete="username" required autofocus>
                     </div>
                 </div>
 
@@ -608,6 +608,9 @@
                 </div>
 
                 <button class="submit" type="submit">Entrar al sistema</button>
+                <div style="text-align:center;margin-top:16px;">
+                    <a href="{% url 'solicitar_recuperacion' empresa.slug %}" style="color:#087772;font-weight:800;text-decoration:none;">Olvide mi contrasena</a>
+                </div>
             </form>
 
             <div class="login-footer">

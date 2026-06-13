@@ -13,12 +13,12 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.db.models import FileField
 from django.utils import timezone
 
-from .models import Empresa, RespaldoEmpresa, TokenRespaldoEmpresa
+from .models import Empresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 
 
 BACKUP_FORMAT_VERSION = "1.0"
 EXCLUDED_REVERSE_APPS = {"admin", "sessions"}
-EXCLUDED_BACKUP_MODELS = (RespaldoEmpresa, TokenRespaldoEmpresa)
+EXCLUDED_BACKUP_MODELS = (RespaldoEmpresa, TokenRespaldoEmpresa, TokenAccesoUsuario)
 
 
 def _key(obj):

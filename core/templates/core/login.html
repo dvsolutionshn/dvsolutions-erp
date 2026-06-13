@@ -400,7 +400,7 @@
                 <div class="tenant-copy">
                     <small>Acceso de empresa</small>
                     <h2>{{ empresa.nombre }}</h2>
-                    <p>Ingresa con tu usuario operativo para continuar con la gestion de esta empresa dentro del entorno DV Solutions.</p>
+                    <p>Ingresa con tu correo operativo para continuar con la gestion de esta empresa dentro del entorno DV Solutions.</p>
                 </div>
             </div>
 
@@ -420,8 +420,8 @@
                 <form method="post" class="form" autocomplete="off">
                     {% csrf_token %}
                     <div class="field">
-                        <label for="id_username">Usuario</label>
-                        <input id="id_username" type="text" name="username" placeholder="Ingresa tu usuario" required autofocus>
+                        <label for="id_username">Correo electronico</label>
+                        <input id="id_username" type="text" name="username" placeholder="nombre@empresa.com" autocomplete="username" required autofocus>
                     </div>
                     <div class="field">
                         <label for="id_password">Contrasena</label>
@@ -430,6 +430,9 @@
                     <div class="actions">
                         <p>Si este acceso pertenece a otra empresa, vuelve a su enlace de ingreso para conservar el contexto correcto.</p>
                         <button type="submit" class="btn">Entrar al sistema</button>
+                    </div>
+                    <div style="margin-top:14px;text-align:right;">
+                        <a href="{% url 'solicitar_recuperacion' empresa.slug %}" style="color:#116b70;font-weight:800;text-decoration:none;">Olvide mi contrasena</a>
                     </div>
                 </form>
             </div>

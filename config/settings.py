@@ -176,6 +176,9 @@ USE_TZ = True
 STATIC_URL = os.environ.get("STATIC_URL", "/static/")
 STATIC_ROOT = BASE_DIR / "staticfiles"
 AUTH_USER_MODEL = 'core.Usuario'
+AUTHENTICATION_BACKENDS = [
+    "core.auth_backends.EmailOrUsernameBackend",
+]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # MEDIA FILES (logos, uploads, etc)
@@ -189,6 +192,7 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "20"))
 # Email
 # In local development we keep console as fallback, but automatically switch to
 # SMTP when host credentials are configured.

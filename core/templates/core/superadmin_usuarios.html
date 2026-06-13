@@ -33,7 +33,7 @@
         <table class="erp-table">
             <thead>
                 <tr>
-                    <th>Usuario</th>
+                    <th>Persona y correo</th>
                     <th>Empresa</th>
                     <th>Roles</th>
                     <th>Estado</th>
@@ -43,7 +43,7 @@
             <tbody>
                 {% for usuario in usuarios %}
                 <tr>
-                    <td>{{ usuario.username }}<br><small>{{ usuario.get_full_name|default:usuario.email }}</small></td>
+                    <td><strong>{{ usuario.get_full_name|default:usuario.username }}</strong><br><small>{{ usuario.email|default:"Sin correo" }}</small></td>
                     <td>{{ usuario.empresa.nombre|default:"Sin empresa" }}</td>
                     <td>
                         {% if usuario.is_superuser %}<span class="erp-badge info">Superadmin</span>{% endif %}
@@ -55,12 +55,24 @@
                         {% endfor %}
                     </td>
                     <td>
-                        <span class="erp-badge {% if usuario.is_active %}success{% else %}danger{% endif %}">
-                            {% if usuario.is_active %}Activo{% else %}Inactivo{% endif %}
-                        </span>
+                        {% if usuario.is_active %}
+                            <span class="erp-badge success">Activo</span>
+                        {% elif usuario.invitaciones_recientes %}
+                            {% with invitacion=usuario.invitaciones_recientes.0 %}
+                            <span class="erp-badge {% if invitacion.vigente %}warning{% else %}neutral{% endif %}">{{ invitacion.estado_display }}</span>
+                            {% endwith %}
+                        {% else %}
+                            <span class="erp-badge danger">Inactivo</span>
+                        {% endif %}
                     </td>
                     <td class="actions">
                         <a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar</a>
+                        {% if usuario.email and not usuario.is_superuser and not usuario.is_active %}
+                        <form method="post" action="{% url 'superadmin_usuario_reenviar_invitacion' usuario.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="erp-link" style="border:0;background:none;padding:0;cursor:pointer;">Reenviar invitacion</button>
+                        </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}

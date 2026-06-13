@@ -6,6 +6,7 @@ import zipfile
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.test.utils import override_settings
@@ -13,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RolSistema, SolicitudComercial, Usuario
-from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenRespaldoEmpresa
+from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 from core.backup_tokens import hash_token_respaldo
 from core.forms import EmpresaControlForm
 
@@ -306,24 +307,21 @@ class SuperAdminControlTests(TestCase):
         empresa = Empresa.objects.get(slug="empresa-control")
         self.assertEqual(empresa.empresamodulo_set.filter(activo=True).count(), 1)
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_superadmin_puede_crear_usuario_con_rol(self):
         empresa = Empresa.objects.create(nombre="Demo", slug="demo", rtn="08011999000002")
         self.client.login(username="master", password="pass12345")
         response = self.client.post(
             reverse("superadmin_usuario_create"),
             {
-                "username": "nuevo",
                 "first_name": "Nuevo",
                 "last_name": "Usuario",
                 "email": "nuevo@demo.com",
                 "empresa": empresa.id,
                 "rol_sistema": self.rol_facturador.id,
                 "es_administrador_empresa": "on",
-                "is_active": "on",
                 "is_staff": "on",
                 "groups": [self.group.id],
-                "password1": "ClaveSegura123",
-                "password2": "ClaveSegura123",
             },
         )
         self.assertRedirects(response, reverse("superadmin_usuarios"))
@@ -332,6 +330,122 @@ class SuperAdminControlTests(TestCase):
         self.assertTrue(usuario.es_administrador_empresa)
         self.assertTrue(usuario.groups.filter(name="Ventas").exists())
         self.assertEqual(usuario.rol_sistema, self.rol_facturador)
+        self.assertFalse(usuario.is_active)
+        self.assertFalse(usuario.has_usable_password())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Activa tu acceso", mail.outbox[0].subject)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_invitacion_permite_crear_password_y_entrar_con_correo(self):
+        import re
+
+        empresa = Empresa.objects.create(nombre="Empresa Invitada", slug="empresa-invitada", rtn="08011999000064")
+        self.client.login(username="master", password="pass12345")
+        response = self.client.post(
+            reverse("superadmin_usuario_create"),
+            {
+                "first_name": "Ana",
+                "last_name": "Lopez",
+                "email": "ana@empresa.com",
+                "empresa": empresa.id,
+                "rol_sistema": self.rol_facturador.id,
+                "groups": [self.group.id],
+            },
+        )
+        self.assertRedirects(response, reverse("superadmin_usuarios"))
+        usuario = Usuario.objects.get(email="ana@empresa.com")
+        match = re.search(r"/acceso/establecer/([^/]+)/", mail.outbox[0].body)
+        self.assertIsNotNone(match)
+
+        self.client.logout()
+        activation_response = self.client.post(
+            reverse("establecer_acceso", args=[match.group(1)]),
+            {
+                "new_password1": "ClavePersonalSegura2026",
+                "new_password2": "ClavePersonalSegura2026",
+            },
+        )
+        self.assertRedirects(
+            activation_response,
+            reverse("empresa_login", args=[empresa.slug]),
+        )
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.is_active)
+        self.assertTrue(usuario.check_password("ClavePersonalSegura2026"))
+        token = TokenAccesoUsuario.objects.get(usuario=usuario)
+        self.assertIsNotNone(token.fecha_uso)
+        reused_response = self.client.get(
+            reverse("establecer_acceso", args=[match.group(1)])
+        )
+        self.assertEqual(reused_response.status_code, 400)
+        self.assertContains(reused_response, "ya fue utilizado", status_code=400)
+
+        login_response = self.client.post(
+            reverse("empresa_login", args=[empresa.slug]),
+            {"username": "ana@empresa.com", "password": "ClavePersonalSegura2026"},
+        )
+        self.assertRedirects(
+            login_response,
+            reverse("dashboard", args=[empresa.slug]),
+            fetch_redirect_response=False,
+        )
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_recuperacion_de_password_por_correo(self):
+        import re
+
+        empresa = Empresa.objects.create(nombre="Empresa Recuperacion", slug="empresa-recuperacion", rtn="08011999000065")
+        usuario = Usuario.objects.create_user(
+            username="recuperacion",
+            email="recuperacion@empresa.com",
+            password="ClaveAnterior2026",
+            empresa=empresa,
+        )
+
+        response = self.client.post(
+            reverse("solicitar_recuperacion", args=[empresa.slug]),
+            {"email": "recuperacion@empresa.com"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "recibiras un enlace")
+        self.assertEqual(len(mail.outbox), 1)
+        match = re.search(r"/acceso/establecer/([^/]+)/", mail.outbox[0].body)
+        self.assertIsNotNone(match)
+
+        reset_response = self.client.post(
+            reverse("establecer_acceso", args=[match.group(1)]),
+            {
+                "new_password1": "ClaveNuevaSegura2026",
+                "new_password2": "ClaveNuevaSegura2026",
+            },
+        )
+        self.assertRedirects(reset_response, reverse("empresa_login", args=[empresa.slug]))
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.check_password("ClaveNuevaSegura2026"))
+
+    def test_creacion_usuario_rechaza_correo_duplicado(self):
+        empresa = Empresa.objects.create(nombre="Empresa Correo", slug="empresa-correo", rtn="08011999000066")
+        Usuario.objects.create_user(
+            username="existente",
+            email="duplicado@empresa.com",
+            password="pass12345",
+            empresa=empresa,
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_create"),
+            {
+                "first_name": "Otro",
+                "last_name": "Usuario",
+                "email": "DUPLICADO@empresa.com",
+                "empresa": empresa.id,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ya existe un usuario registrado con este correo.")
+        self.assertEqual(Usuario.objects.filter(email__iexact="duplicado@empresa.com").count(), 1)
 
     def test_plan_habilita_modulo_para_empresa(self):
         empresa = Empresa.objects.create(

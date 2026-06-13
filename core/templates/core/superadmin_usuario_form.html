@@ -17,7 +17,7 @@
 
     <section class="erp-form-card">
         <h3>Cuenta y acceso</h3>
-        <p>Desde aqui controlas el usuario real del sistema sin abrir el admin tecnico de Django.</p>
+        <p>Registra el correo, empresa y rol. El usuario recibira una invitacion para crear personalmente su contrasena.</p>
         <div class="erp-form-grid">
             {% for field in form %}
                 {% if field.name != 'groups' %}
@@ -43,7 +43,7 @@
 
     <div class="erp-form-actions">
         <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Usuario</button>
+        <button type="submit" class="erp-btn">{% if form.instance.pk %}Guardar Usuario{% else %}Crear y enviar invitacion{% endif %}</button>
     </div>
 </form>
 {% endblock %}
