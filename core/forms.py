@@ -2,6 +2,8 @@ from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import Group
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 
 from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
@@ -206,6 +208,29 @@ def generar_username_tecnico(email):
 
 
 class UsuarioControlCreateForm(forms.ModelForm):
+    MODO_INVITACION = "invitacion"
+    MODO_RAPIDO = "rapido"
+
+    modo_creacion = forms.ChoiceField(
+        choices=[
+            (MODO_INVITACION, "Enviar invitacion por correo"),
+            (MODO_RAPIDO, "Crear usuario rapido"),
+        ],
+        initial=MODO_INVITACION,
+        required=False,
+        widget=forms.RadioSelect,
+        label="Forma de acceso",
+    )
+    password1 = forms.CharField(
+        required=False,
+        label="Contrasena inicial",
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    password2 = forms.CharField(
+        required=False,
+        label="Confirmar contrasena",
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
     groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all().order_by("name"),
         required=False,
@@ -241,6 +266,9 @@ class UsuarioControlCreateForm(forms.ModelForm):
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si realmente quieres permitir acceso al admin tecnico."),
             "is_superuser": ("Es superadministrador", "Reserva esta opcion solo para ti o para cuentas maestras internas."),
             "groups": ("Roles complementarios", "Roles adicionales basados en grupos de Django, utiles para crecer despues."),
+            "modo_creacion": ("Forma de acceso", "Puedes enviar una invitacion o entregar una contrasena inicial inmediatamente."),
+            "password1": ("Contrasena inicial", "Solo se usa en la creacion rapida. El usuario podra cambiarla despues."),
+            "password2": ("Confirmar contrasena", ""),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:
@@ -254,12 +282,39 @@ class UsuarioControlCreateForm(forms.ModelForm):
             raise forms.ValidationError("Ya existe un usuario registrado con este correo.")
         return email
 
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("modo_creacion") != self.MODO_RAPIDO:
+            return cleaned_data
+
+        password1 = cleaned_data.get("password1") or ""
+        password2 = cleaned_data.get("password2") or ""
+        if not password1:
+            self.add_error("password1", "Ingresa una contrasena para crear el usuario rapido.")
+        elif password1 != password2:
+            self.add_error("password2", "Las contrasenas no coinciden.")
+        else:
+            usuario_temporal = Usuario(
+                email=cleaned_data.get("email") or "",
+                first_name=cleaned_data.get("first_name") or "",
+                last_name=cleaned_data.get("last_name") or "",
+            )
+            try:
+                validate_password(password1, user=usuario_temporal)
+            except ValidationError as exc:
+                self.add_error("password1", exc)
+        return cleaned_data
+
     def save(self, commit=True):
         usuario = super().save(commit=False)
         usuario.username = generar_username_tecnico(self.cleaned_data["email"])
         usuario.email = self.cleaned_data["email"]
-        usuario.is_active = False
-        usuario.set_unusable_password()
+        if self.cleaned_data.get("modo_creacion") == self.MODO_RAPIDO:
+            usuario.is_active = True
+            usuario.set_password(self.cleaned_data["password1"])
+        else:
+            usuario.is_active = False
+            usuario.set_unusable_password()
         if commit:
             usuario.save()
             usuario.groups.set(self.cleaned_data.get("groups", []))

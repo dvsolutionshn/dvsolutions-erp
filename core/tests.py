@@ -336,6 +336,58 @@ class SuperAdminControlTests(TestCase):
         self.assertIn("Activa tu acceso", mail.outbox[0].subject)
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_superadmin_puede_crear_usuario_rapido_sin_invitacion(self):
+        empresa = Empresa.objects.create(nombre="Empresa Rapida", slug="empresa-rapida", rtn="08011999000066")
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_create"),
+            {
+                "modo_creacion": "rapido",
+                "first_name": "Mario",
+                "last_name": "Rapido",
+                "email": "mario@empresa.com",
+                "empresa": empresa.id,
+                "rol_sistema": self.rol_facturador.id,
+                "password1": "ClaveInicialSegura2026",
+                "password2": "ClaveInicialSegura2026",
+                "groups": [self.group.id],
+            },
+        )
+
+        self.assertRedirects(response, reverse("superadmin_usuarios"))
+        usuario = Usuario.objects.get(email="mario@empresa.com")
+        self.assertTrue(usuario.is_active)
+        self.assertTrue(usuario.check_password("ClaveInicialSegura2026"))
+        self.assertEqual(usuario.empresa, empresa)
+        self.assertEqual(usuario.rol_sistema, self.rol_facturador)
+        self.assertTrue(usuario.groups.filter(id=self.group.id).exists())
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertFalse(TokenAccesoUsuario.objects.filter(usuario=usuario).exists())
+
+    def test_usuario_rapido_rechaza_contrasenas_distintas(self):
+        empresa = Empresa.objects.create(nombre="Empresa Clave", slug="empresa-clave", rtn="08011999000067")
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_create"),
+            {
+                "modo_creacion": "rapido",
+                "first_name": "Laura",
+                "last_name": "Prueba",
+                "email": "laura@empresa.com",
+                "empresa": empresa.id,
+                "rol_sistema": self.rol_facturador.id,
+                "password1": "ClaveInicialSegura2026",
+                "password2": "OtraClaveSegura2026",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Las contrasenas no coinciden")
+        self.assertFalse(Usuario.objects.filter(email="laura@empresa.com").exists())
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_invitacion_permite_crear_password_y_entrar_con_correo(self):
         import re
 

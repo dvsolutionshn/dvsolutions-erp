@@ -17,11 +17,26 @@
 
     <section class="erp-form-card">
         <h3>Cuenta y acceso</h3>
-        <p>Registra el correo, empresa y rol. El usuario recibira una invitacion para crear personalmente su contrasena.</p>
+        {% if form.instance.pk %}
+        <p>Actualiza la empresa, el rol y el estado operativo del usuario.</p>
+        {% else %}
+        <p>Elige si el usuario creara su propia contrasena por correo o si necesitas habilitarlo inmediatamente.</p>
+        <div class="erp-soft-panel" style="margin-bottom:20px;">
+            <div class="erp-field">
+                <label>{{ form.modo_creacion.label }}</label>
+                {{ form.modo_creacion }}
+                {% if form.modo_creacion.help_text %}<div class="erp-field-help">{{ form.modo_creacion.help_text }}</div>{% endif %}
+                {{ form.modo_creacion.errors }}
+            </div>
+        </div>
+        {% endif %}
         <div class="erp-form-grid">
             {% for field in form %}
-                {% if field.name != 'groups' %}
-                <div class="erp-field {% if field.name == 'username' or field.name == 'email' %}erp-field-span-full{% endif %}">
+                {% if field.name != 'groups' and field.name != 'modo_creacion' %}
+                <div
+                    class="erp-field {% if field.name == 'username' or field.name == 'email' %}erp-field-span-full{% endif %}"
+                    {% if field.name == 'password1' or field.name == 'password2' %}data-quick-password-field{% endif %}
+                >
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
@@ -43,7 +58,34 @@
 
     <div class="erp-form-actions">
         <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">{% if form.instance.pk %}Guardar Usuario{% else %}Crear y enviar invitacion{% endif %}</button>
+        <button type="submit" class="erp-btn" id="usuarioSubmitButton">{% if form.instance.pk %}Guardar Usuario{% else %}Crear y enviar invitacion{% endif %}</button>
     </div>
 </form>
+
+{% if not form.instance.pk %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const modeInputs = document.querySelectorAll('input[name="modo_creacion"]');
+    const passwordFields = document.querySelectorAll("[data-quick-password-field]");
+    const submitButton = document.getElementById("usuarioSubmitButton");
+
+    function updateCreationMode() {
+        const selected = document.querySelector('input[name="modo_creacion"]:checked');
+        const quickMode = selected && selected.value === "rapido";
+        passwordFields.forEach(function (field) {
+            field.hidden = !quickMode;
+            field.querySelectorAll("input").forEach(function (input) {
+                input.disabled = !quickMode;
+            });
+        });
+        submitButton.textContent = quickMode ? "Crear usuario rapido" : "Crear y enviar invitacion";
+    }
+
+    modeInputs.forEach(function (input) {
+        input.addEventListener("change", updateCreationMode);
+    });
+    updateCreationMode();
+});
+</script>
+{% endif %}
 {% endblock %}

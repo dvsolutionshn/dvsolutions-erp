@@ -1346,6 +1346,13 @@ def superadmin_usuario_create(request):
     form = UsuarioControlCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         usuario = form.save()
+        if form.cleaned_data["modo_creacion"] == UsuarioControlCreateForm.MODO_RAPIDO:
+            messages.success(
+                request,
+                f"Usuario {usuario.email} creado y activado. Ya puede iniciar sesion con la contrasena asignada.",
+            )
+            return redirect("superadmin_usuarios")
+
         token_raw, token = emitir_token_acceso(
             usuario,
             TokenAccesoUsuario.TIPO_INVITACION,
