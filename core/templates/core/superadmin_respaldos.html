@@ -1,0 +1,101 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}Respaldos{% endblock %}
+{% block header_title %}Respaldos empresariales{% endblock %}
+{% block header_description %}Control privado para descargar copias portatiles por empresa con datos, archivos, relaciones y verificacion de integridad.{% endblock %}
+
+{% block content %}
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Respaldos generados</div>
+        <p class="erp-stat-value">{{ resumen.total }}</p>
+        <p class="erp-card-muted">Historial completo de solicitudes realizadas desde Control Maestro.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Exitosos</div>
+        <p class="erp-stat-value">{{ resumen.exitosos }}</p>
+        <p class="erp-card-muted">Archivos preparados y entregados para descarga.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Empresas protegidas</div>
+        <p class="erp-stat-value">{{ resumen.empresas_respaldadas }}</p>
+        <p class="erp-card-muted">Empresas que cuentan con al menos un respaldo registrado.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Fallidos</div>
+        <p class="erp-stat-value">{{ resumen.fallidos }}</p>
+        <p class="erp-card-muted">Intentos que requieren revision tecnica.</p>
+    </article>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Generar respaldo ahora</h3>
+            <p class="erp-card-muted">La descarga inicia al terminar. No cierres la ventana durante la preparacion.</p>
+        </div>
+    </div>
+    <div class="erp-soft-panel" style="margin-bottom:16px;">
+        <strong>Politica recomendada:</strong>
+        <div>Genera copias antes de migraciones, cambios grandes o cargas masivas.</div>
+        <div>Manten una copia cifrada local, otra en un disco externo y una tercera fuera de la ubicacion principal.</div>
+        <div>Los ZIP contienen informacion sensible y no deben compartirse por canales inseguros.</div>
+    </div>
+    <div class="erp-grid">
+        {% for empresa in empresas %}
+        <article class="erp-card">
+            <div class="erp-kpi-label">{{ empresa.slug }}</div>
+            <h3 class="erp-panel-title">{{ empresa.nombre }}</h3>
+            <p class="erp-card-muted">RTN {{ empresa.rtn }}</p>
+            <form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa.id %}">
+                {% csrf_token %}
+                <button type="submit" class="erp-btn">Generar y descargar ZIP</button>
+            </form>
+        </article>
+        {% empty %}
+        <div class="erp-empty">No hay empresas disponibles.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Historial de respaldos</h3>
+            <p class="erp-card-muted">Auditoria de fecha, operador, volumen e integridad de cada archivo generado.</p>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Empresa</th>
+                    <th>Estado</th>
+                    <th>Registros</th>
+                    <th>Archivos</th>
+                    <th>Tamano</th>
+                    <th>SHA-256</th>
+                    <th>Operador</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for respaldo in respaldos %}
+                <tr>
+                    <td>{{ respaldo.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                    <td><a class="erp-link" href="{% url 'superadmin_empresa_detail' respaldo.empresa.id %}">{{ respaldo.empresa.nombre }}</a></td>
+                    <td><span class="erp-badge {% if respaldo.estado == 'exitoso' %}success{% elif respaldo.estado == 'fallido' %}danger{% else %}warning{% endif %}">{{ respaldo.get_estado_display }}</span></td>
+                    <td>{{ respaldo.registros_incluidos }}</td>
+                    <td>{{ respaldo.archivos_incluidos }}</td>
+                    <td>{{ respaldo.tamano_bytes|filesizeformat }}</td>
+                    <td><code title="{{ respaldo.sha256 }}">{{ respaldo.sha256|slice:":12"|default:"-" }}</code></td>
+                    <td>{{ respaldo.generado_por.username|default:"Sistema" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="erp-empty">Todavia no hay respaldos registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

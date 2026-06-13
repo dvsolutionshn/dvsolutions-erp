@@ -11,13 +11,14 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import OperationalError
 from django.db.models import Count, Q
-from django.http import Http404, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
+from .backup_service import generar_respaldo_empresa
 from .forms import (
     EmpresaControlForm,
     PagoLicenciaEmpresaForm,
@@ -30,7 +31,7 @@ from .forms import (
 )
 from .models import Empresa
 from .models import EmpresaModulo
-from .models import PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
+from .models import PagoLicenciaEmpresa, PlanComercial, PlanModulo, RespaldoEmpresa, RolSistema, SolicitudComercial, Usuario
 
 
 HOST_LOCAL_PATTERNS = {
@@ -585,6 +586,7 @@ def _superadmin_base_context():
         "superadmin_modulos_url": "/control/modulos/",
         "superadmin_licencias_url": "/control/licencias/",
         "superadmin_solicitudes_url": "/control/solicitudes/",
+        "superadmin_respaldos_url": "/control/respaldos/",
         "enable_django_admin": settings.ENABLE_DJANGO_ADMIN,
         "django_admin_url": f"/{settings.DJANGO_ADMIN_PATH.strip('/')}/" if settings.ENABLE_DJANGO_ADMIN else None,
     }
@@ -752,8 +754,79 @@ def superadmin_empresa_detail(request, empresa_id):
         "modulos_empresa": empresa.modulos_habilitados_lista,
         "matriz_modulos": matriz_modulos,
         "pagos_licencia": empresa.pagos_licencia.select_related("plan_comercial"),
+        "respaldos_empresa": empresa.respaldos.select_related("generado_por")[:8],
     }
     return render(request, "core/superadmin_empresa_detalle.html", context)
+
+
+@superadmin_required
+def superadmin_respaldos(request):
+    empresas = Empresa.objects.order_by("nombre")
+    respaldos = RespaldoEmpresa.objects.select_related("empresa", "generado_por")[:100]
+    context = {
+        **_superadmin_base_context(),
+        "empresas": empresas,
+        "respaldos": respaldos,
+        "resumen": {
+            "total": RespaldoEmpresa.objects.count(),
+            "exitosos": RespaldoEmpresa.objects.filter(estado="exitoso").count(),
+            "fallidos": RespaldoEmpresa.objects.filter(estado="fallido").count(),
+            "empresas_respaldadas": RespaldoEmpresa.objects.filter(estado="exitoso")
+            .values("empresa_id")
+            .distinct()
+            .count(),
+        },
+    }
+    return render(request, "core/superadmin_respaldos.html", context)
+
+
+@superadmin_required
+@require_POST
+def superadmin_empresa_generar_respaldo(request, empresa_id):
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    registro = RespaldoEmpresa.objects.create(
+        empresa=empresa,
+        generado_por=request.user,
+        estado="generando",
+    )
+    try:
+        resultado = generar_respaldo_empresa(empresa)
+    except Exception as exc:
+        logger.exception("No se pudo generar el respaldo de la empresa %s", empresa.pk)
+        registro.estado = "fallido"
+        registro.detalle_error = str(exc)[:4000]
+        registro.fecha_finalizacion = timezone.now()
+        registro.save(update_fields=["estado", "detalle_error", "fecha_finalizacion"])
+        messages.error(request, f"No se pudo generar el respaldo de {empresa.nombre}. Revisa el registro tecnico.")
+        return redirect("superadmin_respaldos")
+
+    registro.estado = "exitoso"
+    registro.nombre_archivo = resultado["nombre"]
+    registro.registros_incluidos = resultado["registros"]
+    registro.archivos_incluidos = resultado["archivos"]
+    registro.tamano_bytes = resultado["tamano_bytes"]
+    registro.sha256 = resultado["sha256"]
+    registro.fecha_finalizacion = timezone.now()
+    registro.save(
+        update_fields=[
+            "estado",
+            "nombre_archivo",
+            "registros_incluidos",
+            "archivos_incluidos",
+            "tamano_bytes",
+            "sha256",
+            "fecha_finalizacion",
+        ]
+    )
+
+    response = FileResponse(
+        resultado["archivo"],
+        as_attachment=True,
+        filename=resultado["nombre"],
+        content_type="application/zip",
+    )
+    response["X-DVSolutions-Backup-SHA256"] = resultado["sha256"]
+    return response
 
 
 @superadmin_required

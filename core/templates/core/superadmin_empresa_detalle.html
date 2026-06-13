@@ -20,6 +20,10 @@
 </form>
 {% endif %}
 <a href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa_obj.id %}" class="erp-action-link">Renovar</a>
+<form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa_obj.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit" class="erp-action-link">Generar respaldo</button>
+</form>
 {% endblock %}
 
 {% block content %}
@@ -107,6 +111,52 @@
     <p class="erp-card-muted">{{ empresa_obj.observaciones_comerciales }}</p>
 </section>
 {% endif %}
+
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Proteccion de datos</h3>
+            <p class="erp-card-muted">Genera un ZIP privado con registros, relaciones, usuarios de la empresa, archivos subidos, manifiesto y hashes de integridad.</p>
+        </div>
+        <form method="post" action="{% url 'superadmin_empresa_generar_respaldo' empresa_obj.id %}">
+            {% csrf_token %}
+            <button type="submit" class="erp-btn">Generar y descargar respaldo</button>
+        </form>
+    </div>
+    <div class="erp-soft-panel" style="margin-bottom:16px;">
+        <strong>Importante:</strong>
+        <div>El ZIP puede contener informacion financiera y datos de salud. Guardalo en un disco cifrado y conserva otra copia fuera del servidor.</div>
+        <div>La restauracion debe probarse primero en un ambiente separado antes de tocar produccion.</div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Registros</th>
+                    <th>Archivos</th>
+                    <th>Tamano</th>
+                    <th>Generado por</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for respaldo in respaldos_empresa %}
+                <tr>
+                    <td>{{ respaldo.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                    <td><span class="erp-badge {% if respaldo.estado == 'exitoso' %}success{% elif respaldo.estado == 'fallido' %}danger{% else %}warning{% endif %}">{{ respaldo.get_estado_display }}</span></td>
+                    <td>{{ respaldo.registros_incluidos }}</td>
+                    <td>{{ respaldo.archivos_incluidos }}</td>
+                    <td>{{ respaldo.tamano_bytes|filesizeformat }}</td>
+                    <td>{{ respaldo.generado_por.username|default:"Sistema" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">Todavia no se ha generado un respaldo para esta empresa.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 
 <section class="erp-card">
     <h3 class="erp-panel-title">Modulos habilitados</h3>

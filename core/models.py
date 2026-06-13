@@ -557,6 +557,40 @@ class PagoLicenciaEmpresa(models.Model):
 
     def __str__(self):
         return f"{self.empresa.nombre} - {self.cantidad_meses} mes(es)"
+
+
+class RespaldoEmpresa(models.Model):
+    ESTADO_CHOICES = [
+        ("generando", "Generando"),
+        ("exitoso", "Exitoso"),
+        ("fallido", "Fallido"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="respaldos")
+    generado_por = models.ForeignKey(
+        "core.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="respaldos_generados",
+    )
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="generando")
+    nombre_archivo = models.CharField(max_length=255, blank=True)
+    registros_incluidos = models.PositiveBigIntegerField(default=0)
+    archivos_incluidos = models.PositiveIntegerField(default=0)
+    tamano_bytes = models.PositiveBigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, blank=True)
+    detalle_error = models.TextField(blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_finalizacion = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion", "-id"]
+        verbose_name = "Respaldo de empresa"
+        verbose_name_plural = "Respaldos de empresas"
+
+    def __str__(self):
+        return f"{self.empresa.nombre} - {self.fecha_creacion:%d/%m/%Y %H:%M}"
     
 # ============================================
 # PAGOS - CUENTAS POR COBRAR

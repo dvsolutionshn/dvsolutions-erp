@@ -1,14 +1,19 @@
 from datetime import timedelta
+import io
+import json
+import tempfile
+import zipfile
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RolSistema, SolicitudComercial, Usuario
-from core.models import PagoLicenciaEmpresa
+from core.models import PagoLicenciaEmpresa, RespaldoEmpresa
 from core.forms import EmpresaControlForm
 
 
@@ -102,6 +107,65 @@ class SuperAdminControlTests(TestCase):
         self.client.login(username="operador", password="pass12345")
         response = self.client.get(reverse("superadmin_dashboard"))
         self.assertRedirects(response, reverse("superadmin_login"))
+
+    def test_solo_superadmin_puede_generar_respaldo(self):
+        empresa = Empresa.objects.create(nombre="Empresa Protegida", slug="empresa-protegida", rtn="08011999000055")
+        self.client.login(username="operador", password="pass12345")
+
+        response = self.client.post(reverse("superadmin_empresa_generar_respaldo", args=[empresa.id]))
+
+        self.assertRedirects(response, reverse("superadmin_login"))
+        self.assertEqual(RespaldoEmpresa.objects.count(), 0)
+
+    def test_respaldo_empresa_genera_zip_aislado_con_manifiesto(self):
+        with tempfile.TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            empresa = Empresa.objects.create(
+                nombre="Empresa Uno",
+                slug="empresa-uno",
+                rtn="08011999000056",
+                logo=SimpleUploadedFile("logo-prueba.png", b"imagen-prueba", content_type="image/png"),
+            )
+            otra_empresa = Empresa.objects.create(nombre="Empresa Dos", slug="empresa-dos", rtn="08011999000057")
+            Usuario.objects.create_user(
+                username="usuario-empresa-uno",
+                password="pass12345",
+                empresa=empresa,
+            )
+            Usuario.objects.create_user(
+                username="usuario-empresa-dos",
+                password="pass12345",
+                empresa=otra_empresa,
+            )
+            self.client.login(username="master", password="pass12345")
+
+            response = self.client.post(reverse("superadmin_empresa_generar_respaldo", args=[empresa.id]))
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/zip")
+            archive_bytes = b"".join(response.streaming_content)
+            with zipfile.ZipFile(io.BytesIO(archive_bytes)) as backup_zip:
+                names = backup_zip.namelist()
+                self.assertIn("manifest.json", names)
+                self.assertIn("datos.json", names)
+                self.assertIn("LEEME_RESTAURACION.txt", names)
+                self.assertTrue(any(name.startswith("media/logos/logo-prueba") for name in names))
+                manifest = json.loads(backup_zip.read("manifest.json"))
+                data = json.loads(backup_zip.read("datos.json"))
+
+            self.assertEqual(manifest["empresa"]["slug"], empresa.slug)
+            self.assertEqual(manifest["archivos_media"], 1)
+            serialized_users = [
+                item["fields"]["username"]
+                for item in data
+                if item["model"] == "core.usuario"
+            ]
+            self.assertIn("usuario-empresa-uno", serialized_users)
+            self.assertNotIn("usuario-empresa-dos", serialized_users)
+            registro = RespaldoEmpresa.objects.get()
+            self.assertEqual(registro.estado, "exitoso")
+            self.assertGreater(registro.registros_incluidos, 0)
+            self.assertEqual(registro.archivos_incluidos, 1)
+            self.assertEqual(len(registro.sha256), 64)
 
     def test_superadmin_puede_crear_empresa_con_modulo(self):
         self.client.login(username="master", password="pass12345")
