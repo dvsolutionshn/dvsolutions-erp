@@ -20,7 +20,7 @@
         {% if form.instance.pk %}
         <p>Actualiza la empresa, el rol y el estado operativo del usuario.</p>
         {% else %}
-        <p>Elige si el usuario creara su propia contrasena por correo o si necesitas habilitarlo inmediatamente.</p>
+        <p>Elige si el usuario creara su propia contrasena por correo o si necesitas habilitarlo inmediatamente. El mismo correo puede existir en empresas distintas con accesos completamente separados.</p>
         <div class="erp-soft-panel" style="margin-bottom:20px;">
             <div class="erp-field">
                 <label>{{ form.modo_creacion.label }}</label>

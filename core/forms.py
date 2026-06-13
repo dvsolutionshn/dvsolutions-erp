@@ -277,13 +277,15 @@ class UsuarioControlCreateForm(forms.ModelForm):
                     self.fields[field_name].help_text = help_text
 
     def clean_email(self):
-        email = (self.cleaned_data.get("email") or "").strip().lower()
-        if Usuario.objects.filter(email__iexact=email).exists():
-            raise forms.ValidationError("Ya existe un usuario registrado con este correo.")
-        return email
+        return (self.cleaned_data.get("email") or "").strip().lower()
 
     def clean(self):
         cleaned_data = super().clean()
+        email = cleaned_data.get("email")
+        empresa = cleaned_data.get("empresa")
+        if email and Usuario.objects.filter(empresa=empresa, email__iexact=email).exists():
+            self.add_error("email", "Ya existe un usuario con este correo dentro de la empresa seleccionada.")
+
         if cleaned_data.get("modo_creacion") != self.MODO_RAPIDO:
             return cleaned_data
 
@@ -369,10 +371,18 @@ class UsuarioControlUpdateForm(forms.ModelForm):
                     self.fields[field_name].help_text = help_text
 
     def clean_email(self):
-        email = (self.cleaned_data.get("email") or "").strip().lower()
-        if Usuario.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
-            raise forms.ValidationError("Ya existe otro usuario registrado con este correo.")
-        return email
+        return (self.cleaned_data.get("email") or "").strip().lower()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        email = cleaned_data.get("email")
+        empresa = cleaned_data.get("empresa")
+        if email and Usuario.objects.filter(
+            empresa=empresa,
+            email__iexact=email,
+        ).exclude(pk=self.instance.pk).exists():
+            self.add_error("email", "Ya existe otro usuario con este correo dentro de la empresa seleccionada.")
+        return cleaned_data
 
     def save(self, commit=True):
         usuario = super().save(commit=commit)

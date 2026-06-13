@@ -496,8 +496,91 @@ class SuperAdminControlTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ya existe un usuario registrado con este correo.")
+        self.assertContains(response, "Ya existe un usuario con este correo dentro de la empresa seleccionada.")
         self.assertEqual(Usuario.objects.filter(email__iexact="duplicado@empresa.com").count(), 1)
+
+    def test_mismo_correo_puede_tener_accesos_separados_por_empresa(self):
+        empresa_hospital = Empresa.objects.create(
+            nombre="Hospital Mia",
+            slug="hospital-mia-test",
+            rtn="08011999000068",
+        )
+        empresa_spa = Empresa.objects.create(
+            nombre="Medical Spa",
+            slug="medical-spa-test",
+            rtn="08011999000069",
+        )
+        self.client.login(username="master", password="pass12345")
+
+        for empresa, password in [
+            (empresa_hospital, "ClaveHospitalSegura2026"),
+            (empresa_spa, "ClaveSpaSegura2026"),
+        ]:
+            response = self.client.post(
+                reverse("superadmin_usuario_create"),
+                {
+                    "modo_creacion": "rapido",
+                    "first_name": "Doctora",
+                    "last_name": "Compartida",
+                    "email": "doctora@ejemplo.com",
+                    "empresa": empresa.id,
+                    "rol_sistema": self.rol_facturador.id,
+                    "password1": password,
+                    "password2": password,
+                },
+            )
+            self.assertRedirects(response, reverse("superadmin_usuarios"))
+
+        self.assertEqual(Usuario.objects.filter(email__iexact="doctora@ejemplo.com").count(), 2)
+        usuario_hospital = Usuario.objects.get(
+            empresa=empresa_hospital,
+            email__iexact="doctora@ejemplo.com",
+        )
+        usuario_spa = Usuario.objects.get(
+            empresa=empresa_spa,
+            email__iexact="doctora@ejemplo.com",
+        )
+        self.assertTrue(usuario_hospital.check_password("ClaveHospitalSegura2026"))
+        self.assertFalse(usuario_hospital.check_password("ClaveSpaSegura2026"))
+        self.assertTrue(usuario_spa.check_password("ClaveSpaSegura2026"))
+
+        self.client.logout()
+        response_hospital = self.client.post(
+            reverse("empresa_login", args=[empresa_hospital.slug]),
+            {
+                "username": "doctora@ejemplo.com",
+                "password": "ClaveHospitalSegura2026",
+            },
+        )
+        self.assertRedirects(
+            response_hospital,
+            reverse("dashboard", args=[empresa_hospital.slug]),
+            fetch_redirect_response=False,
+        )
+
+        self.client.logout()
+        response_cruzada = self.client.post(
+            reverse("empresa_login", args=[empresa_spa.slug]),
+            {
+                "username": "doctora@ejemplo.com",
+                "password": "ClaveHospitalSegura2026",
+            },
+        )
+        self.assertEqual(response_cruzada.status_code, 200)
+        self.assertContains(response_cruzada, "Correo o contrasena incorrectos.")
+
+        response_spa = self.client.post(
+            reverse("empresa_login", args=[empresa_spa.slug]),
+            {
+                "username": "doctora@ejemplo.com",
+                "password": "ClaveSpaSegura2026",
+            },
+        )
+        self.assertRedirects(
+            response_spa,
+            reverse("dashboard", args=[empresa_spa.slug]),
+            fetch_redirect_response=False,
+        )
 
     def test_plan_habilita_modulo_para_empresa(self):
         empresa = Empresa.objects.create(

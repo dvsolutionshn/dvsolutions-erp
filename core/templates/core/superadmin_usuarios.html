@@ -2,7 +2,7 @@
 
 {% block title %}Usuarios{% endblock %}
 {% block header_title %}Usuarios y Roles{% endblock %}
-{% block header_description %}Gestiona acceso interno, empresa asignada y roles operativos sin abrir el admin tecnico de Django.{% endblock %}
+{% block header_description %}Gestiona accesos independientes por empresa. Un mismo correo puede tener contrasenas y permisos distintos en cada organizacion.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'superadmin_usuario_create' %}" class="erp-action-link">Nuevo Usuario</a>
