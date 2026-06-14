@@ -225,4 +225,17 @@
         </section>
     </form>
 </section>
+<script>
+(function(){
+    const barcodeInput = document.querySelector("[data-barcode-input]");
+    const nameInput = document.getElementById("id_nombre");
+    if(!barcodeInput){return;}
+    barcodeInput.addEventListener("keydown", function(event){
+        if(event.key !== "Enter"){return;}
+        event.preventDefault();
+        barcodeInput.value = barcodeInput.value.trim();
+        if(nameInput){nameInput.focus();}
+    });
+})();
+</script>
 {% endblock %}

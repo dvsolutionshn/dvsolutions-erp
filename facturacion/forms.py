@@ -257,7 +257,7 @@ class ProductoForm(forms.ModelForm):
             'activo',
         ]
         help_texts = {
-            'codigo': 'Codigo interno opcional para busquedas, inventario y futuras integraciones.',
+            'codigo': 'Escanea o escribe el codigo de barras. Tambien puede usarse como SKU interno y debe ser unico dentro de la empresa.',
             'tipo_item': 'Define si se trata de un articulo fisico o un servicio.',
             'unidad_medida': 'Unidad comercial principal para facturacion e inventario.',
             'precio': 'Precio base sugerido al seleccionar el producto en factura.',
@@ -278,6 +278,12 @@ class ProductoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
+        self.fields['codigo'].label = 'Codigo de barras / SKU'
+        self.fields['codigo'].widget.attrs.update({
+            'placeholder': 'Escanea el codigo o escribelo manualmente',
+            'autocomplete': 'off',
+            'data-barcode-input': 'true',
+        })
         self.mostrar_perfil_farmaceutico = False
         self.mostrar_bodega_inicial = False
         self.bodega_stock_fields = []

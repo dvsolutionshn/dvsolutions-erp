@@ -12,6 +12,11 @@
 .pos-panel{position:relative;overflow:hidden}
 .pos-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:12px;margin-bottom:16px}
 .pos-search,.pos-input,.pos-select{width:100%;min-height:48px;border:1px solid #bfd0e8;border-radius:10px;padding:0 14px;background:#fff;color:#102338;font-size:15px}
+.pos-scanner-state{display:flex;align-items:center;gap:9px;margin:-4px 0 14px;color:#506984;font-size:13px}
+.pos-scanner-dot{width:9px;height:9px;border-radius:50%;background:#14b8a6;box-shadow:0 0 0 5px rgba(20,184,166,.12)}
+.pos-scan-feedback{min-height:42px;display:none;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:10px 12px;border:1px solid #b9d9cf;border-radius:8px;background:#effcf8;color:#176252;font-size:13px;font-weight:700}
+.pos-scan-feedback.is-visible{display:flex}
+.pos-scan-feedback.is-error{border-color:#efc0bd;background:#fff4f3;color:#9f2720}
 .pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;max-height:620px;overflow:auto;padding-right:4px}
 .pos-product{min-height:244px;text-align:left;border:1px solid #d4e0f1;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:10px;padding:12px;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
 .pos-product:hover{transform:translateY(-3px);border-color:#9eb8df;box-shadow:0 16px 32px rgba(12,34,56,.08)}
@@ -53,6 +58,8 @@
             <input class="pos-search" id="posSearch" type="search" placeholder="Buscar por codigo, barra o nombre" autocomplete="off" autofocus>
             <button class="erp-btn" type="button" id="clearSearch">Limpiar</button>
         </div>
+        <div class="pos-scanner-state"><span class="pos-scanner-dot"></span><span>Lector listo. Escanea un producto o escribe su codigo y presiona Enter.</span></div>
+        <div class="pos-scan-feedback" id="scanFeedback" role="status" aria-live="polite"></div>
         <div class="erp-card-muted" style="margin-bottom:12px;">{{ productos_count }} productos disponibles para venta rapida.</div>
         <div class="pos-grid" id="productGrid"></div>
     </article>
@@ -101,10 +108,40 @@
     const totalLabel = document.getElementById("totalLabel");
     const checkoutButton = document.getElementById("checkoutButton");
     const payloadInput = document.getElementById("payloadInput");
+    const scanFeedback = document.getElementById("scanFeedback");
     const currency = new Intl.NumberFormat("es-HN",{style:"currency",currency:"HNL"});
+    let feedbackTimer = null;
+    let scannerBuffer = "";
+    let scannerLastKeyAt = 0;
 
     function money(value){return currency.format(value || 0).replace("HNL","L.");}
     function normalized(value){return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
+    function normalizedCode(value){return String(value || "").trim().toLowerCase();}
+
+    function showScanFeedback(message, isError){
+        window.clearTimeout(feedbackTimer);
+        scanFeedback.textContent = message;
+        scanFeedback.classList.toggle("is-error", Boolean(isError));
+        scanFeedback.classList.add("is-visible");
+        feedbackTimer = window.setTimeout(() => scanFeedback.classList.remove("is-visible"), 2600);
+    }
+
+    function soundScan(success){
+        try{
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            const context = new AudioContextClass();
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.frequency.value = success ? 880 : 220;
+            gain.gain.value = .035;
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + (success ? .07 : .14));
+        }catch(error){
+            // El sonido es complementario; algunos navegadores pueden bloquearlo.
+        }
+    }
 
     function renderProducts(){
         const term = normalized(search.value);
@@ -178,6 +215,23 @@
         renderCart();
     }
 
+    function scanCode(rawCode){
+        const code = normalizedCode(rawCode);
+        if(!code){return false;}
+        const product = products.find(item => normalizedCode(item.codigo) === code);
+        if(!product){
+            showScanFeedback(`No existe un producto activo con el codigo ${rawCode}.`, true);
+            soundScan(false);
+            return false;
+        }
+        addProduct(product.id);
+        showScanFeedback(`${product.nombre} agregado. Cantidad ${cart.get(product.id).cantidad.toFixed(0)}.`, false);
+        soundScan(true);
+        search.value = "";
+        renderProducts();
+        return true;
+    }
+
     grid.addEventListener("click", event => {
         const button = event.target.closest("[data-id]");
         if(button){addProduct(button.dataset.id);}
@@ -196,6 +250,32 @@
         renderCart();
     });
     search.addEventListener("input", renderProducts);
+    search.addEventListener("keydown", event => {
+        if(event.key !== "Enter"){return;}
+        event.preventDefault();
+        scanCode(search.value);
+    });
+    document.addEventListener("keydown", event => {
+        const target = event.target;
+        const isEditable = target.matches("input, textarea, select, [contenteditable='true']");
+        if(isEditable){return;}
+
+        const now = Date.now();
+        if(now - scannerLastKeyAt > 90){scannerBuffer = "";}
+        scannerLastKeyAt = now;
+
+        if(event.key === "Enter"){
+            if(scannerBuffer.length >= 3){
+                event.preventDefault();
+                scanCode(scannerBuffer);
+            }
+            scannerBuffer = "";
+            return;
+        }
+        if(event.key.length === 1){
+            scannerBuffer += event.key;
+        }
+    });
     document.getElementById("clearSearch").addEventListener("click", () => {search.value = ""; renderProducts(); search.focus();});
     document.getElementById("posForm").addEventListener("submit", event => {
         if(!cart.size){event.preventDefault(); return;}

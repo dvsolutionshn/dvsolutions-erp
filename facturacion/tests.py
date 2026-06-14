@@ -16,7 +16,7 @@ from openpyxl import Workbook, load_workbook
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, EmpresaModulo, Modulo, RolSistema
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
-from .forms import ConfiguracionFacturacionEmpresaForm
+from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
 from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
@@ -238,6 +238,26 @@ class FacturacionTests(TestCase):
                 estado="contabilizado",
             ).exists()
         )
+
+    def test_punto_venta_expone_codigo_para_lector_de_barras(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.codigo = "7501234567890"
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.get(reverse("punto_venta", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lector listo")
+        self.assertContains(response, "7501234567890")
+        self.assertContains(response, "scanCode")
+
+    def test_formulario_producto_prepara_campo_para_codigo_de_barras(self):
+        form = ProductoForm(empresa=self.empresa)
+
+        self.assertEqual(form.fields["codigo"].label, "Codigo de barras / SKU")
+        self.assertEqual(form.fields["codigo"].widget.attrs["data-barcode-input"], "true")
 
     def test_libro_compras_fiscal_evita_duplicados_entre_meses(self):
         RegistroCompraFiscal.objects.create(
