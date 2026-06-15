@@ -387,6 +387,28 @@ class FacturacionTests(TestCase):
         self.assertEqual(form.fields["codigo"].label, "Codigo de barras / SKU")
         self.assertEqual(form.fields["codigo"].widget.attrs["data-barcode-input"], "true")
 
+    def test_nuevo_producto_muestra_estacion_lector_en_empresas_pos(self):
+        for slug in ["demo_1", "hospital_mia", "medical_spa"]:
+            self.empresa.slug = slug
+            self.empresa.save(update_fields=["slug"])
+            response = self.client.get(
+                reverse("crear_producto_facturacion", args=[self.empresa.slug])
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Lector listo")
+            self.assertContains(response, "Activar lector")
+            self.assertContains(response, 'data-barcode-enabled="true"')
+
+    def test_nuevo_producto_no_duplica_campo_codigo_con_estacion_lector(self):
+        self.empresa.slug = "demo_1"
+        self.empresa.save(update_fields=["slug"])
+
+        response = self.client.get(
+            reverse("crear_producto_facturacion", args=[self.empresa.slug])
+        )
+
+        self.assertEqual(response.content.decode().count('id="id_codigo"'), 1)
+
     def test_pantalla_asigna_codigo_a_producto_existente(self):
         response = self.client.get(
             reverse("codigos_barras_productos", args=[self.empresa.slug])

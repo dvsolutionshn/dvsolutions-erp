@@ -49,11 +49,55 @@
     margin-bottom:4px;
     color:#102338;
 }
+.erp-barcode-station{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:16px;
+    align-items:end;
+    border:1px solid #a8d9d5;
+    background:linear-gradient(135deg,#f3fffd 0%,#f5f9ff 100%);
+}
+.erp-barcode-heading{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.erp-barcode-heading h3{margin:0}
+.erp-barcode-live{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    color:#08766f;
+    font-size:12px;
+    font-weight:800;
+    text-transform:uppercase;
+}
+.erp-barcode-live::before{
+    content:"";
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:#14b8a6;
+    box-shadow:0 0 0 5px rgba(20,184,166,.14);
+}
+.erp-barcode-input-wrap input{
+    width:100%;
+    min-height:54px;
+    border-color:#79c9c2;
+    font-size:18px;
+    font-weight:800;
+    letter-spacing:0;
+}
+.erp-barcode-input-wrap.is-scanned input{
+    border-color:#16a085;
+    box-shadow:0 0 0 4px rgba(22,160,133,.12);
+}
+.erp-barcode-status{min-height:20px;margin-top:7px;color:#537087;font-size:13px;font-weight:700}
+.erp-barcode-actions{display:flex;gap:8px}
 @media (max-width: 760px){
     .erp-compact-grid.three-col,
     .erp-compact-grid.two-col{
         grid-template-columns:1fr;
     }
+    .erp-barcode-station{grid-template-columns:1fr}
+    .erp-barcode-actions{width:100%}
+    .erp-barcode-actions button{flex:1}
 }
 </style>
 {% endblock %}
@@ -69,12 +113,32 @@
         </section>
         {% endif %}
 
+        {% if lector_codigo_activo %}
+        <section class="erp-compact-card is-slim erp-barcode-station">
+            <div class="erp-barcode-input-wrap" id="barcodeStation">
+                <div class="erp-barcode-heading">
+                    <h3>Codigo de barras</h3>
+                    <span class="erp-barcode-live">Lector listo</span>
+                </div>
+                <p>Conecta el lector, pulsa Activar lector y escanea la etiqueta. El codigo quedara asociado a este producto.</p>
+                {{ form.codigo }}
+                <div class="erp-barcode-status" id="barcodeStatus">Esperando lectura del codigo...</div>
+                {% if form.codigo.help_text %}<div class="erp-field-help">{{ form.codigo.help_text }}</div>{% endif %}
+                {% if form.codigo.errors %}<ul class="erp-field-errors">{% for error in form.codigo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="erp-barcode-actions">
+                <button class="erp-btn" type="button" id="activateBarcode">Activar lector</button>
+                <button class="erp-btn-secondary" type="button" id="clearBarcode">Limpiar</button>
+            </div>
+        </section>
+        {% endif %}
+
         <section class="erp-compact-card is-slim">
             <h3>Datos base</h3>
             <p>Registra el producto, su precio de referencia y la configuracion comercial principal.</p>
             <div class="erp-compact-grid three-col is-tight" style="margin-top:12px;">
                 <div class="erp-field">{{ form.nombre.label_tag }}{{ form.nombre }}{% if form.nombre.errors %}<ul class="erp-field-errors">{% for error in form.nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
-                <div class="erp-field">{{ form.codigo.label_tag }}{{ form.codigo }}{% if form.codigo.help_text %}<div class="erp-field-help">{{ form.codigo.help_text }}</div>{% endif %}{% if form.codigo.errors %}<ul class="erp-field-errors">{% for error in form.codigo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                {% if not lector_codigo_activo %}<div class="erp-field">{{ form.codigo.label_tag }}{{ form.codigo }}{% if form.codigo.help_text %}<div class="erp-field-help">{{ form.codigo.help_text }}</div>{% endif %}{% if form.codigo.errors %}<ul class="erp-field-errors">{% for error in form.codigo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}
                 <div class="erp-field">{{ form.tipo_item.label_tag }}{{ form.tipo_item }}{% if form.tipo_item.errors %}<ul class="erp-field-errors">{% for error in form.tipo_item.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field">{{ form.unidad_medida.label_tag }}{{ form.unidad_medida }}{% if form.unidad_medida.errors %}<ul class="erp-field-errors">{% for error in form.unidad_medida.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field">{{ form.precio.label_tag }}{{ form.precio }}{% if form.precio.help_text %}<div class="erp-field-help">{{ form.precio.help_text }}</div>{% endif %}{% if form.precio.errors %}<ul class="erp-field-errors">{% for error in form.precio.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
@@ -229,13 +293,46 @@
 (function(){
     const barcodeInput = document.querySelector("[data-barcode-input]");
     const nameInput = document.getElementById("id_nombre");
+    const activateButton = document.getElementById("activateBarcode");
+    const clearButton = document.getElementById("clearBarcode");
+    const station = document.getElementById("barcodeStation");
+    const status = document.getElementById("barcodeStatus");
     if(!barcodeInput){return;}
+
+    function focusScanner(){
+        barcodeInput.focus();
+        barcodeInput.select();
+        if(status){status.textContent = "Lector activo. Escanea ahora.";}
+    }
+
+    function confirmScan(){
+        barcodeInput.value = barcodeInput.value.trim();
+        if(!barcodeInput.value){
+            if(status){status.textContent = "No se recibio ningun codigo.";}
+            return;
+        }
+        if(station){station.classList.add("is-scanned");}
+        if(status){status.textContent = `Codigo ${barcodeInput.value} capturado correctamente.`;}
+        window.setTimeout(() => station && station.classList.remove("is-scanned"), 1800);
+        if(nameInput){nameInput.focus();}
+    }
+
     barcodeInput.addEventListener("keydown", function(event){
         if(event.key !== "Enter"){return;}
         event.preventDefault();
-        barcodeInput.value = barcodeInput.value.trim();
-        if(nameInput){nameInput.focus();}
+        confirmScan();
     });
+    barcodeInput.addEventListener("input", function(){
+        if(status){status.textContent = barcodeInput.value ? "Leyendo codigo..." : "Esperando lectura del codigo...";}
+    });
+    if(activateButton){activateButton.addEventListener("click", focusScanner);}
+    if(clearButton){
+        clearButton.addEventListener("click", function(){
+            barcodeInput.value = "";
+            if(status){status.textContent = "Esperando lectura del codigo...";}
+            focusScanner();
+        });
+    }
 })();
 </script>
 {% endblock %}

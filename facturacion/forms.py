@@ -285,12 +285,19 @@ class ProductoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
+        self.lector_codigo_activo = bool(
+            self.empresa
+            and self.empresa.slug in {"demo_1", "hospital_mia", "medical_spa"}
+        )
         self.fields['codigo'].label = 'Codigo de barras / SKU'
         self.fields['codigo'].widget.attrs.update({
             'placeholder': 'Escanea el codigo o escribelo manualmente',
             'autocomplete': 'off',
             'data-barcode-input': 'true',
+            'spellcheck': 'false',
         })
+        if self.lector_codigo_activo:
+            self.fields['codigo'].widget.attrs['data-barcode-enabled'] = 'true'
         self.mostrar_perfil_farmaceutico = False
         self.mostrar_bodega_inicial = False
         self.bodega_stock_fields = []

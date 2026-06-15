@@ -13,6 +13,10 @@
     .erp-quick-modal-header h3{margin:0 0 8px;font-size:24px;color:#102338;}
     .erp-quick-modal-header p{margin:0;color:#5a6b80;line-height:1.6;}
     .erp-quick-success{padding:18px;border-radius:16px;background:#f4fbf7;border:1px solid #cfe8d9;color:#1f4d35;}
+    .erp-quick-barcode{grid-column:1/-1;padding:14px;border:1px solid #a8d9d5;border-radius:12px;background:#f3fffd;}
+    .erp-quick-barcode-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;}
+    .erp-quick-barcode-head strong{color:#102338;}
+    .erp-quick-barcode-status{margin-top:7px;color:#08766f;font-size:12px;font-weight:700;}
     @media (max-width:760px){.erp-quick-modal-shell{padding:14px;}}
     </style>
 </head>
@@ -48,9 +52,11 @@
                     {{ form.nombre }}
                     {% if form.nombre.errors %}<ul class="erp-field-errors">{% for error in form.nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
                 </div>
-                <div class="erp-field">
+                <div class="erp-field{% if lector_codigo_activo %} erp-quick-barcode{% endif %}">
+                    {% if lector_codigo_activo %}<div class="erp-quick-barcode-head"><strong>Lector de codigo de barras</strong><button class="erp-btn-secondary" type="button" id="activateBarcode">Activar lector</button></div>{% endif %}
                     {{ form.codigo.label_tag }}
                     {{ form.codigo }}
+                    {% if lector_codigo_activo %}<div class="erp-quick-barcode-status" id="barcodeStatus">Escanea el producto y el lector enviara Enter automaticamente.</div>{% endif %}
                     {% if form.codigo.errors %}<ul class="erp-field-errors">{% for error in form.codigo.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
                 </div>
                 <div class="erp-field">
@@ -113,13 +119,25 @@
             const controlaInventario = document.getElementById("id_controla_inventario");
             const barcodeInput = document.querySelector("[data-barcode-input]");
             const nameInput = document.getElementById("id_nombre");
+            const activateButton = document.getElementById("activateBarcode");
+            const barcodeStatus = document.getElementById("barcodeStatus");
             if(barcodeInput){
                 barcodeInput.addEventListener("keydown", function(event){
                     if(event.key !== "Enter"){return;}
                     event.preventDefault();
                     barcodeInput.value = barcodeInput.value.trim();
+                    if(barcodeStatus && barcodeInput.value){
+                        barcodeStatus.textContent = `Codigo ${barcodeInput.value} capturado correctamente.`;
+                    }
                     if(nameInput){nameInput.focus();}
                 });
+                if(activateButton){
+                    activateButton.addEventListener("click", function(){
+                        barcodeInput.focus();
+                        barcodeInput.select();
+                        if(barcodeStatus){barcodeStatus.textContent = "Lector activo. Escanea ahora.";}
+                    });
+                }
             }
             if(!tipoItem || !controlaInventario){
                 return;
