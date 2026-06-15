@@ -176,7 +176,13 @@ def facturas_dashboard(request, empresa_slug):
 @login_required
 def punto_venta(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    solicitud_pos_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if not empresa.tiene_modulo_activo("punto_venta"):
+        if solicitud_pos_ajax:
+            return JsonResponse(
+                {"ok": False, "error": "El modulo Punto de Venta no esta activo para esta empresa."},
+                status=403,
+            )
         messages.error(request, "El modulo Punto de Venta no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
 
@@ -199,6 +205,7 @@ def punto_venta(request, empresa_slug):
         metodo = (payload.get("metodo") or "efectivo").strip()
         cuenta_id = payload.get("cuenta_financiera")
         referencia = (payload.get("referencia") or "").strip()
+        monto_recibido_raw = payload.get("monto_recibido")
         fecha_venta = _parsear_fecha_latam(payload.get("fecha")) or timezone.localdate()
 
         try:
@@ -286,29 +293,67 @@ def punto_venta(request, empresa_slug):
                 _registrar_salida_factura(factura)
                 registrar_asiento_factura_emitida(factura)
 
+                monto_recibido = None
+                cambio = Decimal("0.00")
+                if metodo == "efectivo" and monto_recibido_raw not in (None, ""):
+                    monto_recibido = Decimal(str(monto_recibido_raw)).quantize(Decimal("0.01"))
+                    if monto_recibido < factura.total_documento_ajustado:
+                        raise ValidationError("El efectivo recibido es menor que el total de la venta.")
+                    cambio = monto_recibido - factura.total_documento_ajustado
+
+                referencia_pago = referencia or f"POS {factura.numero_factura or factura.id}"
+                if monto_recibido is not None:
+                    referencia_pago = (
+                        f"{referencia_pago} | Recibido L. {monto_recibido:.2f} | Cambio L. {cambio:.2f}"
+                    )[:100]
+
                 pago = PagoFactura.objects.create(
                     factura=factura,
                     fecha=fecha_venta,
                     monto=factura.total_documento_ajustado,
                     metodo=metodo,
-                    referencia=referencia or f"POS {factura.numero_factura or factura.id}",
+                    referencia=referencia_pago,
                     cuenta_financiera=cuenta_financiera,
                     cajero=request.user,
                 )
                 registrar_asiento_pago_cliente(pago)
 
             recibo_numero = pago.recibo.numero_recibo if hasattr(pago, "recibo") else "sin numero"
+            if solicitud_pos_ajax:
+                return JsonResponse({
+                    "ok": True,
+                    "mensaje": "Venta cobrada y facturada correctamente.",
+                    "factura_id": factura.id,
+                    "numero_factura": factura.numero_factura,
+                    "numero_recibo": recibo_numero,
+                    "total": f"{factura.total:.2f}",
+                    "cambio": f"{cambio:.2f}",
+                    "factura_url": reverse("ver_factura", args=[empresa.slug, factura.id]),
+                    "ticket_url": reverse("imprimir_factura_pos", args=[empresa.slug, factura.id]),
+                })
             messages.success(
                 request,
                 f"Venta POS registrada. Factura {factura.numero_factura}; recibo {recibo_numero}; total L. {factura.total:.2f}.",
             )
             return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
         except (InvalidOperation, ValueError) as exc:
+            if solicitud_pos_ajax:
+                return JsonResponse(
+                    {"ok": False, "error": f"No se pudo registrar la venta: {exc}"},
+                    status=400,
+                )
             messages.error(request, f"No se pudo registrar la venta: {exc}")
         except ValidationError as exc:
+            if solicitud_pos_ajax:
+                return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
             messages.error(request, "; ".join(exc.messages))
         except Exception as exc:
             logger.exception("Error registrando venta POS para empresa %s", empresa.id)
+            if solicitud_pos_ajax:
+                return JsonResponse(
+                    {"ok": False, "error": "No se pudo completar la venta. Revisa la configuracion fiscal y vuelve a intentar."},
+                    status=500,
+                )
             messages.error(request, f"No se pudo registrar la venta POS: {exc}")
 
     productos_payload = []
@@ -764,7 +809,7 @@ def _emitir_factura_desde_borrador(factura):
     registrar_asiento_factura_emitida(factura)
 
 
-def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, prefijo_archivo="Factura"):
+def _contexto_documento_factura(empresa, factura):
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
     resumen = factura.resumen_fiscal()
     resumen_detallado = _resumen_detallado(factura.subtotal, resumen)
@@ -775,19 +820,24 @@ def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, pref
         if (linea.comentario or "").strip()
     )
     alto_ticket_mm = min(2000, max(220, 185 + (len(lineas) * 14) + (bloques_comentario * 6)))
+    return {
+        "empresa": empresa,
+        "factura": factura,
+        "resumen": resumen,
+        "resumen_detallado": resumen_detallado,
+        "lineas_factura": lineas,
+        "alto_ticket_mm": alto_ticket_mm,
+        "logo_url": _obtener_logo_url(empresa),
+        "configuracion_facturacion": configuracion,
+    }
+
+
+def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, prefijo_archivo="Factura"):
+    contexto = _contexto_documento_factura(empresa, factura)
 
     html_string = render_to_string(
         plantilla,
-        {
-            "empresa": empresa,
-            "factura": factura,
-            "resumen": resumen,
-            "resumen_detallado": resumen_detallado,
-            "lineas_factura": lineas,
-            "alto_ticket_mm": alto_ticket_mm,
-            "logo_url": _obtener_logo_url(empresa),
-            "configuracion_facturacion": configuracion,
-        }
+        contexto,
     )
 
     pdf_file = HTML(
@@ -5575,6 +5625,17 @@ def vista_previa_factura_pdf(request, empresa_slug, factura_id):
         inline=True,
         prefijo_archivo="Factura",
     )
+
+
+@login_required
+def imprimir_factura_pos(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    if empresa.slug not in {"hospital_mia", "medical_spa"}:
+        return redirect("vista_previa_factura_pdf", empresa_slug=empresa.slug, factura_id=factura.id)
+    contexto = _contexto_documento_factura(empresa, factura)
+    contexto["auto_print"] = True
+    return render(request, "facturacion/factura_pdf_termica_80mm.html", contexto)
 
 
 @login_required

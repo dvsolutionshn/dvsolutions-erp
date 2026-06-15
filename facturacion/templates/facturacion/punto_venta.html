@@ -39,6 +39,13 @@
 .pos-summary-row{display:flex;justify-content:space-between;gap:12px;color:#5b6f8e}
 .pos-summary-row.total{color:#102338;font-size:24px;font-weight:900}
 .pos-actions{display:grid;gap:10px;margin-top:14px}
+.pos-cash-box{display:none;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border:1px solid #cfe0f2;border-radius:10px;background:#f7fbff}
+.pos-cash-box.is-visible{display:grid}
+.pos-cash-total{display:flex;align-items:center;justify-content:space-between;gap:10px;grid-column:1/-1;color:#506984;font-size:13px}
+.pos-cash-total strong{font-size:19px;color:#102338}
+.pos-checkout-status{display:none;padding:11px 12px;border:1px solid #b9d9cf;border-radius:8px;background:#effcf8;color:#176252;font-size:13px;font-weight:700}
+.pos-checkout-status.is-visible{display:block}
+.pos-checkout-status.is-error{border-color:#efc0bd;background:#fff4f3;color:#9f2720}
 .pos-empty{border:1px dashed #c9d8eb;border-radius:12px;padding:24px;text-align:center;color:#5b6f8e;background:#fbfdff}
 .pos-warning{border:1px solid #f1d3a6;background:#fff8ed;color:#724a10;border-radius:10px;padding:12px;margin-bottom:14px}
 @media (max-width:980px){.pos-shell{grid-template-columns:1fr}.pos-cart{position:static}.pos-toolbar{grid-template-columns:1fr}}
@@ -87,11 +94,17 @@
             <select class="pos-select" id="financialAccount" required>
                 <option value="">Seleccione caja o banco</option>
                 {% for cuenta in cuentas_financieras %}
-                <option value="{{ cuenta.id }}">{{ cuenta.nombre }} - {{ cuenta.get_tipo_display }}</option>
+                <option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}">{{ cuenta.nombre }} - {{ cuenta.get_tipo_display }}</option>
                 {% endfor %}
             </select>
+            <div class="pos-cash-box" id="cashBox">
+                <input class="pos-input" id="cashReceived" type="number" min="0" step="0.01" placeholder="Efectivo recibido">
+                <button class="erp-btn-secondary" type="button" id="exactCash">Monto exacto</button>
+                <div class="pos-cash-total"><span>Cambio para el cliente</span><strong id="changeLabel">L. 0.00</strong></div>
+            </div>
             <input class="pos-input" id="referenceInput" type="text" placeholder="Referencia opcional">
-            <button class="erp-btn" type="submit" id="checkoutButton" disabled>Cobrar y facturar</button>
+            <div class="pos-checkout-status" id="checkoutStatus" role="status" aria-live="polite"></div>
+            <button class="erp-btn" type="submit" id="checkoutButton" disabled>Cobrar, facturar e imprimir</button>
         </form>
     </aside>
 </section>
@@ -109,6 +122,13 @@
     const checkoutButton = document.getElementById("checkoutButton");
     const payloadInput = document.getElementById("payloadInput");
     const scanFeedback = document.getElementById("scanFeedback");
+    const paymentMethod = document.getElementById("paymentMethod");
+    const financialAccount = document.getElementById("financialAccount");
+    const cashBox = document.getElementById("cashBox");
+    const cashReceived = document.getElementById("cashReceived");
+    const changeLabel = document.getElementById("changeLabel");
+    const checkoutStatus = document.getElementById("checkoutStatus");
+    const posForm = document.getElementById("posForm");
     const currency = new Intl.NumberFormat("es-HN",{style:"currency",currency:"HNL"});
     let feedbackTimer = null;
     let scannerBuffer = "";
@@ -197,6 +217,44 @@
         taxLabel.textContent = money(total.tax);
         totalLabel.textContent = money(total.total);
         checkoutButton.disabled = !items.length || total.total <= 0;
+        updateChange();
+    }
+
+    function updateChange(){
+        const isCash = paymentMethod.value === "efectivo";
+        cashBox.classList.toggle("is-visible", isCash);
+        if(!isCash){
+            changeLabel.textContent = money(0);
+            return;
+        }
+        const received = Number(cashReceived.value || 0);
+        const change = Math.max(0, received - totals().total);
+        changeLabel.textContent = money(change);
+    }
+
+    function selectAccountForPayment(){
+        const desiredType = paymentMethod.value === "efectivo"
+            ? "caja"
+            : paymentMethod.value === "tarjeta" ? "tarjeta_credito" : "banco";
+        const matching = Array.from(financialAccount.options).find(option => option.dataset.tipo === desiredType);
+        if(matching){financialAccount.value = matching.value;}
+        updateChange();
+    }
+
+    function showCheckoutStatus(message, isError){
+        checkoutStatus.textContent = message;
+        checkoutStatus.classList.toggle("is-error", Boolean(isError));
+        checkoutStatus.classList.add("is-visible");
+    }
+
+    function resetSale(){
+        cart.clear();
+        cashReceived.value = "";
+        document.getElementById("referenceInput").value = "";
+        renderCart();
+        search.value = "";
+        renderProducts();
+        search.focus();
     }
 
     function addProduct(id){
@@ -277,16 +335,81 @@
         }
     });
     document.getElementById("clearSearch").addEventListener("click", () => {search.value = ""; renderProducts(); search.focus();});
-    document.getElementById("posForm").addEventListener("submit", event => {
-        if(!cart.size){event.preventDefault(); return;}
+    paymentMethod.addEventListener("change", selectAccountForPayment);
+    cashReceived.addEventListener("input", updateChange);
+    document.getElementById("exactCash").addEventListener("click", () => {
+        cashReceived.value = totals().total.toFixed(2);
+        updateChange();
+    });
+    posForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        if(!cart.size || checkoutButton.disabled){return;}
+        if(!financialAccount.value){
+            showCheckoutStatus("Selecciona la caja o cuenta donde ingreso el pago.", true);
+            financialAccount.focus();
+            return;
+        }
+        const saleTotal = totals().total;
+        if(paymentMethod.value === "efectivo" && Number(cashReceived.value || 0) < saleTotal){
+            showCheckoutStatus("El efectivo recibido es menor que el total de la venta.", true);
+            cashReceived.focus();
+            return;
+        }
+
         payloadInput.value = JSON.stringify({
             fecha: document.getElementById("saleDate").value,
-            metodo: document.getElementById("paymentMethod").value,
-            cuenta_financiera: document.getElementById("financialAccount").value,
+            metodo: paymentMethod.value,
+            cuenta_financiera: financialAccount.value,
             referencia: document.getElementById("referenceInput").value,
+            monto_recibido: paymentMethod.value === "efectivo" ? cashReceived.value : "",
             items: Array.from(cart.values())
         });
+        checkoutButton.disabled = true;
+        checkoutButton.textContent = "Procesando venta...";
+        checkoutStatus.classList.remove("is-visible");
+        const ticketWindow = window.open("", "dv-pos-ticket");
+        if(ticketWindow){
+            ticketWindow.document.write("<title>Generando factura</title><p style='font-family:Arial;padding:24px'>Generando factura y preparando ticket...</p>");
+        }
+
+        try{
+            const response = await fetch(posForm.action || window.location.href, {
+                method: "POST",
+                body: new FormData(posForm),
+                headers: {"X-Requested-With": "XMLHttpRequest"}
+            });
+            const result = await response.json();
+            if(!response.ok || !result.ok){
+                throw new Error(result.error || "No se pudo completar la venta.");
+            }
+            showCheckoutStatus(
+                `Factura ${result.numero_factura} creada. Cambio ${money(Number(result.cambio))}. Abriendo ticket...`,
+                false
+            );
+            if(ticketWindow){
+                ticketWindow.location.href = result.ticket_url;
+            }else{
+                showCheckoutStatus(
+                    `Factura ${result.numero_factura} creada. El navegador bloqueo el ticket; habilita ventanas emergentes.`,
+                    true
+                );
+            }
+            resetSale();
+        }catch(error){
+            if(ticketWindow){ticketWindow.close();}
+            showCheckoutStatus(error.message, true);
+        }finally{
+            checkoutButton.textContent = "Cobrar, facturar e imprimir";
+            checkoutButton.disabled = !cart.size;
+        }
     });
+    document.addEventListener("keydown", event => {
+        if(event.key === "F4"){
+            event.preventDefault();
+            if(!checkoutButton.disabled){posForm.requestSubmit();}
+        }
+    });
+    selectAccountForPayment();
     renderProducts();
     renderCart();
 })();

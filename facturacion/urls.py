@@ -8,6 +8,7 @@ urlpatterns = [
 
     path('facturas/', views.facturas_dashboard, name='facturas_dashboard'),
     path('pos/', views.punto_venta, name='punto_venta'),
+    path('pos/facturas/<int:factura_id>/imprimir/', views.imprimir_factura_pos, name='imprimir_factura_pos'),
     path('crear/', views.crear_factura, name='crear_factura'),
     path('facturas/prefijo-manual/', views.prefijo_factura_manual, name='prefijo_factura_manual'),
     path('clientes/', views.clientes_facturacion, name='clientes_facturacion'),

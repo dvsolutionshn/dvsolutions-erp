@@ -275,6 +275,79 @@ class FacturacionTests(TestCase):
             ).exists()
         )
 
+    def test_punto_venta_ajax_cobra_y_devuelve_ticket_para_imprimir(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "efectivo",
+                    "monto_recibido": "250.00",
+                    "items": [
+                        {
+                            "producto_id": self.producto.id,
+                            "cantidad": "2",
+                            "precio_unitario": "100.00",
+                        }
+                    ],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        resultado = response.json()
+        self.assertTrue(resultado["ok"])
+        self.assertEqual(resultado["total"], "230.00")
+        self.assertEqual(resultado["cambio"], "20.00")
+        factura = Factura.objects.get(pk=resultado["factura_id"])
+        pago = PagoFactura.objects.get(factura=factura)
+        self.assertIn("Recibido L. 250.00", pago.referencia)
+        self.assertEqual(
+            resultado["ticket_url"],
+            reverse("imprimir_factura_pos", args=[self.empresa.slug, factura.id]),
+        )
+        impresion = self.client.get(resultado["ticket_url"])
+        self.assertEqual(impresion.status_code, 200)
+        self.assertContains(impresion, "window.print()")
+        self.assertContains(impresion, "size: 80mm")
+
+    def test_punto_venta_ajax_rechaza_efectivo_insuficiente_sin_crear_factura(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "efectivo",
+                    "monto_recibido": "200.00",
+                    "items": [
+                        {
+                            "producto_id": self.producto.id,
+                            "cantidad": "2",
+                            "precio_unitario": "100.00",
+                        }
+                    ],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["ok"])
+        self.assertEqual(Factura.objects.filter(empresa=self.empresa).count(), 0)
+
     def test_punto_venta_expone_codigo_para_lector_de_barras(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)

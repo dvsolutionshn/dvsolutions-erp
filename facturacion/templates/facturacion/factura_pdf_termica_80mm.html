@@ -192,5 +192,13 @@ body{
         <div class="strong">Gracias por su preferencia</div>
         <div>Documento generado por DV Solutions ERP</div>
     </footer>
+{% if auto_print %}
+<script>
+window.addEventListener("load", function(){
+    window.setTimeout(function(){window.print();}, 250);
+});
+window.addEventListener("afterprint", function(){window.close();});
+</script>
+{% endif %}
 </body>
 </html>
