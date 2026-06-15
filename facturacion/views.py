@@ -329,7 +329,7 @@ def punto_venta(request, empresa_slug):
                     "total": f"{factura.total:.2f}",
                     "cambio": f"{cambio:.2f}",
                     "factura_url": reverse("ver_factura", args=[empresa.slug, factura.id]),
-                    "ticket_url": reverse("vista_previa_factura_pdf", args=[empresa.slug, factura.id]),
+                    "ticket_url": reverse("imprimir_factura_pos", args=[empresa.slug, factura.id]),
                 })
             messages.success(
                 request,
@@ -5635,9 +5635,11 @@ def imprimir_factura_pos(request, empresa_slug, factura_id):
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     if empresa.slug not in {"hospital_mia", "medical_spa", "demo_1"}:
         return redirect("vista_previa_factura_pdf", empresa_slug=empresa.slug, factura_id=factura.id)
-    contexto = _contexto_documento_factura(empresa, factura)
-    contexto["auto_print"] = True
-    return render(request, "facturacion/factura_pdf_termica_80mm.html", contexto)
+    return render(request, "facturacion/factura_pos_auto_print.html", {
+        "empresa": empresa,
+        "factura": factura,
+        "pdf_url": reverse("vista_previa_factura_pdf", args=[empresa.slug, factura.id]),
+    })
 
 
 @login_required

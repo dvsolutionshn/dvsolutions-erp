@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Imprimiendo {{ factura.numero_factura }}</title>
+    <style>
+        html,body{width:100%;height:100%;margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#102338}
+        .print-status{position:fixed;inset:0;display:grid;place-items:center;text-align:center;padding:24px}
+        .print-status strong{display:block;font-size:20px;margin-bottom:8px}
+        .print-status span{display:block;color:#5b6f8e;font-size:14px}
+        .print-status button{margin-top:18px;border:0;border-radius:8px;background:#175cd3;color:#fff;padding:11px 18px;font-weight:700;cursor:pointer}
+        #ticketFrame{position:fixed;width:1px;height:1px;right:0;bottom:0;border:0;opacity:.01;pointer-events:none}
+    </style>
+</head>
+<body>
+    <div class="print-status">
+        <div>
+            <strong>Preparando impresion...</strong>
+            <span>El dialogo de la impresora se abrira automaticamente.</span>
+            <button type="button" id="printAgain" hidden>Imprimir ticket</button>
+        </div>
+    </div>
+    <iframe id="ticketFrame" title="Ticket termico" src="{{ pdf_url }}"></iframe>
+    <script>
+    (function(){
+        const frame = document.getElementById("ticketFrame");
+        const retryButton = document.getElementById("printAgain");
+        let printStarted = false;
+
+        function printTicket(){
+            if(printStarted){return;}
+            printStarted = true;
+            try{
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+            }catch(error){
+                printStarted = false;
+                retryButton.hidden = false;
+            }
+        }
+
+        frame.addEventListener("load", function(){
+            try{
+                frame.contentWindow.addEventListener("afterprint", function(){window.close();});
+            }catch(error){
+                // El cierre automatico es complementario a la impresion.
+            }
+            window.setTimeout(printTicket, 450);
+            window.setTimeout(function(){retryButton.hidden = false;}, 1800);
+        });
+        retryButton.addEventListener("click", function(){
+            printStarted = false;
+            printTicket();
+        });
+        window.addEventListener("afterprint", function(){window.close();});
+    })();
+    </script>
+</body>
+</html>

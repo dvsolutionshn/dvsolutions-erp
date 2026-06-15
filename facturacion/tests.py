@@ -246,8 +246,11 @@ class FacturacionTests(TestCase):
             reverse("imprimir_factura_pos", args=[self.empresa.slug, factura.id])
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "window.print()")
-        self.assertContains(response, "size: 80mm 98mm")
+        self.assertContains(response, "frame.contentWindow.print()")
+        self.assertContains(
+            response,
+            reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
+        )
 
     def test_punto_venta_crea_factura_pago_recibo_y_asientos(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
@@ -335,11 +338,15 @@ class FacturacionTests(TestCase):
         self.assertIn("Recibido L. 250.00", pago.referencia)
         self.assertEqual(
             resultado["ticket_url"],
-            reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
+            reverse("imprimir_factura_pos", args=[self.empresa.slug, factura.id]),
         )
         impresion = self.client.get(resultado["ticket_url"])
         self.assertEqual(impresion.status_code, 200)
-        self.assertEqual(impresion["Content-Type"], "application/pdf")
+        self.assertContains(impresion, "frame.contentWindow.print()")
+        self.assertContains(
+            impresion,
+            reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
+        )
 
     def test_punto_venta_ajax_rechaza_efectivo_insuficiente_sin_crear_factura(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

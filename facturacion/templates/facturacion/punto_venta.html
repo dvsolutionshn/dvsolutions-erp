@@ -46,6 +46,15 @@
 .pos-checkout-status{display:none;padding:11px 12px;border:1px solid #b9d9cf;border-radius:8px;background:#effcf8;color:#176252;font-size:13px;font-weight:700}
 .pos-checkout-status.is-visible{display:block}
 .pos-checkout-status.is-error{border-color:#efc0bd;background:#fff4f3;color:#9f2720}
+.pos-change-dialog{width:min(440px,calc(100% - 32px));border:0;border-radius:14px;padding:0;box-shadow:0 28px 80px rgba(7,25,48,.28)}
+.pos-change-dialog::backdrop{background:rgba(7,25,48,.62);backdrop-filter:blur(4px)}
+.pos-change-content{padding:26px;text-align:center}
+.pos-change-kicker{color:#55708f;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.pos-change-title{margin:8px 0 4px;color:#102338;font-size:23px}
+.pos-change-amount{display:block;margin:18px 0;color:#0f766e;font-size:46px;line-height:1;font-weight:900}
+.pos-change-detail{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
+.pos-change-detail div{padding:12px;border:1px solid #d6e3f2;border-radius:9px;background:#f8fbff;color:#55708f;font-size:12px}
+.pos-change-detail strong{display:block;margin-top:5px;color:#102338;font-size:18px}
 .pos-empty{border:1px dashed #c9d8eb;border-radius:12px;padding:24px;text-align:center;color:#5b6f8e;background:#fbfdff}
 .pos-warning{border:1px solid #f1d3a6;background:#fff8ed;color:#724a10;border-radius:10px;padding:12px;margin-bottom:14px}
 @media (max-width:980px){.pos-shell{grid-template-columns:1fr}.pos-cart{position:static}.pos-toolbar{grid-template-columns:1fr}}
@@ -109,6 +118,19 @@
     </aside>
 </section>
 
+<dialog class="pos-change-dialog" id="changeDialog">
+    <div class="pos-change-content">
+        <div class="pos-change-kicker">Venta completada</div>
+        <h3 class="pos-change-title">Cambio para el cliente</h3>
+        <strong class="pos-change-amount" id="finalChangeLabel">L. 0.00</strong>
+        <div class="pos-change-detail">
+            <div>Total de la venta<strong id="finalTotalLabel">L. 0.00</strong></div>
+            <div>Efectivo recibido<strong id="finalReceivedLabel">L. 0.00</strong></div>
+        </div>
+        <button class="erp-btn" type="button" id="newSaleButton">Nueva venta</button>
+    </div>
+</dialog>
+
 <script>
 (function(){
     const products = JSON.parse(document.getElementById("pos-products").textContent);
@@ -128,6 +150,10 @@
     const cashReceived = document.getElementById("cashReceived");
     const changeLabel = document.getElementById("changeLabel");
     const checkoutStatus = document.getElementById("checkoutStatus");
+    const changeDialog = document.getElementById("changeDialog");
+    const finalChangeLabel = document.getElementById("finalChangeLabel");
+    const finalTotalLabel = document.getElementById("finalTotalLabel");
+    const finalReceivedLabel = document.getElementById("finalReceivedLabel");
     const posForm = document.getElementById("posForm");
     const currency = new Intl.NumberFormat("es-HN",{style:"currency",currency:"HNL"});
     let feedbackTimer = null;
@@ -257,6 +283,15 @@
         search.focus();
     }
 
+    function showFinalChange(total, received, change){
+        finalTotalLabel.textContent = money(total);
+        finalReceivedLabel.textContent = money(received);
+        finalChangeLabel.textContent = money(change);
+        if(typeof changeDialog.showModal === "function"){
+            changeDialog.showModal();
+        }
+    }
+
     function addProduct(id){
         const product = products.find(item => item.id === Number(id));
         if(!product){return;}
@@ -341,6 +376,10 @@
         cashReceived.value = totals().total.toFixed(2);
         updateChange();
     });
+    document.getElementById("newSaleButton").addEventListener("click", () => {
+        changeDialog.close();
+        search.focus();
+    });
     posForm.addEventListener("submit", async event => {
         event.preventDefault();
         if(!cart.size || checkoutButton.disabled){return;}
@@ -388,17 +427,20 @@
             );
             if(ticketWindow){
                 ticketWindow.location.href = result.ticket_url;
-                window.setTimeout(function(){
-                    try{ticketWindow.print();}catch(error){
-                        // El visor PDF mantiene disponible su propio boton de impresion.
-                    }
-                }, 1200);
             }else{
                 showCheckoutStatus(
                     `Factura ${result.numero_factura} creada. El navegador bloqueo el ticket; habilita ventanas emergentes.`,
                     true
                 );
             }
+            const receivedAmount = paymentMethod.value === "efectivo"
+                ? Number(cashReceived.value || result.total)
+                : Number(result.total);
+            showFinalChange(
+                Number(result.total),
+                receivedAmount,
+                Number(result.cambio)
+            );
             resetSale();
         }catch(error){
             if(ticketWindow){ticketWindow.close();}
