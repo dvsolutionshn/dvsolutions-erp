@@ -246,6 +246,11 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "size: 80mm")
         self.assertContains(response, "getBoundingClientRect().height")
         self.assertContains(response, "@page { size: 80mm")
+        contenido = response.content.decode()
+        self.assertGreater(
+            contenido.index('id="dynamicPrintPage"'),
+            contenido.index("@page {"),
+        )
 
     def test_punto_venta_crea_factura_pago_recibo_y_asientos(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

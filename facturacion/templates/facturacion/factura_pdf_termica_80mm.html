@@ -3,7 +3,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-{% if auto_print %}<style id="dynamicPrintPage"></style>{% endif %}
 <style>
 @page {
     size: 80mm {% if auto_print %}150mm{% else %}{{ alto_ticket_mm }}mm{% endif %};
@@ -111,7 +110,29 @@ body{
     font-size:7pt;
     text-align:center;
 }
+{% if auto_print %}
+@media print{
+    html,body{
+        position:absolute;
+        top:0;
+        left:0;
+        width:80mm;
+        min-height:0;
+        margin:0;
+        padding:0;
+        overflow:hidden;
+    }
+    .ticket-content{
+        position:absolute;
+        top:0;
+        left:0;
+        width:80mm;
+        margin:0;
+    }
+}
+{% endif %}
 </style>
+{% if auto_print %}<style id="dynamicPrintPage"></style>{% endif %}
 </head>
 <body>
 <main class="ticket-content" id="ticketContent">
@@ -212,11 +233,17 @@ window.addEventListener("load", function(){
     const pageStyle = document.getElementById("dynamicPrintPage");
     const printTicket = function(){
         const pixelsToMillimeters = 25.4 / 96;
-        const contentHeight = Math.ceil(ticket.getBoundingClientRect().height);
-        const paperHeight = Math.max(60, Math.ceil((contentHeight * pixelsToMillimeters) + 1));
+        const contentHeight = Math.ceil(Math.max(
+            ticket.getBoundingClientRect().height,
+            ticket.scrollHeight
+        ));
+        const paperHeight = Math.max(60, Math.ceil((contentHeight * pixelsToMillimeters) + 0.5));
         pageStyle.textContent = [
             "@page { size: 80mm " + paperHeight + "mm; margin: 0; }",
-            "html, body { width: 80mm; height: " + paperHeight + "mm; margin: 0; padding: 0; overflow: hidden; }"
+            "@media print {",
+            "html, body { position: absolute; inset: 0 auto auto 0; width: 80mm; height: " + paperHeight + "mm; min-height: 0; margin: 0; padding: 0; overflow: hidden; }",
+            ".ticket-content { position: absolute; inset: 0 auto auto 0; width: 80mm; margin: 0; }",
+            "}"
         ].join("\n");
         window.requestAnimationFrame(function(){
             window.requestAnimationFrame(function(){window.print();});
