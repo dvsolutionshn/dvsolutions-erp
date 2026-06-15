@@ -3,20 +3,31 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+{% if auto_print %}<style id="dynamicPrintPage"></style>{% endif %}
 <style>
 @page {
-    size: 80mm {{ alto_ticket_mm }}mm;
-    margin: 3mm 4mm 4mm;
+    size: 80mm {% if auto_print %}150mm{% else %}{{ alto_ticket_mm }}mm{% endif %};
+    margin:0;
 }
 *{box-sizing:border-box}
+html{
+    width:80mm;
+    margin:0;
+    padding:0;
+}
 body{
-    width:72mm;
+    width:80mm;
     margin:0;
     padding:0;
     color:#000;
     font-family:"DejaVu Sans",Arial,sans-serif;
     font-size:8.5pt;
     line-height:1.28;
+}
+.ticket-content{
+    width:80mm;
+    margin:0;
+    padding:3mm 4mm 2mm;
 }
 .center{text-align:center}
 .right{text-align:right}
@@ -103,6 +114,7 @@ body{
 </style>
 </head>
 <body>
+<main class="ticket-content" id="ticketContent">
     <header class="center">
         {% if logo_url %}<img class="company-logo" src="{{ logo_url }}" alt="">{% endif %}
         <h1 class="company-name">{{ configuracion_facturacion.nombre_comercial_documentos|default:empresa.nombre }}</h1>
@@ -192,10 +204,29 @@ body{
         <div class="strong">Gracias por su preferencia</div>
         <div>Documento generado por DV Solutions ERP</div>
     </footer>
+</main>
 {% if auto_print %}
 <script>
 window.addEventListener("load", function(){
-    window.setTimeout(function(){window.print();}, 250);
+    const ticket = document.getElementById("ticketContent");
+    const pageStyle = document.getElementById("dynamicPrintPage");
+    const printTicket = function(){
+        const pixelsToMillimeters = 25.4 / 96;
+        const contentHeight = Math.ceil(ticket.getBoundingClientRect().height);
+        const paperHeight = Math.max(60, Math.ceil((contentHeight * pixelsToMillimeters) + 1));
+        pageStyle.textContent = [
+            "@page { size: 80mm " + paperHeight + "mm; margin: 0; }",
+            "html, body { width: 80mm; height: " + paperHeight + "mm; margin: 0; padding: 0; overflow: hidden; }"
+        ].join("\n");
+        window.requestAnimationFrame(function(){
+            window.requestAnimationFrame(function(){window.print();});
+        });
+    };
+    if(document.fonts && document.fonts.ready){
+        document.fonts.ready.then(printTicket);
+    }else{
+        window.setTimeout(printTicket, 150);
+    }
 });
 window.addEventListener("afterprint", function(){window.close();});
 </script>

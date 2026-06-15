@@ -819,7 +819,7 @@ def _contexto_documento_factura(empresa, factura):
         for linea in lineas
         if (linea.comentario or "").strip()
     )
-    alto_ticket_mm = min(2000, max(220, 185 + (len(lineas) * 14) + (bloques_comentario * 6)))
+    alto_ticket_mm = min(2000, max(150, 135 + (len(lineas) * 12) + (bloques_comentario * 5)))
     return {
         "empresa": empresa,
         "factura": factura,
