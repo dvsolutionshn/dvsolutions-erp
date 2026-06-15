@@ -567,6 +567,8 @@ def _empresa_permite_plantilla_independiente(empresa):
 
 def _resolver_plantilla_factura(configuracion, empresa, plantilla_forzada=None):
     plantilla_activa = plantilla_forzada or configuracion.plantilla_factura_pdf
+    if plantilla_activa == "termica_80mm" and empresa.slug in {"hospital_mia", "medical_spa"}:
+        return "facturacion/factura_pdf_termica_80mm.html"
     if plantilla_activa == "independiente" and _empresa_permite_plantilla_independiente(empresa):
         return "facturacion/factura_pdf_independiente.html"
     if plantilla_activa == "alternativa":
@@ -766,6 +768,13 @@ def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, pref
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
     resumen = factura.resumen_fiscal()
     resumen_detallado = _resumen_detallado(factura.subtotal, resumen)
+    lineas = list(factura.lineas.select_related("producto", "impuesto").all())
+    bloques_comentario = sum(
+        max(1, len((linea.comentario or "").strip()) // 42 + 1)
+        for linea in lineas
+        if (linea.comentario or "").strip()
+    )
+    alto_ticket_mm = min(2000, max(220, 185 + (len(lineas) * 14) + (bloques_comentario * 6)))
 
     html_string = render_to_string(
         plantilla,
@@ -774,6 +783,8 @@ def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, pref
             "factura": factura,
             "resumen": resumen,
             "resumen_detallado": resumen_detallado,
+            "lineas_factura": lineas,
+            "alto_ticket_mm": alto_ticket_mm,
             "logo_url": _obtener_logo_url(empresa),
             "configuracion_facturacion": configuracion,
         }
@@ -5464,6 +5475,7 @@ def ver_factura(request, empresa_slug, factura_id):
         "permite_gestion_fiscal_historica": config_avanzada.permite_gestion_fiscal_historica,
         "permite_plantilla_notas_extensas": _empresa_permite_plantilla_notas_extensas(empresa),
         "permite_plantilla_independiente": _empresa_permite_plantilla_independiente(empresa),
+        "configuracion_facturacion": ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)[0],
     })
 
 

@@ -4,6 +4,7 @@ from io import BytesIO
 import json
 from unittest.mock import patch
 
+from pypdf import PdfReader
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -189,6 +190,41 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "53,761.71")
+
+    def test_factura_termica_genera_pdf_de_80_mm_para_empresa_medica(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=self.empresa)
+        configuracion.plantilla_factura_pdf = "termica_80mm"
+        configuracion.save(update_fields=["plantilla_factura_pdf"])
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.get(
+            reverse("descargar_factura_pdf", args=[self.empresa.slug, factura.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        pdf = PdfReader(BytesIO(response.content))
+        self.assertEqual(len(pdf.pages), 1)
+        ancho_puntos = float(pdf.pages[0].mediabox.width)
+        ancho_esperado = 80 / 25.4 * 72
+        self.assertAlmostEqual(ancho_puntos, ancho_esperado, delta=1)
+        texto = pdf.pages[0].extract_text()
+        self.assertIn("FACTURA", texto)
+        self.assertIn("DATOS FISCALES", texto)
+
+    def test_plantilla_termica_solo_aparece_en_empresas_medicas(self):
+        configuracion = ConfiguracionFacturacionEmpresa(empresa=self.empresa)
+        form = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
+        opciones = dict(form.fields["plantilla_factura_pdf"].choices)
+        self.assertNotIn("termica_80mm", opciones)
+
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        form_medico = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
+        opciones_medicas = dict(form_medico.fields["plantilla_factura_pdf"].choices)
+        self.assertEqual(opciones_medicas["termica_80mm"], "Factura termica 80 mm")
 
     def test_punto_venta_crea_factura_pago_recibo_y_asientos(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

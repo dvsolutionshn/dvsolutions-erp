@@ -70,6 +70,13 @@ class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):
         permite_plantilla_notas_extensas = kwargs.pop("permite_plantilla_notas_extensas", False)
         permite_plantilla_independiente = kwargs.pop("permite_plantilla_independiente", False)
         super().__init__(*args, **kwargs)
+        empresa = self.instance.empresa if getattr(self.instance, "empresa_id", None) else None
+        if not empresa or empresa.slug not in {"hospital_mia", "medical_spa"}:
+            self.fields["plantilla_factura_pdf"].choices = [
+                choice
+                for choice in self.fields["plantilla_factura_pdf"].choices
+                if choice[0] != "termica_80mm"
+            ]
         if not permite_plantilla_notas_extensas:
             self.fields["plantilla_factura_pdf"].choices = [
                 choice

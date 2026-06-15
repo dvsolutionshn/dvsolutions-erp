@@ -15,11 +15,11 @@
 <button
     class="erp-action-link erp-print-button"
     type="button"
-    data-preview-title="Factura clasica"
+    data-preview-title="{% if configuracion_facturacion.plantilla_factura_pdf == 'termica_80mm' %}Factura termica 80 mm{% else %}Factura clasica{% endif %}"
     data-preview-url="{% url 'vista_previa_factura_pdf' empresa.slug factura.id %}"
     data-download-url="{% url 'descargar_factura_pdf' empresa.slug factura.id %}"
 >
-    PDF
+    {% if configuracion_facturacion.plantilla_factura_pdf == 'termica_80mm' %}Epson 80 mm{% else %}PDF{% endif %}
 </button>
 <button
     class="erp-action-link erp-print-button"

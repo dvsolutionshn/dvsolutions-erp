@@ -1,0 +1,196 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+@page {
+    size: 80mm {{ alto_ticket_mm }}mm;
+    margin: 3mm 4mm 4mm;
+}
+*{box-sizing:border-box}
+body{
+    width:72mm;
+    margin:0;
+    padding:0;
+    color:#000;
+    font-family:"DejaVu Sans",Arial,sans-serif;
+    font-size:8.5pt;
+    line-height:1.28;
+}
+.center{text-align:center}
+.right{text-align:right}
+.strong{font-weight:800}
+.company-logo{
+    display:block;
+    max-width:34mm;
+    max-height:17mm;
+    margin:0 auto 2mm;
+    object-fit:contain;
+    filter:grayscale(1);
+}
+.company-name{
+    margin:0;
+    font-size:12pt;
+    font-weight:900;
+    line-height:1.15;
+}
+.company-data{margin-top:1mm;font-size:7.5pt}
+.document-title{
+    margin:2.5mm 0 1mm;
+    padding:1.5mm 0;
+    border-top:.35mm solid #000;
+    border-bottom:.35mm solid #000;
+    font-size:11pt;
+    font-weight:900;
+    text-align:center;
+}
+.document-number{
+    font-size:10pt;
+    font-weight:900;
+    overflow-wrap:anywhere;
+}
+.section{
+    margin-top:2mm;
+    padding-top:1.5mm;
+    border-top:.25mm dashed #000;
+}
+.row{
+    display:flex;
+    justify-content:space-between;
+    gap:3mm;
+}
+.row span:first-child{flex:1}
+.row strong{text-align:right}
+.items{width:100%;border-collapse:collapse;margin-top:1.5mm;table-layout:fixed}
+.items th{
+    padding:1mm .5mm;
+    border-top:.3mm solid #000;
+    border-bottom:.3mm solid #000;
+    font-size:7pt;
+    text-transform:uppercase;
+}
+.items td{
+    padding:1.2mm .5mm;
+    vertical-align:top;
+    border-bottom:.2mm dotted #777;
+}
+.items .description{width:45%}
+.items .qty{width:12%;text-align:center}
+.items .price{width:20%;text-align:right}
+.items .total{width:23%;text-align:right}
+.item-name{font-weight:800;overflow-wrap:anywhere}
+.item-note{font-size:7pt;margin-top:.5mm;overflow-wrap:anywhere}
+.totals{margin-top:2mm}
+.totals .row{padding:.5mm 0}
+.grand-total{
+    margin-top:1mm;
+    padding:1.5mm 0;
+    border-top:.45mm solid #000;
+    border-bottom:.45mm solid #000;
+    font-size:11pt;
+    font-weight:900;
+}
+.fiscal{font-size:7pt;overflow-wrap:anywhere}
+.letters{margin-top:1.5mm;font-size:7pt;font-weight:700}
+.footer{
+    margin-top:2.5mm;
+    padding-top:2mm;
+    border-top:.3mm dashed #000;
+    font-size:7pt;
+    text-align:center;
+}
+</style>
+</head>
+<body>
+    <header class="center">
+        {% if logo_url %}<img class="company-logo" src="{{ logo_url }}" alt="">{% endif %}
+        <h1 class="company-name">{{ configuracion_facturacion.nombre_comercial_documentos|default:empresa.nombre }}</h1>
+        <div class="company-data">
+            {% if empresa.rtn %}<div>RTN: {{ empresa.rtn }}</div>{% endif %}
+            {% if empresa.direccion %}<div>{{ empresa.direccion }}</div>{% endif %}
+            <div>{% if empresa.telefono %}Tel: {{ empresa.telefono }}{% endif %}{% if empresa.correo %}{% if empresa.telefono %} | {% endif %}{{ empresa.correo }}{% endif %}</div>
+        </div>
+    </header>
+
+    <div class="document-title">FACTURA</div>
+    <div class="center document-number">{{ factura.numero_factura|default:"SIN NUMERO" }}</div>
+
+    <section class="section">
+        <div class="row"><span>Emision</span><strong>{{ factura.fecha_emision|date:"d/m/Y" }}</strong></div>
+        {% if factura.fecha_vencimiento %}<div class="row"><span>Vencimiento</span><strong>{{ factura.fecha_vencimiento|date:"d/m/Y" }}</strong></div>{% endif %}
+        <div class="row"><span>Moneda</span><strong>{{ factura.get_moneda_display }}</strong></div>
+        <div class="row"><span>Estado</span><strong>{{ factura.get_estado_display }} / {{ factura.get_estado_pago_display }}</strong></div>
+    </section>
+
+    <section class="section">
+        <div class="strong">CLIENTE</div>
+        <div>{{ factura.cliente.nombre }}</div>
+        {% if factura.cliente.rtn %}<div>RTN/Identidad: {{ factura.cliente.rtn }}</div>{% endif %}
+        {% if factura.cliente.telefono %}<div>Tel: {{ factura.cliente.telefono }}</div>{% endif %}
+        {% if factura.cliente.direccion %}<div>{{ factura.cliente.direccion }}</div>{% endif %}
+    </section>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th class="description">Descripcion</th>
+                <th class="qty">Cant.</th>
+                <th class="price">Precio</th>
+                <th class="total">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linea in lineas_factura %}
+            <tr>
+                <td class="description">
+                    <div class="item-name">{{ linea.descripcion_visual }}</div>
+                    {% if linea.comentario %}<div class="item-note">{{ linea.comentario }}</div>{% endif %}
+                </td>
+                <td class="qty">{{ linea.cantidad|floatformat:2 }}</td>
+                <td class="price">{{ linea.precio_unitario|floatformat:2|intcomma }}</td>
+                <td class="total">{{ linea.total_linea|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <section class="totals">
+        <div class="row"><span>Subtotal</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_bruto|floatformat:2|intcomma }}</strong></div>
+        {% if resumen_detallado.descuento_total %}<div class="row"><span>Descuento</span><strong>- {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.descuento_total|floatformat:2|intcomma }}</strong></div>{% endif %}
+        <div class="row"><span>Base gravada 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_15|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Base gravada 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_18|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Exento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exento|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Exonerado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exonerado|floatformat:2|intcomma }}</strong></div>
+        {% if resumen_detallado.isv_15 %}<div class="row"><span>ISV 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_15|floatformat:2|intcomma }}</strong></div>{% endif %}
+        {% if resumen_detallado.isv_18 %}<div class="row"><span>ISV 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_18|floatformat:2|intcomma }}</strong></div>{% endif %}
+        <div class="row grand-total"><span>TOTAL</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
+        {% if factura.moneda == "USD" %}
+        <div class="row"><span>Tasa de cambio</span><strong>L. {{ factura.tipo_cambio|floatformat:4|intcomma }}</strong></div>
+        <div class="row"><span>Total en lempiras</span><strong>L. {{ factura.total_lempiras|floatformat:2|intcomma }}</strong></div>
+        {% endif %}
+        <div class="letters">{{ factura.total_en_letras }}</div>
+    </section>
+
+    <section class="section fiscal">
+        <div class="strong">DATOS FISCALES</div>
+        <div>CAI: {{ factura.cai_numero_historico|default:"-" }}</div>
+        {% if factura.cai_rango_inicial_historico and factura.cai_rango_final_historico %}
+        <div>Rango: {{ factura.cai_establecimiento_historico|default:"000" }}-{{ factura.cai_punto_emision_historico|default:"000" }}-{{ factura.cai_tipo_documento_historico|default:"00" }}-{{ factura.cai_rango_inicial_historico|stringformat:"08d" }} al {{ factura.cai_establecimiento_historico|default:"000" }}-{{ factura.cai_punto_emision_historico|default:"000" }}-{{ factura.cai_tipo_documento_historico|default:"00" }}-{{ factura.cai_rango_final_historico|stringformat:"08d" }}</div>
+        {% else %}
+        <div>Rango autorizado: -</div>
+        {% endif %}
+        <div>Fecha limite de emision: {{ factura.cai_fecha_limite_historico|date:"d/m/Y"|default:"-" }}</div>
+        {% if factura.orden_compra_exenta %}<div>Orden compra exenta: {{ factura.orden_compra_exenta }}</div>{% endif %}
+        {% if factura.registro_exonerado %}<div>Registro exonerado: {{ factura.registro_exonerado }}</div>{% endif %}
+        {% if factura.registro_sag %}<div>Registro SAG: {{ factura.registro_sag }}</div>{% endif %}
+    </section>
+
+    <footer class="footer">
+        {% if configuracion_facturacion.leyenda_factura %}<div>{{ configuracion_facturacion.leyenda_factura }}</div>{% endif %}
+        {% if configuracion_facturacion.pie_factura %}<div>{{ configuracion_facturacion.pie_factura|linebreaksbr }}</div>{% endif %}
+        <div class="strong">Gracias por su preferencia</div>
+        <div>Documento generado por DV Solutions ERP</div>
+    </footer>
+</body>
+</html>
