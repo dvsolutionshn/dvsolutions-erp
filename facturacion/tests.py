@@ -259,6 +259,58 @@ class FacturacionTests(TestCase):
         self.assertEqual(form.fields["codigo"].label, "Codigo de barras / SKU")
         self.assertEqual(form.fields["codigo"].widget.attrs["data-barcode-input"], "true")
 
+    def test_pantalla_asigna_codigo_a_producto_existente(self):
+        response = self.client.get(
+            reverse("codigos_barras_productos", args=[self.empresa.slug])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Asignar codigos de barras")
+        self.assertContains(response, self.producto.nombre)
+
+        response = self.client.post(
+            reverse("codigos_barras_productos", args=[self.empresa.slug]),
+            {
+                "producto_id": self.producto.id,
+                "codigo": "7421234567890",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {
+                "ok": True,
+                "producto_id": self.producto.id,
+                "producto": self.producto.nombre,
+                "codigo": "7421234567890",
+            },
+        )
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.codigo, "7421234567890")
+
+    def test_asignacion_rapida_rechaza_codigo_duplicado(self):
+        otro_producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto con barra",
+            codigo="7420000000001",
+            precio=Decimal("50.00"),
+        )
+
+        response = self.client.post(
+            reverse("codigos_barras_productos", args=[self.empresa.slug]),
+            {
+                "producto_id": self.producto.id,
+                "codigo": otro_producto.codigo,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["ok"])
+        self.assertIn("Ya existe", response.json()["error"])
+        self.producto.refresh_from_db()
+        self.assertFalse(self.producto.codigo)
+
     def test_libro_compras_fiscal_evita_duplicados_entre_meses(self):
         RegistroCompraFiscal.objects.create(
             empresa=self.empresa,

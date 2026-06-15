@@ -5,7 +5,10 @@
 {% block header_kicker %}Catalogo Comercial{% endblock %}
 {% block header_title %}Productos{% endblock %}
 {% block header_description %}Organiza el catalogo comercial, fiscal y operativo desde una vista mas limpia, consistente y preparada para crecer con inventario.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto</a>{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'codigos_barras_productos' empresa.slug %}">Asignar codigos</a>
+<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto</a>
+{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -131,6 +134,7 @@
             {% if erp_access.usa_inventario_farmaceutico %}
             <a class="erp-btn-secondary" href="{% url 'categorias_farmaceuticas' empresa.slug %}">Categorias</a>
             {% endif %}
+            <a class="erp-btn-secondary" href="{% url 'codigos_barras_productos' empresa.slug %}">Asignar codigos de barras</a>
         </div>
         <form method="get" class="erp-list-filter-grid">
             <div class="erp-filter-field">

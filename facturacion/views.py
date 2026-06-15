@@ -1602,6 +1602,69 @@ def productos_facturacion(request, empresa_slug):
 
 
 @login_required
+def codigos_barras_productos(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+
+    if request.method == "POST":
+        producto = get_object_or_404(
+            Producto,
+            id=request.POST.get("producto_id"),
+            empresa=empresa,
+            eliminado=False,
+        )
+        codigo = (request.POST.get("codigo") or "").strip()
+        if not codigo:
+            return JsonResponse({"ok": False, "error": "Escanea o escribe un codigo de barras."}, status=400)
+        if len(codigo) > 50:
+            return JsonResponse({"ok": False, "error": "El codigo no puede superar 50 caracteres."}, status=400)
+
+        producto.codigo = codigo
+        try:
+            producto.save(update_fields=["codigo"])
+        except ValidationError as exc:
+            errores = exc.message_dict.get("codigo", exc.messages) if hasattr(exc, "message_dict") else exc.messages
+            return JsonResponse({"ok": False, "error": " ".join(errores)}, status=400)
+
+        return JsonResponse({
+            "ok": True,
+            "producto_id": producto.id,
+            "producto": producto.nombre,
+            "codigo": producto.codigo,
+        })
+
+    q = (request.GET.get("q") or "").strip()
+    solo_sin_codigo = request.GET.get("estado", "sin-codigo") != "todos"
+    productos = Producto.objects.filter(
+        empresa=empresa,
+        eliminado=False,
+    ).order_by("nombre")
+    if q:
+        productos = productos.filter(
+            Q(nombre__icontains=q) |
+            Q(codigo__icontains=q) |
+            Q(descripcion__icontains=q)
+        )
+    if solo_sin_codigo:
+        productos = productos.filter(Q(codigo__isnull=True) | Q(codigo__exact=""))
+
+    total_catalogo = Producto.objects.filter(empresa=empresa, eliminado=False).count()
+    sin_codigo = Producto.objects.filter(
+        empresa=empresa,
+        eliminado=False,
+    ).filter(Q(codigo__isnull=True) | Q(codigo__exact="")).count()
+
+    return render(request, "facturacion/codigos_barras_productos.html", {
+        "empresa": empresa,
+        "productos": productos,
+        "q": q,
+        "solo_sin_codigo": solo_sin_codigo,
+        "total_catalogo": total_catalogo,
+        "sin_codigo": sin_codigo,
+        "con_codigo": total_catalogo - sin_codigo,
+    })
+
+
+@login_required
 def proveedores_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     q = request.GET.get("q", "").strip()
