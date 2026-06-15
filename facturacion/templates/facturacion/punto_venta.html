@@ -388,6 +388,11 @@
             );
             if(ticketWindow){
                 ticketWindow.location.href = result.ticket_url;
+                window.setTimeout(function(){
+                    try{ticketWindow.print();}catch(error){
+                        // El visor PDF mantiene disponible su propio boton de impresion.
+                    }
+                }, 1200);
             }else{
                 showCheckoutStatus(
                     `Factura ${result.numero_factura} creada. El navegador bloqueo el ticket; habilita ventanas emergentes.`,

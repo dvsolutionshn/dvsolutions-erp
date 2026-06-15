@@ -210,6 +210,9 @@ class FacturacionTests(TestCase):
         ancho_puntos = float(pdf.pages[0].mediabox.width)
         ancho_esperado = 80 / 25.4 * 72
         self.assertAlmostEqual(ancho_puntos, ancho_esperado, delta=1)
+        alto_puntos = float(pdf.pages[0].mediabox.height)
+        alto_esperado = 98 / 25.4 * 72
+        self.assertAlmostEqual(alto_puntos, alto_esperado, delta=1)
         texto = pdf.pages[0].extract_text()
         self.assertIn("FACTURA", texto)
         self.assertIn("DATOS FISCALES", texto)
@@ -332,12 +335,11 @@ class FacturacionTests(TestCase):
         self.assertIn("Recibido L. 250.00", pago.referencia)
         self.assertEqual(
             resultado["ticket_url"],
-            reverse("imprimir_factura_pos", args=[self.empresa.slug, factura.id]),
+            reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
         )
         impresion = self.client.get(resultado["ticket_url"])
         self.assertEqual(impresion.status_code, 200)
-        self.assertContains(impresion, "window.print()")
-        self.assertContains(impresion, "size: 80mm")
+        self.assertEqual(impresion["Content-Type"], "application/pdf")
 
     def test_punto_venta_ajax_rechaza_efectivo_insuficiente_sin_crear_factura(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

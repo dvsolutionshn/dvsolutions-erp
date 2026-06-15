@@ -329,7 +329,7 @@ def punto_venta(request, empresa_slug):
                     "total": f"{factura.total:.2f}",
                     "cambio": f"{cambio:.2f}",
                     "factura_url": reverse("ver_factura", args=[empresa.slug, factura.id]),
-                    "ticket_url": reverse("imprimir_factura_pos", args=[empresa.slug, factura.id]),
+                    "ticket_url": reverse("vista_previa_factura_pdf", args=[empresa.slug, factura.id]),
                 })
             messages.success(
                 request,
