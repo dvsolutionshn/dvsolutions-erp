@@ -214,7 +214,7 @@ class FacturacionTests(TestCase):
         self.assertIn("FACTURA", texto)
         self.assertIn("DATOS FISCALES", texto)
 
-    def test_plantilla_termica_solo_aparece_en_empresas_medicas(self):
+    def test_plantilla_termica_solo_aparece_en_empresas_autorizadas(self):
         configuracion = ConfiguracionFacturacionEmpresa(empresa=self.empresa)
         form = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
         opciones = dict(form.fields["plantilla_factura_pdf"].choices)
@@ -225,6 +225,25 @@ class FacturacionTests(TestCase):
         form_medico = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
         opciones_medicas = dict(form_medico.fields["plantilla_factura_pdf"].choices)
         self.assertEqual(opciones_medicas["termica_80mm"], "Factura termica 80 mm")
+
+    def test_demo_1_puede_usar_plantilla_termica_y_autoimpresion_pos(self):
+        self.empresa.slug = "demo_1"
+        self.empresa.save(update_fields=["slug"])
+        configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=self.empresa)
+        configuracion.plantilla_factura_pdf = "termica_80mm"
+        configuracion.save(update_fields=["plantilla_factura_pdf"])
+        factura = self.crear_factura_con_linea()
+
+        form = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
+        opciones = dict(form.fields["plantilla_factura_pdf"].choices)
+        self.assertEqual(opciones["termica_80mm"], "Factura termica 80 mm")
+
+        response = self.client.get(
+            reverse("imprimir_factura_pos", args=[self.empresa.slug, factura.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "window.print()")
+        self.assertContains(response, "size: 80mm")
 
     def test_punto_venta_crea_factura_pago_recibo_y_asientos(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

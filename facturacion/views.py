@@ -612,7 +612,7 @@ def _empresa_permite_plantilla_independiente(empresa):
 
 def _resolver_plantilla_factura(configuracion, empresa, plantilla_forzada=None):
     plantilla_activa = plantilla_forzada or configuracion.plantilla_factura_pdf
-    if plantilla_activa == "termica_80mm" and empresa.slug in {"hospital_mia", "medical_spa"}:
+    if plantilla_activa == "termica_80mm" and empresa.slug in {"hospital_mia", "medical_spa", "demo_1"}:
         return "facturacion/factura_pdf_termica_80mm.html"
     if plantilla_activa == "independiente" and _empresa_permite_plantilla_independiente(empresa):
         return "facturacion/factura_pdf_independiente.html"
@@ -5631,7 +5631,7 @@ def vista_previa_factura_pdf(request, empresa_slug, factura_id):
 def imprimir_factura_pos(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
-    if empresa.slug not in {"hospital_mia", "medical_spa"}:
+    if empresa.slug not in {"hospital_mia", "medical_spa", "demo_1"}:
         return redirect("vista_previa_factura_pdf", empresa_slug=empresa.slug, factura_id=factura.id)
     contexto = _contexto_documento_factura(empresa, factura)
     contexto["auto_print"] = True

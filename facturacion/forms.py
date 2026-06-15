@@ -71,7 +71,7 @@ class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):
         permite_plantilla_independiente = kwargs.pop("permite_plantilla_independiente", False)
         super().__init__(*args, **kwargs)
         empresa = self.instance.empresa if getattr(self.instance, "empresa_id", None) else None
-        if not empresa or empresa.slug not in {"hospital_mia", "medical_spa"}:
+        if not empresa or empresa.slug not in {"hospital_mia", "medical_spa", "demo_1"}:
             self.fields["plantilla_factura_pdf"].choices = [
                 choice
                 for choice in self.fields["plantilla_factura_pdf"].choices
