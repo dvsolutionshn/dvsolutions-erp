@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <style>
 @page {
-    size: 80mm {% if auto_print %}150mm{% else %}{{ alto_ticket_mm }}mm{% endif %};
+    size: 80mm {{ alto_ticket_mm }}mm;
     margin:0;
 }
 *{box-sizing:border-box}
@@ -20,13 +20,13 @@ body{
     padding:0;
     color:#000;
     font-family:"DejaVu Sans",Arial,sans-serif;
-    font-size:8.5pt;
-    line-height:1.28;
+    font-size:8pt;
+    line-height:1.16;
 }
 .ticket-content{
     width:80mm;
     margin:0;
-    padding:3mm 4mm 2mm;
+    padding:1.5mm 3mm 1mm;
 }
 .center{text-align:center}
 .right{text-align:right}
@@ -34,35 +34,35 @@ body{
 .company-logo{
     display:block;
     max-width:34mm;
-    max-height:17mm;
-    margin:0 auto 2mm;
+    max-height:12mm;
+    margin:0 auto 1mm;
     object-fit:contain;
     filter:grayscale(1);
 }
 .company-name{
     margin:0;
-    font-size:12pt;
+    font-size:10.5pt;
     font-weight:900;
     line-height:1.15;
 }
-.company-data{margin-top:1mm;font-size:7.5pt}
+.company-data{margin-top:.5mm;font-size:7pt}
 .document-title{
-    margin:2.5mm 0 1mm;
-    padding:1.5mm 0;
+    margin:1.2mm 0 .6mm;
+    padding:.8mm 0;
     border-top:.35mm solid #000;
     border-bottom:.35mm solid #000;
-    font-size:11pt;
+    font-size:10pt;
     font-weight:900;
     text-align:center;
 }
 .document-number{
-    font-size:10pt;
+    font-size:9pt;
     font-weight:900;
     overflow-wrap:anywhere;
 }
 .section{
-    margin-top:2mm;
-    padding-top:1.5mm;
+    margin-top:1mm;
+    padding-top:.8mm;
     border-top:.25mm dashed #000;
 }
 .row{
@@ -72,16 +72,16 @@ body{
 }
 .row span:first-child{flex:1}
 .row strong{text-align:right}
-.items{width:100%;border-collapse:collapse;margin-top:1.5mm;table-layout:fixed}
+.items{width:100%;border-collapse:collapse;margin-top:.8mm;table-layout:fixed}
 .items th{
-    padding:1mm .5mm;
+    padding:.6mm .4mm;
     border-top:.3mm solid #000;
     border-bottom:.3mm solid #000;
     font-size:7pt;
     text-transform:uppercase;
 }
 .items td{
-    padding:1.2mm .5mm;
+    padding:.7mm .4mm;
     vertical-align:top;
     border-bottom:.2mm dotted #777;
 }
@@ -90,22 +90,22 @@ body{
 .items .price{width:20%;text-align:right}
 .items .total{width:23%;text-align:right}
 .item-name{font-weight:800;overflow-wrap:anywhere}
-.item-note{font-size:7pt;margin-top:.5mm;overflow-wrap:anywhere}
-.totals{margin-top:2mm}
-.totals .row{padding:.5mm 0}
+.item-note{font-size:6.8pt;margin-top:.3mm;overflow-wrap:anywhere}
+.totals{margin-top:1mm}
+.totals .row{padding:.25mm 0}
 .grand-total{
-    margin-top:1mm;
-    padding:1.5mm 0;
+    margin-top:.5mm;
+    padding:.8mm 0;
     border-top:.45mm solid #000;
     border-bottom:.45mm solid #000;
-    font-size:11pt;
+    font-size:10pt;
     font-weight:900;
 }
 .fiscal{font-size:7pt;overflow-wrap:anywhere}
-.letters{margin-top:1.5mm;font-size:7pt;font-weight:700}
+.letters{margin-top:.7mm;font-size:6.8pt;font-weight:700}
 .footer{
-    margin-top:2.5mm;
-    padding-top:2mm;
+    margin-top:1mm;
+    padding-top:.8mm;
     border-top:.3mm dashed #000;
     font-size:7pt;
     text-align:center;
@@ -132,7 +132,6 @@ body{
 }
 {% endif %}
 </style>
-{% if auto_print %}<style id="dynamicPrintPage"></style>{% endif %}
 </head>
 <body>
 <main class="ticket-content" id="ticketContent">
@@ -151,7 +150,7 @@ body{
 
     <section class="section">
         <div class="row"><span>Emision</span><strong>{{ factura.fecha_emision|date:"d/m/Y" }}</strong></div>
-        {% if factura.fecha_vencimiento %}<div class="row"><span>Vencimiento</span><strong>{{ factura.fecha_vencimiento|date:"d/m/Y" }}</strong></div>{% endif %}
+        {% if factura.fecha_vencimiento and factura.fecha_vencimiento != factura.fecha_emision %}<div class="row"><span>Vencimiento</span><strong>{{ factura.fecha_vencimiento|date:"d/m/Y" }}</strong></div>{% endif %}
         <div class="row"><span>Moneda</span><strong>{{ factura.get_moneda_display }}</strong></div>
         <div class="row"><span>Estado</span><strong>{{ factura.get_estado_display }} / {{ factura.get_estado_pago_display }}</strong></div>
     </section>
@@ -191,10 +190,10 @@ body{
     <section class="totals">
         <div class="row"><span>Subtotal</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_bruto|floatformat:2|intcomma }}</strong></div>
         {% if resumen_detallado.descuento_total %}<div class="row"><span>Descuento</span><strong>- {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.descuento_total|floatformat:2|intcomma }}</strong></div>{% endif %}
-        <div class="row"><span>Base gravada 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_15|floatformat:2|intcomma }}</strong></div>
-        <div class="row"><span>Base gravada 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_18|floatformat:2|intcomma }}</strong></div>
-        <div class="row"><span>Exento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exento|floatformat:2|intcomma }}</strong></div>
-        <div class="row"><span>Exonerado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exonerado|floatformat:2|intcomma }}</strong></div>
+        {% if resumen_detallado.base_15 %}<div class="row"><span>Base gravada 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_15|floatformat:2|intcomma }}</strong></div>{% endif %}
+        {% if resumen_detallado.base_18 %}<div class="row"><span>Base gravada 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_18|floatformat:2|intcomma }}</strong></div>{% endif %}
+        {% if resumen_detallado.base_exento %}<div class="row"><span>Exento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exento|floatformat:2|intcomma }}</strong></div>{% endif %}
+        {% if resumen_detallado.base_exonerado %}<div class="row"><span>Exonerado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exonerado|floatformat:2|intcomma }}</strong></div>{% endif %}
         {% if resumen_detallado.isv_15 %}<div class="row"><span>ISV 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_15|floatformat:2|intcomma }}</strong></div>{% endif %}
         {% if resumen_detallado.isv_18 %}<div class="row"><span>ISV 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_18|floatformat:2|intcomma }}</strong></div>{% endif %}
         <div class="row grand-total"><span>TOTAL</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
@@ -229,22 +228,7 @@ body{
 {% if auto_print %}
 <script>
 window.addEventListener("load", function(){
-    const ticket = document.getElementById("ticketContent");
-    const pageStyle = document.getElementById("dynamicPrintPage");
     const printTicket = function(){
-        const pixelsToMillimeters = 25.4 / 96;
-        const contentHeight = Math.ceil(Math.max(
-            ticket.getBoundingClientRect().height,
-            ticket.scrollHeight
-        ));
-        const paperHeight = Math.max(60, Math.ceil((contentHeight * pixelsToMillimeters) + 0.5));
-        pageStyle.textContent = [
-            "@page { size: 80mm " + paperHeight + "mm; margin: 0; }",
-            "@media print {",
-            "html, body { position: absolute; inset: 0 auto auto 0; width: 80mm; height: " + paperHeight + "mm; min-height: 0; margin: 0; padding: 0; overflow: hidden; }",
-            ".ticket-content { position: absolute; inset: 0 auto auto 0; width: 80mm; margin: 0; }",
-            "}"
-        ].join("\n");
         window.requestAnimationFrame(function(){
             window.requestAnimationFrame(function(){window.print();});
         });

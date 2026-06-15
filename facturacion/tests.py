@@ -213,6 +213,7 @@ class FacturacionTests(TestCase):
         texto = pdf.pages[0].extract_text()
         self.assertIn("FACTURA", texto)
         self.assertIn("DATOS FISCALES", texto)
+        self.assertIn("Documento generado por DV Solutions ERP", texto)
 
     def test_plantilla_termica_solo_aparece_en_empresas_autorizadas(self):
         configuracion = ConfiguracionFacturacionEmpresa(empresa=self.empresa)
@@ -243,14 +244,7 @@ class FacturacionTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "window.print()")
-        self.assertContains(response, "size: 80mm")
-        self.assertContains(response, "getBoundingClientRect().height")
-        self.assertContains(response, "@page { size: 80mm")
-        contenido = response.content.decode()
-        self.assertGreater(
-            contenido.index('id="dynamicPrintPage"'),
-            contenido.index("@page {"),
-        )
+        self.assertContains(response, "size: 80mm 98mm")
 
     def test_punto_venta_crea_factura_pago_recibo_y_asientos(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
