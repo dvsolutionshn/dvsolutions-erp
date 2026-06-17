@@ -416,6 +416,34 @@ class FacturacionTests(TestCase):
         pago = PagoFactura.objects.get(factura_id=response.json()["factura_id"])
         self.assertEqual(pago.cuenta_financiera.tipo, "banco")
 
+    def test_resumen_caja_cuenta_aperturas_solo_por_efectivo(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_cierre_caja = True
+        configuracion.save(update_fields=["usa_cierre_caja"])
+        factura_efectivo = self.crear_factura_con_linea()
+        factura_tarjeta = self.crear_factura_con_linea()
+        PagoFactura.objects.create(
+            factura=factura_efectivo,
+            fecha=timezone.localdate(),
+            monto=Decimal("115.00"),
+            metodo="efectivo",
+            cajero=self.user,
+        )
+        PagoFactura.objects.create(
+            factura=factura_tarjeta,
+            fecha=timezone.localdate(),
+            monto=Decimal("115.00"),
+            metodo="tarjeta",
+            cajero=self.user,
+        )
+
+        response = self.client.get(reverse("resumen_diario_caja", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Aperturas caja")
+        self.assertEqual(response.context["resumen"]["aperturas_caja"], 1)
+        self.assertEqual(response.context["resumen_cajeros"][0]["aperturas_caja"], 1)
+
     def test_pos_crea_cliente_rapido_para_empresa_medica(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])

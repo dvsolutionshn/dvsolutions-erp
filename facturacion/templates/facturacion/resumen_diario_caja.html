@@ -36,6 +36,11 @@
         <p class="erp-card-muted">Cierres por cajero y turno.</p>
     </article>
     <article class="erp-card">
+        <div class="erp-kpi-label">Aperturas caja</div>
+        <p class="erp-stat-value">{{ resumen.aperturas_caja }}</p>
+        <p class="erp-card-muted">Conteo esperado por ventas o cobros en efectivo.</p>
+    </article>
+    <article class="erp-card">
         <div class="erp-kpi-label">Total reportado</div>
         <p class="erp-stat-value erp-money">L. {{ resumen.total_cerrado|floatformat:2|intcomma }}</p>
         <p class="erp-card-muted">Suma declarada en cierres.</p>
@@ -67,12 +72,13 @@
         </div>
         <div class="erp-table-wrap">
             <table class="erp-table">
-                <thead><tr><th>Cajero</th><th>Pagos</th><th>Total</th><th>Cierres</th></tr></thead>
+                <thead><tr><th>Cajero</th><th>Pagos</th><th>Aperturas</th><th>Total</th><th>Cierres</th></tr></thead>
                 <tbody>
                 {% for item in resumen_cajeros %}
                 <tr>
                     <td><strong>{{ item.cajero.username|default:"Sin usuario" }}</strong></td>
                     <td>{{ item.cantidad }}</td>
+                    <td>{{ item.aperturas_caja }}</td>
                     <td class="erp-money">L. {{ item.total|floatformat:2|intcomma }}</td>
                     <td>
                         {% for cierre in item.cierres %}
@@ -83,7 +89,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="4" class="erp-empty-row">No hay pagos por cajero en esta fecha.</td></tr>
+                <tr><td colspan="5" class="erp-empty-row">No hay pagos por cajero en esta fecha.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

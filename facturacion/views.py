@@ -6323,6 +6323,7 @@ def cierres_caja(request, empresa_slug):
     efectivo_sistema = total_metodo("efectivo")
     tarjeta_sistema = total_metodo("tarjeta")
     transferencia_sistema = total_metodo("transferencia")
+    aperturas_caja = pagos_usuario.filter(metodo="efectivo").count()
 
     if request.method == "POST":
         def leer_decimal(nombre, valor_sistema):
@@ -6364,6 +6365,7 @@ def cierres_caja(request, empresa_slug):
         "transferencia_sistema": transferencia_sistema,
         "total_sistema": efectivo_sistema + tarjeta_sistema + transferencia_sistema,
         "pagos": pagos_usuario.count(),
+        "aperturas_caja": aperturas_caja,
     }
 
     return render(request, "facturacion/cierres_caja.html", {
@@ -6408,12 +6410,14 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
             "cantidad": pagos_metodo.count(),
             "total": pagos_metodo.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
         })
+    aperturas_caja = pagos.filter(metodo="efectivo").count()
 
     return render(request, "facturacion/ver_cierre_caja.html", {
         "empresa": empresa,
         "cierre": cierre,
         "pagos": pagos,
         "resumen_metodos": resumen_metodos,
+        "aperturas_caja": aperturas_caja,
     })
 
 
@@ -6453,6 +6457,7 @@ def resumen_diario_caja(request, empresa_slug):
         resumen_cajeros.append({
             "cajero": cajero,
             "cantidad": pagos_cajero.count(),
+            "aperturas_caja": pagos_cajero.filter(metodo="efectivo").count(),
             "total": pagos_cajero.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
             "cierres": cierres.filter(cajero_id=cajero_id),
         })
@@ -6471,6 +6476,7 @@ def resumen_diario_caja(request, empresa_slug):
         "total": pagos.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
         "pagos": pagos.count(),
         "facturas": pagos.values("factura_id").distinct().count(),
+        "aperturas_caja": pagos.filter(metodo="efectivo").count(),
         "cierres": cierres.count(),
         "total_cerrado": sum((cierre.total_reportado for cierre in cierres), Decimal("0.00")),
         "diferencia_cierres": sum((cierre.diferencia for cierre in cierres), Decimal("0.00")),

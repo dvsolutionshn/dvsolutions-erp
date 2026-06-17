@@ -33,6 +33,11 @@
         <p class="erp-stat-value erp-money">L. {{ resumen.transferencia_sistema|floatformat:2|intcomma }}</p>
         <p class="erp-card-muted">Cobros bancarios registrados.</p>
     </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Aperturas caja</div>
+        <p class="erp-stat-value">{{ resumen.aperturas_caja }}</p>
+        <p class="erp-card-muted">Conteo esperado por cobros en efectivo.</p>
+    </article>
 </section>
 
 <section class="erp-form-card">
@@ -41,6 +46,9 @@
             <h3 style="margin:0 0 8px;">Cerrar mi caja</h3>
             <p>El sistema trae tus cobros del dia. Si el dinero fisico no cuadra, reporta el valor real y quedara la diferencia.</p>
         </div>
+    </div>
+    <div class="erp-soft-panel" style="margin-top:12px;">
+        La gaveta debe abrir solo en efectivo. Tarjeta, transferencia y banco no deben disparar apertura de caja; el conteo mostrado corresponde a cobros en efectivo.
     </div>
     <form method="get" class="erp-form-grid three" style="margin-top:18px;">
         <div class="erp-field">
