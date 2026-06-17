@@ -211,10 +211,15 @@ class FacturacionTests(TestCase):
         ancho_esperado = 80 / 25.4 * 72
         self.assertAlmostEqual(ancho_puntos, ancho_esperado, delta=1)
         alto_puntos = float(pdf.pages[0].mediabox.height)
-        alto_esperado = 98 / 25.4 * 72
+        alto_esperado = 132 / 25.4 * 72
         self.assertAlmostEqual(alto_puntos, alto_esperado, delta=1)
         texto = pdf.pages[0].extract_text()
         self.assertIn("FACTURA", texto)
+        self.assertIn("Sub Total Antes De Impuesto", texto)
+        self.assertIn("Base 18%", texto)
+        self.assertIn("Exento", texto)
+        self.assertIn("Exonerado", texto)
+        self.assertIn("ISV 18%", texto)
         self.assertIn("DATOS FISCALES", texto)
         self.assertIn("Documento generado por DV Solutions ERP", texto)
 

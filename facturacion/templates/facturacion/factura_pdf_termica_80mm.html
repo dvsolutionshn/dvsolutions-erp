@@ -188,14 +188,15 @@ body{
     </table>
 
     <section class="totals">
-        <div class="row"><span>Subtotal</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_bruto|floatformat:2|intcomma }}</strong></div>
-        {% if resumen_detallado.descuento_total %}<div class="row"><span>Descuento</span><strong>- {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.descuento_total|floatformat:2|intcomma }}</strong></div>{% endif %}
-        {% if resumen_detallado.base_15 %}<div class="row"><span>Base gravada 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_15|floatformat:2|intcomma }}</strong></div>{% endif %}
-        {% if resumen_detallado.base_18 %}<div class="row"><span>Base gravada 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_18|floatformat:2|intcomma }}</strong></div>{% endif %}
-        {% if resumen_detallado.base_exento %}<div class="row"><span>Exento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exento|floatformat:2|intcomma }}</strong></div>{% endif %}
-        {% if resumen_detallado.base_exonerado %}<div class="row"><span>Exonerado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exonerado|floatformat:2|intcomma }}</strong></div>{% endif %}
-        {% if resumen_detallado.isv_15 %}<div class="row"><span>ISV 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_15|floatformat:2|intcomma }}</strong></div>{% endif %}
-        {% if resumen_detallado.isv_18 %}<div class="row"><span>ISV 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_18|floatformat:2|intcomma }}</strong></div>{% endif %}
+        <div class="row"><span>Sub Total</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_bruto|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Descuento</span><strong>{% if resumen_detallado.descuento_total %}- {% endif %}{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.descuento_total|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Sub Total Antes De Impuesto</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.subtotal|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Base 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_15|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Base 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_18|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Exento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exento|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>Exonerado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.base_exonerado|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>ISV 15%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_15|floatformat:2|intcomma }}</strong></div>
+        <div class="row"><span>ISV 18%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.isv_18|floatformat:2|intcomma }}</strong></div>
         <div class="row grand-total"><span>TOTAL</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
         {% if factura.moneda == "USD" %}
         <div class="row"><span>Tasa de cambio</span><strong>L. {{ factura.tipo_cambio|floatformat:4|intcomma }}</strong></div>
