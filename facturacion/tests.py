@@ -192,6 +192,21 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "53,761.71")
 
+    def test_factura_clasica_genera_pdf_para_empresa_general(self):
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.get(
+            reverse("descargar_factura_pdf", args=[self.empresa.slug, factura.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        pdf = PdfReader(BytesIO(response.content))
+        self.assertEqual(len(pdf.pages), 1)
+        texto = pdf.pages[0].extract_text()
+        self.assertIn("FACTURA", texto)
+        self.assertIn("Cliente Demo", texto)
+
     def test_factura_termica_genera_pdf_de_80_mm_para_empresa_medica(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])

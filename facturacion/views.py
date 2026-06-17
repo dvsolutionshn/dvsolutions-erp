@@ -980,6 +980,17 @@ def _contexto_documento_factura(empresa, factura):
         for linea in lineas
         if (linea.comentario or "").strip()
     )
+    alto_ticket_mm = min(2000, max(132, 122 + (len(lineas) * 8) + (bloques_comentario * 4)))
+    return {
+        "empresa": empresa,
+        "factura": factura,
+        "resumen": resumen,
+        "resumen_detallado": resumen_detallado,
+        "lineas_factura": lineas,
+        "alto_ticket_mm": alto_ticket_mm,
+        "logo_url": _obtener_logo_url(empresa),
+        "configuracion_facturacion": configuracion,
+    }
 
 
 def _pos_cliente_obligatorio(empresa):
@@ -1189,17 +1200,6 @@ def _pos_bodega_payload(bodega):
         "id": bodega.id,
         "nombre": bodega.nombre,
         "tipo": bodega.tipo,
-    }
-    alto_ticket_mm = min(2000, max(132, 122 + (len(lineas) * 8) + (bloques_comentario * 4)))
-    return {
-        "empresa": empresa,
-        "factura": factura,
-        "resumen": resumen,
-        "resumen_detallado": resumen_detallado,
-        "lineas_factura": lineas,
-        "alto_ticket_mm": alto_ticket_mm,
-        "logo_url": _obtener_logo_url(empresa),
-        "configuracion_facturacion": configuracion,
     }
 
 
