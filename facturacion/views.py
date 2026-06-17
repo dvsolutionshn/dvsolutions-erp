@@ -400,6 +400,17 @@ def punto_venta(request, empresa_slug):
 
 
 @login_required
+def pos_buscar_clientes(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if empresa.slug not in POS_CLIENTE_OBLIGATORIO_SLUGS:
+        return JsonResponse({"ok": False, "error": "La busqueda rapida POS no esta activa para esta empresa."}, status=403)
+
+    termino = request.GET.get("q", "")
+    clientes = [_pos_cliente_payload(cliente) for cliente in _buscar_clientes_pos(empresa, termino)]
+    return JsonResponse({"ok": True, "clientes": clientes})
+
+
+@login_required
 @require_POST
 def pos_crear_cliente_rapido(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
@@ -981,9 +992,73 @@ def _pos_cliente_payload(cliente):
         "nombre": cliente.nombre,
         "rtn": cliente.rtn or "",
         "telefono": cliente.telefono or "",
+        "telefono_whatsapp": cliente.telefono_whatsapp or "",
         "correo": cliente.correo or "",
         "ciudad": cliente.ciudad or "",
     }
+
+
+def _solo_digitos(valor):
+    return "".join(caracter for caracter in str(valor or "") if caracter.isdigit())
+
+
+def _buscar_clientes_pos(empresa, termino, limite=12):
+    termino = (termino or "").strip()
+    if len(termino) < 2:
+        return []
+
+    clientes_base = (
+        Cliente.objects.filter(empresa=empresa, activo=True)
+        .exclude(nombre__iexact="Consumidor Final")
+        .order_by("nombre", "id")
+    )
+    clientes = []
+    ids = set()
+    termino_digitos = _solo_digitos(termino)
+
+    if termino_digitos:
+        for cliente in clientes_base.iterator(chunk_size=500):
+            valores = [
+                cliente.rtn,
+                cliente.telefono,
+                cliente.telefono_whatsapp,
+            ]
+            if any(_solo_digitos(valor) == termino_digitos for valor in valores):
+                clientes.append(cliente)
+                ids.add(cliente.id)
+                if len(clientes) >= limite:
+                    break
+
+    filtro = (
+        Q(nombre__icontains=termino)
+        | Q(rtn__icontains=termino)
+        | Q(telefono__icontains=termino)
+        | Q(telefono_whatsapp__icontains=termino)
+        | Q(correo__icontains=termino)
+    )
+    for cliente in clientes_base.filter(filtro)[:limite]:
+        if cliente.id not in ids:
+            clientes.append(cliente)
+            ids.add(cliente.id)
+            if len(clientes) >= limite:
+                break
+
+    if termino_digitos and len(clientes) < limite:
+        for cliente in clientes_base.iterator(chunk_size=500):
+            if cliente.id in ids:
+                continue
+            valores = [
+                cliente.rtn,
+                cliente.telefono,
+                cliente.telefono_whatsapp,
+            ]
+            if any(termino_digitos in _solo_digitos(valor) for valor in valores):
+                clientes.append(cliente)
+                ids.add(cliente.id)
+                if len(clientes) >= limite:
+                    break
+
+    return clientes[:limite]
 
 
 def _pos_producto_payload(producto, impuesto_default=None):

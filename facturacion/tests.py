@@ -467,6 +467,35 @@ class FacturacionTests(TestCase):
         self.assertEqual(cliente.rtn, "0801199911111")
         self.assertIsNotNone(cliente.cuenta_contable)
 
+    def test_pos_busca_clientes_en_base_completa_y_documento_sin_guiones(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        for indice in range(260):
+            Cliente.objects.create(
+                empresa=self.empresa,
+                nombre=f"Cliente Masivo {indice:03d}",
+                rtn=f"08011994{indice:05d}",
+                activo=True,
+            )
+        cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Tatiana Prueba POS",
+            rtn="0801-1994-13996",
+            telefono="99998888",
+            correo="tatiana@example.com",
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("pos_buscar_clientes", args=[self.empresa.slug]),
+            {"q": "0801199413996"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        resultados = response.json()["clientes"]
+        self.assertTrue(any(item["id"] == cliente.id for item in resultados))
+
     def test_pos_crea_producto_rapido_con_distribucion_bodega(self):
         self.empresa.slug = "medical_spa"
         self.empresa.save(update_fields=["slug"])

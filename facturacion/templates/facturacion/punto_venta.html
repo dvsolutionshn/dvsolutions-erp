@@ -243,6 +243,7 @@
     const warehouses = JSON.parse(document.getElementById("pos-warehouses").textContent);
     const clientRequired = {{ cliente_obligatorio|yesno:"true,false" }};
     const urls = {
+        clientSearch: "{% url 'pos_buscar_clientes' empresa.slug %}",
         clientCreate: "{% url 'pos_crear_cliente_rapido' empresa.slug %}",
         productCreate: "{% url 'pos_crear_producto_rapido' empresa.slug %}"
     };
@@ -282,6 +283,8 @@
     let scannerBuffer = "";
     let scannerLastKeyAt = 0;
     let selectedClient = null;
+    let clientSearchTimer = null;
+    let clientSearchSequence = 0;
 
     function money(value){return currency.format(value || 0).replace("HNL","L.");}
     function normalized(value){return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
@@ -337,7 +340,30 @@
         `;
     }
 
-    function renderClientResults(){
+    function clientMatches(client, term){
+        return normalized(client.nombre).includes(term)
+            || normalized(client.rtn).includes(term)
+            || normalized(client.telefono).includes(term)
+            || normalized(client.telefono_whatsapp).includes(term)
+            || normalized(client.correo).includes(term);
+    }
+
+    function mergeClients(newClients){
+        const known = new Map(clients.map(client => [Number(client.id), client]));
+        newClients.forEach(client => known.set(Number(client.id), client));
+        clients = Array.from(known.values());
+    }
+
+    function clientResultsHtml(resultados, emptyMessage){
+        return resultados.map(client => `
+            <button class="pos-client-result" type="button" data-client-id="${client.id}">
+                <strong>${client.nombre}</strong>
+                <span>${client.rtn || "Sin DNI/RTN"} - ${client.telefono || client.telefono_whatsapp || "Sin telefono"} - ${client.correo || "Sin correo"}</span>
+            </button>
+        `).join("") || `<div class="pos-empty">${emptyMessage}</div>`;
+    }
+
+    async function renderClientResults(){
         if(!clientRequired || !clientSearch){return;}
         const term = normalized(clientSearch.value);
         if(!term){
@@ -345,19 +371,32 @@
             clientResults.innerHTML = "";
             return;
         }
-        const visible = clients.filter(client => {
-            return normalized(client.nombre).includes(term)
-                || normalized(client.rtn).includes(term)
-                || normalized(client.telefono).includes(term)
-                || normalized(client.correo).includes(term);
-        }).slice(0, 12);
-        clientResults.innerHTML = visible.map(client => `
-            <button class="pos-client-result" type="button" data-client-id="${client.id}">
-                <strong>${client.nombre}</strong>
-                <span>${client.rtn || "Sin DNI/RTN"} - ${client.telefono || "Sin telefono"} - ${client.correo || "Sin correo"}</span>
-            </button>
-        `).join("") || '<div class="pos-empty">No encontre ese cliente. Puedes crearlo rapido.</div>';
+        const sequence = ++clientSearchSequence;
+        const localResults = clients.filter(client => clientMatches(client, term)).slice(0, 12);
+        clientResults.innerHTML = clientResultsHtml(localResults, "Buscando cliente en la base de datos...");
         clientResults.classList.add("is-visible");
+
+        try{
+            const response = await fetch(`${urls.clientSearch}?q=${encodeURIComponent(clientSearch.value.trim())}`, {
+                headers: {"X-Requested-With": "XMLHttpRequest"}
+            });
+            const result = await response.json();
+            if(sequence !== clientSearchSequence){return;}
+            if(!response.ok || !result.ok){
+                throw new Error(result.error || "No se pudo buscar el cliente.");
+            }
+            mergeClients(result.clientes || []);
+            const visible = clients.filter(client => clientMatches(client, term)).slice(0, 12);
+            clientResults.innerHTML = clientResultsHtml(visible, "No encontre ese cliente. Puedes crearlo rapido.");
+        }catch(error){
+            if(sequence !== clientSearchSequence){return;}
+            clientResults.innerHTML = clientResultsHtml(localResults, "No pude consultar clientes. Revisa conexion e intenta de nuevo.");
+        }
+    }
+
+    function scheduleClientSearch(){
+        window.clearTimeout(clientSearchTimer);
+        clientSearchTimer = window.setTimeout(renderClientResults, 180);
     }
 
     function selectClient(client){
@@ -553,7 +592,7 @@
         scanCode(search.value);
     });
     if(clientSearch){
-        clientSearch.addEventListener("input", renderClientResults);
+        clientSearch.addEventListener("input", scheduleClientSearch);
         clientResults.addEventListener("click", event => {
             const button = event.target.closest("[data-client-id]");
             if(!button){return;}
