@@ -1058,7 +1058,115 @@ def _buscar_clientes_pos(empresa, termino, limite=12):
                 if len(clientes) >= limite:
                     break
 
+    if len(clientes) < limite:
+        try:
+            from clinica.models import Paciente
+        except Exception:
+            Paciente = None
+        if Paciente:
+            pacientes_base = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre", "id")
+            pacientes = []
+            paciente_ids = set()
+            if termino_digitos:
+                for paciente in pacientes_base.iterator(chunk_size=500):
+                    valores = [paciente.identidad, paciente.telefono, paciente.whatsapp, paciente.celular_2]
+                    if any(_solo_digitos(valor) == termino_digitos for valor in valores):
+                        pacientes.append(paciente)
+                        paciente_ids.add(paciente.id)
+                        if len(pacientes) >= limite:
+                            break
+            filtro_paciente = (
+                Q(nombre__icontains=termino)
+                | Q(primer_nombre__icontains=termino)
+                | Q(segundo_nombre__icontains=termino)
+                | Q(primer_apellido__icontains=termino)
+                | Q(segundo_apellido__icontains=termino)
+                | Q(identidad__icontains=termino)
+                | Q(telefono__icontains=termino)
+                | Q(whatsapp__icontains=termino)
+                | Q(celular_2__icontains=termino)
+                | Q(correo__icontains=termino)
+            )
+            for paciente in pacientes_base.filter(filtro_paciente)[:limite]:
+                if paciente.id not in paciente_ids:
+                    pacientes.append(paciente)
+                    paciente_ids.add(paciente.id)
+                    if len(pacientes) >= limite:
+                        break
+            if termino_digitos and len(pacientes) < limite:
+                for paciente in pacientes_base.iterator(chunk_size=500):
+                    if paciente.id in paciente_ids:
+                        continue
+                    valores = [paciente.identidad, paciente.telefono, paciente.whatsapp, paciente.celular_2]
+                    if any(termino_digitos in _solo_digitos(valor) for valor in valores):
+                        pacientes.append(paciente)
+                        paciente_ids.add(paciente.id)
+                        if len(pacientes) >= limite:
+                            break
+
+            for paciente in pacientes:
+                if len(clientes) >= limite:
+                    break
+                cliente = _cliente_desde_paciente_pos(paciente)
+                if cliente.id not in ids:
+                    clientes.append(cliente)
+                    ids.add(cliente.id)
+
     return clientes[:limite]
+
+
+def _cliente_desde_paciente_pos(paciente):
+    cliente = paciente.cliente if paciente.cliente_id and paciente.cliente.empresa_id == paciente.empresa_id else None
+    identidad = (paciente.identidad or "").strip()
+    if not cliente and identidad:
+        cliente = Cliente.objects.filter(empresa=paciente.empresa, rtn__iexact=identidad).first()
+    if not cliente and paciente.nombre:
+        cliente = Cliente.objects.filter(empresa=paciente.empresa, nombre__iexact=paciente.nombre.strip()).first()
+
+    datos = {
+        "nombre": paciente.nombre or "Paciente sin nombre",
+        "rtn": identidad,
+        "telefono": paciente.telefono or paciente.whatsapp or paciente.celular_2 or "",
+        "telefono_whatsapp": paciente.whatsapp or paciente.telefono or "",
+        "correo": paciente.correo or "",
+        "fecha_nacimiento": paciente.fecha_nacimiento,
+        "acepta_promociones": paciente.acepta_promociones,
+        "direccion": paciente.direccion or "",
+        "ciudad": paciente.municipio or paciente.departamento or "",
+        "canal_preferido": "correo" if paciente.recibir_email and paciente.correo else "whatsapp",
+        "activo": paciente.activo,
+    }
+
+    if cliente:
+        cambios = []
+        for campo, valor in datos.items():
+            if campo == "rtn" and valor:
+                existe = Cliente.objects.filter(
+                    empresa=paciente.empresa,
+                    rtn__iexact=valor,
+                ).exclude(pk=cliente.pk).exists()
+                if existe:
+                    continue
+            if campo == "nombre" and valor:
+                existe = Cliente.objects.filter(
+                    empresa=paciente.empresa,
+                    nombre__iexact=valor,
+                ).exclude(pk=cliente.pk).exists()
+                if existe:
+                    continue
+            if getattr(cliente, campo) != valor:
+                setattr(cliente, campo, valor)
+                cambios.append(campo)
+        if cambios:
+            cliente.save(update_fields=cambios)
+    else:
+        cliente = Cliente.objects.create(empresa=paciente.empresa, **datos)
+
+    if paciente.cliente_id != cliente.id:
+        paciente.cliente = cliente
+        paciente.save(update_fields=["cliente"])
+    asegurar_cuenta_contable_cliente(cliente)
+    return cliente
 
 
 def _pos_producto_payload(producto, impuesto_default=None):

@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
+from facturacion.models import Cliente
 from .models import Paciente
 
 
@@ -66,6 +67,8 @@ class ClinicaPacienteTests(TestCase):
         paciente = Paciente.objects.get(empresa=self.empresa, expediente_codigo="HM-0001")
         self.assertTrue(paciente.es_alergico)
         self.assertEqual(paciente.alergias, "Penicilina")
+        self.assertIsNotNone(paciente.cliente)
+        self.assertTrue(Cliente.objects.filter(empresa=self.empresa, rtn="0801199912345").exists())
 
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)

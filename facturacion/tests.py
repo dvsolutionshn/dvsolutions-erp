@@ -15,6 +15,7 @@ from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, EmpresaModulo, Modulo, RolSistema
+from clinica.models import Paciente
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
@@ -495,6 +496,34 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         resultados = response.json()["clientes"]
         self.assertTrue(any(item["id"] == cliente.id for item in resultados))
+
+    def test_pos_busca_paciente_clinico_y_lo_enlaza_como_cliente(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-0999",
+            primer_nombre="Mariana",
+            primer_apellido="Lopez",
+            nombre="Mariana Lopez",
+            identidad="0801199413996",
+            whatsapp="99991111",
+            correo="mariana@example.com",
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("pos_buscar_clientes", args=[self.empresa.slug]),
+            {"q": "Mariana"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        paciente.refresh_from_db()
+        self.assertIsNotNone(paciente.cliente)
+        resultados = response.json()["clientes"]
+        self.assertTrue(any(item["id"] == paciente.cliente_id for item in resultados))
+        self.assertTrue(Cliente.objects.filter(empresa=self.empresa, rtn="0801199413996").exists())
 
     def test_pos_crea_producto_rapido_con_distribucion_bodega(self):
         self.empresa.slug = "medical_spa"

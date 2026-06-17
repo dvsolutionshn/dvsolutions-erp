@@ -8,6 +8,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.models import Empresa
+from contabilidad.services import asegurar_cuenta_contable_cliente
+from facturacion.models import Cliente
 
 from .forms import CitaClinicaForm, ExpedienteEventoForm, PacienteForm, ProfesionalSaludForm, ServicioClinicoForm, TratamientoPacienteForm
 from .models import (
@@ -37,6 +39,59 @@ def _proximo_codigo_expediente(empresa):
     prefijo = "MIA" if "mia" in (empresa.slug or "").lower() or "mia" in (empresa.nombre or "").lower() else "EXP"
     total = Paciente.objects.filter(empresa=empresa).count() + 1
     return f"{prefijo}-{total:05d}"
+
+
+def _sincronizar_cliente_facturacion_paciente(paciente):
+    cliente = paciente.cliente if paciente.cliente_id and paciente.cliente.empresa_id == paciente.empresa_id else None
+    identidad = (paciente.identidad or "").strip()
+    if not cliente and identidad:
+        cliente = Cliente.objects.filter(empresa=paciente.empresa, rtn__iexact=identidad).first()
+    if not cliente and paciente.nombre:
+        cliente = Cliente.objects.filter(empresa=paciente.empresa, nombre__iexact=paciente.nombre.strip()).first()
+
+    datos = {
+        "nombre": paciente.nombre or "Paciente sin nombre",
+        "rtn": identidad,
+        "telefono": paciente.telefono or paciente.whatsapp or paciente.celular_2 or "",
+        "telefono_whatsapp": paciente.whatsapp or paciente.telefono or "",
+        "correo": paciente.correo or "",
+        "fecha_nacimiento": paciente.fecha_nacimiento,
+        "acepta_promociones": paciente.acepta_promociones,
+        "direccion": paciente.direccion or "",
+        "ciudad": paciente.municipio or paciente.departamento or "",
+        "canal_preferido": "correo" if paciente.recibir_email and paciente.correo else "whatsapp",
+        "activo": paciente.activo,
+    }
+    if cliente:
+        cambios = []
+        for campo, valor in datos.items():
+            if campo == "rtn" and valor:
+                existe = Cliente.objects.filter(
+                    empresa=paciente.empresa,
+                    rtn__iexact=valor,
+                ).exclude(pk=cliente.pk).exists()
+                if existe:
+                    continue
+            if campo == "nombre" and valor:
+                existe = Cliente.objects.filter(
+                    empresa=paciente.empresa,
+                    nombre__iexact=valor,
+                ).exclude(pk=cliente.pk).exists()
+                if existe:
+                    continue
+            if getattr(cliente, campo) != valor:
+                setattr(cliente, campo, valor)
+                cambios.append(campo)
+        if cambios:
+            cliente.save(update_fields=cambios)
+    else:
+        cliente = Cliente.objects.create(empresa=paciente.empresa, **datos)
+
+    if paciente.cliente_id != cliente.id:
+        paciente.cliente = cliente
+        paciente.save(update_fields=["cliente"])
+    asegurar_cuenta_contable_cliente(cliente)
+    return cliente
 
 
 @login_required
@@ -188,6 +243,7 @@ def crear_paciente(request, empresa_slug):
         paciente.empresa = empresa
         paciente.creado_por = request.user
         paciente.save()
+        _sincronizar_cliente_facturacion_paciente(paciente)
         if paciente.foto_perfil:
             PacienteFotoEvolucion.objects.create(
                 empresa=empresa,
@@ -211,6 +267,7 @@ def editar_paciente(request, empresa_slug, paciente_id):
     form = PacienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=paciente)
     if request.method == "POST" and form.is_valid():
         paciente = form.save()
+        _sincronizar_cliente_facturacion_paciente(paciente)
         foto_nueva = paciente.foto_perfil.name if paciente.foto_perfil else ""
         if foto_nueva and foto_nueva != foto_anterior:
             PacienteFotoEvolucion.objects.create(
