@@ -48,6 +48,8 @@ from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, Cuen
 
 logger = logging.getLogger(__name__)
 
+POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
+
 
 def _cuentas_financieras_activas_para_pago(empresa):
     asegurar_cuentas_financieras_base_honduras(empresa)
@@ -75,7 +77,7 @@ def _cuenta_financiera_por_defecto(cuentas_financieras, metodo=None):
     if metodo == "efectivo":
         return cuentas_financieras.filter(tipo="caja").first() or cuentas_financieras.first()
     if metodo == "tarjeta":
-        return cuentas_financieras.filter(tipo="tarjeta_credito").first() or cuentas_financieras.first()
+        return cuentas_financieras.filter(tipo="banco").first() or cuentas_financieras.first()
     return cuentas_financieras.filter(tipo="banco").first() or cuentas_financieras.first()
 
 
@@ -194,6 +196,17 @@ def punto_venta(request, empresa_slug):
     impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")
     impuesto_default = impuestos_qs.first()
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    cliente_obligatorio = _pos_cliente_obligatorio(empresa)
+    bodegas_pos = []
+    if empresa.slug in POS_CLIENTE_OBLIGATORIO_SLUGS:
+        bodegas_pos = list(
+            BodegaInventario.objects.filter(
+                empresa=empresa,
+                activa=True,
+            ).order_by("tipo", "nombre")
+        )
+        if not bodegas_pos:
+            bodegas_pos = list(_asegurar_bodegas_farmaceuticas(empresa).values())
 
     if request.method == "POST":
         try:
@@ -206,6 +219,7 @@ def punto_venta(request, empresa_slug):
         cuenta_id = payload.get("cuenta_financiera")
         referencia = (payload.get("referencia") or "").strip()
         monto_recibido_raw = payload.get("monto_recibido")
+        cliente_id = payload.get("cliente_id")
         fecha_venta = _parsear_fecha_latam(payload.get("fecha")) or timezone.localdate()
 
         try:
@@ -215,6 +229,8 @@ def punto_venta(request, empresa_slug):
                 raise ValidationError("Configura al menos un impuesto activo antes de usar el punto de venta.")
             if not items:
                 raise ValidationError("Agrega al menos un producto al carrito.")
+            if cliente_obligatorio and not cliente_id:
+                raise ValidationError("Selecciona o crea el cliente antes de cobrar esta venta.")
 
             cuenta_financiera = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
             if not cuenta_financiera:
@@ -251,17 +267,23 @@ def punto_venta(request, empresa_slug):
                 })
 
             with transaction.atomic():
-                cliente = Cliente.objects.filter(
-                    empresa=empresa,
-                    nombre__iexact="Consumidor Final",
-                ).first()
+                cliente = None
+                if cliente_id:
+                    cliente = Cliente.objects.filter(empresa=empresa, id=cliente_id, activo=True).first()
+                if cliente_obligatorio and not cliente:
+                    raise ValidationError("El cliente seleccionado ya no esta disponible. Vuelve a buscarlo o crealo nuevamente.")
                 if not cliente:
-                    cliente = Cliente.objects.create(
+                    cliente = Cliente.objects.filter(
                         empresa=empresa,
-                        nombre="Consumidor Final",
-                        rtn="",
-                        ciudad=empresa.ciudad or "",
-                    )
+                        nombre__iexact="Consumidor Final",
+                    ).first()
+                    if not cliente:
+                        cliente = Cliente.objects.create(
+                            empresa=empresa,
+                            nombre="Consumidor Final",
+                            rtn="",
+                            ciudad=empresa.ciudad or "",
+                        )
                 asegurar_cuenta_contable_cliente(cliente)
 
                 factura = Factura.objects.create(
@@ -356,29 +378,157 @@ def punto_venta(request, empresa_slug):
                 )
             messages.error(request, f"No se pudo registrar la venta POS: {exc}")
 
-    productos_payload = []
-    for producto in productos_qs:
-        impuesto = producto.impuesto_predeterminado or impuesto_default
-        productos_payload.append({
-            "id": producto.id,
-            "nombre": producto.nombre,
-            "codigo": producto.codigo or "",
-            "foto_url": producto.foto.url if producto.foto else "",
-            "precio": float(producto.precio or Decimal("0.00")),
-            "impuesto": float(impuesto.porcentaje if impuesto else Decimal("0.00")),
-            "stock": float(producto.stock_actual),
-            "unidad": producto.get_unidad_medida_display(),
-            "controla_inventario": producto.controla_inventario,
-        })
+    productos_payload = [_pos_producto_payload(producto, impuesto_default) for producto in productos_qs]
+    clientes_payload = [
+        _pos_cliente_payload(cliente)
+        for cliente in Cliente.objects.filter(empresa=empresa, activo=True)
+        .exclude(nombre__iexact="Consumidor Final")
+        .order_by("nombre")[:250]
+    ]
 
     return render(request, "facturacion/punto_venta.html", {
         "empresa": empresa,
         "productos_payload": productos_payload,
+        "clientes_payload": clientes_payload,
+        "bodegas_payload": [_pos_bodega_payload(bodega) for bodega in bodegas_pos],
         "productos_count": len(productos_payload),
         "cuentas_financieras": cuentas_financieras,
         "fecha_hoy": timezone.localdate().strftime("%Y-%m-%d"),
         "metodos_pago": PagoFactura.METODOS,
+        "cliente_obligatorio": cliente_obligatorio,
     })
+
+
+@login_required
+@require_POST
+def pos_crear_cliente_rapido(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if empresa.slug not in POS_CLIENTE_OBLIGATORIO_SLUGS:
+        return JsonResponse({"ok": False, "error": "La creacion rapida POS no esta activa para esta empresa."}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    nombre = (payload.get("nombre") or "").strip()
+    rtn = (payload.get("rtn") or "").strip()
+    telefono = (payload.get("telefono") or "").strip()
+    correo = (payload.get("correo") or "").strip().lower()
+    telefono_whatsapp = (payload.get("telefono_whatsapp") or telefono).strip()
+    ciudad = (payload.get("ciudad") or empresa.ciudad or "").strip()
+    direccion = (payload.get("direccion") or "").strip()
+    fecha_nacimiento = _parsear_fecha_latam(payload.get("fecha_nacimiento"))
+
+    errores = []
+    if not nombre:
+        errores.append("Ingresa el nombre del cliente.")
+    if not rtn:
+        errores.append("Ingresa el numero de identidad o RTN.")
+    if not telefono:
+        errores.append("Ingresa el numero de telefono.")
+    if not correo:
+        errores.append("Ingresa el correo del cliente.")
+    if errores:
+        return JsonResponse({"ok": False, "error": " ".join(errores)}, status=400)
+
+    try:
+        with transaction.atomic():
+            cliente = Cliente.objects.create(
+                empresa=empresa,
+                nombre=nombre,
+                rtn=rtn,
+                telefono=telefono,
+                telefono_whatsapp=telefono_whatsapp,
+                correo=correo,
+                ciudad=ciudad,
+                direccion=direccion,
+                fecha_nacimiento=fecha_nacimiento,
+                acepta_promociones=bool(payload.get("acepta_promociones", True)),
+                canal_preferido=payload.get("canal_preferido") or "whatsapp",
+                activo=True,
+            )
+            asegurar_cuenta_contable_cliente(cliente)
+    except ValidationError as exc:
+        return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+
+    return JsonResponse({"ok": True, "cliente": _pos_cliente_payload(cliente)})
+
+
+@login_required
+@require_POST
+def pos_crear_producto_rapido(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if empresa.slug not in POS_CLIENTE_OBLIGATORIO_SLUGS:
+        return JsonResponse({"ok": False, "error": "La creacion rapida POS no esta activa para esta empresa."}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    nombre = (payload.get("nombre") or "").strip()
+    codigo = (payload.get("codigo") or "").strip()
+    try:
+        precio = Decimal(str(payload.get("precio") or "0")).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return JsonResponse({"ok": False, "error": "El precio del producto no es valido."}, status=400)
+    if not nombre:
+        return JsonResponse({"ok": False, "error": "Ingresa el nombre del producto."}, status=400)
+    if precio < 0:
+        return JsonResponse({"ok": False, "error": "El precio no puede ser negativo."}, status=400)
+
+    impuesto_default = TipoImpuesto.objects.filter(activo=True).order_by("nombre").first()
+    impuesto = impuesto_default
+    impuesto_id = payload.get("impuesto_id")
+    if impuesto_id:
+        impuesto = TipoImpuesto.objects.filter(id=impuesto_id, activo=True).first() or impuesto_default
+    if not impuesto:
+        return JsonResponse({"ok": False, "error": "Configura al menos un impuesto activo antes de crear productos desde POS."}, status=400)
+
+    distribucion = payload.get("bodegas") or {}
+    lote_inicial = (payload.get("lote_inicial") or "").strip()
+    fecha_vencimiento = _parsear_fecha_latam(payload.get("vencimiento_lote"))
+
+    try:
+        with transaction.atomic():
+            producto = Producto.objects.create(
+                empresa=empresa,
+                nombre=nombre,
+                codigo=codigo or None,
+                tipo_item=payload.get("tipo_item") or "producto",
+                unidad_medida=payload.get("unidad_medida") or "unidad",
+                precio=precio,
+                impuesto_predeterminado=impuesto,
+                controla_inventario=bool(payload.get("controla_inventario", True)),
+                descripcion=(payload.get("descripcion") or "").strip(),
+                activo=True,
+            )
+            if producto.controla_inventario:
+                _obtener_inventario_producto(producto)
+                for bodega_id, cantidad_raw in distribucion.items():
+                    try:
+                        cantidad = Decimal(str(cantidad_raw or "0")).quantize(Decimal("0.01"))
+                    except (InvalidOperation, ValueError):
+                        raise ValidationError("Una de las cantidades por bodega no es valida.")
+                    if cantidad <= 0:
+                        continue
+                    bodega = BodegaInventario.objects.filter(empresa=empresa, activa=True, id=bodega_id).first()
+                    if not bodega:
+                        raise ValidationError("Una de las bodegas seleccionadas ya no esta disponible.")
+                    _ajustar_existencia_producto_bodega(
+                        producto,
+                        bodega,
+                        cantidad,
+                        numero_lote=lote_inicial,
+                        fecha_vencimiento=fecha_vencimiento,
+                        observacion="Alta rapida de producto desde punto de venta.",
+                    )
+                _sincronizar_existencia_general_producto(producto)
+    except ValidationError as exc:
+        return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+
+    return JsonResponse({"ok": True, "producto": _pos_producto_payload(producto, impuesto_default)})
 
 
 @login_required
@@ -819,6 +969,44 @@ def _contexto_documento_factura(empresa, factura):
         for linea in lineas
         if (linea.comentario or "").strip()
     )
+
+
+def _pos_cliente_obligatorio(empresa):
+    return empresa.slug in POS_CLIENTE_OBLIGATORIO_SLUGS
+
+
+def _pos_cliente_payload(cliente):
+    return {
+        "id": cliente.id,
+        "nombre": cliente.nombre,
+        "rtn": cliente.rtn or "",
+        "telefono": cliente.telefono or "",
+        "correo": cliente.correo or "",
+        "ciudad": cliente.ciudad or "",
+    }
+
+
+def _pos_producto_payload(producto, impuesto_default=None):
+    impuesto = producto.impuesto_predeterminado or impuesto_default
+    return {
+        "id": producto.id,
+        "nombre": producto.nombre,
+        "codigo": producto.codigo or "",
+        "foto_url": producto.foto.url if producto.foto else "",
+        "precio": float(producto.precio or Decimal("0.00")),
+        "impuesto": float(impuesto.porcentaje if impuesto else Decimal("0.00")),
+        "stock": float(producto.stock_actual),
+        "unidad": producto.get_unidad_medida_display(),
+        "controla_inventario": producto.controla_inventario,
+    }
+
+
+def _pos_bodega_payload(bodega):
+    return {
+        "id": bodega.id,
+        "nombre": bodega.nombre,
+        "tipo": bodega.tipo,
+    }
     alto_ticket_mm = min(2000, max(132, 122 + (len(lineas) * 8) + (bloques_comentario * 4)))
     return {
         "empresa": empresa,

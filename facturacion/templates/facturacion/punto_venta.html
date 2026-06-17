@@ -12,6 +12,17 @@
 .pos-panel{position:relative;overflow:hidden}
 .pos-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:12px;margin-bottom:16px}
 .pos-search,.pos-input,.pos-select{width:100%;min-height:48px;border:1px solid #bfd0e8;border-radius:10px;padding:0 14px;background:#fff;color:#102338;font-size:15px}
+.pos-textarea{width:100%;min-height:88px;border:1px solid #bfd0e8;border-radius:10px;padding:12px 14px;background:#fff;color:#102338;font-size:15px;resize:vertical}
+.pos-client-box{display:grid;gap:10px;padding:12px;border:1px solid #cfe0f2;border-radius:12px;background:linear-gradient(180deg,#f8fbff,#fff);margin-bottom:14px}
+.pos-client-row{display:grid;grid-template-columns:minmax(0,1fr) 126px;gap:9px}
+.pos-client-results{display:none;max-height:190px;overflow:auto;border:1px solid #d7e4f4;border-radius:10px;background:#fff}
+.pos-client-results.is-visible{display:block}
+.pos-client-result{display:block;width:100%;border:0;border-bottom:1px solid #eef3fa;background:#fff;text-align:left;padding:10px 12px;cursor:pointer}
+.pos-client-result strong{display:block;color:#102338}
+.pos-client-result span{display:block;color:#5b6f8e;font-size:12px;margin-top:2px}
+.pos-client-selected{display:none;padding:11px 12px;border:1px solid #b9d9cf;border-radius:10px;background:#effcf8;color:#176252;font-size:13px}
+.pos-client-selected.is-visible{display:block}
+.pos-client-selected strong{display:block;color:#102338;font-size:15px}
 .pos-scanner-state{display:flex;align-items:center;gap:9px;margin:-4px 0 14px;color:#506984;font-size:13px}
 .pos-scanner-dot{width:9px;height:9px;border-radius:50%;background:#14b8a6;box-shadow:0 0 0 5px rgba(20,184,166,.12)}
 .pos-scan-feedback{min-height:42px;display:none;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:10px 12px;border:1px solid #b9d9cf;border-radius:8px;background:#effcf8;color:#176252;font-size:13px;font-weight:700}
@@ -55,14 +66,29 @@
 .pos-change-detail{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
 .pos-change-detail div{padding:12px;border:1px solid #d6e3f2;border-radius:9px;background:#f8fbff;color:#55708f;font-size:12px}
 .pos-change-detail strong{display:block;margin-top:5px;color:#102338;font-size:18px}
+.pos-modal{width:min(720px,calc(100% - 32px));border:0;border-radius:16px;padding:0;box-shadow:0 28px 80px rgba(7,25,48,.28)}
+.pos-modal::backdrop{background:rgba(7,25,48,.62);backdrop-filter:blur(4px)}
+.pos-modal-content{padding:24px}
+.pos-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.pos-modal-title{margin:0;color:#102338;font-size:22px}
+.pos-modal-subtitle{margin:5px 0 0;color:#5b6f8e;font-size:13px;line-height:1.4}
+.pos-modal-close{width:36px;height:36px;border:1px solid #cfe0f2;border-radius:9px;background:#fff;color:#143867;font-weight:900;cursor:pointer}
+.pos-modal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.pos-modal-grid .span-2{grid-column:1/-1}
+.pos-field label{display:block;margin-bottom:6px;color:#506984;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+.pos-check{display:flex;align-items:center;gap:9px;color:#102338;font-weight:700}
+.pos-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.pos-bodega-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .pos-empty{border:1px dashed #c9d8eb;border-radius:12px;padding:24px;text-align:center;color:#5b6f8e;background:#fbfdff}
 .pos-warning{border:1px solid #f1d3a6;background:#fff8ed;color:#724a10;border-radius:10px;padding:12px;margin-bottom:14px}
-@media (max-width:980px){.pos-shell{grid-template-columns:1fr}.pos-cart{position:static}.pos-toolbar{grid-template-columns:1fr}}
+@media (max-width:980px){.pos-shell{grid-template-columns:1fr}.pos-cart{position:static}.pos-toolbar,.pos-client-row,.pos-modal-grid,.pos-bodega-grid{grid-template-columns:1fr}.pos-modal-grid .span-2{grid-column:auto}}
 </style>
 {% endblock %}
 
 {% block content %}
 {{ productos_payload|json_script:"pos-products" }}
+{{ clientes_payload|json_script:"pos-clients" }}
+{{ bodegas_payload|json_script:"pos-warehouses" }}
 
 {% if not cuentas_financieras %}
 <div class="pos-warning">Configura una caja o cuenta bancaria activa antes de cobrar en punto de venta.</div>
@@ -82,6 +108,20 @@
 
     <aside class="erp-card pos-cart">
         <div class="erp-kpi-label">Caja activa</div>
+        {% if cliente_obligatorio %}
+        <div class="pos-client-box">
+            <div>
+                <h3 class="erp-panel-title" style="margin:0;">Cliente de la venta</h3>
+                <p class="erp-card-muted" style="margin:4px 0 0;">Obligatorio para CRM, promociones y trazabilidad de compras.</p>
+            </div>
+            <div class="pos-client-row">
+                <input class="pos-input" id="clientSearch" type="search" placeholder="Buscar DNI, RTN, nombre, telefono o correo" autocomplete="off">
+                <button class="erp-btn-secondary" type="button" id="newClientButton">Nuevo cliente</button>
+            </div>
+            <div class="pos-client-results" id="clientResults"></div>
+            <div class="pos-client-selected" id="selectedClientBox"></div>
+        </div>
+        {% endif %}
         <h3 class="erp-panel-title" style="margin-top:6px;">Carrito de venta</h3>
         <div class="pos-cart-list" id="cartList">
             <div class="pos-empty">Agrega productos para iniciar la venta.</div>
@@ -131,9 +171,81 @@
     </div>
 </dialog>
 
+<dialog class="pos-modal" id="clientModal">
+    <form class="pos-modal-content" method="dialog" id="clientForm">
+        <div class="pos-modal-head">
+            <div>
+                <h3 class="pos-modal-title">Nuevo cliente</h3>
+                <p class="pos-modal-subtitle">Captura los datos vitales para facturar y alimentar CRM desde el mostrador.</p>
+            </div>
+            <button class="pos-modal-close" type="button" data-close-modal="clientModal">x</button>
+        </div>
+        <div class="pos-modal-grid">
+            <div class="pos-field span-2"><label>Nombre completo</label><input class="pos-input" name="nombre" required></div>
+            <div class="pos-field"><label>DNI / RTN</label><input class="pos-input" name="rtn" required inputmode="numeric"></div>
+            <div class="pos-field"><label>Telefono</label><input class="pos-input" name="telefono" required inputmode="tel"></div>
+            <div class="pos-field"><label>Correo</label><input class="pos-input" name="correo" required type="email"></div>
+            <div class="pos-field"><label>WhatsApp</label><input class="pos-input" name="telefono_whatsapp" inputmode="tel"></div>
+            <div class="pos-field"><label>Fecha nacimiento</label><input class="pos-input" name="fecha_nacimiento" type="date"></div>
+            <div class="pos-field"><label>Ciudad</label><input class="pos-input" name="ciudad" value="{{ empresa.ciudad|default:'' }}"></div>
+            <div class="pos-field"><label>Canal preferido</label><select class="pos-select" name="canal_preferido"><option value="whatsapp">WhatsApp</option><option value="correo">Correo</option><option value="telefono">Telefono</option></select></div>
+            <div class="pos-field span-2"><label>Direccion</label><textarea class="pos-textarea" name="direccion"></textarea></div>
+            <label class="pos-check span-2"><input type="checkbox" name="acepta_promociones" checked> Acepta comunicaciones y promociones</label>
+        </div>
+        <div class="pos-checkout-status" id="clientModalStatus" role="status" aria-live="polite"></div>
+        <div class="pos-modal-actions">
+            <button class="erp-btn-secondary" type="button" data-close-modal="clientModal">Cancelar</button>
+            <button class="erp-btn" type="submit">Guardar cliente</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog class="pos-modal" id="productModal">
+    <form class="pos-modal-content" method="dialog" id="productForm">
+        <div class="pos-modal-head">
+            <div>
+                <h3 class="pos-modal-title">Nuevo producto</h3>
+                <p class="pos-modal-subtitle">Crea el producto sin salir del punto de venta y distribuye el stock inicial por bodega.</p>
+            </div>
+            <button class="pos-modal-close" type="button" data-close-modal="productModal">x</button>
+        </div>
+        <div class="pos-modal-grid">
+            <div class="pos-field span-2"><label>Nombre producto</label><input class="pos-input" name="nombre" required></div>
+            <div class="pos-field"><label>Codigo / barra</label><input class="pos-input" name="codigo" autocomplete="off"></div>
+            <div class="pos-field"><label>Precio venta</label><input class="pos-input" name="precio" type="number" min="0" step="0.01" required></div>
+            <div class="pos-field"><label>Lote inicial</label><input class="pos-input" name="lote_inicial" placeholder="Opcional"></div>
+            <div class="pos-field"><label>Vencimiento lote</label><input class="pos-input" name="vencimiento_lote" type="date"></div>
+            <label class="pos-check span-2"><input type="checkbox" name="controla_inventario" checked> Controla inventario</label>
+            <div class="pos-field span-2">
+                <label>Distribucion por bodegas</label>
+                <div class="pos-bodega-grid">
+                    {% for bodega in bodegas_payload %}
+                    <input class="pos-input" name="bodega_{{ bodega.id }}" type="number" min="0" step="0.01" placeholder="{{ bodega.nombre }}">
+                    {% empty %}
+                    <div class="pos-empty">No hay bodegas activas para esta empresa.</div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="pos-field span-2"><label>Descripcion</label><textarea class="pos-textarea" name="descripcion"></textarea></div>
+        </div>
+        <div class="pos-checkout-status" id="productModalStatus" role="status" aria-live="polite"></div>
+        <div class="pos-modal-actions">
+            <button class="erp-btn-secondary" type="button" data-close-modal="productModal">Cancelar</button>
+            <button class="erp-btn" type="submit">Guardar producto</button>
+        </div>
+    </form>
+</dialog>
+
 <script>
 (function(){
-    const products = JSON.parse(document.getElementById("pos-products").textContent);
+    let products = JSON.parse(document.getElementById("pos-products").textContent);
+    let clients = JSON.parse(document.getElementById("pos-clients").textContent);
+    const warehouses = JSON.parse(document.getElementById("pos-warehouses").textContent);
+    const clientRequired = {{ cliente_obligatorio|yesno:"true,false" }};
+    const urls = {
+        clientCreate: "{% url 'pos_crear_cliente_rapido' empresa.slug %}",
+        productCreate: "{% url 'pos_crear_producto_rapido' empresa.slug %}"
+    };
     const cart = new Map();
     const grid = document.getElementById("productGrid");
     const search = document.getElementById("posSearch");
@@ -154,11 +266,22 @@
     const finalChangeLabel = document.getElementById("finalChangeLabel");
     const finalTotalLabel = document.getElementById("finalTotalLabel");
     const finalReceivedLabel = document.getElementById("finalReceivedLabel");
+    const clientSearch = document.getElementById("clientSearch");
+    const clientResults = document.getElementById("clientResults");
+    const selectedClientBox = document.getElementById("selectedClientBox");
+    const clientModal = document.getElementById("clientModal");
+    const clientForm = document.getElementById("clientForm");
+    const clientModalStatus = document.getElementById("clientModalStatus");
+    const productModal = document.getElementById("productModal");
+    const productForm = document.getElementById("productForm");
+    const productModalStatus = document.getElementById("productModalStatus");
     const posForm = document.getElementById("posForm");
     const currency = new Intl.NumberFormat("es-HN",{style:"currency",currency:"HNL"});
+    const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
     let feedbackTimer = null;
     let scannerBuffer = "";
     let scannerLastKeyAt = 0;
+    let selectedClient = null;
 
     function money(value){return currency.format(value || 0).replace("HNL","L.");}
     function normalized(value){return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
@@ -194,6 +317,9 @@
         const visible = products.filter(product => {
             return !term || normalized(product.nombre).includes(term) || normalized(product.codigo).includes(term);
         }).slice(0, 120);
+        const emptyAction = clientRequired
+            ? '<br><br><button class="erp-btn-secondary" type="button" id="createMissingProduct">Crear producto</button>'
+            : '';
         grid.innerHTML = visible.map(product => `
             <button class="pos-product" type="button" data-id="${product.id}">
                 ${product.foto_url
@@ -204,7 +330,47 @@
                 <span>${product.controla_inventario ? `Stock ${Number(product.stock).toFixed(2)}` : "Servicio o sin inventario"}</span>
                 <div class="price">${money(product.precio)}</div>
             </button>
-        `).join("") || '<div class="pos-empty">No encontre productos con esa busqueda.</div>';
+        `).join("") || `
+            <div class="pos-empty">
+                No encontre productos con esa busqueda.${emptyAction}
+            </div>
+        `;
+    }
+
+    function renderClientResults(){
+        if(!clientRequired || !clientSearch){return;}
+        const term = normalized(clientSearch.value);
+        if(!term){
+            clientResults.classList.remove("is-visible");
+            clientResults.innerHTML = "";
+            return;
+        }
+        const visible = clients.filter(client => {
+            return normalized(client.nombre).includes(term)
+                || normalized(client.rtn).includes(term)
+                || normalized(client.telefono).includes(term)
+                || normalized(client.correo).includes(term);
+        }).slice(0, 12);
+        clientResults.innerHTML = visible.map(client => `
+            <button class="pos-client-result" type="button" data-client-id="${client.id}">
+                <strong>${client.nombre}</strong>
+                <span>${client.rtn || "Sin DNI/RTN"} - ${client.telefono || "Sin telefono"} - ${client.correo || "Sin correo"}</span>
+            </button>
+        `).join("") || '<div class="pos-empty">No encontre ese cliente. Puedes crearlo rapido.</div>';
+        clientResults.classList.add("is-visible");
+    }
+
+    function selectClient(client){
+        selectedClient = client;
+        if(clientSearch){clientSearch.value = "";}
+        if(clientResults){clientResults.classList.remove("is-visible");}
+        if(selectedClientBox){
+            selectedClientBox.innerHTML = `
+                <strong>${client.nombre}</strong>
+                <span>${client.rtn || "Sin DNI/RTN"} - ${client.telefono || "Sin telefono"} - ${client.correo || "Sin correo"}</span>
+            `;
+            selectedClientBox.classList.add("is-visible");
+        }
     }
 
     function totals(){
@@ -261,7 +427,7 @@
     function selectAccountForPayment(){
         const desiredType = paymentMethod.value === "efectivo"
             ? "caja"
-            : paymentMethod.value === "tarjeta" ? "tarjeta_credito" : "banco";
+            : "banco";
         const matching = Array.from(financialAccount.options).find(option => option.dataset.tipo === desiredType);
         if(matching){financialAccount.value = matching.value;}
         updateChange();
@@ -273,10 +439,36 @@
         checkoutStatus.classList.add("is-visible");
     }
 
+    function showModalStatus(element, message, isError){
+        element.textContent = message;
+        element.classList.toggle("is-error", Boolean(isError));
+        element.classList.add("is-visible");
+    }
+
+    async function postJson(url, payload){
+        const response = await fetch(url, {
+            method: "POST",
+            body: JSON.stringify(payload),
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest"
+            }
+        });
+        const result = await response.json();
+        if(!response.ok || !result.ok){
+            throw new Error(result.error || "No se pudo guardar.");
+        }
+        return result;
+    }
+
     function resetSale(){
         cart.clear();
         cashReceived.value = "";
         document.getElementById("referenceInput").value = "";
+        selectedClient = null;
+        if(selectedClientBox){selectedClientBox.classList.remove("is-visible"); selectedClientBox.innerHTML = "";}
+        if(clientSearch){clientSearch.value = "";}
         renderCart();
         search.value = "";
         renderProducts();
@@ -328,6 +520,18 @@
     grid.addEventListener("click", event => {
         const button = event.target.closest("[data-id]");
         if(button){addProduct(button.dataset.id);}
+        const createButton = event.target.closest("#createMissingProduct");
+        if(createButton && productModal){
+            const term = search.value.trim();
+            productForm.reset();
+            productModalStatus.classList.remove("is-visible");
+            if(/^\d{5,}$/.test(term)){
+                productForm.elements.codigo.value = term;
+            }else{
+                productForm.elements.nombre.value = term;
+            }
+            productModal.showModal();
+        }
     });
     cartList.addEventListener("click", event => {
         const inc = event.target.closest("[data-inc]");
@@ -348,6 +552,67 @@
         event.preventDefault();
         scanCode(search.value);
     });
+    if(clientSearch){
+        clientSearch.addEventListener("input", renderClientResults);
+        clientResults.addEventListener("click", event => {
+            const button = event.target.closest("[data-client-id]");
+            if(!button){return;}
+            const client = clients.find(item => item.id === Number(button.dataset.clientId));
+            if(client){selectClient(client);}
+        });
+        document.getElementById("newClientButton").addEventListener("click", () => {
+            clientForm.reset();
+            clientModalStatus.classList.remove("is-visible");
+            const term = clientSearch.value.trim();
+            if(term && !/^\d+$/.test(term)){clientForm.elements.nombre.value = term;}
+            if(/^\d+$/.test(term)){clientForm.elements.rtn.value = term;}
+            clientModal.showModal();
+        });
+    }
+    document.querySelectorAll("[data-close-modal]").forEach(button => {
+        button.addEventListener("click", () => {
+            document.getElementById(button.dataset.closeModal).close();
+        });
+    });
+    if(clientForm){
+        clientForm.addEventListener("submit", async event => {
+            event.preventDefault();
+            const data = Object.fromEntries(new FormData(clientForm).entries());
+            data.acepta_promociones = Boolean(clientForm.elements.acepta_promociones.checked);
+            try{
+                showModalStatus(clientModalStatus, "Guardando cliente...", false);
+                const result = await postJson(urls.clientCreate, data);
+                clients.unshift(result.cliente);
+                selectClient(result.cliente);
+                clientModal.close();
+            }catch(error){
+                showModalStatus(clientModalStatus, error.message, true);
+            }
+        });
+    }
+    if(productForm){
+        productForm.addEventListener("submit", async event => {
+            event.preventDefault();
+            const formData = new FormData(productForm);
+            const data = Object.fromEntries(formData.entries());
+            data.controla_inventario = Boolean(productForm.elements.controla_inventario.checked);
+            data.bodegas = {};
+            warehouses.forEach(warehouse => {
+                data.bodegas[warehouse.id] = formData.get(`bodega_${warehouse.id}`) || "0";
+            });
+            try{
+                showModalStatus(productModalStatus, "Guardando producto...", false);
+                const result = await postJson(urls.productCreate, data);
+                products.unshift(result.producto);
+                renderProducts();
+                addProduct(result.producto.id);
+                showScanFeedback(`${result.producto.nombre} creado y agregado al carrito.`, false);
+                productModal.close();
+            }catch(error){
+                showModalStatus(productModalStatus, error.message, true);
+            }
+        });
+    }
     document.addEventListener("keydown", event => {
         const target = event.target;
         const isEditable = target.matches("input, textarea, select, [contenteditable='true']");
@@ -383,6 +648,11 @@
     posForm.addEventListener("submit", async event => {
         event.preventDefault();
         if(!cart.size || checkoutButton.disabled){return;}
+        if(clientRequired && !selectedClient){
+            showCheckoutStatus("Selecciona o crea el cliente antes de cobrar.", true);
+            if(clientSearch){clientSearch.focus();}
+            return;
+        }
         if(!financialAccount.value){
             showCheckoutStatus("Selecciona la caja o cuenta donde ingreso el pago.", true);
             financialAccount.focus();
@@ -399,6 +669,7 @@
             fecha: document.getElementById("saleDate").value,
             metodo: paymentMethod.value,
             cuenta_financiera: financialAccount.value,
+            cliente_id: selectedClient ? selectedClient.id : "",
             referencia: document.getElementById("referenceInput").value,
             monto_recibido: paymentMethod.value === "efectivo" ? cashReceived.value : "",
             items: Array.from(cart.values())

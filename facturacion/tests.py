@@ -320,6 +320,7 @@ class FacturacionTests(TestCase):
             {
                 "payload": json.dumps({
                     "metodo": "efectivo",
+                    "cliente_id": self.cliente.id,
                     "monto_recibido": "250.00",
                     "items": [
                         {
@@ -352,6 +353,115 @@ class FacturacionTests(TestCase):
             impresion,
             reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
         )
+
+    def test_punto_venta_medico_requiere_cliente_seleccionado(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "efectivo",
+                    "monto_recibido": "250.00",
+                    "items": [
+                        {
+                            "producto_id": self.producto.id,
+                            "cantidad": "2",
+                            "precio_unitario": "100.00",
+                        }
+                    ],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("cliente", response.json()["error"].lower())
+        self.assertFalse(Factura.objects.filter(empresa=self.empresa).exists())
+
+    def test_punto_venta_tarjeta_selecciona_banco_por_defecto(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "tarjeta",
+                    "cliente_id": self.cliente.id,
+                    "items": [
+                        {
+                            "producto_id": self.producto.id,
+                            "cantidad": "1",
+                            "precio_unitario": "100.00",
+                        }
+                    ],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        pago = PagoFactura.objects.get(factura_id=response.json()["factura_id"])
+        self.assertEqual(pago.cuenta_financiera.tipo, "banco")
+
+    def test_pos_crea_cliente_rapido_para_empresa_medica(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+
+        response = self.client.post(
+            reverse("pos_crear_cliente_rapido", args=[self.empresa.slug]),
+            data=json.dumps({
+                "nombre": "Paciente POS",
+                "rtn": "0801199911111",
+                "telefono": "99990000",
+                "correo": "paciente@example.com",
+                "ciudad": "San Pedro Sula",
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        resultado = response.json()
+        self.assertTrue(resultado["ok"])
+        cliente = Cliente.objects.get(pk=resultado["cliente"]["id"])
+        self.assertEqual(cliente.rtn, "0801199911111")
+        self.assertIsNotNone(cliente.cuenta_contable)
+
+    def test_pos_crea_producto_rapido_con_distribucion_bodega(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        bodega = BodegaInventario.objects.create(empresa=self.empresa, nombre="Vitrina", tipo="vitrina")
+
+        response = self.client.post(
+            reverse("pos_crear_producto_rapido", args=[self.empresa.slug]),
+            data=json.dumps({
+                "nombre": "Crema POS",
+                "codigo": "POS-001",
+                "precio": "350.00",
+                "lote_inicial": "L-001",
+                "vencimiento_lote": "2027-08-31",
+                "bodegas": {str(bodega.id): "4"},
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        producto = Producto.objects.get(codigo="POS-001", empresa=self.empresa)
+        self.assertEqual(producto.stock_actual, Decimal("4.00"))
+        existencia = ExistenciaLoteBodega.objects.get(lote__producto=producto, bodega=bodega)
+        self.assertEqual(existencia.cantidad, Decimal("4.00"))
 
     def test_punto_venta_ajax_rechaza_efectivo_insuficiente_sin_crear_factura(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

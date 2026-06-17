@@ -8,6 +8,8 @@ urlpatterns = [
 
     path('facturas/', views.facturas_dashboard, name='facturas_dashboard'),
     path('pos/', views.punto_venta, name='punto_venta'),
+    path('pos/clientes/crear-rapido/', views.pos_crear_cliente_rapido, name='pos_crear_cliente_rapido'),
+    path('pos/productos/crear-rapido/', views.pos_crear_producto_rapido, name='pos_crear_producto_rapido'),
     path('pos/facturas/<int:factura_id>/imprimir/', views.imprimir_factura_pos, name='imprimir_factura_pos'),
     path('crear/', views.crear_factura, name='crear_factura'),
     path('facturas/prefijo-manual/', views.prefijo_factura_manual, name='prefijo_factura_manual'),
