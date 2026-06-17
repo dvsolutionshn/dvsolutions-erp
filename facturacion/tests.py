@@ -591,6 +591,9 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Lector listo")
         self.assertContains(response, "7501234567890")
         self.assertContains(response, "scanCode")
+        self.assertContains(response, 'replace(/[^a-z0-9]/g,"")')
+        self.assertContains(response, "scannerLastKeyAt > 160")
+        self.assertContains(response, "productCode.replace(/^0+/,")
 
     def test_formulario_producto_prepara_campo_para_codigo_de_barras(self):
         form = ProductoForm(empresa=self.empresa)

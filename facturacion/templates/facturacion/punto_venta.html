@@ -288,7 +288,7 @@
 
     function money(value){return currency.format(value || 0).replace("HNL","L.");}
     function normalized(value){return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
-    function normalizedCode(value){return String(value || "").trim().toLowerCase();}
+    function normalizedCode(value){return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g,"");}
 
     function showScanFeedback(message, isError){
         window.clearTimeout(feedbackTimer);
@@ -318,7 +318,11 @@
     function renderProducts(){
         const term = normalized(search.value);
         const visible = products.filter(product => {
-            return !term || normalized(product.nombre).includes(term) || normalized(product.codigo).includes(term);
+            const codeTerm = normalizedCode(search.value);
+            return !term
+                || normalized(product.nombre).includes(term)
+                || normalized(product.codigo).includes(term)
+                || (codeTerm && normalizedCode(product.codigo).includes(codeTerm));
         }).slice(0, 120);
         const emptyAction = clientRequired
             ? '<br><br><button class="erp-btn-secondary" type="button" id="createMissingProduct">Crear producto</button>'
@@ -542,7 +546,10 @@
     function scanCode(rawCode){
         const code = normalizedCode(rawCode);
         if(!code){return false;}
-        const product = products.find(item => normalizedCode(item.codigo) === code);
+        const product = products.find(item => {
+            const productCode = normalizedCode(item.codigo);
+            return productCode === code || productCode.replace(/^0+/,"") === code.replace(/^0+/,"");
+        });
         if(!product){
             showScanFeedback(`No existe un producto activo con el codigo ${rawCode}.`, true);
             soundScan(false);
@@ -654,17 +661,20 @@
     }
     document.addEventListener("keydown", event => {
         const target = event.target;
-        const isEditable = target.matches("input, textarea, select, [contenteditable='true']");
-        if(isEditable){return;}
+        if(target.closest("dialog") || target.matches("textarea, select, [contenteditable='true']")){return;}
 
         const now = Date.now();
-        if(now - scannerLastKeyAt > 90){scannerBuffer = "";}
+        if(now - scannerLastKeyAt > 160){scannerBuffer = "";}
         scannerLastKeyAt = now;
 
         if(event.key === "Enter"){
             if(scannerBuffer.length >= 3){
                 event.preventDefault();
-                scanCode(scannerBuffer);
+                const scannedCode = scannerBuffer;
+                if(scanCode(scannedCode) && target.matches("input") && target !== search){
+                    target.value = "";
+                    target.dispatchEvent(new Event("input", {bubbles:true}));
+                }
             }
             scannerBuffer = "";
             return;
