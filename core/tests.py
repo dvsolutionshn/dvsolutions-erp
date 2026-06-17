@@ -974,3 +974,27 @@ class SuperAdminControlTests(TestCase):
         dashboard_response = self.client.get("/dashboard/", HTTP_HOST="digital-planning.erp.test")
         self.assertEqual(dashboard_response.status_code, 200)
         self.assertContains(dashboard_response, "Digital Planning")
+
+    @override_settings(ALLOWED_HOSTS=["hospital-mia.erp.test", "testserver"])
+    def test_login_por_subdominio_resuelve_slug_con_guion_bajo(self):
+        empresa = Empresa.objects.create(
+            nombre="Hospital Mia",
+            slug="hospital_mia",
+            rtn="08011999000022",
+        )
+        Usuario.objects.create_user(
+            username="usuario_hospital_mia",
+            password="pass12345",
+            empresa=empresa,
+        )
+
+        response = self.client.post(
+            "/",
+            {"username": "usuario_hospital_mia", "password": "pass12345"},
+            HTTP_HOST="hospital-mia.erp.test",
+        )
+
+        self.assertRedirects(response, "/dashboard/", fetch_redirect_response=False)
+        dashboard_response = self.client.get("/dashboard/", HTTP_HOST="hospital-mia.erp.test")
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertContains(dashboard_response, "Hospital Mia")

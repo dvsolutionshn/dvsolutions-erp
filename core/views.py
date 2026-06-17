@@ -302,7 +302,17 @@ def _empresa_desde_host(request):
     if subdominio in {"www", "erp", "test", "app"}:
         return None
 
-    return Empresa.objects.filter(slug=subdominio, activa=True).first()
+    empresa = Empresa.objects.filter(slug=subdominio, activa=True).first()
+    if empresa:
+        return empresa
+
+    # Los slugs internos existentes usan guion bajo, pero los nombres DNS solo
+    # deben usar letras, numeros y guiones. Ej.: hospital-mia -> hospital_mia.
+    slug_compatible = subdominio.replace("-", "_")
+    if slug_compatible != subdominio:
+        return Empresa.objects.filter(slug=slug_compatible, activa=True).first()
+
+    return None
 
 
 def _resolver_empresa_request(request, slug=None):
