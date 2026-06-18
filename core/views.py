@@ -9,12 +9,14 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.core.paginator import Paginator
 from django.db import OperationalError, transaction
 from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
@@ -40,6 +42,7 @@ from .models import (
     PlanComercial,
     PlanModulo,
     RespaldoEmpresa,
+    RegistroAuditoria,
     RolSistema,
     SolicitudComercial,
     TokenRespaldoEmpresa,
@@ -832,9 +835,119 @@ def _superadmin_base_context():
         "superadmin_licencias_url": "/control/licencias/",
         "superadmin_solicitudes_url": "/control/solicitudes/",
         "superadmin_respaldos_url": "/control/respaldos/",
+        "superadmin_auditoria_url": "/control/auditoria/",
         "enable_django_admin": settings.ENABLE_DJANGO_ADMIN,
         "django_admin_url": f"/{settings.DJANGO_ADMIN_PATH.strip('/')}/" if settings.ENABLE_DJANGO_ADMIN else None,
     }
+
+
+def _aplicar_filtros_auditoria(queryset, request):
+    q = (request.GET.get("q") or "").strip()
+    accion = (request.GET.get("accion") or "").strip()
+    modulo = (request.GET.get("modulo") or "").strip()
+    usuario_id = (request.GET.get("usuario") or "").strip()
+    desde = parse_date((request.GET.get("desde") or "").strip())
+    hasta = parse_date((request.GET.get("hasta") or "").strip())
+    if q:
+        queryset = queryset.filter(
+            Q(objeto_representacion__icontains=q)
+            | Q(objeto_id__icontains=q)
+            | Q(modelo__icontains=q)
+            | Q(motivo__icontains=q)
+            | Q(usuario__username__icontains=q)
+            | Q(usuario__email__icontains=q)
+        )
+    if accion:
+        queryset = queryset.filter(accion=accion)
+    if modulo:
+        queryset = queryset.filter(modulo=modulo)
+    if usuario_id.isdigit():
+        queryset = queryset.filter(usuario_id=int(usuario_id))
+    if desde:
+        queryset = queryset.filter(fecha__date__gte=desde)
+    if hasta:
+        queryset = queryset.filter(fecha__date__lte=hasta)
+    return queryset
+
+
+def _contexto_filtros_auditoria(queryset_base, request):
+    return {
+        "acciones": RegistroAuditoria.ACCION_CHOICES,
+        "modulos": queryset_base.order_by("modulo").values_list("modulo", flat=True).distinct(),
+        "usuarios_auditoria": Usuario.objects.filter(
+            id__in=queryset_base.exclude(usuario_id=None).values_list("usuario_id", flat=True)
+        ).order_by("username"),
+        "filtros": {
+            "q": (request.GET.get("q") or "").strip(),
+            "accion": (request.GET.get("accion") or "").strip(),
+            "modulo": (request.GET.get("modulo") or "").strip(),
+            "usuario": (request.GET.get("usuario") or "").strip(),
+            "desde": (request.GET.get("desde") or "").strip(),
+            "hasta": (request.GET.get("hasta") or "").strip(),
+        },
+    }
+
+
+@login_required
+def auditoria_empresa(request, slug):
+    empresa = _resolver_empresa_request(request, slug)
+    if not request.user.is_superuser and (
+        request.user.empresa_id != empresa.id or not request.user.es_administrador_empresa
+    ):
+        return JsonResponse({"error": "Solo el administrador de la empresa puede consultar la bitacora."}, status=403)
+    base = RegistroAuditoria.objects.filter(empresa=empresa).select_related("usuario")
+    registros = _aplicar_filtros_auditoria(base, request)
+    page = Paginator(registros, 50).get_page(request.GET.get("page"))
+    context = {
+        "empresa": empresa,
+        "registros": page,
+        "total_registros": registros.count(),
+        **_contexto_filtros_auditoria(base, request),
+    }
+    return render(request, "core/auditoria_empresa.html", context)
+
+
+@login_required
+def auditoria_objeto(request, slug, app_label, modelo, objeto_id):
+    empresa = _resolver_empresa_request(request, slug)
+    if not request.user.is_superuser and (
+        request.user.empresa_id != empresa.id or not request.user.es_administrador_empresa
+    ):
+        return JsonResponse({"error": "No autorizado."}, status=403)
+    registros = RegistroAuditoria.objects.filter(
+        empresa=empresa,
+        app_label=app_label,
+        modelo=modelo,
+        objeto_id=str(objeto_id),
+    ).select_related("usuario")
+    return render(request, "core/auditoria_objeto.html", {
+        "empresa": empresa,
+        "registros": registros,
+        "objeto_titulo": registros.first().objeto_representacion if registros.exists() else f"{modelo} #{objeto_id}",
+    })
+
+
+@login_required(login_url="/control/login/")
+def superadmin_auditoria(request):
+    if not request.user.is_superuser:
+        return redirect("superadmin_login")
+    base = RegistroAuditoria.objects.select_related("empresa", "usuario")
+    empresa_id = (request.GET.get("empresa") or "").strip()
+    if empresa_id.isdigit():
+        base_filtrada = base.filter(empresa_id=int(empresa_id))
+    else:
+        base_filtrada = base
+    registros = _aplicar_filtros_auditoria(base_filtrada, request)
+    page = Paginator(registros, 75).get_page(request.GET.get("page"))
+    context = {
+        **_superadmin_base_context(),
+        "registros": page,
+        "total_registros": registros.count(),
+        "empresas": Empresa.objects.order_by("nombre"),
+        "empresa_seleccionada": empresa_id,
+        **_contexto_filtros_auditoria(base_filtrada, request),
+    }
+    return render(request, "core/superadmin_auditoria.html", context)
 
 
 def _enriquecer_empresa(empresa):

@@ -74,6 +74,7 @@
     {% url 'clinica_servicios' empresa.slug as clinica_servicios_url %}
     {% url 'asistente_consulta' empresa.slug as asistente_consulta_url %}
     {% url 'empresa_respaldo' empresa.slug as empresa_respaldo_url %}
+    {% url 'auditoria_empresa' empresa.slug as auditoria_empresa_url %}
 {% endif %}
 <div class="erp-shell">
     <div class="erp-mobile-topbar">
@@ -155,6 +156,10 @@
                 </a>
                 {% endif %}
                 {% if request.user.is_superuser or request.user.es_administrador_empresa %}
+                <a class="erp-nav-link {% if '/dashboard/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_empresa_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Bitacora ERP</span>
+                </a>
                 <a class="erp-nav-link {% if '/dashboard/respaldo/' in request.path %}is-active{% endif %}" href="{{ empresa_respaldo_url }}">
                     <span class="erp-nav-bullet"></span>
                     <span>Mi respaldo</span>

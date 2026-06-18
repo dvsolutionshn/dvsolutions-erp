@@ -1,0 +1,8 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Historia - {{ objeto_titulo }}{% endblock %}
+{% block header_kicker %}Trazabilidad del registro{% endblock %}
+{% block header_title %}{{ objeto_titulo }}{% endblock %}
+{% block header_description %}Linea de tiempo completa del registro, ordenada desde el cambio mas reciente.{% endblock %}
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'auditoria_empresa' empresa.slug %}">Volver a la bitacora</a>{% endblock %}
+{% block extra_head %}{% include "core/auditoria_estilos.html" %}{% endblock %}
+{% block content %}<section class="erp-card">{% include "core/_auditoria_tabla.html" %}</section>{% endblock %}

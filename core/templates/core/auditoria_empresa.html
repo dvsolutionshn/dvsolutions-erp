@@ -1,0 +1,21 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Bitacora ERP - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control y trazabilidad{% endblock %}
+{% block header_title %}Bitacora ERP{% endblock %}
+{% block header_description %}Historia central de creaciones, modificaciones, eliminaciones y relaciones realizadas en todos los modulos.{% endblock %}
+{% block extra_head %}{% include "core/auditoria_estilos.html" %}{% endblock %}
+{% block content %}
+<section class="erp-card">
+    <div class="audit-heading"><div><div class="erp-kpi-label">Eventos encontrados</div><h3>{{ total_registros }}</h3></div><div class="audit-immutable">Registro append-only</div></div>
+    <form method="get" class="audit-filters">
+        <div class="wide"><label for="audit-q">Buscar</label><input id="audit-q" name="q" value="{{ filtros.q }}" placeholder="Documento, usuario, motivo o ID"></div>
+        <div><label for="audit-action">Accion</label><select id="audit-action" name="accion"><option value="">Todas</option>{% for value,label in acciones %}<option value="{{ value }}" {% if filtros.accion == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div><label for="audit-module">Modulo</label><select id="audit-module" name="modulo"><option value="">Todos</option>{% for value in modulos %}<option value="{{ value }}" {% if filtros.modulo == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></div>
+        <div><label for="audit-user">Usuario</label><select id="audit-user" name="usuario"><option value="">Todos</option>{% for value in usuarios_auditoria %}<option value="{{ value.id }}" {% if filtros.usuario == value.id|stringformat:"s" %}selected{% endif %}>{{ value.username }}</option>{% endfor %}</select></div>
+        <div><label for="audit-from">Desde</label><input id="audit-from" type="date" name="desde" value="{{ filtros.desde }}"></div>
+        <div><label for="audit-to">Hasta</label><input id="audit-to" type="date" name="hasta" value="{{ filtros.hasta }}"></div>
+        <div class="audit-filter-actions"><a class="erp-btn-secondary" href="{% url 'auditoria_empresa' empresa.slug %}">Limpiar</a><button class="erp-btn" type="submit">Filtrar</button></div>
+    </form>
+</section>
+<section class="erp-card">{% include "core/_auditoria_tabla.html" %}{% include "core/auditoria_paginacion.html" %}</section>
+{% endblock %}

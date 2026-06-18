@@ -1,0 +1,29 @@
+<div class="audit-table-wrap">
+    <table class="audit-table">
+        <thead><tr><th>Fecha</th><th>Usuario</th><th>Modulo</th><th>Accion</th><th>Registro</th><th>Motivo</th><th>Cambios</th></tr></thead>
+        <tbody>
+        {% for registro in registros %}
+            <tr>
+                <td><strong>{{ registro.fecha|date:"d/m/Y" }}</strong><span>{{ registro.fecha|date:"H:i:s" }}</span></td>
+                <td><strong>{% if registro.usuario %}{{ registro.usuario.get_full_name|default:registro.usuario.username }}{% else %}Sistema{% endif %}</strong><span>{{ registro.direccion_ip|default:"Sin IP" }}</span></td>
+                <td>{{ registro.modulo }}<span>{{ registro.app_label }}.{{ registro.modelo }}</span></td>
+                <td><span class="audit-action is-{{ registro.accion }}">{{ registro.get_accion_display }}</span></td>
+                <td>
+                    {% if registro.empresa %}<a class="audit-object" href="{% url 'auditoria_objeto' registro.empresa.slug registro.app_label registro.modelo registro.objeto_id %}">{{ registro.objeto_representacion }}</a>{% else %}<strong>{{ registro.objeto_representacion }}</strong>{% endif %}
+                    <span>ID {{ registro.objeto_id }}</span>
+                </td>
+                <td>{{ registro.motivo|default:"Sin motivo indicado" }}{% if registro.ruta %}<span>{{ registro.metodo_http }} {{ registro.ruta }}</span>{% endif %}</td>
+                <td>
+                    {% if registro.cambios %}
+                    <details class="audit-details"><summary>{{ registro.cambios|length }} cambio(s)</summary><div class="audit-change-list">
+                        {% for campo, cambio in registro.cambios.items %}
+                        <div><strong>{{ campo }}</strong><span class="old">{{ cambio.anterior|default:"-" }}</span><span class="arrow">→</span><span class="new">{{ cambio.nuevo|default:"-" }}</span></div>
+                        {% endfor %}
+                    </div></details>
+                    {% else %}<span>Sin detalle</span>{% endif %}
+                </td>
+            </tr>
+        {% empty %}<tr><td colspan="7"><div class="erp-empty">No hay eventos para los filtros seleccionados.</div></td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -36,6 +36,9 @@ from .views import (
     superadmin_usuarios,
     asistente_consulta,
     empresa_respaldo,
+    auditoria_empresa,
+    auditoria_objeto,
+    superadmin_auditoria,
 )
 
 urlpatterns = [
@@ -53,6 +56,7 @@ urlpatterns = [
     path('control/empresas/<int:empresa_id>/respaldo/', superadmin_empresa_generar_respaldo, name='superadmin_empresa_generar_respaldo'),
     path('control/empresas/<int:empresa_id>/respaldo/token/', superadmin_empresa_generar_token_respaldo, name='superadmin_empresa_generar_token_respaldo'),
     path('control/respaldos/', superadmin_respaldos, name='superadmin_respaldos'),
+    path('control/auditoria/', superadmin_auditoria, name='superadmin_auditoria'),
     path('control/usuarios/', superadmin_usuarios, name='superadmin_usuarios'),
     path('control/usuarios/nuevo/', superadmin_usuario_create, name='superadmin_usuario_create'),
     path('control/usuarios/<int:usuario_id>/editar/', superadmin_usuario_edit, name='superadmin_usuario_edit'),
@@ -77,6 +81,8 @@ urlpatterns = [
     path('<slug:slug>/', empresa_login, name='empresa_login'),
     path('<slug:slug>/dashboard/asistente/consulta/', asistente_consulta, name='asistente_consulta'),
     path('<slug:slug>/dashboard/respaldo/', empresa_respaldo, name='empresa_respaldo'),
+    path('<slug:slug>/dashboard/auditoria/', auditoria_empresa, name='auditoria_empresa'),
+    path('<slug:slug>/dashboard/auditoria/<slug:app_label>/<slug:modelo>/<str:objeto_id>/', auditoria_objeto, name='auditoria_objeto'),
     path('<slug:slug>/dashboard/', dashboard, name='dashboard'),
     path('<slug:slug>/logout/', cerrar_sesion, name='cerrar_sesion'),
 ]

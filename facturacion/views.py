@@ -29,7 +29,7 @@ import json
 import calendar
 from pathlib import Path
 
-from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, Usuario
+from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
 from contabilidad.services import (
     asegurar_cuenta_contable_cliente,
     asegurar_cuentas_financieras_base_honduras,
@@ -5075,6 +5075,16 @@ def editar_factura(request, empresa_slug, factura_id):
                 form.fields['numero_factura'].help_text = (
                     "Opcional. Si lo completas, el ERP validara que pertenezca al CAI activo para la fecha de esta factura."
                 )
+        form.fields['motivo_auditoria'] = forms.CharField(
+            required=True,
+            min_length=8,
+            label='Motivo de la modificacion',
+            help_text='Explica brevemente por que se modifica esta factura. Quedara en la bitacora permanente.',
+            widget=forms.Textarea(attrs={
+                'rows': 2,
+                'placeholder': 'Ejemplo: Correccion solicitada por el cliente.',
+            }),
+        )
         return form
 
     if request.method == "POST":
@@ -5888,6 +5898,17 @@ def ver_factura(request, empresa_slug, factura_id):
     resumen = factura.resumen_fiscal()
     resumen_detallado = _resumen_detallado(factura.subtotal, resumen)
     ultimo_pago_factura_id = factura.pagos_facturacion.order_by("fecha", "id").values_list("id", flat=True).last()
+    auditoria_factura = RegistroAuditoria.objects.filter(
+        empresa=empresa,
+        app_label="facturacion",
+        modelo="factura",
+        objeto_id=str(factura.id),
+    )
+    solicitudes_factura = auditoria_factura.values_list("identificador_solicitud", flat=True)
+    historial_auditoria = RegistroAuditoria.objects.filter(empresa=empresa).filter(
+        Q(app_label="facturacion", modelo="factura", objeto_id=str(factura.id))
+        | Q(app_label="facturacion", identificador_solicitud__in=solicitudes_factura)
+    ).select_related("usuario").distinct()[:30]
 
     return render(request, "facturacion/ver_factura_premium.html", {
         "empresa": empresa,
@@ -5899,6 +5920,7 @@ def ver_factura(request, empresa_slug, factura_id):
         "permite_plantilla_notas_extensas": _empresa_permite_plantilla_notas_extensas(empresa),
         "permite_plantilla_independiente": _empresa_permite_plantilla_independiente(empresa),
         "configuracion_facturacion": ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)[0],
+        "historial_auditoria": historial_auditoria,
     })
 
 

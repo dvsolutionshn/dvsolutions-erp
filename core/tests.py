@@ -8,15 +8,19 @@ from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.http import HttpResponse
+from django.test import Client, RequestFactory, TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RolSistema, SolicitudComercial, Usuario
+from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario
 from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 from core.backup_tokens import hash_token_respaldo
 from core.forms import EmpresaControlForm
+from core.audit_context import audit_scope
+from core.middleware import AuditoriaRequestMiddleware
+from facturacion.models import Cliente
 
 
 class SuperAdminControlTests(TestCase):
@@ -998,3 +1002,92 @@ class SuperAdminControlTests(TestCase):
         dashboard_response = self.client.get("/dashboard/", HTTP_HOST="hospital-mia.erp.test")
         self.assertEqual(dashboard_response.status_code, 200)
         self.assertContains(dashboard_response, "Hospital Mia")
+
+
+class AuditoriaGlobalTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(
+            nombre="Empresa Auditada", slug="empresa-auditada", rtn="08011999000999"
+        )
+        self.usuario = Usuario.objects.create_user(
+            username="auditor",
+            password="pass12345",
+            empresa=self.empresa,
+            es_administrador_empresa=True,
+        )
+
+    def test_registra_creacion_modificacion_y_eliminacion_con_contexto(self):
+        with audit_scope(user=self.usuario, reason="Alta solicitada por ventas"):
+            cliente = Cliente.objects.create(empresa=self.empresa, nombre="Cliente Inicial")
+
+        creacion = RegistroAuditoria.objects.get(
+            app_label="facturacion", modelo="cliente", objeto_id=str(cliente.id), accion="crear"
+        )
+        self.assertEqual(creacion.empresa, self.empresa)
+        self.assertEqual(creacion.usuario, self.usuario)
+        self.assertEqual(creacion.motivo, "Alta solicitada por ventas")
+        self.assertEqual(creacion.cambios["nombre"]["nuevo"], "Cliente Inicial")
+
+        with audit_scope(user=self.usuario, reason="Correccion confirmada por el cliente"):
+            cliente.nombre = "Cliente Corregido"
+            cliente.save(update_fields=["nombre"])
+
+        modificacion = RegistroAuditoria.objects.get(
+            app_label="facturacion", modelo="cliente", objeto_id=str(cliente.id), accion="modificar"
+        )
+        self.assertEqual(
+            modificacion.cambios["nombre"],
+            {"anterior": "Cliente Inicial", "nuevo": "Cliente Corregido"},
+        )
+
+        cliente_id = cliente.id
+        with audit_scope(user=self.usuario, reason="Depuracion autorizada"):
+            cliente.delete()
+
+        eliminacion = RegistroAuditoria.objects.get(
+            app_label="facturacion", modelo="cliente", objeto_id=str(cliente_id), accion="eliminar"
+        )
+        self.assertEqual(eliminacion.usuario, self.usuario)
+        self.assertEqual(eliminacion.motivo, "Depuracion autorizada")
+        self.assertEqual(
+            eliminacion.cambios["registro_eliminado"]["anterior"]["nombre"],
+            "Cliente Corregido",
+        )
+
+    def test_middleware_toma_usuario_motivo_ruta_e_ip(self):
+        request = RequestFactory().post(
+            "/empresa-auditada/dashboard/clientes/nuevo/",
+            {"motivo": "Registro solicitado en mostrador"},
+            REMOTE_ADDR="192.0.2.10",
+        )
+        request.user = self.usuario
+
+        def crear_cliente(_request):
+            Cliente.objects.create(empresa=self.empresa, nombre="Cliente Web")
+            return HttpResponse("ok")
+
+        response = AuditoriaRequestMiddleware(crear_cliente)(request)
+        self.assertEqual(response.status_code, 200)
+        registro = RegistroAuditoria.objects.get(
+            app_label="facturacion", modelo="cliente", objeto_representacion="Cliente Web", accion="crear"
+        )
+        self.assertEqual(registro.usuario, self.usuario)
+        self.assertEqual(registro.motivo, "Registro solicitado en mostrador")
+        self.assertEqual(registro.metodo_http, "POST")
+        self.assertEqual(registro.direccion_ip, "192.0.2.10")
+
+    def test_administrador_solo_ve_bitacora_de_su_empresa(self):
+        otra_empresa = Empresa.objects.create(
+            nombre="Otra Empresa", slug="otra-empresa-auditada", rtn="08011999000998"
+        )
+        with audit_scope(user=self.usuario, reason="Registro propio"):
+            Cliente.objects.create(empresa=self.empresa, nombre="Visible")
+        with audit_scope(reason="Registro externo"):
+            Cliente.objects.create(empresa=otra_empresa, nombre="Oculto")
+
+        self.client.login(username="auditor", password="pass12345")
+        response = self.client.get(reverse("auditoria_empresa", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Visible")
+        self.assertNotContains(response, "Oculto")

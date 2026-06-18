@@ -56,6 +56,10 @@
                     <span class="erp-nav-bullet"></span>
                     <span>Respaldos</span>
                 </a>
+                <a class="erp-nav-link {% if '/control/auditoria/' in request.path %}is-active{% endif %}" href="{{ superadmin_auditoria_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Bitacora Global</span>
+                </a>
                 {% if enable_django_admin and django_admin_url %}
                 <a class="erp-nav-link" href="{{ django_admin_url }}" target="_blank" rel="noopener">
                     <span class="erp-nav-bullet"></span>

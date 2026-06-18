@@ -629,6 +629,7 @@
                     <div class="erp-field">{{ form.orden_compra_exenta.label_tag }}{{ form.orden_compra_exenta }}{% if form.orden_compra_exenta.errors %}<ul class="erp-field-errors">{% for error in form.orden_compra_exenta.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                     <div class="erp-field">{{ form.registro_exonerado.label_tag }}{{ form.registro_exonerado }}{% if form.registro_exonerado.errors %}<ul class="erp-field-errors">{% for error in form.registro_exonerado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                     <div class="erp-field">{{ form.registro_sag.label_tag }}{{ form.registro_sag }}{% if form.registro_sag.errors %}<ul class="erp-field-errors">{% for error in form.registro_sag.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                    {% if modo_edicion and form.motivo_auditoria %}<div class="erp-field erp-field-span-full">{{ form.motivo_auditoria.label_tag }}{{ form.motivo_auditoria }}{% if form.motivo_auditoria.help_text %}<div class="erp-field-help">{{ form.motivo_auditoria.help_text }}</div>{% endif %}{% if form.motivo_auditoria.errors %}<ul class="erp-field-errors">{% for error in form.motivo_auditoria.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}
                 </div>
             </section>
             <section class="erp-form-card erp-lines-card">

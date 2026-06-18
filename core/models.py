@@ -4,6 +4,7 @@ from django.db import models
 from django.utils import timezone
 from calendar import monthrange
 from datetime import date
+import uuid
 
 
 class PlanComercial(models.Model):
@@ -389,7 +390,63 @@ class Usuario(AbstractUser):
         if self.is_superuser or self.es_administrador_empresa:
             return True
         return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_clinica)
-    
+
+
+class RegistroAuditoria(models.Model):
+    ACCION_CREAR = "crear"
+    ACCION_MODIFICAR = "modificar"
+    ACCION_ELIMINAR = "eliminar"
+    ACCION_RELACION = "relacion"
+    ACCION_CHOICES = [
+        (ACCION_CREAR, "Creacion"),
+        (ACCION_MODIFICAR, "Modificacion"),
+        (ACCION_ELIMINAR, "Eliminacion"),
+        (ACCION_RELACION, "Cambio de relacion"),
+    ]
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="registros_auditoria",
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acciones_auditoria",
+    )
+    accion = models.CharField(max_length=20, choices=ACCION_CHOICES)
+    modulo = models.CharField(max_length=40, db_index=True)
+    app_label = models.CharField(max_length=80)
+    modelo = models.CharField(max_length=100)
+    objeto_id = models.CharField(max_length=100, db_index=True)
+    objeto_representacion = models.CharField(max_length=300)
+    cambios = models.JSONField(default=dict, blank=True)
+    motivo = models.CharField(max_length=500, blank=True)
+    ruta = models.CharField(max_length=500, blank=True)
+    metodo_http = models.CharField(max_length=10, blank=True)
+    direccion_ip = models.GenericIPAddressField(blank=True, null=True)
+    agente_usuario = models.CharField(max_length=500, blank=True)
+    identificador_solicitud = models.UUIDField(default=uuid.uuid4, db_index=True)
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-fecha", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "-fecha"]),
+            models.Index(fields=["empresa", "app_label", "modelo", "objeto_id"]),
+            models.Index(fields=["usuario", "-fecha"]),
+        ]
+        verbose_name = "Registro de auditoria"
+        verbose_name_plural = "Registros de auditoria"
+
+    def __str__(self):
+        return f"{self.get_accion_display()} - {self.objeto_representacion}"
+
+
 class Modulo(models.Model):
     nombre = models.CharField(max_length=100)
     codigo = models.CharField(max_length=50, unique=True)

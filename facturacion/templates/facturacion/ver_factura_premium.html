@@ -655,6 +655,21 @@
             </section>
         </div>
 
+        {% if historial_auditoria %}
+        <section class="erp-document-section" style="margin-top:18px;">
+            <div class="erp-document-section-head"><div><div class="erp-document-block-title">Historia del documento</div><p>Creaciones, modificaciones y operaciones relacionadas con esta factura.</p></div><a class="erp-link" href="{% url 'auditoria_objeto' empresa.slug 'facturacion' 'factura' factura.id %}">Ver historia completa</a></div>
+            <div style="display:grid;gap:10px;margin-top:14px;">
+                {% for evento in historial_auditoria %}
+                <div style="display:grid;grid-template-columns:145px minmax(0,1fr) auto;gap:14px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line);">
+                    <div><strong style="display:block;color:#102338;">{{ evento.fecha|date:"d/m/Y H:i" }}</strong><span class="erp-card-muted">{{ evento.usuario.username|default:"Sistema" }}</span></div>
+                    <div><strong style="color:#102338;">{{ evento.get_accion_display }} · {{ evento.objeto_representacion }}</strong><div class="erp-card-muted" style="margin-top:4px;">{{ evento.motivo }}</div></div>
+                    <details><summary class="erp-link" style="cursor:pointer;">{{ evento.cambios|length }} cambio(s)</summary>{% for campo,cambio in evento.cambios.items %}<div class="erp-card-muted" style="max-width:380px;margin-top:6px;"><strong>{{ campo }}:</strong> {{ cambio.anterior|default:"-" }} → {{ cambio.nuevo|default:"-" }}</div>{% endfor %}</details>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
         <div class="erp-document-actions">
             <div class="erp-document-actions-group">
                 {% if factura.puede_editar_emitida %}

@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
-from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, EmpresaModulo, Modulo, RolSistema
+from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, EmpresaModulo, Modulo, RegistroAuditoria, RolSistema
 from clinica.models import Paciente
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
@@ -3588,6 +3588,57 @@ class FacturacionTests(TestCase):
         self.assertEqual(inventario.existencias, Decimal("1.00"))
         self.assertFalse(MovimientoInventario.objects.filter(producto=self.producto, tipo="salida_factura").exists())
 
+    def test_editar_factura_exige_motivo_y_lo_guarda_en_auditoria(self):
+        factura = self.crear_factura_con_linea(estado="borrador")
+        linea = factura.lineas.get()
+        datos = {
+            "cliente": str(self.cliente.id),
+            "fecha_emision": str(factura.fecha_emision),
+            "fecha_vencimiento": str(factura.fecha_emision + timedelta(days=15)),
+            "vendedor": "",
+            "tipo_cambio": "1.0000",
+            "moneda": "HNL",
+            "estado": "borrador",
+            "orden_compra_exenta": "",
+            "registro_exonerado": "",
+            "registro_sag": "",
+            "lineas-TOTAL_FORMS": "1",
+            "lineas-INITIAL_FORMS": "1",
+            "lineas-MIN_NUM_FORMS": "0",
+            "lineas-MAX_NUM_FORMS": "1000",
+            "lineas-0-id": str(linea.id),
+            "lineas-0-producto": str(self.producto.id),
+            "lineas-0-cantidad": "1.00",
+            "lineas-0-precio_unitario": "100.00",
+            "lineas-0-descuento_porcentaje": "0",
+            "lineas-0-comentario": "",
+            "lineas-0-impuesto": str(self.impuesto.id),
+        }
+
+        sin_motivo = self.client.post(
+            reverse("editar_factura", args=[self.empresa.slug, factura.id]), datos
+        )
+        self.assertEqual(sin_motivo.status_code, 200)
+        self.assertIn("motivo_auditoria", sin_motivo.context["form"].errors)
+
+        datos["motivo_auditoria"] = "Correccion de fecha solicitada por el cliente"
+        con_motivo = self.client.post(
+            reverse("editar_factura", args=[self.empresa.slug, factura.id]), datos
+        )
+        self.assertRedirects(
+            con_motivo, reverse("facturas_dashboard", args=[self.empresa.slug])
+        )
+        evento = RegistroAuditoria.objects.filter(
+            empresa=self.empresa,
+            app_label="facturacion",
+            modelo="factura",
+            objeto_id=str(factura.id),
+            accion="modificar",
+            cambios__has_key="fecha_vencimiento",
+        ).latest("fecha")
+        self.assertEqual(evento.usuario, self.user)
+        self.assertEqual(evento.motivo, "Correccion de fecha solicitada por el cliente")
+
     def test_si_permite_guardar_factura_borrador_aunque_no_haya_stock(self):
         InventarioProducto.objects.create(
             empresa=self.empresa,
@@ -3654,6 +3705,7 @@ class FacturacionTests(TestCase):
                 "orden_compra_exenta": "",
                 "registro_exonerado": "",
                 "registro_sag": "",
+                "motivo_auditoria": "Emision autorizada por administracion",
                 "lineas-TOTAL_FORMS": "1",
                 "lineas-INITIAL_FORMS": "1",
                 "lineas-MIN_NUM_FORMS": "0",
