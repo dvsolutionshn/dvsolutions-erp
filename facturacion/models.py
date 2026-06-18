@@ -48,6 +48,10 @@ class ConfiguracionFacturacionEmpresa(models.Model):
     mostrar_vendedor = models.BooleanField(default=False)
     mostrar_descuentos = models.BooleanField(default=True)
     mostrar_notas_linea = models.BooleanField(default=True)
+    precios_incluyen_impuesto = models.BooleanField(
+        default=False,
+        help_text='El precio del catalogo se interpreta como total final con impuesto incluido.',
+    )
     leyenda_factura = models.CharField(max_length=255, blank=True, null=True)
     pie_factura = models.TextField(blank=True, null=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
@@ -1674,6 +1678,7 @@ class LineaFactura(models.Model):
     descripcion_manual = models.CharField(max_length=255, blank=True, null=True)
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+    precio_incluye_impuesto = models.BooleanField(default=False)
 
     comentario = models.TextField(blank=True, null=True)
 
@@ -1697,19 +1702,21 @@ class LineaFactura(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
 
-        subtotal_base = self.cantidad * self.precio_unitario
-
-        # descuento
+        subtotal_base = (self.cantidad * self.precio_unitario).quantize(DOS_DECIMALES)
         descuento = self.descuento_porcentaje or Decimal('0')
-
-        self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
-
-        subtotal_final = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
-
-        # impuesto sobre subtotal con descuento
-        self.impuesto_monto = (subtotal_final * (self.impuesto.porcentaje / Decimal ('100'))).quantize(DOS_DECIMALES)
-
-        self.subtotal = subtotal_final
+        if self.precio_incluye_impuesto and self.impuesto.porcentaje:
+            divisor = Decimal('1') + (self.impuesto.porcentaje / Decimal('100'))
+            total_final = (
+                subtotal_base - (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
+            ).quantize(DOS_DECIMALES)
+            subtotal_sin_descuento = (subtotal_base / divisor).quantize(DOS_DECIMALES)
+            self.subtotal = (total_final / divisor).quantize(DOS_DECIMALES)
+            self.descuento_monto = (subtotal_sin_descuento - self.subtotal).quantize(DOS_DECIMALES)
+            self.impuesto_monto = (total_final - self.subtotal).quantize(DOS_DECIMALES)
+        else:
+            self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
+            self.subtotal = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
+            self.impuesto_monto = (self.subtotal * (self.impuesto.porcentaje / Decimal('100'))).quantize(DOS_DECIMALES)
 
         super().save(*args, **kwargs)
 
@@ -1739,6 +1746,7 @@ class LineaNotaCredito(models.Model):
     descripcion_manual = models.CharField(max_length=255, blank=True, null=True)
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+    precio_incluye_impuesto = models.BooleanField(default=False)
     comentario = models.TextField(blank=True, null=True)
     descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0, blank=True, null=True)
     descuento_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -1758,12 +1766,21 @@ class LineaNotaCredito(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
 
-        subtotal_base = self.cantidad * self.precio_unitario
+        subtotal_base = (self.cantidad * self.precio_unitario).quantize(DOS_DECIMALES)
         descuento = self.descuento_porcentaje or Decimal('0')
-        self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
-        subtotal_final = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
-        self.impuesto_monto = (subtotal_final * (self.impuesto.porcentaje / Decimal('100'))).quantize(DOS_DECIMALES)
-        self.subtotal = subtotal_final
+        if self.precio_incluye_impuesto and self.impuesto.porcentaje:
+            divisor = Decimal('1') + (self.impuesto.porcentaje / Decimal('100'))
+            total_final = (
+                subtotal_base - (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
+            ).quantize(DOS_DECIMALES)
+            subtotal_sin_descuento = (subtotal_base / divisor).quantize(DOS_DECIMALES)
+            self.subtotal = (total_final / divisor).quantize(DOS_DECIMALES)
+            self.descuento_monto = (subtotal_sin_descuento - self.subtotal).quantize(DOS_DECIMALES)
+            self.impuesto_monto = (total_final - self.subtotal).quantize(DOS_DECIMALES)
+        else:
+            self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
+            self.subtotal = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
+            self.impuesto_monto = (self.subtotal * (self.impuesto.porcentaje / Decimal('100'))).quantize(DOS_DECIMALES)
 
         super().save(*args, **kwargs)
 

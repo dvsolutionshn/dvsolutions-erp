@@ -323,6 +323,67 @@ class FacturacionTests(TestCase):
             ).exists()
         )
 
+    def test_precio_con_impuesto_incluido_conserva_total_exacto(self):
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            estado="borrador",
+            fecha_emision=date.today(),
+        )
+        linea = LineaFactura.objects.create(
+            factura=factura,
+            producto=self.producto,
+            cantidad=Decimal("1.00"),
+            precio_unitario=Decimal("2500.00"),
+            precio_incluye_impuesto=True,
+            impuesto=self.impuesto,
+        )
+        factura.calcular_totales()
+
+        self.assertEqual(linea.subtotal, Decimal("2173.91"))
+        self.assertEqual(linea.impuesto_monto, Decimal("326.09"))
+        self.assertEqual(linea.total_linea, Decimal("2500.00"))
+        self.assertEqual(factura.total, Decimal("2500.00"))
+
+    def test_pos_medical_spa_interpreta_precio_catalogo_como_total_final(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        ConfiguracionFacturacionEmpresa.objects.update_or_create(
+            empresa=self.empresa,
+            defaults={"precios_incluyen_impuesto": True},
+        )
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.precio = Decimal("2500.00")
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "efectivo",
+                    "cliente_id": self.cliente.id,
+                    "monto_recibido": "2500.00",
+                    "items": [{
+                        "producto_id": self.producto.id,
+                        "cantidad": "1",
+                        "precio_unitario": "2500.00",
+                    }],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        factura = Factura.objects.get(pk=response.json()["factura_id"])
+        linea = factura.lineas.get()
+        self.assertTrue(linea.precio_incluye_impuesto)
+        self.assertEqual(linea.subtotal, Decimal("2173.91"))
+        self.assertEqual(linea.impuesto_monto, Decimal("326.09"))
+        self.assertEqual(factura.total, Decimal("2500.00"))
+
     def test_punto_venta_ajax_cobra_y_devuelve_ticket_para_imprimir(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])

@@ -102,6 +102,7 @@ class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):
             'mostrar_vendedor',
             'mostrar_descuentos',
             'mostrar_notas_linea',
+            'precios_incluyen_impuesto',
             'leyenda_factura',
             'pie_factura',
         ]
@@ -304,6 +305,10 @@ class ProductoForm(forms.ModelForm):
         self.fields['impuesto_predeterminado'].queryset = TipoImpuesto.objects.filter(activo=True).order_by('porcentaje', 'nombre')
         if self.empresa:
             configuracion_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+            configuracion_facturacion = ConfiguracionFacturacionEmpresa.objects.filter(empresa=self.empresa).first()
+            if configuracion_facturacion and configuracion_facturacion.precios_incluyen_impuesto:
+                self.fields['precio'].label = 'Precio final (impuesto incluido)'
+                self.fields['precio'].help_text = 'Escribe el total que pagara el cliente; el sistema separara automaticamente la base y el impuesto.'
             self.mostrar_bodega_inicial = bool(configuracion_avanzada.usa_bodegas_internas)
             self.mostrar_perfil_farmaceutico = bool(
                 self.empresa.tiene_modulo_activo("clinica_medica")

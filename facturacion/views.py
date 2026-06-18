@@ -51,6 +51,14 @@ logger = logging.getLogger(__name__)
 POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
 
 
+def _precios_incluyen_impuesto(empresa):
+    configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(
+        empresa=empresa,
+        defaults={"precios_incluyen_impuesto": empresa.slug == "medical_spa"},
+    )
+    return configuracion.precios_incluyen_impuesto
+
+
 def _cuentas_financieras_activas_para_pago(empresa):
     asegurar_cuentas_financieras_base_honduras(empresa)
     cuentas = CuentaFinanciera.objects.filter(
@@ -119,7 +127,10 @@ def facturacion_dashboard(request, empresa_slug):
 @login_required
 def configuracion_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
+    configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(
+        empresa=empresa,
+        defaults={"precios_incluyen_impuesto": empresa.slug == "medical_spa"},
+    )
     permite_plantilla_notas_extensas = _empresa_permite_plantilla_notas_extensas(empresa)
     permite_plantilla_independiente = _empresa_permite_plantilla_independiente(empresa)
     form = ConfiguracionFacturacionEmpresaForm(
@@ -178,6 +189,7 @@ def facturas_dashboard(request, empresa_slug):
 @login_required
 def punto_venta(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    precios_incluyen_impuesto = _precios_incluyen_impuesto(empresa)
     solicitud_pos_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if not empresa.tiene_modulo_activo("punto_venta"):
         if solicitud_pos_ajax:
@@ -304,6 +316,7 @@ def punto_venta(request, empresa_slug):
                         cantidad=linea["cantidad"],
                         precio_unitario=linea["precio_unitario"],
                         impuesto=linea["impuesto"],
+                        precio_incluye_impuesto=precios_incluyen_impuesto,
                     )
                     for linea in lineas_preparadas
                 ]
@@ -396,6 +409,7 @@ def punto_venta(request, empresa_slug):
         "fecha_hoy": timezone.localdate().strftime("%Y-%m-%d"),
         "metodos_pago": PagoFactura.METODOS,
         "cliente_obligatorio": cliente_obligatorio,
+        "precios_incluyen_impuesto": precios_incluyen_impuesto,
     })
 
 
@@ -4274,6 +4288,7 @@ def crear_nota_credito(request, empresa_slug):
                     for f in lineas_validas:
                         linea = f.save(commit=False)
                         linea.nota_credito = nota
+                        linea.precio_incluye_impuesto = _precios_incluyen_impuesto(empresa)
                         linea.save()
 
                     nota.calcular_totales()
@@ -4374,7 +4389,14 @@ def editar_nota_credito(request, empresa_slug, nota_id):
                     nota.tipo_cambio = nota.factura_origen.tipo_cambio
                     nota.estado = 'borrador' if estado_destino == 'emitida' else estado_destino
                     nota.save()
-                    formset.save()
+                    lineas_actualizadas = formset.save(commit=False)
+                    for linea in formset.deleted_objects:
+                        linea.delete()
+                    for linea in lineas_actualizadas:
+                        if not linea.pk:
+                            linea.precio_incluye_impuesto = _precios_incluyen_impuesto(empresa)
+                        linea.save()
+                    formset.save_m2m()
                     nota.calcular_totales()
                     nota.estado = estado_destino
                     nota.full_clean()
@@ -4507,6 +4529,7 @@ def generar_nota_credito_desde_factura(request, empresa_slug, factura_id):
             producto=linea.producto,
             cantidad=linea.cantidad,
             precio_unitario=linea.precio_unitario,
+            precio_incluye_impuesto=linea.precio_incluye_impuesto,
             descuento_porcentaje=linea.descuento_porcentaje,
             comentario=linea.comentario,
             impuesto=linea.impuesto,
@@ -4764,6 +4787,7 @@ def crear_factura(request, empresa_slug):
                     for f in lineas_validas:
                         linea = f.save(commit=False)
                         linea.factura = factura
+                        linea.precio_incluye_impuesto = _precios_incluyen_impuesto(empresa)
                         linea.save()
                         lineas_guardadas.append(linea)
 
@@ -4827,6 +4851,7 @@ def crear_factura(request, empresa_slug):
         "permite_gestion_fiscal_historica": config_avanzada.permite_gestion_fiscal_historica,
         "numero_factura_prefijo_manual": prefijo_manual,
         "prefijo_factura_manual_url": reverse("prefijo_factura_manual", args=[empresa.slug]),
+        "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
     })
 
 # =====================================================
@@ -5116,7 +5141,14 @@ def editar_factura(request, empresa_slug, factura_id):
             try:
                 with transaction.atomic():
                     factura = form.save()
-                    formset.save()
+                    lineas_actualizadas = formset.save(commit=False)
+                    for linea in formset.deleted_objects:
+                        linea.delete()
+                    for linea in lineas_actualizadas:
+                        if not linea.pk:
+                            linea.precio_incluye_impuesto = _precios_incluyen_impuesto(empresa)
+                        linea.save()
+                    formset.save_m2m()
 
                     if estado_original != 'emitida' and factura.estado == 'emitida':
                         _validar_stock_disponible_para_lineas(
@@ -5194,6 +5226,7 @@ def editar_factura(request, empresa_slug, factura_id):
         "permite_gestion_fiscal_historica": config_avanzada.permite_gestion_fiscal_historica,
         "numero_factura_prefijo_manual": prefijo_manual,
         "prefijo_factura_manual_url": reverse("prefijo_factura_manual", args=[empresa.slug]),
+        "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
     })
 
 # =====================================================
@@ -5867,6 +5900,7 @@ def duplicar_factura(request, empresa_slug, factura_id):
             producto=linea.producto,
             cantidad=linea.cantidad,
             precio_unitario=linea.precio_unitario,
+            precio_incluye_impuesto=linea.precio_incluye_impuesto,
             descuento_porcentaje=linea.descuento_porcentaje,
             comentario=linea.comentario,
             impuesto=linea.impuesto,

@@ -657,7 +657,7 @@
 
                     <div id="lineas-container" class="erp-line-layout">
                     {% for form_linea in formset %}
-                        <div class="tabla-row erp-line-row">
+                        <div class="tabla-row erp-line-row" data-precio-incluye-impuesto="{% if form_linea.instance.pk %}{{ form_linea.instance.precio_incluye_impuesto|yesno:'1,0' }}{% else %}{{ precios_incluyen_impuesto|yesno:'1,0' }}{% endif %}">
                             {{ form_linea.id }}
                             <div style="display:none;">{{ form_linea.DELETE }}</div>
                             <div>
@@ -834,6 +834,8 @@
 {% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+
+    const preciosIncluyenImpuesto = {{ precios_incluyen_impuesto|yesno:"true,false" }};
 
     const productos = {
         {% for p in productos %}
@@ -1334,14 +1336,14 @@ document.addEventListener("DOMContentLoaded", function () {
         const precioVal = parseFloat(precio.value) || 0;
         const descuentoVal = parseFloat(descuento.value) || 0;
 
-        const base = cantidadVal * precioVal;
-        const desc = base * (descuentoVal / 100);
-        const sub = base - desc;
+        let porcentaje = impuestos[impuestoSelect.value] || 0;
+        const totalBase = cantidadVal * precioVal;
+        const totalConDescuento = totalBase - (totalBase * (descuentoVal / 100));
+        const precioIncluyeImpuesto = linea.dataset.precioIncluyeImpuesto === "1" && porcentaje > 0;
+        const sub = precioIncluyeImpuesto ? totalConDescuento / (1 + (porcentaje / 100)) : totalConDescuento;
+        const imp = precioIncluyeImpuesto ? totalConDescuento - sub : sub * (porcentaje / 100);
 
         subtotal.value = sub.toFixed(2);
-
-        let porcentaje = impuestos[impuestoSelect.value] || 0;
-        let imp = sub * (porcentaje / 100);
 
         impuestoMonto.value = imp.toFixed(2);
 
@@ -1365,16 +1367,20 @@ document.addEventListener("DOMContentLoaded", function () {
             let impuestoSelect = l.querySelector(".impuesto");
             let porcentaje = parseFloat(impuestos[impuestoSelect?.value] || 0);
 
-            let base = c * p;
+            let totalBase = c * p;
+            let totalConDescuento = totalBase - (totalBase * (d / 100));
+            let precioIncluyeImpuesto = l.dataset.precioIncluyeImpuesto === "1" && porcentaje > 0;
+            let divisor = precioIncluyeImpuesto ? 1 + (porcentaje / 100) : 1;
+            let base = totalBase / divisor;
+            let subtotalLinea = totalConDescuento / divisor;
+            let descuentoLinea = base - subtotalLinea;
             subtotalBruto += base;
-            let descuentoLinea = base * (d / 100);
-            let subtotalLinea = base - descuentoLinea;
             descuento += descuentoLinea;
 
             if (porcentaje === 15) {
-                isv15 += subtotalLinea * 0.15;
+                isv15 += precioIncluyeImpuesto ? totalConDescuento - subtotalLinea : subtotalLinea * 0.15;
             } else if (porcentaje === 18) {
-                isv18 += subtotalLinea * 0.18;
+                isv18 += precioIncluyeImpuesto ? totalConDescuento - subtotalLinea : subtotalLinea * 0.18;
             } else if (porcentaje === 0) {
                 baseExenta += subtotalLinea;
             } else {
@@ -1414,6 +1420,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if(impuestoSelect && datosProducto.impuesto){
                 impuestoSelect.value = datosProducto.impuesto;
             }
+            linea.dataset.precioIncluyeImpuesto = preciosIncluyenImpuesto ? "1" : "0";
             recalcularLinea(linea);
         });
 
@@ -1458,6 +1465,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         let nueva = plantilla.cloneNode(true);
+        nueva.dataset.precioIncluyeImpuesto = preciosIncluyenImpuesto ? "1" : "0";
         delete nueva.dataset.deleted;
         delete nueva.dataset.eventsInit;
         nueva.style.display = "";

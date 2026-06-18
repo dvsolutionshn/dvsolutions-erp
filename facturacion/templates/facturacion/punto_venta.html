@@ -212,7 +212,7 @@
         <div class="pos-modal-grid">
             <div class="pos-field span-2"><label>Nombre producto</label><input class="pos-input" name="nombre" required></div>
             <div class="pos-field"><label>Codigo / barra</label><input class="pos-input" name="codigo" autocomplete="off"></div>
-            <div class="pos-field"><label>Precio venta</label><input class="pos-input" name="precio" type="number" min="0" step="0.01" required></div>
+            <div class="pos-field"><label>{% if precios_incluyen_impuesto %}Precio final (impuesto incluido){% else %}Precio venta{% endif %}</label><input class="pos-input" name="precio" type="number" min="0" step="0.01" required></div>
             <div class="pos-field"><label>Lote inicial</label><input class="pos-input" name="lote_inicial" placeholder="Opcional"></div>
             <div class="pos-field"><label>Vencimiento lote</label><input class="pos-input" name="vencimiento_lote" type="date"></div>
             <label class="pos-check span-2"><input type="checkbox" name="controla_inventario" checked> Controla inventario</label>
@@ -242,6 +242,7 @@
     let clients = JSON.parse(document.getElementById("pos-clients").textContent);
     const warehouses = JSON.parse(document.getElementById("pos-warehouses").textContent);
     const clientRequired = {{ cliente_obligatorio|yesno:"true,false" }};
+    const preciosIncluyenImpuesto = {{ precios_incluyen_impuesto|yesno:"true,false" }};
     const urls = {
         clientSearch: "{% url 'pos_buscar_clientes' empresa.slug %}",
         clientCreate: "{% url 'pos_crear_cliente_rapido' empresa.slug %}",
@@ -420,9 +421,15 @@
         let subtotal = 0;
         let tax = 0;
         cart.forEach(item => {
-            const base = item.cantidad * item.precio_unitario;
-            subtotal += base;
-            tax += base * (item.impuesto / 100);
+            const totalProducto = item.cantidad * item.precio_unitario;
+            if(preciosIncluyenImpuesto && item.impuesto > 0){
+                const base = totalProducto / (1 + (item.impuesto / 100));
+                subtotal += base;
+                tax += totalProducto - base;
+            }else{
+                subtotal += totalProducto;
+                tax += totalProducto * (item.impuesto / 100);
+            }
         });
         return {subtotal, tax, total: subtotal + tax};
     }

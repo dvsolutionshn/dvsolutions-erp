@@ -433,6 +433,18 @@
             </div>
 
             <div class="erp-card" style="grid-column:1 / -1; background:#f8fafc;">
+                <div class="erp-kpi-label">Regla de precios</div>
+                <div class="erp-config-visibility" style="margin-top:14px;">
+                    <label>
+                        {{ form.precios_incluyen_impuesto }}
+                        <span>Los precios del catalogo ya incluyen impuesto</span>
+                    </label>
+                </div>
+                <small style="display:block; margin-top:10px; color:#5d718a;">Al escribir L. 2,500, el cliente pagara exactamente L. 2,500 y el sistema separara internamente la base gravada y el ISV.</small>
+                {{ form.precios_incluyen_impuesto.errors }}
+            </div>
+
+            <div class="erp-card" style="grid-column:1 / -1; background:#f8fafc;">
                 <div class="erp-kpi-label">Datos Visibles</div>
                 <div class="erp-config-visibility" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); margin-top:14px;">
                     <label>
