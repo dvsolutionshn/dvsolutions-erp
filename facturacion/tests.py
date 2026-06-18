@@ -38,6 +38,7 @@ class FacturacionTests(TestCase):
             nombre="Administrador Operativo",
             codigo="admin-operativo",
             activo=True,
+            puede_punto_venta=True,
             puede_facturas=True,
             puede_clientes=True,
             puede_productos=True,

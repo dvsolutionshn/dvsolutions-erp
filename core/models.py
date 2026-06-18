@@ -28,6 +28,7 @@ class RolSistema(models.Model):
     codigo = models.SlugField(unique=True)
     descripcion = models.TextField(blank=True, null=True)
     activo = models.BooleanField(default=True)
+    puede_punto_venta = models.BooleanField(default=False)
     puede_facturas = models.BooleanField(default=False)
     puede_clientes = models.BooleanField(default=False)
     puede_productos = models.BooleanField(default=False)
@@ -96,6 +97,7 @@ class RolSistema(models.Model):
         return any(
             getattr(self, permiso)
             for permiso in [
+                "puede_punto_venta",
                 "puede_facturas",
                 "puede_clientes",
                 "puede_productos",

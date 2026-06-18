@@ -18,7 +18,7 @@ def erp_access(request):
     base = {
         "modulo_facturacion": facturacion_activa and getattr(user, "tiene_alguna_permision_facturacion", False),
         "modulo_contabilidad": contabilidad_activa and getattr(user, "tiene_alguna_permision_contabilidad", False),
-        "modulo_pos": facturacion_activa and pos_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_facturas") and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_productos"),
+        "modulo_pos": facturacion_activa and pos_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_punto_venta"),
         "modulo_rrhh": rrhh_activa and getattr(user, "tiene_alguna_permision_rrhh", False),
         "modulo_crm": crm_activa and getattr(user, "tiene_alguna_permision_crm", False),
         "modulo_citas": citas_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_citas"),

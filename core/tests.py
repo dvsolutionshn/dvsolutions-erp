@@ -17,7 +17,8 @@ from django.utils import timezone
 from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario
 from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 from core.backup_tokens import hash_token_respaldo
-from core.forms import EmpresaControlForm
+from core.forms import EmpresaControlForm, RolSistemaForm
+from core.access import permiso_facturacion_desde_ruta
 from core.audit_context import audit_scope
 from core.middleware import AuditoriaRequestMiddleware
 from facturacion.models import Cliente
@@ -1091,3 +1092,26 @@ class AuditoriaGlobalTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Visible")
         self.assertNotContains(response, "Oculto")
+
+
+class RolSistemaPermisosTests(TestCase):
+    def test_formulario_expone_todos_los_permisos_del_modelo(self):
+        form = RolSistemaForm()
+        permisos_modelo = {
+            field.name
+            for field in RolSistema._meta.fields
+            if field.name.startswith("puede_")
+        }
+
+        self.assertTrue(permisos_modelo)
+        self.assertEqual(permisos_modelo, permisos_modelo.intersection(form.fields))
+        self.assertIn("puede_punto_venta", form.fields)
+        self.assertIn("puede_crm", form.fields)
+        self.assertIn("puede_citas", form.fields)
+        self.assertIn("puede_clinica", form.fields)
+
+    def test_ruta_pos_exige_permiso_explicito(self):
+        self.assertEqual(
+            permiso_facturacion_desde_ruta("pos/"),
+            "puede_punto_venta",
+        )

@@ -57,4 +57,4 @@ class PlanModuloAdmin(admin.ModelAdmin):
 
 @admin.register(RolSistema)
 class RolSistemaAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'codigo', 'activo', 'puede_facturas', 'puede_inventario', 'puede_reportes')
+    list_display = ('nombre', 'codigo', 'activo', 'puede_punto_venta', 'puede_facturas', 'puede_inventario', 'puede_reportes')

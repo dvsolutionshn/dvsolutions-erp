@@ -475,57 +475,9 @@ class PlanComercialForm(forms.ModelForm):
 class RolSistemaForm(forms.ModelForm):
     class Meta:
         model = RolSistema
-        fields = [
-            "nombre",
-            "codigo",
-            "descripcion",
-            "activo",
-            "puede_facturas",
-            "puede_clientes",
-            "puede_productos",
-            "puede_proveedores",
-            "puede_inventario",
-            "puede_compras",
-            "puede_cai",
-            "puede_impuestos",
-            "puede_notas_credito",
-            "puede_recibos",
-            "puede_egresos",
-            "puede_reportes",
-            "puede_cxc",
-            "puede_cxp",
-            "puede_contabilidad",
-            "puede_crear_facturas",
-            "puede_editar_facturas",
-            "puede_anular_facturas",
-            "puede_eliminar_borradores",
-            "puede_registrar_pagos_clientes",
-            "puede_crear_clientes",
-            "puede_editar_clientes",
-            "puede_crear_productos",
-            "puede_editar_productos",
-            "puede_crear_proveedores",
-            "puede_editar_proveedores",
-            "puede_ajustar_inventario",
-            "puede_crear_compras",
-            "puede_editar_compras",
-            "puede_aplicar_compras",
-            "puede_anular_compras",
-            "puede_registrar_pagos_proveedores",
-            "puede_crear_notas_credito",
-            "puede_editar_notas_credito",
-            "puede_anular_notas_credito",
-            "puede_exportar_reportes",
-            "puede_catalogo_cuentas",
-            "puede_crear_asientos",
-            "puede_contabilizar_asientos",
-            "puede_reportes_contables",
-            "puede_rrhh",
-            "puede_empleados",
-            "puede_planillas",
-            "puede_vacaciones",
-            "puede_configuracion_rrhh",
-        ]
+        # Mantener todas las capacidades del modelo visibles evita que un permiso
+        # nuevo quede implementado en backend pero no pueda asignarse desde Roles.
+        fields = "__all__"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -534,6 +486,7 @@ class RolSistemaForm(forms.ModelForm):
             "codigo": ("Codigo interno", "Identificador tecnico del rol, por ejemplo solo-facturas."),
             "descripcion": ("Descripcion", ""),
             "activo": ("Rol activo", ""),
+            "puede_punto_venta": ("Puede entrar a Punto de Venta", "Autoriza el acceso operativo a caja y venta directa."),
             "puede_facturas": ("Puede entrar a facturas", ""),
             "puede_clientes": ("Puede entrar a clientes", ""),
             "puede_productos": ("Puede entrar a productos", ""),
@@ -579,6 +532,15 @@ class RolSistemaForm(forms.ModelForm):
             "puede_planillas": ("Puede gestionar planillas", ""),
             "puede_vacaciones": ("Puede gestionar vacaciones", ""),
             "puede_configuracion_rrhh": ("Puede configurar RRHH", ""),
+            "puede_crm": ("Puede entrar a CRM", ""),
+            "puede_campanias": ("Puede gestionar campanas", ""),
+            "puede_citas": ("Puede gestionar agenda y citas", ""),
+            "puede_configuracion_crm": ("Puede configurar CRM", ""),
+            "puede_clinica": ("Puede entrar a Clinica", ""),
+            "puede_pacientes": ("Puede gestionar pacientes", ""),
+            "puede_expediente_clinico": ("Puede gestionar expedientes clinicos", ""),
+            "puede_tratamientos_clinicos": ("Puede gestionar tratamientos clinicos", ""),
+            "puede_configuracion_clinica": ("Puede configurar Clinica", ""),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:
