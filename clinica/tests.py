@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from facturacion.models import Cliente
-from .models import Paciente
+from .models import HistoriaClinicaEspecialidad, Paciente
 
 
 class ClinicaPacienteTests(TestCase):
@@ -23,13 +23,13 @@ class ClinicaPacienteTests(TestCase):
             puede_tratamientos_clinicos=True,
             puede_configuracion_clinica=True,
         )
-        user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_user(
             username="clinica",
             password="pass",
             empresa=self.empresa,
             rol_sistema=rol,
         )
-        self.client.force_login(user)
+        self.client.force_login(self.user)
 
     def test_crear_paciente_alergico_y_mostrar_alerta_en_lista(self):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
@@ -171,3 +171,102 @@ class ClinicaPacienteTests(TestCase):
             {"q": "0"},
         )
         self.assertEqual(response.json()["results"], [])
+
+    def test_historias_especialidad_permite_crear_y_editar_en_hospital_mia(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0300",
+            primer_nombre="Andrea",
+            primer_apellido="Lopez",
+            nombre="Andrea Lopez",
+            identidad="0801199500001",
+        )
+
+        selector = self.client.get(
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id])
+        )
+        self.assertEqual(selector.status_code, 200)
+        for nombre in ["Capilar", "Cirugia plastica y reconstructiva", "Enfermeria", "Terapias", "Camara hiperbarica"]:
+            self.assertContains(selector, nombre)
+
+        crear_url = reverse(
+            "clinica_crear_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, "capilar"],
+        )
+        response = self.client.post(
+            crear_url,
+            {
+                "fecha_atencion": "2026-06-17T10:30",
+                "motivo_consulta": "Caida de cabello",
+                "antecedentes": "Sin antecedentes relevantes",
+                "signos_vitales": "PA 120/80",
+                "evaluacion_clinica": "Evaluacion capilar inicial",
+                "diagnostico": "Alopecia en estudio",
+                "procedimiento": "Tricoscopia",
+                "plan_tratamiento": "Control en 30 dias",
+                "indicaciones": "Aplicar tratamiento indicado",
+                "observaciones": "Sin complicaciones",
+                "estado": "borrador",
+            },
+        )
+        self.assertRedirects(
+            response,
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id]),
+        )
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente)
+        self.assertEqual(historia.tipo, "capilar")
+        self.assertEqual(historia.creado_por, self.user)
+
+        editar_url = reverse(
+            "clinica_editar_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, historia.id],
+        )
+        response = self.client.post(
+            editar_url,
+            {
+                "fecha_atencion": "2026-06-17T10:30",
+                "motivo_consulta": "Caida de cabello actualizada",
+                "antecedentes": historia.antecedentes,
+                "signos_vitales": historia.signos_vitales,
+                "evaluacion_clinica": historia.evaluacion_clinica,
+                "diagnostico": historia.diagnostico,
+                "procedimiento": historia.procedimiento,
+                "plan_tratamiento": historia.plan_tratamiento,
+                "indicaciones": historia.indicaciones,
+                "observaciones": historia.observaciones,
+                "estado": "finalizada",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        historia.refresh_from_db()
+        self.assertEqual(historia.estado, "finalizada")
+        self.assertEqual(historia.motivo_consulta, "Caida de cabello actualizada")
+        self.assertEqual(historia.actualizado_por, self.user)
+
+    def test_historias_especialidad_no_estan_disponibles_para_otra_empresa(self):
+        otra_empresa = Empresa.objects.create(
+            nombre="Mia Medical Spa",
+            slug="medical_spa",
+            rtn="08011999000999",
+        )
+        modulo = Modulo.objects.get(codigo="clinica_medica")
+        EmpresaModulo.objects.create(empresa=otra_empresa, modulo=modulo, activo=True)
+        paciente = Paciente.objects.create(
+            empresa=otra_empresa,
+            expediente_codigo="MMS-0001",
+            nombre="Paciente Spa",
+            identidad="0801199500002",
+        )
+        otro_usuario = get_user_model().objects.create_user(
+            username="clinica_spa",
+            password="pass",
+            empresa=otra_empresa,
+            rol_sistema=self.user.rol_sistema,
+        )
+        self.client.force_login(otro_usuario)
+
+        response = self.client.get(
+            reverse("clinica_historias_especialidad", args=[otra_empresa.slug, paciente.id])
+        )
+
+        self.assertEqual(response.status_code, 404)

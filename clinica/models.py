@@ -362,6 +362,70 @@ class ExpedienteEvento(models.Model):
         return f"{self.paciente.nombre} - {self.titulo}"
 
 
+class HistoriaClinicaEspecialidad(models.Model):
+    TIPO_CHOICES = [
+        ("capilar", "Capilar"),
+        ("cirugia_plastica", "Cirugia plastica y reconstructiva"),
+        ("enfermeria", "Enfermeria"),
+        ("terapias", "Terapias"),
+        ("camara_hiperbarica", "Camara hiperbarica"),
+    ]
+    ESTADO_CHOICES = [
+        ("borrador", "Borrador"),
+        ("finalizada", "Finalizada"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="historias_clinicas_especialidad")
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="historias_especialidad")
+    profesional = models.ForeignKey(
+        ProfesionalSalud,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historias_clinicas_especialidad",
+    )
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES)
+    fecha_atencion = models.DateTimeField(default=timezone.now)
+    motivo_consulta = models.TextField(blank=True)
+    antecedentes = models.TextField(blank=True)
+    signos_vitales = models.TextField(blank=True)
+    evaluacion_clinica = models.TextField(blank=True)
+    diagnostico = models.TextField(blank=True)
+    procedimiento = models.TextField(blank=True)
+    plan_tratamiento = models.TextField(blank=True)
+    indicaciones = models.TextField(blank=True)
+    observaciones = models.TextField(blank=True)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="borrador")
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historias_clinicas_creadas",
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historias_clinicas_actualizadas",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha_atencion", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "paciente", "tipo"]),
+            models.Index(fields=["empresa", "fecha_atencion"]),
+        ]
+        verbose_name = "Historia clinica por especialidad"
+        verbose_name_plural = "Historias clinicas por especialidad"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} - {self.get_tipo_display()} - {self.fecha_atencion:%d/%m/%Y}"
+
+
 class MedicamentoPrescrito(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="medicamentos_prescritos")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="medicamentos_prescritos")

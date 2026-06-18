@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -11,12 +11,13 @@ from core.models import Empresa
 from contabilidad.services import asegurar_cuenta_contable_cliente
 from facturacion.models import Cliente
 
-from .forms import CitaClinicaForm, ExpedienteEventoForm, PacienteForm, ProfesionalSaludForm, ServicioClinicoForm, TratamientoPacienteForm
+from .forms import CitaClinicaForm, ExpedienteEventoForm, HistoriaClinicaEspecialidadForm, PacienteForm, ProfesionalSaludForm, ServicioClinicoForm, TratamientoPacienteForm
 from .models import (
     CitaClinica,
     ConsentimientoClinico,
     ConfiguracionClinica,
     ExpedienteEvento,
+    HistoriaClinicaEspecialidad,
     MedicamentoPrescrito,
     Paciente,
     PacienteFotoEvolucion,
@@ -33,6 +34,11 @@ def _empresa_desde_slug(empresa_slug):
 
 def _configuracion_clinica(empresa):
     return ConfiguracionClinica.objects.get_or_create(empresa=empresa)[0]
+
+
+def _requiere_hospital_mia(empresa):
+    if empresa.slug != "hospital_mia":
+        raise Http404("Los formularios hospitalarios no estan habilitados para esta empresa.")
 
 
 def _proximo_codigo_expediente(empresa):
@@ -294,6 +300,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
     fotos_evolucion = paciente.fotos_evolucion.select_related("creado_por")[:12]
     medicamentos = MedicamentoPrescrito.objects.filter(empresa=empresa, paciente=paciente)[:10]
     consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10]
+    historias_especialidad = paciente.historias_especialidad.select_related("profesional", "actualizado_por")[:20]
     return render(
         request,
         "clinica/paciente_detalle.html",
@@ -306,6 +313,100 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "fotos_evolucion": fotos_evolucion,
             "medicamentos": medicamentos,
             "consentimientos": consentimientos,
+            "historias_especialidad": historias_especialidad,
+            "formularios_hospitalarios": empresa.slug == "hospital_mia",
+        },
+    )
+
+
+@login_required
+def historias_especialidad(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
+    tipos = [
+        {"codigo": codigo, "nombre": nombre, "total": historias.filter(tipo=codigo).count()}
+        for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
+    ]
+    return render(
+        request,
+        "clinica/historias_especialidad.html",
+        {"empresa": empresa, "paciente": paciente, "historias": historias, "tipos": tipos},
+    )
+
+
+@login_required
+def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
+    if tipo not in tipos_validos:
+        raise Http404("Formulario clinico no valido.")
+    initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
+    form = HistoriaClinicaEspecialidadForm(
+        request.POST or None,
+        empresa=empresa,
+        tipo=tipo,
+        initial=initial,
+    )
+    if request.method == "POST" and form.is_valid():
+        historia = form.save(commit=False)
+        historia.empresa = empresa
+        historia.paciente = paciente
+        historia.tipo = tipo
+        historia.creado_por = request.user
+        historia.actualizado_por = request.user
+        historia.save()
+        messages.success(request, f"Historia de {historia.get_tipo_display()} guardada correctamente.")
+        return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    return render(
+        request,
+        "clinica/historia_especialidad_form.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "form": form,
+            "tipo_nombre": tipos_validos[tipo],
+            "titulo": f"Nueva historia: {tipos_validos[tipo]}",
+        },
+    )
+
+
+@login_required
+def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    historia = get_object_or_404(
+        HistoriaClinicaEspecialidad,
+        id=historia_id,
+        empresa=empresa,
+        paciente=paciente,
+    )
+    form = HistoriaClinicaEspecialidadForm(
+        request.POST or None,
+        empresa=empresa,
+        tipo=historia.tipo,
+        instance=historia,
+    )
+    if request.method == "POST" and form.is_valid():
+        historia = form.save(commit=False)
+        historia.actualizado_por = request.user
+        historia.save()
+        messages.success(request, "Historia clinica actualizada correctamente.")
+        return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    return render(
+        request,
+        "clinica/historia_especialidad_form.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "historia": historia,
+            "form": form,
+            "tipo_nombre": historia.get_tipo_display(),
+            "titulo": f"Editar historia: {historia.get_tipo_display()}",
         },
     )
 

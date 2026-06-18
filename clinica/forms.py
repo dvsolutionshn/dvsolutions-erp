@@ -4,6 +4,7 @@ from .models import (
     CitaClinica,
     ConsentimientoClinico,
     ExpedienteEvento,
+    HistoriaClinicaEspecialidad,
     MedicamentoPrescrito,
     Paciente,
     ProfesionalSalud,
@@ -262,6 +263,81 @@ class ExpedienteEventoForm(BaseClinicaForm):
         self.fields["cita"].required = False
         self.fields["tratamiento"].required = False
         self.fields["profesional"].required = False
+
+
+class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
+    CAMPOS_POR_TIPO = {
+        "capilar": {
+            "motivo_consulta": "Motivo de consulta capilar",
+            "antecedentes": "Antecedentes personales y capilares",
+            "evaluacion_clinica": "Evaluacion capilar y hallazgos",
+            "procedimiento": "Procedimiento o tecnica realizada",
+            "plan_tratamiento": "Plan capilar",
+        },
+        "cirugia_plastica": {
+            "motivo_consulta": "Motivo y expectativa quirurgica",
+            "antecedentes": "Antecedentes medicos y quirurgicos",
+            "evaluacion_clinica": "Examen fisico y valoracion preoperatoria",
+            "procedimiento": "Procedimiento propuesto o realizado",
+            "plan_tratamiento": "Plan quirurgico y seguimiento",
+        },
+        "enfermeria": {
+            "motivo_consulta": "Motivo de atencion",
+            "antecedentes": "Antecedentes relevantes para enfermeria",
+            "evaluacion_clinica": "Valoracion de enfermeria",
+            "procedimiento": "Cuidados, medicamentos e insumos aplicados",
+            "plan_tratamiento": "Plan de cuidados",
+        },
+        "terapias": {
+            "motivo_consulta": "Motivo y objetivo de la terapia",
+            "antecedentes": "Antecedentes funcionales",
+            "evaluacion_clinica": "Evaluacion inicial o evolucion funcional",
+            "procedimiento": "Tecnicas y terapia aplicada",
+            "plan_tratamiento": "Plan de sesiones y objetivos",
+        },
+        "camara_hiperbarica": {
+            "motivo_consulta": "Indicacion de terapia hiperbarica",
+            "antecedentes": "Antecedentes y contraindicaciones",
+            "evaluacion_clinica": "Evaluacion previa y posterior a la sesion",
+            "procedimiento": "Presion, duracion y numero de sesion",
+            "plan_tratamiento": "Protocolo de sesiones",
+        },
+    }
+
+    class Meta:
+        model = HistoriaClinicaEspecialidad
+        fields = [
+            "profesional",
+            "fecha_atencion",
+            "motivo_consulta",
+            "antecedentes",
+            "signos_vitales",
+            "evaluacion_clinica",
+            "diagnostico",
+            "procedimiento",
+            "plan_tratamiento",
+            "indicaciones",
+            "observaciones",
+            "estado",
+        ]
+        widgets = {
+            "fecha_atencion": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+        }
+
+    def __init__(self, *args, empresa=None, tipo=None, **kwargs):
+        super().__init__(*args, empresa=empresa, **kwargs)
+        self.tipo = tipo or getattr(self.instance, "tipo", None)
+        if empresa:
+            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(
+                empresa=empresa,
+                activo=True,
+            ).order_by("nombre")
+        else:
+            self.fields["profesional"].queryset = ProfesionalSalud.objects.none()
+        self.fields["profesional"].required = False
+        self.fields["fecha_atencion"].input_formats = ["%Y-%m-%dT%H:%M"]
+        for campo, etiqueta in self.CAMPOS_POR_TIPO.get(self.tipo, {}).items():
+            self.fields[campo].label = etiqueta
 
 
 class MedicamentoPrescritoForm(BaseClinicaForm):

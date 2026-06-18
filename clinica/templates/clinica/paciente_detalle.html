@@ -75,7 +75,7 @@
 </section>
 
 <section class="patient-entry-grid">
-    <a class="erp-card patient-entry-card" href="#historial-clinico"><div class="erp-kpi-label">Expediente</div><h3>Historial Clinico</h3><p>Antecedentes, funciones, examen fisico, diagnosticos, plan y tricopigmentacion.</p></a>
+    <a class="erp-card patient-entry-card" href="{% if formularios_hospitalarios %}{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}{% else %}#historial-clinico{% endif %}"><div class="erp-kpi-label">Expediente</div><h3>Historial Clinico</h3><p>{% if formularios_hospitalarios %}Formularios de Capilar, Cirugia, Enfermeria, Terapias y Camara hiperbarica.{% else %}Antecedentes, funciones, examen fisico, diagnosticos y plan.{% endif %}</p></a>
     <a class="erp-card patient-entry-card" href="#plan-tratamiento"><div class="erp-kpi-label">Ruta medica</div><h3>Plan de tratamiento</h3><p>Tratamientos activos, objetivos, plan clinico, costos y seguimiento profesional.</p></a>
     <a class="erp-card patient-entry-card" href="#evolucion"><div class="erp-kpi-label">Bitacora visual</div><h3>Evolucion</h3><p>Fotos, fechas, procedimiento aplicado y registro cronologico del avance.</p></a>
     <a class="erp-card patient-entry-card" href="#citas"><div class="erp-kpi-label">Agenda</div><h3>Citas</h3><p>Citas pasadas, programadas y acceso rapido para agendar nuevas atenciones.</p></a>
@@ -89,6 +89,15 @@
         </div>
         <a class="erp-action-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar entrada</a>
     </div>
+    {% if formularios_hospitalarios %}
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid var(--line);border-radius:12px;background:#f7fbff;flex-wrap:wrap;">
+        <div>
+            <strong style="display:block;color:#102338;">Formularios hospitalarios</strong>
+            <span class="erp-card-muted">{{ historias_especialidad|length }} registro(s) especializado(s) en este expediente.</span>
+        </div>
+        <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Abrir formularios</a>
+    </div>
+    {% endif %}
     <div class="patient-section-grid">
         <div class="patient-mini-card"><strong>Antecedentes</strong><span>{{ paciente.antecedentes_medicos|default:"Sin antecedentes registrados." }}</span></div>
         <div class="patient-mini-card"><strong>Funciones</strong><span>Funciones vitales, habitos y sistemas se registran como eventos del expediente.</span></div>

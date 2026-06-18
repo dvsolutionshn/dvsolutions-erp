@@ -1,0 +1,52 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ titulo }} - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}{{ tipo_nombre }} · {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+{% block header_description %}Registro clinico de {{ paciente.nombre }}. Los cambios quedan asociados al usuario y fecha de actualizacion.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.clinical-form-shell{max-width:1180px;margin:0 auto}.clinical-banner{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding-bottom:18px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.clinical-banner h3{margin:4px 0;color:#102338}.clinical-banner p{margin:0;color:var(--muted)}
+.clinical-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.clinical-field{display:flex;flex-direction:column;gap:7px}.clinical-field.is-wide{grid-column:1/-1}
+.clinical-field label{font-size:11px;font-weight:900;text-transform:uppercase;color:#4e6480}.clinical-field input,.clinical-field select,.clinical-field textarea{width:100%;box-sizing:border-box;border:1px solid #bed0e6;border-radius:8px;padding:12px 13px;background:#fff;color:#102338;font:inherit;outline:none;transition:border-color .2s ease,box-shadow .2s ease}
+.clinical-field input:focus,.clinical-field select:focus,.clinical-field textarea:focus{border-color:#2367df;box-shadow:0 0 0 3px rgba(35,103,223,.12)}.clinical-field textarea{min-height:105px;resize:vertical}
+.clinical-error{color:#b42318;font-size:12px}.clinical-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:8px;padding:10px 12px;font-weight:800}
+@media(max-width:760px){.clinical-banner,.clinical-form-grid{grid-template-columns:1fr}.clinical-field.is-wide{grid-column:auto}}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card clinical-form-shell">
+    <div class="clinical-banner">
+        <div><div class="erp-kpi-label">Formulario hospitalario</div><h3>{{ tipo_nombre }}</h3><p>{{ paciente.nombre }} · Documento {{ paciente.identidad|default:"No indicado" }}</p></div>
+        {% if paciente.es_alergico %}<div class="patient-alert">Alergico: {{ paciente.alergias|default:"Sin detalle" }}</div>{% endif %}
+    </div>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="clinical-form-grid">
+        {% for field in form %}
+            <div class="clinical-field {% if field.name != 'profesional' and field.name != 'fecha_atencion' and field.name != 'estado' %}is-wide{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+            </div>
+        {% endfor %}
+        </div>
+        {% if form.non_field_errors %}<div class="clinical-error">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="clinical-actions">
+            <span class="erp-card-muted">Guarda como borrador mientras completas la evaluacion o marca Finalizada al concluir.</span>
+            <div style="display:flex;gap:10px;">
+                <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Cancelar</a>
+                <button class="erp-btn" type="submit">Guardar historia</button>
+            </div>
+        </div>
+    </form>
+</section>
+{% endblock %}
