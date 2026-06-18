@@ -5,7 +5,8 @@ from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from facturacion.models import Cliente
-from .models import HistoriaClinicaEspecialidad, Paciente
+from .models import HistoriaClinicaEspecialidad, Paciente, PreconsultaClinica
+from .tokens import hash_token_preconsulta
 
 
 class ClinicaPacienteTests(TestCase):
@@ -270,3 +271,93 @@ class ClinicaPacienteTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_preconsulta_publica_se_genera_completa_y_actualiza_expediente(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0400",
+            primer_nombre="Laura",
+            primer_apellido="Perez",
+            nombre="Laura Perez",
+            identidad="0801199600001",
+            whatsapp="99990001",
+        )
+        generar_url = reverse(
+            "clinica_generar_enlace_preconsulta",
+            args=[self.empresa.slug, paciente.id],
+        )
+        response = self.client.post(generar_url)
+
+        self.assertEqual(response.status_code, 200)
+        enlace = response.context["enlace_publico"]
+        token_raw = enlace.rstrip("/").rsplit("/", 1)[-1]
+        preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
+        self.assertEqual(preconsulta.token_hash, hash_token_preconsulta(token_raw))
+        self.assertNotEqual(preconsulta.token_hash, token_raw)
+        self.assertContains(response, "Enviar por WhatsApp")
+
+        self.client.logout()
+        publica_url = reverse("clinica_preconsulta_publica", args=[token_raw])
+        response = self.client.get(publica_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Preparemos su consulta")
+        self.assertContains(response, "Laura")
+
+        response = self.client.post(
+            publica_url,
+            {
+                "primer_nombre": "Laura Maria",
+                "segundo_nombre": "",
+                "primer_apellido": "Perez",
+                "segundo_apellido": "Lopez",
+                "identidad": "0801199600001",
+                "fecha_nacimiento": "1996-04-10",
+                "sexo": "femenino",
+                "estado_civil": "soltero",
+                "correo": "laura@example.com",
+                "telefono": "99990001",
+                "direccion": "Tegucigalpa",
+                "lugar_nacimiento": "Tegucigalpa",
+                "ocupacion": "Administradora",
+                "lugar_trabajo": "Empresa privada",
+                "redes_sociales": "@laura",
+                "informante": "Paciente",
+                "contacto_emergencia": "Maria Perez",
+                "telefono_emergencia": "99990002",
+                "referido_por": "Instagram",
+                "motivo_consulta": "Valoracion de cirugia facial",
+                "funciones_organicas": "normal",
+                "funciones_detalle": "",
+                "revision_sistemas": "normal",
+                "revision_sistemas_detalle": "",
+                "antecedentes_hospitalarios": "on",
+                "antecedentes_hospitalarios_detalle": "Apendicectomia en 2018",
+                "antecedentes_personales": ["asma", "hipertension"],
+                "antecedentes_personales_detalle": "Asma controlada",
+                "medicamentos_habituales": ["anticonceptivos"],
+                "medicamentos_habituales_detalle": "Uso diario",
+                "antecedentes_familiares": ["diabetes"],
+                "antecedentes_familiares_detalle": "Madre",
+                "dieta": "Balanceada",
+                "ejercicio": "Tres veces por semana",
+                "habitos": "No fuma",
+                "alergias": "Penicilina",
+                "antecedentes_infecciosos": "COVID-19 en 2022",
+                "consentimiento_datos": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Información recibida")
+        preconsulta.refresh_from_db()
+        paciente.refresh_from_db()
+        self.assertEqual(preconsulta.estado, "completada")
+        self.assertEqual(preconsulta.antecedentes_personales, ["asma", "hipertension"])
+        self.assertEqual(paciente.nombre, "Laura Maria Perez Lopez")
+        self.assertEqual(paciente.correo, "laura@example.com")
+        self.assertTrue(paciente.es_alergico)
+        self.assertIn("Asma bronquial", paciente.antecedentes_medicos)
+
+        response = self.client.get(publica_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Información recibida")

@@ -395,6 +395,7 @@ class HistoriaClinicaEspecialidad(models.Model):
     plan_tratamiento = models.TextField(blank=True)
     indicaciones = models.TextField(blank=True)
     observaciones = models.TextField(blank=True)
+    datos_especialidad = models.JSONField(default=dict, blank=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="borrador")
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -424,6 +425,72 @@ class HistoriaClinicaEspecialidad(models.Model):
 
     def __str__(self):
         return f"{self.paciente.nombre} - {self.get_tipo_display()} - {self.fecha_atencion:%d/%m/%Y}"
+
+
+class PreconsultaClinica(models.Model):
+    ESTADO_CHOICES = [
+        ("pendiente", "Pendiente"),
+        ("completada", "Completada"),
+        ("revocada", "Revocada"),
+    ]
+    REVISION_CHOICES = [
+        ("normal", "Normal"),
+        ("alterada", "Alterada"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="preconsultas_clinicas")
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="preconsultas")
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    token_preview = models.CharField(max_length=16)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
+    fecha_expiracion = models.DateTimeField()
+    fecha_completada = models.DateTimeField(blank=True, null=True)
+    datos_generales = models.JSONField(default=dict, blank=True)
+    motivo_consulta = models.TextField(blank=True)
+    funciones_organicas = models.CharField(max_length=20, choices=REVISION_CHOICES, blank=True)
+    funciones_detalle = models.TextField(blank=True)
+    revision_sistemas = models.CharField(max_length=20, choices=REVISION_CHOICES, blank=True)
+    revision_sistemas_detalle = models.TextField(blank=True)
+    antecedentes_hospitalarios = models.BooleanField(default=False)
+    antecedentes_hospitalarios_detalle = models.TextField(blank=True)
+    antecedentes_personales = models.JSONField(default=list, blank=True)
+    antecedentes_personales_detalle = models.TextField(blank=True)
+    medicamentos_habituales = models.JSONField(default=list, blank=True)
+    medicamentos_habituales_detalle = models.TextField(blank=True)
+    antecedentes_familiares = models.JSONField(default=list, blank=True)
+    antecedentes_familiares_detalle = models.TextField(blank=True)
+    dieta = models.TextField(blank=True)
+    ejercicio = models.TextField(blank=True)
+    habitos = models.TextField(blank=True)
+    alergias = models.TextField(blank=True)
+    antecedentes_infecciosos = models.TextField(blank=True)
+    consentimiento_datos = models.BooleanField(default=False)
+    ip_completada = models.GenericIPAddressField(blank=True, null=True)
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="preconsultas_clinicas_creadas",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "paciente", "estado"]),
+            models.Index(fields=["empresa", "fecha_creacion"]),
+        ]
+        verbose_name = "Preconsulta clinica"
+        verbose_name_plural = "Preconsultas clinicas"
+
+    @property
+    def vigente(self):
+        return self.estado == "pendiente" and self.fecha_expiracion > timezone.now()
+
+    def __str__(self):
+        return f"Preconsulta {self.paciente.nombre} - {self.get_estado_display()}"
 
 
 class MedicamentoPrescrito(models.Model):

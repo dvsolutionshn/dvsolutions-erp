@@ -1,0 +1,25 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Preconsulta - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Preconsulta del paciente{% endblock %}
+{% block header_description %}Informacion declarada por el paciente antes de su atencion. Utilizala como apoyo y confirma los datos clinicos durante la consulta.{% endblock %}
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>{% endblock %}
+
+{% block extra_head %}<style>
+.pre-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.pre-section{padding:18px 0;border-bottom:1px solid var(--line)}.pre-section:last-child{border-bottom:0}.pre-section h3{margin:0 0 12px;color:#102338}.pre-item{padding:12px;border:1px solid var(--line);border-radius:8px;background:#fff}.pre-item span{display:block;font-size:10px;text-transform:uppercase;font-weight:900;color:var(--muted);margin-bottom:5px}.pre-tags{display:flex;gap:7px;flex-wrap:wrap}.pre-tag{padding:6px 9px;border-radius:6px;background:#edf4ff;color:#174f9f;font-size:12px;font-weight:800}@media(max-width:760px){.pre-grid{grid-template-columns:1fr}}
+</style>{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <div class="erp-section-heading"><div><div class="erp-kpi-label">Estado</div><h3>{{ preconsulta.get_estado_display }}</h3></div><span class="erp-card-muted">{% if preconsulta.fecha_completada %}Completada {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% else %}Pendiente de respuesta{% endif %}</span></div>
+    {% if preconsulta.estado == 'completada' %}
+    <div class="pre-section"><h3>Motivo principal</h3><p>{{ preconsulta.motivo_consulta|default:"No indicado"|linebreaksbr }}</p></div>
+    <div class="pre-section"><h3>Revision general</h3><div class="pre-grid"><div class="pre-item"><span>Funciones organicas</span>{{ preconsulta.get_funciones_organicas_display|default:"No indicado" }}{% if preconsulta.funciones_detalle %}<br>{{ preconsulta.funciones_detalle }}{% endif %}</div><div class="pre-item"><span>Organos y sistemas</span>{{ preconsulta.get_revision_sistemas_display|default:"No indicado" }}{% if preconsulta.revision_sistemas_detalle %}<br>{{ preconsulta.revision_sistemas_detalle }}{% endif %}</div></div></div>
+    <div class="pre-section"><h3>Antecedentes personales</h3><div class="pre-tags">{% for valor in resumen.antecedentes_personales %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó condiciones.</span>{% endfor %}</div>{% if preconsulta.antecedentes_personales_detalle %}<p>{{ preconsulta.antecedentes_personales_detalle|linebreaksbr }}</p>{% endif %}{% if preconsulta.antecedentes_hospitalarios_detalle %}<p><strong>Hospitalizaciones/cirugias:</strong> {{ preconsulta.antecedentes_hospitalarios_detalle|linebreaksbr }}</p>{% endif %}</div>
+    <div class="pre-section"><h3>Medicamentos y alergias</h3><div class="pre-tags">{% for valor in resumen.medicamentos %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó medicamentos.</span>{% endfor %}</div><p>{{ preconsulta.medicamentos_habituales_detalle|default:"Sin detalle adicional"|linebreaksbr }}</p><p><strong>Alergias:</strong> {{ preconsulta.alergias|default:"No declaradas" }}</p></div>
+    <div class="pre-section"><h3>Antecedentes familiares</h3><div class="pre-tags">{% for valor in resumen.antecedentes_familiares %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó antecedentes familiares.</span>{% endfor %}</div><p>{{ preconsulta.antecedentes_familiares_detalle|default:"Sin detalle adicional"|linebreaksbr }}</p></div>
+    <div class="pre-section"><h3>Estilo de vida</h3><div class="pre-grid"><div class="pre-item"><span>Alimentacion</span>{{ preconsulta.dieta|default:"No indicada" }}</div><div class="pre-item"><span>Ejercicio</span>{{ preconsulta.ejercicio|default:"No indicado" }}</div><div class="pre-item"><span>Habitos</span>{{ preconsulta.habitos|default:"No indicados" }}</div><div class="pre-item"><span>Infecciosos</span>{{ preconsulta.antecedentes_infecciosos|default:"No indicados" }}</div></div></div>
+    {% else %}<div class="erp-empty">El paciente todavía no ha completado este formulario.</div>{% endif %}
+</section>
+{% endblock %}

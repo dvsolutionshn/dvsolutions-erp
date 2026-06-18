@@ -1,17 +1,35 @@
+from urllib.parse import quote
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.debug import sensitive_post_parameters
+from django.views.decorators.http import require_POST
 
 from core.models import Empresa
 from contabilidad.services import asegurar_cuenta_contable_cliente
 from facturacion.models import Cliente
 
-from .forms import CitaClinicaForm, ExpedienteEventoForm, HistoriaClinicaEspecialidadForm, PacienteForm, ProfesionalSaludForm, ServicioClinicoForm, TratamientoPacienteForm
+from .forms import (
+    ANTECEDENTES_FAMILIARES_CHOICES,
+    ANTECEDENTES_PERSONALES_CHOICES,
+    MEDICAMENTOS_HABITUALES_CHOICES,
+    CitaClinicaForm,
+    ExpedienteEventoForm,
+    HistoriaClinicaEspecialidadForm,
+    PacienteForm,
+    PreconsultaClinicaPublicaForm,
+    ProfesionalSaludForm,
+    ServicioClinicoForm,
+    TratamientoPacienteForm,
+)
 from .models import (
     CitaClinica,
     ConsentimientoClinico,
@@ -21,11 +39,13 @@ from .models import (
     MedicamentoPrescrito,
     Paciente,
     PacienteFotoEvolucion,
+    PreconsultaClinica,
     ProfesionalSalud,
     SeguimientoPostOperatorio,
     ServicioClinico,
     TratamientoPaciente,
 )
+from .tokens import generar_token_preconsulta, hash_token_preconsulta
 
 
 def _empresa_desde_slug(empresa_slug):
@@ -39,6 +59,62 @@ def _configuracion_clinica(empresa):
 def _requiere_hospital_mia(empresa):
     if empresa.slug != "hospital_mia":
         raise Http404("Los formularios hospitalarios no estan habilitados para esta empresa.")
+
+
+def _ip_cliente(request):
+    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
+    return forwarded or request.META.get("REMOTE_ADDR") or None
+
+
+def _etiquetas_seleccion(valores, choices):
+    etiquetas = dict(choices)
+    return [etiquetas.get(valor, valor) for valor in (valores or [])]
+
+
+def _resumen_preconsulta(preconsulta):
+    return {
+        "antecedentes_personales": _etiquetas_seleccion(
+            preconsulta.antecedentes_personales,
+            ANTECEDENTES_PERSONALES_CHOICES,
+        ),
+        "medicamentos": _etiquetas_seleccion(
+            preconsulta.medicamentos_habituales,
+            MEDICAMENTOS_HABITUALES_CHOICES,
+        ),
+        "antecedentes_familiares": _etiquetas_seleccion(
+            preconsulta.antecedentes_familiares,
+            ANTECEDENTES_FAMILIARES_CHOICES,
+        ),
+    }
+
+
+def _actualizar_paciente_desde_preconsulta(paciente, form):
+    campos_directos = [
+        "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+        "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "direccion",
+        "lugar_nacimiento", "ocupacion", "contacto_emergencia", "telefono_emergencia",
+    ]
+    for campo in campos_directos:
+        setattr(paciente, campo, form.cleaned_data.get(campo))
+    paciente.telefono = form.cleaned_data.get("telefono")
+    paciente.whatsapp = form.cleaned_data.get("telefono")
+    alergias = (form.cleaned_data.get("alergias") or "").strip()
+    paciente.alergias = alergias
+    paciente.es_alergico = bool(alergias)
+    antecedentes = _etiquetas_seleccion(
+        form.cleaned_data.get("antecedentes_personales"),
+        ANTECEDENTES_PERSONALES_CHOICES,
+    )
+    detalle_antecedentes = (form.cleaned_data.get("antecedentes_personales_detalle") or "").strip()
+    paciente.antecedentes_medicos = "; ".join(antecedentes + ([detalle_antecedentes] if detalle_antecedentes else []))
+    medicamentos = _etiquetas_seleccion(
+        form.cleaned_data.get("medicamentos_habituales"),
+        MEDICAMENTOS_HABITUALES_CHOICES,
+    )
+    detalle_medicamentos = (form.cleaned_data.get("medicamentos_habituales_detalle") or "").strip()
+    paciente.medicamentos_actuales = "; ".join(medicamentos + ([detalle_medicamentos] if detalle_medicamentos else []))
+    paciente.save()
+    _sincronizar_cliente_facturacion_paciente(paciente)
 
 
 def _proximo_codigo_expediente(empresa):
@@ -325,6 +401,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
     _requiere_hospital_mia(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
+    preconsultas = paciente.preconsultas.select_related("creada_por")[:10]
     tipos = [
         {"codigo": codigo, "nombre": nombre, "total": historias.filter(tipo=codigo).count()}
         for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
@@ -332,7 +409,13 @@ def historias_especialidad(request, empresa_slug, paciente_id):
     return render(
         request,
         "clinica/historias_especialidad.html",
-        {"empresa": empresa, "paciente": paciente, "historias": historias, "tipos": tipos},
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "historias": historias,
+            "tipos": tipos,
+            "preconsultas": preconsultas,
+        },
     )
 
 
@@ -345,6 +428,24 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
+    ultima_preconsulta = paciente.preconsultas.filter(estado="completada").first()
+    if ultima_preconsulta:
+        resumen = _resumen_preconsulta(ultima_preconsulta)
+        bloques_antecedentes = []
+        if resumen["antecedentes_personales"]:
+            bloques_antecedentes.append("Personales: " + ", ".join(resumen["antecedentes_personales"]))
+        if ultima_preconsulta.antecedentes_personales_detalle:
+            bloques_antecedentes.append(ultima_preconsulta.antecedentes_personales_detalle)
+        if ultima_preconsulta.antecedentes_hospitalarios_detalle:
+            bloques_antecedentes.append("Hospitalarios/quirurgicos: " + ultima_preconsulta.antecedentes_hospitalarios_detalle)
+        if resumen["medicamentos"]:
+            bloques_antecedentes.append("Medicamentos: " + ", ".join(resumen["medicamentos"]))
+        if ultima_preconsulta.alergias:
+            bloques_antecedentes.append("ALERGIAS: " + ultima_preconsulta.alergias)
+        initial.update({
+            "motivo_consulta": ultima_preconsulta.motivo_consulta,
+            "antecedentes": "\n".join(bloques_antecedentes),
+        })
     form = HistoriaClinicaEspecialidadForm(
         request.POST or None,
         empresa=empresa,
@@ -408,6 +509,105 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
             "tipo_nombre": historia.get_tipo_display(),
             "titulo": f"Editar historia: {historia.get_tipo_display()}",
         },
+    )
+
+
+@login_required
+@require_POST
+def generar_enlace_preconsulta(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    paciente.preconsultas.filter(estado="pendiente").update(estado="revocada")
+    token_raw, token_hash, token_preview = generar_token_preconsulta()
+    preconsulta = PreconsultaClinica.objects.create(
+        empresa=empresa,
+        paciente=paciente,
+        token_hash=token_hash,
+        token_preview=token_preview,
+        fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+        creada_por=request.user,
+    )
+    enlace_publico = request.build_absolute_uri(
+        reverse("clinica_preconsulta_publica", args=[token_raw])
+    )
+    telefono = "".join(c for c in (paciente.whatsapp or paciente.telefono or "") if c.isdigit())
+    if len(telefono) == 8:
+        telefono = "504" + telefono
+    mensaje = quote(
+        f"Hola {paciente.primer_nombre or paciente.nombre}. Hospital MIA le comparte su formulario de preconsulta. "
+        f"Complete la informacion antes de su cita en este enlace seguro: {enlace_publico}"
+    )
+    whatsapp_url = f"https://wa.me/{telefono}?text={mensaje}" if telefono else ""
+    return render(
+        request,
+        "clinica/preconsulta_enlace.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "preconsulta": preconsulta,
+            "enlace_publico": enlace_publico,
+            "whatsapp_url": whatsapp_url,
+        },
+    )
+
+
+@login_required
+def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    preconsulta = get_object_or_404(
+        PreconsultaClinica,
+        id=preconsulta_id,
+        empresa=empresa,
+        paciente=paciente,
+    )
+    return render(
+        request,
+        "clinica/preconsulta_detalle.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "preconsulta": preconsulta,
+            "resumen": _resumen_preconsulta(preconsulta),
+        },
+    )
+
+
+@never_cache
+@sensitive_post_parameters()
+def preconsulta_publica(request, token):
+    preconsulta = get_object_or_404(
+        PreconsultaClinica.objects.select_related("empresa", "paciente"),
+        token_hash=hash_token_preconsulta(token),
+        empresa__slug="hospital_mia",
+    )
+    if preconsulta.estado == "completada":
+        return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
+    if not preconsulta.vigente:
+        return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": False}, status=410)
+
+    form = PreconsultaClinicaPublicaForm(
+        request.POST or None,
+        instance=preconsulta,
+        paciente=preconsulta.paciente,
+    )
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            preconsulta = form.save(commit=False)
+            preconsulta.datos_generales = form.datos_generales_limpios()
+            preconsulta.estado = "completada"
+            preconsulta.fecha_completada = timezone.now()
+            preconsulta.ip_completada = _ip_cliente(request)
+            preconsulta.save()
+            _actualizar_paciente_desde_preconsulta(preconsulta.paciente, form)
+        return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
+
+    return render(
+        request,
+        "clinica/preconsulta_publica.html",
+        {"form": form, "preconsulta": preconsulta, "paciente": preconsulta.paciente},
     )
 
 

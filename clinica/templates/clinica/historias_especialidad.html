@@ -46,7 +46,27 @@
         </a>
         {% endfor %}
     </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px;padding:16px;border:1px solid #bcd0e8;border-radius:8px;background:#f6faff;flex-wrap:wrap;">
+        <div><strong style="display:block;color:#102338;">Preconsulta para el paciente</strong><span class="erp-card-muted">Genera un enlace privado, envialo por WhatsApp y recibe las paginas 1 a 5 directamente en el expediente.</span></div>
+        <form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}">
+            {% csrf_token %}
+            <button class="erp-btn" type="submit">Generar enlace seguro</button>
+        </form>
+    </div>
 </section>
+
+{% if preconsultas %}
+<section class="erp-card history-list">
+    <div class="erp-section-heading"><div><div class="erp-kpi-label">Formularios enviados</div><h3>Preconsultas del paciente</h3></div></div>
+    {% for preconsulta in preconsultas %}
+    <div class="history-row">
+        <div><div class="history-date">{{ preconsulta.fecha_creacion|date:"d/m/Y" }}</div><div class="history-meta">{{ preconsulta.fecha_creacion|date:"H:i" }}</div></div>
+        <div><h4>Preconsulta general</h4><div class="history-meta">{% if preconsulta.fecha_completada %}Completada {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% else %}Vence {{ preconsulta.fecha_expiracion|date:"d/m/Y H:i" }}{% endif %}</div><span class="status-pill {% if preconsulta.estado == 'pendiente' %}is-draft{% endif %}">{{ preconsulta.get_estado_display }}</span></div>
+        <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id preconsulta.id %}">Ver resumen</a>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
 
 <section class="erp-card history-list">
     <div class="erp-section-heading"><div><div class="erp-kpi-label">Registro cronologico</div><h3>Historias anteriores</h3></div></div>

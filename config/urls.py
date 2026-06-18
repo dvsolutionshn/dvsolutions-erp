@@ -9,6 +9,7 @@ if settings.ENABLE_DJANGO_ADMIN:
     urlpatterns.append(path(settings.DJANGO_ADMIN_PATH, admin.site.urls))
 
 urlpatterns += [
+    path('formularios/clinica/', include('clinica.public_urls')),
     # Facturación por empresa
     path('<slug:empresa_slug>/dashboard/facturacion/', include('facturacion.urls')),
     path('<slug:empresa_slug>/dashboard/contabilidad/', include('contabilidad.urls')),

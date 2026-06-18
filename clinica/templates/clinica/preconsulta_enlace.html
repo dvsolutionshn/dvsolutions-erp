@@ -1,0 +1,33 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Enlace de preconsulta - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Enlace seguro generado{% endblock %}
+{% block header_description %}Comparte este acceso únicamente con el paciente. Vence en siete días y deja de aceptar cambios al completarse.{% endblock %}
+
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver al historial</a>{% endblock %}
+
+{% block content %}
+<section class="erp-card" style="max-width:920px;margin:0 auto;">
+    <div class="erp-kpi-label">Paciente</div>
+    <h3 style="margin:6px 0;color:#102338;">{{ paciente.nombre }}</h3>
+    <p class="erp-card-muted">Este es el único momento en que el enlace completo se muestra dentro del ERP.</p>
+    <label for="preconsultaLink" style="display:block;margin:22px 0 7px;font-size:11px;font-weight:900;text-transform:uppercase;color:#4e6480;">Enlace de preconsulta</label>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+        <input id="preconsultaLink" value="{{ enlace_publico }}" readonly style="width:100%;box-sizing:border-box;border:1px solid #bed0e6;border-radius:8px;padding:13px;background:#f8fbff;color:#102338;">
+        <button class="erp-btn-secondary" type="button" id="copyPreconsulta">Copiar</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">
+        {% if whatsapp_url %}<a class="erp-btn" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Enviar por WhatsApp</a>{% endif %}
+        <a class="erp-btn-secondary" href="{{ enlace_publico }}" target="_blank" rel="noopener">Vista del paciente</a>
+    </div>
+    <p id="copyStatus" class="erp-card-muted" style="margin-top:14px;"></p>
+</section>
+<script>
+document.getElementById("copyPreconsulta").addEventListener("click", async function(){
+    const input=document.getElementById("preconsultaLink");
+    try{await navigator.clipboard.writeText(input.value);}catch(error){input.select();document.execCommand("copy");}
+    document.getElementById("copyStatus").textContent="Enlace copiado correctamente.";
+});
+</script>
+{% endblock %}

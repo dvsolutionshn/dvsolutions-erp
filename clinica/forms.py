@@ -7,6 +7,7 @@ from .models import (
     HistoriaClinicaEspecialidad,
     MedicamentoPrescrito,
     Paciente,
+    PreconsultaClinica,
     ProfesionalSalud,
     ServicioClinico,
     TratamientoPaciente,
@@ -338,6 +339,194 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
         self.fields["fecha_atencion"].input_formats = ["%Y-%m-%dT%H:%M"]
         for campo, etiqueta in self.CAMPOS_POR_TIPO.get(self.tipo, {}).items():
             self.fields[campo].label = etiqueta
+
+
+ANTECEDENTES_PERSONALES_CHOICES = [
+    ("diabetes", "Diabetes mellitus"),
+    ("asma", "Asma bronquial"),
+    ("tiroides", "Enfermedad tiroidea"),
+    ("hipertension", "Hipertension arterial"),
+    ("infarto_cardiaco", "Infarto al corazon"),
+    ("evento_cerebral", "Infarto o evento cerebral"),
+    ("tromboflebitis", "Tromboflebitis"),
+    ("tromboembolia", "Tromboembolia"),
+    ("tuberculosis", "Tuberculosis"),
+    ("cirrosis", "Cirrosis"),
+    ("pancreatitis", "Pancreatitis"),
+    ("renal", "Enfermedad renal"),
+    ("gastrointestinal", "Enfermedad gastrointestinal"),
+    ("cancer", "Cancer"),
+    ("ovario_poliquistico", "Sindrome de ovario poliquistico"),
+    ("salud_mental", "Condicion psicologica o psiquiatrica"),
+    ("hernia", "Hernia abdominal"),
+    ("obesidad", "Obesidad"),
+    ("otra", "Otra condicion"),
+]
+
+MEDICAMENTOS_HABITUALES_CHOICES = [
+    ("ibuprofeno", "Ibuprofeno"),
+    ("acetaminofen", "Acetaminofen o paracetamol"),
+    ("aspirina", "Aspirina"),
+    ("esteroides", "Esteroides"),
+    ("diclofenaco", "Diclofenaco"),
+    ("naproxeno", "Naproxeno"),
+    ("vitamina_k", "Vitamina K"),
+    ("vitamina_e", "Vitamina E"),
+    ("anticonceptivos", "Anticonceptivos orales"),
+    ("anticoagulantes", "Anticoagulantes"),
+    ("antibioticos", "Antibioticos"),
+    ("alcohol", "Alcohol"),
+    ("sustancias", "Otras sustancias o drogas"),
+    ("otro", "Otro medicamento"),
+]
+
+ANTECEDENTES_FAMILIARES_CHOICES = [
+    ("diabetes", "Diabetes mellitus"),
+    ("asma", "Asma bronquial"),
+    ("tiroides", "Enfermedad tiroidea"),
+    ("hipertension", "Hipertension arterial"),
+    ("cardiaco", "Enfermedad cardiaca"),
+    ("cerebral", "Evento cerebral"),
+    ("trombosis", "Trombosis o tromboembolia"),
+    ("renal", "Enfermedad renal"),
+    ("cancer", "Cancer"),
+    ("obesidad", "Obesidad"),
+    ("otra", "Otra condicion familiar"),
+]
+
+
+class PreconsultaClinicaPublicaForm(forms.ModelForm):
+    primer_nombre = forms.CharField(max_length=80, label="Primer nombre")
+    segundo_nombre = forms.CharField(max_length=80, required=False, label="Segundo nombre")
+    primer_apellido = forms.CharField(max_length=80, label="Primer apellido")
+    segundo_apellido = forms.CharField(max_length=80, required=False, label="Segundo apellido")
+    identidad = forms.CharField(max_length=30, label="Numero de identidad")
+    fecha_nacimiento = forms.DateField(label="Fecha de nacimiento", widget=forms.DateInput(attrs={"type": "date"}))
+    sexo = forms.ChoiceField(label="Sexo", choices=Paciente.SEXO_CHOICES)
+    estado_civil = forms.ChoiceField(label="Estado civil", choices=Paciente.ESTADO_CIVIL_CHOICES)
+    correo = forms.EmailField(required=False, label="Correo electronico")
+    telefono = forms.CharField(max_length=30, label="Telefono o WhatsApp")
+    direccion = forms.CharField(required=False, label="Lugar de residencia", widget=forms.Textarea(attrs={"rows": 2}))
+    lugar_nacimiento = forms.CharField(max_length=160, required=False, label="Lugar de nacimiento")
+    ocupacion = forms.CharField(max_length=160, required=False, label="Profesion u ocupacion")
+    lugar_trabajo = forms.CharField(max_length=180, required=False, label="Lugar de trabajo")
+    redes_sociales = forms.CharField(max_length=180, required=False, label="Redes sociales")
+    informante = forms.CharField(max_length=180, required=False, label="Persona que proporciona la informacion")
+    contacto_emergencia = forms.CharField(max_length=180, required=False, label="Contacto de emergencia")
+    telefono_emergencia = forms.CharField(max_length=30, required=False, label="Telefono de emergencia")
+    referido_por = forms.CharField(max_length=180, required=False, label="Como conocio Hospital MIA")
+    antecedentes_personales = forms.MultipleChoiceField(
+        required=False,
+        choices=ANTECEDENTES_PERSONALES_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label="Condiciones diagnosticadas por un medico",
+    )
+    medicamentos_habituales = forms.MultipleChoiceField(
+        required=False,
+        choices=MEDICAMENTOS_HABITUALES_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label="Medicamentos o sustancias de uso habitual",
+    )
+    antecedentes_familiares = forms.MultipleChoiceField(
+        required=False,
+        choices=ANTECEDENTES_FAMILIARES_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label="Antecedentes familiares",
+    )
+    consentimiento_datos = forms.BooleanField(
+        required=True,
+        label="Confirmo que la informacion es correcta y autorizo su uso para mi atencion medica.",
+    )
+
+    class Meta:
+        model = PreconsultaClinica
+        fields = [
+            "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+            "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono",
+            "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo", "redes_sociales",
+            "informante", "contacto_emergencia", "telefono_emergencia", "referido_por",
+            "motivo_consulta", "funciones_organicas", "funciones_detalle", "revision_sistemas",
+            "revision_sistemas_detalle", "antecedentes_hospitalarios",
+            "antecedentes_hospitalarios_detalle", "antecedentes_personales",
+            "antecedentes_personales_detalle", "medicamentos_habituales",
+            "medicamentos_habituales_detalle", "antecedentes_familiares",
+            "antecedentes_familiares_detalle", "dieta", "ejercicio", "habitos", "alergias",
+            "antecedentes_infecciosos", "consentimiento_datos",
+        ]
+        widgets = {
+            "motivo_consulta": forms.Textarea(attrs={"rows": 3, "placeholder": "Cuentenos brevemente que desea consultar o que procedimiento le interesa."}),
+            "funciones_organicas": forms.RadioSelect,
+            "funciones_detalle": forms.Textarea(attrs={"rows": 2}),
+            "revision_sistemas": forms.RadioSelect,
+            "revision_sistemas_detalle": forms.Textarea(attrs={"rows": 2}),
+            "antecedentes_hospitalarios_detalle": forms.Textarea(attrs={"rows": 3}),
+            "antecedentes_personales_detalle": forms.Textarea(attrs={"rows": 3}),
+            "medicamentos_habituales_detalle": forms.Textarea(attrs={"rows": 3}),
+            "antecedentes_familiares_detalle": forms.Textarea(attrs={"rows": 3}),
+            "dieta": forms.Textarea(attrs={"rows": 2}),
+            "ejercicio": forms.Textarea(attrs={"rows": 2}),
+            "habitos": forms.Textarea(attrs={"rows": 2}),
+            "alergias": forms.Textarea(attrs={"rows": 2}),
+            "antecedentes_infecciosos": forms.Textarea(attrs={"rows": 2}),
+        }
+        labels = {
+            "motivo_consulta": "Motivo principal de consulta",
+            "funciones_organicas": "Apetito, sueno, sed, miccion y evacuaciones",
+            "funciones_detalle": "Explique cualquier alteracion",
+            "revision_sistemas": "Revision general de organos y sistemas",
+            "revision_sistemas_detalle": "Explique sintomas o alteraciones",
+            "antecedentes_hospitalarios": "He tenido hospitalizaciones, accidentes, fracturas o cirugias previas",
+            "antecedentes_hospitalarios_detalle": "Detalle fechas, lugar, motivo y procedimiento",
+            "antecedentes_personales_detalle": "Detalle condiciones seleccionadas u otras enfermedades",
+            "medicamentos_habituales_detalle": "Indique nombre, dosis, frecuencia y desde cuando",
+            "antecedentes_familiares_detalle": "Indique familiar y condicion",
+            "dieta": "Como describe su alimentacion",
+            "ejercicio": "Actividad fisica, frecuencia y duracion",
+            "habitos": "Habitos relevantes",
+            "alergias": "Alergias a medicamentos, alimentos o materiales",
+            "antecedentes_infecciosos": "Enfermedades infecciosas previas, incluido COVID-19",
+        }
+
+    def __init__(self, *args, paciente=None, **kwargs):
+        self.paciente = paciente
+        super().__init__(*args, **kwargs)
+        if paciente and not self.is_bound:
+            for campo in [
+                "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+                "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "direccion",
+                "lugar_nacimiento", "ocupacion", "contacto_emergencia", "telefono_emergencia",
+            ]:
+                self.fields[campo].initial = getattr(paciente, campo, None)
+            self.fields["telefono"].initial = paciente.whatsapp or paciente.telefono
+            self.fields["alergias"].initial = paciente.alergias
+        self.fields["identidad"].widget.attrs.update({
+            "inputmode": "numeric",
+            "pattern": "[0-9]*",
+            "placeholder": "Solo numeros, sin guiones",
+        })
+
+    def clean_identidad(self):
+        identidad = (self.cleaned_data.get("identidad") or "").strip()
+        if not identidad.isdigit():
+            raise forms.ValidationError("Utilice solamente numeros, sin espacios ni guiones.")
+        if self.paciente and Paciente.objects.filter(
+            empresa=self.paciente.empresa,
+            identidad=identidad,
+        ).exclude(pk=self.paciente.pk).exists():
+            raise forms.ValidationError("Este numero de identidad ya pertenece a otro expediente.")
+        return identidad
+
+    def datos_generales_limpios(self):
+        campos = [
+            "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+            "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono",
+            "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo", "redes_sociales",
+            "informante", "contacto_emergencia", "telefono_emergencia", "referido_por",
+        ]
+        datos = {campo: self.cleaned_data.get(campo) for campo in campos}
+        if datos.get("fecha_nacimiento"):
+            datos["fecha_nacimiento"] = datos["fecha_nacimiento"].isoformat()
+        return datos
 
 
 class MedicamentoPrescritoForm(BaseClinicaForm):
