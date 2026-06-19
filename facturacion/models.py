@@ -49,7 +49,7 @@ class ConfiguracionFacturacionEmpresa(models.Model):
     mostrar_descuentos = models.BooleanField(default=True)
     mostrar_notas_linea = models.BooleanField(default=True)
     precios_incluyen_impuesto = models.BooleanField(
-        default=False,
+        default=True,
         help_text='El precio del catalogo se interpreta como total final con impuesto incluido.',
     )
     leyenda_factura = models.CharField(max_length=255, blank=True, null=True)

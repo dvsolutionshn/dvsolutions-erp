@@ -306,7 +306,7 @@ class ProductoForm(forms.ModelForm):
         if self.empresa:
             configuracion_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
             configuracion_facturacion = ConfiguracionFacturacionEmpresa.objects.filter(empresa=self.empresa).first()
-            if configuracion_facturacion and configuracion_facturacion.precios_incluyen_impuesto:
+            if configuracion_facturacion is None or configuracion_facturacion.precios_incluyen_impuesto:
                 self.fields['precio'].label = 'Precio final (impuesto incluido)'
                 self.fields['precio'].help_text = 'Escribe el total que pagara el cliente; el sistema separara automaticamente la base y el impuesto.'
             self.mostrar_bodega_inicial = bool(configuracion_avanzada.usa_bodegas_internas)

@@ -54,7 +54,7 @@ POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
 def _precios_incluyen_impuesto(empresa):
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(
         empresa=empresa,
-        defaults={"precios_incluyen_impuesto": empresa.slug == "medical_spa"},
+        defaults={"precios_incluyen_impuesto": True},
     )
     return configuracion.precios_incluyen_impuesto
 
@@ -129,7 +129,7 @@ def configuracion_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(
         empresa=empresa,
-        defaults={"precios_incluyen_impuesto": empresa.slug == "medical_spa"},
+        defaults={"precios_incluyen_impuesto": True},
     )
     permite_plantilla_notas_extensas = _empresa_permite_plantilla_notas_extensas(empresa)
     permite_plantilla_independiente = _empresa_permite_plantilla_independiente(empresa)

@@ -301,11 +301,11 @@ class FacturacionTests(TestCase):
         factura = Factura.objects.get(cliente__nombre="Consumidor Final")
         self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
         self.assertEqual(factura.estado, "emitida")
-        self.assertEqual(factura.total, Decimal("230.00"))
+        self.assertEqual(factura.total, Decimal("200.00"))
         self.assertEqual(factura.estado_pago, "pagado")
         pago = PagoFactura.objects.get(factura=factura)
-        self.assertEqual(pago.monto, Decimal("230.00"))
-        self.assertTrue(ReciboPago.objects.filter(pago=pago, monto=Decimal("230.00")).exists())
+        self.assertEqual(pago.monto, Decimal("200.00"))
+        self.assertTrue(ReciboPago.objects.filter(pago=pago, monto=Decimal("200.00")).exists())
         self.assertTrue(
             AsientoContable.objects.filter(
                 empresa=self.empresa,
@@ -415,8 +415,8 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         resultado = response.json()
         self.assertTrue(resultado["ok"])
-        self.assertEqual(resultado["total"], "230.00")
-        self.assertEqual(resultado["cambio"], "20.00")
+        self.assertEqual(resultado["total"], "200.00")
+        self.assertEqual(resultado["cambio"], "50.00")
         factura = Factura.objects.get(pk=resultado["factura_id"])
         pago = PagoFactura.objects.get(factura=factura)
         self.assertIn("Recibido L. 250.00", pago.referencia)
@@ -638,7 +638,7 @@ class FacturacionTests(TestCase):
             {
                 "payload": json.dumps({
                     "metodo": "efectivo",
-                    "monto_recibido": "200.00",
+                    "monto_recibido": "199.99",
                     "items": [
                         {
                             "producto_id": self.producto.id,
