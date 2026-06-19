@@ -497,9 +497,10 @@ class FacturacionTests(TestCase):
         self.assertEqual(pago.cuenta_financiera.tipo, "banco")
 
     def test_cierres_caja_respeta_permiso_del_rol(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
-        configuracion.usa_cierre_caja = True
-        configuracion.save(update_fields=["usa_cierre_caja"])
+        self.assertFalse(configuracion.usa_cierre_caja)
         self.rol_total.puede_cierres_caja = False
         self.rol_total.save(update_fields=["puede_cierres_caja"])
 

@@ -59,6 +59,13 @@ def _precios_incluyen_impuesto(empresa):
     return configuracion.precios_incluyen_impuesto
 
 
+def _empresa_usa_cierre_caja(empresa):
+    return bool(
+        empresa.tiene_modulo_activo("punto_venta")
+        or ConfiguracionAvanzadaEmpresa.para_empresa(empresa).usa_cierre_caja
+    )
+
+
 def _cuentas_financieras_activas_para_pago(empresa):
     asegurar_cuentas_financieras_base_honduras(empresa)
     cuentas = CuentaFinanciera.objects.filter(
@@ -6542,8 +6549,7 @@ def reporte_ingresos_bancos(request, empresa_slug):
 @login_required
 def cierres_caja(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_cierre_caja:
+    if not _empresa_usa_cierre_caja(empresa):
         messages.error(request, "El cierre de caja no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
 
@@ -6621,8 +6627,7 @@ def cierres_caja(request, empresa_slug):
 @login_required
 def ver_cierre_caja(request, empresa_slug, cierre_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_cierre_caja:
+    if not _empresa_usa_cierre_caja(empresa):
         messages.error(request, "El cierre de caja no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
 
@@ -6663,8 +6668,7 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
 @login_required
 def resumen_diario_caja(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_cierre_caja:
+    if not _empresa_usa_cierre_caja(empresa):
         messages.error(request, "El resumen diario de caja no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
 

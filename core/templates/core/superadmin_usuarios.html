@@ -35,7 +35,7 @@
                 <tr>
                     <th>Persona y correo</th>
                     <th>Empresa</th>
-                    <th>Roles</th>
+                    <th>Rol y permisos</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
@@ -48,11 +48,11 @@
                     <td>
                         {% if usuario.is_superuser %}<span class="erp-badge info">Superadmin</span>{% endif %}
                         {% if usuario.es_administrador_empresa %}<span class="erp-badge warning">Admin Empresa</span>{% endif %}
+                        {% if usuario.rol_sistema %}<span class="erp-badge success">{{ usuario.rol_sistema.nombre }}</span>{% endif %}
                         {% for grupo in usuario.groups.all %}
                             <span class="erp-badge neutral">{{ grupo.name }}</span>
-                        {% empty %}
-                            <span class="erp-badge neutral">Sin roles</span>
                         {% endfor %}
+                        {% if not usuario.is_superuser and not usuario.es_administrador_empresa and not usuario.rol_sistema and not usuario.groups.all %}<span class="erp-badge neutral">Sin rol asignado</span>{% endif %}
                     </td>
                     <td>
                         {% if usuario.is_active %}

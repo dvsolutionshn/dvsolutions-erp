@@ -1263,7 +1263,7 @@ def superadmin_empresa_edit(request, empresa_id):
 
 @superadmin_required
 def superadmin_usuarios(request):
-    usuarios = Usuario.objects.select_related("empresa").prefetch_related(
+    usuarios = Usuario.objects.select_related("empresa", "rol_sistema").prefetch_related(
         "groups",
         Prefetch(
             "tokens_acceso",

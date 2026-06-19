@@ -1127,3 +1127,40 @@ class RolSistemaPermisosTests(TestCase):
             permiso_facturacion_desde_ruta("cierres-caja/resumen-diario/"),
             "puede_cierres_caja",
         )
+
+    def test_lista_usuarios_muestra_rol_sistema_asignado(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Roles",
+            slug="empresa-roles",
+            rtn="08011999000888",
+        )
+        rol = RolSistema.objects.create(
+            nombre="Facturacion y Caja",
+            codigo="facturacion-caja",
+            puede_facturas=True,
+            puede_punto_venta=True,
+            puede_cierres_caja=True,
+        )
+        Usuario.objects.create_user(
+            username="krystel-prueba",
+            email="krystel@example.com",
+            password="pass12345",
+            empresa=empresa,
+            rol_sistema=rol,
+        )
+        superadmin = Usuario.objects.create_superuser(
+            username="superadmin-roles",
+            email="superadmin@example.com",
+            password="pass12345",
+        )
+        self.client.force_login(superadmin)
+
+        response = self.client.get(reverse("superadmin_usuarios"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Facturacion y Caja")
+        usuario_listado = next(
+            usuario for usuario in response.context["usuarios"]
+            if usuario.email == "krystel@example.com"
+        )
+        self.assertEqual(usuario_listado.rol_sistema, rol)

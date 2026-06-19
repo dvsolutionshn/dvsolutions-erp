@@ -234,9 +234,9 @@ class UsuarioControlCreateForm(forms.ModelForm):
     groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all().order_by("name"),
         required=False,
-        label="Roles",
+        label="Grupos complementarios",
         widget=forms.CheckboxSelectMultiple,
-        help_text="Asigna uno o varios roles basados en grupos de Django.",
+        help_text="Opcional. No reemplaza el Rol del sistema que controla los permisos del ERP.",
     )
 
     class Meta:
@@ -265,7 +265,7 @@ class UsuarioControlCreateForm(forms.ModelForm):
             "es_administrador_empresa": ("Es administrador de empresa", "Activalo solo si esta persona puede ver todo dentro de su empresa."),
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si realmente quieres permitir acceso al admin tecnico."),
             "is_superuser": ("Es superadministrador", "Reserva esta opcion solo para ti o para cuentas maestras internas."),
-            "groups": ("Roles complementarios", "Roles adicionales basados en grupos de Django, utiles para crecer despues."),
+            "groups": ("Grupos complementarios", "Opcional. El acceso funcional se controla con Rol del sistema."),
             "modo_creacion": ("Forma de acceso", "Puedes enviar una invitacion o entregar una contrasena inicial inmediatamente."),
             "password1": ("Contrasena inicial", "Solo se usa en la creacion rapida. El usuario podra cambiarla despues."),
             "password2": ("Confirmar contrasena", ""),
@@ -327,7 +327,7 @@ class UsuarioControlUpdateForm(forms.ModelForm):
     groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all().order_by("name"),
         required=False,
-        label="Roles",
+        label="Grupos complementarios",
         widget=forms.CheckboxSelectMultiple,
     )
     class Meta:
@@ -362,7 +362,7 @@ class UsuarioControlUpdateForm(forms.ModelForm):
             "is_active": ("Usuario activo", "Si lo desactivas, la cuenta queda bloqueada sin borrar el historial."),
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si quieres permitir el ingreso al admin tecnico."),
             "is_superuser": ("Es superadministrador", "Esta opcion da control total del sistema."),
-            "groups": ("Roles complementarios", "Roles adicionales basados en grupos de Django."),
+            "groups": ("Grupos complementarios", "Opcional. El acceso funcional se controla con Rol del sistema."),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:

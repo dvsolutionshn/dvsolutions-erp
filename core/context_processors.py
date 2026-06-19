@@ -58,7 +58,7 @@ def erp_access(request):
         "expediente_clinico": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_expediente_clinico"),
         "tratamientos_clinicos": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_tratamientos_clinicos"),
         "configuracion_clinica": clinica_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_configuracion_clinica"),
-        "usa_cierre_caja": bool(config_avanzada and config_avanzada.usa_cierre_caja),
+        "usa_cierre_caja": bool(pos_activa or (config_avanzada and config_avanzada.usa_cierre_caja)),
         "usa_pagos_mixtos": bool(config_avanzada and config_avanzada.usa_pagos_mixtos),
         "usa_reporte_bancos": bool(config_avanzada and config_avanzada.usa_reporte_bancos),
         "usa_inventario_farmaceutico": bool(clinica_activa and config_avanzada and config_avanzada.usa_inventario_farmaceutico),
