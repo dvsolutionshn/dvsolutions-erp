@@ -24,6 +24,8 @@ def erp_access(request):
         "modulo_citas": citas_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_citas"),
         "modulo_clinica": clinica_activa and getattr(user, "tiene_alguna_permision_clinica", False),
         "facturas": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_facturas"),
+        "configuracion_facturacion": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_configuracion_facturacion"),
+        "cierres_caja": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_cierres_caja"),
         "clientes": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_clientes"),
         "productos": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_productos"),
         "proveedores": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_proveedores"),

@@ -39,6 +39,8 @@ class FacturacionTests(TestCase):
             codigo="admin-operativo",
             activo=True,
             puede_punto_venta=True,
+            puede_configuracion_facturacion=True,
+            puede_cierres_caja=True,
             puede_facturas=True,
             puede_clientes=True,
             puede_productos=True,
@@ -493,6 +495,25 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         pago = PagoFactura.objects.get(factura_id=response.json()["factura_id"])
         self.assertEqual(pago.cuenta_financiera.tipo, "banco")
+
+    def test_cierres_caja_respeta_permiso_del_rol(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_cierre_caja = True
+        configuracion.save(update_fields=["usa_cierre_caja"])
+        self.rol_total.puede_cierres_caja = False
+        self.rol_total.save(update_fields=["puede_cierres_caja"])
+
+        bloqueado = self.client.get(reverse("cierres_caja", args=[self.empresa.slug]))
+        self.assertRedirects(
+            bloqueado,
+            reverse("dashboard", args=[self.empresa.slug]),
+            fetch_redirect_response=False,
+        )
+
+        self.rol_total.puede_cierres_caja = True
+        self.rol_total.save(update_fields=["puede_cierres_caja"])
+        permitido = self.client.get(reverse("cierres_caja", args=[self.empresa.slug]))
+        self.assertEqual(permitido.status_code, 200)
 
     def test_resumen_caja_cuenta_aperturas_solo_por_efectivo(self):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)

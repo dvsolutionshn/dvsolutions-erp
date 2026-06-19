@@ -1,6 +1,7 @@
 FACTURACION_PERMISSION_MAP = [
     ("pos/", "puede_punto_venta"),
-    ("configuracion/", "puede_facturas"),
+    ("configuracion/", "puede_configuracion_facturacion"),
+    ("cierres-caja/", "puede_cierres_caja"),
     ("inventario/compras/", "puede_compras"),
     ("libro-compras/", "puede_compras"),
     ("inventario/entrada/", "puede_inventario"),

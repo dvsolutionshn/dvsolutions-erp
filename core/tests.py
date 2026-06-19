@@ -1106,6 +1106,8 @@ class RolSistemaPermisosTests(TestCase):
         self.assertTrue(permisos_modelo)
         self.assertEqual(permisos_modelo, permisos_modelo.intersection(form.fields))
         self.assertIn("puede_punto_venta", form.fields)
+        self.assertIn("puede_configuracion_facturacion", form.fields)
+        self.assertIn("puede_cierres_caja", form.fields)
         self.assertIn("puede_crm", form.fields)
         self.assertIn("puede_citas", form.fields)
         self.assertIn("puede_clinica", form.fields)
@@ -1114,4 +1116,14 @@ class RolSistemaPermisosTests(TestCase):
         self.assertEqual(
             permiso_facturacion_desde_ruta("pos/"),
             "puede_punto_venta",
+        )
+
+    def test_configuracion_y_cierres_exigen_permisos_explicitos(self):
+        self.assertEqual(
+            permiso_facturacion_desde_ruta("configuracion/"),
+            "puede_configuracion_facturacion",
+        )
+        self.assertEqual(
+            permiso_facturacion_desde_ruta("cierres-caja/resumen-diario/"),
+            "puede_cierres_caja",
         )

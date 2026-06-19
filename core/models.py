@@ -29,6 +29,8 @@ class RolSistema(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     activo = models.BooleanField(default=True)
     puede_punto_venta = models.BooleanField(default=False)
+    puede_configuracion_facturacion = models.BooleanField(default=False)
+    puede_cierres_caja = models.BooleanField(default=False)
     puede_facturas = models.BooleanField(default=False)
     puede_clientes = models.BooleanField(default=False)
     puede_productos = models.BooleanField(default=False)
@@ -98,6 +100,8 @@ class RolSistema(models.Model):
             getattr(self, permiso)
             for permiso in [
                 "puede_punto_venta",
+                "puede_configuracion_facturacion",
+                "puede_cierres_caja",
                 "puede_facturas",
                 "puede_clientes",
                 "puede_productos",

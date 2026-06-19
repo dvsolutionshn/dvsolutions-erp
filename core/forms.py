@@ -487,6 +487,8 @@ class RolSistemaForm(forms.ModelForm):
             "descripcion": ("Descripcion", ""),
             "activo": ("Rol activo", ""),
             "puede_punto_venta": ("Puede entrar a Punto de Venta", "Autoriza el acceso operativo a caja y venta directa."),
+            "puede_configuracion_facturacion": ("Puede configurar Facturacion", "Autoriza plantillas, identidad documental y reglas comerciales."),
+            "puede_cierres_caja": ("Puede gestionar Cierres de Caja", "Autoriza cierres por cajero, detalle y resumen diario."),
             "puede_facturas": ("Puede entrar a facturas", ""),
             "puede_clientes": ("Puede entrar a clientes", ""),
             "puede_productos": ("Puede entrar a productos", ""),
