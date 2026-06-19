@@ -270,6 +270,15 @@ class AsientoContable(models.Model):
                 condition=models.Q(numero__isnull=False) & ~models.Q(numero__exact=""),
                 name="unique_asiento_numero_por_empresa",
             ),
+            models.UniqueConstraint(
+                fields=["empresa", "documento_tipo", "documento_id", "evento"],
+                condition=(
+                    models.Q(documento_id__isnull=False)
+                    & ~models.Q(documento_tipo__exact="")
+                    & ~models.Q(evento__exact="")
+                ),
+                name="unique_asiento_evento_documento_empresa",
+            ),
         ]
 
     def __str__(self):

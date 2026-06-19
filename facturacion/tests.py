@@ -1170,7 +1170,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_banco = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="1102",
@@ -1207,7 +1207,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_banco = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="1102",
@@ -1252,7 +1252,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_operativa = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="1102",
@@ -1308,7 +1308,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_isv = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="1103",
@@ -1364,7 +1364,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_operativa = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="1102",
@@ -1405,7 +1405,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_banco = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="1102",
@@ -1440,7 +1440,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_banco = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="1102",
@@ -1487,7 +1487,7 @@ class FacturacionTests(TestCase):
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_banco = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="110201",
@@ -1558,15 +1558,16 @@ class FacturacionTests(TestCase):
         )
         self.assertEqual(asientos.count(), 1)
         asiento = asientos.first()
+        factura.cliente.refresh_from_db()
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, debe=Decimal("60.00")).exists())
-        self.assertTrue(asiento.lineas.filter(cuenta=cuenta_clientes, haber=Decimal("60.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta=factura.cliente.cuenta_contable, haber=Decimal("60.00")).exists())
 
     def test_editar_pago_anterior_recontabiliza_todos_los_pagos(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
             codigo="contabilidad",
             defaults={"nombre": "Contabilidad"},
         )
-        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_contabilidad, activo=True)
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
         cuenta_banco = CuentaContable.objects.create(
             empresa=self.empresa,
             codigo="110201",
@@ -1655,13 +1656,14 @@ class FacturacionTests(TestCase):
                 lineas__debe=Decimal("45.00"),
             ).exists()
         )
+        factura.cliente.refresh_from_db()
         self.assertTrue(
             AsientoContable.objects.filter(
                 empresa=self.empresa,
                 documento_tipo="pago_factura",
                 documento_id=pago_2.id,
                 evento="cobro",
-                lineas__cuenta=cuenta_clientes,
+                lineas__cuenta=factura.cliente.cuenta_contable,
                 lineas__haber=Decimal("50.00"),
             ).exists()
         )
@@ -2004,7 +2006,7 @@ class FacturacionTests(TestCase):
         self.assertIsNotNone(cliente.cuenta_contable_id)
         self.assertEqual(cliente.cuenta_contable.tipo, "activo")
         self.assertTrue(cliente.cuenta_contable.acepta_movimientos)
-        self.assertTrue(cliente.cuenta_contable.codigo.startswith("1110."))
+        self.assertTrue(cliente.cuenta_contable.codigo.startswith("111001."))
 
     def test_crear_cliente_rapido_desde_factura_retorna_payload(self):
         response = self.client.post(
@@ -3338,7 +3340,8 @@ class FacturacionTests(TestCase):
         )
         self.assertEqual(asientos.count(), 1)
         asiento = asientos.get()
-        self.assertTrue(asiento.lineas.filter(cuenta__codigo="1110", haber=Decimal("57.50")).exists())
+        nota.cliente.refresh_from_db()
+        self.assertTrue(asiento.lineas.filter(cuenta=nota.cliente.cuenta_contable, haber=Decimal("57.50")).exists())
 
     def test_crear_factura_emitida_descuenta_inventario(self):
         InventarioProducto.objects.create(

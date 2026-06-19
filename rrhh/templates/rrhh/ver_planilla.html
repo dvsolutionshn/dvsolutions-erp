@@ -45,13 +45,35 @@
             </div>
         </div>
         <div class="erp-document-actions">
+            {% if periodo.estado == "borrador" or periodo.estado == "calculada" %}
             <form method="post" action="{% url 'generar_planilla' empresa.slug periodo.id %}">
                 {% csrf_token %}
                 <button class="erp-btn" type="submit">Generar / Recalcular</button>
             </form>
+            {% endif %}
+            {% if periodo.estado == "calculada" %}
+            <form method="post" action="{% url 'cerrar_planilla' empresa.slug periodo.id %}">
+                {% csrf_token %}
+                <button class="erp-btn" type="submit">Cerrar y contabilizar</button>
+            </form>
+            {% endif %}
+            {% if periodo.estado == "cerrada" %}
+            <form method="post" action="{% url 'pagar_planilla' empresa.slug periodo.id %}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                {% csrf_token %}
+                <select name="cuenta_financiera" required>
+                    <option value="">Caja o banco del pago</option>
+                    {% for cuenta in cuentas_financieras %}<option value="{{ cuenta.id }}">{{ cuenta.nombre }} · {{ cuenta.cuenta_contable.codigo }}</option>{% endfor %}
+                </select>
+                <button class="erp-btn" type="submit">Registrar pago contable</button>
+            </form>
+            {% endif %}
             <a class="erp-btn-secondary" href="{% url 'movimientos_planilla' empresa.slug %}">Bonos y deducciones</a>
             <a class="erp-btn-secondary" href="{% url 'vacaciones_rrhh' empresa.slug %}">Vacaciones</a>
         </div>
+        {% if asiento_cierre or asiento_pago %}<div class="erp-soft-panel" style="margin-top:14px;">
+            {% if asiento_cierre %}<span class="erp-badge success">Devengo {{ asiento_cierre.numero }}</span>{% endif %}
+            {% if asiento_pago %}<span class="erp-badge success">Pago {{ asiento_pago.numero }}</span>{% endif %}
+        </div>{% endif %}
     </section>
 
     <section class="erp-card">

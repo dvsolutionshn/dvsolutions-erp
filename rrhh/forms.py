@@ -66,7 +66,7 @@ class EmpleadoForm(forms.ModelForm):
 class PeriodoPlanillaForm(forms.ModelForm):
     class Meta:
         model = PeriodoPlanilla
-        fields = ["nombre", "frecuencia", "fecha_inicio", "fecha_fin", "fecha_pago", "incluir_14avo", "estado"]
+        fields = ["nombre", "frecuencia", "fecha_inicio", "fecha_fin", "fecha_pago", "incluir_14avo"]
         widgets = {
             "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
             "fecha_fin": forms.DateInput(attrs={"type": "date"}),

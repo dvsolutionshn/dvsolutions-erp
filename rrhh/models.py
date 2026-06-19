@@ -143,6 +143,13 @@ class PeriodoPlanilla(models.Model):
     incluir_14avo = models.BooleanField(default=False)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="borrador")
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    cuenta_financiera_pago = models.ForeignKey(
+        'contabilidad.CuentaFinanciera',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='planillas_pagadas',
+    )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:

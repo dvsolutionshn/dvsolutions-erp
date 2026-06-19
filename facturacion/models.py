@@ -255,6 +255,7 @@ class Producto(models.Model):
     unidad_medida = models.CharField(max_length=20, choices=UNIDADES_MEDIDA, default='unidad')
     descripcion = models.TextField(blank=True, null=True)
     precio = models.DecimalField(max_digits=12, decimal_places=2)
+    costo_promedio = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     fecha_referencia = models.DateField(blank=True, null=True)
     fecha_alerta = models.DateField(blank=True, null=True)
     nota_fecha = models.CharField(max_length=200, blank=True, null=True)
@@ -1679,6 +1680,7 @@ class LineaFactura(models.Model):
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
     precio_incluye_impuesto = models.BooleanField(default=False)
+    costo_unitario = models.DecimalField(max_digits=12, decimal_places=4, default=0)
 
     comentario = models.TextField(blank=True, null=True)
 
@@ -1701,6 +1703,9 @@ class LineaFactura(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+
+        if self._state.adding and self.producto_id and not self.costo_unitario:
+            self.costo_unitario = self.producto.costo_promedio or Decimal('0')
 
         subtotal_base = (self.cantidad * self.precio_unitario).quantize(DOS_DECIMALES)
         descuento = self.descuento_porcentaje or Decimal('0')
@@ -1747,6 +1752,7 @@ class LineaNotaCredito(models.Model):
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
     precio_incluye_impuesto = models.BooleanField(default=False)
+    costo_unitario = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     comentario = models.TextField(blank=True, null=True)
     descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0, blank=True, null=True)
     descuento_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -1765,6 +1771,9 @@ class LineaNotaCredito(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+
+        if self._state.adding and self.producto_id and not self.costo_unitario:
+            self.costo_unitario = self.producto.costo_promedio or Decimal('0')
 
         subtotal_base = (self.cantidad * self.precio_unitario).quantize(DOS_DECIMALES)
         descuento = self.descuento_porcentaje or Decimal('0')

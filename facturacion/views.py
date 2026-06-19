@@ -1792,6 +1792,17 @@ def _aplicar_compra_documento(compra):
     for linea in compra.lineas.select_related('producto').all():
         if not linea.producto.controla_inventario:
             continue
+        inventario = _obtener_inventario_producto(linea.producto)
+        cantidad_anterior = Decimal(inventario.existencias or 0)
+        valor_anterior = cantidad_anterior * Decimal(linea.producto.costo_promedio or 0)
+        cantidad_nueva = cantidad_anterior + Decimal(linea.cantidad or 0)
+        if cantidad_nueva > 0:
+            costo_nuevo = (
+                (valor_anterior + (Decimal(linea.cantidad) * Decimal(linea.costo_unitario)))
+                / cantidad_nueva
+            ).quantize(Decimal("0.0001"))
+            Producto.objects.filter(pk=linea.producto_id).update(costo_promedio=costo_nuevo)
+            linea.producto.costo_promedio = costo_nuevo
         _registrar_movimiento_inventario(
             empresa=compra.empresa,
             producto=linea.producto,
@@ -1819,6 +1830,19 @@ def _revertir_compra_documento(compra):
     for linea in compra.lineas.select_related('producto').all():
         if not linea.producto.controla_inventario:
             continue
+        inventario = _obtener_inventario_producto(linea.producto)
+        cantidad_anterior = Decimal(inventario.existencias or 0)
+        cantidad_nueva = cantidad_anterior - Decimal(linea.cantidad or 0)
+        valor_nuevo = (
+            (cantidad_anterior * Decimal(linea.producto.costo_promedio or 0))
+            - (Decimal(linea.cantidad or 0) * Decimal(linea.costo_unitario or 0))
+        )
+        costo_nuevo = (
+            max(valor_nuevo, Decimal("0.00")) / cantidad_nueva
+            if cantidad_nueva > 0 else Decimal("0.00")
+        ).quantize(Decimal("0.0001"))
+        Producto.objects.filter(pk=linea.producto_id).update(costo_promedio=costo_nuevo)
+        linea.producto.costo_promedio = costo_nuevo
         _registrar_movimiento_inventario(
             empresa=compra.empresa,
             producto=linea.producto,
@@ -4537,6 +4561,7 @@ def generar_nota_credito_desde_factura(request, empresa_slug, factura_id):
             cantidad=linea.cantidad,
             precio_unitario=linea.precio_unitario,
             precio_incluye_impuesto=linea.precio_incluye_impuesto,
+            costo_unitario=linea.costo_unitario,
             descuento_porcentaje=linea.descuento_porcentaje,
             comentario=linea.comentario,
             impuesto=linea.impuesto,

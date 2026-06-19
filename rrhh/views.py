@@ -2,6 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -9,6 +11,8 @@ from django.views.decorators.http import require_POST
 from weasyprint import HTML
 
 from core.models import Empresa
+from contabilidad.models import AsientoContable, CuentaFinanciera
+from contabilidad.services import registrar_asiento_planilla_cerrada, registrar_asiento_planilla_pagada
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_mensaje_whatsapp_texto
 
@@ -160,6 +164,9 @@ def ver_planilla(request, empresa_slug, periodo_id):
         "periodo": periodo,
         "detalles": periodo.detalles.select_related("empleado"),
         "config_crm": config_crm,
+        "cuentas_financieras": CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related("cuenta_contable"),
+        "asiento_cierre": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="cierre").first(),
+        "asiento_pago": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="pago").first(),
     })
 
 
@@ -168,8 +175,63 @@ def ver_planilla(request, empresa_slug, periodo_id):
 def generar_planilla_view(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
     periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
+    if periodo.estado in {"cerrada", "pagada"}:
+        messages.error(request, "Una planilla cerrada o pagada no puede recalcularse.")
+        return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
     creados = generar_planilla(periodo)
     messages.success(request, f"Planilla calculada correctamente para {creados} empleado(s).")
+    return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
+
+
+@login_required
+@require_POST
+def cerrar_planilla(request, empresa_slug, periodo_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
+    if periodo.estado == "pagada":
+        messages.error(request, "La planilla ya fue pagada.")
+    elif periodo.estado == "cerrada":
+        messages.info(request, "La planilla ya estaba cerrada.")
+    elif periodo.estado != "calculada" or not periodo.detalles.exists():
+        messages.error(request, "Primero genera y revisa la planilla antes de cerrarla.")
+    else:
+        try:
+            with transaction.atomic():
+                periodo.estado = "cerrada"
+                periodo.save(update_fields=["estado"])
+                registrar_asiento_planilla_cerrada(periodo)
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        else:
+            messages.success(request, "Planilla cerrada y devengada contablemente.")
+    return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
+
+
+@login_required
+@require_POST
+def pagar_planilla(request, empresa_slug, periodo_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
+    cuenta = CuentaFinanciera.objects.filter(
+        empresa=empresa, activa=True, id=request.POST.get("cuenta_financiera")
+    ).select_related("cuenta_contable").first()
+    if periodo.estado == "pagada":
+        messages.info(request, "La planilla ya estaba pagada.")
+    elif periodo.estado != "cerrada":
+        messages.error(request, "La planilla debe estar cerrada antes de pagarla.")
+    elif not cuenta:
+        messages.error(request, "Selecciona la caja o cuenta bancaria desde la que se pago la planilla.")
+    else:
+        try:
+            with transaction.atomic():
+                periodo.cuenta_financiera_pago = cuenta
+                periodo.estado = "pagada"
+                periodo.save(update_fields=["cuenta_financiera_pago", "estado"])
+                registrar_asiento_planilla_pagada(periodo, request.user)
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        else:
+            messages.success(request, "Planilla pagada y registrada contablemente.")
     return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
 
 

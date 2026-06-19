@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from crm.models import ConfiguracionCRM
+from contabilidad.models import AsientoContable, CuentaContable, CuentaFinanciera
 
 from .models import DetallePlanilla, Empleado, MovimientoPlanilla, PeriodoPlanilla
 from .services import generar_planilla
@@ -73,6 +74,78 @@ class RRHHTests(TestCase):
         self.assertGreater(detalle.ihss, Decimal("0.00"))
         self.assertGreater(detalle.rap, Decimal("0.00"))
         self.assertGreater(detalle.neto_pagar, Decimal("0.00"))
+
+    def test_cerrar_y_pagar_planilla_genera_asientos_balanceados(self):
+        empleado = Empleado.objects.create(
+            empresa=self.empresa,
+            codigo="EMP-CONT-001",
+            nombres="Maria",
+            apellidos="Contable",
+            identidad="0801199900099",
+            fecha_ingreso=date(2026, 1, 1),
+            salario_mensual=Decimal("1000.00"),
+        )
+        periodo = PeriodoPlanilla.objects.create(
+            empresa=self.empresa,
+            nombre="Planilla contable junio",
+            fecha_inicio=date(2026, 6, 1),
+            fecha_fin=date(2026, 6, 30),
+            fecha_pago=date(2026, 6, 30),
+            estado="calculada",
+            creado_por=self.usuario,
+        )
+        DetallePlanilla.objects.create(
+            periodo=periodo,
+            empleado=empleado,
+            salario_base=Decimal("1000.00"),
+            total_devengado=Decimal("1000.00"),
+            ihss=Decimal("50.00"),
+            rap=Decimal("20.00"),
+            isr=Decimal("30.00"),
+            prestamos=Decimal("40.00"),
+            otras_deducciones=Decimal("10.00"),
+            total_deducciones=Decimal("150.00"),
+            neto_pagar=Decimal("850.00"),
+        )
+        banco = CuentaContable.objects.create(
+            empresa=self.empresa, codigo="110299", nombre="Banco planilla", tipo="activo"
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa, nombre="Banco planilla", tipo="banco", cuenta_contable=banco
+        )
+        self.client.login(username="rrhh", password="pass12345")
+
+        response = self.client.post(reverse("cerrar_planilla", args=[self.empresa.slug, periodo.id]))
+        self.assertEqual(response.status_code, 302)
+        periodo.refresh_from_db()
+        self.assertEqual(periodo.estado, "cerrada")
+        cierre = AsientoContable.objects.get(documento_tipo="planilla", documento_id=periodo.id, evento="cierre")
+        self.assertEqual(cierre.total_debe, Decimal("1000.00"))
+        self.assertEqual(cierre.total_haber, Decimal("1000.00"))
+        self.assertTrue(cierre.lineas.filter(cuenta__codigo="610101", debe=Decimal("1000.00")).exists())
+        self.assertTrue(cierre.lineas.filter(cuenta__codigo="210301", haber=Decimal("850.00")).exists())
+
+        response = self.client.post(
+            reverse("pagar_planilla", args=[self.empresa.slug, periodo.id]),
+            {"cuenta_financiera": cuenta_financiera.id},
+        )
+        self.assertEqual(response.status_code, 302)
+        periodo.refresh_from_db()
+        self.assertEqual(periodo.estado, "pagada")
+        self.assertEqual(periodo.cuenta_financiera_pago, cuenta_financiera)
+        pago = AsientoContable.objects.get(documento_tipo="planilla", documento_id=periodo.id, evento="pago")
+        self.assertEqual(pago.total_debe, Decimal("850.00"))
+        self.assertEqual(pago.total_haber, Decimal("850.00"))
+        self.assertTrue(pago.lineas.filter(cuenta=banco, haber=Decimal("850.00")).exists())
+
+        self.client.post(
+            reverse("pagar_planilla", args=[self.empresa.slug, periodo.id]),
+            {"cuenta_financiera": cuenta_financiera.id},
+        )
+        self.assertEqual(
+            AsientoContable.objects.filter(documento_tipo="planilla", documento_id=periodo.id, evento="pago").count(),
+            1,
+        )
 
     def test_dashboard_rrhh_responde_con_permiso(self):
         self.client.login(username="rrhh", password="pass12345")

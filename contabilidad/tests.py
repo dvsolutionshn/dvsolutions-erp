@@ -12,7 +12,7 @@ from core.models import Empresa, Modulo, PlanComercial, PlanModulo, RolSistema, 
 
 from .importadores import _extraer_movimientos_desde_texto_pdf
 from .models import AsientoContable, ClasificacionCompraFiscal, ClasificacionMovimientoBanco, ConfiguracionContableEmpresa, CuentaContable, CuentaFinanciera, LineaAsientoContable, MovimientoBancario, PeriodoContable, ReglaClasificacionBanco
-from .services import registrar_asiento_factura_emitida, registrar_asiento_nota_credito
+from .services import registrar_asiento_documento, registrar_asiento_factura_emitida, registrar_asiento_nota_credito
 from facturacion.models import (
     CAI,
     Cliente,
@@ -1660,8 +1660,9 @@ class ContabilidadTests(TestCase):
         asiento = registrar_asiento_factura_emitida(factura)
         self.assertEqual(asiento.estado, "contabilizado")
         self.assertEqual(asiento.lineas.count(), 3)
+        self.cliente.refresh_from_db()
         self.assertTrue(
-            asiento.lineas.filter(cuenta__codigo="1110", debe=Decimal("115.00")).exists()
+            asiento.lineas.filter(cuenta=self.cliente.cuenta_contable, debe=Decimal("115.00")).exists()
         )
 
     def test_emision_factura_usa_cuenta_configurada(self):
@@ -1746,8 +1747,70 @@ class ContabilidadTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         asiento = AsientoContable.objects.get(documento_tipo="pago_factura", evento="cobro")
+        self.cliente.refresh_from_db()
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, debe=Decimal("115.00")).exists())
-        self.assertTrue(asiento.lineas.filter(cuenta__codigo="1110", haber=Decimal("115.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta=self.cliente.cuenta_contable, haber=Decimal("115.00")).exists())
+
+    def test_factura_inventariable_registra_costo_de_venta_sin_duplicar(self):
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto con costo",
+            tipo_item="producto",
+            unidad_medida="unidad",
+            precio=Decimal("115.00"),
+            controla_inventario=True,
+            costo_promedio=Decimal("40.00"),
+            impuesto_predeterminado=self.impuesto,
+        )
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            vendedor=self.usuario,
+            fecha_emision=self.empresa.fecha_inicio_plan,
+            fecha_vencimiento=self.empresa.fecha_inicio_plan,
+            moneda="HNL",
+            tipo_cambio=1,
+            estado="borrador",
+        )
+        linea = LineaFactura.objects.create(
+            factura=factura,
+            producto=producto,
+            cantidad=2,
+            precio_unitario=Decimal("100.00"),
+            impuesto=self.impuesto,
+        )
+        self.assertEqual(linea.costo_unitario, Decimal("40.00"))
+        factura.calcular_totales()
+        factura.estado = "emitida"
+        factura.save(update_fields=["estado"])
+
+        asiento = registrar_asiento_factura_emitida(factura)
+        segundo = registrar_asiento_factura_emitida(factura)
+
+        self.assertEqual(asiento.id, segundo.id)
+        self.assertEqual(
+            AsientoContable.objects.filter(
+                empresa=self.empresa, documento_tipo="factura", documento_id=factura.id, evento="emision"
+            ).count(),
+            1,
+        )
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="5101", debe=Decimal("80.00")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="112001", haber=Decimal("80.00")).exists())
+
+    def test_asiento_automatico_descuadrado_no_deja_borrador(self):
+        with self.assertRaises(ValidationError):
+            registrar_asiento_documento(
+                empresa=self.empresa,
+                documento_tipo="prueba",
+                documento_id=999,
+                evento="descuadrado",
+                fecha=self.empresa.fecha_inicio_plan,
+                descripcion="Prueba descuadrada",
+                referencia="TEST",
+                origen_modulo="contabilidad",
+                lineas=[{"cuenta": "caja", "debe": Decimal("10.00"), "haber": 0}],
+            )
+        self.assertFalse(AsientoContable.objects.filter(documento_tipo="prueba", documento_id=999).exists())
 
     def test_enlazar_deposito_bancario_a_factura_registra_pago_y_asiento(self):
         factura = Factura.objects.create(

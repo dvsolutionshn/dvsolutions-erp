@@ -1,21 +1,37 @@
 from decimal import Decimal
 
-from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 
 from .models import AsientoContable, ClasificacionMovimientoBanco, ConfiguracionContableEmpresa, CuentaContable, CuentaFinanciera, LineaAsientoContable, MovimientoBancario, ReglaClasificacionBanco
 
 
 CUENTAS_BASE = {
     "caja": {"codigo": "1101", "nombre": "Caja General", "tipo": "activo"},
-    "bancos": {"codigo": "1102", "nombre": "Bancos", "tipo": "activo"},
-    "clientes": {"codigo": "1110", "nombre": "Cuentas por Cobrar Clientes", "tipo": "activo"},
+    "bancos": {"codigo": "110201", "nombre": "Banco Moneda Nacional", "tipo": "activo"},
+    "clientes": {"codigo": "111001", "nombre": "Clientes Nacionales", "tipo": "activo"},
     "isr_retenido_clientes": {"codigo": "113003", "nombre": "ISR Retenido por Clientes", "tipo": "activo"},
     "isv_retenido_clientes": {"codigo": "113005", "nombre": "ISV Retenido por Clientes", "tipo": "activo"},
-    "inventario": {"codigo": "1140", "nombre": "Inventario de Mercaderia", "tipo": "activo"},
-    "isv_por_pagar": {"codigo": "2102", "nombre": "Impuestos por Pagar", "tipo": "pasivo"},
-    "proveedores": {"codigo": "2101", "nombre": "Cuentas por Pagar Proveedores", "tipo": "pasivo"},
-    "ventas": {"codigo": "4101", "nombre": "Ventas", "tipo": "ingreso"},
-    "devoluciones_ventas": {"codigo": "5101", "nombre": "Devoluciones sobre Ventas", "tipo": "gasto"},
+    "inventario": {"codigo": "112001", "nombre": "Inventario de Mercaderia", "tipo": "activo"},
+    "isv_por_pagar": {"codigo": "210201", "nombre": "ISV Cobrado 15%", "tipo": "pasivo"},
+    "isv_15_por_pagar": {"codigo": "210201", "nombre": "ISV Cobrado 15%", "tipo": "pasivo"},
+    "isv_18_por_pagar": {"codigo": "210202", "nombre": "ISV Cobrado 18%", "tipo": "pasivo"},
+    "proveedores": {"codigo": "210101", "nombre": "Proveedores Nacionales", "tipo": "pasivo"},
+    "ventas": {"codigo": "410101", "nombre": "Ventas Gravadas 15%", "tipo": "ingreso"},
+    "ventas_15": {"codigo": "410101", "nombre": "Ventas Gravadas 15%", "tipo": "ingreso"},
+    "ventas_18": {"codigo": "410102", "nombre": "Ventas Gravadas 18%", "tipo": "ingreso"},
+    "ventas_exentas": {"codigo": "410103", "nombre": "Ventas Exentas", "tipo": "ingreso"},
+    "ventas_exoneradas": {"codigo": "410104", "nombre": "Ventas Exoneradas", "tipo": "ingreso"},
+    "compras": {"codigo": "5102", "nombre": "Compras", "tipo": "costo"},
+    "devoluciones_ventas": {"codigo": "410202", "nombre": "Devoluciones sobre Ventas", "tipo": "ingreso"},
+    "costo_ventas": {"codigo": "5101", "nombre": "Costo de Ventas", "tipo": "costo"},
+    "gasto_salarios": {"codigo": "610101", "nombre": "Sueldos y Salarios", "tipo": "gasto"},
+    "sueldos_por_pagar": {"codigo": "210301", "nombre": "Sueldos por Pagar", "tipo": "pasivo"},
+    "ihss_por_pagar": {"codigo": "210302", "nombre": "IHSS por Pagar", "tipo": "pasivo"},
+    "rap_por_pagar": {"codigo": "210303", "nombre": "RAP por Pagar", "tipo": "pasivo"},
+    "isr_por_pagar": {"codigo": "210203", "nombre": "ISR por Pagar", "tipo": "pasivo"},
+    "otras_deducciones_por_pagar": {"codigo": "210304", "nombre": "Otras Deducciones por Pagar", "tipo": "pasivo"},
+    "anticipos_empleados": {"codigo": "114002", "nombre": "Anticipos a Empleados", "tipo": "activo"},
 }
 
 
@@ -367,13 +383,51 @@ def asegurar_cuenta_contable_cliente(cliente):
     cliente.cuenta_contable = cuenta
     return cuenta
 
+
+def asegurar_cuenta_contable_proveedor(proveedor):
+    if not proveedor or not getattr(proveedor, "empresa_id", None):
+        return None
+    if getattr(proveedor, "cuenta_contable_id", None):
+        return proveedor.cuenta_contable
+
+    cuenta_padre = obtener_o_crear_cuenta_base(proveedor.empresa, "proveedores")
+    prefijo = f"{cuenta_padre.codigo}."
+    usados = set(
+        CuentaContable.objects.filter(empresa=proveedor.empresa, codigo__startswith=prefijo)
+        .values_list("codigo", flat=True)
+    )
+    consecutivo = 1
+    while True:
+        codigo = f"{prefijo}{consecutivo:04d}"
+        if codigo not in usados:
+            break
+        consecutivo += 1
+
+    cuenta = CuentaContable.objects.create(
+        empresa=proveedor.empresa,
+        cuenta_padre=cuenta_padre,
+        codigo=codigo,
+        nombre=f"Proveedor - {proveedor.nombre}",
+        tipo="pasivo",
+        descripcion=f"Cuenta por pagar individual del proveedor {proveedor.nombre}.",
+        acepta_movimientos=True,
+        activa=True,
+    )
+    type(proveedor).objects.filter(pk=proveedor.pk).update(cuenta_contable=cuenta)
+    proveedor.cuenta_contable = cuenta
+    return cuenta
+
 def obtener_configuracion_contable(empresa):
     configuracion, _ = ConfiguracionContableEmpresa.objects.get_or_create(empresa=empresa)
     return configuracion
 
 
 def obtener_cuenta_operativa(empresa, clave):
-    campo = f"cuenta_{clave}"
+    alias_configuracion = {
+        "ventas_15": "ventas", "ventas_18": "ventas", "ventas_exentas": "ventas", "ventas_exoneradas": "ventas",
+        "isv_15_por_pagar": "isv_por_pagar", "isv_18_por_pagar": "isv_por_pagar",
+    }
+    campo = f"cuenta_{alias_configuracion.get(clave, clave)}"
     configuracion = obtener_configuracion_contable(empresa)
     cuenta = getattr(configuracion, campo, None)
     if cuenta and cuenta.activa and cuenta.acepta_movimientos and cuenta.empresa_id == empresa.id:
@@ -398,8 +452,6 @@ def registrar_asiento_documento(
     creado_por=None,
     lineas=None,
 ):
-    if not contabilidad_activa_para_empresa(empresa):
-        return None
     if not lineas:
         return None
 
@@ -412,42 +464,106 @@ def registrar_asiento_documento(
     if asiento_existente:
         return asiento_existente
 
-    with transaction.atomic():
-        asiento = AsientoContable.objects.create(
-            empresa=empresa,
-            fecha=fecha,
-            descripcion=descripcion,
-            referencia=referencia,
-            origen_modulo=origen_modulo,
-            documento_tipo=documento_tipo,
-            documento_id=documento_id,
-            evento=evento,
-            creado_por=creado_por,
-            estado="borrador",
+    lineas_normalizadas = []
+    total_debe = Decimal("0.00")
+    total_haber = Decimal("0.00")
+    for linea in lineas:
+        debe = Decimal(linea.get("debe", 0) or 0).quantize(Decimal("0.01"))
+        haber = Decimal(linea.get("haber", 0) or 0).quantize(Decimal("0.01"))
+        if debe < 0 or haber < 0 or (debe > 0 and haber > 0):
+            raise ValidationError("Las lineas automaticas deben contener valores validos en debe o haber.")
+        if debe == 0 and haber == 0:
+            continue
+        lineas_normalizadas.append({**linea, "debe": debe, "haber": haber})
+        total_debe += debe
+        total_haber += haber
+    if not lineas_normalizadas or total_debe <= 0 or total_debe != total_haber:
+        raise ValidationError(
+            f"El asiento automatico no esta balanceado: debe {total_debe:.2f}, haber {total_haber:.2f}."
         )
 
-        for linea in lineas:
-            cuenta = linea["cuenta"]
-            if isinstance(cuenta, str):
-                cuenta = obtener_cuenta_operativa(empresa, cuenta)
-            LineaAsientoContable.objects.create(
-                asiento=asiento,
-                cuenta=cuenta,
-                detalle=linea.get("detalle"),
-                debe=linea.get("debe", Decimal("0.00")),
-                haber=linea.get("haber", Decimal("0.00")),
+    try:
+        with transaction.atomic():
+            asiento = AsientoContable.objects.create(
+                empresa=empresa,
+                fecha=fecha,
+                descripcion=descripcion,
+                referencia=referencia,
+                origen_modulo=origen_modulo,
+                documento_tipo=documento_tipo,
+                documento_id=documento_id,
+                evento=evento,
+                creado_por=creado_por,
+                estado="borrador",
             )
 
-        if asiento.esta_balanceado:
+            for linea in lineas_normalizadas:
+                cuenta = linea["cuenta"]
+                if isinstance(cuenta, str):
+                    cuenta = obtener_cuenta_operativa(empresa, cuenta)
+                movimiento = LineaAsientoContable(
+                    asiento=asiento,
+                    cuenta=cuenta,
+                    detalle=linea.get("detalle"),
+                    debe=linea["debe"],
+                    haber=linea["haber"],
+                )
+                movimiento.full_clean()
+                movimiento.save()
+
             asiento.generar_numero()
             asiento.estado = "contabilizado"
             asiento.save(update_fields=["numero", "estado"])
-        return asiento
+            return asiento
+    except IntegrityError:
+        existente = AsientoContable.objects.filter(
+            empresa=empresa,
+            documento_tipo=documento_tipo,
+            documento_id=documento_id,
+            evento=evento,
+        ).first()
+        if existente:
+            return existente
+        raise
 
 
 def registrar_asiento_factura_emitida(factura):
     if factura.estado != "emitida":
         return None
+    costo_ventas = sum(
+        (
+            Decimal(linea.costo_unitario or 0) * Decimal(linea.cantidad or 0)
+            for linea in factura.lineas.select_related("producto").all()
+            if linea.producto_id and linea.producto.controla_inventario
+        ),
+        Decimal("0.00"),
+    ).quantize(Decimal("0.01"))
+    cuenta_cliente = asegurar_cuenta_contable_cliente(factura.cliente)
+    resumen = factura.resumen_fiscal()
+    lineas = [
+        {
+            "cuenta": cuenta_cliente,
+            "detalle": f"Cobro a cliente {factura.cliente.nombre}",
+            "debe": factura.total,
+            "haber": Decimal("0.00"),
+        },
+    ]
+    for cuenta, clave, detalle in [
+        ("ventas_15", "base_15", "Venta gravada 15%"),
+        ("ventas_18", "base_18", "Venta gravada 18%"),
+        ("ventas_exentas", "base_exento", "Venta exenta"),
+        ("ventas_exoneradas", "base_exonerado", "Venta exonerada"),
+        ("isv_15_por_pagar", "isv_15", "ISV trasladado 15%"),
+        ("isv_18_por_pagar", "isv_18", "ISV trasladado 18%"),
+    ]:
+        monto = Decimal(resumen.get(clave, 0) or 0).quantize(Decimal("0.01"))
+        if monto > 0:
+            lineas.append({"cuenta": cuenta, "detalle": detalle, "debe": 0, "haber": monto})
+    if costo_ventas > 0:
+        lineas.extend([
+            {"cuenta": "costo_ventas", "detalle": "Costo de mercaderia vendida", "debe": costo_ventas, "haber": 0},
+            {"cuenta": "inventario", "detalle": "Salida contable de inventario", "debe": 0, "haber": costo_ventas},
+        ])
     return registrar_asiento_documento(
         empresa=factura.empresa,
         documento_tipo="factura",
@@ -458,26 +574,7 @@ def registrar_asiento_factura_emitida(factura):
         referencia=factura.numero_factura or str(factura.id),
         origen_modulo="facturacion",
         creado_por=factura.vendedor,
-        lineas=[
-            {
-                "cuenta": "clientes",
-                "detalle": f"Cobro a cliente {factura.cliente.nombre}",
-                "debe": factura.total,
-                "haber": Decimal("0.00"),
-            },
-            {
-                "cuenta": "ventas",
-                "detalle": "Venta neta",
-                "debe": Decimal("0.00"),
-                "haber": factura.subtotal,
-            },
-            {
-                "cuenta": "isv_por_pagar",
-                "detalle": "Impuesto trasladado",
-                "debe": Decimal("0.00"),
-                "haber": factura.impuesto,
-            },
-        ],
+        lineas=lineas,
     )
 
 
@@ -536,9 +633,10 @@ def registrar_asiento_pago_cliente(pago):
             }
         )
 
+    cuenta_cliente = asegurar_cuenta_contable_cliente(pago.factura.cliente)
     lineas.append(
         {
-            "cuenta": "clientes",
+            "cuenta": cuenta_cliente,
             "detalle": f"Aplicacion a cliente {pago.factura.cliente.nombre}",
             "debe": Decimal("0.00"),
             "haber": pago.total_aplicado,
@@ -562,6 +660,18 @@ def registrar_asiento_pago_cliente(pago):
 def registrar_asiento_compra_aplicada(compra):
     if compra.estado != "aplicada":
         return None
+    total_inventario = sum(
+        (Decimal(linea.total_linea) for linea in compra.lineas.select_related("producto") if linea.producto.controla_inventario),
+        Decimal("0.00"),
+    ).quantize(Decimal("0.01"))
+    total_gasto = (Decimal(compra.total_documento) - total_inventario).quantize(Decimal("0.01"))
+    lineas = []
+    if total_inventario > 0:
+        lineas.append({"cuenta": "inventario", "detalle": f"Inventario comprado a {compra.proveedor_nombre}", "debe": total_inventario, "haber": 0})
+    if total_gasto > 0:
+        lineas.append({"cuenta": "compras", "detalle": f"Compra no inventariable a {compra.proveedor_nombre}", "debe": total_gasto, "haber": 0})
+    cuenta_proveedor = asegurar_cuenta_contable_proveedor(compra.proveedor) if compra.proveedor_id else "proveedores"
+    lineas.append({"cuenta": cuenta_proveedor, "detalle": "Obligacion con proveedor", "debe": 0, "haber": compra.total_documento})
     return registrar_asiento_documento(
         empresa=compra.empresa,
         documento_tipo="compra",
@@ -571,25 +681,13 @@ def registrar_asiento_compra_aplicada(compra):
         descripcion=f"Compra aplicada {compra.numero_compra or compra.id}",
         referencia=compra.numero_compra or compra.referencia_documento or str(compra.id),
         origen_modulo="compras",
-        lineas=[
-            {
-                "cuenta": "inventario",
-                "detalle": f"Compra a proveedor {compra.proveedor_nombre}",
-                "debe": compra.total_documento,
-                "haber": Decimal("0.00"),
-            },
-            {
-                "cuenta": "proveedores",
-                "detalle": "Obligacion con proveedor",
-                "debe": Decimal("0.00"),
-                "haber": compra.total_documento,
-            },
-        ],
+        lineas=lineas,
     )
 
 
 def registrar_asiento_pago_proveedor(pago):
     cuenta_caja = pago.cuenta_financiera.cuenta_contable if pago.cuenta_financiera_id else metodo_a_clave_cuenta(pago.metodo)
+    cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.compra.proveedor) if pago.compra.proveedor_id else "proveedores"
     return registrar_asiento_documento(
         empresa=pago.compra.empresa,
         documento_tipo="pago_compra",
@@ -601,7 +699,7 @@ def registrar_asiento_pago_proveedor(pago):
         origen_modulo="compras",
         lineas=[
             {
-                "cuenta": "proveedores",
+                "cuenta": cuenta_proveedor,
                 "detalle": f"Pago a proveedor {pago.compra.proveedor_nombre}",
                 "debe": pago.monto,
                 "haber": Decimal("0.00"),
@@ -619,6 +717,32 @@ def registrar_asiento_pago_proveedor(pago):
 def registrar_asiento_nota_credito(nota):
     if nota.estado != "emitida":
         return None
+    costo_devuelto = sum(
+        (
+            Decimal(linea.costo_unitario or 0) * Decimal(linea.cantidad or 0)
+            for linea in nota.lineas.select_related("producto").all()
+            if linea.producto_id and linea.producto.controla_inventario
+        ),
+        Decimal("0.00"),
+    ).quantize(Decimal("0.01"))
+    cuenta_cliente = asegurar_cuenta_contable_cliente(nota.cliente)
+    resumen = nota.resumen_fiscal()
+    lineas = [
+        {"cuenta": "devoluciones_ventas", "detalle": f"Devolucion cliente {nota.cliente.nombre}", "debe": nota.subtotal, "haber": 0},
+        {"cuenta": cuenta_cliente, "detalle": "Disminucion de cuenta por cobrar", "debe": 0, "haber": nota.total},
+    ]
+    for cuenta, clave, detalle in [
+        ("isv_15_por_pagar", "isv_15", "Reversion ISV 15%"),
+        ("isv_18_por_pagar", "isv_18", "Reversion ISV 18%"),
+    ]:
+        monto = Decimal(resumen.get(clave, 0) or 0).quantize(Decimal("0.01"))
+        if monto > 0:
+            lineas.append({"cuenta": cuenta, "detalle": detalle, "debe": monto, "haber": 0})
+    if costo_devuelto > 0:
+        lineas.extend([
+            {"cuenta": "inventario", "detalle": "Reintegro contable de inventario", "debe": costo_devuelto, "haber": 0},
+            {"cuenta": "costo_ventas", "detalle": "Reversion del costo de venta", "debe": 0, "haber": costo_devuelto},
+        ])
     return registrar_asiento_documento(
         empresa=nota.empresa,
         documento_tipo="nota_credito",
@@ -629,32 +753,49 @@ def registrar_asiento_nota_credito(nota):
         referencia=nota.numero_nota or str(nota.id),
         origen_modulo="facturacion",
         creado_por=nota.vendedor,
+        lineas=lineas,
+    )
+
+
+def registrar_asiento_planilla_cerrada(periodo):
+    detalles = list(periodo.detalles.all())
+    total_devengado = sum((Decimal(item.total_devengado or 0) for item in detalles), Decimal("0.00"))
+    total_neto = sum((Decimal(item.neto_pagar or 0) for item in detalles), Decimal("0.00"))
+    conceptos = [
+        ("ihss_por_pagar", sum((Decimal(item.ihss or 0) for item in detalles), Decimal("0.00")), "IHSS retenido"),
+        ("rap_por_pagar", sum((Decimal(item.rap or 0) for item in detalles), Decimal("0.00")), "RAP retenido"),
+        ("isr_por_pagar", sum((Decimal(item.isr or 0) for item in detalles), Decimal("0.00")), "ISR retenido"),
+        ("anticipos_empleados", sum((Decimal(item.prestamos or 0) for item in detalles), Decimal("0.00")), "Recuperacion de prestamos"),
+        ("otras_deducciones_por_pagar", sum((Decimal(item.otras_deducciones or 0) for item in detalles), Decimal("0.00")), "Otras deducciones"),
+        ("sueldos_por_pagar", total_neto, "Neto por pagar a empleados"),
+    ]
+    lineas = [{"cuenta": "gasto_salarios", "detalle": "Devengo de nomina", "debe": total_devengado, "haber": 0}]
+    lineas.extend(
+        {"cuenta": cuenta, "detalle": detalle, "debe": 0, "haber": monto}
+        for cuenta, monto, detalle in conceptos if monto > 0
+    )
+    return registrar_asiento_documento(
+        empresa=periodo.empresa, documento_tipo="planilla", documento_id=periodo.id,
+        evento="cierre", fecha=periodo.fecha_fin, descripcion=f"Devengo planilla {periodo.nombre}",
+        referencia=periodo.nombre, origen_modulo="rrhh", creado_por=periodo.creado_por, lineas=lineas,
+    )
+
+
+def registrar_asiento_planilla_pagada(periodo, usuario=None):
+    cuenta = periodo.cuenta_financiera_pago.cuenta_contable
+    total_neto = Decimal(periodo.total_neto or 0).quantize(Decimal("0.01"))
+    return registrar_asiento_documento(
+        empresa=periodo.empresa, documento_tipo="planilla", documento_id=periodo.id,
+        evento="pago", fecha=periodo.fecha_pago, descripcion=f"Pago planilla {periodo.nombre}",
+        referencia=periodo.nombre, origen_modulo="rrhh", creado_por=usuario or periodo.creado_por,
         lineas=[
-            {
-                "cuenta": "devoluciones_ventas",
-                "detalle": f"Devolucion cliente {nota.cliente.nombre}",
-                "debe": nota.subtotal,
-                "haber": Decimal("0.00"),
-            },
-            {
-                "cuenta": "isv_por_pagar",
-                "detalle": "Reversion de impuesto",
-                "debe": nota.impuesto,
-                "haber": Decimal("0.00"),
-            },
-            {
-                "cuenta": "clientes",
-                "detalle": "Disminucion de cuenta por cobrar",
-                "debe": Decimal("0.00"),
-                "haber": nota.total,
-            },
+            {"cuenta": "sueldos_por_pagar", "detalle": "Cancelacion de nomina", "debe": total_neto, "haber": 0},
+            {"cuenta": cuenta, "detalle": "Salida de caja o banco por nomina", "debe": 0, "haber": total_neto},
         ],
     )
 
 
 def registrar_reversion_documento(*, empresa, documento_tipo, documento_id, evento_origen, evento_reversion, fecha, descripcion, referencia, origen_modulo, creado_por=None):
-    if not contabilidad_activa_para_empresa(empresa):
-        return None
     asiento_origen = AsientoContable.objects.filter(
         empresa=empresa,
         documento_tipo=documento_tipo,
