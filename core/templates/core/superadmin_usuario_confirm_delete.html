@@ -1,0 +1,36 @@
+{% extends 'core/superadmin_base.html' %}
+
+{% block title %}Eliminar Usuario{% endblock %}
+{% block header_title %}Eliminar Usuario{% endblock %}
+{% block header_description %}Confirma la baja definitiva del acceso. La accion quedara registrada en la bitacora global.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'superadmin_usuarios' %}" class="erp-action-link">Volver a Usuarios</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card" style="max-width:760px;">
+    <div class="erp-toolbar">
+        <div>
+            <span class="erp-badge danger">Accion irreversible</span>
+            <h3 class="erp-panel-title" style="margin-top:12px;">{{ usuario_obj.get_full_name|default:usuario_obj.username }}</h3>
+            <p class="erp-card-muted">{{ usuario_obj.email|default:"Sin correo" }} · {{ usuario_obj.empresa.nombre|default:"Sin empresa" }}</p>
+        </div>
+    </div>
+
+    <p>Se eliminara la cuenta, sus permisos, grupos y tokens de acceso. Si posee historial protegido, el sistema impedira el borrado y te indicara que debes desactivarla.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="erp-field" style="margin-top:18px;">
+            <label for="motivo_eliminacion">Motivo de la eliminacion</label>
+            <textarea id="motivo_eliminacion" name="motivo_eliminacion" rows="4" required minlength="5" placeholder="Ejemplo: usuario duplicado creado por error.">{{ request.POST.motivo_eliminacion }}</textarea>
+            <span class="erp-field-help">Este motivo aparecera en la bitacora de auditoria.</span>
+        </div>
+        <div class="erp-form-actions" style="margin-top:22px;">
+            <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Cancelar</a>
+            <button type="submit" class="erp-btn" style="background:#b42318;border-color:#b42318;">Eliminar definitivamente</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

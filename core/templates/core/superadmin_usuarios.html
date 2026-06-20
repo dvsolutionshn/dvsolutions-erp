@@ -67,6 +67,9 @@
                     </td>
                     <td class="actions">
                         <a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar</a>
+                        {% if usuario.id != request.user.id %}
+                        <a class="erp-link" style="color:#b42318;" href="{% url 'superadmin_usuario_delete' usuario.id %}">Eliminar</a>
+                        {% endif %}
                         {% if usuario.email and not usuario.is_superuser and not usuario.is_active %}
                         <form method="post" action="{% url 'superadmin_usuario_reenviar_invitacion' usuario.id %}" style="display:inline;">
                             {% csrf_token %}

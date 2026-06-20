@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import OperationalError, transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Prefetch, ProtectedError, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -1535,6 +1535,55 @@ def superadmin_usuario_edit(request, usuario_id):
         **_superadmin_base_context(),
         "form": form,
         "titulo": f"Editar Usuario: {usuario.username}",
+    })
+
+
+@superadmin_required
+def superadmin_usuario_delete(request, usuario_id):
+    usuario = get_object_or_404(Usuario.objects.select_related("empresa", "rol_sistema"), id=usuario_id)
+
+    if request.method == "POST":
+        motivo = (request.POST.get("motivo_eliminacion") or "").strip()
+        if usuario.pk == request.user.pk:
+            messages.error(request, "No puedes eliminar el usuario con el que tienes abierta la sesion.")
+            return redirect("superadmin_usuarios")
+        if len(motivo) < 5:
+            messages.error(request, "Explica el motivo de la eliminacion con al menos 5 caracteres.")
+        elif (
+            usuario.empresa_id
+            and usuario.es_administrador_empresa
+            and usuario.is_active
+            and not Usuario.objects.filter(
+                empresa_id=usuario.empresa_id,
+                es_administrador_empresa=True,
+                is_active=True,
+            ).exclude(pk=usuario.pk).exists()
+        ):
+            messages.error(
+                request,
+                "No puedes eliminar el ultimo administrador activo de la empresa. Asigna otro administrador primero.",
+            )
+        else:
+            identificacion = usuario.email or usuario.username
+            try:
+                with transaction.atomic():
+                    usuario.delete()
+            except ProtectedError as exc:
+                modelos = sorted({obj._meta.verbose_name for obj in exc.protected_objects})
+                detalle = ", ".join(modelos[:4])
+                messages.error(
+                    request,
+                    "Este usuario conserva historial protegido"
+                    f"{f' ({detalle})' if detalle else ''} y no puede borrarse. "
+                    "Desactivalo desde Editar para bloquear su acceso sin perder la trazabilidad.",
+                )
+            else:
+                messages.success(request, f"Usuario {identificacion} eliminado correctamente.")
+                return redirect("superadmin_usuarios")
+
+    return render(request, "core/superadmin_usuario_confirm_delete.html", {
+        **_superadmin_base_context(),
+        "usuario_obj": usuario,
     })
 
 

@@ -370,6 +370,77 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
         self.assertFalse(TokenAccesoUsuario.objects.filter(usuario=usuario).exists())
 
+    def test_superadmin_puede_eliminar_usuario_con_motivo_y_auditoria(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Baja Usuario",
+            slug="empresa-baja-usuario",
+            rtn="08011999000077",
+        )
+        usuario = Usuario.objects.create_user(
+            username="usuario-eliminable",
+            email="eliminar@empresa.com",
+            password="pass12345",
+            empresa=empresa,
+            rol_sistema=self.rol_facturador,
+        )
+        usuario_id = usuario.id
+        self.client.login(username="master", password="pass12345")
+
+        confirmacion = self.client.get(reverse("superadmin_usuario_delete", args=[usuario_id]))
+        self.assertEqual(confirmacion.status_code, 200)
+        self.assertContains(confirmacion, "Eliminar definitivamente")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_delete", args=[usuario_id]),
+            {"motivo_eliminacion": "Usuario duplicado creado por error"},
+        )
+
+        self.assertRedirects(response, reverse("superadmin_usuarios"))
+        self.assertFalse(Usuario.objects.filter(pk=usuario_id).exists())
+        auditoria = RegistroAuditoria.objects.get(
+            modelo="usuario",
+            objeto_id=str(usuario_id),
+            accion=RegistroAuditoria.ACCION_ELIMINAR,
+        )
+        self.assertEqual(auditoria.usuario, self.superadmin)
+        self.assertEqual(auditoria.empresa, empresa)
+        self.assertEqual(auditoria.motivo, "Usuario duplicado creado por error")
+
+    def test_superadmin_no_puede_eliminar_su_propia_sesion(self):
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_delete", args=[self.superadmin.id]),
+            {"motivo_eliminacion": "Prueba de seguridad"},
+        )
+
+        self.assertRedirects(response, reverse("superadmin_usuarios"))
+        self.assertTrue(Usuario.objects.filter(pk=self.superadmin.id).exists())
+
+    def test_no_elimina_ultimo_administrador_activo_de_empresa(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Un Solo Admin",
+            slug="empresa-un-solo-admin",
+            rtn="08011999000078",
+        )
+        administrador = Usuario.objects.create_user(
+            username="admin-unico",
+            password="pass12345",
+            empresa=empresa,
+            es_administrador_empresa=True,
+            is_active=True,
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_delete", args=[administrador.id]),
+            {"motivo_eliminacion": "Solicitud de baja"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Usuario.objects.filter(pk=administrador.id).exists())
+        self.assertContains(response, "No puedes eliminar el ultimo administrador activo")
+
     def test_usuario_rapido_rechaza_contrasenas_distintas(self):
         empresa = Empresa.objects.create(nombre="Empresa Clave", slug="empresa-clave", rtn="08011999000067")
         self.client.login(username="master", password="pass12345")

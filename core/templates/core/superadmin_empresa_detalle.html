@@ -355,7 +355,12 @@
                         {% endif %}
                     </td>
                     <td><span class="erp-badge {% if usuario.is_active %}success{% else %}danger{% endif %}">{% if usuario.is_active %}Activo{% else %}Inactivo{% endif %}</span></td>
-                    <td class="actions"><a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar usuario</a></td>
+                    <td class="actions">
+                        <a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar usuario</a>
+                        {% if usuario.id != request.user.id %}
+                        <a class="erp-link" style="color:#b42318;" href="{% url 'superadmin_usuario_delete' usuario.id %}">Eliminar</a>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="5" class="erp-empty">Esta empresa todavia no tiene usuarios asignados.</td></tr>
