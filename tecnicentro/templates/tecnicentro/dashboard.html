@@ -20,5 +20,6 @@
       </div>{% endfor %}
     </div>
   </section>
+  <section class="garage-panel" style="margin-top:15px"><div class="garage-head" style="margin-bottom:10px"><div><h3 class="garage-panel-title">Próximas llegadas</h3><p class="garage-panel-copy">Citas que impactarán la capacidad operativa del taller.</p></div>{% if erp_access.recepcion_taller %}<a class="garage-btn secondary" href="{% url 'tecnicentro_agenda' empresa.slug %}">Abrir agenda</a>{% endif %}</div><div style="overflow:auto"><table class="garage-table"><thead><tr><th>Hora</th><th>Cliente</th><th>Vehículo</th><th>Servicio</th><th></th></tr></thead><tbody>{% for cita in proximas_citas %}<tr><td>{{ cita.fecha_hora|date:"d/m H:i" }}</td><td>{{ cita.cliente.nombre }}</td><td>{% if cita.vehiculo %}{{ cita.vehiculo.placa }}{% else %}Por confirmar{% endif %}</td><td>{{ cita.servicio_solicitado }}</td><td><a href="{% url 'tecnicentro_recepcion' empresa.slug %}?cita={{ cita.id }}">Recibir</a></td></tr>{% empty %}<tr><td colspan="5">No hay citas próximas programadas.</td></tr>{% endfor %}</tbody></table></div></section>
 </section>
 {% endblock %}

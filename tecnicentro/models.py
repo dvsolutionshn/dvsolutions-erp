@@ -147,6 +147,60 @@ class OrdenServicio(models.Model):
         return f"{self.numero} · {self.vehiculo.placa}"
 
 
+class CitaTaller(models.Model):
+    ESTADO_CHOICES = [
+        ("programada", "Programada"), ("confirmada", "Confirmada"),
+        ("atendida", "Atendida"), ("no_asistio", "No asistió"),
+        ("cancelada", "Cancelada"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="citas_tecnicentro")
+    cliente = models.ForeignKey("facturacion.Cliente", on_delete=models.PROTECT, related_name="citas_taller")
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="citas")
+    orden = models.OneToOneField(OrdenServicio, on_delete=models.SET_NULL, null=True, blank=True, related_name="cita_origen")
+    fecha_hora = models.DateTimeField(db_index=True)
+    servicio_solicitado = models.CharField(max_length=220)
+    duracion_estimada_min = models.PositiveIntegerField(default=60)
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="programada", db_index=True)
+    observaciones = models.TextField(blank=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["fecha_hora", "id"]
+
+    def clean(self):
+        if self.cliente_id and self.empresa_id and self.cliente.empresa_id != self.empresa_id:
+            raise ValidationError("El cliente de la cita debe pertenecer a la misma empresa.")
+        if self.vehiculo_id and self.vehiculo.empresa_id != self.empresa_id:
+            raise ValidationError("El vehículo de la cita debe pertenecer a la misma empresa.")
+
+    def __str__(self):
+        return f"{self.fecha_hora:%d/%m/%Y %H:%M} · {self.cliente.nombre}"
+
+
+class InspeccionRecepcion(models.Model):
+    orden = models.OneToOneField(OrdenServicio, on_delete=models.CASCADE, related_name="inspeccion_recepcion")
+    carroceria = models.CharField(max_length=20, choices=[("buena", "Sin daños visibles"), ("observaciones", "Con observaciones"), ("danada", "Daño evidente")], default="buena")
+    llantas = models.CharField(max_length=20, choices=[("buenas", "Buen estado"), ("desgaste", "Desgaste visible"), ("danadas", "Daño o presión baja")], default="buenas")
+    parabrisas = models.CharField(max_length=20, choices=[("bueno", "Sin daños"), ("marcas", "Marcas menores"), ("quebrado", "Quebrado o fisurado")], default="bueno")
+    luces_tablero_activas = models.BooleanField(default=False)
+    porta_documentos = models.BooleanField(default=False)
+    llanta_repuesto = models.BooleanField(default=False)
+    herramientas = models.BooleanField(default=False)
+    radio_pantalla = models.BooleanField(default=False)
+    objetos_valor = models.TextField(blank=True)
+    danos_existentes = models.TextField(blank=True)
+    observaciones = models.TextField(blank=True)
+    aceptacion_cliente = models.BooleanField(default=False)
+    nombre_aceptante = models.CharField(max_length=160, blank=True)
+    inspeccionado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Inspección de recepción · {self.orden.numero}"
+
+
 class HistorialEstadoOrden(models.Model):
     orden = models.ForeignKey(OrdenServicio, on_delete=models.CASCADE, related_name="historial_estados")
     estado = models.CharField(max_length=20, choices=OrdenServicio.ESTADO_CHOICES)

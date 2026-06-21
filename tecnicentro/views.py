@@ -9,9 +9,11 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.models import Empresa
+from facturacion.models import Cliente
 
-from .forms import AsignacionOrdenForm, BahiaServicioForm, ConfiguracionTecnicentroForm, DiagnosticoForm, EvidenciaForm, RecepcionOrdenForm
-from .models import BahiaServicio, ConfiguracionTecnicentro, DiagnosticoVehicular, HistorialEstadoOrden, OrdenServicio, Vehiculo
+from .forms import AsignacionOrdenForm, BahiaServicioForm, CitaTallerForm, ConfiguracionTecnicentroForm, DiagnosticoForm, EvidenciaForm, InspeccionRecepcionForm, RecepcionOrdenForm
+from .models import BahiaServicio, CitaTaller, ConfiguracionTecnicentro, DiagnosticoVehicular, HistorialEstadoOrden, InspeccionRecepcion, OrdenServicio, Vehiculo
+from .services import actualizar_estimaciones_cola, espera_para_nuevo_ingreso
 
 
 ESTADOS_ACTIVOS = ["espera", "recepcion", "diagnostico", "cotizacion", "aprobacion", "reparacion", "pruebas", "listo"]
@@ -40,6 +42,7 @@ def dashboard(request, empresa_slug):
         "vehiculo", "cliente", "tecnico_asignado", "bahia"
     )
     ahora = timezone.now()
+    actualizar_estimaciones_cola(empresa)
     cola = activas.filter(estado="espera").annotate(
         orden_prioridad=Case(
             When(prioridad="urgente", then=0),
@@ -76,27 +79,49 @@ def dashboard(request, empresa_slug):
             "entregados_hoy": completadas_hoy,
             "promedio_min": promedio,
         },
+        "proximas_citas": CitaTaller.objects.filter(
+            empresa=empresa, estado__in=["programada", "confirmada"], fecha_hora__gte=ahora
+        ).select_related("cliente", "vehiculo")[:5],
     })
 
 
 @login_required
 def recepcion(request, empresa_slug):
     empresa = _empresa(empresa_slug)
-    form = RecepcionOrdenForm(request.POST or None, empresa=empresa)
+    cita = None
+    cita_id = request.GET.get("cita")
+    if cita_id:
+        cita = get_object_or_404(CitaTaller, empresa=empresa, id=cita_id, estado__in=["programada", "confirmada"])
+    inicial = {}
+    if cita:
+        inicial.update({"cliente": cita.cliente, "motivo_ingreso": cita.servicio_solicitado, "tiempo_reparacion_estimado_min": cita.duracion_estimada_min})
+        if cita.vehiculo:
+            inicial.update({"placa": cita.vehiculo.placa, "marca": cita.vehiculo.marca, "modelo": cita.vehiculo.modelo, "anio": cita.vehiculo.anio, "color": cita.vehiculo.color, "tipo_vehiculo": cita.vehiculo.tipo, "combustible": cita.vehiculo.combustible, "kilometraje_entrada": cita.vehiculo.kilometraje_actual})
+    form = RecepcionOrdenForm(request.POST or None, empresa=empresa, initial=inicial)
     if request.method == "POST" and form.is_valid():
         datos = form.cleaned_data
         with transaction.atomic():
+            cliente = datos["cliente"]
+            if not cliente:
+                cliente = Cliente.objects.create(
+                    empresa=empresa,
+                    nombre=datos["nuevo_cliente_nombre"].strip(),
+                    telefono=datos["nuevo_cliente_telefono"].strip() or None,
+                    telefono_whatsapp=datos["nuevo_cliente_telefono"].strip() or None,
+                    rtn=datos["nuevo_cliente_rtn"].strip() or None,
+                    activo=True,
+                )
             vehiculo, creado = Vehiculo.objects.get_or_create(
                 empresa=empresa,
                 placa=datos["placa"],
                 defaults={
-                    "cliente": datos["cliente"], "marca": datos["marca"], "modelo": datos["modelo"],
+                    "cliente": cliente, "marca": datos["marca"], "modelo": datos["modelo"],
                     "anio": datos["anio"], "color": datos["color"], "tipo": datos["tipo_vehiculo"],
                     "combustible": datos["combustible"], "kilometraje_actual": datos["kilometraje_entrada"],
                 },
             )
             if not creado:
-                vehiculo.cliente = datos["cliente"]
+                vehiculo.cliente = cliente
                 vehiculo.marca = datos["marca"]
                 vehiculo.modelo = datos["modelo"]
                 vehiculo.anio = datos["anio"]
@@ -105,22 +130,79 @@ def recepcion(request, empresa_slug):
                 vehiculo.combustible = datos["combustible"]
                 vehiculo.kilometraje_actual = datos["kilometraje_entrada"]
                 vehiculo.save()
+            espera_calculada = espera_para_nuevo_ingreso(empresa)
             orden = OrdenServicio.objects.create(
-                empresa=empresa, cliente=datos["cliente"], vehiculo=vehiculo,
+                empresa=empresa, cliente=cliente, vehiculo=vehiculo,
                 asesor_recepcion=request.user, prioridad=datos["prioridad"],
                 motivo_ingreso=datos["motivo_ingreso"], observaciones_recepcion=datos["observaciones_recepcion"],
                 kilometraje_entrada=datos["kilometraje_entrada"], nivel_combustible=datos["nivel_combustible"],
                 deja_vehiculo=datos["deja_vehiculo"], autoriza_whatsapp=datos["autoriza_whatsapp"],
-                tiempo_espera_estimado_min=datos["tiempo_espera_estimado_min"],
+                tiempo_espera_estimado_min=espera_calculada,
                 tiempo_reparacion_estimado_min=datos["tiempo_reparacion_estimado_min"],
                 fecha_estimada_finalizacion=timezone.now() + timedelta(
-                    minutes=datos["tiempo_espera_estimado_min"] + datos["tiempo_reparacion_estimado_min"]
+                    minutes=espera_calculada + datos["tiempo_reparacion_estimado_min"]
                 ),
             )
+            if cita:
+                cita.orden = orden
+                cita.estado = "atendida"
+                cita.save(update_fields=["orden", "estado"])
             HistorialEstadoOrden.objects.create(orden=orden, estado="espera", usuario=request.user, nota="Vehiculo recibido en recepcion digital.")
-        messages.success(request, f"{orden.numero} creada. {vehiculo.placa} ingreso a la cola del taller.")
+        messages.success(request, f"{orden.numero} creada. Espera calculada: {espera_calculada} minutos.")
+        return redirect("tecnicentro_inspeccion", empresa_slug=empresa.slug, orden_id=orden.id)
+    return render(request, "tecnicentro/recepcion.html", {"empresa": empresa, "form": form, "cita": cita})
+
+
+@login_required
+def agenda(request, empresa_slug):
+    empresa = _empresa(empresa_slug)
+    form = CitaTallerForm(request.POST or None, empresa=empresa)
+    if request.method == "POST" and form.is_valid():
+        cita = form.save(commit=False)
+        cita.empresa = empresa
+        cita.creado_por = request.user
+        cita.save()
+        messages.success(request, "Cita registrada en la agenda del taller.")
+        return redirect("tecnicentro_agenda", empresa_slug=empresa.slug)
+    inicio = timezone.localdate()
+    citas = CitaTaller.objects.filter(empresa=empresa, fecha_hora__date__gte=inicio).select_related("cliente", "vehiculo", "orden")[:100]
+    return render(request, "tecnicentro/agenda.html", {"empresa": empresa, "form": form, "citas": citas})
+
+
+@login_required
+@require_POST
+def cambiar_estado_cita(request, empresa_slug, cita_id):
+    empresa = _empresa(empresa_slug)
+    cita = get_object_or_404(CitaTaller, empresa=empresa, id=cita_id)
+    nuevo = request.POST.get("estado")
+    permitidos = {
+        "programada": {"confirmada", "cancelada", "no_asistio"},
+        "confirmada": {"cancelada", "no_asistio"},
+    }
+    if nuevo not in permitidos.get(cita.estado, set()):
+        messages.error(request, "Ese cambio no es válido para el estado actual de la cita.")
+    else:
+        cita.estado = nuevo
+        cita.save(update_fields=["estado"])
+        messages.success(request, f"Cita actualizada: {cita.get_estado_display()}.")
+    return redirect("tecnicentro_agenda", empresa_slug=empresa.slug)
+
+
+@login_required
+def inspeccion_recepcion(request, empresa_slug, orden_id):
+    empresa = _empresa(empresa_slug)
+    orden = get_object_or_404(OrdenServicio.objects.select_related("vehiculo", "cliente"), empresa=empresa, id=orden_id)
+    objeto = InspeccionRecepcion.objects.filter(orden=orden).first()
+    form = InspeccionRecepcionForm(request.POST or None, instance=objeto)
+    if request.method == "POST" and form.is_valid():
+        inspeccion = form.save(commit=False)
+        inspeccion.orden = orden
+        inspeccion.inspeccionado_por = request.user
+        inspeccion.save()
+        HistorialEstadoOrden.objects.create(orden=orden, estado=orden.estado, usuario=request.user, nota="Inspección de recepción documentada y aceptada." if inspeccion.aceptacion_cliente else "Inspección de recepción documentada.")
+        messages.success(request, "Inspección de entrada guardada en la trazabilidad del vehículo.")
         return redirect("tecnicentro_detalle_orden", empresa_slug=empresa.slug, orden_id=orden.id)
-    return render(request, "tecnicentro/recepcion.html", {"empresa": empresa, "form": form})
+    return render(request, "tecnicentro/inspeccion.html", {"empresa": empresa, "orden": orden, "form": form})
 
 
 @login_required
@@ -149,6 +231,7 @@ def detalle_orden(request, empresa_slug, orden_id):
     diagnostico_obj = DiagnosticoVehicular.objects.filter(orden=orden).first()
     return render(request, "tecnicentro/detalle_orden.html", {
         "empresa": empresa, "orden": orden, "diagnostico": diagnostico_obj,
+        "inspeccion": InspeccionRecepcion.objects.filter(orden=orden).first(),
         "asignacion_form": AsignacionOrdenForm(instance=orden, empresa=empresa),
         "evidencia_form": EvidenciaForm(),
         "transiciones": [(codigo, dict(OrdenServicio.ESTADO_CHOICES)[codigo]) for codigo in TRANSICIONES.get(orden.estado, set())],

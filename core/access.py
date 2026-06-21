@@ -61,6 +61,7 @@ CLINICA_PERMISSION_MAP = [
 ]
 
 TECNICENTRO_PERMISSION_MAP = [
+    ("agenda/", "puede_recepcion_taller"),
     ("recepcion/", "puede_recepcion_taller"),
     ("diagnosticos/", "puede_diagnostico_taller"),
     ("ordenes/", "puede_operacion_taller"),

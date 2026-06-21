@@ -30,7 +30,7 @@ html{background:#101214}body{background:linear-gradient(135deg,#101214 0%,#171a1
   <a class="garage-brand" href="{% url 'tecnicentro_dashboard' empresa.slug %}"><span class="garage-brand-mark">G/OS</span><span class="garage-brand-copy"><strong>{{ empresa.nombre }}</strong><span>Garage Operations System</span></span></a>
   <nav class="garage-nav">
     <a class="{% if request.resolver_match.url_name == 'tecnicentro_dashboard' %}active{% endif %}" href="{% url 'tecnicentro_dashboard' empresa.slug %}">Control</a>
-    {% if erp_access.recepcion_taller %}<a class="{% if request.resolver_match.url_name == 'tecnicentro_recepcion' %}active{% endif %}" href="{% url 'tecnicentro_recepcion' empresa.slug %}">Recepción</a>{% endif %}
+    {% if erp_access.recepcion_taller %}<a class="{% if request.resolver_match.url_name == 'tecnicentro_agenda' %}active{% endif %}" href="{% url 'tecnicentro_agenda' empresa.slug %}">Agenda</a><a class="{% if request.resolver_match.url_name == 'tecnicentro_recepcion' or request.resolver_match.url_name == 'tecnicentro_inspeccion' %}active{% endif %}" href="{% url 'tecnicentro_recepcion' empresa.slug %}">Recepción</a>{% endif %}
     <a class="{% if 'orden' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'tecnicentro_ordenes' empresa.slug %}">Órdenes</a>
     {% if erp_access.configuracion_taller %}<a class="{% if request.resolver_match.url_name == 'tecnicentro_configuracion' %}active{% endif %}" href="{% url 'tecnicentro_configuracion' empresa.slug %}">Configuración</a>{% endif %}
     <a href="{% url 'dashboard' empresa.slug %}">ERP</a>
