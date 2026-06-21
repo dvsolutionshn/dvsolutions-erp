@@ -9,6 +9,7 @@ from core.access import (
     permiso_facturacion_desde_ruta,
     permiso_crm_desde_ruta,
     permiso_rrhh_desde_ruta,
+    permiso_tecnicentro_desde_ruta,
 )
 from core.models import Empresa
 from core.audit_context import reset_audit_request, set_audit_request
@@ -191,6 +192,29 @@ class EmpresaAccessMiddleware:
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_clinica:
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo clinico.")
+                        return redirect("dashboard", slug=empresa.slug)
+
+        if len(parts) >= 3 and parts[1] == "dashboard" and parts[2] == "tecnicentro":
+            empresa_slug = parts[0]
+            empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
+            if empresa and request.user.is_authenticated:
+                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                    messages.error(request, "Tu usuario no pertenece a esta empresa.")
+                    return redirect("empresa_login", slug=empresa.slug)
+                if not request.user.is_superuser and not empresa.licencia_operativa:
+                    messages.error(request, "La licencia de esta empresa no esta operativa.")
+                    return redirect("empresa_login", slug=empresa.slug)
+                if not empresa.tiene_modulo_activo("tecnicentro"):
+                    messages.error(request, "El modulo Tecnicentro no esta habilitado para esta empresa.")
+                    return redirect("dashboard", slug=empresa.slug)
+                if not request.user.is_superuser and not request.user.es_administrador_empresa:
+                    suffix = "/".join(parts[3:])
+                    permiso = permiso_tecnicentro_desde_ruta(suffix)
+                    if permiso and not request.user.tiene_permiso_erp(permiso):
+                        messages.error(request, "Tu rol no tiene permiso para esta operacion del taller.")
+                        return redirect("dashboard", slug=empresa.slug)
+                    if not suffix and not request.user.tiene_alguna_permision_tecnicentro:
+                        messages.error(request, "Tu rol no tiene acceso al modulo Tecnicentro.")
                         return redirect("dashboard", slug=empresa.slug)
 
         return self.get_response(request)

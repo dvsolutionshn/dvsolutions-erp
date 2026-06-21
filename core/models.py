@@ -85,6 +85,11 @@ class RolSistema(models.Model):
     puede_expediente_clinico = models.BooleanField(default=False)
     puede_tratamientos_clinicos = models.BooleanField(default=False)
     puede_configuracion_clinica = models.BooleanField(default=False)
+    puede_tecnicentro = models.BooleanField(default=False)
+    puede_recepcion_taller = models.BooleanField(default=False)
+    puede_diagnostico_taller = models.BooleanField(default=False)
+    puede_operacion_taller = models.BooleanField(default=False)
+    puede_configuracion_taller = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["nombre"]
@@ -167,6 +172,19 @@ class RolSistema(models.Model):
                 "puede_expediente_clinico",
                 "puede_tratamientos_clinicos",
                 "puede_configuracion_clinica",
+            ]
+        )
+
+    @property
+    def tiene_algun_acceso_tecnicentro(self):
+        return any(
+            getattr(self, permiso)
+            for permiso in [
+                "puede_tecnicentro",
+                "puede_recepcion_taller",
+                "puede_diagnostico_taller",
+                "puede_operacion_taller",
+                "puede_configuracion_taller",
             ]
         )
 
@@ -396,6 +414,12 @@ class Usuario(AbstractUser):
         if self.is_superuser or self.es_administrador_empresa:
             return True
         return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_clinica)
+
+    @property
+    def tiene_alguna_permision_tecnicentro(self):
+        if self.is_superuser or self.es_administrador_empresa:
+            return True
+        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_tecnicentro)
 
 
 class RegistroAuditoria(models.Model):

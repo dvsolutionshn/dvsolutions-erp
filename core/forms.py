@@ -543,6 +543,11 @@ class RolSistemaForm(forms.ModelForm):
             "puede_expediente_clinico": ("Puede gestionar expedientes clinicos", ""),
             "puede_tratamientos_clinicos": ("Puede gestionar tratamientos clinicos", ""),
             "puede_configuracion_clinica": ("Puede configurar Clinica", ""),
+            "puede_tecnicentro": ("Puede entrar a Tecnicentro", "Acceso general al centro de control del taller."),
+            "puede_recepcion_taller": ("Puede recibir vehiculos", "Autoriza registrar clientes, vehiculos y ordenes de servicio."),
+            "puede_diagnostico_taller": ("Puede realizar diagnosticos", "Autoriza hallazgos, recomendaciones y evidencias tecnicas."),
+            "puede_operacion_taller": ("Puede operar el taller", "Autoriza mover ordenes, asignar tecnicos y controlar tiempos."),
+            "puede_configuracion_taller": ("Puede configurar Tecnicentro", "Autoriza bahias, tiempos y parametros del taller."),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:

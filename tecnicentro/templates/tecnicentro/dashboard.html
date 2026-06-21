@@ -1,0 +1,24 @@
+{% extends "tecnicentro/base.html" %}
+{% block title %}Garage OS - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Tecnicentro Vehicular{% endblock %}
+{% block header_title %}Centro de Control{% endblock %}
+{% block header_description %}Operaciones, tiempos y vehiculos en una sola cabina digital.{% endblock %}
+{% block content %}
+<section class="garage-shell">
+  <div class="garage-head"><div><div class="garage-eyebrow">Garage Operations System</div><h2 class="garage-title">Taller en tiempo real</h2><p class="garage-sub">Visibilidad total desde la recepcion hasta la entrega.</p></div><div class="garage-actions"><span class="garage-live">OPERACION EN LINEA</span>{% if erp_access.recepcion_taller %}<a class="garage-btn" href="{% url 'tecnicentro_recepcion' empresa.slug %}">+ Recibir vehiculo</a>{% endif %}<a class="garage-btn secondary" href="{% url 'tecnicentro_ordenes' empresa.slug %}">Historial</a></div></div>
+  <div class="garage-kpis">
+    <article class="garage-kpi"><span>Vehiculos en cola</span><strong>{{ metricas.cola }}</strong><small>espera activa</small></article>
+    <article class="garage-kpi"><span>En proceso</span><strong>{{ metricas.taller }}</strong><small>dentro del taller</small></article>
+    <article class="garage-kpi"><span>Listos</span><strong>{{ metricas.listos }}</strong><small>para entregar</small></article>
+    <article class="garage-kpi"><span>Entregados hoy</span><strong>{{ metricas.entregados_hoy }}</strong><small>ciclo completado</small></article>
+    <article class="garage-kpi"><span>Tiempo promedio</span><strong>{{ metricas.promedio_min }}</strong><small>minutos por orden</small></article>
+  </div>
+  <section class="garage-panel"><h3 class="garage-panel-title">Pipeline operativo</h3><p class="garage-panel-copy">Cada tarjeta representa un vehiculo y su progreso actual.</p>
+    <div class="garage-grid">
+      {% for columna in columnas %}<div class="garage-lane"><div class="garage-lane-head"><h3>{{ columna.titulo }}</h3><span class="garage-count">{{ columna.ordenes|length }}</span></div>
+        {% for orden in columna.ordenes %}<a class="garage-card" href="{% url 'tecnicentro_detalle_orden' empresa.slug orden.id %}"><div class="garage-card-top"><span class="garage-plate">{{ orden.vehiculo.placa }}</span><span class="garage-order">{{ orden.numero }}</span></div><div class="garage-car">{{ orden.vehiculo.marca }} {{ orden.vehiculo.modelo }} · {{ orden.cliente.nombre }}</div><div class="garage-meta"><span>{{ orden.get_estado_display }}</span><span>{% if orden.estado == 'espera' %}Espera ~{{ orden.tiempo_espera_estimado_min }} min{% else %}{{ orden.minutos_en_taller }} min{% endif %}</span></div><div class="garage-progress"><i style="width:{{ orden.progreso }}%"></i></div></a>{% empty %}<div class="garage-sub" style="font-size:12px;padding:20px 4px;">Sin vehiculos</div>{% endfor %}
+      </div>{% endfor %}
+    </div>
+  </section>
+</section>
+{% endblock %}

@@ -72,6 +72,10 @@
     {% url 'clinica_tratamientos' empresa.slug as clinica_tratamientos_url %}
     {% url 'clinica_profesionales' empresa.slug as clinica_profesionales_url %}
     {% url 'clinica_servicios' empresa.slug as clinica_servicios_url %}
+    {% url 'tecnicentro_dashboard' empresa.slug as tecnicentro_url %}
+    {% url 'tecnicentro_recepcion' empresa.slug as tecnicentro_recepcion_url %}
+    {% url 'tecnicentro_ordenes' empresa.slug as tecnicentro_ordenes_url %}
+    {% url 'tecnicentro_configuracion' empresa.slug as tecnicentro_configuracion_url %}
     {% url 'asistente_consulta' empresa.slug as asistente_consulta_url %}
     {% url 'empresa_respaldo' empresa.slug as empresa_respaldo_url %}
     {% url 'auditoria_empresa' empresa.slug as auditoria_empresa_url %}
@@ -155,6 +159,12 @@
                     <span>Clinica</span>
                 </a>
                 {% endif %}
+                {% if erp_access.modulo_tecnicentro %}
+                <a class="erp-nav-link {% if '/dashboard/tecnicentro/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Tecnicentro</span>
+                </a>
+                {% endif %}
                 {% if request.user.is_superuser or request.user.es_administrador_empresa %}
                 <a class="erp-nav-link {% if '/dashboard/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_empresa_url }}">
                     <span class="erp-nav-bullet"></span>
@@ -199,6 +209,18 @@
                 {% if erp_access.reportes and erp_access.usa_reporte_bancos %}<a class="erp-nav-link {% if '/dashboard/facturacion/reportes/bancos/' in request.path %}is-active{% endif %}" href="{{ reporte_ingresos_bancos_url }}"><span class="erp-nav-bullet"></span><span>Ingresos por Banco</span></a>{% endif %}
                 {% if erp_access.cxc %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxc/' in request.path %}is-active{% endif %}" href="{{ cxc_url }}"><span class="erp-nav-bullet"></span><span>Cuentas por Cobrar</span></a>{% endif %}
                 {% if erp_access.cxp %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxp/' in request.path %}is-active{% endif %}" href="{{ cxp_url }}"><span class="erp-nav-bullet"></span><span>Cuentas por Pagar</span></a>{% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
+        {% if '/dashboard/tecnicentro/' in request.path %}
+        <div>
+            <div class="erp-nav-group-title">Garage OS</div>
+            <nav class="erp-nav">
+                <a class="erp-nav-link {% if request.path == tecnicentro_url %}is-active{% endif %}" href="{{ tecnicentro_url }}"><span class="erp-nav-bullet"></span><span>Centro de Control</span></a>
+                {% if erp_access.recepcion_taller %}<a class="erp-nav-link {% if '/recepcion/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_recepcion_url }}"><span class="erp-nav-bullet"></span><span>Recepcion Digital</span></a>{% endif %}
+                <a class="erp-nav-link {% if '/ordenes/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_ordenes_url }}"><span class="erp-nav-bullet"></span><span>Ordenes de Trabajo</span></a>
+                {% if erp_access.configuracion_taller %}<a class="erp-nav-link {% if '/configuracion/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_configuracion_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}

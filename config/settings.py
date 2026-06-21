@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'rrhh',
     'crm',
     'clinica',
+    'tecnicentro',
     'django.contrib.humanize',
 ]
 

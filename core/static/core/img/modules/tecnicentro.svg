@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-label="Tecnicentro vehicular">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#06111a"/><stop offset="1" stop-color="#102b36"/></linearGradient>
+    <linearGradient id="car" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#48e2ff"/><stop offset="1" stop-color="#baff68"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M44 0H0V44" fill="none" stroke="#52dff7" stroke-opacity=".08"/></pattern>
+  </defs>
+  <rect width="1200" height="620" rx="38" fill="url(#bg)"/><rect width="1200" height="620" rx="38" fill="url(#grid)"/>
+  <g opacity=".25" stroke="#49e3ff"><path d="M0 470h1200"/><path d="M150 0v620M1050 0v620"/></g>
+  <g transform="translate(175 170)" filter="url(#glow)" fill="none" stroke="url(#car)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M80 242l53-116c12-27 39-44 69-44h420c31 0 60 17 75 45l59 115 55 21v87H38v-86z"/>
+    <path d="M170 221l51-94h365l65 94z"/><path d="M367 127v94"/><circle cx="190" cy="350" r="62"/><circle cx="650" cy="350" r="62"/><path d="M290 300h256"/>
+  </g>
+  <g font-family="Arial,sans-serif"><text x="60" y="72" fill="#49e3ff" font-size="22" font-weight="700" letter-spacing="7">GARAGE OS</text><text x="60" y="108" fill="#a7c0cc" font-size="18" letter-spacing="3">VEHICLE OPERATIONS ONLINE</text></g>
+  <g transform="translate(930 60)"><circle cx="65" cy="65" r="54" fill="none" stroke="#baff68" stroke-width="5" stroke-dasharray="20 10"/><circle cx="65" cy="65" r="8" fill="#baff68" filter="url(#glow)"/><path d="M65 65l28-26" stroke="#baff68" stroke-width="7" stroke-linecap="round"/></g>
+</svg>

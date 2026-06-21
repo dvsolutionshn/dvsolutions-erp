@@ -525,6 +525,16 @@
                 <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/clinica/">Ingresar al modulo</a></div>
             </article>
                 {% endif %}
+            {% elif modulo.codigo == "tecnicentro" %}
+                {% if erp_access.modulo_tecnicentro %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/tecnicentro.svg' %}" alt="" aria-hidden="true"></div>
+                <div class="erp-kpi-label">Garage Operations</div>
+                <h3>Tecnicentro Vehicular</h3>
+                <p>Recepcion digital, cola, diagnostico, evidencias, tiempos y ordenes de trabajo en una cabina especializada.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/tecnicentro/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
             {% else %}
             <article class="erp-card erp-module-card erp-dashboard-module">
                 <div class="erp-module-visual"><img src="{% static 'core/img/modules/module-generic.svg' %}" alt="" aria-hidden="true"></div>

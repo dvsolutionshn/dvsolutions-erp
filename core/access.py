@@ -60,6 +60,13 @@ CLINICA_PERMISSION_MAP = [
     ("servicios/", "puede_configuracion_clinica"),
 ]
 
+TECNICENTRO_PERMISSION_MAP = [
+    ("recepcion/", "puede_recepcion_taller"),
+    ("diagnosticos/", "puede_diagnostico_taller"),
+    ("ordenes/", "puede_operacion_taller"),
+    ("configuracion/", "puede_configuracion_taller"),
+]
+
 
 def permiso_facturacion_desde_ruta(path_suffix):
     if not path_suffix:
@@ -234,3 +241,13 @@ def permiso_clinica_desde_ruta(path_suffix):
         if normalized.startswith(prefix):
             return permiso
     return None
+
+
+def permiso_tecnicentro_desde_ruta(path_suffix):
+    if not path_suffix:
+        return None
+    normalized = path_suffix if path_suffix.endswith("/") else f"{path_suffix}/"
+    for prefix, permiso in TECNICENTRO_PERMISSION_MAP:
+        if normalized.startswith(prefix):
+            return permiso
+    return "puede_tecnicentro"
