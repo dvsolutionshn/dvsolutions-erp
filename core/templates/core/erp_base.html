@@ -303,7 +303,11 @@
             {% if empresa %}
             <div><strong>Empresa:</strong> {{ empresa.nombre }}</div>
             <div style="margin-top:10px;">
+                {% if '/dashboard/tecnicentro/' in request.path %}
+                <a href="{% url 'tecnicentro_logout' empresa.slug %}" style="color:#fff;">Cerrar Garage OS</a>
+                {% else %}
                 <a href="{% url 'cerrar_sesion' empresa.slug %}" style="color:#fff;">Cerrar sesion</a>
+                {% endif %}
             </div>
             {% endif %}
         </div>

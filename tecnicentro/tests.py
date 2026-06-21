@@ -97,3 +97,22 @@ class TecnicentroTests(TestCase):
         self.client.login(username="sin-taller", password="pass12345")
         response = self.client.get(reverse("tecnicentro_dashboard", args=[self.empresa.slug]))
         self.assertRedirects(response, reverse("dashboard", args=[self.empresa.slug]))
+
+    def test_login_exclusivo_tecnicentro_usa_mismas_credenciales(self):
+        self.client.logout()
+        login_url = reverse("tecnicentro_login", args=[self.empresa.slug])
+        response = self.client.get(login_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "GARAGE")
+        self.assertContains(response, "Acceso exclusivo al tecnicentro")
+
+        response = self.client.post(login_url, {
+            "username": "jefe-taller",
+            "password": "pass12345",
+        })
+        self.assertRedirects(response, reverse("tecnicentro_dashboard", args=[self.empresa.slug]))
+
+    def test_acceso_directo_sin_sesion_redirige_al_login_del_taller(self):
+        self.client.logout()
+        response = self.client.get(reverse("tecnicentro_dashboard", args=[self.empresa.slug]))
+        self.assertRedirects(response, reverse("tecnicentro_login", args=[self.empresa.slug]))

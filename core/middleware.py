@@ -197,6 +197,8 @@ class EmpresaAccessMiddleware:
         if len(parts) >= 3 and parts[1] == "dashboard" and parts[2] == "tecnicentro":
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
+            if empresa and not request.user.is_authenticated:
+                return redirect("tecnicentro_login", empresa_slug=empresa.slug)
             if empresa and request.user.is_authenticated:
                 if not request.user.is_superuser and request.user.empresa_id != empresa.id:
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
