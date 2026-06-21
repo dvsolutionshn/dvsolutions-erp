@@ -10,7 +10,8 @@ from .models import DiagnosticoVehicular, HistorialEstadoOrden, OrdenServicio, V
 class TecnicentroTests(TestCase):
     def setUp(self):
         self.empresa = Empresa.objects.create(
-            nombre="Taller Futuro", slug="taller-futuro", rtn="08011999007777", estado_licencia="activa"
+            nombre="Taller Futuro", slug="taller-futuro", rtn="08011999007777",
+            estado_licencia="activa", tipo_solucion="tecnicentro",
         )
         modulo, _ = Modulo.objects.get_or_create(codigo="tecnicentro", defaults={"nombre": "Tecnicentro Vehicular"})
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo, activo=True)
@@ -115,4 +116,9 @@ class TecnicentroTests(TestCase):
     def test_acceso_directo_sin_sesion_redirige_al_login_del_taller(self):
         self.client.logout()
         response = self.client.get(reverse("tecnicentro_dashboard", args=[self.empresa.slug]))
+        self.assertRedirects(response, reverse("tecnicentro_login", args=[self.empresa.slug]))
+
+    def test_enlace_principal_empresa_tecnicentro_abre_garage_os(self):
+        self.client.logout()
+        response = self.client.get(reverse("empresa_login", args=[self.empresa.slug]))
         self.assertRedirects(response, reverse("tecnicentro_login", args=[self.empresa.slug]))

@@ -190,6 +190,11 @@ class RolSistema(models.Model):
 
 
 class Empresa(models.Model):
+    TIPO_SOLUCION_CHOICES = [
+        ("erp", "ERP Empresarial"),
+        ("clinica", "Clinica y Centro Medico"),
+        ("tecnicentro", "Tecnicentro Vehicular"),
+    ]
     ESTADO_LICENCIA_CHOICES = [
         ("prueba", "Prueba"),
         ("activa", "Activa"),
@@ -199,6 +204,7 @@ class Empresa(models.Model):
 
     nombre = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
+    tipo_solucion = models.CharField(max_length=20, choices=TIPO_SOLUCION_CHOICES, default="erp", db_index=True)
 
     rtn = models.CharField(max_length=20, unique=True)
 

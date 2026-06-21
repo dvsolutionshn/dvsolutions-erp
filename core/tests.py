@@ -14,7 +14,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario
+from core.models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario
 from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 from core.backup_tokens import hash_token_respaldo
 from core.forms import EmpresaControlForm, RolSistemaForm
@@ -339,6 +339,27 @@ class SuperAdminControlTests(TestCase):
         self.assertFalse(usuario.has_usable_password())
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Activa tu acceso", mail.outbox[0].subject)
+
+    def test_crear_empresa_tecnicentro_activa_perfil_y_modulos_esenciales(self):
+        self.client.login(username="master", password="pass12345")
+        response = self.client.post(
+            reverse("superadmin_empresa_create"),
+            {
+                "nombre": "Duron Tecnicentro",
+                "tipo_solucion": "tecnicentro",
+                "slug": "duron",
+                "rtn": "08011999000991",
+                "pais": "Honduras",
+                "condiciones_pago": "Pago inmediato",
+                "activa": "on",
+            },
+        )
+        self.assertRedirects(response, reverse("superadmin_empresas"))
+        empresa = Empresa.objects.get(slug="duron")
+        self.assertEqual(empresa.tipo_solucion, "tecnicentro")
+        self.assertTrue(empresa.tiene_modulo_activo("tecnicentro"))
+        self.assertTrue(empresa.tiene_modulo_activo("facturacion"))
+        self.assertTrue(empresa.tiene_modulo_activo("punto_venta"))
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_superadmin_puede_crear_usuario_rapido_sin_invitacion(self):
@@ -867,6 +888,35 @@ class SuperAdminControlTests(TestCase):
         response = self.client.post(login_url, {"username": "usuario_login", "password": "ClaveCorrecta123"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "bloqueamos temporalmente este acceso")
+
+    def test_empresa_clinica_usa_login_medico_y_entra_directo_a_clinica(self):
+        empresa = Empresa.objects.create(
+            nombre="Clinica Perfil",
+            slug="clinica-perfil",
+            rtn="08011999000092",
+            tipo_solucion="clinica",
+            estado_licencia="activa",
+        )
+        modulo, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica", defaults={"nombre": "Clinica Medica", "es_comercial": True}
+        )
+        EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
+        Usuario.objects.create_user(
+            username="medico-perfil",
+            password="ClaveClinica2026",
+            empresa=empresa,
+            es_administrador_empresa=True,
+        )
+
+        login_url = reverse("empresa_login", args=[empresa.slug])
+        response = self.client.get(login_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "core/login_hospital_mia.html")
+        response = self.client.post(login_url, {
+            "username": "medico-perfil",
+            "password": "ClaveClinica2026",
+        })
+        self.assertRedirects(response, reverse("clinica_dashboard", args=[empresa.slug]))
 
     @override_settings(LOGIN_THROTTLE_LIMIT=3, LOGIN_THROTTLE_WINDOW_SECONDS=60)
     def test_superadmin_login_bloquea_acceso_tras_varios_intentos_fallidos(self):

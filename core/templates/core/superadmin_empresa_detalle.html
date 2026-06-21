@@ -35,6 +35,7 @@
         <div class="erp-kpi-label">Empresa</div>
         <p class="erp-stat-value" style="font-size:26px;">{{ empresa_obj.nombre }}</p>
         <p class="erp-card-muted">RTN {{ empresa_obj.rtn }}</p>
+        <span class="erp-badge {% if empresa_obj.tipo_solucion == 'tecnicentro' %}warning{% elif empresa_obj.tipo_solucion == 'clinica' %}info{% else %}neutral{% endif %}">{{ empresa_obj.get_tipo_solucion_display }}</span>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Plan Comercial</div>

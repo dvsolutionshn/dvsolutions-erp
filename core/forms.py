@@ -64,6 +64,7 @@ class EmpresaControlForm(forms.ModelForm):
         model = Empresa
         fields = [
             "nombre",
+            "tipo_solucion",
             "slug",
             "rtn",
             "plan_comercial",
@@ -89,6 +90,9 @@ class EmpresaControlForm(forms.ModelForm):
         if "estado_licencia" in self.fields:
             self.fields["estado_licencia"].initial = self.instance.estado_licencia or "prueba"
             self.fields["estado_licencia"].required = False
+        self.fields["tipo_solucion"].widget = forms.RadioSelect()
+        self.fields["tipo_solucion"].required = False
+        self.fields["tipo_solucion"].initial = self.instance.tipo_solucion or "erp"
         if self.instance.pk:
             self.fields["modulos_activos"].initial = Modulo.objects.filter(
                 empresamodulo__empresa=self.instance,
@@ -105,6 +109,7 @@ class EmpresaControlForm(forms.ModelForm):
         self.fields["modulos_activos"].help_text = "Sirve como activacion adicional o ajuste especial por empresa, ademas del plan comercial."
         textos = {
             "nombre": ("Nombre de la empresa", ""),
+            "tipo_solucion": ("Tipo de solucion", "Define el login, el panel inicial y los modulos esenciales de esta empresa."),
             "slug": ("Slug / enlace privado", "Este slug define la ruta privada de acceso de la empresa dentro del ERP."),
             "rtn": ("RTN", ""),
             "plan_comercial": ("Plan comercial", "Selecciona el plan que esta empresa tiene contratado hoy."),
@@ -143,6 +148,9 @@ class EmpresaControlForm(forms.ModelForm):
             self.add_error("fecha_vencimiento_plan", "La fecha de vencimiento no puede ser menor que la fecha de inicio.")
         return cleaned_data
 
+    def clean_tipo_solucion(self):
+        return self.cleaned_data.get("tipo_solucion") or self.instance.tipo_solucion or "erp"
+
     def save(self, commit=True):
         empresa = super().save(commit=commit)
         if commit:
@@ -158,6 +166,24 @@ class EmpresaControlForm(forms.ModelForm):
 
     def _save_modules(self, empresa):
         seleccionados = set(self.cleaned_data.get("modulos_activos", []))
+        catalogo_perfiles = {
+            "facturacion": "Facturacion",
+            "punto_venta": "Punto de Venta",
+            "clinica_medica": "Clinica Medica",
+            "agenda_citas": "Agenda de Citas",
+            "tecnicentro": "Tecnicentro Vehicular",
+        }
+        perfiles = {
+            "erp": {"facturacion"},
+            "clinica": {"facturacion", "punto_venta", "clinica_medica", "agenda_citas"},
+            "tecnicentro": {"facturacion", "punto_venta", "tecnicentro"},
+        }
+        for codigo in perfiles.get(empresa.tipo_solucion, {"facturacion"}):
+            modulo, _ = Modulo.objects.get_or_create(
+                codigo=codigo,
+                defaults={"nombre": catalogo_perfiles[codigo], "es_comercial": True},
+            )
+            seleccionados.add(modulo)
         if empresa.plan_comercial_id:
             seleccionados.update(
                 Modulo.objects.filter(

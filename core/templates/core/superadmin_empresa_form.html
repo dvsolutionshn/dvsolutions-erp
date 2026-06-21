@@ -16,11 +16,21 @@
     {% endif %}
 
     <section class="erp-form-card">
+        <h3>Tipo de solucion</h3>
+        <p>Este perfil define automaticamente la puerta de entrada, experiencia principal y modulos esenciales.</p>
+        <div class="erp-soft-panel solution-profile-selector">
+            {{ form.tipo_solucion }}
+            {{ form.tipo_solucion.errors }}
+            <div class="erp-field-help">Puedes agregar modulos adicionales mas abajo sin perder la identidad seleccionada.</div>
+        </div>
+    </section>
+
+    <section class="erp-form-card">
         <h3>Perfil empresarial</h3>
         <p>Este formulario queda reservado para tu operacion interna y no se expone a los clientes finales.</p>
         <div class="erp-form-grid">
             {% for field in form %}
-                {% if field.name != 'modulos_activos' %}
+                {% if field.name != 'modulos_activos' and field.name != 'tipo_solucion' %}
                 <div class="erp-field {% if field.name == 'direccion' or field.name == 'slogan' or field.name == 'observaciones_comerciales' %}erp-field-span-full{% endif %}">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
@@ -59,4 +69,7 @@
         <button type="submit" class="erp-btn">Guardar Empresa</button>
     </div>
 </form>
+<style>
+.solution-profile-selector ul{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:14px;list-style:none;margin:0;padding:0}.solution-profile-selector li{margin:0}.solution-profile-selector label{display:flex;align-items:center;gap:10px;min-height:76px;padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff;color:#102338;font-weight:800;cursor:pointer}.solution-profile-selector label:has(input:checked){border-color:#2a86e8;background:linear-gradient(145deg,#f2f8ff,#f7fffe);box-shadow:0 0 0 3px rgba(42,134,232,.09)}.solution-profile-selector input{width:18px;height:18px}@media(max-width:760px){.solution-profile-selector ul{grid-template-columns:1fr}}
+</style>
 {% endblock %}

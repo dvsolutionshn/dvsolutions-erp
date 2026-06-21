@@ -48,6 +48,7 @@
         <h3>{{ empresa.nombre }}</h3>
         <p>{{ empresa.plan_comercial.nombre|default:"Sin plan asignado" }}</p>
         <div class="erp-inline-actions" style="margin-bottom:10px;">
+            <span class="erp-badge {% if empresa.tipo_solucion == 'tecnicentro' %}warning{% elif empresa.tipo_solucion == 'clinica' %}info{% else %}neutral{% endif %}">{{ empresa.get_tipo_solucion_display }}</span>
             <span class="erp-badge {% if empresa.activa %}success{% else %}danger{% endif %}">{% if empresa.activa %}Activa{% else %}Inactiva{% endif %}</span>
             <span class="erp-badge {% if empresa.estado_licencia_resuelto == 'activa' %}success{% elif empresa.estado_licencia_resuelto == 'prueba' %}info{% elif empresa.estado_licencia_resuelto == 'suspendida' %}warning{% else %}danger{% endif %}">{{ empresa.estado_licencia_resuelto|capfirst }}</span>
             <span class="erp-badge neutral">{{ empresa.modulos_habilitados_total }} modulos</span>

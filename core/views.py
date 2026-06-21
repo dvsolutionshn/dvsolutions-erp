@@ -379,7 +379,9 @@ def _minutes_remaining(seconds):
 
 def empresa_login(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
-    template_name = "core/login_hospital_mia.html"
+    if empresa.tipo_solucion == "tecnicentro":
+        return redirect("tecnicentro_login", empresa_slug=empresa.slug)
+    template_name = "core/login_hospital_mia.html" if empresa.tipo_solucion == "clinica" else "core/login.html"
     _flash_session_expired_message(request)
     throttle_scope = f"empresa:{empresa.slug}"
 
@@ -401,6 +403,8 @@ def empresa_login(request, slug=None):
             if user.empresa == empresa:
                 _clear_login_failures(throttle_scope, request)
                 login(request, user)
+                if empresa.tipo_solucion == "clinica" and empresa.tiene_modulo_activo("clinica_medica"):
+                    return redirect("clinica_dashboard", empresa_slug=empresa.slug)
                 return _redirect_dashboard_empresa(request, empresa)
             else:
                 bloqueo_restante = _register_login_failure(throttle_scope, request)
