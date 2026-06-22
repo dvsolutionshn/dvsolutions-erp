@@ -130,6 +130,8 @@ class CRMTests(TestCase):
         response = self.client.get(url)
         self.assertContains(response, "Tipo de consulta")
         self.assertContains(response, "Doctor / profesional")
+        self.assertContains(response, "Fecha y hora")
+        self.assertContains(response, "appointment-datetime")
         self.assertContains(response, "Dr. Carlos Demo")
         self.assertNotContains(response, "<label for=\"id_titulo\">", html=False)
         self.assertNotContains(response, "id_duracion_minutos")

@@ -79,7 +79,7 @@ class CitaClienteForm(forms.ModelForm):
         for minuto in (0, 15, 30, 45)
     ]
     fecha_cita = forms.DateField(
-        label="Fecha",
+        label="Fecha y hora",
         required=False,
         widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         input_formats=["%Y-%m-%d"],
