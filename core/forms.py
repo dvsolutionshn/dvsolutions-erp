@@ -562,7 +562,7 @@ class RolSistemaForm(forms.ModelForm):
             "puede_configuracion_rrhh": ("Puede configurar RRHH", ""),
             "puede_crm": ("Puede entrar a CRM", ""),
             "puede_campanias": ("Puede gestionar campanas", ""),
-            "puede_citas": ("Puede gestionar agenda y citas", ""),
+            "puede_citas": ("Gestionar Agenda y Citas", "Autoriza entrar al calendario, crear y editar citas, cambiar estados y usar las vistas mensual, semanal y diaria."),
             "puede_configuracion_crm": ("Puede configurar CRM", ""),
             "puede_clinica": ("Puede entrar a Clinica", ""),
             "puede_pacientes": ("Puede gestionar pacientes", ""),
