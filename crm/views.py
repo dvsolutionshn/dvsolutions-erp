@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -449,4 +450,32 @@ def actualizar_estado_cita(request, empresa_slug, cita_id):
     vista = request.POST.get("vista", "mes")
     fecha = request.POST.get("fecha", timezone.localdate().isoformat())
     url = reverse("agenda_citas", args=[empresa.slug])
+    return redirect(f"{url}?vista={vista}&fecha={fecha}")
+
+
+@login_required
+@require_POST
+def eliminar_cita(request, empresa_slug, cita_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    cita = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id)
+    motivo = (request.POST.get("motivo_eliminacion") or "").strip()
+    vista = request.POST.get("vista", "mes")
+    fecha = request.POST.get("fecha", timezone.localdate().isoformat())
+    url = reverse("agenda_citas", args=[empresa.slug])
+
+    if len(motivo) < 5:
+        messages.error(request, "Explica el motivo de la eliminación con al menos 5 caracteres.")
+        return redirect(f"{url}?vista={vista}&fecha={fecha}")
+
+    referencia = cita.display_servicio or cita.titulo
+    paciente = cita.display_cliente
+    cita_clinica = cita.cita_clinica
+    with transaction.atomic():
+        # Los recordatorios de WhatsApp se eliminan en cascada junto con la cita.
+        cita.delete()
+        # La agenda clínica es el registro operativo vinculado; no debe quedar huérfano.
+        if cita_clinica:
+            cita_clinica.delete()
+
+    messages.success(request, f"Cita eliminada: {referencia} · {paciente}.")
     return redirect(f"{url}?vista={vista}&fecha={fecha}")

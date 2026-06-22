@@ -151,6 +151,63 @@ class CRMTests(TestCase):
         self.assertEqual(cita_clinica.servicio, servicio)
         self.assertEqual(cita_clinica.estado, "confirmada")
 
+    def test_eliminar_cita_exige_motivo_y_limpia_registros_vinculados(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa, expediente_codigo="EXP-DEL", nombre="Paciente Eliminación"
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa, nombre="Consulta para eliminar", duracion_minutos=30
+        )
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. Auditoría")
+        fecha_hora = timezone.make_aware(datetime(2026, 6, 25, 14, 0))
+        cita_clinica = CitaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            profesional=doctor,
+            servicio=servicio,
+            fecha_hora=fecha_hora,
+            motivo=servicio.nombre,
+        )
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=doctor,
+            cita_clinica=cita_clinica,
+            titulo=servicio.nombre,
+            responsable=doctor.nombre,
+            fecha_hora=fecha_hora,
+        )
+        notificacion = NotificacionCitaWhatsApp.objects.create(
+            cita=cita,
+            tipo="dia",
+            programada_para=fecha_hora - timedelta(days=1),
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_cita_eliminar", args=[self.empresa.slug, cita.id])
+
+        response = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
+        self.assertContains(response, "Eliminar cita")
+        self.assertContains(response, "Motivo obligatorio")
+
+        response = self.client.post(url, {
+            "motivo_eliminacion": "no", "vista": "dia", "fecha": "2026-06-25",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(CitaCliente.objects.filter(id=cita.id).exists())
+        self.assertTrue(CitaClinica.objects.filter(id=cita_clinica.id).exists())
+
+        response = self.client.post(url, {
+            "motivo_eliminacion": "El paciente canceló definitivamente",
+            "vista": "dia", "fecha": "2026-06-25",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(CitaCliente.objects.filter(id=cita.id).exists())
+        self.assertFalse(CitaClinica.objects.filter(id=cita_clinica.id).exists())
+        self.assertFalse(NotificacionCitaWhatsApp.objects.filter(id=notificacion.id).exists())
+
     @patch("crm.appointment_notifications.enviar_plantilla_cita_whatsapp")
     def test_hospital_mia_programa_y_envia_recordatorios_sin_duplicar(self, mock_enviar):
         mock_enviar.return_value = {"messages": [{"id": "wamid.cita"}]}
