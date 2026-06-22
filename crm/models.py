@@ -153,8 +153,12 @@ class CitaCliente(models.Model):
     ]
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="citas_clientes")
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="citas")
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, null=True, blank=True, related_name="citas")
     producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name="citas")
+    paciente = models.ForeignKey("clinica.Paciente", on_delete=models.CASCADE, null=True, blank=True, related_name="citas_agenda")
+    servicio_clinico = models.ForeignKey("clinica.ServicioClinico", on_delete=models.SET_NULL, null=True, blank=True, related_name="citas_agenda")
+    profesional_salud = models.ForeignKey("clinica.ProfesionalSalud", on_delete=models.SET_NULL, null=True, blank=True, related_name="citas_agenda")
+    cita_clinica = models.OneToOneField("clinica.CitaClinica", on_delete=models.SET_NULL, null=True, blank=True, related_name="cita_agenda")
     titulo = models.CharField(max_length=180)
     fecha_hora = models.DateTimeField()
     duracion_minutos = models.PositiveIntegerField(default=60)
@@ -167,15 +171,33 @@ class CitaCliente(models.Model):
         ordering = ["fecha_hora"]
 
     def __str__(self):
-        return f"{self.titulo} - {self.cliente}"
+        return f"{self.titulo} - {self.display_cliente}"
+
+    @property
+    def display_cliente(self):
+        return self.paciente.nombre if self.paciente_id else (self.cliente.nombre if self.cliente_id else "Sin paciente")
+
+    @property
+    def display_servicio(self):
+        return self.servicio_clinico.nombre if self.servicio_clinico_id else (self.producto.nombre if self.producto_id else "Sin tipo de consulta")
+
+    @property
+    def display_responsable(self):
+        return self.profesional_salud.nombre if self.profesional_salud_id else (self.responsable or "Sin responsable")
 
     @property
     def whatsapp_url(self):
-        telefono = "".join(ch for ch in (self.cliente.telefono_whatsapp or self.cliente.telefono or "") if ch.isdigit())
+        if self.paciente_id:
+            contacto = self.paciente.whatsapp or self.paciente.telefono or ""
+        elif self.cliente_id:
+            contacto = self.cliente.telefono_whatsapp or self.cliente.telefono or ""
+        else:
+            contacto = ""
+        telefono = "".join(ch for ch in contacto if ch.isdigit())
         if telefono and not telefono.startswith("504") and len(telefono) == 8:
             telefono = f"504{telefono}"
         mensaje = (
-            f"Hola {self.cliente.nombre}, le recordamos su cita {self.titulo} "
+            f"Hola {self.display_cliente}, le recordamos su cita {self.titulo} "
             f"para el {timezone.localtime(self.fecha_hora).strftime('%d/%m/%Y %I:%M %p')}."
         )
         return f"https://wa.me/{telefono}?text={quote(mensaje)}" if telefono else ""

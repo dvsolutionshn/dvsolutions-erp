@@ -1,6 +1,7 @@
 from django import forms
 
 from facturacion.models import Cliente, Producto
+from clinica.models import Paciente, ProfesionalSalud, ServicioClinico
 
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, PlantillaMensaje
 
@@ -67,7 +68,7 @@ class CampaniaMarketingForm(forms.ModelForm):
 class CitaClienteForm(forms.ModelForm):
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "producto", "titulo", "fecha_hora", "duracion_minutos", "responsable", "estado", "observacion"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "observacion"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "observacion": forms.Textarea(attrs={"rows": 3}),
@@ -75,13 +76,46 @@ class CitaClienteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop("empresa", None)
+        self.empresa = empresa
         super().__init__(*args, **kwargs)
+        self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
         if empresa:
             self.fields["cliente"].queryset = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["producto"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            self.fields["paciente"].queryset = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            self.fields["servicio_clinico"].queryset = ServicioClinico.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            self.fields["profesional_salud"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
         else:
             self.fields["cliente"].queryset = Cliente.objects.none()
             self.fields["producto"].queryset = Producto.objects.none()
+            self.fields["paciente"].queryset = Paciente.objects.none()
+            self.fields["servicio_clinico"].queryset = ServicioClinico.objects.none()
+            self.fields["profesional_salud"].queryset = ProfesionalSalud.objects.none()
         self.fields["producto"].required = False
         self.fields["duracion_minutos"].label = "Duración (minutos)"
         self.fields["fecha_hora"].input_formats = ["%Y-%m-%dT%H:%M"]
+        if self.es_clinica:
+            for nombre in ["cliente", "producto", "titulo", "responsable"]:
+                self.fields.pop(nombre)
+            self.fields["paciente"].label = "Paciente"
+            self.fields["paciente"].required = True
+            self.fields["servicio_clinico"].label = "Tipo de consulta"
+            self.fields["servicio_clinico"].required = True
+            self.fields["profesional_salud"].label = "Doctor / profesional"
+            self.fields["profesional_salud"].required = True
+            self.fields["observacion"].label = "Motivo o notas de la cita"
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_hora", "duracion_minutos", "estado", "observacion"])
+        else:
+            for nombre in ["paciente", "servicio_clinico", "profesional_salud"]:
+                self.fields.pop(nombre)
+
+    def save(self, commit=True):
+        cita = super().save(commit=False)
+        if self.es_clinica:
+            cita.titulo = cita.servicio_clinico.nombre
+            cita.responsable = cita.profesional_salud.nombre
+            cita.cliente = cita.paciente.cliente
+            cita.producto = None
+        if commit:
+            cita.save()
+        return cita

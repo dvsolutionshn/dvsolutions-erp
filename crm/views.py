@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 
 from core.models import Empresa
 from facturacion.models import Cliente, Producto
+from clinica.models import CitaClinica
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PlantillaMensajeForm
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
@@ -63,7 +64,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False):
     citas = list(
         CitaCliente.objects.filter(
             empresa=empresa, fecha_hora__date__gte=inicio, fecha_hora__date__lte=fin
-        ).select_related("cliente", "producto").order_by("fecha_hora")
+        ).select_related("cliente", "producto", "paciente", "servicio_clinico", "profesional_salud").order_by("fecha_hora")
     )
     por_fecha = {}
     for cita in citas:
@@ -88,7 +89,35 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False):
         "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
         "cita_editando": getattr(form, "instance", None) if getattr(form, "instance", None) and form.instance.pk else None,
         "estados_cita": CitaCliente.ESTADO_CHOICES,
+        "es_clinica": bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")),
     }
+
+
+def _sincronizar_cita_clinica(cita):
+    if not cita.paciente_id:
+        return
+    estados = {
+        "pendiente": "solicitada", "confirmada": "confirmada",
+        "realizada": "completada", "cancelada": "cancelada",
+    }
+    valores = {
+        "empresa": cita.empresa,
+        "paciente": cita.paciente,
+        "profesional": cita.profesional_salud,
+        "servicio": cita.servicio_clinico,
+        "fecha_hora": cita.fecha_hora,
+        "estado": estados.get(cita.estado, "solicitada"),
+        "canal": "recepcion",
+        "motivo": cita.observacion or cita.titulo,
+        "observaciones": cita.observacion,
+    }
+    if cita.cita_clinica_id:
+        for campo, valor in valores.items():
+            setattr(cita.cita_clinica, campo, valor)
+        cita.cita_clinica.save()
+    else:
+        cita.cita_clinica = CitaClinica.objects.create(**valores)
+        cita.save(update_fields=["cita_clinica"])
 
 
 @login_required
@@ -360,6 +389,7 @@ def citas(request, empresa_slug):
         cita = form.save(commit=False)
         cita.empresa = empresa
         cita.save()
+        _sincronizar_cita_clinica(cita)
         messages.success(request, "Cita guardada correctamente.")
         return redirect("crm_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form))
@@ -375,6 +405,7 @@ def agenda_citas(request, empresa_slug):
         cita = form.save(commit=False)
         cita.empresa = empresa
         cita.save()
+        _sincronizar_cita_clinica(cita)
         messages.success(request, "Cita actualizada correctamente." if objeto else "Cita guardada correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
@@ -392,6 +423,7 @@ def actualizar_estado_cita(request, empresa_slug, cita_id):
     else:
         cita.estado = estado
         cita.save(update_fields=["estado"])
+        _sincronizar_cita_clinica(cita)
         messages.success(request, f"Cita marcada como {cita.get_estado_display()}.")
     vista = request.POST.get("vista", "mes")
     fecha = request.POST.get("fecha", timezone.localdate().isoformat())

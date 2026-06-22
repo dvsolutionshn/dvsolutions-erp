@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from facturacion.models import Cliente
+from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
 from .services import subir_media_whatsapp
@@ -107,6 +108,45 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 302)
         cita.refresh_from_db()
         self.assertEqual(cita.estado, "realizada")
+
+    def test_agenda_clinica_usa_paciente_tipo_consulta_y_doctor(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica", defaults={"nombre": "Clínica Médica", "es_comercial": True}
+        )
+        EmpresaModulo.objects.get_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
+        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-001", nombre="Paciente Clínico")
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa, nombre="Consulta de cardiología", categoria="consulta", duracion_minutos=45
+        )
+        doctor = ProfesionalSalud.objects.create(
+            empresa=self.empresa, nombre="Dr. Carlos Demo", especialidad="Cardiología"
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_citas", args=[self.empresa.slug])
+
+        response = self.client.get(url)
+        self.assertContains(response, "Tipo de consulta")
+        self.assertContains(response, "Doctor / profesional")
+        self.assertContains(response, "Dr. Carlos Demo")
+        self.assertNotContains(response, "<label for=\"id_titulo\">", html=False)
+
+        response = self.client.post(url, {
+            "paciente": paciente.id, "servicio_clinico": servicio.id,
+            "profesional_salud": doctor.id, "fecha_hora": "2026-06-24T11:00",
+            "duracion_minutos": "45", "estado": "confirmada", "observacion": "Primera valoración",
+        })
+        self.assertEqual(response.status_code, 302)
+        cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
+        self.assertEqual(cita.titulo, "Consulta de cardiología")
+        self.assertEqual(cita.responsable, "Dr. Carlos Demo")
+        self.assertEqual(cita.profesional_salud, doctor)
+        cita_clinica = CitaClinica.objects.get(id=cita.cita_clinica_id)
+        self.assertEqual(cita_clinica.paciente, paciente)
+        self.assertEqual(cita_clinica.profesional, doctor)
+        self.assertEqual(cita_clinica.servicio, servicio)
+        self.assertEqual(cita_clinica.estado, "confirmada")
 
     def test_preparar_envios_de_campania_crea_whatsapp_por_cliente(self):
         cliente = Cliente.objects.create(

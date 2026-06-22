@@ -390,7 +390,9 @@ def empresa_login(request, slug=None):
     if empresa.tipo_solucion == "tecnicentro":
         return redirect("tecnicentro_login", empresa_slug=empresa.slug)
     es_perfil_clinico = _es_perfil_clinico(empresa)
-    template_name = "core/login_hospital_mia.html" if es_perfil_clinico else "core/login.html"
+    # Todas las empresas comparten la experiencia premium; Tecnicentro conserva
+    # su acceso Garage OS independiente definido arriba.
+    template_name = "core/login_hospital_mia.html"
     _flash_session_expired_message(request)
     throttle_scope = f"empresa:{empresa.slug}"
 

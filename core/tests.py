@@ -948,6 +948,17 @@ class SuperAdminControlTests(TestCase):
             self.assertTemplateUsed(response, "core/login_hospital_mia.html")
             self.assertContains(response, "Sistema Clínico")
 
+    def test_empresa_erp_tambien_usa_login_futurista_empresarial(self):
+        empresa = Empresa.objects.create(
+            nombre="ERP Futuro", slug="erp-futuro", rtn="08011999000871",
+            tipo_solucion="erp", estado_licencia="activa",
+        )
+        response = self.client.get(reverse("empresa_login", args=[empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "core/login_hospital_mia.html")
+        self.assertContains(response, "Sistema Empresarial")
+        self.assertContains(response, "ERP Futuro")
+
     @override_settings(LOGIN_THROTTLE_LIMIT=3, LOGIN_THROTTLE_WINDOW_SECONDS=60)
     def test_superadmin_login_bloquea_acceso_tras_varios_intentos_fallidos(self):
         login_url = reverse("superadmin_login")
