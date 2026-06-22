@@ -340,7 +340,7 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Activa tu acceso", mail.outbox[0].subject)
 
-    def test_control_muestra_acceso_ordenado_y_permiso_destacado_de_citas(self):
+    def test_control_muestra_permisos_destacados_de_clinica_y_citas(self):
         self.client.login(username="master", password="pass12345")
 
         response = self.client.get(reverse("superadmin_usuario_create"))
@@ -355,6 +355,9 @@ class SuperAdminControlTests(TestCase):
         self.assertContains(response, "Calendario y gestión de citas")
         self.assertContains(response, "id_puede_citas")
         self.assertContains(response, "Habilitar Citas")
+        self.assertContains(response, "id_puede_clinica")
+        self.assertContains(response, "Habilitar Clínica")
+        self.assertContains(response, "Expedientes clínicos")
 
     def test_crear_empresa_tecnicentro_activa_perfil_y_modulos_esenciales(self):
         self.client.login(username="master", password="pass12345")

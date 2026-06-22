@@ -10,8 +10,8 @@
 
 {% block content %}
 <style>
-.role-permission-feature{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:19px;border:1px solid rgba(184,151,85,.38);border-radius:15px;background:linear-gradient(145deg,#fcfaf5,#f6f1e6)}.role-permission-feature h4{margin:0;color:#24374a;font-size:16px}.role-permission-feature p{margin:6px 0 0;color:#697887;font-size:11px;line-height:1.55}.role-permission-toggle label{display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid #d3c39f;border-radius:11px;background:#fff;color:#27394b;font-size:12px;font-weight:900}.role-permission-toggle input[type="checkbox"]{width:20px!important;height:20px;margin:0;padding:0!important;accent-color:#9a773e}.role-section-note{margin:7px 0 17px;color:#728292;font-size:11px}.erp-form-grid .erp-field input[type="checkbox"]{width:18px;height:18px;padding:0;margin-top:5px;accent-color:#2878d0}
-@media(max-width:700px){.role-permission-feature{grid-template-columns:1fr}}
+.role-clinical-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.role-permission-feature{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:19px;border:1px solid #cbdbe5;border-radius:15px;background:linear-gradient(145deg,#f9fbfc,#f1f6f8)}.role-permission-feature.primary{border-color:#aac8d5;background:linear-gradient(145deg,#f5fafb,#eaf3f6)}.role-permission-feature h4{margin:0;color:#24374a;font-size:16px}.role-permission-feature p{margin:6px 0 0;color:#697887;font-size:11px;line-height:1.55}.role-permission-toggle label{display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid #b8ced9;border-radius:11px;background:#fff;color:#27394b;font-size:12px;font-weight:900}.role-permission-toggle input[type="checkbox"]{width:20px!important;height:20px;margin:0;padding:0!important;accent-color:#276a7b}.role-section-note{margin:7px 0 17px;color:#728292;font-size:11px}.erp-form-grid .erp-field input[type="checkbox"]{width:18px;height:18px;padding:0;margin-top:5px;accent-color:#2878d0}
+@media(max-width:900px){.role-clinical-grid{grid-template-columns:1fr}}@media(max-width:700px){.role-permission-feature{grid-template-columns:1fr}}
 </style>
 <form method="post" class="erp-form-shell">
     {% csrf_token %}
@@ -32,9 +32,21 @@
     </section>
 
     <section class="erp-form-card">
-        <div class="role-permission-feature">
-            <div><div class="erp-kpi-label">Agenda operativa</div><h4>Calendario y gestión de citas</h4><p>Permite al usuario entrar al módulo de Citas, visualizar mes, semana y día, crear o editar citas, actualizar estados y enviar recordatorios.</p></div>
-            <div class="role-permission-toggle"><label for="{{ form.puede_citas.id_for_label }}">{{ form.puede_citas }} Habilitar Citas</label>{{ form.puede_citas.errors }}</div>
+        <h3>Clínica y citas</h3>
+        <p class="role-section-note">Puedes habilitar únicamente el calendario o combinarlo con las funciones clínicas que necesite cada usuario.</p>
+        <div class="role-clinical-grid">
+            <div class="role-permission-feature primary">
+                <div><div class="erp-kpi-label">Módulo médico</div><h4>Clínica</h4><p>Acceso al panel clínico y a la operación de citas clínicas del hospital.</p></div>
+                <div class="role-permission-toggle"><label for="{{ form.puede_clinica.id_for_label }}">{{ form.puede_clinica }} Habilitar Clínica</label>{{ form.puede_clinica.errors }}</div>
+            </div>
+            <div class="role-permission-feature primary">
+                <div><div class="erp-kpi-label">Agenda operativa</div><h4>Calendario y gestión de citas</h4><p>Permite visualizar mes, semana y día, crear o editar citas, cambiar estados y gestionar recordatorios.</p></div>
+                <div class="role-permission-toggle"><label for="{{ form.puede_citas.id_for_label }}">{{ form.puede_citas }} Habilitar Citas</label>{{ form.puede_citas.errors }}</div>
+            </div>
+            <div class="role-permission-feature"><div><h4>Pacientes</h4><p>{{ form.puede_pacientes.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_pacientes.id_for_label }}">{{ form.puede_pacientes }} Habilitar</label>{{ form.puede_pacientes.errors }}</div></div>
+            <div class="role-permission-feature"><div><h4>Expedientes clínicos</h4><p>{{ form.puede_expediente_clinico.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_expediente_clinico.id_for_label }}">{{ form.puede_expediente_clinico }} Habilitar</label>{{ form.puede_expediente_clinico.errors }}</div></div>
+            <div class="role-permission-feature"><div><h4>Tratamientos</h4><p>{{ form.puede_tratamientos_clinicos.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_tratamientos_clinicos.id_for_label }}">{{ form.puede_tratamientos_clinicos }} Habilitar</label>{{ form.puede_tratamientos_clinicos.errors }}</div></div>
+            <div class="role-permission-feature"><div><h4>Configuración clínica</h4><p>{{ form.puede_configuracion_clinica.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_configuracion_clinica.id_for_label }}">{{ form.puede_configuracion_clinica }} Habilitar</label>{{ form.puede_configuracion_clinica.errors }}</div></div>
         </div>
     </section>
 
@@ -43,7 +55,7 @@
         <p class="role-section-note">Activa únicamente las áreas necesarias para las responsabilidades de este rol.</p>
         <div class="erp-form-grid">
             {% for field in form %}
-                {% if field.name != 'nombre' and field.name != 'codigo' and field.name != 'descripcion' and field.name != 'activo' and field.name != 'puede_citas' and field.name != 'puede_crear_facturas' and field.name != 'puede_editar_facturas' and field.name != 'puede_anular_facturas' and field.name != 'puede_eliminar_borradores' and field.name != 'puede_registrar_pagos_clientes' and field.name != 'puede_crear_clientes' and field.name != 'puede_editar_clientes' and field.name != 'puede_crear_productos' and field.name != 'puede_editar_productos' and field.name != 'puede_crear_proveedores' and field.name != 'puede_editar_proveedores' and field.name != 'puede_ajustar_inventario' and field.name != 'puede_crear_compras' and field.name != 'puede_editar_compras' and field.name != 'puede_aplicar_compras' and field.name != 'puede_anular_compras' and field.name != 'puede_registrar_pagos_proveedores' and field.name != 'puede_crear_notas_credito' and field.name != 'puede_editar_notas_credito' and field.name != 'puede_anular_notas_credito' and field.name != 'puede_exportar_reportes' %}
+                {% if field.name != 'nombre' and field.name != 'codigo' and field.name != 'descripcion' and field.name != 'activo' and field.name != 'puede_citas' and field.name != 'puede_clinica' and field.name != 'puede_pacientes' and field.name != 'puede_expediente_clinico' and field.name != 'puede_tratamientos_clinicos' and field.name != 'puede_configuracion_clinica' and field.name != 'puede_crear_facturas' and field.name != 'puede_editar_facturas' and field.name != 'puede_anular_facturas' and field.name != 'puede_eliminar_borradores' and field.name != 'puede_registrar_pagos_clientes' and field.name != 'puede_crear_clientes' and field.name != 'puede_editar_clientes' and field.name != 'puede_crear_productos' and field.name != 'puede_editar_productos' and field.name != 'puede_crear_proveedores' and field.name != 'puede_editar_proveedores' and field.name != 'puede_ajustar_inventario' and field.name != 'puede_crear_compras' and field.name != 'puede_editar_compras' and field.name != 'puede_aplicar_compras' and field.name != 'puede_anular_compras' and field.name != 'puede_registrar_pagos_proveedores' and field.name != 'puede_crear_notas_credito' and field.name != 'puede_editar_notas_credito' and field.name != 'puede_anular_notas_credito' and field.name != 'puede_exportar_reportes' %}
                 <div class="erp-field">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
