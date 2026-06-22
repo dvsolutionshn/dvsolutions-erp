@@ -14,6 +14,8 @@ from clinica.models import CitaClinica
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PlantillaMensajeForm
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
+from .appointment_notifications import procesar_notificacion, programar_notificaciones_cita
+from .models import NotificacionCitaWhatsApp
 from .services import (
     WhatsAppAPIError,
     enviar_imagen_whatsapp,
@@ -90,6 +92,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False):
         "cita_editando": getattr(form, "instance", None) if getattr(form, "instance", None) and form.instance.pk else None,
         "estados_cita": CitaCliente.ESTADO_CHOICES,
         "es_clinica": bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")),
+        "es_hospital_mia": empresa.slug == "hospital_mia",
     }
 
 
@@ -118,6 +121,21 @@ def _sincronizar_cita_clinica(cita):
     else:
         cita.cita_clinica = CitaClinica.objects.create(**valores)
         cita.save(update_fields=["cita_clinica"])
+
+
+def _programar_whatsapp_cita(request, cita):
+    notificaciones = programar_notificaciones_cita(cita)
+    confirmacion = next(
+        (item for item in notificaciones if item.tipo == NotificacionCitaWhatsApp.TIPO_CONFIRMACION),
+        None,
+    )
+    if not confirmacion or confirmacion.estado == "enviado":
+        return
+    resultado = procesar_notificacion(confirmacion.id)
+    if resultado.estado == "enviado":
+        messages.success(request, "Confirmación de la cita enviada por WhatsApp.")
+    elif resultado.estado == "error":
+        messages.warning(request, f"La cita se guardó, pero WhatsApp respondió con error: {resultado.ultimo_error}")
 
 
 @login_required
@@ -390,6 +408,7 @@ def citas(request, empresa_slug):
         cita.empresa = empresa
         cita.save()
         _sincronizar_cita_clinica(cita)
+        _programar_whatsapp_cita(request, cita)
         messages.success(request, "Cita guardada correctamente.")
         return redirect("crm_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form))
@@ -406,6 +425,7 @@ def agenda_citas(request, empresa_slug):
         cita.empresa = empresa
         cita.save()
         _sincronizar_cita_clinica(cita)
+        _programar_whatsapp_cita(request, cita)
         messages.success(request, "Cita actualizada correctamente." if objeto else "Cita guardada correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
@@ -424,6 +444,7 @@ def actualizar_estado_cita(request, empresa_slug, cita_id):
         cita.estado = estado
         cita.save(update_fields=["estado"])
         _sincronizar_cita_clinica(cita)
+        programar_notificaciones_cita(cita)
         messages.success(request, f"Cita marcada como {cita.get_estado_display()}.")
     vista = request.POST.get("vista", "mes")
     fecha = request.POST.get("fecha", timezone.localdate().isoformat())

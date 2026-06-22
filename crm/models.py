@@ -20,6 +20,8 @@ class ConfiguracionCRM(models.Model):
     whatsapp_idioma_plantilla = models.CharField(max_length=12, default="en_US")
     whatsapp_plantilla_marketing = models.CharField(max_length=80, default="promo_general_imagen")
     whatsapp_idioma_marketing = models.CharField(max_length=12, default="es")
+    whatsapp_plantilla_cita = models.CharField(max_length=80, default="recordatorio_cita")
+    whatsapp_idioma_cita = models.CharField(max_length=12, default="es")
     remitente_correo = models.EmailField(blank=True, null=True)
     recordatorio_cumpleanos_activo = models.BooleanField(default=True)
     recordatorio_citas_activo = models.BooleanField(default=True)
@@ -165,6 +167,9 @@ class CitaCliente(models.Model):
     responsable = models.CharField(max_length=120, blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
     observacion = models.TextField(blank=True, null=True)
+    enviar_confirmacion_whatsapp = models.BooleanField(default=False)
+    recordatorio_semana_whatsapp = models.BooleanField(default=True)
+    recordatorio_dia_whatsapp = models.BooleanField(default=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -201,3 +206,38 @@ class CitaCliente(models.Model):
             f"para el {timezone.localtime(self.fecha_hora).strftime('%d/%m/%Y %I:%M %p')}."
         )
         return f"https://wa.me/{telefono}?text={quote(mensaje)}" if telefono else ""
+
+
+class NotificacionCitaWhatsApp(models.Model):
+    TIPO_CONFIRMACION = "confirmacion"
+    TIPO_SEMANA = "semana"
+    TIPO_DIA = "dia"
+    TIPO_CHOICES = [
+        (TIPO_CONFIRMACION, "Confirmación al crear"),
+        (TIPO_SEMANA, "Recordatorio 7 días antes"),
+        (TIPO_DIA, "Recordatorio 1 día antes"),
+    ]
+    ESTADO_CHOICES = [
+        ("pendiente", "Pendiente"), ("enviado", "Enviado"),
+        ("error", "Error"), ("omitido", "Omitido"),
+    ]
+
+    cita = models.ForeignKey(CitaCliente, on_delete=models.CASCADE, related_name="notificaciones_whatsapp")
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    programada_para = models.DateTimeField(db_index=True)
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="pendiente", db_index=True)
+    intentos = models.PositiveIntegerField(default=0)
+    ultimo_error = models.TextField(blank=True)
+    respuesta = models.JSONField(default=dict, blank=True)
+    enviada_en = models.DateTimeField(null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["programada_para", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["cita", "tipo"], name="unique_notificacion_tipo_por_cita")
+        ]
+
+    def __str__(self):
+        return f"{self.cita} · {self.get_tipo_display()}"

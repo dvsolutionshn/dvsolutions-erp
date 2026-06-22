@@ -168,6 +168,44 @@ def enviar_plantilla_whatsapp(config, numero, nombre_plantilla=None, idioma=None
     return _post_whatsapp(config, payload)
 
 
+def enviar_plantilla_cita_whatsapp(
+    config,
+    numero,
+    *,
+    paciente,
+    aviso,
+    fecha,
+    hora,
+    consulta,
+    profesional,
+):
+    """Envía la plantilla transaccional recordatorio_cita con seis variables de cuerpo."""
+    telefono = normalizar_telefono_hn(numero)
+    if not telefono:
+        raise WhatsAppAPIError("El paciente no tiene un número de WhatsApp válido.")
+    nombre_plantilla = (config.whatsapp_plantilla_cita or "").strip()
+    if not nombre_plantilla:
+        raise WhatsAppAPIError("Configura una plantilla de citas aprobada por Meta.")
+    valores = [paciente, aviso, fecha, hora, consulta, profesional]
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": telefono,
+        "type": "template",
+        "template": {
+            "name": nombre_plantilla,
+            "language": {"code": config.whatsapp_idioma_cita or "es"},
+            "components": [{
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": _texto_parametro(valor)} for valor in valores
+                ],
+            }],
+        },
+    }
+    return _post_whatsapp(config, payload)
+
+
 def _texto_parametro(valor, fallback="-"):
     texto = str(valor or fallback).strip()
     return texto or fallback

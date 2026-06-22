@@ -20,6 +20,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_idioma_plantilla",
             "whatsapp_plantilla_marketing",
             "whatsapp_idioma_marketing",
+            "whatsapp_plantilla_cita",
+            "whatsapp_idioma_cita",
             "remitente_correo",
             "recordatorio_cumpleanos_activo",
             "recordatorio_citas_activo",
@@ -35,6 +37,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_idioma_plantilla": "Para hello_world normalmente es en_US.",
             "whatsapp_plantilla_marketing": "Nombre exacto de la plantilla comercial aprobada en Meta. Ejemplo: promo_general_imagen.",
             "whatsapp_idioma_marketing": "Idioma aprobado de la plantilla comercial. Para Spanish normalmente usa es.",
+            "whatsapp_plantilla_cita": "Nombre exacto de la plantilla transaccional aprobada en Meta. Debe tener 6 variables: paciente, aviso, fecha, hora, tipo de consulta y profesional.",
+            "whatsapp_idioma_cita": "Código de idioma aprobado para la plantilla de citas, normalmente es.",
             "dias_alerta_producto": "Dias antes para alertar productos con fecha de seguimiento o vencimiento.",
         }
 
@@ -68,7 +72,7 @@ class CampaniaMarketingForm(forms.ModelForm):
 class CitaClienteForm(forms.ModelForm):
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "observacion"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "observacion": forms.Textarea(attrs={"rows": 3}),
@@ -79,6 +83,7 @@ class CitaClienteForm(forms.ModelForm):
         self.empresa = empresa
         super().__init__(*args, **kwargs)
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
+        self.es_hospital_mia = bool(empresa and empresa.slug == "hospital_mia")
         if empresa:
             self.fields["cliente"].queryset = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["producto"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
@@ -104,9 +109,15 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["profesional_salud"].label = "Doctor / profesional"
             self.fields["profesional_salud"].required = True
             self.fields["observacion"].label = "Motivo o notas de la cita"
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_hora", "duracion_minutos", "estado", "observacion"])
+            self.fields["enviar_confirmacion_whatsapp"].label = "Enviar confirmación por WhatsApp al guardar"
+            self.fields["recordatorio_semana_whatsapp"].label = "Recordar 7 días antes"
+            self.fields["recordatorio_dia_whatsapp"].label = "Recordar 1 día antes"
+            if not self.es_hospital_mia:
+                for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
+                    self.fields.pop(nombre)
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_hora", "duracion_minutos", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
         else:
-            for nombre in ["paciente", "servicio_clinico", "profesional_salud"]:
+            for nombre in ["paciente", "servicio_clinico", "profesional_salud", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre)
 
     def save(self, commit=True):

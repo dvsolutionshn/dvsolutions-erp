@@ -1,10 +1,11 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import os
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 
 from PIL import Image
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -14,7 +15,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from facturacion.models import Cliente
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, PlantillaMensaje
 from .services import subir_media_whatsapp
 
 
@@ -147,6 +148,51 @@ class CRMTests(TestCase):
         self.assertEqual(cita_clinica.profesional, doctor)
         self.assertEqual(cita_clinica.servicio, servicio)
         self.assertEqual(cita_clinica.estado, "confirmada")
+
+    @patch("crm.appointment_notifications.enviar_plantilla_cita_whatsapp")
+    def test_hospital_mia_programa_y_envia_recordatorios_sin_duplicar(self, mock_enviar):
+        mock_enviar.return_value = {"messages": [{"id": "wamid.cita"}]}
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica", defaults={"nombre": "Clínica Médica", "es_comercial": True}
+        )
+        EmpresaModulo.objects.get_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
+        paciente = Paciente.objects.create(
+            empresa=self.empresa, expediente_codigo="EXP-WA", nombre="Paciente WhatsApp", whatsapp="99990000"
+        )
+        servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta general", duracion_minutos=30)
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. WhatsApp")
+        config, _ = ConfiguracionCRM.objects.get_or_create(empresa=self.empresa)
+        config.whatsapp_activo = True
+        config.recordatorio_citas_activo = True
+        config.whatsapp_phone_number_id = "phone-id"
+        config.whatsapp_token = "token"
+        config.whatsapp_plantilla_cita = "recordatorio_cita"
+        config.save()
+        fecha = timezone.localtime(timezone.now() + timedelta(days=10)).replace(second=0, microsecond=0)
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.post(reverse("agenda_citas", args=[self.empresa.slug]), {
+            "paciente": paciente.id, "servicio_clinico": servicio.id, "profesional_salud": doctor.id,
+            "fecha_hora": fecha.strftime("%Y-%m-%dT%H:%M"), "duracion_minutos": "30",
+            "estado": "confirmada", "observacion": "Avisar automáticamente",
+            "enviar_confirmacion_whatsapp": "on", "recordatorio_semana_whatsapp": "on",
+            "recordatorio_dia_whatsapp": "on",
+        })
+        self.assertEqual(response.status_code, 302)
+        cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
+        self.assertEqual(cita.notificaciones_whatsapp.count(), 3)
+        confirmacion = cita.notificaciones_whatsapp.get(tipo="confirmacion")
+        self.assertEqual(confirmacion.estado, "enviado")
+        semana = cita.notificaciones_whatsapp.get(tipo="semana")
+        momento_semana = cita.fecha_hora - timedelta(days=7) + timedelta(minutes=1)
+        with patch("crm.appointment_notifications.timezone.now", return_value=momento_semana):
+            call_command("procesar_recordatorios_citas")
+        semana.refresh_from_db()
+        self.assertEqual(semana.estado, "enviado")
+        with patch("crm.appointment_notifications.timezone.now", return_value=momento_semana):
+            call_command("procesar_recordatorios_citas")
+        self.assertEqual(mock_enviar.call_count, 2)
 
     def test_preparar_envios_de_campania_crea_whatsapp_por_cliente(self):
         cliente = Cliente.objects.create(

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, PlantillaMensaje
 
 
 @admin.register(ConfiguracionCRM)
@@ -35,3 +35,10 @@ class CitaClienteAdmin(admin.ModelAdmin):
     list_display = ("titulo", "empresa", "cliente", "fecha_hora", "estado", "responsable")
     list_filter = ("estado",)
     search_fields = ("titulo", "cliente__nombre", "empresa__nombre")
+
+
+@admin.register(NotificacionCitaWhatsApp)
+class NotificacionCitaWhatsAppAdmin(admin.ModelAdmin):
+    list_display = ("cita", "tipo", "programada_para", "estado", "intentos", "enviada_en")
+    list_filter = ("tipo", "estado", "cita__empresa")
+    search_fields = ("cita__titulo", "cita__paciente__nombre", "cita__cliente__nombre")
