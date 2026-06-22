@@ -132,6 +132,7 @@ class CRMTests(TestCase):
         self.assertContains(response, "Doctor / profesional")
         self.assertContains(response, "Dr. Carlos Demo")
         self.assertNotContains(response, "<label for=\"id_titulo\">", html=False)
+        self.assertNotContains(response, "id_duracion_minutos")
 
         response = self.client.post(url, {
             "paciente": paciente.id, "servicio_clinico": servicio.id,
@@ -143,6 +144,7 @@ class CRMTests(TestCase):
         self.assertEqual(cita.titulo, "Consulta de cardiología")
         self.assertEqual(cita.responsable, "Dr. Carlos Demo")
         self.assertEqual(cita.profesional_salud, doctor)
+        self.assertEqual(cita.duracion_minutos, servicio.duracion_minutos)
         cita_clinica = CitaClinica.objects.get(id=cita.cita_clinica_id)
         self.assertEqual(cita_clinica.paciente, paciente)
         self.assertEqual(cita_clinica.profesional, doctor)

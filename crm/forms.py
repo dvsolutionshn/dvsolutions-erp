@@ -100,7 +100,7 @@ class CitaClienteForm(forms.ModelForm):
         self.fields["duracion_minutos"].label = "Duración (minutos)"
         self.fields["fecha_hora"].input_formats = ["%Y-%m-%dT%H:%M"]
         if self.es_clinica:
-            for nombre in ["cliente", "producto", "titulo", "responsable"]:
+            for nombre in ["cliente", "producto", "titulo", "responsable", "duracion_minutos"]:
                 self.fields.pop(nombre)
             self.fields["paciente"].label = "Paciente"
             self.fields["paciente"].required = True
@@ -115,7 +115,7 @@ class CitaClienteForm(forms.ModelForm):
             if not self.es_hospital_mia:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_hora", "duracion_minutos", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_hora", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
         else:
             for nombre in ["paciente", "servicio_clinico", "profesional_salud", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre)
@@ -127,6 +127,7 @@ class CitaClienteForm(forms.ModelForm):
             cita.responsable = cita.profesional_salud.nombre
             cita.cliente = cita.paciente.cliente
             cita.producto = None
+            cita.duracion_minutos = cita.servicio_clinico.duracion_minutos
         if commit:
             cita.save()
         return cita
