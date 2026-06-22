@@ -136,7 +136,8 @@ class CRMTests(TestCase):
 
         response = self.client.post(url, {
             "paciente": paciente.id, "servicio_clinico": servicio.id,
-            "profesional_salud": doctor.id, "fecha_hora": "2026-06-24T11:00",
+            "profesional_salud": doctor.id, "fecha_cita": "2026-06-24",
+            "hora_cita": "02:30", "periodo_cita": "PM",
             "duracion_minutos": "45", "estado": "confirmada", "observacion": "Primera valoración",
         })
         self.assertEqual(response.status_code, 302)
@@ -145,6 +146,8 @@ class CRMTests(TestCase):
         self.assertEqual(cita.responsable, "Dr. Carlos Demo")
         self.assertEqual(cita.profesional_salud, doctor)
         self.assertEqual(cita.duracion_minutos, servicio.duracion_minutos)
+        self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 14)
+        self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 30)
         cita_clinica = CitaClinica.objects.get(id=cita.cita_clinica_id)
         self.assertEqual(cita_clinica.paciente, paciente)
         self.assertEqual(cita_clinica.profesional, doctor)

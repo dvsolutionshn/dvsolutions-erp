@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from django import forms
+from django.utils import timezone
 
 from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico
@@ -70,6 +73,24 @@ class CampaniaMarketingForm(forms.ModelForm):
 
 
 class CitaClienteForm(forms.ModelForm):
+    HORAS_12 = [
+        (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
+        for hora in range(1, 13)
+        for minuto in (0, 15, 30, 45)
+    ]
+    fecha_cita = forms.DateField(
+        label="Fecha",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        input_formats=["%Y-%m-%d"],
+    )
+    hora_cita = forms.ChoiceField(label="Hora", required=False, choices=HORAS_12)
+    periodo_cita = forms.ChoiceField(
+        label="AM / PM",
+        required=False,
+        choices=(("AM", "AM"), ("PM", "PM")),
+    )
+
     class Meta:
         model = CitaCliente
         fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
@@ -98,7 +119,21 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["profesional_salud"].queryset = ProfesionalSalud.objects.none()
         self.fields["producto"].required = False
         self.fields["duracion_minutos"].label = "Duración (minutos)"
-        self.fields["fecha_hora"].input_formats = ["%Y-%m-%dT%H:%M"]
+        self.fields.pop("fecha_hora")
+        if self.instance and self.instance.pk and self.instance.fecha_hora:
+            fecha_local = timezone.localtime(self.instance.fecha_hora)
+            hora_12 = fecha_local.hour % 12 or 12
+            valor_hora = f"{hora_12:02d}:{fecha_local.minute:02d}"
+            if valor_hora not in dict(self.HORAS_12):
+                self.fields["hora_cita"].choices = [
+                    *self.HORAS_12,
+                    (valor_hora, valor_hora),
+                ]
+            self.initial.update({
+                "fecha_cita": fecha_local.date(),
+                "hora_cita": valor_hora,
+                "periodo_cita": "PM" if fecha_local.hour >= 12 else "AM",
+            })
         if self.es_clinica:
             for nombre in ["cliente", "producto", "titulo", "responsable", "duracion_minutos"]:
                 self.fields.pop(nombre)
@@ -115,13 +150,46 @@ class CitaClienteForm(forms.ModelForm):
             if not self.es_hospital_mia:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_hora", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
         else:
             for nombre in ["paciente", "servicio_clinico", "profesional_salud", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre)
+            self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "duracion_minutos", "responsable", "estado", "observacion"])
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha = cleaned_data.get("fecha_cita")
+        hora_texto = cleaned_data.get("hora_cita")
+        periodo = cleaned_data.get("periodo_cita")
+
+        # Compatibilidad con integraciones y formularios anteriores al selector AM/PM.
+        fecha_hora_anterior = (self.data.get("fecha_hora") or "").strip()
+        if not all((fecha, hora_texto, periodo)) and fecha_hora_anterior:
+            try:
+                fecha_hora = datetime.strptime(fecha_hora_anterior, "%Y-%m-%dT%H:%M")
+                cleaned_data["fecha_hora_compuesta"] = timezone.make_aware(fecha_hora)
+                return cleaned_data
+            except ValueError:
+                pass
+
+        if not fecha:
+            self.add_error("fecha_cita", "Selecciona la fecha de la cita.")
+        if not hora_texto:
+            self.add_error("hora_cita", "Selecciona la hora de la cita.")
+        if not periodo:
+            self.add_error("periodo_cita", "Selecciona AM o PM.")
+        if not all((fecha, hora_texto, periodo)):
+            return cleaned_data
+
+        hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
+        hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
+        fecha_hora = datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto)
+        cleaned_data["fecha_hora_compuesta"] = timezone.make_aware(fecha_hora)
+        return cleaned_data
 
     def save(self, commit=True):
         cita = super().save(commit=False)
+        cita.fecha_hora = self.cleaned_data["fecha_hora_compuesta"]
         if self.es_clinica:
             cita.titulo = cita.servicio_clinico.nombre
             cita.responsable = cita.profesional_salud.nombre
