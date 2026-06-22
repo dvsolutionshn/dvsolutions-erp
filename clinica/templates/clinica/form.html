@@ -70,6 +70,7 @@
     box-shadow:none;
 }
 .clinic-field textarea{min-height:98px;resize:vertical}
+.clinic-datetime{display:grid;grid-template-columns:minmax(150px,1fr) 105px 82px;min-height:46px;border:1px solid var(--line-strong);border-radius:10px;background:#fff;overflow:hidden}.clinic-datetime input,.clinic-datetime select{width:100%!important;min-width:0!important;height:44px!important;min-height:44px!important;border:0!important;border-radius:0!important;background:#fff!important;padding:0 12px!important;box-shadow:none!important}.clinic-datetime select{border-left:1px solid var(--line)!important;font-weight:800}.clinic-datetime:focus-within{border-color:rgba(39,101,232,.46);box-shadow:0 0 0 4px rgba(39,101,232,.08)}
 .clinic-field input:focus,
 .clinic-field select:focus,
 .clinic-field textarea:focus{
@@ -126,14 +127,22 @@
     <form method="post" enctype="multipart/form-data" class="clinic-form-body">
         {% csrf_token %}
         <div class="clinic-form-grid">
-        {% for field in form %}
+        {% for field in form %}{% if field.name == "fecha_cita" %}
+        <div class="clinic-field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="clinic-datetime">{{ field }}{{ form.hora_cita }}{{ form.periodo_cita }}</div>
+            {% for error in field.errors %}<div class="clinic-error">{{ error }}</div>{% endfor %}
+            {% for error in form.hora_cita.errors %}<div class="clinic-error">{{ error }}</div>{% endfor %}
+            {% for error in form.periodo_cita.errors %}<div class="clinic-error">{{ error }}</div>{% endfor %}
+        </div>
+        {% elif field.name != "hora_cita" and field.name != "periodo_cita" %}
         <div class="clinic-field {% if field.field.widget.input_type == 'checkbox' %}clinic-check{% endif %} {% if field.name in 'direccion alergias antecedentes_medicos medicamentos_actuales notas_privadas objetivo plan_clinico descripcion diagnostico plan signos_vitales contenido observaciones' %}is-wide{% endif %}">
             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
             {{ field }}
             {% if field.help_text %}<small class="clinic-help">{{ field.help_text }}</small>{% endif %}
             {% for error in field.errors %}<div class="clinic-error">{{ error }}</div>{% endfor %}
         </div>
-        {% endfor %}
+        {% endif %}{% endfor %}
         </div>
         {% if form.non_field_errors %}<div class="clinic-error" style="margin-top:16px;">{{ form.non_field_errors }}</div>{% endif %}
         <div class="clinic-form-actions">

@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from django import forms
+from django.utils import timezone
 
 from .models import (
     CitaClinica,
@@ -194,12 +197,25 @@ class ServicioClinicoForm(BaseClinicaForm):
 
 
 class CitaClinicaForm(BaseClinicaForm):
+    HORAS_12 = [
+        (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
+        for hora in range(1, 13)
+        for minuto in (0, 15, 30, 45)
+    ]
+    fecha_cita = forms.DateField(
+        label="Fecha y hora",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        input_formats=["%Y-%m-%d"],
+    )
+    hora_cita = forms.ChoiceField(label="Hora", required=False, choices=HORAS_12)
+    periodo_cita = forms.ChoiceField(
+        label="AM / PM", required=False, choices=(("AM", "AM"), ("PM", "PM"))
+    )
+
     class Meta:
         model = CitaClinica
         fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "sala", "observaciones"]
-        widgets = {
-            "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}),
-        }
 
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
@@ -213,6 +229,56 @@ class CitaClinicaForm(BaseClinicaForm):
             self.fields["servicio"].queryset = ServicioClinico.objects.none()
         self.fields["profesional"].required = False
         self.fields["servicio"].required = False
+        self.fields.pop("fecha_hora")
+        if self.instance and self.instance.pk and self.instance.fecha_hora:
+            fecha_local = timezone.localtime(self.instance.fecha_hora)
+            hora_12 = fecha_local.hour % 12 or 12
+            valor_hora = f"{hora_12:02d}:{fecha_local.minute:02d}"
+            if valor_hora not in dict(self.HORAS_12):
+                self.fields["hora_cita"].choices = [*self.HORAS_12, (valor_hora, valor_hora)]
+            self.initial.update({
+                "fecha_cita": fecha_local.date(),
+                "hora_cita": valor_hora,
+                "periodo_cita": "PM" if fecha_local.hour >= 12 else "AM",
+            })
+        self.order_fields([
+            "paciente", "profesional", "servicio", "fecha_cita", "hora_cita",
+            "periodo_cita", "estado", "canal", "motivo", "sala", "observaciones",
+        ])
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha = cleaned_data.get("fecha_cita")
+        hora_texto = cleaned_data.get("hora_cita")
+        periodo = cleaned_data.get("periodo_cita")
+        fecha_hora_anterior = (self.data.get("fecha_hora") or "").strip()
+        if not all((fecha, hora_texto, periodo)) and fecha_hora_anterior:
+            try:
+                fecha_hora = datetime.strptime(fecha_hora_anterior, "%Y-%m-%dT%H:%M")
+                cleaned_data["fecha_hora_compuesta"] = timezone.make_aware(fecha_hora)
+                return cleaned_data
+            except ValueError:
+                pass
+        if not fecha:
+            self.add_error("fecha_cita", "Selecciona la fecha de la cita.")
+        if not hora_texto:
+            self.add_error("hora_cita", "Selecciona la hora de la cita.")
+        if not periodo:
+            self.add_error("periodo_cita", "Selecciona AM o PM.")
+        if not all((fecha, hora_texto, periodo)):
+            return cleaned_data
+        hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
+        hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
+        fecha_hora = datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto)
+        cleaned_data["fecha_hora_compuesta"] = timezone.make_aware(fecha_hora)
+        return cleaned_data
+
+    def save(self, commit=True):
+        cita = super().save(commit=False)
+        cita.fecha_hora = self.cleaned_data["fecha_hora_compuesta"]
+        if commit:
+            cita.save()
+        return cita
 
 
 class TratamientoPacienteForm(BaseClinicaForm):

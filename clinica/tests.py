@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from facturacion.models import Cliente
-from .models import HistoriaClinicaEspecialidad, Paciente, PreconsultaClinica
+from .models import CitaClinica, HistoriaClinicaEspecialidad, Paciente, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -31,6 +31,37 @@ class ClinicaPacienteTests(TestCase):
             rol_sistema=rol,
         )
         self.client.force_login(self.user)
+
+    def test_nueva_cita_clinica_usa_control_unificado_am_pm(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa, expediente_codigo="HM-CITA", nombre="Paciente Cita"
+        )
+        profesional = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. Cita")
+        servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta General")
+        url = reverse("clinica_crear_cita", args=[self.empresa.slug])
+
+        response = self.client.get(url)
+        self.assertContains(response, "clinic-datetime")
+        self.assertContains(response, "Fecha y hora")
+
+        response = self.client.post(url, {
+            "paciente": paciente.id,
+            "profesional": profesional.id,
+            "servicio": servicio.id,
+            "fecha_cita": "2026-06-26",
+            "hora_cita": "03:15",
+            "periodo_cita": "PM",
+            "estado": "solicitada",
+            "canal": "recepcion",
+            "motivo": "Consulta de prueba",
+            "sala": "1",
+            "observaciones": "",
+        })
+
+        self.assertEqual(response.status_code, 302)
+        cita = CitaClinica.objects.get(empresa=self.empresa, paciente=paciente)
+        self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
+        self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 15)
 
     def test_crear_paciente_alergico_y_mostrar_alerta_en_lista(self):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
