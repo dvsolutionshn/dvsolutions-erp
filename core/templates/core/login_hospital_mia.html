@@ -554,11 +554,11 @@
                         <div class="mia-logo-fallback">{{ empresa.nombre|slice:":3"|upper }}</div>
                     {% endif %}
                 </div>
-                <small>{% if empresa.slug == "hospital_mia" %}Acceso clinico privado{% else %}Acceso empresarial privado{% endif %}</small>
+                <small>{% if es_perfil_clinico %}Acceso clínico privado{% else %}Acceso empresarial privado{% endif %}</small>
                 <h1>{{ empresa.nombre }}</h1>
-                <p>{% if empresa.slug == "hospital_mia" %}Un entorno digital premium para agenda, pacientes, tratamientos, expediente clinico y seguimiento especializado.{% else %}Un entorno digital premium para operar facturacion, finanzas, clientes, inventario, reportes y crecimiento empresarial.{% endif %}</p>
+                <p>{% if es_perfil_clinico %}Un entorno digital premium para agenda, pacientes, tratamientos, expediente clínico y seguimiento especializado.{% else %}Un entorno digital premium para operar facturación, finanzas, clientes, inventario, reportes y crecimiento empresarial.{% endif %}</p>
                 <div class="signal-row">
-                    {% if empresa.slug == "hospital_mia" %}
+                    {% if es_perfil_clinico %}
                     <div class="signal"><strong>Pacientes</strong>Expediente centralizado</div>
                     <div class="signal"><strong>Agenda</strong>Citas y controles</div>
                     <div class="signal"><strong>Clinica</strong>Operacion especializada</div>
@@ -573,7 +573,7 @@
 
         <section class="login-card">
             <div class="login-head">
-                <div class="login-kicker">{% if empresa.slug == "hospital_mia" %}Sistema Hospitalario{% else %}Sistema Empresarial{% endif %}</div>
+                <div class="login-kicker">{% if es_perfil_clinico %}Sistema Clínico{% else %}Sistema Empresarial{% endif %}</div>
                 <h2>Bienvenido de nuevo</h2>
                 <p>Ingresa con tu correo de {{ empresa.nombre }} para continuar dentro de una experiencia creada especialmente para su operacion.</p>
             </div>

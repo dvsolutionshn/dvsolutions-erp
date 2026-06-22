@@ -377,11 +377,20 @@ def _minutes_remaining(seconds):
     return max(1, (seconds + 59) // 60)
 
 
+def _es_perfil_clinico(empresa):
+    return bool(
+        empresa.tipo_solucion == "clinica"
+        or empresa.slug in {"hospital_mia", "medical_spa"}
+        or empresa.tiene_modulo_activo("clinica_medica")
+    )
+
+
 def empresa_login(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
     if empresa.tipo_solucion == "tecnicentro":
         return redirect("tecnicentro_login", empresa_slug=empresa.slug)
-    template_name = "core/login_hospital_mia.html" if empresa.tipo_solucion == "clinica" else "core/login.html"
+    es_perfil_clinico = _es_perfil_clinico(empresa)
+    template_name = "core/login_hospital_mia.html" if es_perfil_clinico else "core/login.html"
     _flash_session_expired_message(request)
     throttle_scope = f"empresa:{empresa.slug}"
 
@@ -392,7 +401,7 @@ def empresa_login(request, slug=None):
                 request,
                 f"Por seguridad bloqueamos temporalmente este acceso. Intenta nuevamente en {_minutes_remaining(bloqueo_restante)} minuto(s).",
             )
-            return render(request, template_name, {'empresa': empresa})
+            return render(request, template_name, {'empresa': empresa, 'es_perfil_clinico': es_perfil_clinico})
 
         username = (request.POST.get('username') or "").strip()
         password = request.POST.get('password')
@@ -403,7 +412,7 @@ def empresa_login(request, slug=None):
             if user.empresa == empresa:
                 _clear_login_failures(throttle_scope, request)
                 login(request, user)
-                if empresa.tipo_solucion == "clinica" and empresa.tiene_modulo_activo("clinica_medica"):
+                if es_perfil_clinico and empresa.tiene_modulo_activo("clinica_medica"):
                     return redirect("clinica_dashboard", empresa_slug=empresa.slug)
                 return _redirect_dashboard_empresa(request, empresa)
             else:
@@ -423,7 +432,7 @@ def empresa_login(request, slug=None):
                     f"Por seguridad bloqueamos temporalmente este acceso. Intenta nuevamente en {_minutes_remaining(bloqueo_restante)} minuto(s).",
                 )
 
-    return render(request, template_name, {'empresa': empresa})
+    return render(request, template_name, {'empresa': empresa, 'es_perfil_clinico': es_perfil_clinico})
 
 
 def solicitar_recuperacion(request, slug=None):

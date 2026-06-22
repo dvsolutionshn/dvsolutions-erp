@@ -918,6 +918,20 @@ class SuperAdminControlTests(TestCase):
         })
         self.assertRedirects(response, reverse("clinica_dashboard", args=[empresa.slug]))
 
+    def test_empresas_medicas_historicas_conservan_login_futurista(self):
+        for indice, slug in enumerate(["hospital_mia", "medical_spa"], start=1):
+            empresa = Empresa.objects.create(
+                nombre=slug.replace("_", " ").title(),
+                slug=slug,
+                rtn=f"08011999009{indice:03d}",
+                tipo_solucion="erp",
+                estado_licencia="activa",
+            )
+            response = self.client.get(reverse("empresa_login", args=[empresa.slug]))
+            self.assertEqual(response.status_code, 200)
+            self.assertTemplateUsed(response, "core/login_hospital_mia.html")
+            self.assertContains(response, "Sistema Clínico")
+
     @override_settings(LOGIN_THROTTLE_LIMIT=3, LOGIN_THROTTLE_WINDOW_SECONDS=60)
     def test_superadmin_login_bloquea_acceso_tras_varios_intentos_fallidos(self):
         login_url = reverse("superadmin_login")
