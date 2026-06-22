@@ -1,5 +1,6 @@
 import calendar
 from datetime import date, datetime, timedelta
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -25,6 +26,9 @@ from .services import (
     enviar_plantilla_whatsapp,
     subir_media_whatsapp,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _empresa_desde_slug(empresa_slug):
@@ -125,18 +129,28 @@ def _sincronizar_cita_clinica(cita):
 
 
 def _programar_whatsapp_cita(request, cita):
-    notificaciones = programar_notificaciones_cita(cita)
-    confirmacion = next(
-        (item for item in notificaciones if item.tipo == NotificacionCitaWhatsApp.TIPO_CONFIRMACION),
-        None,
-    )
-    if not confirmacion or confirmacion.estado == "enviado":
-        return
-    resultado = procesar_notificacion(confirmacion.id)
-    if resultado.estado == "enviado":
-        messages.success(request, "Confirmación de la cita enviada por WhatsApp.")
-    elif resultado.estado == "error":
-        messages.warning(request, f"La cita se guardó, pero WhatsApp respondió con error: {resultado.ultimo_error}")
+    try:
+        notificaciones = programar_notificaciones_cita(cita)
+        confirmacion = next(
+            (item for item in notificaciones if item.tipo == NotificacionCitaWhatsApp.TIPO_CONFIRMACION),
+            None,
+        )
+        if not confirmacion or confirmacion.estado == "enviado":
+            return
+        resultado = procesar_notificacion(confirmacion.id)
+        if resultado.estado == "enviado":
+            messages.success(request, "Confirmación de la cita enviada por WhatsApp.")
+        elif resultado.estado == "error":
+            messages.warning(request, f"La cita se guardó, pero WhatsApp respondió con error: {resultado.ultimo_error}")
+    except Exception:
+        # Una falla externa de Meta, red o configuración nunca debe impedir que
+        # recepción registre la cita. El detalle completo queda en el log.
+        logger.exception("No se pudo procesar WhatsApp para la cita %s", cita.pk)
+        messages.warning(
+            request,
+            "La cita se guardó correctamente, pero WhatsApp no pudo procesarse ahora. "
+            "El recordatorio podrá reintentarse automáticamente.",
+        )
 
 
 @login_required

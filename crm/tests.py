@@ -253,6 +253,40 @@ class CRMTests(TestCase):
             call_command("procesar_recordatorios_citas")
         self.assertEqual(mock_enviar.call_count, 2)
 
+    @patch("crm.views.procesar_notificacion", side_effect=TimeoutError("Meta no respondió"))
+    def test_falla_inesperada_de_whatsapp_no_impide_guardar_cita(self, _mock_procesar):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="EXP-TIMEOUT",
+            nombre="Paciente con cita segura",
+            whatsapp="99990001",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa, nombre="Consulta segura", duracion_minutos=30
+        )
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. Resiliencia")
+        fecha = timezone.localtime(timezone.now() + timedelta(days=10)).replace(second=0, microsecond=0)
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.post(reverse("agenda_citas", args=[self.empresa.slug]), {
+            "paciente": paciente.id,
+            "servicio_clinico": servicio.id,
+            "profesional_salud": doctor.id,
+            "fecha_hora": fecha.strftime("%Y-%m-%dT%H:%M"),
+            "estado": "confirmada",
+            "observacion": "No perder esta cita si Meta falla",
+            "enviar_confirmacion_whatsapp": "on",
+            "recordatorio_semana_whatsapp": "on",
+            "recordatorio_dia_whatsapp": "on",
+        })
+
+        self.assertRedirects(response, reverse("agenda_citas", args=[self.empresa.slug]))
+        self.assertTrue(CitaCliente.objects.filter(empresa=self.empresa, paciente=paciente).exists())
+        cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
+        self.assertIsNotNone(cita.cita_clinica_id)
+
     def test_preparar_envios_de_campania_crea_whatsapp_por_cliente(self):
         cliente = Cliente.objects.create(
             empresa=self.empresa,

@@ -64,6 +64,8 @@ def _post_whatsapp(config, payload):
         raise WhatsAppAPIError(f"Meta respondio con error {exc.code}: {detail}") from exc
     except URLError as exc:
         raise WhatsAppAPIError(f"No se pudo conectar con WhatsApp Cloud API: {exc}") from exc
+    except (TimeoutError, OSError) as exc:
+        raise WhatsAppAPIError(f"WhatsApp Cloud API no respondió a tiempo: {exc}") from exc
 
 
 def _post_multipart(config, url, fields, file_field, file_path, content_type):
@@ -107,6 +109,8 @@ def _post_multipart(config, url, fields, file_field, file_path, content_type):
         raise WhatsAppAPIError(f"Meta respondio con error {exc.code}: {detail}") from exc
     except URLError as exc:
         raise WhatsAppAPIError(f"No se pudo conectar con WhatsApp Cloud API: {exc}") from exc
+    except (TimeoutError, OSError) as exc:
+        raise WhatsAppAPIError(f"WhatsApp Cloud API no respondió a tiempo: {exc}") from exc
 
 
 def _guardar_imagen_optimizada(imagen, file_path, calidad):
