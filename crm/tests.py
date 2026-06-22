@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 import os
 from pathlib import Path
 import tempfile
@@ -13,7 +13,7 @@ from unittest.mock import patch
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from facturacion.models import Cliente
 
-from .models import CampaniaMarketing, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
 from .services import subir_media_whatsapp
 
 
@@ -63,6 +63,50 @@ class CRMTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Calendario de Citas")
+
+    def test_calendario_ofrece_vistas_mes_semana_y_dia(self):
+        cliente = Cliente.objects.create(empresa=self.empresa, nombre="Paciente Calendario", activo=True)
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            cliente=cliente,
+            titulo="Evaluación médica",
+            fecha_hora=timezone.make_aware(datetime(2026, 6, 22, 10, 30)),
+            duracion_minutos=45,
+            responsable="Dra. Demo",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_citas", args=[self.empresa.slug])
+        for vista in ["mes", "semana", "dia"]:
+            response = self.client.get(url, {"vista": vista, "fecha": "2026-06-22"})
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Evaluación médica")
+            self.assertContains(response, "Paciente Calendario")
+        response = self.client.get(url, {"vista": "mes", "fecha": "2026-06-22", "editar": cita.id})
+        self.assertContains(response, "Editando cita")
+        self.assertContains(response, "45")
+
+    def test_cita_puede_editarse_y_cambiar_estado_desde_calendario(self):
+        cliente = Cliente.objects.create(empresa=self.empresa, nombre="Paciente Estado", activo=True)
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa, cliente=cliente, titulo="Consulta inicial",
+            fecha_hora=timezone.make_aware(datetime(2026, 6, 23, 9, 0)),
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_citas", args=[self.empresa.slug])
+        response = self.client.post(url, {
+            "cita_id": cita.id, "cliente": cliente.id, "producto": "", "titulo": "Consulta actualizada",
+            "fecha_hora": "2026-06-23T09:30", "duracion_minutos": "90",
+            "responsable": "Dr. Responsable", "estado": "confirmada", "observacion": "Control",
+        })
+        self.assertEqual(response.status_code, 302)
+        cita.refresh_from_db()
+        self.assertEqual(cita.titulo, "Consulta actualizada")
+        self.assertEqual(cita.duracion_minutos, 90)
+        estado_url = reverse("agenda_cita_estado", args=[self.empresa.slug, cita.id])
+        response = self.client.post(estado_url, {"estado": "realizada", "vista": "dia", "fecha": "2026-06-23"})
+        self.assertEqual(response.status_code, 302)
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado, "realizada")
 
     def test_preparar_envios_de_campania_crea_whatsapp_por_cliente(self):
         cliente = Cliente.objects.create(

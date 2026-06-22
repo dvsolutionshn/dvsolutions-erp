@@ -1,6 +1,10 @@
+import calendar
+from datetime import date, datetime, timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -25,6 +29,66 @@ def _empresa_desde_slug(empresa_slug):
 
 def _configuracion_crm(empresa):
     return ConfiguracionCRM.objects.get_or_create(empresa=empresa)[0]
+
+
+def _fecha_agenda(valor):
+    try:
+        return date.fromisoformat(valor or "")
+    except ValueError:
+        return timezone.localdate()
+
+
+def _contexto_calendario(empresa, request, form, *, modo_agenda=False):
+    vista = request.GET.get("vista", "mes")
+    if vista not in {"mes", "semana", "dia"}:
+        vista = "mes"
+    seleccionada = _fecha_agenda(request.GET.get("fecha"))
+    if vista == "mes":
+        inicio = seleccionada.replace(day=1)
+        fin = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        anterior = (inicio - timedelta(days=1)).replace(day=1)
+        siguiente = fin + timedelta(days=1)
+        meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        titulo_periodo = f"{meses[seleccionada.month]} {seleccionada.year}"
+    elif vista == "semana":
+        inicio = seleccionada - timedelta(days=seleccionada.weekday())
+        fin = inicio + timedelta(days=6)
+        anterior, siguiente = inicio - timedelta(days=7), inicio + timedelta(days=7)
+        titulo_periodo = f"{inicio:%d/%m/%Y} — {fin:%d/%m/%Y}"
+    else:
+        inicio = fin = seleccionada
+        anterior, siguiente = seleccionada - timedelta(days=1), seleccionada + timedelta(days=1)
+        titulo_periodo = seleccionada.strftime("%d/%m/%Y")
+
+    citas = list(
+        CitaCliente.objects.filter(
+            empresa=empresa, fecha_hora__date__gte=inicio, fecha_hora__date__lte=fin
+        ).select_related("cliente", "producto").order_by("fecha_hora")
+    )
+    por_fecha = {}
+    for cita in citas:
+        clave = timezone.localtime(cita.fecha_hora).date()
+        por_fecha.setdefault(clave, []).append(cita)
+
+    semanas = []
+    if vista == "mes":
+        calendario = calendar.Calendar(firstweekday=0)
+        for semana in calendario.monthdatescalendar(seleccionada.year, seleccionada.month):
+            semanas.append([
+                {"fecha": dia, "es_mes": dia.month == seleccionada.month, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, [])}
+                for dia in semana
+            ])
+    dias = [
+        {"fecha": dia, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, [])}
+        for dia in (inicio + timedelta(days=i) for i in range((fin - inicio).days + 1))
+    ]
+    return {
+        "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
+        "vista": vista, "fecha_seleccionada": seleccionada, "titulo_periodo": titulo_periodo,
+        "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
+        "cita_editando": getattr(form, "instance", None) if getattr(form, "instance", None) and form.instance.pk else None,
+        "estados_cita": CitaCliente.ESTADO_CHOICES,
+    }
 
 
 @login_required
@@ -289,26 +353,47 @@ def enviar_campania_whatsapp_api(request, empresa_slug, campania_id):
 @login_required
 def citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    form = CitaClienteForm(request.POST or None, empresa=empresa)
+    cita_id = request.POST.get("cita_id") or request.GET.get("editar")
+    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
         cita.save()
         messages.success(request, "Cita guardada correctamente.")
         return redirect("crm_citas", empresa_slug=empresa.slug)
-    citas_qs = CitaCliente.objects.filter(empresa=empresa).select_related("cliente", "producto")
-    return render(request, "crm/citas.html", {"empresa": empresa, "form": form, "citas": citas_qs})
+    return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form))
 
 
 @login_required
 def agenda_citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    form = CitaClienteForm(request.POST or None, empresa=empresa)
+    cita_id = request.POST.get("cita_id") or request.GET.get("editar")
+    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
         cita.save()
-        messages.success(request, "Cita guardada correctamente.")
+        messages.success(request, "Cita actualizada correctamente." if objeto else "Cita guardada correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
-    citas_qs = CitaCliente.objects.filter(empresa=empresa).select_related("cliente", "producto")
-    return render(request, "crm/citas.html", {"empresa": empresa, "form": form, "citas": citas_qs, "modo_agenda": True})
+    return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
+
+
+@login_required
+@require_POST
+def actualizar_estado_cita(request, empresa_slug, cita_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    cita = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id)
+    estado = request.POST.get("estado")
+    estados_validos = {codigo for codigo, _ in CitaCliente.ESTADO_CHOICES}
+    if estado not in estados_validos:
+        messages.error(request, "El estado solicitado no es válido.")
+    else:
+        cita.estado = estado
+        cita.save(update_fields=["estado"])
+        messages.success(request, f"Cita marcada como {cita.get_estado_display()}.")
+    vista = request.POST.get("vista", "mes")
+    fecha = request.POST.get("fecha", timezone.localdate().isoformat())
+    url = reverse("agenda_citas", args=[empresa.slug])
+    return redirect(f"{url}?vista={vista}&fecha={fecha}")

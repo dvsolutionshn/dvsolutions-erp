@@ -157,6 +157,7 @@ class CitaCliente(models.Model):
     producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True, related_name="citas")
     titulo = models.CharField(max_length=180)
     fecha_hora = models.DateTimeField()
+    duracion_minutos = models.PositiveIntegerField(default=60)
     responsable = models.CharField(max_length=120, blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
     observacion = models.TextField(blank=True, null=True)

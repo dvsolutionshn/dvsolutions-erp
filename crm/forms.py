@@ -67,9 +67,9 @@ class CampaniaMarketingForm(forms.ModelForm):
 class CitaClienteForm(forms.ModelForm):
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "producto", "titulo", "fecha_hora", "responsable", "estado", "observacion"]
+        fields = ["cliente", "producto", "titulo", "fecha_hora", "duracion_minutos", "responsable", "estado", "observacion"]
         widgets = {
-            "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "observacion": forms.Textarea(attrs={"rows": 3}),
         }
 
@@ -83,3 +83,5 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["cliente"].queryset = Cliente.objects.none()
             self.fields["producto"].queryset = Producto.objects.none()
         self.fields["producto"].required = False
+        self.fields["duracion_minutos"].label = "Duración (minutos)"
+        self.fields["fecha_hora"].input_formats = ["%Y-%m-%dT%H:%M"]
