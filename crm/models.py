@@ -28,6 +28,7 @@ class ConfiguracionCRM(models.Model):
     whatsapp_idioma_marketing = models.CharField(max_length=12, default="es")
     whatsapp_plantilla_cita = models.CharField(max_length=80, default="recordatorio_cita")
     whatsapp_idioma_cita = models.CharField(max_length=12, default="es")
+    whatsapp_cita_incluir_enlace = models.BooleanField(default=False)
     remitente_correo = models.EmailField(blank=True, null=True)
     recordatorio_cumpleanos_activo = models.BooleanField(default=True)
     recordatorio_citas_activo = models.BooleanField(default=True)

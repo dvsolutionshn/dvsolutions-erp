@@ -25,6 +25,7 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_idioma_marketing",
             "whatsapp_plantilla_cita",
             "whatsapp_idioma_cita",
+            "whatsapp_cita_incluir_enlace",
             "remitente_correo",
             "recordatorio_cumpleanos_activo",
             "recordatorio_citas_activo",
@@ -32,6 +33,9 @@ class ConfiguracionCRMForm(forms.ModelForm):
         ]
         widgets = {
             "whatsapp_token": forms.PasswordInput(render_value=True),
+        }
+        labels = {
+            "whatsapp_cita_incluir_enlace": "La plantilla de citas incluye enlace de confirmacion",
         }
         help_texts = {
             "whatsapp_token": "Token de Meta/WhatsApp Cloud API. Guardalo solo si el cliente ya tiene credenciales.",
@@ -42,6 +46,7 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_idioma_marketing": "Idioma aprobado de la plantilla comercial. Para Spanish normalmente usa es.",
             "whatsapp_plantilla_cita": "Nombre exacto de la plantilla transaccional aprobada en Meta. Debe tener 6 variables: paciente, aviso, fecha, hora, tipo de consulta y profesional.",
             "whatsapp_idioma_cita": "Código de idioma aprobado para la plantilla de citas, normalmente es.",
+            "whatsapp_cita_incluir_enlace": "Activalo solo cuando la plantilla aprobada en Meta tenga la variable del enlace para confirmar o cancelar la cita.",
             "dias_alerta_producto": "Dias antes para alertar productos con fecha de seguimiento o vencimiento.",
         }
 

@@ -17,6 +17,7 @@ from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClin
 
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, PlantillaMensaje
 from .services import subir_media_whatsapp
+from .tokens import generar_token_respuesta_cita
 
 
 class CRMTests(TestCase):
@@ -293,6 +294,96 @@ class CRMTests(TestCase):
         self.assertEqual(mock_enviar.call_count, 2)
 
     @patch("crm.views.procesar_notificacion", side_effect=TimeoutError("Meta no respondió"))
+    @patch("crm.appointment_notifications.enviar_plantilla_cita_whatsapp")
+    def test_recordatorio_cita_incluye_enlace_solo_si_plantilla_lo_permite(self, mock_enviar, _mock_procesar):
+        mock_enviar.return_value = {"messages": [{"id": "wamid.link"}]}
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa, expediente_codigo="EXP-LINK", nombre="Paciente Link", whatsapp="99990002"
+        )
+        servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta link", duracion_minutos=30)
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. Link")
+        config, _ = ConfiguracionCRM.objects.get_or_create(empresa=self.empresa)
+        config.whatsapp_activo = True
+        config.recordatorio_citas_activo = True
+        config.whatsapp_phone_number_id = "phone-id"
+        config.whatsapp_token = "token"
+        config.whatsapp_plantilla_cita = "recordatorio_cita_link"
+        config.whatsapp_cita_incluir_enlace = True
+        config.save()
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=doctor,
+            titulo=servicio.nombre,
+            responsable=doctor.nombre,
+            fecha_hora=timezone.localtime(timezone.now() + timedelta(days=8)).replace(second=0, microsecond=0),
+            enviar_confirmacion_whatsapp=True,
+        )
+        NotificacionCitaWhatsApp.objects.create(
+            cita=cita,
+            tipo=NotificacionCitaWhatsApp.TIPO_CONFIRMACION,
+            programada_para=timezone.now(),
+        )
+
+        call_command("procesar_recordatorios_citas")
+
+        kwargs = mock_enviar.call_args.kwargs
+        self.assertIn("https://dvsolutionshn.com/confirmacion/citas/", kwargs["enlace"])
+
+    def test_paciente_confirma_y_cancela_cita_desde_enlace_publico(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa, expediente_codigo="EXP-PUBLIC", nombre="Paciente Publico"
+        )
+        servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta publica", duracion_minutos=30)
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. Publica")
+        fecha = timezone.make_aware(datetime(2026, 7, 1, 9, 0))
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=doctor,
+            titulo=servicio.nombre,
+            responsable=doctor.nombre,
+            fecha_hora=fecha,
+        )
+        cita_clinica = CitaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            profesional=doctor,
+            servicio=servicio,
+            fecha_hora=fecha,
+            motivo=servicio.nombre,
+        )
+        cita.cita_clinica = cita_clinica
+        cita.save(update_fields=["cita_clinica"])
+        url = reverse("crm_cita_respuesta_publica", args=[generar_token_respuesta_cita(cita)])
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Confirme su cita")
+        response = self.client.post(url, {"accion": "confirmar"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cita confirmada")
+        cita.refresh_from_db()
+        cita_clinica.refresh_from_db()
+        self.assertEqual(cita.estado, "confirmada")
+        self.assertEqual(cita_clinica.estado, "confirmada")
+
+        response = self.client.post(url, {"accion": "cancelar", "motivo": "Necesito otro horario"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cita cancelada")
+        cita.refresh_from_db()
+        cita_clinica.refresh_from_db()
+        self.assertEqual(cita.estado, "cancelada")
+        self.assertEqual(cita_clinica.estado, "cancelada")
+        self.assertIn("Necesito otro horario", cita.observacion)
+
+    @patch("crm.views.procesar_notificacion", side_effect=TimeoutError("Meta no respondio"))
     def test_falla_inesperada_de_whatsapp_no_impide_guardar_cita(self, _mock_procesar):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])

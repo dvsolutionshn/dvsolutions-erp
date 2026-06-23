@@ -4,6 +4,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core import signing
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -26,6 +27,7 @@ from .services import (
     enviar_plantilla_whatsapp,
     subir_media_whatsapp,
 )
+from .tokens import leer_token_respuesta_cita
 
 
 logger = logging.getLogger(__name__)
@@ -151,6 +153,56 @@ def _programar_whatsapp_cita(request, cita):
             "La cita se guardó correctamente, pero WhatsApp no pudo procesarse ahora. "
             "El recordatorio podrá reintentarse automáticamente.",
         )
+
+
+def cita_respuesta_publica(request, token):
+    try:
+        datos = leer_token_respuesta_cita(token)
+    except (signing.BadSignature, signing.SignatureExpired):
+        return render(
+            request,
+            "crm/cita_respuesta_publica.html",
+            {"estado_pagina": "invalido"},
+            status=410,
+        )
+
+    cita = get_object_or_404(
+        CitaCliente.objects.select_related(
+            "empresa", "paciente", "cliente", "servicio_clinico", "profesional_salud", "cita_clinica"
+        ),
+        id=datos.get("cita_id"),
+        empresa__slug=datos.get("empresa"),
+    )
+    local = timezone.localtime(cita.fecha_hora)
+    contexto = {
+        "estado_pagina": "formulario",
+        "empresa": cita.empresa,
+        "cita": cita,
+        "fecha_local": local,
+    }
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        if accion == "confirmar":
+            cita.estado = "confirmada"
+            nota = f"Paciente confirmó asistencia desde enlace público el {timezone.localtime(timezone.now()):%d/%m/%Y %I:%M %p}."
+            cita.observacion = f"{cita.observacion}\n{nota}".strip() if cita.observacion else nota
+            cita.save(update_fields=["estado", "observacion"])
+            _sincronizar_cita_clinica(cita)
+            contexto["estado_pagina"] = "confirmada"
+        elif accion == "cancelar":
+            motivo = (request.POST.get("motivo") or "").strip()
+            cita.estado = "cancelada"
+            nota = f"Paciente canceló desde enlace público el {timezone.localtime(timezone.now()):%d/%m/%Y %I:%M %p}."
+            if motivo:
+                nota = f"{nota} Motivo: {motivo}"
+            cita.observacion = f"{cita.observacion}\n{nota}".strip() if cita.observacion else nota
+            cita.save(update_fields=["estado", "observacion"])
+            cita.notificaciones_whatsapp.filter(estado__in=["pendiente", "error"]).update(estado="omitido")
+            _sincronizar_cita_clinica(cita)
+            contexto["estado_pagina"] = "cancelada"
+        else:
+            contexto["error"] = "Selecciona si confirmas o cancelas la cita."
+    return render(request, "crm/cita_respuesta_publica.html", contexto)
 
 
 @login_required

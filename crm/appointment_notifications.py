@@ -1,10 +1,12 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from .models import CitaCliente, ConfiguracionCRM, NotificacionCitaWhatsApp
 from .services import WhatsAppAPIError, enviar_plantilla_cita_whatsapp
+from .tokens import construir_url_respuesta_cita
 
 
 def _numero_cita(cita):
@@ -80,6 +82,11 @@ def procesar_notificacion(notificacion_id, ahora=None):
             "dia": "recordatorio: su cita es mañana",
         }[notificacion.tipo]
         try:
+            enlace_respuesta = (
+                construir_url_respuesta_cita(cita, base_url=settings.PUBLIC_BASE_URL)
+                if config.whatsapp_cita_incluir_enlace
+                else None
+            )
             respuesta = enviar_plantilla_cita_whatsapp(
                 config,
                 _numero_cita(cita),
@@ -89,6 +96,7 @@ def procesar_notificacion(notificacion_id, ahora=None):
                 hora=local.strftime("%I:%M %p"),
                 consulta=cita.display_servicio,
                 profesional=cita.display_responsable,
+                enlace=enlace_respuesta,
             )
         except WhatsAppAPIError as exc:
             notificacion.estado = "error"

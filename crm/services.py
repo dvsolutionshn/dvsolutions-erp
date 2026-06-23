@@ -182,6 +182,7 @@ def enviar_plantilla_cita_whatsapp(
     hora,
     consulta,
     profesional,
+    enlace=None,
 ):
     """Envía la plantilla transaccional recordatorio_cita con seis variables de cuerpo."""
     telefono = normalizar_telefono_hn(numero)
@@ -191,6 +192,8 @@ def enviar_plantilla_cita_whatsapp(
     if not nombre_plantilla:
         raise WhatsAppAPIError("Configura una plantilla de citas aprobada por Meta.")
     valores = [paciente, aviso, fecha, hora, consulta, profesional]
+    if enlace:
+        valores.append(enlace)
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
