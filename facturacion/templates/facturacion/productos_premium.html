@@ -17,20 +17,28 @@
 }
 .erp-autocomplete{
     position:relative;
+    z-index:80;
+}
+.erp-list-filter-card{
+    overflow:visible;
+    z-index:60;
+}
+.erp-list-filter-card:focus-within{
+    z-index:120;
 }
 .erp-suggestion-list{
     position:absolute;
     top:calc(100% + 8px);
     left:0;
-    right:0;
-    z-index:20;
+    width:min(520px, calc(100vw - 72px));
+    z-index:140;
     background:#fff;
-    border:1px solid var(--line);
-    border-radius:16px;
-    box-shadow:var(--shadow-soft);
+    border:1px solid #bfd2e5;
+    border-radius:14px;
+    box-shadow:0 22px 50px rgba(16,35,56,.22);
     padding:8px;
     display:none;
-    max-height:260px;
+    max-height:320px;
     overflow:auto;
 }
 .erp-suggestion-item{
@@ -42,9 +50,23 @@
     border-radius:12px;
     cursor:pointer;
     color:var(--primary);
+    font-weight:750;
+    line-height:1.35;
+    transition:background .15s ease,color .15s ease,transform .15s ease;
 }
-.erp-suggestion-item:hover{
-    background:#f4f8fc;
+.erp-suggestion-item:hover,
+.erp-suggestion-item:focus,
+.erp-suggestion-item.is-active{
+    outline:none;
+    background:#eaf3ff;
+    color:#1359a8;
+    transform:translateX(2px);
+}
+@media(max-width:760px){
+    .erp-suggestion-list{
+        width:100%;
+        max-width:calc(100vw - 64px);
+    }
 }
 .erp-product-identity{
     display:flex;
