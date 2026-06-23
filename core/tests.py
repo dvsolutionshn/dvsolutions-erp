@@ -352,9 +352,9 @@ class SuperAdminControlTests(TestCase):
 
         response = self.client.get(reverse("superadmin_rol_create"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Calendario y gestión de citas")
+        self.assertContains(response, "Solo agenda y gestión de citas")
         self.assertContains(response, "id_puede_citas")
-        self.assertContains(response, "Habilitar Citas")
+        self.assertContains(response, "Habilitar Agenda de Citas")
         self.assertContains(response, "id_puede_clinica")
         self.assertContains(response, "Habilitar Clínica")
         self.assertContains(response, "Expedientes clínicos")
@@ -936,6 +936,48 @@ class SuperAdminControlTests(TestCase):
             "password": "ClaveClinica2026",
         })
         self.assertRedirects(response, reverse("clinica_dashboard", args=[empresa.slug]))
+
+    def test_usuario_solo_citas_entra_directo_a_agenda_sin_acceso_clinico(self):
+        empresa = Empresa.objects.create(
+            nombre="Clinica Solo Agenda",
+            slug="clinica-solo-agenda",
+            rtn="08011999000093",
+            tipo_solucion="clinica",
+            estado_licencia="activa",
+        )
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica", defaults={"nombre": "Clinica Medica", "es_comercial": True}
+        )
+        modulo_citas, _ = Modulo.objects.get_or_create(
+            codigo="agenda_citas", defaults={"nombre": "Agenda de Citas", "es_comercial": True}
+        )
+        EmpresaModulo.objects.create(empresa=empresa, modulo=modulo_clinica, activo=True)
+        EmpresaModulo.objects.create(empresa=empresa, modulo=modulo_citas, activo=True)
+        rol = RolSistema.objects.create(
+            nombre="Recepcion Solo Citas",
+            codigo="recepcion-solo-citas-test",
+            puede_citas=True,
+        )
+        Usuario.objects.create_user(
+            username="agenda-perfil",
+            password="ClaveAgenda2026",
+            empresa=empresa,
+            rol_sistema=rol,
+        )
+
+        response = self.client.post(reverse("empresa_login", args=[empresa.slug]), {
+            "username": "agenda-perfil",
+            "password": "ClaveAgenda2026",
+        })
+        self.assertRedirects(response, reverse("agenda_citas", args=[empresa.slug]))
+
+        response = self.client.get(reverse("agenda_citas", args=[empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Calendario de Citas")
+        self.assertContains(response, "Guardar cita")
+
+        response = self.client.get(reverse("clinica_dashboard", args=[empresa.slug]))
+        self.assertRedirects(response, reverse("dashboard", args=[empresa.slug]))
 
     def test_empresas_medicas_historicas_conservan_login_futurista(self):
         for indice, slug in enumerate(["hospital_mia", "medical_spa"], start=1):

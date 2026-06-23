@@ -40,8 +40,8 @@
                 <div class="role-permission-toggle"><label for="{{ form.puede_clinica.id_for_label }}">{{ form.puede_clinica }} Habilitar Clínica</label>{{ form.puede_clinica.errors }}</div>
             </div>
             <div class="role-permission-feature primary">
-                <div><div class="erp-kpi-label">Agenda operativa</div><h4>Calendario y gestión de citas</h4><p>Permite visualizar mes, semana y día, crear o editar citas, cambiar estados y gestionar recordatorios.</p></div>
-                <div class="role-permission-toggle"><label for="{{ form.puede_citas.id_for_label }}">{{ form.puede_citas }} Habilitar Citas</label>{{ form.puede_citas.errors }}</div>
+                <div><div class="erp-kpi-label">Acceso independiente</div><h4>Solo agenda y gestión de citas</h4><p>Permite agendar citas, crear y editar, ver los calendarios mensual, semanal y diario, cambiar estados y gestionar recordatorios. No concede acceso a expedientes ni al resto de Clínica.</p></div>
+                <div class="role-permission-toggle"><label for="{{ form.puede_citas.id_for_label }}">{{ form.puede_citas }} Habilitar Agenda de Citas</label>{{ form.puede_citas.errors }}</div>
             </div>
             <div class="role-permission-feature"><div><h4>Pacientes</h4><p>{{ form.puede_pacientes.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_pacientes.id_for_label }}">{{ form.puede_pacientes }} Habilitar</label>{{ form.puede_pacientes.errors }}</div></div>
             <div class="role-permission-feature"><div><h4>Expedientes clínicos</h4><p>{{ form.puede_expediente_clinico.help_text }}</p></div><div class="role-permission-toggle"><label for="{{ form.puede_expediente_clinico.id_for_label }}">{{ form.puede_expediente_clinico }} Habilitar</label>{{ form.puede_expediente_clinico.errors }}</div></div>

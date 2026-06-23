@@ -414,8 +414,17 @@ def empresa_login(request, slug=None):
             if user.empresa == empresa:
                 _clear_login_failures(throttle_scope, request)
                 login(request, user)
-                if es_perfil_clinico and empresa.tiene_modulo_activo("clinica_medica"):
-                    return redirect("clinica_dashboard", empresa_slug=empresa.slug)
+                if es_perfil_clinico:
+                    if (
+                        empresa.tiene_modulo_activo("clinica_medica")
+                        and user.tiene_alguna_permision_clinica
+                    ):
+                        return redirect("clinica_dashboard", empresa_slug=empresa.slug)
+                    if (
+                        empresa.tiene_modulo_activo("agenda_citas")
+                        and user.tiene_permiso_erp("puede_citas")
+                    ):
+                        return redirect("agenda_citas", empresa_slug=empresa.slug)
                 return _redirect_dashboard_empresa(request, empresa)
             else:
                 bloqueo_restante = _register_login_failure(throttle_scope, request)
