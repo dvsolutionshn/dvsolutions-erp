@@ -157,6 +157,80 @@ class CRMTests(TestCase):
         self.assertEqual(cita_clinica.servicio, servicio)
         self.assertEqual(cita_clinica.estado, "confirmada")
 
+    def test_agenda_clinica_crea_paciente_rapido_y_lo_sincroniza_con_facturacion(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica",
+            defaults={"nombre": "Clínica Médica", "es_comercial": True},
+        )
+        EmpresaModulo.objects.get_or_create(
+            empresa=self.empresa,
+            modulo=modulo_clinica,
+            defaults={"activo": True},
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        agenda = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
+        self.assertContains(agenda, "+ Nuevo paciente")
+        self.assertContains(agenda, "patientQuickModal")
+
+        response = self.client.post(
+            reverse("agenda_crear_paciente_rapido", args=[self.empresa.slug]),
+            {
+                "tipo_id": "dni",
+                "identidad": "0801199012345",
+                "primer_nombre": "Ana",
+                "segundo_nombre": "María",
+                "primer_apellido": "López",
+                "segundo_apellido": "Paz",
+                "fecha_nacimiento": "1990-05-12",
+                "sexo": "femenino",
+                "telefono": "99991111",
+                "whatsapp": "",
+                "correo": "ana@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        paciente = Paciente.objects.get(id=payload["paciente"]["id"])
+        self.assertEqual(paciente.nombre, "Ana María López Paz")
+        self.assertEqual(paciente.whatsapp, "99991111")
+        self.assertEqual(paciente.creado_por, self.usuario)
+        self.assertIsNotNone(paciente.cliente_id)
+        self.assertEqual(paciente.cliente.nombre, paciente.nombre)
+        self.assertEqual(paciente.cliente.telefono_whatsapp, "99991111")
+        self.assertTrue(paciente.expediente_codigo.startswith("MIA-"))
+
+    def test_creacion_rapida_de_paciente_evitar_documento_duplicado(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-00001",
+            nombre="Paciente existente",
+            identidad="0801199012345",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.post(
+            reverse("agenda_crear_paciente_rapido", args=[self.empresa.slug]),
+            {
+                "tipo_id": "dni",
+                "identidad": "0801199012345",
+                "primer_nombre": "Paciente",
+                "primer_apellido": "Duplicado",
+                "whatsapp": "99992222",
+                "sexo": "no_indicado",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("identidad", response.json()["errors"])
+        self.assertEqual(Paciente.objects.filter(empresa=self.empresa).count(), 1)
+
     def test_agenda_clinica_muestra_modal_y_colores_por_tipo_consulta(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])

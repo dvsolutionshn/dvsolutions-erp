@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -13,9 +14,9 @@ from django.views.decorators.http import require_POST
 
 from core.models import Empresa
 from facturacion.models import Cliente, Producto
-from clinica.models import CitaClinica
+from clinica.models import CitaClinica, Paciente
 
-from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PlantillaMensajeForm
+from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
 from .appointment_notifications import procesar_notificacion, programar_notificaciones_cita
 from .models import NotificacionCitaWhatsApp
@@ -49,6 +50,7 @@ def _fecha_agenda(valor):
 
 
 def _contexto_calendario(empresa, request, form, *, modo_agenda=False):
+    es_clinica = bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica"))
     vista = request.GET.get("vista", "mes")
     if vista not in {"mes", "semana", "dia"}:
         vista = "mes"
@@ -98,8 +100,9 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False):
         "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
         "cita_editando": getattr(form, "instance", None) if getattr(form, "instance", None) and form.instance.pk else None,
         "estados_cita": CitaCliente.ESTADO_CHOICES,
-        "es_clinica": bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")),
+        "es_clinica": es_clinica,
         "es_hospital_mia": empresa.slug == "hospital_mia",
+        "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
     }
 
 
@@ -496,6 +499,59 @@ def agenda_citas(request, empresa_slug):
         messages.success(request, "Cita actualizada correctamente." if objeto else "Cita guardada correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
+
+
+@login_required
+@require_POST
+def crear_paciente_rapido_cita(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    es_clinica = empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")
+    if not es_clinica:
+        return JsonResponse(
+            {"ok": False, "error": "La creación de pacientes solo está disponible para empresas clínicas."},
+            status=403,
+        )
+
+    form = PacienteRapidoCitaForm(request.POST, empresa=empresa)
+    if not form.is_valid():
+        errores = {
+            campo: [str(error) for error in lista]
+            for campo, lista in form.errors.items()
+        }
+        return JsonResponse(
+            {"ok": False, "error": "Revisa los datos indicados.", "errors": errores},
+            status=400,
+        )
+
+    from clinica.views import _proximo_codigo_expediente, _sincronizar_cliente_facturacion_paciente
+
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        codigo = _proximo_codigo_expediente(empresa)
+        prefijo, numero = codigo.rsplit("-", 1)
+        while Paciente.objects.filter(empresa=empresa, expediente_codigo=codigo).exists():
+            numero = str(int(numero) + 1).zfill(5)
+            codigo = f"{prefijo}-{numero}"
+
+        paciente = form.save(commit=False)
+        paciente.empresa = empresa
+        paciente.expediente_codigo = codigo
+        paciente.creado_por = request.user
+        paciente.activo = True
+        paciente.save()
+        _sincronizar_cliente_facturacion_paciente(paciente)
+
+    return JsonResponse({
+        "ok": True,
+        "paciente": {
+            "id": paciente.id,
+            "nombre": paciente.nombre,
+            "expediente": paciente.expediente_codigo,
+            "documento": paciente.identidad or "",
+            "telefono": paciente.whatsapp or paciente.telefono or "",
+            "label": str(paciente),
+        },
+    })
 
 
 @login_required

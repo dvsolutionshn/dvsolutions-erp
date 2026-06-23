@@ -204,3 +204,75 @@ class CitaClienteForm(forms.ModelForm):
         if commit:
             cita.save()
         return cita
+
+
+class PacienteRapidoCitaForm(forms.ModelForm):
+    class Meta:
+        model = Paciente
+        fields = [
+            "tipo_id",
+            "identidad",
+            "primer_nombre",
+            "segundo_nombre",
+            "primer_apellido",
+            "segundo_apellido",
+            "fecha_nacimiento",
+            "sexo",
+            "telefono",
+            "whatsapp",
+            "correo",
+        ]
+        widgets = {
+            "fecha_nacimiento": forms.DateInput(attrs={"type": "date"}),
+        }
+        labels = {
+            "tipo_id": "Tipo de documento",
+            "identidad": "No. de documento",
+            "primer_nombre": "Primer nombre",
+            "segundo_nombre": "Segundo nombre",
+            "primer_apellido": "Primer apellido",
+            "segundo_apellido": "Segundo apellido",
+            "fecha_nacimiento": "Fecha de nacimiento",
+            "telefono": "Teléfono",
+            "whatsapp": "WhatsApp",
+            "correo": "Correo electrónico",
+        }
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        self.empresa = empresa
+        super().__init__(*args, **kwargs)
+        self.fields["primer_nombre"].required = True
+        self.fields["primer_apellido"].required = True
+        self.fields["identidad"].required = False
+        self.fields["identidad"].widget.attrs.update({
+            "inputmode": "numeric",
+            "pattern": "[0-9]*",
+            "autocomplete": "off",
+            "placeholder": "Solo números, sin guiones",
+        })
+        self.fields["telefono"].widget.attrs.update({"inputmode": "tel"})
+        self.fields["whatsapp"].widget.attrs.update({"inputmode": "tel"})
+
+    def clean_identidad(self):
+        identidad = (self.cleaned_data.get("identidad") or "").strip()
+        if identidad and not identidad.isdigit():
+            raise forms.ValidationError("El documento solo debe contener números, sin guiones ni espacios.")
+        if identidad and self.empresa and Paciente.objects.filter(
+            empresa=self.empresa,
+            identidad=identidad,
+            activo=True,
+        ).exists():
+            raise forms.ValidationError("Ya existe un paciente activo con este número de documento.")
+        return identidad
+
+    def clean(self):
+        cleaned_data = super().clean()
+        telefono = (cleaned_data.get("telefono") or "").strip()
+        whatsapp = (cleaned_data.get("whatsapp") or "").strip()
+        if not telefono and not whatsapp:
+            self.add_error("whatsapp", "Ingresa al menos un teléfono o número de WhatsApp.")
+        if whatsapp and not telefono:
+            cleaned_data["telefono"] = whatsapp
+        if telefono and not whatsapp:
+            cleaned_data["whatsapp"] = telefono
+        return cleaned_data
