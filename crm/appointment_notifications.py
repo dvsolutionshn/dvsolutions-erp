@@ -62,12 +62,15 @@ def programar_notificaciones_cita(cita, ahora=None):
 def procesar_notificacion(notificacion_id, ahora=None):
     ahora = ahora or timezone.now()
     with transaction.atomic():
-        notificacion = NotificacionCitaWhatsApp.objects.select_for_update().select_related(
-            "cita__empresa", "cita__paciente", "cita__cliente", "cita__servicio_clinico", "cita__profesional_salud"
-        ).get(id=notificacion_id)
+        # PostgreSQL no permite aplicar FOR UPDATE sobre el lado nullable de
+        # joins externos. Bloqueamos solo la fila de la notificacion y luego
+        # cargamos la cita con sus relaciones opcionales para armar el mensaje.
+        notificacion = NotificacionCitaWhatsApp.objects.select_for_update().get(id=notificacion_id)
         if notificacion.estado == "enviado" or notificacion.programada_para > ahora:
             return notificacion
-        cita = notificacion.cita
+        cita = CitaCliente.objects.select_related(
+            "empresa", "paciente", "cliente", "servicio_clinico", "profesional_salud"
+        ).get(id=notificacion.cita_id)
         if cita.estado in {"cancelada", "realizada"} or cita.fecha_hora <= ahora:
             notificacion.estado = "omitido"
             notificacion.save(update_fields=["estado", "fecha_actualizacion"])
