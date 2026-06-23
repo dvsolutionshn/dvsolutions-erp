@@ -63,6 +63,15 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
         self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 15)
 
+    def test_servicios_clinicos_incluyen_categoria_spa_estetica_no_medica(self):
+        response = self.client.get(reverse("clinica_servicios", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Faciales, masajes, hidrataciones, tratamientos esteticos no medicos",
+        )
+
     def test_crear_paciente_alergico_y_mostrar_alerta_en_lista(self):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)

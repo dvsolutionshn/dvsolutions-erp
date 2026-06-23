@@ -236,6 +236,7 @@ class ServicioClinico(models.Model):
         ("procedimiento", "Procedimiento"),
         ("cirugia", "Cirugia"),
         ("tratamiento", "Tratamiento"),
+        ("spa", "Faciales, masajes, hidrataciones, tratamientos esteticos no medicos"),
         ("control", "Control"),
         ("laboratorio", "Laboratorio"),
         ("imagen", "Imagen"),

@@ -1,3 +1,4 @@
+import unicodedata
 from urllib.parse import quote
 
 from django.conf import settings
@@ -6,6 +7,11 @@ from django.utils import timezone
 
 from core.models import Empresa
 from facturacion.models import Cliente, Producto
+
+
+def _normalizar_texto(valor):
+    texto = unicodedata.normalize("NFKD", valor or "")
+    return "".join(ch for ch in texto if not unicodedata.combining(ch)).lower()
 
 
 class ConfiguracionCRM(models.Model):
@@ -189,6 +195,43 @@ class CitaCliente(models.Model):
     @property
     def display_responsable(self):
         return self.profesional_salud.nombre if self.profesional_salud_id else (self.responsable or "Sin responsable")
+
+    @property
+    def agenda_color(self):
+        responsable = _normalizar_texto(self.display_responsable)
+        servicio = _normalizar_texto(self.display_servicio)
+        categoria = _normalizar_texto(
+            self.servicio_clinico.categoria if self.servicio_clinico_id else ""
+        )
+        if "luis" in responsable:
+            return "doctor-luis"
+        if "candy" in responsable:
+            return "dra-candy"
+        if "terapia" in servicio or "camara" in servicio or "hiperbar" in servicio:
+            return "terapias"
+        if categoria == "spa" or any(
+            palabra in servicio
+            for palabra in ["facial", "masaje", "hidratacion", "spa", "estetico no medico"]
+        ):
+            return "spa"
+        if categoria == "cirugia" or "cirug" in servicio:
+            return "cirugias"
+        if categoria in {"tratamiento", "procedimiento"} or "tratamiento" in servicio:
+            return "tratamientos"
+        return "general"
+
+    @property
+    def agenda_color_label(self):
+        etiquetas = {
+            "doctor-luis": "Dr Luis",
+            "dra-candy": "Dra Candy",
+            "terapias": "Terapias / camaras hiperbaricas",
+            "tratamientos": "Tratamientos",
+            "cirugias": "Cirugias",
+            "spa": "Spa",
+            "general": "General",
+        }
+        return etiquetas.get(self.agenda_color, "General")
 
     @property
     def whatsapp_url(self):

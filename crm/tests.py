@@ -156,6 +156,40 @@ class CRMTests(TestCase):
         self.assertEqual(cita_clinica.servicio, servicio)
         self.assertEqual(cita_clinica.estado, "confirmada")
 
+    def test_agenda_clinica_muestra_modal_y_colores_por_tipo_consulta(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica", defaults={"nombre": "Clínica Médica", "es_comercial": True}
+        )
+        EmpresaModulo.objects.get_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
+        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-COLOR", nombre="Paciente Color")
+        dr_luis = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dr Luis")
+        dra_candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra Candy Luque")
+        consulta = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta general", categoria="consulta")
+        spa = ServicioClinico.objects.create(empresa=self.empresa, nombre="Facial hidratante", categoria="spa")
+        fecha = timezone.make_aware(datetime(2026, 6, 23, 10, 0))
+        CitaCliente.objects.create(
+            empresa=self.empresa, paciente=paciente, servicio_clinico=consulta,
+            profesional_salud=dr_luis, titulo=consulta.nombre, responsable=dr_luis.nombre,
+            fecha_hora=fecha,
+        )
+        CitaCliente.objects.create(
+            empresa=self.empresa, paciente=paciente, servicio_clinico=spa,
+            profesional_salud=dra_candy, titulo=spa.nombre, responsable=dra_candy.nombre,
+            fecha_hora=fecha.replace(hour=11),
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]), {"vista": "mes", "fecha": "2026-06-23"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "calendarDayModal")
+        self.assertContains(response, "data-calendar-day=\"2026-06-23\"")
+        self.assertContains(response, "color-doctor-luis")
+        self.assertContains(response, "color-dra-candy")
+        self.assertContains(response, "Spa")
+
     def test_eliminar_cita_exige_motivo_y_limpia_registros_vinculados(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
