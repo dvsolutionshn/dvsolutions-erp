@@ -18,6 +18,7 @@ urlpatterns = [
     path("pacientes/<int:paciente_id>/preconsulta/<int:preconsulta_id>/", views.preconsulta_detalle, name="clinica_preconsulta_detalle"),
     path("citas/", views.citas, name="clinica_citas"),
     path("citas/crear/", views.crear_cita, name="clinica_crear_cita"),
+    path("citas/pacientes/crear-rapido/", views.crear_paciente_rapido_cita, name="clinica_crear_paciente_rapido"),
     path("expediente/agregar/", views.crear_evento_expediente, name="clinica_crear_evento"),
     path("tratamientos/", views.tratamientos, name="clinica_tratamientos"),
     path("tratamientos/crear/", views.crear_tratamiento, name="clinica_crear_tratamiento"),

@@ -63,6 +63,35 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
         self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 15)
 
+    def test_nueva_cita_clinica_permite_crear_paciente_sin_salir(self):
+        url = reverse("clinica_crear_cita", args=[self.empresa.slug])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "+ Nuevo paciente")
+        self.assertContains(response, "patientQuickModal")
+
+        response = self.client.post(
+            reverse("clinica_crear_paciente_rapido", args=[self.empresa.slug]),
+            {
+                "tipo_id": "dni",
+                "identidad": "0801198812345",
+                "primer_nombre": "Laura",
+                "primer_apellido": "Martínez",
+                "fecha_nacimiento": "1988-07-10",
+                "sexo": "femenino",
+                "whatsapp": "99887766",
+                "correo": "laura@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        paciente = Paciente.objects.get(id=response.json()["paciente"]["id"])
+        self.assertEqual(paciente.nombre, "Laura Martínez")
+        self.assertEqual(paciente.creado_por, self.user)
+        self.assertIsNotNone(paciente.cliente_id)
+        self.assertEqual(paciente.cliente.telefono_whatsapp, "99887766")
+
     def test_servicios_clinicos_incluyen_categoria_spa_estetica_no_medica(self):
         response = self.client.get(reverse("clinica_servicios", args=[self.empresa.slug]))
 

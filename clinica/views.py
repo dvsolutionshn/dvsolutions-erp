@@ -46,6 +46,7 @@ from .models import (
     TratamientoPaciente,
 )
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
+from crm.forms import PacienteRapidoCitaForm
 
 
 def _empresa_desde_slug(empresa_slug):
@@ -628,7 +629,19 @@ def crear_cita(request, empresa_slug):
         cita.save()
         messages.success(request, "Cita clinica guardada correctamente.")
         return redirect("clinica_citas", empresa_slug=empresa.slug)
-    return render(request, "clinica/form.html", {"empresa": empresa, "form": form, "titulo": "Nueva cita clinica"})
+    return render(request, "clinica/form.html", {
+        "empresa": empresa,
+        "form": form,
+        "titulo": "Nueva cita clinica",
+        "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa),
+    })
+
+
+def crear_paciente_rapido_cita(request, empresa_slug):
+    # La agenda y el módulo clínico comparten una sola validación y sincronización
+    # para evitar expedientes o clientes de facturación con reglas diferentes.
+    from crm.views import crear_paciente_rapido_cita as crear_paciente
+    return crear_paciente(request, empresa_slug)
 
 
 @login_required

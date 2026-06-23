@@ -71,6 +71,7 @@
 }
 .clinic-field textarea{min-height:98px;resize:vertical}
 .clinic-datetime{display:grid;grid-template-columns:minmax(150px,1fr) 105px 82px;min-height:46px;border:1px solid var(--line-strong);border-radius:10px;background:#fff;overflow:hidden}.clinic-datetime input,.clinic-datetime select{width:100%!important;min-width:0!important;height:44px!important;min-height:44px!important;border:0!important;border-radius:0!important;background:#fff!important;padding:0 12px!important;box-shadow:none!important}.clinic-datetime select{border-left:1px solid var(--line)!important;font-weight:800}.clinic-datetime:focus-within{border-color:rgba(39,101,232,.46);box-shadow:0 0 0 4px rgba(39,101,232,.08)}
+.clinic-patient-picker{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.clinic-patient-picker select{min-width:0}.clinic-patient-new{height:46px;white-space:nowrap;border:1px solid #2878d0;border-radius:10px;background:#f3f8fe;color:#2469b4;padding:0 14px;font-size:11px;font-weight:900;cursor:pointer}.clinic-patient-new:hover{background:#e7f2ff}
 .clinic-field input:focus,
 .clinic-field select:focus,
 .clinic-field textarea:focus{
@@ -101,6 +102,7 @@
     margin-top:4px;
     border-top:1px solid var(--line);
 }
+.patient-quick-modal{width:min(780px,96vw);max-height:90vh;padding:0;border:0;border-radius:22px;background:#fff;box-shadow:0 26px 70px rgba(18,35,56,.3)}.patient-quick-modal::backdrop{background:rgba(15,28,42,.5);backdrop-filter:blur(5px)}.patient-quick-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:20px 22px;border-bottom:1px solid #e0e8f0;background:linear-gradient(135deg,#fff,#f3f8fd)}.patient-quick-head h3{margin:3px 0 0;color:#132338;font-size:21px}.patient-quick-head p{margin:6px 0 0;color:#6a7b8c;font-size:11px}.patient-quick-close{width:38px;height:38px;border:1px solid #ccd9e5;border-radius:12px;background:#fff;color:#26394d;font-size:20px;cursor:pointer}.patient-quick-body{padding:20px 22px}.patient-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.patient-quick-field{display:grid;gap:6px}.patient-quick-field label{color:#617486;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.patient-quick-field input,.patient-quick-field select{width:100%;min-height:44px;border:1px solid #b8ccdc;border-radius:10px;background:#fff;padding:0 12px;color:#25384a}.patient-quick-field input:focus,.patient-quick-field select:focus{outline:0;border-color:#2878d0;box-shadow:0 0 0 3px rgba(40,120,208,.1)}.patient-quick-status{display:none;margin-top:15px;padding:11px 13px;border-radius:10px;background:#f8eceb;color:#943d38;font-size:11px;line-height:1.45}.patient-quick-status.is-visible{display:block}.patient-quick-status.is-success{background:#e9f5ef;color:#28654d}.patient-quick-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid #e4eaf0}.patient-quick-actions button[disabled]{opacity:.55;cursor:wait}
 @media (max-width:1180px){
     .clinic-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -111,6 +113,9 @@
     .clinic-form-actions{align-items:stretch;flex-direction:column}
     .clinic-form-actions .erp-btn,
     .clinic-form-actions .erp-btn-secondary{width:100%}
+    .clinic-patient-picker{grid-template-columns:1fr}
+    .patient-quick-grid{grid-template-columns:1fr}
+    .patient-quick-modal{width:94vw}
 }
 </style>
 {% endblock %}
@@ -138,7 +143,14 @@
         {% elif field.name != "hora_cita" and field.name != "periodo_cita" %}
         <div class="clinic-field {% if field.field.widget.input_type == 'checkbox' %}clinic-check{% endif %} {% if field.name in 'direccion alergias antecedentes_medicos medicamentos_actuales notas_privadas objetivo plan_clinico descripcion diagnostico plan signos_vitales contenido observaciones' %}is-wide{% endif %}">
             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
+            {% if field.name == "paciente" and paciente_rapido_form %}
+            <div class="clinic-patient-picker">
+                {{ field }}
+                <button class="clinic-patient-new" type="button" data-open-patient-modal>+ Nuevo paciente</button>
+            </div>
+            {% else %}
+                {{ field }}
+            {% endif %}
             {% if field.help_text %}<small class="clinic-help">{{ field.help_text }}</small>{% endif %}
             {% for error in field.errors %}<div class="clinic-error">{{ error }}</div>{% endfor %}
         </div>
@@ -154,4 +166,98 @@
         </div>
     </form>
 </section>
+
+{% if paciente_rapido_form %}
+<dialog class="patient-quick-modal" id="patientQuickModal">
+    <form id="patientQuickForm">
+        {% csrf_token %}
+        <div class="patient-quick-head">
+            <div>
+                <div class="erp-kpi-label">Alta rápida desde la cita clínica</div>
+                <h3>Crear nuevo paciente</h3>
+                <p>El expediente y el cliente de facturación se crearán automáticamente.</p>
+            </div>
+            <button class="patient-quick-close" type="button" data-close-patient-modal aria-label="Cerrar">×</button>
+        </div>
+        <div class="patient-quick-body">
+            <div class="patient-quick-grid">
+                {% for field in paciente_rapido_form %}
+                <div class="patient-quick-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+                    {{ field }}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="patient-quick-status" id="patientQuickStatus" role="status" aria-live="polite"></div>
+            <div class="patient-quick-actions">
+                <button class="erp-btn-secondary" type="button" data-close-patient-modal>Cancelar</button>
+                <button class="erp-btn" type="submit" id="patientQuickSubmit">Guardar y seleccionar</button>
+            </div>
+        </div>
+    </form>
+</dialog>
+<script>
+(function(){
+    const modal = document.getElementById("patientQuickModal");
+    const form = document.getElementById("patientQuickForm");
+    const patientSelect = document.getElementById("id_paciente");
+    const status = document.getElementById("patientQuickStatus");
+    const submit = document.getElementById("patientQuickSubmit");
+    if(!modal || !form || !patientSelect || !status || !submit){ return; }
+
+    function showStatus(message, success){
+        status.textContent = message;
+        status.classList.add("is-visible");
+        status.classList.toggle("is-success", Boolean(success));
+    }
+    function closeModal(){
+        modal.close();
+        status.classList.remove("is-visible", "is-success");
+        status.textContent = "";
+    }
+
+    document.querySelectorAll("[data-open-patient-modal]").forEach(function(button){
+        button.addEventListener("click", function(){
+            modal.showModal();
+            const firstName = form.querySelector("[name=primer_nombre]");
+            if(firstName){ window.setTimeout(function(){ firstName.focus(); }, 50); }
+        });
+    });
+    document.querySelectorAll("[data-close-patient-modal]").forEach(function(button){
+        button.addEventListener("click", closeModal);
+    });
+
+    form.addEventListener("submit", async function(event){
+        event.preventDefault();
+        submit.disabled = true;
+        showStatus("Guardando paciente…", true);
+        try{
+            const response = await fetch("{% url 'clinica_crear_paciente_rapido' empresa.slug %}", {
+                method: "POST",
+                body: new FormData(form),
+                headers: {"X-Requested-With": "XMLHttpRequest"},
+            });
+            const data = await response.json();
+            if(!response.ok || !data.ok){
+                const details = data.errors
+                    ? Object.values(data.errors).flat().join(" ")
+                    : (data.error || "No fue posible crear el paciente.");
+                showStatus(details, false);
+                return;
+            }
+            const patient = data.paciente;
+            patientSelect.add(new Option(patient.label, String(patient.id), true, true));
+            patientSelect.dispatchEvent(new Event("change", {bubbles:true}));
+            form.reset();
+            showStatus(patient.nombre + " fue creado y seleccionado.", true);
+            window.setTimeout(closeModal, 650);
+        }catch(error){
+            showStatus("No se pudo conectar con el servidor. Intenta nuevamente.", false);
+        }finally{
+            submit.disabled = false;
+        }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
