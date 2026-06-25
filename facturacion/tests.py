@@ -571,6 +571,56 @@ class FacturacionTests(TestCase):
         self.assertEqual(cliente.rtn, "0801199911111")
         self.assertIsNotNone(cliente.cuenta_contable)
 
+    def test_pos_medical_spa_crea_cliente_con_datos_reales_del_modal(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+
+        response = self.client.post(
+            reverse("pos_crear_cliente_rapido", args=[self.empresa.slug]),
+            data=json.dumps({
+                "nombre": "Osman Ivan Maldonado",
+                "rtn": "1706197900050",
+                "telefono": "94584821",
+                "correo": "osmannaples@icloud.com",
+                "telefono_whatsapp": "94584821",
+                "fecha_nacimiento": "1979-01-28",
+                "ciudad": "Tegucigalpa",
+                "canal_preferido": "whatsapp",
+                "direccion": "",
+                "acepta_promociones": True,
+            }),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        cliente = Cliente.objects.get(pk=response.json()["cliente"]["id"])
+        self.assertEqual(cliente.fecha_nacimiento, date(1979, 1, 28))
+        self.assertEqual(cliente.telefono_whatsapp, "94584821")
+        self.assertIsNotNone(cliente.cuenta_contable_id)
+
+    @patch("facturacion.views.asegurar_cuenta_contable_cliente", side_effect=RuntimeError("fallo contable"))
+    def test_pos_cliente_rapido_siempre_responde_json_si_falla_contabilidad(self, _mock_cuenta):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+
+        response = self.client.post(
+            reverse("pos_crear_cliente_rapido", args=[self.empresa.slug]),
+            data=json.dumps({
+                "nombre": "Cliente Error Controlado",
+                "rtn": "0801199911777",
+                "telefono": "99990001",
+                "correo": "error@example.com",
+            }),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertFalse(response.json()["ok"])
+        self.assertFalse(Cliente.objects.filter(nombre="Cliente Error Controlado").exists())
+
     def test_pos_busca_clientes_en_base_completa_y_documento_sin_guiones(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])

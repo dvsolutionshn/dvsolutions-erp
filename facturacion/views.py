@@ -13,7 +13,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
@@ -473,6 +473,9 @@ def pos_crear_cliente_rapido(request, empresa_slug):
 
     try:
         with transaction.atomic():
+            # Serializa las altas rápidas de una misma empresa para que dos cajas
+            # no intenten reservar simultáneamente el mismo código contable.
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
             cliente = Cliente.objects.create(
                 empresa=empresa,
                 nombre=nombre,
@@ -490,6 +493,30 @@ def pos_crear_cliente_rapido(request, empresa_slug):
             asegurar_cuenta_contable_cliente(cliente)
     except ValidationError as exc:
         return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+    except IntegrityError:
+        logger.exception("Conflicto de integridad creando cliente rápido POS para %s", empresa.slug)
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": (
+                    "No se pudo guardar porque otro cliente o cuenta contable utiliza "
+                    "los mismos datos. Verifica el DNI/RTN e intenta nuevamente."
+                ),
+            },
+            status=409,
+        )
+    except Exception:
+        logger.exception("Error creando cliente rápido POS para %s", empresa.slug)
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": (
+                    "El servidor no pudo completar el registro del cliente. "
+                    "Intenta nuevamente; si continúa, revisa el registro de errores."
+                ),
+            },
+            status=500,
+        )
 
     return JsonResponse({"ok": True, "cliente": _pos_cliente_payload(cliente)})
 
