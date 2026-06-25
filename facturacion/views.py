@@ -41,7 +41,7 @@ from contabilidad.services import (
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
@@ -52,11 +52,15 @@ POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
 
 
 def _precios_incluyen_impuesto(empresa):
+    debe_incluir = empresa.slug in EMPRESAS_PRECIO_FINAL_CON_IMPUESTO
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(
         empresa=empresa,
-        defaults={"precios_incluyen_impuesto": True},
+        defaults={"precios_incluyen_impuesto": debe_incluir},
     )
-    return configuracion.precios_incluyen_impuesto
+    if configuracion.precios_incluyen_impuesto != debe_incluir:
+        configuracion.precios_incluyen_impuesto = debe_incluir
+        configuracion.save(update_fields=["precios_incluyen_impuesto", "fecha_actualizacion"])
+    return debe_incluir
 
 
 def _empresa_usa_cierre_caja(empresa):
@@ -134,9 +138,10 @@ def facturacion_dashboard(request, empresa_slug):
 @login_required
 def configuracion_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    precios_incluyen_impuesto = _precios_incluyen_impuesto(empresa)
     configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(
         empresa=empresa,
-        defaults={"precios_incluyen_impuesto": True},
+        defaults={"precios_incluyen_impuesto": precios_incluyen_impuesto},
     )
     permite_plantilla_notas_extensas = _empresa_permite_plantilla_notas_extensas(empresa)
     permite_plantilla_independiente = _empresa_permite_plantilla_independiente(empresa)
@@ -150,6 +155,7 @@ def configuracion_facturacion(request, empresa_slug):
     if request.method == "POST" and form.is_valid():
         configuracion = form.save(commit=False)
         configuracion.empresa = empresa
+        configuracion.precios_incluyen_impuesto = precios_incluyen_impuesto
         configuracion.save()
         messages.success(request, "Configuracion de facturacion actualizada correctamente.")
         return redirect("configuracion_facturacion", empresa_slug=empresa.slug)
@@ -160,6 +166,7 @@ def configuracion_facturacion(request, empresa_slug):
         "configuracion": configuracion,
         "permite_plantilla_notas_extensas": permite_plantilla_notas_extensas,
         "permite_plantilla_independiente": permite_plantilla_independiente,
+        "precios_incluyen_impuesto": precios_incluyen_impuesto,
     })
 
 

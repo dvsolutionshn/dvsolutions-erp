@@ -434,14 +434,13 @@
 
             <div class="erp-card" style="grid-column:1 / -1; background:#f8fafc;">
                 <div class="erp-kpi-label">Regla de precios</div>
-                <div class="erp-config-visibility" style="margin-top:14px;">
-                    <label>
-                        {{ form.precios_incluyen_impuesto }}
-                        <span>Los precios del catalogo ya incluyen impuesto</span>
-                    </label>
-                </div>
-                <small style="display:block; margin-top:10px; color:#5d718a;">Al escribir L. 2,500, el cliente pagara exactamente L. 2,500 y el sistema separara internamente la base gravada y el ISV.</small>
-                {{ form.precios_incluyen_impuesto.errors }}
+                {% if precios_incluyen_impuesto %}
+                <strong style="display:block;margin-top:12px;color:#183b56;">Precio final con impuesto incluido</strong>
+                <small style="display:block; margin-top:7px; color:#5d718a;">Esta empresa captura el total que pagará el cliente. Al escribir L. 2,500, el sistema separa internamente la base gravada y el ISV.</small>
+                {% else %}
+                <strong style="display:block;margin-top:12px;color:#183b56;">Precio base más impuesto</strong>
+                <small style="display:block; margin-top:7px; color:#5d718a;">El precio del catálogo se interpreta como valor antes de impuesto. Al facturar, el sistema calcula y suma el ISV correspondiente.</small>
+                {% endif %}
             </div>
 
             <div class="erp-card" style="grid-column:1 / -1; background:#f8fafc;">

@@ -2,7 +2,7 @@ from django import forms
 from django.db.models import Sum
 from decimal import Decimal
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
 
@@ -71,6 +71,7 @@ class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):
         permite_plantilla_independiente = kwargs.pop("permite_plantilla_independiente", False)
         super().__init__(*args, **kwargs)
         empresa = self.instance.empresa if getattr(self.instance, "empresa_id", None) else None
+        self.fields.pop("precios_incluyen_impuesto", None)
         if not empresa or empresa.slug not in {"hospital_mia", "medical_spa", "demo_1"}:
             self.fields["plantilla_factura_pdf"].choices = [
                 choice
@@ -305,8 +306,7 @@ class ProductoForm(forms.ModelForm):
         self.fields['impuesto_predeterminado'].queryset = TipoImpuesto.objects.filter(activo=True).order_by('porcentaje', 'nombre')
         if self.empresa:
             configuracion_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
-            configuracion_facturacion = ConfiguracionFacturacionEmpresa.objects.filter(empresa=self.empresa).first()
-            if configuracion_facturacion is None or configuracion_facturacion.precios_incluyen_impuesto:
+            if self.empresa.slug in EMPRESAS_PRECIO_FINAL_CON_IMPUESTO:
                 self.fields['precio'].label = 'Precio final (impuesto incluido)'
                 self.fields['precio'].help_text = 'Escribe el total que pagara el cliente; el sistema separara automaticamente la base y el impuesto.'
             self.mostrar_bodega_inicial = bool(configuracion_avanzada.usa_bodegas_internas)

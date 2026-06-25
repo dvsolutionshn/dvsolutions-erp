@@ -303,11 +303,15 @@ class FacturacionTests(TestCase):
         factura = Factura.objects.get(cliente__nombre="Consumidor Final")
         self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
         self.assertEqual(factura.estado, "emitida")
-        self.assertEqual(factura.total, Decimal("200.00"))
+        self.assertEqual(factura.subtotal, Decimal("200.00"))
+        self.assertEqual(factura.impuesto, Decimal("30.00"))
+        self.assertEqual(factura.total, Decimal("230.00"))
         self.assertEqual(factura.estado_pago, "pagado")
+        linea = factura.lineas.get()
+        self.assertFalse(linea.precio_incluye_impuesto)
         pago = PagoFactura.objects.get(factura=factura)
-        self.assertEqual(pago.monto, Decimal("200.00"))
-        self.assertTrue(ReciboPago.objects.filter(pago=pago, monto=Decimal("200.00")).exists())
+        self.assertEqual(pago.monto, Decimal("230.00"))
+        self.assertTrue(ReciboPago.objects.filter(pago=pago, monto=Decimal("230.00")).exists())
         self.assertTrue(
             AsientoContable.objects.filter(
                 empresa=self.empresa,
@@ -699,6 +703,32 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(form.fields["codigo"].label, "Codigo de barras / SKU")
         self.assertEqual(form.fields["codigo"].widget.attrs["data-barcode-input"], "true")
+
+    def test_precio_final_con_impuesto_solo_aplica_a_empresas_medicas_definidas(self):
+        form_general = ProductoForm(empresa=self.empresa)
+        self.assertEqual(form_general.fields["precio"].label, "Precio")
+        self.assertIn("Precio base", form_general.fields["precio"].help_text)
+
+        for slug in ["hospital_mia", "medical_spa"]:
+            self.empresa.slug = slug
+            self.empresa.save(update_fields=["slug"])
+            form_medico = ProductoForm(empresa=self.empresa)
+            self.assertEqual(form_medico.fields["precio"].label, "Precio final (impuesto incluido)")
+            self.assertIn("total que pagara", form_medico.fields["precio"].help_text)
+
+    def test_configuracion_no_permite_activar_precio_final_en_erp_general(self):
+        configuracion = ConfiguracionFacturacionEmpresa.objects.create(
+            empresa=self.empresa,
+            precios_incluyen_impuesto=True,
+        )
+
+        response = self.client.get(reverse("configuracion_facturacion", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        configuracion.refresh_from_db()
+        self.assertFalse(configuracion.precios_incluyen_impuesto)
+        self.assertContains(response, "Precio base más impuesto")
+        self.assertNotContains(response, 'name="precios_incluyen_impuesto"', html=False)
 
     def test_nuevo_producto_muestra_estacion_lector_en_empresas_pos(self):
         for slug in ["demo_1", "hospital_mia", "medical_spa"]:
