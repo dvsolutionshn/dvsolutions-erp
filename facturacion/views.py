@@ -5845,12 +5845,36 @@ def anular_factura(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    motivo = (request.POST.get("motivo") or "").strip()
 
     if factura.estado == 'anulada':
         messages.info(request, "La factura ya estaba anulada.")
-    else:
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    if len(motivo) < 5:
+        messages.error(request, "Explica el motivo de la anulacion con al menos 5 caracteres.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    with transaction.atomic():
+        factura = Factura.objects.select_for_update().get(id=factura.id, empresa=empresa)
         if factura.estado == 'emitida':
             _revertir_salida_factura(factura)
+            for pago in factura.pagos_facturacion.all():
+                registrar_reversion_documento(
+                    empresa=factura.empresa,
+                    documento_tipo="pago_factura",
+                    documento_id=pago.id,
+                    evento_origen="cobro",
+                    evento_reversion="anulacion",
+                    fecha=timezone.now().date(),
+                    descripcion=(
+                        f"Reversion cobro de factura {factura.numero_factura or factura.id}. "
+                        f"Motivo: {motivo}"
+                    ),
+                    referencia=pago.referencia or factura.numero_factura or str(factura.id),
+                    origen_modulo="facturacion",
+                    creado_por=request.user,
+                )
             registrar_reversion_documento(
                 empresa=factura.empresa,
                 documento_tipo='factura',
@@ -5858,14 +5882,17 @@ def anular_factura(request, empresa_slug, factura_id):
                 evento_origen='emision',
                 evento_reversion='anulacion',
                 fecha=timezone.now().date(),
-                descripcion=f"Reversion factura {factura.numero_factura or factura.id}",
+                descripcion=(
+                    f"Reversion factura {factura.numero_factura or factura.id}. "
+                    f"Motivo: {motivo}"
+                ),
                 referencia=factura.numero_factura or str(factura.id),
                 origen_modulo='facturacion',
-                creado_por=factura.vendedor,
+                creado_por=request.user,
             )
         factura.estado = 'anulada'
         factura.save(update_fields=['estado'])
-        messages.success(request, "Factura anulada correctamente.")
+    messages.success(request, "Factura anulada correctamente y registrada en la bitacora.")
 
     return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 

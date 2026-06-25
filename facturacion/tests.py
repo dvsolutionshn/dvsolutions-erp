@@ -1897,11 +1897,83 @@ class FacturacionTests(TestCase):
     def test_anular_factura_cambia_estado(self):
         factura = self.crear_factura_con_linea()
 
-        response = self.client.post(reverse("anular_factura", args=[self.empresa.slug, factura.id]))
+        response = self.client.post(
+            reverse("anular_factura", args=[self.empresa.slug, factura.id]),
+            {"motivo": "Documento emitido por error"},
+        )
         factura.refresh_from_db()
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(factura.estado, "anulada")
+
+    def test_anular_factura_exige_motivo_y_lo_registra_en_bitacora(self):
+        factura = self.crear_factura_con_linea()
+        url = reverse("anular_factura", args=[self.empresa.slug, factura.id])
+
+        response = self.client.post(url, {"motivo": "no"})
+        factura.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(factura.estado, "emitida")
+
+        motivo = "Tarjeta del cliente denegada"
+        response = self.client.post(url, {"motivo": motivo})
+        factura.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(factura.estado, "anulada")
+        evento = RegistroAuditoria.objects.filter(
+            empresa=self.empresa,
+            app_label="facturacion",
+            modelo="factura",
+            objeto_id=str(factura.id),
+            accion=RegistroAuditoria.ACCION_MODIFICAR,
+        ).latest("fecha")
+        self.assertEqual(evento.usuario, self.user)
+        self.assertEqual(evento.motivo, motivo)
+        self.assertEqual(evento.cambios["estado"]["anterior"], "emitida")
+        self.assertEqual(evento.cambios["estado"]["nuevo"], "anulada")
+
+    def test_anular_factura_pos_revierte_asiento_del_cobro(self):
+        factura = self.crear_factura_con_linea()
+        cuenta = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco tarjeta",
+            tipo="banco",
+            cuenta_contable=CuentaContable.objects.create(
+                empresa=self.empresa,
+                codigo="1102.0099",
+                nombre="Banco tarjeta",
+                tipo="activo",
+            ),
+        )
+        pago = PagoFactura.objects.create(
+            factura=factura,
+            fecha=date.today(),
+            monto=factura.total,
+            metodo="tarjeta",
+            cuenta_financiera=cuenta,
+            cajero=self.user,
+        )
+        registrar_asiento_pago_cliente(pago)
+
+        response = self.client.post(
+            reverse("anular_factura", args=[self.empresa.slug, factura.id]),
+            {"motivo": "Tarjeta denegada por el banco"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        factura.refresh_from_db()
+        self.assertEqual(factura.estado, "anulada")
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="pago_factura",
+                documento_id=pago.id,
+                evento="anulacion",
+                estado="contabilizado",
+            ).exists()
+        )
 
     def test_borrador_sin_cai_se_puede_ver(self):
         factura = self.crear_factura_con_linea(estado="borrador")

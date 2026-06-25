@@ -474,12 +474,15 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
     {% endif %}
 
     {% if factura.estado != "anulada" %}
-    <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}" class="actions-form">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger" onclick="return confirm('¿Seguro que desea anular esta factura?');">
-            Anular Factura
-        </button>
-    </form>
+    <details class="actions-form">
+        <summary class="btn btn-danger" style="cursor:pointer;">Anular Factura</summary>
+        <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}" style="display:grid;gap:8px;margin-top:10px;">
+            {% csrf_token %}
+            <label for="motivo-anulacion-{{ factura.id }}">Motivo obligatorio</label>
+            <textarea id="motivo-anulacion-{{ factura.id }}" name="motivo" rows="3" minlength="5" maxlength="500" required placeholder="Ej. Tarjeta del cliente denegada"></textarea>
+            <button type="submit" class="btn btn-danger">Confirmar Anulacion</button>
+        </form>
+    </details>
     {% endif %}
 </div>
 

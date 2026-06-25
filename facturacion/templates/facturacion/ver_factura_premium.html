@@ -698,7 +698,16 @@
                 <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea eliminar esta factura?');">{% if factura.estado == "borrador" and not factura.numero_factura %}Eliminar borrador{% else %}Eliminar factura{% endif %}</button></form>
                 {% endif %}
                 {% if factura.estado != "anulada" %}
-                <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea anular esta factura?');">Anular factura</button></form>
+                <details class="erp-inline-form" style="min-width:min(100%,320px);">
+                    <summary class="erp-btn-danger" style="cursor:pointer;list-style:none;text-align:center;">Anular factura</summary>
+                    <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}" style="display:grid;gap:8px;margin-top:9px;padding:12px;border:1px solid #efc7c4;border-radius:12px;background:#fff7f6;">
+                        {% csrf_token %}
+                        <label for="motivo-anulacion-{{ factura.id }}" style="font-size:10px;font-weight:900;color:#8f312c;text-transform:uppercase;">Motivo obligatorio</label>
+                        <textarea id="motivo-anulacion-{{ factura.id }}" name="motivo" rows="3" minlength="5" maxlength="500" required placeholder="Ej. Tarjeta del cliente denegada" style="width:100%;box-sizing:border-box;border:1px solid #dca9a5;border-radius:9px;padding:10px;resize:vertical;"></textarea>
+                        <small style="color:#76524f;">Quedará registrado con usuario, fecha y hora en la bitácora ERP.</small>
+                        <button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea anular esta factura? Esta accion revertira inventario y registros contables.');">Confirmar anulación</button>
+                    </form>
+                </details>
                 {% endif %}
             </div>
         </div>
