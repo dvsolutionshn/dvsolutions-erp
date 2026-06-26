@@ -49,6 +49,7 @@ from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, Cuen
 logger = logging.getLogger(__name__)
 
 POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
+CAJA_EXCLUYE_FACTURAS_ANULADAS_SLUGS = {"hospital_mia", "medical_spa"}
 
 
 def _precios_incluyen_impuesto(empresa):
@@ -79,29 +80,31 @@ def _fecha_caja_desde_parametro(valor):
         return timezone.localdate()
 
 
-def _monto_neto_caja_pago(pago):
+def _monto_neto_caja_pago(pago, excluir_anuladas=False):
     monto = Decimal(pago.monto or 0)
-    if pago.factura.estado == "anulada":
+    if excluir_anuladas and pago.factura.estado == "anulada":
         return Decimal("0.00")
     return monto
 
 
 def _total_neto_caja(pagos):
-    return sum((_monto_neto_caja_pago(pago) for pago in pagos), Decimal("0.00"))
+    return sum((Decimal(getattr(pago, "monto_neto_caja", pago.monto) or 0) for pago in pagos), Decimal("0.00"))
 
 
-def _preparar_pagos_caja(pagos):
+def _preparar_pagos_caja(pagos, empresa=None):
     pagos_preparados = list(pagos)
+    excluir_anuladas = bool(empresa and empresa.slug in CAJA_EXCLUYE_FACTURAS_ANULADAS_SLUGS)
     for pago in pagos_preparados:
         pago.es_anulacion_caja = pago.factura.estado == "anulada"
-        pago.monto_neto_caja = _monto_neto_caja_pago(pago)
+        pago.anulacion_no_suma_caja = excluir_anuladas and pago.es_anulacion_caja
+        pago.monto_neto_caja = _monto_neto_caja_pago(pago, excluir_anuladas=excluir_anuladas)
     return pagos_preparados
 
 
 def _desglose_metodo_caja(pagos, metodo_pago):
     pagos_metodo = [pago for pago in pagos if pago.metodo == metodo_pago]
-    ventas = sum((Decimal(pago.monto or 0) for pago in pagos_metodo if not pago.es_anulacion_caja), Decimal("0.00"))
-    anulaciones = sum((Decimal(pago.monto or 0) for pago in pagos_metodo if pago.es_anulacion_caja), Decimal("0.00"))
+    ventas = sum((Decimal(pago.monto or 0) for pago in pagos_metodo if not pago.anulacion_no_suma_caja), Decimal("0.00"))
+    anulaciones = sum((Decimal(pago.monto or 0) for pago in pagos_metodo if pago.anulacion_no_suma_caja), Decimal("0.00"))
     return {
         "ventas": ventas,
         "anulaciones": anulaciones,
@@ -6683,11 +6686,13 @@ def cierres_caja(request, empresa_slug):
     fecha = _fecha_caja_desde_parametro(request.POST.get("fecha") or request.GET.get("fecha") or timezone.localdate())
     turno = request.POST.get("turno") or request.GET.get("turno") or "general"
 
-    pagos_usuario = _preparar_pagos_caja(PagoFactura.objects.filter(
-        factura__empresa=empresa,
-        cajero=request.user,
-        fecha=fecha,
-    ).select_related("factura", "factura__cliente", "cuenta_financiera")
+    pagos_usuario = _preparar_pagos_caja(
+        PagoFactura.objects.filter(
+            factura__empresa=empresa,
+            cajero=request.user,
+            fecha=fecha,
+        ).select_related("factura", "factura__cliente", "cuenta_financiera"),
+        empresa=empresa,
     )
 
     desglose_caja = {
@@ -6698,7 +6703,7 @@ def cierres_caja(request, empresa_slug):
     efectivo_sistema = desglose_caja["efectivo"]["neto"]
     tarjeta_sistema = desglose_caja["tarjeta"]["neto"]
     transferencia_sistema = desglose_caja["transferencia"]["neto"]
-    aperturas_caja = sum(1 for pago in pagos_usuario if pago.metodo == "efectivo" and not pago.es_anulacion_caja)
+    aperturas_caja = sum(1 for pago in pagos_usuario if pago.metodo == "efectivo" and not pago.anulacion_no_suma_caja)
 
     if request.method == "POST":
         def leer_decimal(nombre, valor_sistema):
@@ -6740,7 +6745,7 @@ def cierres_caja(request, empresa_slug):
         "transferencia_sistema": transferencia_sistema,
         "total_sistema": efectivo_sistema + tarjeta_sistema + transferencia_sistema,
         "pagos": len(pagos_usuario),
-        "anulaciones": sum(1 for pago in pagos_usuario if pago.es_anulacion_caja),
+        "anulaciones": sum(1 for pago in pagos_usuario if pago.anulacion_no_suma_caja),
         "aperturas_caja": aperturas_caja,
         "desglose_caja": desglose_caja,
     }
@@ -6775,7 +6780,8 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
             fecha=cierre.fecha,
         )
         .select_related("factura", "factura__cliente", "cuenta_financiera")
-        .order_by("metodo", "factura__numero_factura", "id")
+        .order_by("metodo", "factura__numero_factura", "id"),
+        empresa=empresa,
     )
 
     resumen_metodos = []
@@ -6786,7 +6792,7 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
             "cantidad": len(pagos_metodo),
             "total": _total_neto_caja(pagos_metodo),
         })
-    aperturas_caja = sum(1 for pago in pagos if pago.metodo == "efectivo" and not pago.es_anulacion_caja)
+    aperturas_caja = sum(1 for pago in pagos if pago.metodo == "efectivo" and not pago.anulacion_no_suma_caja)
 
     return render(request, "facturacion/ver_cierre_caja.html", {
         "empresa": empresa,
@@ -6808,7 +6814,8 @@ def resumen_diario_caja(request, empresa_slug):
     pagos = _preparar_pagos_caja(
         PagoFactura.objects.filter(factura__empresa=empresa, fecha=fecha)
         .select_related("factura", "factura__cliente", "cuenta_financiera", "cajero")
-        .order_by("cajero__username", "metodo", "factura__numero_factura", "id")
+        .order_by("cajero__username", "metodo", "factura__numero_factura", "id"),
+        empresa=empresa,
     )
     cierres = (
         CierreCaja.objects.filter(empresa=empresa, fecha=fecha)
@@ -6832,7 +6839,7 @@ def resumen_diario_caja(request, empresa_slug):
         resumen_cajeros.append({
             "cajero": cajero,
             "cantidad": len(pagos_cajero),
-            "aperturas_caja": sum(1 for pago in pagos_cajero if pago.metodo == "efectivo" and not pago.es_anulacion_caja),
+            "aperturas_caja": sum(1 for pago in pagos_cajero if pago.metodo == "efectivo" and not pago.anulacion_no_suma_caja),
             "total": _total_neto_caja(pagos_cajero),
             "cierres": cierres.filter(cajero_id=cajero_id),
         })
@@ -6850,9 +6857,9 @@ def resumen_diario_caja(request, empresa_slug):
     resumen = {
         "total": _total_neto_caja(pagos),
         "pagos": len(pagos),
-        "anulaciones": sum(1 for pago in pagos if pago.es_anulacion_caja),
+        "anulaciones": sum(1 for pago in pagos if pago.anulacion_no_suma_caja),
         "facturas": len({pago.factura_id for pago in pagos}),
-        "aperturas_caja": sum(1 for pago in pagos if pago.metodo == "efectivo" and not pago.es_anulacion_caja),
+        "aperturas_caja": sum(1 for pago in pagos if pago.metodo == "efectivo" and not pago.anulacion_no_suma_caja),
         "cierres": cierres.count(),
         "total_cerrado": sum((cierre.total_reportado for cierre in cierres), Decimal("0.00")),
         "diferencia_cierres": sum((cierre.diferencia for cierre in cierres), Decimal("0.00")),

@@ -548,7 +548,9 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.context["resumen"]["aperturas_caja"], 1)
         self.assertEqual(response.context["resumen_cajeros"][0]["aperturas_caja"], 1)
 
-    def test_cierre_caja_excluye_pagos_de_facturas_anuladas(self):
+    def test_cierre_caja_excluye_pagos_anulados_en_empresas_medicas(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
         configuracion.usa_cierre_caja = True
         configuracion.save(update_fields=["usa_cierre_caja"])
