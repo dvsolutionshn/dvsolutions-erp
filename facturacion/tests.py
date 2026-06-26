@@ -803,6 +803,18 @@ class FacturacionTests(TestCase):
         self.assertEqual(form.fields["codigo"].label, "Codigo de barras / SKU")
         self.assertEqual(form.fields["codigo"].widget.attrs["data-barcode-input"], "true")
 
+    def test_formulario_producto_costo_real_solo_empresas_medicas(self):
+        form_general = ProductoForm(empresa=self.empresa)
+        self.assertNotIn("costo_real_inventario", form_general.fields)
+
+        for slug in ["hospital_mia", "medical_spa"]:
+            self.empresa.slug = slug
+            self.empresa.save(update_fields=["slug"])
+            form_medico = ProductoForm(empresa=self.empresa)
+            self.assertIn("costo_real_inventario", form_medico.fields)
+            self.assertEqual(form_medico.fields["costo_real_inventario"].label, "Costo real")
+            self.assertIn("No afecta el costo promedio contable", form_medico.fields["costo_real_inventario"].help_text)
+
     def test_precio_final_con_impuesto_solo_aplica_a_empresas_medicas_definidas(self):
         form_general = ProductoForm(empresa=self.empresa)
         self.assertEqual(form_general.fields["precio"].label, "Precio")
@@ -2331,6 +2343,57 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Producto.objects.filter(empresa=self.empresa, nombre="Producto Nuevo").exists())
+
+    def test_crear_y_editar_producto_guarda_costo_real_en_empresas_medicas(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+
+        response = self.client.get(reverse("crear_producto_facturacion", args=[self.empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="costo_real_inventario"', html=False)
+        self.assertContains(response, "Costo real")
+
+        response = self.client.post(
+            reverse("crear_producto_facturacion", args=[self.empresa.slug]),
+            {
+                "nombre": "Producto Margen",
+                "codigo": "MRG-001",
+                "tipo_item": "producto",
+                "unidad_medida": "unidad",
+                "descripcion": "Producto con costo real",
+                "precio": "300.00",
+                "costo_real_inventario": "180.2500",
+                "impuesto_predeterminado": str(self.impuesto.id),
+                "activo": "on",
+                "controla_inventario": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        producto = Producto.objects.get(empresa=self.empresa, codigo="MRG-001")
+        self.assertEqual(producto.costo_real_inventario, Decimal("180.2500"))
+        self.assertEqual(producto.venta_real_inventario, Decimal("119.75"))
+        self.assertEqual(producto.porcentaje_venta_real, Decimal("39.92"))
+
+        response = self.client.post(
+            reverse("editar_producto_facturacion", args=[self.empresa.slug, producto.id]),
+            {
+                "nombre": producto.nombre,
+                "codigo": producto.codigo,
+                "tipo_item": producto.tipo_item,
+                "unidad_medida": producto.unidad_medida,
+                "descripcion": producto.descripcion,
+                "precio": "300.00",
+                "costo_real_inventario": "150.0000",
+                "impuesto_predeterminado": str(self.impuesto.id),
+                "activo": "on",
+                "controla_inventario": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        producto.refresh_from_db()
+        self.assertEqual(producto.costo_real_inventario, Decimal("150.0000"))
 
     def test_crear_producto_registra_existencia_distribuida_por_bodega(self):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)

@@ -5,6 +5,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpres
 from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
+EMPRESAS_COSTO_REAL_INVENTARIO = {"hospital_mia", "medical_spa"}
 
 
 def configurar_campo_fecha(field, placeholder="dd/mm/aaaa"):
@@ -246,6 +247,7 @@ class ProductoForm(forms.ModelForm):
             'tipo_item',
             'unidad_medida',
             'precio',
+            'costo_real_inventario',
             'fecha_referencia',
             'fecha_alerta',
             'nota_fecha',
@@ -270,6 +272,7 @@ class ProductoForm(forms.ModelForm):
             'tipo_item': 'Define si se trata de un articulo fisico o un servicio.',
             'unidad_medida': 'Unidad comercial principal para facturacion e inventario.',
             'precio': 'Precio base sugerido al seleccionar el producto en factura.',
+            'costo_real_inventario': 'Costo real comercial para analisis de margen en inventario. No afecta el costo promedio contable.',
             'impuesto_predeterminado': 'Se aplicara automaticamente al cargar el producto en nuevas lineas.',
             'controla_inventario': 'Activalo solo si este item debe mover existencias cuando construyamos inventario.',
             'descripcion': 'Descripcion comercial o tecnica del item.',
@@ -309,6 +312,16 @@ class ProductoForm(forms.ModelForm):
             if self.empresa.slug in EMPRESAS_PRECIO_FINAL_CON_IMPUESTO:
                 self.fields['precio'].label = 'Precio final (impuesto incluido)'
                 self.fields['precio'].help_text = 'Escribe el total que pagara el cliente; el sistema separara automaticamente la base y el impuesto.'
+            if self.empresa.slug in EMPRESAS_COSTO_REAL_INVENTARIO:
+                self.fields['costo_real_inventario'].label = 'Costo real'
+                self.fields['costo_real_inventario'].required = False
+                self.fields['costo_real_inventario'].widget.attrs.update({
+                    'min': '0',
+                    'step': '0.0001',
+                    'placeholder': '0.0000',
+                })
+            else:
+                self.fields.pop('costo_real_inventario', None)
             self.mostrar_bodega_inicial = bool(configuracion_avanzada.usa_bodegas_internas)
             self.mostrar_perfil_farmaceutico = bool(
                 self.empresa.tiene_modulo_activo("clinica_medica")
@@ -354,6 +367,14 @@ class ProductoForm(forms.ModelForm):
                 self.fields['requiere_refrigeracion'].initial = perfil.requiere_refrigeracion
                 self.fields['producto_controlado'].initial = perfil.producto_controlado
                 self.fields['alerta_vencimiento_dias'].initial = perfil.alerta_vencimiento_dias
+
+    def clean_costo_real_inventario(self):
+        costo_real = self.cleaned_data.get('costo_real_inventario')
+        if costo_real in (None, ''):
+            return Decimal('0.0000')
+        if costo_real < 0:
+            raise forms.ValidationError('El costo real no puede ser negativo.')
+        return costo_real
 
     def _agregar_campos_stock_bodega(self):
         bodegas = BodegaInventario.objects.filter(

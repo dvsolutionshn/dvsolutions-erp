@@ -142,6 +142,9 @@
                 <div class="erp-field">{{ form.tipo_item.label_tag }}{{ form.tipo_item }}{% if form.tipo_item.errors %}<ul class="erp-field-errors">{% for error in form.tipo_item.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field">{{ form.unidad_medida.label_tag }}{{ form.unidad_medida }}{% if form.unidad_medida.errors %}<ul class="erp-field-errors">{% for error in form.unidad_medida.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field">{{ form.precio.label_tag }}{{ form.precio }}{% if form.precio.help_text %}<div class="erp-field-help">{{ form.precio.help_text }}</div>{% endif %}{% if form.precio.errors %}<ul class="erp-field-errors">{% for error in form.precio.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                {% if form.costo_real_inventario %}
+                <div class="erp-field">{{ form.costo_real_inventario.label_tag }}{{ form.costo_real_inventario }}{% if form.costo_real_inventario.help_text %}<div class="erp-field-help">{{ form.costo_real_inventario.help_text }}</div>{% endif %}{% if form.costo_real_inventario.errors %}<ul class="erp-field-errors">{% for error in form.costo_real_inventario.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
+                {% endif %}
                 <div class="erp-field">{{ form.impuesto_predeterminado.label_tag }}{{ form.impuesto_predeterminado }}{% if form.impuesto_predeterminado.help_text %}<div class="erp-field-help">{{ form.impuesto_predeterminado.help_text }}</div>{% endif %}{% if form.impuesto_predeterminado.errors %}<ul class="erp-field-errors">{% for error in form.impuesto_predeterminado.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</div>
                 <div class="erp-field erp-field-span-full">
                     {{ form.foto.label_tag }}
