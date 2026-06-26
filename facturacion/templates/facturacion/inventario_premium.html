@@ -80,9 +80,25 @@
     font-weight:800;
     color:#7a271a;
 }
-.erp-real-cost-form{display:flex;gap:6px;align-items:center;justify-content:flex-end}
-.erp-real-cost-form input{width:110px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:right}
-.erp-real-cost-form button{border:0;border-radius:10px;background:#1769d2;color:#fff;font-size:11px;font-weight:800;padding:8px 10px;cursor:pointer}
+.erp-cost-value{font-weight:800;color:#172b4d;white-space:nowrap}
+.erp-cost-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:6px}
+.erp-cost-edit{border:1px solid #bdd1eb;border-radius:9px;background:#f7fbff;color:#1769d2;font-size:11px;font-weight:800;padding:6px 9px;cursor:pointer}
+.erp-cost-dialog{width:min(680px,calc(100vw - 28px));border:0;border-radius:18px;padding:0;box-shadow:0 24px 70px rgba(16,35,63,.28)}
+.erp-cost-dialog::backdrop{background:rgba(16,35,63,.48);backdrop-filter:blur(2px)}
+.erp-cost-dialog-body{padding:24px}
+.erp-cost-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}
+.erp-cost-dialog-head h3{margin:0 0 5px;color:#172b4d}
+.erp-cost-dialog-close{border:0;background:#edf3fa;border-radius:50%;width:34px;height:34px;cursor:pointer;font-size:20px;color:#49627d}
+.erp-real-cost-form{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;padding:16px;border:1px solid #d8e4f1;border-radius:14px;background:#f8fbff}
+.erp-real-cost-form label{display:block;text-align:left;font-size:12px;font-weight:800;color:#49627d;margin-bottom:6px}
+.erp-real-cost-form input{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:right}
+.erp-real-cost-form button{border:0;border-radius:10px;background:#1769d2;color:#fff;font-size:12px;font-weight:800;padding:11px 15px;cursor:pointer}
+.erp-cost-history-title{margin:20px 0 10px;font-size:14px;color:#172b4d}
+.erp-cost-history{max-height:280px;overflow:auto;border:1px solid #d8e4f1;border-radius:12px}
+.erp-cost-history table{width:100%;border-collapse:collapse;font-size:12px}
+.erp-cost-history th,.erp-cost-history td{padding:10px 12px;border-bottom:1px solid #e6edf5;text-align:left}
+.erp-cost-history th{position:sticky;top:0;background:#f4f8fc;color:#49627d}
+.erp-cost-history td.amount{text-align:right}
 .erp-inventory-note{margin-top:8px;padding:10px 12px;border:1px solid #c8d9ed;border-radius:12px;background:#f6faff;color:#49627d;font-size:12px}
 </style>
 {% endblock %}
@@ -213,14 +229,52 @@
                     </td>
                     {% if mostrar_costo_real_inventario %}
                     <td class="amount">
-                        <form method="post" class="erp-real-cost-form">
-                            {% csrf_token %}
-                            <input type="hidden" name="accion" value="actualizar_costo_real">
-                            <input type="hidden" name="producto_id" value="{{ producto.id }}">
-                            <input type="number" name="costo_real_inventario" min="0" step="0.0001" value="{{ producto.costo_real_inventario|floatformat:4 }}">
-                            <button type="submit">Guardar</button>
-                        </form>
+                        <div class="erp-cost-value">L. {{ producto.costo_real_inventario|floatformat:4|intcomma }}</div>
+                        <div class="erp-cost-actions">
+                            <button type="button" class="erp-cost-edit" onclick="document.getElementById('costo-dialog-{{ producto.id }}').showModal()">Editar costo</button>
+                        </div>
                         <div class="erp-card-muted">Contable: L. {{ producto.costo_promedio|floatformat:4|intcomma }}</div>
+                        <dialog class="erp-cost-dialog" id="costo-dialog-{{ producto.id }}">
+                            <div class="erp-cost-dialog-body">
+                                <div class="erp-cost-dialog-head">
+                                    <div>
+                                        <h3>Costo real de {{ producto.nombre }}</h3>
+                                        <div class="erp-card-muted">Cada modificación queda registrada con fecha y usuario.</div>
+                                    </div>
+                                    <button type="button" class="erp-cost-dialog-close" aria-label="Cerrar" onclick="this.closest('dialog').close()">&times;</button>
+                                </div>
+                                <form method="post" class="erp-real-cost-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="accion" value="actualizar_costo_real">
+                                    <input type="hidden" name="producto_id" value="{{ producto.id }}">
+                                    <div>
+                                        <label for="costo-real-{{ producto.id }}">Nuevo costo real</label>
+                                        <input id="costo-real-{{ producto.id }}" type="number" name="costo_real_inventario" min="0" step="0.0001" value="{{ producto.costo_real_inventario|floatformat:4 }}" required>
+                                    </div>
+                                    <button type="submit">Guardar cambio</button>
+                                </form>
+                                <h4 class="erp-cost-history-title">Historial de costos</h4>
+                                <div class="erp-cost-history">
+                                    <table>
+                                        <thead>
+                                            <tr><th>Fecha</th><th>Usuario</th><th>Anterior</th><th>Nuevo</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        {% for cambio in producto.historial_costos_recientes|slice:":20" %}
+                                            <tr>
+                                                <td>{{ cambio.fecha|date:"d/m/Y H:i" }}</td>
+                                                <td>{{ cambio.usuario.get_full_name|default:cambio.usuario.username|default:"Sistema" }}</td>
+                                                <td class="amount">L. {{ cambio.costo_anterior|floatformat:4|intcomma }}</td>
+                                                <td class="amount"><strong>L. {{ cambio.costo_nuevo|floatformat:4|intcomma }}</strong></td>
+                                            </tr>
+                                        {% empty %}
+                                            <tr><td colspan="4" class="erp-empty">Todavía no hay cambios registrados.</td></tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </dialog>
                     </td>
                     <td class="amount">L. {{ producto.precio|floatformat:2|intcomma }}</td>
                     <td class="amount">{% if producto.venta_real_inventario is not None %}L. {{ producto.venta_real_inventario|floatformat:2|intcomma }}{% else %}-{% endif %}</td>

@@ -19,7 +19,7 @@ from clinica.models import Paciente
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
-from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -2374,6 +2374,9 @@ class FacturacionTests(TestCase):
         self.assertEqual(producto.costo_real_inventario, Decimal("180.2500"))
         self.assertEqual(producto.venta_real_inventario, Decimal("119.75"))
         self.assertEqual(producto.porcentaje_venta_real, Decimal("39.92"))
+        primer_cambio = HistorialCostoRealProducto.objects.get(producto=producto)
+        self.assertEqual(primer_cambio.costo_anterior, Decimal("0.0000"))
+        self.assertEqual(primer_cambio.costo_nuevo, Decimal("180.2500"))
 
         response = self.client.post(
             reverse("editar_producto_facturacion", args=[self.empresa.slug, producto.id]),
@@ -2394,6 +2397,10 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         producto.refresh_from_db()
         self.assertEqual(producto.costo_real_inventario, Decimal("150.0000"))
+        cambios = HistorialCostoRealProducto.objects.filter(producto=producto)
+        self.assertEqual(cambios.count(), 2)
+        self.assertEqual(cambios.first().costo_anterior, Decimal("180.2500"))
+        self.assertEqual(cambios.first().costo_nuevo, Decimal("150.0000"))
 
     def test_crear_producto_registra_existencia_distribuida_por_bodega(self):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
@@ -2748,6 +2755,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Costo real")
         self.assertContains(response, "Contable:")
+        self.assertContains(response, "Editar costo")
 
         self.producto.costo_promedio = Decimal("40.0000")
         self.producto.save(update_fields=["costo_promedio"])
@@ -2765,6 +2773,14 @@ class FacturacionTests(TestCase):
         self.assertEqual(self.producto.costo_promedio, Decimal("40.0000"))
         self.assertEqual(self.producto.venta_real_inventario, Decimal("44.75"))
         self.assertEqual(self.producto.porcentaje_venta_real, Decimal("44.75"))
+        cambio = HistorialCostoRealProducto.objects.get(producto=self.producto)
+        self.assertEqual(cambio.costo_anterior, Decimal("0.0000"))
+        self.assertEqual(cambio.costo_nuevo, Decimal("55.2500"))
+        self.assertEqual(cambio.usuario, self.user)
+
+        response = self.client.get(inventario_url)
+        self.assertContains(response, "Historial de costos")
+        self.assertContains(response, "55.2500")
 
     def test_inventario_farmaceutico_tiene_acceso_a_crear_producto(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")

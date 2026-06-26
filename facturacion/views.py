@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.db import IntegrityError, transaction
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
 from weasyprint import HTML
@@ -41,7 +41,7 @@ from contabilidad.services import (
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
@@ -53,6 +53,20 @@ EMPRESAS_COSTO_REAL_INVENTARIO = {"hospital_mia", "medical_spa"}
 
 def _empresa_muestra_costo_real_inventario(empresa):
     return bool(empresa and empresa.slug in EMPRESAS_COSTO_REAL_INVENTARIO)
+
+
+def _registrar_cambio_costo_real(producto, costo_anterior, usuario):
+    anterior = Decimal(costo_anterior or 0).quantize(Decimal("0.0001"))
+    nuevo = Decimal(producto.costo_real_inventario or 0).quantize(Decimal("0.0001"))
+    if anterior == nuevo:
+        return
+    HistorialCostoRealProducto.objects.create(
+        empresa=producto.empresa,
+        producto=producto,
+        costo_anterior=anterior,
+        costo_nuevo=nuevo,
+        usuario=usuario if getattr(usuario, "is_authenticated", False) else None,
+    )
 
 POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
 CAJA_EXCLUYE_FACTURAS_ANULADAS_SLUGS = {"hospital_mia", "medical_spa"}
@@ -2372,8 +2386,11 @@ def inventario_facturacion(request, empresa_slug):
         if costo_real < 0:
             messages.error(request, "El costo real no puede ser negativo.")
             return redirect("inventario_facturacion", empresa_slug=empresa.slug)
-        producto.costo_real_inventario = costo_real
-        producto.save(update_fields=["costo_real_inventario"])
+        costo_anterior = producto.costo_real_inventario
+        with transaction.atomic():
+            producto.costo_real_inventario = costo_real
+            producto.save(update_fields=["costo_real_inventario"])
+            _registrar_cambio_costo_real(producto, costo_anterior, request.user)
         messages.success(request, f"Costo real actualizado para {producto.nombre}.")
         return redirect(f"{reverse('inventario_facturacion', args=[empresa.slug])}?producto={producto.id}")
 
@@ -2390,7 +2407,13 @@ def inventario_facturacion(request, empresa_slug):
         empresa=empresa,
         controla_inventario=True,
         eliminado=False,
-    ).select_related('impuesto_predeterminado', 'inventario').order_by('nombre')
+    ).select_related('impuesto_predeterminado', 'inventario').prefetch_related(
+        Prefetch(
+            'historial_costos_reales',
+            queryset=HistorialCostoRealProducto.objects.select_related('usuario'),
+            to_attr='historial_costos_recientes',
+        )
+    ).order_by('nombre')
 
     producto_id = request.GET.get('producto')
     producto_seleccionado = None
@@ -3909,6 +3932,8 @@ def crear_producto(request, empresa_slug):
                     producto = form.save(commit=False)
                     producto.empresa = empresa
                     producto.save()
+                    if _empresa_muestra_costo_real_inventario(empresa):
+                        _registrar_cambio_costo_real(producto, Decimal("0"), request.user)
                     if getattr(form, "mostrar_perfil_farmaceutico", False):
                         form.guardar_perfil_farmaceutico(producto)
                     _aplicar_distribucion_bodegas_producto(producto, form)
@@ -3963,6 +3988,7 @@ def crear_producto(request, empresa_slug):
 def editar_producto(request, empresa_slug, producto_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     producto = get_object_or_404(Producto, id=producto_id, empresa=empresa, eliminado=False)
+    costo_real_anterior = producto.costo_real_inventario
 
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, instance=producto, empresa=empresa)
@@ -3970,6 +3996,8 @@ def editar_producto(request, empresa_slug, producto_id):
             try:
                 with transaction.atomic():
                     producto = form.save()
+                    if _empresa_muestra_costo_real_inventario(empresa):
+                        _registrar_cambio_costo_real(producto, costo_real_anterior, request.user)
                     if getattr(form, "mostrar_perfil_farmaceutico", False):
                         form.guardar_perfil_farmaceutico(producto)
                     _aplicar_distribucion_bodegas_producto(producto, form)

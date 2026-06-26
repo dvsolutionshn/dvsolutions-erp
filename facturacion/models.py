@@ -339,6 +339,37 @@ class Producto(models.Model):
         return ((utilidad / self.precio) * Decimal('100')).quantize(Decimal('0.01'))
 
 
+class HistorialCostoRealProducto(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='historial_costos_reales_producto',
+    )
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.CASCADE,
+        related_name='historial_costos_reales',
+    )
+    costo_anterior = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    costo_nuevo = models.DecimalField(max_digits=12, decimal_places=4)
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cambios_costos_reales_producto',
+    )
+    fecha = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-fecha', '-id']
+        verbose_name = 'Historial de costo real de producto'
+        verbose_name_plural = 'Historial de costos reales de productos'
+
+    def __str__(self):
+        return f'{self.producto} - {self.costo_nuevo}'
+
+
 class BitacoraProductoEliminado(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='bitacora_productos_eliminados')
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='bitacora_eliminaciones')
