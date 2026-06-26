@@ -496,9 +496,9 @@ PROCEDIMIENTOS_GENERALES_GRUPOS = [
             ("lipoescultura", "Lipoescultura"),
             ("abdominoplastia", "Abdominoplastia"),
             ("lipoabdominoplastia", "Lipoabdominoplastia"),
-            ("braquioplastia", "Braquioplastia"),
-            ("musloplastia", "Musloplastia"),
-            ("gluteoplastia", "Gluteoplastia"),
+            ("braquioplastia", "Braquioplastia (Brazos)"),
+            ("musloplastia", "Musloplastia (Piernas)"),
+            ("gluteoplastia", "Gluteoplastia (Gluteos)"),
             ("lipoinjerto_gluteo", "Lipoinjerto gluteo"),
             ("mommy_makeover", "Mommy Makeover"),
         ],
@@ -812,6 +812,17 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         ).exclude(pk=self.paciente.pk).exists():
             raise forms.ValidationError("Este numero de identidad ya pertenece a otro expediente.")
         return identidad
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("sexo") == "masculino":
+            for campo in [
+                "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos",
+                "gine_ultima_menstruacion", "gine_embarazada", "gine_lactancia",
+                "gine_mamografia", "gine_mamografia_fecha",
+            ]:
+                cleaned_data[campo] = [] if isinstance(self.fields.get(campo), forms.MultipleChoiceField) else ""
+        return cleaned_data
 
     @property
     def procedimientos_interes_grupos(self):

@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from facturacion.models import Cliente
+from .forms import PreconsultaClinicaPublicaForm
 from .models import CitaClinica, HistoriaClinicaEspecialidad, Paciente, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 from .tokens import hash_token_preconsulta
 
@@ -341,6 +342,53 @@ class ClinicaPacienteTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_formulario_general_masculino_limpia_campos_ginecologicos(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0401",
+            primer_nombre="Carlos",
+            primer_apellido="Diaz",
+            nombre="Carlos Diaz",
+            identidad="0801199200002",
+            whatsapp="99990003",
+        )
+        form = PreconsultaClinicaPublicaForm(
+            data={
+                "primer_nombre": "Carlos",
+                "segundo_nombre": "",
+                "primer_apellido": "Diaz",
+                "segundo_apellido": "",
+                "identidad": "0801199200002",
+                "fecha_nacimiento": "1992-05-10",
+                "sexo": "masculino",
+                "estado_civil": "soltero",
+                "correo": "carlos@example.com",
+                "telefono": "99990003",
+                "direccion": "Tegucigalpa",
+                "lugar_nacimiento": "Tegucigalpa",
+                "ocupacion": "Ingeniero",
+                "contacto_emergencia": "Ana Diaz",
+                "telefono_emergencia": "99990004",
+                "referido_por": "Facebook",
+                "motivo_consulta": "Valoracion",
+                "procedimientos_interes": ["aumento_mamario", "braquioplastia"],
+                "gine_gestas": "2",
+                "gine_embarazada": ["si"],
+                "gine_lactancia": ["si"],
+                "gine_mamografia": ["si"],
+                "gine_mamografia_fecha": "2026-01-10",
+                "consentimiento_datos": "on",
+            },
+            paciente=paciente,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        datos = form.datos_generales_limpios()["formulario_general"]
+        self.assertEqual(datos["procedimientos_interes"], ["aumento_mamario", "braquioplastia"])
+        self.assertNotIn("gine_gestas", datos)
+        self.assertNotIn("gine_embarazada", datos)
+        self.assertNotIn("gine_mamografia_fecha", datos)
+
     def test_preconsulta_publica_se_genera_completa_y_actualiza_expediente(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
@@ -371,6 +419,11 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Preparemos su consulta")
         self.assertContains(response, "Laura")
+        self.assertContains(response, "Paso 6 de 6")
+        self.assertContains(response, "Braquioplastia (Brazos)")
+        self.assertContains(response, "Musloplastia (Piernas)")
+        self.assertContains(response, "Gluteoplastia (Gluteos)")
+        self.assertNotContains(response, "Estado de salud actual")
 
         response = self.client.post(
             publica_url,
