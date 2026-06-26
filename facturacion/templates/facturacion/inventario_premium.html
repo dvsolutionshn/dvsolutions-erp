@@ -147,12 +147,6 @@
                 <tr>
                     <th>Producto</th>
                     <th>Stock Actual</th>
-                    {% if mostrar_costo_real_inventario %}
-                    <th>Precio venta</th>
-                    <th>Costo real</th>
-                    <th>Venta real</th>
-                    <th>% venta</th>
-                    {% endif %}
                     <th>Stock Minimo</th>
                     <th>Accion</th>
                 </tr>
@@ -190,6 +184,12 @@
                     <th>Código</th>
                     <th>Unidad</th>
                     <th>Stock Actual</th>
+                    {% if mostrar_costo_real_inventario %}
+                    <th>Precio venta</th>
+                    <th>Costo real</th>
+                    <th>Venta real</th>
+                    <th>% ganancia</th>
+                    {% endif %}
                     <th>Stock Mínimo</th>
                     <th>Impuesto Base</th>
                     <th>Estado</th>
