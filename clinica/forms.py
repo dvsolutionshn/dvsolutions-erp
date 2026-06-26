@@ -460,51 +460,87 @@ ANTECEDENTES_FAMILIARES_CHOICES = [
     ("otra", "Otra condicion familiar"),
 ]
 
+PROCEDIMIENTOS_GENERALES_GRUPOS = [
+    (
+        "Cirugia facial",
+        [
+            ("blefaroplastia_superior", "Blefaroplastia superior"),
+            ("blefaroplastia_inferior", "Blefaroplastia inferior"),
+            ("lifting_facial", "Lifting facial"),
+            ("lifting_cervical", "Lifting cervical"),
+            ("rinoplastia", "Rinoplastia"),
+            ("otoplastia", "Otoplastia"),
+            ("lip_lift", "Lip Lift"),
+            ("bichectomia", "Bichectomia"),
+            ("lipoinjerto_facial", "Lipoinjerto facial"),
+            ("mentoplastia", "Mentoplastia"),
+        ],
+    ),
+    (
+        "Cirugia mamaria",
+        [
+            ("aumento_mamario", "Aumento mamario"),
+            ("levantamiento_mamario", "Levantamiento mamario"),
+            ("reduccion_mamaria", "Reduccion mamaria"),
+            ("recambio_implantes", "Recambio de implantes"),
+            ("contractura_capsular", "Correccion de contractura capsular"),
+            ("ginecomastia", "Ginecomastia"),
+            ("reconstruccion_mamaria", "Reconstruccion mamaria"),
+        ],
+    ),
+    (
+        "Contorno corporal",
+        [
+            ("liposuccion", "Liposuccion"),
+            ("liposuccion_hd", "Liposuccion HD"),
+            ("lipoescultura", "Lipoescultura"),
+            ("abdominoplastia", "Abdominoplastia"),
+            ("lipoabdominoplastia", "Lipoabdominoplastia"),
+            ("braquioplastia", "Braquioplastia"),
+            ("musloplastia", "Musloplastia"),
+            ("gluteoplastia", "Gluteoplastia"),
+            ("lipoinjerto_gluteo", "Lipoinjerto gluteo"),
+            ("mommy_makeover", "Mommy Makeover"),
+        ],
+    ),
+    (
+        "Cirugia intima femenina",
+        [
+            ("labioplastia", "Labioplastia"),
+            ("vaginoplastia", "Vaginoplastia"),
+            ("hoodplasty", "Hoodplasty"),
+            ("rejuvenecimiento_vaginal", "Rejuvenecimiento vaginal"),
+        ],
+    ),
+    (
+        "Capilar",
+        [
+            ("evaluacion_alopecia", "Evaluacion alopecia"),
+            ("prp_capilar", "PRP capilar"),
+            ("mesoterapia_capilar", "Mesoterapia capilar"),
+            ("trasplante_capilar", "Trasplante capilar"),
+        ],
+    ),
+    (
+        "Medicina estetica",
+        [
+            ("toxina_botulinica", "Toxina botulinica"),
+            ("acido_hialuronico", "Acido hialuronico"),
+            ("bioestimuladores", "Bioestimuladores"),
+            ("hilos_tensores", "Hilos tensores"),
+            ("laser_co2", "Laser CO2"),
+            ("ipl", "IPL"),
+            ("hollywood_peel", "Hollywood Peel"),
+            ("dermapen", "Dermapen"),
+            ("radiofrecuencia_microaguja", "Radiofrecuencia microaguja"),
+        ],
+    ),
+]
+
 PROCEDIMIENTOS_GENERALES_CHOICES = [
-    ("blefaroplastia_superior", "Blefaroplastia superior"),
-    ("blefaroplastia_inferior", "Blefaroplastia inferior"),
-    ("lifting_facial", "Lifting facial"),
-    ("lifting_cervical", "Lifting cervical"),
-    ("rinoplastia", "Rinoplastia"),
-    ("otoplastia", "Otoplastia"),
-    ("lip_lift", "Lip Lift"),
-    ("bichectomia", "Bichectomia"),
-    ("lipoinjerto_facial", "Lipoinjerto facial"),
-    ("mentoplastia", "Mentoplastia"),
-    ("aumento_mamario", "Aumento mamario"),
-    ("levantamiento_mamario", "Levantamiento mamario"),
-    ("reduccion_mamaria", "Reduccion mamaria"),
-    ("recambio_implantes", "Recambio de implantes"),
-    ("contractura_capsular", "Correccion de contractura capsular"),
-    ("ginecomastia", "Ginecomastia"),
-    ("reconstruccion_mamaria", "Reconstruccion mamaria"),
-    ("liposuccion", "Liposuccion"),
-    ("liposuccion_hd", "Liposuccion HD"),
-    ("lipoescultura", "Lipoescultura"),
-    ("abdominoplastia", "Abdominoplastia"),
-    ("lipoabdominoplastia", "Lipoabdominoplastia"),
-    ("braquioplastia", "Braquioplastia"),
-    ("musloplastia", "Musloplastia"),
-    ("gluteoplastia", "Gluteoplastia"),
-    ("lipoinjerto_gluteo", "Lipoinjerto gluteo"),
-    ("mommy_makeover", "Mommy Makeover"),
-    ("labioplastia", "Labioplastia"),
-    ("vaginoplastia", "Vaginoplastia"),
-    ("hoodplasty", "Hoodplasty"),
-    ("rejuvenecimiento_vaginal", "Rejuvenecimiento vaginal"),
-    ("evaluacion_alopecia", "Evaluacion alopecia"),
-    ("prp_capilar", "PRP capilar"),
-    ("mesoterapia_capilar", "Mesoterapia capilar"),
-    ("trasplante_capilar", "Trasplante capilar"),
-    ("toxina_botulinica", "Toxina botulinica"),
-    ("acido_hialuronico", "Acido hialuronico"),
-    ("bioestimuladores", "Bioestimuladores"),
-    ("hilos_tensores", "Hilos tensores"),
-    ("laser_co2", "Laser CO2"),
-    ("ipl", "IPL"),
-    ("hollywood_peel", "Hollywood Peel"),
-    ("dermapen", "Dermapen"),
-    ("radiofrecuencia_microaguja", "Radiofrecuencia microaguja"),
+    opcion
+    for _, opciones in PROCEDIMIENTOS_GENERALES_GRUPOS
+    for opcion in opciones
 ]
 
 ALERGIAS_GENERALES_CHOICES = [
@@ -776,6 +812,25 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         ).exclude(pk=self.paciente.pk).exists():
             raise forms.ValidationError("Este numero de identidad ya pertenece a otro expediente.")
         return identidad
+
+    @property
+    def procedimientos_interes_grupos(self):
+        valores = self["procedimientos_interes"].value() or []
+        seleccionados = {str(valor) for valor in valores}
+        return [
+            {
+                "titulo": titulo,
+                "opciones": [
+                    {
+                        "value": valor,
+                        "label": etiqueta,
+                        "selected": str(valor) in seleccionados,
+                    }
+                    for valor, etiqueta in opciones
+                ],
+            }
+            for titulo, opciones in PROCEDIMIENTOS_GENERALES_GRUPOS
+        ]
 
     def datos_generales_limpios(self):
         campos = [
