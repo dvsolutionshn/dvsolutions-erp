@@ -5,6 +5,7 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core import signing
+from django.db.models import Count
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from core.models import Empresa
 from facturacion.models import Cliente, Producto
-from clinica.models import CitaClinica, Paciente
+from clinica.models import CitaClinica, Paciente, PreconsultaClinica
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
@@ -226,6 +227,31 @@ def crm_dashboard(request, empresa_slug):
         fecha_alerta__isnull=False,
         fecha_alerta__lte=fecha_alerta,
     ).order_by("fecha_alerta")[:8]
+    etiquetas_fuente = {
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "x": "X",
+        "tiktok": "TikTok",
+        "youtube": "YouTube",
+        "google": "Google",
+        "whatsapp": "WhatsApp",
+        "referencia": "Referencia",
+        "otro": "Otro",
+    }
+    fuentes_preconsulta = [
+        {
+            "fuente": etiquetas_fuente.get(item["datos_generales__referido_por"], item["datos_generales__referido_por"] or "No indicado"),
+            "total": item["total"],
+        }
+        for item in PreconsultaClinica.objects.filter(
+            empresa=empresa,
+            datos_generales__referido_por__isnull=False,
+        )
+        .exclude(datos_generales__referido_por="")
+        .values("datos_generales__referido_por")
+        .annotate(total=Count("id"))
+        .order_by("-total", "datos_generales__referido_por")[:8]
+    ]
     return render(
         request,
         "crm/dashboard.html",
@@ -239,6 +265,7 @@ def crm_dashboard(request, empresa_slug):
             },
             "cumpleanos_manana": cumpleanos_manana,
             "productos_alerta": productos_alerta,
+            "fuentes_preconsulta": fuentes_preconsulta,
         },
     )
 

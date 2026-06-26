@@ -82,6 +82,9 @@
                 <div class="field wide"><label for="{{ form.medicamentos_actuales_otros.id_for_label }}">Otros:</label>{{ form.medicamentos_actuales_otros }}</div>
                 <div class="field wide check-grid"><span class="group-label">{{ form.medicamentos_habituales.label }}</span>{{ form.medicamentos_habituales }}</div>
                 <div class="field wide"><label for="{{ form.medicamentos_habituales_detalle.id_for_label }}">Otros / detalle:</label>{{ form.medicamentos_habituales_detalle }}</div>
+                <div class="field wide check-grid"><span class="group-label">{{ form.drogas_recreativas.label }}</span>{{ form.drogas_recreativas }}</div>
+                <div class="field wide check-grid drug-detail"><span class="group-label">{{ form.drogas_recreativas_tipos.label }}</span>{{ form.drogas_recreativas_tipos }}</div>
+                <div class="field wide drug-detail"><label for="{{ form.drogas_recreativas_detalle.id_for_label }}">Otros:</label>{{ form.drogas_recreativas_detalle }}</div>
                 <div class="field wide check-grid"><span class="group-label">{{ form.antecedentes_familiares.label }}</span>{{ form.antecedentes_familiares }}</div>
                 <div class="field wide"><label for="{{ form.antecedentes_familiares_detalle.id_for_label }}">Otros / detalle:</label>{{ form.antecedentes_familiares_detalle }}</div>
             </div>
@@ -96,8 +99,6 @@
                 <div class="field wide"><label for="{{ form.quirurgicos_detalle.id_for_label }}">Otros / detalle:</label>{{ form.quirurgicos_detalle }}</div>
                 <div class="field check-grid"><span class="group-label">{{ form.tabaco_frecuencia.label }}</span>{{ form.tabaco_frecuencia }}</div>
                 <div class="field check-grid"><span class="group-label">{{ form.alcohol_frecuencia.label }}</span>{{ form.alcohol_frecuencia }}</div>
-                <div class="field wide check-grid"><span class="group-label">{{ form.drogas_recreativas.label }}</span>{{ form.drogas_recreativas }}</div>
-                <div class="field wide"><label for="{{ form.drogas_recreativas_detalle.id_for_label }}">Otros / cuáles:</label>{{ form.drogas_recreativas_detalle }}</div>
                 <div class="field wide check-grid"><span class="group-label">{{ form.riesgo_tromboembolico.label }}</span>{{ form.riesgo_tromboembolico }}</div>
                 <div class="field wide"><label for="{{ form.riesgo_tromboembolico_otros.id_for_label }}">Otros:</label>{{ form.riesgo_tromboembolico_otros }}</div>
                 <div class="subsection-title gine-field">Historia ginecológica (si aplica)</div>
@@ -127,13 +128,14 @@
     const form=document.getElementById("preconsultaForm"),steps=[...document.querySelectorAll(".form-step")],bars=[...document.querySelectorAll(".progress span")];let current=0;
     function refreshChecks(){document.querySelectorAll(".check-grid label,.radio-row label").forEach(label=>{const input=label.querySelector("input");label.classList.toggle("is-selected",!!input&&input.checked);});}
     function toggleGineFields(){const sexo=form.querySelector('[name="sexo"]');const ocultar=sexo&&sexo.value==="masculino";document.querySelectorAll(".gine-field").forEach(field=>{field.hidden=!!ocultar;if(ocultar){field.querySelectorAll("input,select,textarea").forEach(input=>{if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}});}});refreshChecks();}
-    function show(index){current=index;steps.forEach((step,i)=>step.classList.toggle("active",i===index));bars.forEach((bar,i)=>bar.classList.toggle("active",i<=index));refreshChecks();toggleGineFields();window.scrollTo({top:0,behavior:"smooth"});}
+    function toggleDrugFields(){const si=[...form.querySelectorAll('[name="drogas_recreativas"]')].some(input=>input.value==="si"&&input.checked);document.querySelectorAll(".drug-detail").forEach(field=>{field.hidden=!si;if(!si){field.querySelectorAll("input,select,textarea").forEach(input=>{if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}});}});refreshChecks();}
+    function show(index){current=index;steps.forEach((step,i)=>step.classList.toggle("active",i===index));bars.forEach((bar,i)=>bar.classList.toggle("active",i<=index));refreshChecks();toggleGineFields();toggleDrugFields();window.scrollTo({top:0,behavior:"smooth"});}
     function validCurrent(){const required=[...steps[current].querySelectorAll("input[required],select[required],textarea[required]")];for(const input of required){if(!input.checkValidity()){input.reportValidity();return false;}}return true;}
     document.querySelectorAll(".next-step").forEach(button=>button.addEventListener("click",()=>{if(validCurrent())show(Math.min(current+1,steps.length-1));}));
     document.querySelectorAll(".prev-step").forEach(button=>button.addEventListener("click",()=>show(Math.max(current-1,0))));
-    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input"))refreshChecks();if(event.target.matches('[name="sexo"]'))toggleGineFields();});
+    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input"))refreshChecks();if(event.target.matches('[name="sexo"]'))toggleGineFields();if(event.target.matches('[name="drogas_recreativas"]'))toggleDrugFields();});
     const firstError=form.querySelector(".field-error");if(firstError){const errorStep=firstError.closest(".form-step");if(errorStep)show(steps.indexOf(errorStep));}
-    refreshChecks();toggleGineFields();
+    refreshChecks();toggleGineFields();toggleDrugFields();
 })();
 </script>
 </body></html>

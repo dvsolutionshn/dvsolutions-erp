@@ -441,9 +441,25 @@ MEDICAMENTOS_HABITUALES_CHOICES = [
     ("anticonceptivos", "Anticonceptivos orales"),
     ("anticoagulantes", "Anticoagulantes"),
     ("antibioticos", "Antibioticos"),
-    ("alcohol", "Alcohol"),
-    ("sustancias", "Otras sustancias o drogas"),
-    ("otro", "Otro medicamento"),
+]
+
+REFERIDO_POR_CHOICES = [
+    ("", "Seleccione una opcion"),
+    ("facebook", "Facebook"),
+    ("instagram", "Instagram"),
+    ("x", "X"),
+    ("tiktok", "TikTok"),
+    ("youtube", "YouTube"),
+    ("google", "Google"),
+    ("whatsapp", "WhatsApp"),
+    ("referencia", "Referencia"),
+    ("otro", "Otro"),
+]
+
+DROGAS_RECREATIVAS_CHOICES = [
+    ("cocaina", "Cocaina"),
+    ("marihuana", "Marihuana"),
+    ("crack", "Crack"),
 ]
 
 ANTECEDENTES_FAMILIARES_CHOICES = [
@@ -615,7 +631,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     informante = forms.CharField(max_length=180, required=False, label="Persona que proporciona la informacion")
     contacto_emergencia = forms.CharField(max_length=180, required=False, label="Contacto de emergencia")
     telefono_emergencia = forms.CharField(max_length=30, required=False, label="Telefono de emergencia")
-    referido_por = forms.CharField(max_length=180, required=False, label="Como conocio Hospital MIA")
+    referido_por = forms.ChoiceField(required=False, choices=REFERIDO_POR_CHOICES, label="Como conocio Hospital MIA")
     antecedentes_personales = forms.MultipleChoiceField(
         required=False,
         choices=ANTECEDENTES_PERSONALES_CHOICES,
@@ -626,7 +642,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         required=False,
         choices=MEDICAMENTOS_HABITUALES_CHOICES,
         widget=forms.CheckboxSelectMultiple,
-        label="Medicamentos o sustancias de uso habitual",
+        label="Medicamentos de uso habitual",
     )
     antecedentes_familiares = forms.MultipleChoiceField(
         required=False,
@@ -673,7 +689,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     tabaco_frecuencia = forms.MultipleChoiceField(required=False, choices=FRECUENCIA_CHOICES, widget=forms.CheckboxSelectMultiple, label="Tabaco")
     alcohol_frecuencia = forms.MultipleChoiceField(required=False, choices=FRECUENCIA_CHOICES, widget=forms.CheckboxSelectMultiple, label="Alcohol")
     drogas_recreativas = forms.MultipleChoiceField(required=False, choices=SI_NO_CHOICES, widget=forms.CheckboxSelectMultiple, label="Drogas recreativas")
-    drogas_recreativas_detalle = forms.CharField(required=False, label="Cuales drogas recreativas", widget=forms.Textarea(attrs={"rows": 2}))
+    drogas_recreativas_tipos = forms.MultipleChoiceField(required=False, choices=DROGAS_RECREATIVAS_CHOICES, widget=forms.CheckboxSelectMultiple, label="Cuales drogas recreativas")
+    drogas_recreativas_detalle = forms.CharField(required=False, label="Otros", widget=forms.Textarea(attrs={"rows": 2}))
     riesgo_tromboembolico = forms.MultipleChoiceField(
         required=False,
         choices=RIESGO_TROMBOEMBOLICO_CHOICES,
@@ -725,7 +742,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "historia_tratamientos_previos", "historia_expectativas", "alergias_seleccion",
             "alergias_otras", "medicamentos_actuales_seleccion", "medicamentos_actuales_otros",
             "quirurgicos_operado", "quirurgicos_detalle", "tabaco_frecuencia", "alcohol_frecuencia",
-            "drogas_recreativas", "drogas_recreativas_detalle", "riesgo_tromboembolico",
+            "drogas_recreativas", "drogas_recreativas_tipos", "drogas_recreativas_detalle", "riesgo_tromboembolico",
             "riesgo_tromboembolico_otros", "gine_menarca", "gine_gestas", "gine_partos",
             "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion", "gine_embarazada",
             "gine_lactancia", "gine_mamografia", "gine_mamografia_fecha", "decision_cirugia",
@@ -794,7 +811,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         for campo in [
             "procedimientos_interes", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
-            "quirurgicos_operado", "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas",
+            "quirurgicos_operado", "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos",
             "riesgo_tromboembolico", "gine_embarazada", "gine_lactancia", "gine_mamografia",
             "decision_cirugia", "expectativas_realistas", "busca_perfeccion",
             "multiples_cirugias_insatisfaccion",
@@ -822,6 +839,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 "gine_mamografia", "gine_mamografia_fecha",
             ]:
                 cleaned_data[campo] = [] if isinstance(self.fields.get(campo), forms.MultipleChoiceField) else ""
+        if "si" not in (cleaned_data.get("drogas_recreativas") or []):
+            cleaned_data["drogas_recreativas_tipos"] = []
+            cleaned_data["drogas_recreativas_detalle"] = ""
         return cleaned_data
 
     @property
@@ -858,7 +878,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "historia_tiempo_preocupacion", "historia_tratamientos_previos", "historia_expectativas",
             "alergias_seleccion", "alergias_otras", "medicamentos_actuales_seleccion",
             "medicamentos_actuales_otros", "quirurgicos_operado", "quirurgicos_detalle",
-            "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_detalle",
+            "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos", "drogas_recreativas_detalle",
             "riesgo_tromboembolico", "riesgo_tromboembolico_otros", "gine_menarca", "gine_gestas",
             "gine_partos", "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion",
             "gine_embarazada", "gine_lactancia", "gine_mamografia", "gine_mamografia_fecha",

@@ -62,5 +62,20 @@
             </table>
         </div>
     </article>
+    <article class="erp-card erp-table-card">
+        <h3 class="erp-panel-title">Fuentes de Pacientes</h3>
+        <p class="erp-card-muted">Origen reportado en el formulario general de Hospital MIA.</p>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <tbody>
+                {% for fuente in fuentes_preconsulta %}
+                <tr><td><strong>{{ fuente.fuente }}</strong><small>{{ fuente.total }} formulario(s)</small></td></tr>
+                {% empty %}
+                <tr><td class="erp-empty">Aun no hay fuentes registradas desde preconsultas.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
 </section>
 {% endblock %}

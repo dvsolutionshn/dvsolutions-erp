@@ -369,7 +369,7 @@ class ClinicaPacienteTests(TestCase):
                 "ocupacion": "Ingeniero",
                 "contacto_emergencia": "Ana Diaz",
                 "telefono_emergencia": "99990004",
-                "referido_por": "Facebook",
+                "referido_por": "facebook",
                 "motivo_consulta": "Valoracion",
                 "procedimientos_interes": ["aumento_mamario", "braquioplastia"],
                 "gine_gestas": "2",
@@ -423,7 +423,16 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Braquioplastia (Brazos)")
         self.assertContains(response, "Musloplastia (Piernas)")
         self.assertContains(response, "Gluteoplastia (Gluteos)")
+        self.assertContains(response, "Facebook")
+        self.assertContains(response, "TikTok")
+        self.assertContains(response, "YouTube")
+        self.assertContains(response, "Referencia")
+        self.assertContains(response, "Cocaina")
+        self.assertContains(response, "Marihuana")
+        self.assertContains(response, "Crack")
         self.assertNotContains(response, "Estado de salud actual")
+        self.assertNotContains(response, "Otras sustancias o drogas")
+        self.assertNotContains(response, "Otro medicamento")
 
         response = self.client.post(
             publica_url,
@@ -446,7 +455,7 @@ class ClinicaPacienteTests(TestCase):
                 "informante": "Paciente",
                 "contacto_emergencia": "Maria Perez",
                 "telefono_emergencia": "99990002",
-                "referido_por": "Instagram",
+                "referido_por": "instagram",
                 "motivo_consulta": "Valoracion de cirugia facial",
                 "procedimientos_interes": ["rinoplastia", "prp_capilar"],
                 "procedimientos_interes_otros": "Revision de cicatriz previa",
@@ -474,7 +483,9 @@ class ClinicaPacienteTests(TestCase):
                 "quirurgicos_detalle": "Apendicectomia en 2018",
                 "tabaco_frecuencia": "nunca",
                 "alcohol_frecuencia": "ocasional",
-                "drogas_recreativas": "no",
+                "drogas_recreativas": ["si"],
+                "drogas_recreativas_tipos": ["marihuana"],
+                "drogas_recreativas_detalle": "Uso ocasional historico",
                 "riesgo_tromboembolico": ["ninguno"],
                 "gine_gestas": "0",
                 "gine_embarazada": "no",
@@ -508,6 +519,8 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(formulario_general["procedimientos_interes"], ["rinoplastia", "prp_capilar"])
         self.assertEqual(formulario_general["alergias_seleccion"], ["medicamentos", "latex"])
         self.assertEqual(formulario_general["medicamentos_actuales_seleccion"], ["anticonceptivos", "multivitaminicos"])
+        self.assertEqual(formulario_general["drogas_recreativas"], ["si"])
+        self.assertEqual(formulario_general["drogas_recreativas_tipos"], ["marihuana"])
         self.assertEqual(formulario_general["examen_peso"], "64")
         self.assertEqual(formulario_general["examen_sato2"], "98")
         self.assertEqual(paciente.nombre, "Laura Maria Perez Lopez")
