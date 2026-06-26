@@ -332,6 +332,96 @@ class ExpedienteEventoForm(BaseClinicaForm):
         self.fields["profesional"].required = False
 
 
+CAPILAR_FORMULARIO = [
+    ("capilar_motivo", "Motivo de consulta - ¿Que le preocupa principalmente?", [
+        ("caida_excesiva", "Caida excesiva del cabello"), ("adelgazamiento", "Adelgazamiento del cabello"),
+        ("entradas", "Entradas pronunciadas"), ("perdida_densidad", "Perdida de densidad"),
+        ("coronilla", "Alopecia en coronilla"), ("difusa", "Alopecia difusa"),
+        ("alopecia_femenina", "Alopecia femenina"), ("alopecia_masculina", "Alopecia masculina"),
+        ("cejas", "Perdida de cejas"), ("barba", "Perdida de barba"), ("caspa", "Caspa"),
+        ("picazon", "Picazon del cuero cabelludo"), ("grasa", "Exceso de grasa"),
+        ("trasplante", "Desea trasplante capilar"), ("seguimiento", "Seguimiento de tratamiento capilar"),
+    ], True),
+    ("capilar_inicio", "Historia de la caida - ¿Cuando inicio?", [
+        ("menos_3_meses", "Menos de 3 meses"), ("3_6_meses", "3 a 6 meses"),
+        ("6_12_meses", "6 meses a 1 año"), ("1_3_anos", "1 a 3 años"), ("mas_3_anos", "Mas de 3 años"),
+    ], False),
+    ("capilar_tipo_caida", "La caida es", [("gradual", "Gradual"), ("repentina", "Repentina"), ("intermitente", "Intermitente"), ("constante", "Constante")], False),
+    ("capilar_estado_actual", "Actualmente considera que", [("estable", "Esta estable"), ("empeorando", "Esta empeorando"), ("mejorando", "Esta mejorando")], False),
+    ("capilar_familiares", "Antecedentes familiares - ¿Tiene familiares con alopecia?", [
+        ("padre", "Padre"), ("madre", "Madre"), ("abuelo_paterno", "Abuelo paterno"), ("abuelo_materno", "Abuelo materno"), ("hermanos", "Hermanos"), ("ninguno", "Ninguno"),
+    ], True),
+    ("capilar_sintomas", "Sintomas del cuero cabelludo", [
+        ("picazon", "Picazon"), ("ardor", "Ardor"), ("dolor", "Dolor"), ("caspa", "Caspa"), ("descamacion", "Descamacion"), ("grasa", "Exceso de grasa"), ("enrojecimiento", "Enrojecimiento"), ("sensibilidad", "Sensibilidad"), ("ninguno", "Ninguno"),
+    ], True),
+    ("capilar_areas", "Areas afectadas", [
+        ("entradas", "Entradas"), ("linea_frontal", "Linea frontal"), ("temporal", "Region temporal"), ("coronilla", "Coronilla"), ("superior", "Parte superior"), ("todo", "Todo el cuero cabelludo"), ("cejas", "Cejas"), ("barba", "Barba"),
+    ], True),
+    ("capilar_tratamientos_previos", "Tratamientos capilares previos - ¿Cuales?", [
+        ("minoxidil", "Minoxidil"), ("finasteride", "Finasteride"), ("dutasteride", "Dutasteride"), ("prp", "PRP Capilar"), ("mesoterapia", "Mesoterapia Capilar"), ("exosomas", "Exosomas"), ("laser", "Laser Capilar"), ("vitaminas", "Vitaminas capilares"), ("shampoo", "Shampoo anticaida"), ("suplementos", "Suplementos nutricionales"), ("trasplante", "Trasplante capilar"),
+    ], True),
+    ("capilar_antecedentes_medicos", "Antecedentes medicos", [
+        ("hipertension", "Hipertension"), ("diabetes", "Diabetes"), ("hipotiroidismo", "Hipotiroidismo"), ("hipertiroidismo", "Hipertiroidismo"), ("anemia", "Anemia"), ("lupus", "Lupus"), ("psoriasis", "Psoriasis"), ("dermatitis", "Dermatitis"), ("ansiedad", "Ansiedad"), ("depresion", "Depresion"), ("sop", "SOP"), ("ninguna", "Ninguna"),
+    ], True),
+    ("capilar_medicamentos", "Medicamentos actuales", [
+        ("anticonceptivos", "Anticonceptivos"), ("hormonas", "Hormonas"), ("finasteride", "Finasteride"), ("dutasteride", "Dutasteride"), ("minoxidil_oral", "Minoxidil oral"), ("minoxidil_topico", "Minoxidil topico"), ("multivitaminicos", "Multivitaminicos"), ("ozempic", "Ozempic"), ("mounjaro", "Mounjaro"), ("ninguno", "Ninguno"),
+    ], True),
+    ("capilar_habitos", "Habitos", [("fuma", "Fuma"), ("vapea", "Vapea"), ("alcohol_nunca", "Alcohol: nunca"), ("alcohol_ocasional", "Alcohol: ocasional"), ("alcohol_frecuente", "Alcohol: frecuente")], True),
+    ("capilar_mujeres", "Mujeres - ¿Ha presentado recientemente?", [
+        ("embarazo", "Embarazo"), ("parto", "Parto"), ("lactancia", "Lactancia"), ("menopausia", "Menopausia"), ("sop", "SOP"), ("cambios_hormonales", "Cambios hormonales"), ("ninguno", "Ninguno"),
+    ], True),
+    ("capilar_estres", "Estres y estilo de vida", [
+        ("estres_6_meses", "Estres importante en ultimos 6 meses"), ("cirugia_reciente", "Cirugia reciente"), ("enfermedad_grave", "Enfermedad grave"), ("covid", "COVID"), ("perdida_peso", "Perdida importante de peso"), ("dieta_estricta", "Dieta estricta"), ("ninguna", "Ninguna"),
+    ], True),
+    ("capilar_expectativas", "Expectativas - ¿Que espera lograr?", [
+        ("detener_caida", "Detener la caida"), ("recuperar_densidad", "Recuperar densidad"), ("mejorar_calidad", "Mejorar calidad del cabello"), ("restaurar_entradas", "Restaurar entradas"), ("restaurar_coronilla", "Restaurar coronilla"), ("trasplante", "Trasplante capilar"), ("autoestima", "Mejorar autoestima"),
+    ], True),
+]
+
+MEDICINA_ESTETICA_FORMULARIO = [
+    ("estetica_motivo", "Motivo de consulta - ¿Que le gustaria mejorar?", [
+        ("arrugas", "Arrugas"), ("flacidez_facial", "Flacidez facial"), ("flacidez_corporal", "Flacidez corporal"), ("manchas_faciales", "Manchas faciales"), ("manchas_corporales", "Manchas corporales"), ("acne", "Acne"), ("cicatrices_acne", "Cicatrices de acne"), ("ojeras", "Ojeras"), ("papada", "Papada"), ("volumen_facial", "Perdida de volumen facial"), ("labios", "Labios"), ("rejuvenecimiento_facial", "Rejuvenecimiento facial"), ("rejuvenecimiento_corporal", "Rejuvenecimiento corporal"), ("grasa_localizada", "Grasa localizada"), ("celulitis", "Celulitis"), ("estrias", "Estrias"), ("alopecia", "Alopecia o caida del cabello"),
+    ], True),
+    ("estetica_tiempo", "¿Cuanto tiempo tiene esta preocupacion?", [("menos_6_meses", "Menos de 6 meses"), ("6_12_meses", "6 meses a 1 año"), ("1_3_anos", "1 a 3 años")], False),
+    ("estetica_tratamientos_previos", "Antecedentes de tratamientos esteticos", [
+        ("botox", "Botox"), ("acido_hialuronico", "Acido hialuronico"), ("bioestimuladores", "Bioestimuladores de colageno"), ("hilos", "Hilos tensores"), ("prp_facial", "PRP facial"), ("prp_capilar", "PRP capilar"), ("mesoterapia_facial", "Mesoterapia facial"), ("mesoterapia_corporal", "Mesoterapia corporal"), ("mesoterapia_capilar", "Mesoterapia capilar"), ("dermapen", "Dermapen"), ("microneedling", "Microneedling"), ("peelings", "Peelings quimicos"), ("hydrafacial", "Hydrafacial"), ("radiofrecuencia", "Radiofrecuencia"), ("rf_microagujas", "Radiofrecuencia con microagujas"), ("ipl", "IPL"), ("laser_co2", "Laser CO2"), ("hollywood_peel", "Hollywood Peel"), ("depilacion_laser", "Depilacion laser"), ("criolipolisis", "Criolipolisis"), ("exilis", "Exilis"), ("hifem", "HIFEM / Emsculpt"), ("sueroterapia", "Sueroterapia intravenosa"), ("trasplante_capilar", "Trasplante capilar"),
+    ], True),
+    ("estetica_ultimo_tratamiento", "¿Cuando fue su ultimo tratamiento?", [("menos_1_mes", "Menos de 1 mes"), ("1_3_meses", "1 a 3 meses"), ("3_6_meses", "3 a 6 meses"), ("mas_6_meses", "Mas de 6 meses"), ("mas_1_ano", "Mas de 1 año")], False),
+    ("estetica_cirugias", "Antecedentes quirurgicos esteticos", [
+        ("liposuccion", "Liposuccion"), ("abdominoplastia", "Abdominoplastia"), ("lipoabdominoplastia", "Lipoabdominoplastia"), ("aumento_mamario", "Aumento mamario"), ("levantamiento_mamario", "Levantamiento mamario"), ("reduccion_mamaria", "Reduccion mamaria"), ("rinoplastia", "Rinoplastia"), ("blefaroplastia", "Blefaroplastia"), ("otoplastia", "Otoplastia"), ("lifting_facial", "Lifting facial"), ("trasplante_capilar", "Trasplante capilar"),
+    ], True),
+    ("estetica_cuidado_piel", "Habitos de cuidado de la piel", [
+        ("protector_solar", "Utiliza protector solar diariamente"), ("productos_piel", "Utiliza productos para cuidado de la piel"), ("lavado_1", "Lava rostro 1 vez al dia"), ("lavado_2", "Lava rostro 2 veces al dia"), ("lavado_3", "Lava rostro 3 o mas veces al dia"), ("sol_frecuente", "Se expone frecuentemente al sol"),
+    ], True),
+    ("estetica_satisfaccion", "Satisfaccion personal - apariencia facial", [("1", "1 Muy insatisfecho"), ("2", "2 Insatisfecho"), ("3", "3 Regular"), ("4", "4 Satisfecho"), ("5", "5 Muy satisfecho")], False),
+    ("estetica_areas_cuerpo", "Evaluacion corporal - Areas que desea mejorar", [
+        ("papada", "Papada"), ("brazos", "Brazos"), ("flancos", "Flancos"), ("espalda_inferior", "Espalda inferior"), ("muslos_internos", "Muslos internos"), ("muslos_externos", "Muslos externos"), ("rodillas", "Rodillas"), ("gluteos", "Gluteos"), ("piernas", "Piernas"), ("pantorrillas", "Pantorrillas"),
+    ], True),
+    ("estetica_preocupacion_corporal", "Principal preocupacion corporal", [
+        ("grasa_localizada", "Grasa localizada"), ("flacidez", "Flacidez"), ("celulitis", "Celulitis"), ("estrias", "Estrias"), ("sobrepeso", "Sobrepeso"), ("retencion_liquidos", "Retencion de liquidos"), ("fibrosis", "Fibrosis postquirurgica"), ("cicatrices", "Cicatrices"), ("asimetria", "Asimetrias corporales"), ("postoperatorio", "Recuperacion postoperatoria"),
+    ], True),
+    ("estetica_medicamentos_adelgazar", "Medicamentos para adelgazar", [("ozempic", "Ozempic"), ("mounjaro", "Mounjaro"), ("saxenda", "Saxenda"), ("metformina", "Metformina"), ("fentermina", "Fentermina")], True),
+    ("estetica_bariatrica", "Cirugia bariatrica", [("no", "No"), ("manga", "Manga gastrica"), ("bypass", "Bypass gastrico"), ("balon", "Balon gastrico")], False),
+    ("estetica_ejercicio", "Actividad fisica", [("nunca", "Nunca"), ("1_2", "1-2 veces por semana"), ("3_4", "3-4 veces por semana"), ("5_mas", "5 o mas veces por semana")], False),
+    ("estetica_intima_femenina", "Zona intima femenina - motivo de consulta", [
+        ("rejuvenecimiento_vaginal", "Rejuvenecimiento vaginal"), ("flacidez_postparto", "Flacidez vaginal postparto"), ("incontinencia", "Incontinencia urinaria leve"), ("sequedad", "Sequedad vaginal"), ("sensibilidad", "Disminucion de sensibilidad sexual"), ("oscurecimiento", "Oscurecimiento intimo"), ("labios_menores", "Hipertrofia de labios menores"), ("labios_mayores", "Perdida de volumen de labios mayores"), ("asimetria", "Asimetria genital"),
+    ], True),
+    ("estetica_evaluacion_facial", "Evaluacion facial detallada", [
+        ("piel_normal", "Piel normal"), ("piel_seca", "Piel seca"), ("piel_grasa", "Piel grasa"), ("piel_mixta", "Piel mixta"), ("piel_sensible", "Piel sensible"), ("melasma", "Melasma"), ("acne_activo", "Acne activo"), ("comedones", "Comedones"), ("rosacea", "Rosacea"), ("lineas_frontales", "Lineas frontales"), ("patas_gallo", "Patas de gallo"), ("papada", "Papada"), ("flacidez_cervical", "Flacidez cervical"),
+    ], True),
+    ("estetica_plan_recomendado", "Plan recomendado", [
+        ("toxina", "Toxina botulinica"), ("acido_hialuronico", "Acido hialuronico"), ("skinbooster", "Skinbooster"), ("bioestimuladores", "Bioestimuladores"), ("hilos", "Hilos tensores"), ("prp_facial", "PRP facial"), ("dermapen", "Dermapen"), ("rf_microagujas", "Matrix Pro RF Microagujas"), ("ipl", "IPL Luminous Light"), ("laser_co2", "Laser CO2 fraccionado"), ("hollywood", "Hollywood Carbon Peel"), ("hydrafacial", "Hydrafacial Elite"), ("exilis_body", "Exilis RF Body"), ("hifem", "Sculpt Body Definition HIFEM"), ("drenaje", "Drenaje linfatico"), ("celulitis", "Tratamiento celulitis"), ("estrias", "Tratamiento estrias"), ("mesoterapia_corporal", "Mesoterapia corporal"), ("sueroterapia", "Sueroterapia IV"), ("prp_capilar", "PRP Capilar"), ("exosomas", "Exosomas"), ("trasplante_capilar", "Trasplante Capilar"), ("radiofrecuencia_vaginal", "Radiofrecuencia vaginal"), ("prp_intimo", "PRP intimo"), ("blanqueamiento_intimo", "Blanqueamiento intimo"),
+    ], True),
+]
+
+FORMULARIOS_ESTRUCTURADOS = {
+    "capilar": CAPILAR_FORMULARIO,
+    "medicina_estetica": MEDICINA_ESTETICA_FORMULARIO,
+}
+
+BITACORA_TIPOS = {"enfermeria", "terapias", "camara_hiperbarica"}
+
+
 class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
     CAMPOS_POR_TIPO = {
         "capilar": {
@@ -348,26 +438,21 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             "procedimiento": "Procedimiento propuesto o realizado",
             "plan_tratamiento": "Plan quirurgico y seguimiento",
         },
+        "medicina_estetica": {
+            "motivo_consulta": "Explique con sus propias palabras que desea mejorar",
+            "antecedentes": "Antecedentes esteticos, quirurgicos y medicos relevantes",
+            "evaluacion_clinica": "Evaluacion estetica facial/corporal",
+            "procedimiento": "Procedimiento recomendado o realizado",
+            "plan_tratamiento": "HEA y plan estetico",
+        },
         "enfermeria": {
-            "motivo_consulta": "Motivo de atencion",
-            "antecedentes": "Antecedentes relevantes para enfermeria",
-            "evaluacion_clinica": "Valoracion de enfermeria",
-            "procedimiento": "Cuidados, medicamentos e insumos aplicados",
-            "plan_tratamiento": "Plan de cuidados",
+            "observaciones": "Nota de bitacora de enfermeria",
         },
         "terapias": {
-            "motivo_consulta": "Motivo y objetivo de la terapia",
-            "antecedentes": "Antecedentes funcionales",
-            "evaluacion_clinica": "Evaluacion inicial o evolucion funcional",
-            "procedimiento": "Tecnicas y terapia aplicada",
-            "plan_tratamiento": "Plan de sesiones y objetivos",
+            "observaciones": "Nota de bitacora de terapias",
         },
         "camara_hiperbarica": {
-            "motivo_consulta": "Indicacion de terapia hiperbarica",
-            "antecedentes": "Antecedentes y contraindicaciones",
-            "evaluacion_clinica": "Evaluacion previa y posterior a la sesion",
-            "procedimiento": "Presion, duracion y numero de sesion",
-            "plan_tratamiento": "Protocolo de sesiones",
+            "observaciones": "Nota de bitacora de camara hiperbarica",
         },
     }
 
@@ -405,6 +490,61 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
         self.fields["fecha_atencion"].input_formats = ["%Y-%m-%dT%H:%M"]
         for campo, etiqueta in self.CAMPOS_POR_TIPO.get(self.tipo, {}).items():
             self.fields[campo].label = etiqueta
+        if self.tipo in BITACORA_TIPOS:
+            for campo in [
+                "motivo_consulta", "antecedentes", "signos_vitales", "evaluacion_clinica",
+                "diagnostico", "procedimiento", "plan_tratamiento", "indicaciones",
+            ]:
+                self.fields.pop(campo, None)
+            self.fields["observaciones"].widget.attrs.update({
+                "rows": 8,
+                "placeholder": "Escriba aqui la nota de bitacora. Se guardara con fecha, hora y usuario.",
+            })
+        self.campos_estructurados = FORMULARIOS_ESTRUCTURADOS.get(self.tipo, [])
+        datos = self.instance.datos_especialidad if self.instance and isinstance(self.instance.datos_especialidad, dict) else {}
+        for nombre, etiqueta, opciones, multiple in self.campos_estructurados:
+            field_class = forms.MultipleChoiceField if multiple else forms.ChoiceField
+            choices = opciones if multiple else [("", "Seleccione una opcion"), *opciones]
+            self.fields[nombre] = field_class(
+                required=False,
+                label=etiqueta,
+                choices=choices,
+                widget=forms.CheckboxSelectMultiple(attrs={"class": "clinical-check-list"}) if multiple else forms.RadioSelect(attrs={"class": "clinical-check-list"}),
+                initial=datos.get(nombre),
+            )
+            self.fields[f"{nombre}_otros"] = forms.CharField(
+                required=False,
+                label="Otros / detalle",
+                widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Detalle si aplica."}),
+                initial=datos.get(f"{nombre}_otros", ""),
+            )
+        for nombre in ["motivo_consulta", "antecedentes", "evaluacion_clinica", "procedimiento", "plan_tratamiento"]:
+            if nombre in self.fields and self.tipo in FORMULARIOS_ESTRUCTURADOS:
+                self.fields[nombre].widget.attrs.setdefault("rows", 3)
+
+    def save(self, commit=True):
+        historia = super().save(commit=False)
+        if self.campos_estructurados:
+            datos = {}
+            resumen = []
+            for nombre, etiqueta, opciones, multiple in self.campos_estructurados:
+                valor = self.cleaned_data.get(nombre)
+                otros = self.cleaned_data.get(f"{nombre}_otros")
+                if valor not in (None, "", []):
+                    datos[nombre] = valor
+                    etiquetas = dict(opciones)
+                    seleccion = valor if isinstance(valor, list) else [valor]
+                    resumen.append(f"{etiqueta}: " + ", ".join(etiquetas.get(item, item) for item in seleccion))
+                if otros:
+                    datos[f"{nombre}_otros"] = otros
+                    resumen.append(f"{etiqueta} - otros/detalle: {otros}")
+            historia.datos_especialidad = datos
+            if not historia.evaluacion_clinica:
+                historia.evaluacion_clinica = "\n".join(resumen[:12])
+        if commit:
+            historia.save()
+            self.save_m2m()
+        return historia
 
 
 ANTECEDENTES_PERSONALES_CHOICES = [

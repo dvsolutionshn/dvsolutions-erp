@@ -367,6 +367,7 @@ class HistoriaClinicaEspecialidad(models.Model):
     TIPO_CHOICES = [
         ("capilar", "Capilar"),
         ("cirugia_plastica", "Cirugia plastica y reconstructiva"),
+        ("medicina_estetica", "Medicina Estetica"),
         ("enfermeria", "Enfermeria"),
         ("terapias", "Terapias"),
         ("camara_hiperbarica", "Camara hiperbarica"),

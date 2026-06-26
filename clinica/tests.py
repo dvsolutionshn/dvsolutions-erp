@@ -257,7 +257,7 @@ class ClinicaPacienteTests(TestCase):
             reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id])
         )
         self.assertEqual(selector.status_code, 200)
-        for nombre in ["Capilar", "Cirugia plastica y reconstructiva", "Enfermeria", "Terapias", "Camara hiperbarica"]:
+        for nombre in ["Capilar", "Cirugia plastica y reconstructiva", "Medicina Estetica", "Enfermeria", "Terapias", "Camara hiperbarica"]:
             self.assertContains(selector, nombre)
 
         crear_url = reverse(
@@ -313,6 +313,79 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.estado, "finalizada")
         self.assertEqual(historia.motivo_consulta, "Caida de cabello actualizada")
         self.assertEqual(historia.actualizado_por, self.user)
+
+    def test_medicina_estetica_guarda_formulario_estructurado(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0301",
+            primer_nombre="Diana",
+            primer_apellido="Reyes",
+            nombre="Diana Reyes",
+            identidad="0801199600101",
+        )
+        crear_url = reverse(
+            "clinica_crear_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, "medicina_estetica"],
+        )
+        response = self.client.post(
+            crear_url,
+            {
+                "fecha_atencion": "2026-06-17T11:30",
+                "motivo_consulta": "Desea mejorar textura facial",
+                "antecedentes": "Sin antecedentes",
+                "signos_vitales": "",
+                "evaluacion_clinica": "",
+                "diagnostico": "",
+                "procedimiento": "Valoracion inicial",
+                "plan_tratamiento": "Plan facial personalizado",
+                "indicaciones": "",
+                "observaciones": "",
+                "estado": "borrador",
+                "estetica_motivo": ["arrugas", "manchas_faciales"],
+                "estetica_motivo_otros": "Poros dilatados",
+                "estetica_plan_recomendado": ["toxina", "hydrafacial"],
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id]),
+        )
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente)
+        self.assertEqual(historia.tipo, "medicina_estetica")
+        self.assertEqual(historia.datos_especialidad["estetica_motivo"], ["arrugas", "manchas_faciales"])
+        self.assertEqual(historia.datos_especialidad["estetica_motivo_otros"], "Poros dilatados")
+        self.assertEqual(historia.datos_especialidad["estetica_plan_recomendado"], ["toxina", "hydrafacial"])
+
+    def test_enfermeria_guarda_bitacora_simple(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0302",
+            primer_nombre="Luis",
+            primer_apellido="Mora",
+            nombre="Luis Mora",
+            identidad="0801199000102",
+        )
+        crear_url = reverse(
+            "clinica_crear_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, "enfermeria"],
+        )
+        response = self.client.post(
+            crear_url,
+            {
+                "fecha_atencion": "2026-06-17T12:00",
+                "observaciones": "Paciente recibe curacion y queda estable.",
+                "estado": "finalizada",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id]),
+        )
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente)
+        self.assertEqual(historia.tipo, "enfermeria")
+        self.assertEqual(historia.observaciones, "Paciente recibe curacion y queda estable.")
 
     def test_historias_especialidad_no_estan_disponibles_para_otra_empresa(self):
         otra_empresa = Empresa.objects.create(
