@@ -185,9 +185,9 @@
                     <th>Unidad</th>
                     <th>Stock Actual</th>
                     {% if mostrar_costo_real_inventario %}
-                    <th>Precio venta</th>
                     <th>Costo real</th>
-                    <th>Venta real</th>
+                    <th>Precio venta</th>
+                    <th>Ganancia L.</th>
                     <th>% ganancia</th>
                     {% endif %}
                     <th>Stock Mínimo</th>
@@ -212,7 +212,6 @@
                         {% endif %}
                     </td>
                     {% if mostrar_costo_real_inventario %}
-                    <td class="amount">L. {{ producto.precio|floatformat:2|intcomma }}</td>
                     <td class="amount">
                         <form method="post" class="erp-real-cost-form">
                             {% csrf_token %}
@@ -223,6 +222,7 @@
                         </form>
                         <div class="erp-card-muted">Contable: L. {{ producto.costo_promedio|floatformat:4|intcomma }}</div>
                     </td>
+                    <td class="amount">L. {{ producto.precio|floatformat:2|intcomma }}</td>
                     <td class="amount">{% if producto.venta_real_inventario is not None %}L. {{ producto.venta_real_inventario|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
                     <td class="amount">{% if producto.porcentaje_venta_real is not None %}{{ producto.porcentaje_venta_real|floatformat:2 }}%{% else %}-{% endif %}</td>
                     {% endif %}
