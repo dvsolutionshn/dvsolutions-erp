@@ -257,6 +257,7 @@ class Producto(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     precio = models.DecimalField(max_digits=12, decimal_places=2)
     costo_promedio = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    costo_real_inventario = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     fecha_referencia = models.DateField(blank=True, null=True)
     fecha_alerta = models.DateField(blank=True, null=True)
     nota_fecha = models.CharField(max_length=200, blank=True, null=True)
@@ -301,6 +302,11 @@ class Producto(models.Model):
                 'controla_inventario': 'Un servicio no debe controlar inventario.'
             })
 
+        if self.costo_real_inventario is not None and self.costo_real_inventario < 0:
+            raise ValidationError({
+                'costo_real_inventario': 'El costo real de inventario no puede ser negativo.'
+            })
+
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
@@ -314,6 +320,23 @@ class Producto(models.Model):
             return Decimal('0.00')
         inventario = getattr(self, 'inventario', None)
         return inventario.existencias if inventario else Decimal('0.00')
+
+    @property
+    def costo_real_analisis(self):
+        return self.costo_real_inventario or Decimal('0.00')
+
+    @property
+    def venta_real_inventario(self):
+        if self.costo_real_analisis <= 0:
+            return None
+        return (self.precio - self.costo_real_analisis).quantize(Decimal('0.01'))
+
+    @property
+    def porcentaje_venta_real(self):
+        utilidad = self.venta_real_inventario
+        if utilidad is None or not self.precio:
+            return None
+        return ((utilidad / self.precio) * Decimal('100')).quantize(Decimal('0.01'))
 
 
 class BitacoraProductoEliminado(models.Model):

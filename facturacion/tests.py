@@ -2658,10 +2658,50 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.producto.nombre)
+        self.assertNotContains(response, "Costo real")
         producto_url = reverse("crear_producto_facturacion", args=[self.empresa.slug])
         inventario_url = reverse("inventario_facturacion", args=[self.empresa.slug])
         self.assertContains(response, "Nuevo Producto")
         self.assertContains(response, f'href="{producto_url}?next={inventario_url}"', html=False)
+
+    def test_costo_real_inventario_solo_hospital_mia_y_medical_spa(self):
+        inventario_url = reverse("inventario_facturacion", args=[self.empresa.slug])
+        response = self.client.post(
+            inventario_url,
+            {
+                "accion": "actualizar_costo_real",
+                "producto_id": str(self.producto.id),
+                "costo_real_inventario": "55.25",
+            },
+        )
+        self.assertRedirects(response, inventario_url)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.costo_real_inventario, Decimal("0.0000"))
+
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        inventario_url = reverse("inventario_facturacion", args=[self.empresa.slug])
+        response = self.client.get(inventario_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Costo real")
+        self.assertContains(response, "Contable:")
+
+        self.producto.costo_promedio = Decimal("40.0000")
+        self.producto.save(update_fields=["costo_promedio"])
+        response = self.client.post(
+            inventario_url,
+            {
+                "accion": "actualizar_costo_real",
+                "producto_id": str(self.producto.id),
+                "costo_real_inventario": "55.25",
+            },
+        )
+        self.assertRedirects(response, f"{inventario_url}?producto={self.producto.id}")
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.costo_real_inventario, Decimal("55.2500"))
+        self.assertEqual(self.producto.costo_promedio, Decimal("40.0000"))
+        self.assertEqual(self.producto.venta_real_inventario, Decimal("44.75"))
+        self.assertEqual(self.producto.porcentaje_venta_real, Decimal("44.75"))
 
     def test_inventario_farmaceutico_tiene_acceso_a_crear_producto(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")

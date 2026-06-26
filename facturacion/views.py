@@ -48,6 +48,12 @@ from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, Cuen
 
 logger = logging.getLogger(__name__)
 
+EMPRESAS_COSTO_REAL_INVENTARIO = {"hospital_mia", "medical_spa"}
+
+
+def _empresa_muestra_costo_real_inventario(empresa):
+    return bool(empresa and empresa.slug in EMPRESAS_COSTO_REAL_INVENTARIO)
+
 POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
 CAJA_EXCLUYE_FACTURAS_ANULADAS_SLUGS = {"hospital_mia", "medical_spa"}
 
@@ -2345,6 +2351,32 @@ def editar_proveedor(request, empresa_slug, proveedor_id):
 @login_required
 def inventario_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    mostrar_costo_real = _empresa_muestra_costo_real_inventario(empresa)
+    if request.method == "POST" and request.POST.get("accion") == "actualizar_costo_real":
+        if not mostrar_costo_real:
+            messages.error(request, "El costo real de inventario no esta habilitado para esta empresa.")
+            return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+        producto = get_object_or_404(
+            Producto,
+            id=request.POST.get("producto_id"),
+            empresa=empresa,
+            controla_inventario=True,
+            eliminado=False,
+        )
+        valor_raw = (request.POST.get("costo_real_inventario") or "0").strip()
+        try:
+            costo_real = Decimal(valor_raw or "0").quantize(Decimal("0.0001"))
+        except (InvalidOperation, ValueError):
+            messages.error(request, "Ingrese un costo real valido.")
+            return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+        if costo_real < 0:
+            messages.error(request, "El costo real no puede ser negativo.")
+            return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+        producto.costo_real_inventario = costo_real
+        producto.save(update_fields=["costo_real_inventario"])
+        messages.success(request, f"Costo real actualizado para {producto.nombre}.")
+        return redirect(f"{reverse('inventario_facturacion', args=[empresa.slug])}?producto={producto.id}")
+
     productos = Producto.objects.filter(
         empresa=empresa,
         controla_inventario=True,
@@ -2400,6 +2432,7 @@ def inventario_facturacion(request, empresa_slug):
         "producto_seleccionado": producto_seleccionado,
         "movimientos": movimientos,
         "productos_alerta": productos_alerta,
+        "mostrar_costo_real_inventario": mostrar_costo_real,
     })
 
 
