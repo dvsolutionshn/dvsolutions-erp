@@ -18,7 +18,9 @@
 .clinical-field input:focus,.clinical-field select:focus,.clinical-field textarea:focus{border-color:#2367df;box-shadow:0 0 0 3px rgba(35,103,223,.12)}.clinical-field textarea{min-height:105px;resize:vertical}
 .clinical-error{color:#b42318;font-size:12px}.clinical-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:8px;padding:10px 12px;font-weight:800}
+.general-summary{margin-bottom:18px;border:1px solid #c8d9ed;background:linear-gradient(135deg,#f8fbff,#f4fffc);border-radius:14px;padding:16px}.general-summary h3{margin:0 0 8px;color:#102338}.general-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.general-summary-item{padding:10px;border:1px solid #d9e7f4;border-radius:10px;background:#fff}.general-summary-item span{display:block;font-size:10px;text-transform:uppercase;font-weight:900;color:#60748d;margin-bottom:4px}.general-tags{display:flex;gap:6px;flex-wrap:wrap}.general-tag{padding:5px 8px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:11px;font-weight:800;font-style:normal}
 @media(max-width:760px){.clinical-banner,.clinical-form-grid{grid-template-columns:1fr}.clinical-field.is-wide{grid-column:auto}}
+@media(max-width:900px){.general-summary-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -28,6 +30,22 @@
         <div><div class="erp-kpi-label">Formulario hospitalario</div><h3>{{ tipo_nombre }}</h3><p>{{ paciente.nombre }} · Documento {{ paciente.identidad|default:"No indicado" }}</p></div>
         {% if paciente.es_alergico %}<div class="patient-alert">Alergico: {{ paciente.alergias|default:"Sin detalle" }}</div>{% endif %}
     </div>
+    {% if ultima_preconsulta and resumen_preconsulta %}
+    <div class="general-summary">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <div><div class="erp-kpi-label">Formulario general de entrada</div><h3>Información base del paciente</h3></div>
+            <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id ultima_preconsulta.id %}">Ver completo</a>
+        </div>
+        <div class="general-summary-grid">
+            <div class="general-summary-item"><span>Procedimientos</span><div class="general-tags">{% for valor in resumen_preconsulta.procedimientos|slice:":6" %}<em class="general-tag">{{ valor }}</em>{% empty %}<span class="erp-card-muted">No indicado</span>{% endfor %}</div></div>
+            <div class="general-summary-item"><span>Quiere mejorar</span>{{ resumen_preconsulta.general.historia_mejorar|default:"No indicado"|linebreaksbr }}</div>
+            <div class="general-summary-item"><span>Alergias</span>{% for valor in resumen_preconsulta.alergias_generales %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}{{ ultima_preconsulta.alergias|default:"No declaradas" }}{% endfor %}</div>
+            <div class="general-summary-item"><span>Medicamentos actuales</span>{% for valor in resumen_preconsulta.medicamentos_actuales %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}No indicado{% endfor %}</div>
+            <div class="general-summary-item"><span>Riesgo tromboembólico</span>{% for valor in resumen_preconsulta.riesgo_tromboembolico %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}No indicado{% endfor %}</div>
+            <div class="general-summary-item"><span>Examen físico</span>Peso {{ resumen_preconsulta.general.examen_peso|default:"-" }} kg · Talla {{ resumen_preconsulta.general.examen_talla|default:"-" }} cm · PA {{ resumen_preconsulta.general.examen_pa|default:"-" }}</div>
+        </div>
+    </div>
+    {% endif %}
     <form method="post" novalidate>
         {% csrf_token %}
         <div class="clinical-form-grid">

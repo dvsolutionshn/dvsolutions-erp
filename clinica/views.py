@@ -20,7 +20,14 @@ from facturacion.models import Cliente
 from .forms import (
     ANTECEDENTES_FAMILIARES_CHOICES,
     ANTECEDENTES_PERSONALES_CHOICES,
+    ALERGIAS_GENERALES_CHOICES,
+    DECISION_CIRUGIA_CHOICES,
+    FRECUENCIA_CHOICES,
     MEDICAMENTOS_HABITUALES_CHOICES,
+    MEDICAMENTOS_ACTUALES_CHOICES,
+    PROCEDIMIENTOS_GENERALES_CHOICES,
+    RIESGO_TROMBOEMBOLICO_CHOICES,
+    SI_NO_CHOICES,
     CitaClinicaForm,
     ExpedienteEventoForm,
     HistoriaClinicaEspecialidadForm,
@@ -73,6 +80,9 @@ def _etiquetas_seleccion(valores, choices):
 
 
 def _resumen_preconsulta(preconsulta):
+    general = {}
+    if isinstance(preconsulta.datos_generales, dict):
+        general = preconsulta.datos_generales.get("formulario_general", {}) or {}
     return {
         "antecedentes_personales": _etiquetas_seleccion(
             preconsulta.antecedentes_personales,
@@ -86,6 +96,22 @@ def _resumen_preconsulta(preconsulta):
             preconsulta.antecedentes_familiares,
             ANTECEDENTES_FAMILIARES_CHOICES,
         ),
+        "general": general,
+        "procedimientos": _etiquetas_seleccion(general.get("procedimientos_interes"), PROCEDIMIENTOS_GENERALES_CHOICES),
+        "alergias_generales": _etiquetas_seleccion(general.get("alergias_seleccion"), ALERGIAS_GENERALES_CHOICES),
+        "medicamentos_actuales": _etiquetas_seleccion(general.get("medicamentos_actuales_seleccion"), MEDICAMENTOS_ACTUALES_CHOICES),
+        "riesgo_tromboembolico": _etiquetas_seleccion(general.get("riesgo_tromboembolico"), RIESGO_TROMBOEMBOLICO_CHOICES),
+        "decision_cirugia": _etiquetas_seleccion(general.get("decision_cirugia"), DECISION_CIRUGIA_CHOICES),
+        "tabaco_frecuencia": _etiquetas_seleccion(general.get("tabaco_frecuencia"), FRECUENCIA_CHOICES),
+        "alcohol_frecuencia": _etiquetas_seleccion(general.get("alcohol_frecuencia"), FRECUENCIA_CHOICES),
+        "drogas_recreativas": _etiquetas_seleccion(general.get("drogas_recreativas"), SI_NO_CHOICES),
+        "gine_embarazada": _etiquetas_seleccion(general.get("gine_embarazada"), SI_NO_CHOICES),
+        "gine_lactancia": _etiquetas_seleccion(general.get("gine_lactancia"), SI_NO_CHOICES),
+        "gine_mamografia": _etiquetas_seleccion(general.get("gine_mamografia"), SI_NO_CHOICES),
+        "quirurgicos_operado": _etiquetas_seleccion(general.get("quirurgicos_operado"), SI_NO_CHOICES),
+        "expectativas_realistas": _etiquetas_seleccion(general.get("expectativas_realistas"), SI_NO_CHOICES),
+        "busca_perfeccion": _etiquetas_seleccion(general.get("busca_perfeccion"), SI_NO_CHOICES),
+        "multiples_cirugias_insatisfaccion": _etiquetas_seleccion(general.get("multiples_cirugias_insatisfaccion"), SI_NO_CHOICES),
     }
 
 
@@ -472,6 +498,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             "form": form,
             "tipo_nombre": tipos_validos[tipo],
             "titulo": f"Nueva historia: {tipos_validos[tipo]}",
+            "ultima_preconsulta": ultima_preconsulta,
+            "resumen_preconsulta": _resumen_preconsulta(ultima_preconsulta) if ultima_preconsulta else None,
         },
     )
 
@@ -493,6 +521,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         tipo=historia.tipo,
         instance=historia,
     )
+    ultima_preconsulta = paciente.preconsultas.filter(estado="completada").first()
     if request.method == "POST" and form.is_valid():
         historia = form.save(commit=False)
         historia.actualizado_por = request.user
@@ -509,6 +538,8 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
             "form": form,
             "tipo_nombre": historia.get_tipo_display(),
             "titulo": f"Editar historia: {historia.get_tipo_display()}",
+            "ultima_preconsulta": ultima_preconsulta,
+            "resumen_preconsulta": _resumen_preconsulta(ultima_preconsulta) if ultima_preconsulta else None,
         },
     )
 

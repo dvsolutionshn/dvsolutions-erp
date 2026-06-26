@@ -395,6 +395,12 @@ class ClinicaPacienteTests(TestCase):
                 "telefono_emergencia": "99990002",
                 "referido_por": "Instagram",
                 "motivo_consulta": "Valoracion de cirugia facial",
+                "procedimientos_interes": ["rinoplastia", "prp_capilar"],
+                "procedimientos_interes_otros": "Revision de cicatriz previa",
+                "historia_mejorar": "Perfil facial y densidad capilar",
+                "historia_tiempo_preocupacion": "2 anos",
+                "historia_tratamientos_previos": "Mesoterapia capilar",
+                "historia_expectativas": "Resultado natural",
                 "funciones_organicas": "normal",
                 "funciones_detalle": "",
                 "revision_sistemas": "normal",
@@ -407,6 +413,29 @@ class ClinicaPacienteTests(TestCase):
                 "medicamentos_habituales_detalle": "Uso diario",
                 "antecedentes_familiares": ["diabetes"],
                 "antecedentes_familiares_detalle": "Madre",
+                "alergias_seleccion": ["medicamentos", "latex"],
+                "alergias_otras": "Penicilina",
+                "medicamentos_actuales_seleccion": ["anticonceptivos", "multivitaminicos"],
+                "medicamentos_actuales_otros": "Vitamina D",
+                "quirurgicos_operado": "si",
+                "quirurgicos_detalle": "Apendicectomia en 2018",
+                "tabaco_frecuencia": "nunca",
+                "alcohol_frecuencia": "ocasional",
+                "drogas_recreativas": "no",
+                "riesgo_tromboembolico": ["ninguno"],
+                "gine_gestas": "0",
+                "gine_embarazada": "no",
+                "gine_lactancia": "no",
+                "decision_cirugia": ["usted"],
+                "expectativas_realistas": "si",
+                "busca_perfeccion": "no",
+                "multiples_cirugias_insatisfaccion": "no",
+                "examen_peso": "64",
+                "examen_talla": "165",
+                "examen_imc": "23.5",
+                "examen_pa": "120/80",
+                "examen_fc": "72",
+                "examen_sato2": "98",
                 "dieta": "Balanceada",
                 "ejercicio": "Tres veces por semana",
                 "habitos": "No fuma",
@@ -422,6 +451,12 @@ class ClinicaPacienteTests(TestCase):
         paciente.refresh_from_db()
         self.assertEqual(preconsulta.estado, "completada")
         self.assertEqual(preconsulta.antecedentes_personales, ["asma", "hipertension"])
+        formulario_general = preconsulta.datos_generales["formulario_general"]
+        self.assertEqual(formulario_general["procedimientos_interes"], ["rinoplastia", "prp_capilar"])
+        self.assertEqual(formulario_general["alergias_seleccion"], ["medicamentos", "latex"])
+        self.assertEqual(formulario_general["medicamentos_actuales_seleccion"], ["anticonceptivos", "multivitaminicos"])
+        self.assertEqual(formulario_general["examen_peso"], "64")
+        self.assertEqual(formulario_general["examen_sato2"], "98")
         self.assertEqual(paciente.nombre, "Laura Maria Perez Lopez")
         self.assertEqual(paciente.correo, "laura@example.com")
         self.assertTrue(paciente.es_alergico)
