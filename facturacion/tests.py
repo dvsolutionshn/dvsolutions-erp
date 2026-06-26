@@ -19,7 +19,7 @@ from clinica.models import Paciente
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
-from .models import CAI, BodegaInventario, Cliente, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -547,6 +547,53 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Aperturas caja")
         self.assertEqual(response.context["resumen"]["aperturas_caja"], 1)
         self.assertEqual(response.context["resumen_cajeros"][0]["aperturas_caja"], 1)
+
+    def test_cierre_caja_resta_pagos_de_facturas_anuladas(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_cierre_caja = True
+        configuracion.save(update_fields=["usa_cierre_caja"])
+        fecha_caja = timezone.localdate()
+        factura_activa = self.crear_factura_con_linea()
+        factura_anulada = self.crear_factura_con_linea()
+        PagoFactura.objects.create(
+            factura=factura_activa,
+            fecha=fecha_caja,
+            monto=Decimal("115.00"),
+            metodo="efectivo",
+            cajero=self.user,
+        )
+        PagoFactura.objects.create(
+            factura=factura_anulada,
+            fecha=fecha_caja,
+            monto=Decimal("115.00"),
+            metodo="efectivo",
+            cajero=self.user,
+        )
+        factura_anulada.estado = "anulada"
+        factura_anulada.save(update_fields=["estado"])
+
+        response = self.client.get(reverse("cierres_caja", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["resumen"]["efectivo_sistema"], Decimal("0.00"))
+        self.assertEqual(response.context["resumen"]["total_sistema"], Decimal("0.00"))
+        self.assertEqual(response.context["resumen"]["anulaciones"], 1)
+
+        response = self.client.post(
+            reverse("cierres_caja", args=[self.empresa.slug]),
+            {"fecha": fecha_caja.isoformat(), "turno": "general"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        cierre = CierreCaja.objects.get(empresa=self.empresa, cajero=self.user, fecha=fecha_caja)
+        self.assertEqual(cierre.efectivo_sistema, Decimal("0.00"))
+        self.assertEqual(cierre.total_sistema, Decimal("0.00"))
+
+        resumen = self.client.get(reverse("resumen_diario_caja", args=[self.empresa.slug]))
+
+        self.assertEqual(resumen.status_code, 200)
+        self.assertEqual(resumen.context["resumen"]["total"], Decimal("0.00"))
+        self.assertEqual(resumen.context["resumen"]["anulaciones"], 1)
 
     def test_pos_crea_cliente_rapido_para_empresa_medica(self):
         self.empresa.slug = "hospital_mia"

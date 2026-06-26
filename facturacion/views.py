@@ -70,6 +70,34 @@ def _empresa_usa_cierre_caja(empresa):
     )
 
 
+def _fecha_caja_desde_parametro(valor):
+    if isinstance(valor, date):
+        return valor
+    try:
+        return datetime.strptime(str(valor), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return timezone.localdate()
+
+
+def _monto_neto_caja_pago(pago):
+    monto = Decimal(pago.monto or 0)
+    if pago.factura.estado == "anulada":
+        return -monto
+    return monto
+
+
+def _total_neto_caja(pagos):
+    return sum((_monto_neto_caja_pago(pago) for pago in pagos), Decimal("0.00"))
+
+
+def _preparar_pagos_caja(pagos):
+    pagos_preparados = list(pagos)
+    for pago in pagos_preparados:
+        pago.es_anulacion_caja = pago.factura.estado == "anulada"
+        pago.monto_neto_caja = _monto_neto_caja_pago(pago)
+    return pagos_preparados
+
+
 def _cuentas_financieras_activas_para_pago(empresa):
     asegurar_cuentas_financieras_base_honduras(empresa)
     cuentas = CuentaFinanciera.objects.filter(
@@ -6639,22 +6667,23 @@ def cierres_caja(request, empresa_slug):
         messages.error(request, "El cierre de caja no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
 
-    fecha = request.POST.get("fecha") or request.GET.get("fecha") or timezone.now().date().isoformat()
+    fecha = _fecha_caja_desde_parametro(request.POST.get("fecha") or request.GET.get("fecha") or timezone.localdate())
     turno = request.POST.get("turno") or request.GET.get("turno") or "general"
 
-    pagos_usuario = PagoFactura.objects.filter(
+    pagos_usuario = _preparar_pagos_caja(PagoFactura.objects.filter(
         factura__empresa=empresa,
         cajero=request.user,
         fecha=fecha,
     ).select_related("factura", "factura__cliente", "cuenta_financiera")
+    )
 
     def total_metodo(metodo_pago):
-        return pagos_usuario.filter(metodo=metodo_pago).aggregate(total=Sum("monto"))["total"] or Decimal("0.00")
+        return _total_neto_caja(pago for pago in pagos_usuario if pago.metodo == metodo_pago)
 
     efectivo_sistema = total_metodo("efectivo")
     tarjeta_sistema = total_metodo("tarjeta")
     transferencia_sistema = total_metodo("transferencia")
-    aperturas_caja = pagos_usuario.filter(metodo="efectivo").count()
+    aperturas_caja = sum(1 for pago in pagos_usuario if pago.metodo == "efectivo" and not pago.es_anulacion_caja)
 
     if request.method == "POST":
         def leer_decimal(nombre, valor_sistema):
@@ -6687,7 +6716,7 @@ def cierres_caja(request, empresa_slug):
                 },
             )
             messages.success(request, "Cierre de caja registrado correctamente.")
-            return redirect(f"{request.path}?fecha={fecha}&turno={turno}")
+            return redirect(f"{request.path}?fecha={fecha.isoformat()}&turno={turno}")
 
     cierres = CierreCaja.objects.filter(empresa=empresa).select_related("cajero")[:60]
     resumen = {
@@ -6695,13 +6724,14 @@ def cierres_caja(request, empresa_slug):
         "tarjeta_sistema": tarjeta_sistema,
         "transferencia_sistema": transferencia_sistema,
         "total_sistema": efectivo_sistema + tarjeta_sistema + transferencia_sistema,
-        "pagos": pagos_usuario.count(),
+        "pagos": len(pagos_usuario),
+        "anulaciones": sum(1 for pago in pagos_usuario if pago.es_anulacion_caja),
         "aperturas_caja": aperturas_caja,
     }
 
     return render(request, "facturacion/cierres_caja.html", {
         "empresa": empresa,
-        "fecha": fecha,
+        "fecha": fecha.isoformat(),
         "turno": turno,
         "turnos": CierreCaja.TURNOS,
         "pagos_usuario": pagos_usuario[:120],
@@ -6722,7 +6752,7 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
         id=cierre_id,
         empresa=empresa,
     )
-    pagos = (
+    pagos = _preparar_pagos_caja(
         PagoFactura.objects.filter(
             factura__empresa=empresa,
             cajero=cierre.cajero,
@@ -6734,13 +6764,13 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
 
     resumen_metodos = []
     for metodo, etiqueta in PagoFactura.METODOS:
-        pagos_metodo = pagos.filter(metodo=metodo)
+        pagos_metodo = [pago for pago in pagos if pago.metodo == metodo]
         resumen_metodos.append({
             "metodo": etiqueta,
-            "cantidad": pagos_metodo.count(),
-            "total": pagos_metodo.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
+            "cantidad": len(pagos_metodo),
+            "total": _total_neto_caja(pagos_metodo),
         })
-    aperturas_caja = pagos.filter(metodo="efectivo").count()
+    aperturas_caja = sum(1 for pago in pagos if pago.metodo == "efectivo" and not pago.es_anulacion_caja)
 
     return render(request, "facturacion/ver_cierre_caja.html", {
         "empresa": empresa,
@@ -6758,8 +6788,8 @@ def resumen_diario_caja(request, empresa_slug):
         messages.error(request, "El resumen diario de caja no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
 
-    fecha = request.GET.get("fecha") or timezone.now().date().isoformat()
-    pagos = (
+    fecha = _fecha_caja_desde_parametro(request.GET.get("fecha") or timezone.localdate())
+    pagos = _preparar_pagos_caja(
         PagoFactura.objects.filter(factura__empresa=empresa, fecha=fecha)
         .select_related("factura", "factura__cliente", "cuenta_financiera", "cajero")
         .order_by("cajero__username", "metodo", "factura__numero_factura", "id")
@@ -6772,40 +6802,41 @@ def resumen_diario_caja(request, empresa_slug):
 
     resumen_metodos = []
     for metodo, etiqueta in PagoFactura.METODOS:
-        pagos_metodo = pagos.filter(metodo=metodo)
+        pagos_metodo = [pago for pago in pagos if pago.metodo == metodo]
         resumen_metodos.append({
             "metodo": etiqueta,
-            "cantidad": pagos_metodo.count(),
-            "total": pagos_metodo.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
+            "cantidad": len(pagos_metodo),
+            "total": _total_neto_caja(pagos_metodo),
         })
 
     resumen_cajeros = []
-    for cajero_id in pagos.values_list("cajero_id", flat=True).distinct():
-        pagos_cajero = pagos.filter(cajero_id=cajero_id)
-        cajero = pagos_cajero.first().cajero if pagos_cajero.exists() else None
+    for cajero_id in sorted({pago.cajero_id for pago in pagos}, key=lambda value: value or 0):
+        pagos_cajero = [pago for pago in pagos if pago.cajero_id == cajero_id]
+        cajero = pagos_cajero[0].cajero if pagos_cajero else None
         resumen_cajeros.append({
             "cajero": cajero,
-            "cantidad": pagos_cajero.count(),
-            "aperturas_caja": pagos_cajero.filter(metodo="efectivo").count(),
-            "total": pagos_cajero.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
+            "cantidad": len(pagos_cajero),
+            "aperturas_caja": sum(1 for pago in pagos_cajero if pago.metodo == "efectivo" and not pago.es_anulacion_caja),
+            "total": _total_neto_caja(pagos_cajero),
             "cierres": cierres.filter(cajero_id=cajero_id),
         })
 
     resumen_cuentas = []
-    for cuenta_id in pagos.exclude(cuenta_financiera__isnull=True).values_list("cuenta_financiera_id", flat=True).distinct():
-        pagos_cuenta = pagos.filter(cuenta_financiera_id=cuenta_id)
-        cuenta = pagos_cuenta.first().cuenta_financiera if pagos_cuenta.exists() else None
+    for cuenta_id in sorted({pago.cuenta_financiera_id for pago in pagos if pago.cuenta_financiera_id}):
+        pagos_cuenta = [pago for pago in pagos if pago.cuenta_financiera_id == cuenta_id]
+        cuenta = pagos_cuenta[0].cuenta_financiera if pagos_cuenta else None
         resumen_cuentas.append({
             "cuenta": cuenta,
-            "cantidad": pagos_cuenta.count(),
-            "total": pagos_cuenta.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
+            "cantidad": len(pagos_cuenta),
+            "total": _total_neto_caja(pagos_cuenta),
         })
 
     resumen = {
-        "total": pagos.aggregate(total=Sum("monto"))["total"] or Decimal("0.00"),
-        "pagos": pagos.count(),
-        "facturas": pagos.values("factura_id").distinct().count(),
-        "aperturas_caja": pagos.filter(metodo="efectivo").count(),
+        "total": _total_neto_caja(pagos),
+        "pagos": len(pagos),
+        "anulaciones": sum(1 for pago in pagos if pago.es_anulacion_caja),
+        "facturas": len({pago.factura_id for pago in pagos}),
+        "aperturas_caja": sum(1 for pago in pagos if pago.metodo == "efectivo" and not pago.es_anulacion_caja),
         "cierres": cierres.count(),
         "total_cerrado": sum((cierre.total_reportado for cierre in cierres), Decimal("0.00")),
         "diferencia_cierres": sum((cierre.diferencia for cierre in cierres), Decimal("0.00")),
@@ -6813,7 +6844,7 @@ def resumen_diario_caja(request, empresa_slug):
 
     return render(request, "facturacion/resumen_diario_caja.html", {
         "empresa": empresa,
-        "fecha": fecha,
+        "fecha": fecha.isoformat(),
         "pagos": pagos[:300],
         "cierres": cierres,
         "resumen": resumen,

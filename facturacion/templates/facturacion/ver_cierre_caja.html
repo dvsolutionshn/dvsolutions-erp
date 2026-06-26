@@ -72,6 +72,7 @@
                     <th>Metodo</th>
                     <th>Cuenta</th>
                     <th>Referencia</th>
+                    <th>Estado</th>
                     <th class="erp-money">Monto</th>
                     <th>Acciones</th>
                 </tr>
@@ -93,11 +94,18 @@
                         {% endif %}
                     </td>
                     <td>{{ pago.referencia|default:"-" }}</td>
-                    <td class="erp-money">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if pago.es_anulacion_caja %}
+                        <span class="erp-badge danger">Anulada / resta caja</span>
+                        {% else %}
+                        <span class="erp-badge success">Vigente</span>
+                        {% endif %}
+                    </td>
+                    <td class="erp-money">L. {{ pago.monto_neto_caja|floatformat:2|intcomma }}</td>
                     <td><a class="erp-btn-secondary" href="{% url 'ver_factura' empresa.slug pago.factura.id %}">Ver factura</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" class="erp-empty-row">No hay pagos asociados a este cierre.</td></tr>
+                <tr><td colspan="9" class="erp-empty-row">No hay pagos asociados a este cierre.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

@@ -28,7 +28,7 @@
     <article class="erp-card">
         <div class="erp-kpi-label">Cobrado en el dia</div>
         <p class="erp-stat-value erp-money">L. {{ resumen.total|floatformat:2|intcomma }}</p>
-        <p class="erp-card-muted">{{ resumen.pagos }} pago(s) en {{ resumen.facturas }} factura(s).</p>
+        <p class="erp-card-muted">{{ resumen.pagos }} movimiento(s) en {{ resumen.facturas }} factura(s){% if resumen.anulaciones %}, {{ resumen.anulaciones }} anulacion(es) restando{% endif %}.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Cierres registrados</div>
@@ -140,6 +140,7 @@
                     <th>Metodo</th>
                     <th>Cuenta</th>
                     <th>Referencia</th>
+                    <th>Estado</th>
                     <th class="erp-money">Monto</th>
                 </tr>
             </thead>
@@ -152,10 +153,17 @@
                     <td><span class="erp-badge neutral">{{ pago.get_metodo_display }}</span></td>
                     <td>{{ pago.cuenta_financiera.nombre|default:"Sin cuenta" }}</td>
                     <td>{{ pago.referencia|default:"-" }}</td>
-                    <td class="erp-money">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                    <td>
+                        {% if pago.es_anulacion_caja %}
+                        <span class="erp-badge danger">Anulada / resta caja</span>
+                        {% else %}
+                        <span class="erp-badge success">Vigente</span>
+                        {% endif %}
+                    </td>
+                    <td class="erp-money">L. {{ pago.monto_neto_caja|floatformat:2|intcomma }}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7" class="erp-empty-row">No hay pagos registrados para esta fecha.</td></tr>
+                <tr><td colspan="8" class="erp-empty-row">No hay pagos registrados para esta fecha.</td></tr>
             {% endfor %}
             </tbody>
         </table>
