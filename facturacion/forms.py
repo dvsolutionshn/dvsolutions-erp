@@ -214,8 +214,17 @@ class ClienteForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
         self.fields['canal_preferido'].required = False
+        if empresa and empresa.slug in {'hospital_mia', 'medical_spa'}:
+            self.fields['correo'].required = False
+            self.fields['correo'].label = 'Correo (opcional)'
+        if empresa and empresa.slug in {'hospital_mia', 'medical_spa'} and self.instance._state.adding:
+            self.fields['rtn'].required = True
+            self.fields['telefono'].required = True
+            self.fields['rtn'].error_messages['required'] = 'Este campo es obligatorio.'
+            self.fields['telefono'].error_messages['required'] = 'Este campo es obligatorio.'
 
     def clean_canal_preferido(self):
         return self.cleaned_data.get('canal_preferido') or 'whatsapp'

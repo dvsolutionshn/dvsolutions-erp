@@ -620,6 +620,41 @@ class FacturacionTests(TestCase):
         self.assertEqual(cliente.rtn, "0801199911111")
         self.assertIsNotNone(cliente.cuenta_contable)
 
+    def test_pos_empresas_medicas_permiten_cliente_sin_correo(self):
+        for slug in ("hospital_mia", "medical_spa"):
+            with self.subTest(slug=slug):
+                self.empresa.slug = slug
+                self.empresa.save(update_fields=["slug"])
+                response = self.client.post(
+                    reverse("pos_crear_cliente_rapido", args=[slug]),
+                    data=json.dumps({
+                        "nombre": f"Paciente sin correo {slug}",
+                        "rtn": f"08011999{1 if slug == 'hospital_mia' else 2:05d}",
+                        "telefono": "99990000",
+                        "ciudad": "Tegucigalpa",
+                    }),
+                    content_type="application/json",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                cliente = Cliente.objects.get(pk=response.json()["cliente"]["id"])
+                self.assertFalse(cliente.correo)
+
+    def test_pos_empresas_medicas_mantienen_nombre_identidad_y_telefono_obligatorios(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+
+        response = self.client.post(
+            reverse("pos_crear_cliente_rapido", args=[self.empresa.slug]),
+            data=json.dumps({"correo": "opcional@example.com"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("nombre", response.json()["error"])
+        self.assertIn("identidad", response.json()["error"])
+        self.assertIn("telefono", response.json()["error"])
+
     def test_pos_medical_spa_crea_cliente_con_datos_reales_del_modal(self):
         self.empresa.slug = "medical_spa"
         self.empresa.save(update_fields=["slug"])
@@ -2201,6 +2236,41 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente Nuevo").exists())
+
+    def test_facturacion_empresas_medicas_exige_datos_generales_pero_no_correo(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        url = reverse("crear_cliente_facturacion", args=[self.empresa.slug])
+
+        response = self.client.post(
+            url,
+            {
+                "nombre": "Cliente sin correo",
+                "rtn": "0801199912345",
+                "telefono": "99990000",
+                "direccion": "Tegucigalpa",
+                "ciudad": "Tegucigalpa",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        cliente = Cliente.objects.get(empresa=self.empresa, nombre="Cliente sin correo")
+        self.assertFalse(cliente.correo)
+
+        response = self.client.post(
+            url,
+            {
+                "nombre": "Cliente incompleto",
+                "correo": "opcional@example.com",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "rtn", "Este campo es obligatorio.")
+        self.assertFormError(response.context["form"], "telefono", "Este campo es obligatorio.")
+        self.assertFalse(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente incompleto").exists())
 
     def test_crear_cliente_genera_cuenta_contable(self):
         response = self.client.post(

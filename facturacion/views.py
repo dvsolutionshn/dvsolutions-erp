@@ -530,8 +530,6 @@ def pos_crear_cliente_rapido(request, empresa_slug):
         errores.append("Ingresa el numero de identidad o RTN.")
     if not telefono:
         errores.append("Ingresa el numero de telefono.")
-    if not correo:
-        errores.append("Ingresa el correo del cliente.")
     if errores:
         return JsonResponse({"ok": False, "error": " ".join(errores)}, status=400)
 
@@ -2038,7 +2036,7 @@ def crear_cliente(request, empresa_slug):
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
 
     if request.method == "POST":
-        form = ClienteForm(request.POST)
+        form = ClienteForm(request.POST, empresa=empresa)
         if form.is_valid():
             try:
                 cliente = form.save(commit=False)
@@ -2069,7 +2067,7 @@ def crear_cliente(request, empresa_slug):
                 else:
                     form.add_error(None, str(exc))
     else:
-        form = ClienteForm()
+        form = ClienteForm(empresa=empresa)
         nombre_prefill = (request.GET.get("nombre") or "").strip()
         if nombre_prefill:
             form.fields["nombre"].initial = nombre_prefill
@@ -2091,7 +2089,7 @@ def editar_cliente(request, empresa_slug, cliente_id):
     cliente = get_object_or_404(Cliente, id=cliente_id, empresa=empresa)
 
     if request.method == "POST":
-        form = ClienteForm(request.POST, instance=cliente)
+        form = ClienteForm(request.POST, instance=cliente, empresa=empresa)
         if form.is_valid():
             try:
                 cliente = form.save()
@@ -2107,7 +2105,7 @@ def editar_cliente(request, empresa_slug, cliente_id):
                 else:
                     form.add_error(None, str(exc))
     else:
-        form = ClienteForm(instance=cliente)
+        form = ClienteForm(instance=cliente, empresa=empresa)
 
     return render(request, "facturacion/crear_cliente.html", {
         "empresa": empresa,
