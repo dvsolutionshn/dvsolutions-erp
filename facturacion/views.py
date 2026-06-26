@@ -82,7 +82,7 @@ def _fecha_caja_desde_parametro(valor):
 def _monto_neto_caja_pago(pago):
     monto = Decimal(pago.monto or 0)
     if pago.factura.estado == "anulada":
-        return -monto
+        return Decimal("0.00")
     return monto
 
 
@@ -96,6 +96,19 @@ def _preparar_pagos_caja(pagos):
         pago.es_anulacion_caja = pago.factura.estado == "anulada"
         pago.monto_neto_caja = _monto_neto_caja_pago(pago)
     return pagos_preparados
+
+
+def _desglose_metodo_caja(pagos, metodo_pago):
+    pagos_metodo = [pago for pago in pagos if pago.metodo == metodo_pago]
+    ventas = sum((Decimal(pago.monto or 0) for pago in pagos_metodo if not pago.es_anulacion_caja), Decimal("0.00"))
+    anulaciones = sum((Decimal(pago.monto or 0) for pago in pagos_metodo if pago.es_anulacion_caja), Decimal("0.00"))
+    return {
+        "ventas": ventas,
+        "anulaciones": anulaciones,
+        "neto": ventas,
+        "cantidad": len(pagos_metodo),
+        "cantidad_anulaciones": sum(1 for pago in pagos_metodo if pago.es_anulacion_caja),
+    }
 
 
 def _cuentas_financieras_activas_para_pago(empresa):
@@ -6677,12 +6690,14 @@ def cierres_caja(request, empresa_slug):
     ).select_related("factura", "factura__cliente", "cuenta_financiera")
     )
 
-    def total_metodo(metodo_pago):
-        return _total_neto_caja(pago for pago in pagos_usuario if pago.metodo == metodo_pago)
+    desglose_caja = {
+        metodo: _desglose_metodo_caja(pagos_usuario, metodo)
+        for metodo, _etiqueta in PagoFactura.METODOS
+    }
 
-    efectivo_sistema = total_metodo("efectivo")
-    tarjeta_sistema = total_metodo("tarjeta")
-    transferencia_sistema = total_metodo("transferencia")
+    efectivo_sistema = desglose_caja["efectivo"]["neto"]
+    tarjeta_sistema = desglose_caja["tarjeta"]["neto"]
+    transferencia_sistema = desglose_caja["transferencia"]["neto"]
     aperturas_caja = sum(1 for pago in pagos_usuario if pago.metodo == "efectivo" and not pago.es_anulacion_caja)
 
     if request.method == "POST":
@@ -6727,6 +6742,7 @@ def cierres_caja(request, empresa_slug):
         "pagos": len(pagos_usuario),
         "anulaciones": sum(1 for pago in pagos_usuario if pago.es_anulacion_caja),
         "aperturas_caja": aperturas_caja,
+        "desglose_caja": desglose_caja,
     }
 
     return render(request, "facturacion/cierres_caja.html", {

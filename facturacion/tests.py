@@ -548,7 +548,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.context["resumen"]["aperturas_caja"], 1)
         self.assertEqual(response.context["resumen_cajeros"][0]["aperturas_caja"], 1)
 
-    def test_cierre_caja_resta_pagos_de_facturas_anuladas(self):
+    def test_cierre_caja_excluye_pagos_de_facturas_anuladas(self):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
         configuracion.usa_cierre_caja = True
         configuracion.save(update_fields=["usa_cierre_caja"])
@@ -575,8 +575,8 @@ class FacturacionTests(TestCase):
         response = self.client.get(reverse("cierres_caja", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["resumen"]["efectivo_sistema"], Decimal("0.00"))
-        self.assertEqual(response.context["resumen"]["total_sistema"], Decimal("0.00"))
+        self.assertEqual(response.context["resumen"]["efectivo_sistema"], Decimal("115.00"))
+        self.assertEqual(response.context["resumen"]["total_sistema"], Decimal("115.00"))
         self.assertEqual(response.context["resumen"]["anulaciones"], 1)
 
         response = self.client.post(
@@ -586,13 +586,13 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         cierre = CierreCaja.objects.get(empresa=self.empresa, cajero=self.user, fecha=fecha_caja)
-        self.assertEqual(cierre.efectivo_sistema, Decimal("0.00"))
-        self.assertEqual(cierre.total_sistema, Decimal("0.00"))
+        self.assertEqual(cierre.efectivo_sistema, Decimal("115.00"))
+        self.assertEqual(cierre.total_sistema, Decimal("115.00"))
 
         resumen = self.client.get(reverse("resumen_diario_caja", args=[self.empresa.slug]))
 
         self.assertEqual(resumen.status_code, 200)
-        self.assertEqual(resumen.context["resumen"]["total"], Decimal("0.00"))
+        self.assertEqual(resumen.context["resumen"]["total"], Decimal("115.00"))
         self.assertEqual(resumen.context["resumen"]["anulaciones"], 1)
 
     def test_pos_crea_cliente_rapido_para_empresa_medica(self):

@@ -96,7 +96,7 @@
                     <td>{{ pago.referencia|default:"-" }}</td>
                     <td>
                         {% if pago.es_anulacion_caja %}
-                        <span class="erp-badge danger">Anulada / resta caja</span>
+                        <span class="erp-badge danger">Anulada / no suma</span>
                         {% else %}
                         <span class="erp-badge success">Vigente</span>
                         {% endif %}

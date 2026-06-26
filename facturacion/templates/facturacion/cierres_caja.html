@@ -75,17 +75,17 @@
         <div class="erp-field">
             <label for="efectivo_reportado">Efectivo reportado</label>
             <input id="efectivo_reportado" type="number" step="0.01" name="efectivo_reportado" value="{{ resumen.efectivo_sistema|floatformat:2 }}">
-            <div class="erp-field-help">Sistema: L. {{ resumen.efectivo_sistema|floatformat:2|intcomma }}</div>
+            <div class="erp-field-help">Sistema: L. {{ resumen.efectivo_sistema|floatformat:2|intcomma }}. Anuladas no incluidas: L. {{ resumen.desglose_caja.efectivo.anulaciones|floatformat:2|intcomma }}</div>
         </div>
         <div class="erp-field">
             <label for="tarjeta_reportado">Tarjeta reportada</label>
             <input id="tarjeta_reportado" type="number" step="0.01" name="tarjeta_reportado" value="{{ resumen.tarjeta_sistema|floatformat:2 }}">
-            <div class="erp-field-help">Sistema: L. {{ resumen.tarjeta_sistema|floatformat:2|intcomma }}</div>
+            <div class="erp-field-help">Sistema: L. {{ resumen.tarjeta_sistema|floatformat:2|intcomma }}. Anuladas no incluidas: L. {{ resumen.desglose_caja.tarjeta.anulaciones|floatformat:2|intcomma }}</div>
         </div>
         <div class="erp-field">
             <label for="transferencia_reportado">Transferencia reportada</label>
             <input id="transferencia_reportado" type="number" step="0.01" name="transferencia_reportado" value="{{ resumen.transferencia_sistema|floatformat:2 }}">
-            <div class="erp-field-help">Sistema: L. {{ resumen.transferencia_sistema|floatformat:2|intcomma }}</div>
+            <div class="erp-field-help">Sistema: L. {{ resumen.transferencia_sistema|floatformat:2|intcomma }}. Anuladas no incluidas: L. {{ resumen.desglose_caja.transferencia.anulaciones|floatformat:2|intcomma }}</div>
         </div>
         <div class="erp-field" style="grid-column:1 / -1;">
             <label for="observacion">Observacion</label>
@@ -128,7 +128,7 @@
                     <td>{{ pago.referencia|default:"-" }}</td>
                     <td>
                         {% if pago.es_anulacion_caja %}
-                        <span class="erp-badge danger">Anulada / resta caja</span>
+                        <span class="erp-badge danger">Anulada / no suma</span>
                         {% else %}
                         <span class="erp-badge success">Vigente</span>
                         {% endif %}
