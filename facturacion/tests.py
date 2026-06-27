@@ -2272,6 +2272,61 @@ class FacturacionTests(TestCase):
         self.assertFormError(response.context["form"], "telefono", "Este campo es obligatorio.")
         self.assertFalse(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente incompleto").exists())
 
+    def test_cliente_se_comparte_entre_luque_hospital_y_medical_spa(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        luque = Empresa.objects.create(
+            nombre="Luque Aestetic",
+            slug="luque_aestetic",
+            rtn="08011999100001",
+        )
+        medical_spa = Empresa.objects.create(
+            nombre="Medical Spa",
+            slug="medical_spa",
+            rtn="08011999100002",
+        )
+
+        response = self.client.post(
+            reverse("crear_cliente_facturacion", args=[self.empresa.slug]),
+            {
+                "nombre": "Paciente Compartido",
+                "rtn": "0801199912777",
+                "telefono": "99887766",
+                "direccion": "Colonia Centro",
+                "ciudad": "Tegucigalpa",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        fichas = Cliente.objects.filter(
+            empresa__in=[self.empresa, luque, medical_spa],
+            rtn="0801199912777",
+        ).select_related("empresa")
+        self.assertEqual(fichas.count(), 3)
+        self.assertEqual(len({ficha.perfil_compartido_id for ficha in fichas}), 1)
+        self.assertEqual(len({ficha.empresa_id for ficha in fichas}), 3)
+
+        origen = fichas.get(empresa=self.empresa)
+        origen.telefono = "99991111"
+        origen.correo = "compartido@example.com"
+        origen.save(update_fields=["telefono", "correo"])
+
+        self.assertFalse(
+            fichas.exclude(empresa=self.empresa).exclude(
+                telefono="99991111",
+                correo="compartido@example.com",
+            ).exists()
+        )
+        self.assertIsNotNone(origen.cuenta_contable_id)
+        self.assertTrue(
+            Cliente.objects.filter(
+                empresa__in=[luque, medical_spa],
+                rtn="0801199912777",
+                cuenta_contable__isnull=True,
+            ).exists()
+        )
+
     def test_crear_cliente_genera_cuenta_contable(self):
         response = self.client.post(
             reverse("crear_cliente_facturacion", args=[self.empresa.slug]),

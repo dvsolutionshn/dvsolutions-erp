@@ -1,5 +1,6 @@
 from datetime import timedelta
 import re
+import uuid
 from decimal import Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -145,6 +146,7 @@ class CAI(models.Model):
 
 class Cliente(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
+    perfil_compartido_id = models.UUIDField(default=uuid.uuid4, db_index=True, editable=False)
 
     nombre = models.CharField(max_length=200)
     rtn = models.CharField(max_length=20, blank=True, null=True)
