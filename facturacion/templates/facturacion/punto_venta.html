@@ -709,6 +709,22 @@
         changeDialog.close();
         search.focus();
     });
+    function currentCsrfToken(){
+        const cookie = document.cookie
+            .split("; ")
+            .find(item => item.startsWith("csrftoken="));
+        return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : "";
+    }
+    async function readJsonResponse(response){
+        const contentType = response.headers.get("content-type") || "";
+        if(!contentType.includes("application/json")){
+            if(response.redirected || response.status === 401 || response.status === 403){
+                throw new Error("La sesión o el token de seguridad cambió. Actualiza esta página y vuelve a intentar.");
+            }
+            throw new Error(`El servidor no pudo completar la venta (HTTP ${response.status}). Actualiza la página; si continúa, revisa el registro del servidor.`);
+        }
+        return response.json();
+    }
     posForm.addEventListener("submit", async event => {
         event.preventDefault();
         if(!cart.size || checkoutButton.disabled){return;}
@@ -747,12 +763,16 @@
         }
 
         try{
+            const csrfToken = currentCsrfToken();
             const response = await fetch(posForm.action || window.location.href, {
                 method: "POST",
                 body: new FormData(posForm),
-                headers: {"X-Requested-With": "XMLHttpRequest"}
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    ...(csrfToken ? {"X-CSRFToken": csrfToken} : {})
+                }
             });
-            const result = await response.json();
+            const result = await readJsonResponse(response);
             if(!response.ok || !result.ok){
                 throw new Error(result.error || "No se pudo completar la venta.");
             }

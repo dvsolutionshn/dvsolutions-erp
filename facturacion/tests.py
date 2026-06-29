@@ -438,6 +438,17 @@ class FacturacionTests(TestCase):
             reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
         )
 
+    def test_punto_venta_usa_token_csrf_vigente_y_maneja_respuesta_no_json(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+
+        response = self.client.get(reverse("punto_venta", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "currentCsrfToken")
+        self.assertContains(response, '"X-CSRFToken": csrfToken')
+        self.assertContains(response, "El servidor no pudo completar la venta")
+
     def test_punto_venta_medico_requiere_cliente_seleccionado(self):
         self.empresa.slug = "medical_spa"
         self.empresa.save(update_fields=["slug"])
