@@ -21,12 +21,14 @@ from .forms import (
     ANTECEDENTES_FAMILIARES_CHOICES,
     ANTECEDENTES_PERSONALES_CHOICES,
     ALERGIAS_GENERALES_CHOICES,
+    CONSUMO_RIESGO_CHOICES,
     DECISION_CIRUGIA_CHOICES,
     FRECUENCIA_CHOICES,
     MEDICAMENTOS_HABITUALES_CHOICES,
     MEDICAMENTOS_ACTUALES_CHOICES,
     PROCEDIMIENTOS_GENERALES_CHOICES,
     RIESGO_TROMBOEMBOLICO_CHOICES,
+    PSICOLOGICA_CHOICES,
     SI_NO_CHOICES,
     CitaClinicaForm,
     ExpedienteEventoForm,
@@ -105,6 +107,7 @@ def _resumen_preconsulta(preconsulta):
         "tabaco_frecuencia": _etiquetas_seleccion(general.get("tabaco_frecuencia"), FRECUENCIA_CHOICES),
         "alcohol_frecuencia": _etiquetas_seleccion(general.get("alcohol_frecuencia"), FRECUENCIA_CHOICES),
         "drogas_recreativas": _etiquetas_seleccion(general.get("drogas_recreativas"), SI_NO_CHOICES),
+        "consumo_riesgo": _etiquetas_seleccion(general.get("consumo_riesgo"), CONSUMO_RIESGO_CHOICES),
         "gine_embarazada": _etiquetas_seleccion(general.get("gine_embarazada"), SI_NO_CHOICES),
         "gine_lactancia": _etiquetas_seleccion(general.get("gine_lactancia"), SI_NO_CHOICES),
         "gine_mamografia": _etiquetas_seleccion(general.get("gine_mamografia"), SI_NO_CHOICES),
@@ -112,6 +115,7 @@ def _resumen_preconsulta(preconsulta):
         "expectativas_realistas": _etiquetas_seleccion(general.get("expectativas_realistas"), SI_NO_CHOICES),
         "busca_perfeccion": _etiquetas_seleccion(general.get("busca_perfeccion"), SI_NO_CHOICES),
         "multiples_cirugias_insatisfaccion": _etiquetas_seleccion(general.get("multiples_cirugias_insatisfaccion"), SI_NO_CHOICES),
+        "evaluacion_psicologica": _etiquetas_seleccion(general.get("evaluacion_psicologica"), PSICOLOGICA_CHOICES),
     }
 
 

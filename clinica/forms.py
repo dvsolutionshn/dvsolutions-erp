@@ -620,75 +620,75 @@ PROCEDIMIENTOS_GENERALES_GRUPOS = [
     (
         "Cirugia facial",
         [
-            ("blefaroplastia_superior", "Blefaroplastia superior"),
-            ("blefaroplastia_inferior", "Blefaroplastia inferior"),
-            ("lifting_facial", "Lifting facial"),
-            ("lifting_cervical", "Lifting cervical"),
-            ("rinoplastia", "Rinoplastia"),
-            ("otoplastia", "Otoplastia"),
-            ("lip_lift", "Lip Lift"),
-            ("bichectomia", "Bichectomia"),
-            ("lipoinjerto_facial", "Lipoinjerto facial"),
-            ("mentoplastia", "Mentoplastia"),
+            ("blefaroplastia_superior", "Blefaroplastia superior (retirar exceso de piel del parpado superior)"),
+            ("blefaroplastia_inferior", "Blefaroplastia inferior (mejorar bolsas u ojeras del parpado inferior)"),
+            ("lifting_facial", "Lifting facial (rejuvenecimiento del rostro y flacidez facial)"),
+            ("lifting_cervical", "Lifting cervical (mejorar flacidez del cuello)"),
+            ("rinoplastia", "Rinoplastia (cirugia estetica o funcional de la nariz)"),
+            ("otoplastia", "Otoplastia (correccion de orejas prominentes)"),
+            ("lip_lift", "Lip Lift (levantamiento del labio superior)"),
+            ("bichectomia", "Bichectomia (reduccion de bolsas de Bichat en mejillas)"),
+            ("lipoinjerto_facial", "Lipoinjerto facial (relleno con grasa propia)"),
+            ("mentoplastia", "Mentoplastia (mejorar forma o proyeccion del menton)"),
         ],
     ),
     (
         "Cirugia mamaria",
         [
-            ("aumento_mamario", "Aumento mamario"),
-            ("levantamiento_mamario", "Levantamiento mamario"),
-            ("reduccion_mamaria", "Reduccion mamaria"),
-            ("recambio_implantes", "Recambio de implantes"),
-            ("contractura_capsular", "Correccion de contractura capsular"),
-            ("ginecomastia", "Ginecomastia"),
-            ("reconstruccion_mamaria", "Reconstruccion mamaria"),
+            ("aumento_mamario", "Aumento mamario (colocacion de implantes o aumento de volumen)"),
+            ("levantamiento_mamario", "Levantamiento mamario / Mastopexia (elevar y mejorar forma del busto)"),
+            ("reduccion_mamaria", "Reduccion mamaria (disminuir volumen del busto)"),
+            ("recambio_implantes", "Recambio de implantes (cambiar implantes previos)"),
+            ("contractura_capsular", "Correccion de contractura capsular (dureza o molestia alrededor del implante)"),
+            ("ginecomastia", "Ginecomastia (reduccion de pecho masculino)"),
+            ("reconstruccion_mamaria", "Reconstruccion mamaria (reconstruccion posterior a cirugia o enfermedad)"),
         ],
     ),
     (
         "Contorno corporal",
         [
-            ("liposuccion", "Liposuccion"),
-            ("liposuccion_hd", "Liposuccion HD"),
-            ("lipoescultura", "Lipoescultura"),
-            ("abdominoplastia", "Abdominoplastia"),
-            ("lipoabdominoplastia", "Lipoabdominoplastia"),
-            ("braquioplastia", "Braquioplastia (Brazos)"),
-            ("musloplastia", "Musloplastia (Piernas)"),
-            ("gluteoplastia", "Gluteoplastia (Gluteos)"),
-            ("lipoinjerto_gluteo", "Lipoinjerto gluteo"),
-            ("mommy_makeover", "Mommy Makeover"),
+            ("liposuccion", "Liposuccion (retirar grasa localizada)"),
+            ("liposuccion_hd", "Liposuccion HD (definicion corporal de alta marcacion)"),
+            ("lipoescultura", "Lipoescultura (moldear el cuerpo con grasa propia)"),
+            ("abdominoplastia", "Abdominoplastia (retirar exceso de piel y mejorar abdomen)"),
+            ("lipoabdominoplastia", "Lipoabdominoplastia (liposuccion + abdominoplastia)"),
+            ("braquioplastia", "Braquioplastia (brazos: retirar flacidez o exceso de piel)"),
+            ("musloplastia", "Musloplastia (piernas/muslos: retirar flacidez o exceso de piel)"),
+            ("gluteoplastia", "Gluteoplastia (gluteos: mejorar forma o volumen)"),
+            ("lipoinjerto_gluteo", "Lipoinjerto gluteo (aumento de gluteos con grasa propia)"),
+            ("mommy_makeover", "Mommy Makeover (combinacion de cirugias post embarazo)"),
         ],
     ),
     (
         "Cirugia intima femenina",
         [
-            ("labioplastia", "Labioplastia"),
-            ("vaginoplastia", "Vaginoplastia"),
-            ("hoodplasty", "Hoodplasty"),
-            ("rejuvenecimiento_vaginal", "Rejuvenecimiento vaginal"),
+            ("labioplastia", "Labioplastia (mejorar tamano o forma de labios menores)"),
+            ("vaginoplastia", "Vaginoplastia (reparacion o estrechamiento vaginal)"),
+            ("hoodplasty", "Hoodplasty (mejorar exceso de piel sobre el clitoris)"),
+            ("rejuvenecimiento_vaginal", "Rejuvenecimiento vaginal (mejorar firmeza o molestias intimas)"),
         ],
     ),
     (
         "Capilar",
         [
-            ("evaluacion_alopecia", "Evaluacion alopecia"),
-            ("prp_capilar", "PRP capilar"),
-            ("mesoterapia_capilar", "Mesoterapia capilar"),
-            ("trasplante_capilar", "Trasplante capilar"),
+            ("evaluacion_alopecia", "Evaluacion de alopecia (diagnostico de perdida de cabello)"),
+            ("prp_capilar", "PRP capilar (plasma rico en plaquetas para estimular cabello)"),
+            ("mesoterapia_capilar", "Mesoterapia capilar (microinyecciones nutritivas en cuero cabelludo)"),
+            ("trasplante_capilar", "Trasplante capilar (implante de foliculos en areas con perdida)"),
         ],
     ),
     (
         "Medicina estetica",
         [
-            ("toxina_botulinica", "Toxina botulinica"),
-            ("acido_hialuronico", "Acido hialuronico"),
-            ("bioestimuladores", "Bioestimuladores"),
-            ("hilos_tensores", "Hilos tensores"),
-            ("laser_co2", "Laser CO2"),
-            ("ipl", "IPL"),
-            ("hollywood_peel", "Hollywood Peel"),
-            ("dermapen", "Dermapen"),
-            ("radiofrecuencia_microaguja", "Radiofrecuencia microaguja"),
+            ("toxina_botulinica", "Toxina botulinica (relajar arrugas de expresion)"),
+            ("acido_hialuronico", "Acido hialuronico (relleno o hidratacion facial)"),
+            ("bioestimuladores", "Bioestimuladores (estimular colageno y firmeza)"),
+            ("hilos_tensores", "Hilos tensores (efecto lifting sin cirugia)"),
+            ("laser_co2", "Laser CO2 (mejorar cicatrices, manchas o textura)"),
+            ("ipl", "IPL (luz pulsada para manchas o rojeces)"),
+            ("hollywood_peel", "Hollywood Peel (limpieza y luminosidad facial con laser)"),
+            ("dermapen", "Dermapen (microagujas para textura, cicatrices o poros)"),
+            ("radiofrecuencia_microaguja", "Radiofrecuencia microaguja (firmeza y colageno)"),
         ],
     ),
 ]
@@ -701,9 +701,16 @@ PROCEDIMIENTOS_GENERALES_CHOICES = [
 
 ALERGIAS_GENERALES_CHOICES = [
     ("medicamentos", "Medicamentos"),
+    ("penicilina", "Penicilina u otros antibioticos"),
+    ("aines", "Antiinflamatorios / analgesicos"),
     ("latex", "Latex"),
     ("yodo", "Yodo"),
-    ("alimentos", "Alimentos"),
+    ("mariscos", "Mariscos"),
+    ("mani_nueces", "Mani, nueces u otros frutos secos"),
+    ("lacteos", "Leche o derivados lacteos"),
+    ("huevo", "Huevo"),
+    ("soya", "Soya"),
+    ("alimentos", "Otros alimentos"),
     ("adhesivos", "Adhesivos"),
     ("ninguna", "Ninguna"),
 ]
@@ -751,12 +758,35 @@ DECISION_CIRUGIA_CHOICES = [
     ("redes_sociales", "Redes sociales"),
 ]
 
+CONSUMO_RIESGO_CHOICES = [
+    ("tabaco", "Tabaco / cigarrillo"),
+    ("vape", "Vapeador"),
+    ("alcohol", "Alcohol"),
+    ("marihuana", "Marihuana"),
+    ("cocaina", "Cocaina"),
+    ("crack", "Crack"),
+    ("ninguno", "Ninguno"),
+]
+
+PSICOLOGICA_CHOICES = [
+    ("ansiedad", "Ansiedad"),
+    ("depresion", "Depresion"),
+    ("tratamiento_psicologico", "Recibe o ha recibido tratamiento psicologico"),
+    ("tratamiento_psiquiatrico", "Recibe o ha recibido tratamiento psiquiatrico"),
+    ("autoestima", "Busca sentirse mejor consigo mismo/a"),
+    ("perfeccion", "Siente que busca perfeccion absoluta"),
+    ("presion_externa", "Siente presion de otra persona para operarse"),
+    ("ninguna", "Ninguna de las anteriores"),
+]
+
 
 class PreconsultaClinicaPublicaForm(forms.ModelForm):
-    primer_nombre = forms.CharField(max_length=80, label="Primer nombre")
-    segundo_nombre = forms.CharField(max_length=80, required=False, label="Segundo nombre")
-    primer_apellido = forms.CharField(max_length=80, label="Primer apellido")
-    segundo_apellido = forms.CharField(max_length=80, required=False, label="Segundo apellido")
+    nombres = forms.CharField(max_length=170, label="Primer y segundo nombre")
+    apellidos = forms.CharField(max_length=170, label="Primer y segundo apellido")
+    primer_nombre = forms.CharField(max_length=80, required=False, widget=forms.HiddenInput())
+    segundo_nombre = forms.CharField(max_length=80, required=False, widget=forms.HiddenInput())
+    primer_apellido = forms.CharField(max_length=80, required=False, widget=forms.HiddenInput())
+    segundo_apellido = forms.CharField(max_length=80, required=False, widget=forms.HiddenInput())
     identidad = forms.CharField(max_length=30, label="Numero de identidad")
     fecha_nacimiento = forms.DateField(label="Fecha de nacimiento", widget=forms.DateInput(attrs={"type": "date"}))
     sexo = forms.ChoiceField(label="Sexo", choices=Paciente.SEXO_CHOICES)
@@ -767,11 +797,22 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     lugar_nacimiento = forms.CharField(max_length=160, required=False, label="Lugar de nacimiento")
     ocupacion = forms.CharField(max_length=160, required=False, label="Profesion u ocupacion")
     lugar_trabajo = forms.CharField(max_length=180, required=False, label="Lugar de trabajo")
-    redes_sociales = forms.CharField(max_length=180, required=False, label="Redes sociales")
     informante = forms.CharField(max_length=180, required=False, label="Persona que proporciona la informacion")
-    contacto_emergencia = forms.CharField(max_length=180, required=False, label="Contacto de emergencia")
-    telefono_emergencia = forms.CharField(max_length=30, required=False, label="Telefono de emergencia")
+    contacto_emergencia_completo = forms.CharField(
+        max_length=220,
+        required=False,
+        label="Nombre y numero de contacto de emergencia",
+        help_text="Ejemplo: Maria Perez - 9999-9999",
+    )
+    contacto_emergencia = forms.CharField(max_length=180, required=False, widget=forms.HiddenInput())
+    telefono_emergencia = forms.CharField(max_length=30, required=False, widget=forms.HiddenInput())
     referido_por = forms.ChoiceField(required=False, choices=REFERIDO_POR_CHOICES, label="Como conocio Hospital MIA")
+    referido_por_detalle = forms.CharField(
+        max_length=180,
+        required=False,
+        label="Quien lo refirio",
+        help_text="Solo complete este campo si selecciono Referencia.",
+    )
     antecedentes_personales = forms.MultipleChoiceField(
         required=False,
         choices=ANTECEDENTES_PERSONALES_CHOICES,
@@ -818,19 +859,26 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         widget=forms.CheckboxSelectMultiple,
         label="Medicamentos actuales",
     )
-    medicamentos_actuales_otros = forms.CharField(required=False, label="Otros medicamentos", widget=forms.Textarea(attrs={"rows": 2}))
+    medicamentos_actuales_otros = forms.CharField(required=False, label="Explique si toma alguno actualmente", widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Nombre, dosis, frecuencia y desde cuando lo toma."}))
     quirurgicos_operado = forms.MultipleChoiceField(
         required=False,
         choices=SI_NO_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         label="Ha sido operado anteriormente",
     )
-    quirurgicos_detalle = forms.CharField(required=False, label="Cual / detalle de cirugias previas", widget=forms.Textarea(attrs={"rows": 2}))
+    quirurgicos_detalle = forms.CharField(required=False, label="Detalle cirugias previas, plasticas u otras", widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Indique año, procedimiento, lugar y si tuvo alguna complicacion."}))
     tabaco_frecuencia = forms.MultipleChoiceField(required=False, choices=FRECUENCIA_CHOICES, widget=forms.CheckboxSelectMultiple, label="Tabaco")
     alcohol_frecuencia = forms.MultipleChoiceField(required=False, choices=FRECUENCIA_CHOICES, widget=forms.CheckboxSelectMultiple, label="Alcohol")
     drogas_recreativas = forms.MultipleChoiceField(required=False, choices=SI_NO_CHOICES, widget=forms.CheckboxSelectMultiple, label="Drogas recreativas")
     drogas_recreativas_tipos = forms.MultipleChoiceField(required=False, choices=DROGAS_RECREATIVAS_CHOICES, widget=forms.CheckboxSelectMultiple, label="Cuales drogas recreativas")
     drogas_recreativas_detalle = forms.CharField(required=False, label="Otros", widget=forms.Textarea(attrs={"rows": 2}))
+    consumo_riesgo = forms.MultipleChoiceField(
+        required=False,
+        choices=CONSUMO_RIESGO_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label="Habitos de riesgo o consumo actual",
+    )
+    consumo_riesgo_detalle = forms.CharField(required=False, label="Detalle frecuencia o cantidad", widget=forms.Textarea(attrs={"rows": 2}))
     riesgo_tromboembolico = forms.MultipleChoiceField(
         required=False,
         choices=RIESGO_TROMBOEMBOLICO_CHOICES,
@@ -853,6 +901,17 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     expectativas_realistas = forms.MultipleChoiceField(required=False, choices=SI_NO_CHOICES, widget=forms.CheckboxSelectMultiple, label="Expectativas realistas")
     busca_perfeccion = forms.MultipleChoiceField(required=False, choices=SI_NO_CHOICES, widget=forms.CheckboxSelectMultiple, label="Busca perfeccion absoluta")
     multiples_cirugias_insatisfaccion = forms.MultipleChoiceField(required=False, choices=SI_NO_CHOICES, widget=forms.CheckboxSelectMultiple, label="Ha tenido multiples cirugias por insatisfaccion")
+    evaluacion_psicologica = forms.MultipleChoiceField(
+        required=False,
+        choices=PSICOLOGICA_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label="Evaluacion psicologica y emocional",
+    )
+    evaluacion_psicologica_detalle = forms.CharField(
+        required=False,
+        label="Detalle emocional o psicologico",
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Puede contar si ha tenido ansiedad, tratamiento psicologico, quien tomo la decision o que espera sentir despues del procedimiento."}),
+    )
     examen_peso = forms.CharField(required=False, label="Peso (kg)")
     examen_talla = forms.CharField(required=False, label="Talla (cm)")
     examen_imc = forms.CharField(required=False, label="IMC")
@@ -867,10 +926,11 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     class Meta:
         model = PreconsultaClinica
         fields = [
-            "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+            "nombres", "apellidos", "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
             "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono",
-            "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo", "redes_sociales",
-            "informante", "contacto_emergencia", "telefono_emergencia", "referido_por",
+            "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo",
+            "informante", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
+            "referido_por", "referido_por_detalle",
             "procedimientos_interes", "procedimientos_interes_otros",
             "motivo_consulta", "funciones_organicas", "funciones_detalle", "revision_sistemas",
             "revision_sistemas_detalle", "antecedentes_hospitalarios",
@@ -883,11 +943,12 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "alergias_otras", "medicamentos_actuales_seleccion", "medicamentos_actuales_otros",
             "quirurgicos_operado", "quirurgicos_detalle", "tabaco_frecuencia", "alcohol_frecuencia",
             "drogas_recreativas", "drogas_recreativas_tipos", "drogas_recreativas_detalle", "riesgo_tromboembolico",
-            "riesgo_tromboembolico_otros", "gine_menarca", "gine_gestas", "gine_partos",
+            "consumo_riesgo", "consumo_riesgo_detalle", "riesgo_tromboembolico_otros", "gine_menarca", "gine_gestas", "gine_partos",
             "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion", "gine_embarazada",
             "gine_lactancia", "gine_mamografia", "gine_mamografia_fecha", "decision_cirugia",
             "decision_cirugia_otros", "expectativas_realistas", "busca_perfeccion",
-            "multiples_cirugias_insatisfaccion", "examen_peso", "examen_talla", "examen_imc",
+            "multiples_cirugias_insatisfaccion", "evaluacion_psicologica", "evaluacion_psicologica_detalle",
+            "examen_peso", "examen_talla", "examen_imc",
             "examen_pa", "examen_fc", "examen_sato2", "consentimiento_datos",
         ]
         widgets = {
@@ -908,19 +969,19 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         }
         labels = {
             "motivo_consulta": "Motivo principal de consulta",
-            "funciones_organicas": "Apetito, sueno, sed, miccion y evacuaciones",
+            "funciones_organicas": "Funciones organicas generales: apetito, sueno, sed, miccion y evacuaciones",
             "funciones_detalle": "Explique cualquier alteracion",
             "revision_sistemas": "Revision general de organos y sistemas",
             "revision_sistemas_detalle": "Explique sintomas o alteraciones",
             "antecedentes_hospitalarios": "He tenido hospitalizaciones, accidentes, fracturas o cirugias previas",
-            "antecedentes_hospitalarios_detalle": "Detalle fechas, lugar, motivo y procedimiento",
-            "antecedentes_personales_detalle": "Detalle condiciones seleccionadas u otras enfermedades",
-            "medicamentos_habituales_detalle": "Indique nombre, dosis, frecuencia y desde cuando",
-            "antecedentes_familiares_detalle": "Indique familiar y condicion",
-            "dieta": "Como describe su alimentacion",
-            "ejercicio": "Actividad fisica, frecuencia y duracion",
-            "habitos": "Habitos relevantes",
-            "alergias": "Alergias a medicamentos, alimentos o materiales",
+            "antecedentes_hospitalarios_detalle": "Detalle fechas, lugar, motivo, procedimiento y si hubo complicaciones",
+            "antecedentes_personales_detalle": "Detalle condiciones seleccionadas u otras enfermedades propias",
+            "medicamentos_habituales_detalle": "Indique nombre, dosis, frecuencia y desde cuando lo toma",
+            "antecedentes_familiares_detalle": "Indique familiar cercano y condicion",
+            "dieta": "Dieta o alimentacion habitual",
+            "ejercicio": "Ejercicio o actividad fisica",
+            "habitos": "Otros habitos no patologicos",
+            "alergias": "Detalle alergias a medicamentos, alimentos o materiales",
             "antecedentes_infecciosos": "Enfermedades infecciosas previas, incluido COVID-19",
         }
 
@@ -934,6 +995,15 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 "lugar_nacimiento", "ocupacion", "contacto_emergencia", "telefono_emergencia",
             ]:
                 self.fields[campo].initial = getattr(paciente, campo, None)
+            self.fields["nombres"].initial = " ".join(
+                parte for parte in [paciente.primer_nombre, paciente.segundo_nombre] if parte
+            ) or paciente.nombre
+            self.fields["apellidos"].initial = " ".join(
+                parte for parte in [paciente.primer_apellido, paciente.segundo_apellido] if parte
+            )
+            self.fields["contacto_emergencia_completo"].initial = " - ".join(
+                parte for parte in [paciente.contacto_emergencia, paciente.telefono_emergencia] if parte
+            )
             self.fields["telefono"].initial = paciente.whatsapp or paciente.telefono
             self.fields["alergias"].initial = paciente.alergias
         self.fields["identidad"].widget.attrs.update({
@@ -952,9 +1022,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "procedimientos_interes", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
             "quirurgicos_operado", "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos",
-            "riesgo_tromboembolico", "gine_embarazada", "gine_lactancia", "gine_mamografia",
+            "consumo_riesgo", "riesgo_tromboembolico", "gine_embarazada", "gine_lactancia", "gine_mamografia",
             "decision_cirugia", "expectativas_realistas", "busca_perfeccion",
-            "multiples_cirugias_insatisfaccion",
+            "multiples_cirugias_insatisfaccion", "evaluacion_psicologica",
         ]:
             if campo in self.fields:
                 self.fields[campo].widget.attrs["class"] = "animated-check-list"
@@ -972,6 +1042,29 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        nombres = (cleaned_data.get("nombres") or "").strip()
+        apellidos = (cleaned_data.get("apellidos") or "").strip()
+        partes_nombre = nombres.split()
+        partes_apellido = apellidos.split()
+        if nombres:
+            cleaned_data["primer_nombre"] = partes_nombre[0]
+            cleaned_data["segundo_nombre"] = " ".join(partes_nombre[1:])
+        if apellidos:
+            cleaned_data["primer_apellido"] = partes_apellido[0]
+            cleaned_data["segundo_apellido"] = " ".join(partes_apellido[1:])
+
+        contacto = (cleaned_data.get("contacto_emergencia_completo") or "").strip()
+        if contacto:
+            if " - " in contacto:
+                nombre_contacto, telefono_contacto = contacto.split(" - ", 1)
+            else:
+                nombre_contacto, telefono_contacto = contacto, ""
+            cleaned_data["contacto_emergencia"] = nombre_contacto.strip()
+            cleaned_data["telefono_emergencia"] = telefono_contacto.strip()
+
+        if cleaned_data.get("referido_por") != "referencia":
+            cleaned_data["referido_por_detalle"] = ""
+
         if cleaned_data.get("sexo") == "masculino":
             for campo in [
                 "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos",
@@ -1005,10 +1098,11 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
 
     def datos_generales_limpios(self):
         campos = [
-            "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+            "nombres", "apellidos", "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
             "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono",
-            "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo", "redes_sociales",
-            "informante", "contacto_emergencia", "telefono_emergencia", "referido_por",
+            "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo",
+            "informante", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
+            "referido_por", "referido_por_detalle",
         ]
         datos = {campo: self.cleaned_data.get(campo) for campo in campos}
         if datos.get("fecha_nacimiento"):
@@ -1019,11 +1113,12 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "alergias_seleccion", "alergias_otras", "medicamentos_actuales_seleccion",
             "medicamentos_actuales_otros", "quirurgicos_operado", "quirurgicos_detalle",
             "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos", "drogas_recreativas_detalle",
-            "riesgo_tromboembolico", "riesgo_tromboembolico_otros", "gine_menarca", "gine_gestas",
+            "consumo_riesgo", "consumo_riesgo_detalle", "riesgo_tromboembolico", "riesgo_tromboembolico_otros", "gine_menarca", "gine_gestas",
             "gine_partos", "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion",
             "gine_embarazada", "gine_lactancia", "gine_mamografia", "gine_mamografia_fecha",
             "decision_cirugia", "decision_cirugia_otros", "expectativas_realistas", "busca_perfeccion",
-            "multiples_cirugias_insatisfaccion", "examen_peso", "examen_talla", "examen_imc",
+            "multiples_cirugias_insatisfaccion", "evaluacion_psicologica", "evaluacion_psicologica_detalle",
+            "examen_peso", "examen_talla", "examen_imc",
             "examen_pa", "examen_fc", "examen_sato2",
         ]
         datos["formulario_general"] = {
