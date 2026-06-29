@@ -11,7 +11,8 @@
 {% block content %}
 <style>
 .access-mode-panel{margin-bottom:22px;padding:18px;border:1px solid #d8e2ec;border-radius:15px;background:linear-gradient(145deg,#f8fafc,#f2f6f9)}.access-mode-heading{margin-bottom:13px}.access-mode-heading strong{display:block;color:#183047;font-size:12px;text-transform:uppercase;letter-spacing:.1em}.access-mode-heading span{display:block;margin-top:4px;color:#6d7f90;font-size:11px}.access-mode-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.access-mode-card{position:relative;display:flex;align-items:flex-start;gap:13px;min-height:92px;padding:16px;border:1px solid #cfdae5;border-radius:13px;background:#fff;cursor:pointer;transition:border-color .18s,box-shadow .18s,transform .18s}.access-mode-card:hover{transform:translateY(-1px);border-color:#91a9bf}.access-mode-card.is-selected{border-color:#2878d0;box-shadow:0 0 0 3px rgba(40,120,208,.09)}.access-mode-card input[type="radio"]{appearance:none;flex:0 0 20px;width:20px!important;height:20px;margin:2px 0 0;border:1.5px solid #92a3b4;border-radius:50%;background:#fff;padding:0!important}.access-mode-card input[type="radio"]:checked{border:6px solid #2878d0}.access-mode-copy strong{display:block;color:#162a3d;font-size:13px}.access-mode-copy span{display:block;margin-top:5px;color:#6b7d8d;font-size:11px;line-height:1.5}.user-access-note{display:flex;align-items:flex-start;gap:11px;margin-top:15px;padding:12px 14px;border-left:3px solid #b89755;border-radius:7px;background:#faf7ef;color:#5f6871;font-size:11px;line-height:1.5}.user-access-note strong{color:#273849}
-@media(max-width:700px){.access-mode-options{grid-template-columns:1fr}}
+.company-access-shell{grid-column:1/-1;padding:18px;border:1px solid rgba(36,111,176,.18);border-radius:20px;background:linear-gradient(145deg,#f8fbff,#eef7fb);box-shadow:inset 0 1px 0 rgba(255,255,255,.82)}.company-access-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.company-access-kicker{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#2878d0}.company-access-title{margin:4px 0 0;color:#10233a;font-size:16px;font-weight:900}.company-access-summary{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:8px 12px;border:1px solid rgba(40,120,208,.18);border-radius:999px;background:#fff;color:#1f5f9f;font-size:11px;font-weight:800}.company-access-summary span{display:grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:linear-gradient(135deg,#18b7c6,#2477f2);color:#fff}.company-access-search{position:relative;margin-bottom:14px}.company-access-search input{width:100%;padding:13px 15px 13px 42px;border:1px solid #cbd9e6;border-radius:14px;background:#fff;color:#193047;font-weight:700}.company-access-search::before{content:"⌕";position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#6e8194;font-size:17px}.company-access-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;max-height:430px;overflow:auto;padding:2px 4px 4px 2px}.company-access-card{position:relative;display:flex;align-items:center;gap:13px;padding:14px 15px;border:1px solid #d7e3ee;border-radius:16px;background:rgba(255,255,255,.86);cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease}.company-access-card:hover{transform:translateY(-1px);border-color:#89b7de;box-shadow:0 12px 26px rgba(24,48,71,.08)}.company-access-card.is-selected{border-color:#18b7c6;background:linear-gradient(145deg,#eefcff,#f6fbff);box-shadow:0 14px 32px rgba(24,183,198,.16)}.company-access-card input[type="checkbox"]{appearance:none;display:grid;place-items:center;flex:0 0 24px;width:24px!important;height:24px!important;margin:0;border:1.7px solid #9fb0c0;border-radius:8px;background:#fff;padding:0!important;transition:border-color .16s,background .16s,box-shadow .16s}.company-access-card input[type="checkbox"]::after{content:"";width:7px;height:12px;border:solid #fff;border-width:0 3px 3px 0;transform:rotate(45deg) scale(0);transition:transform .16s}.company-access-card input[type="checkbox"]:checked{border-color:#1677f2;background:linear-gradient(135deg,#19bfd0,#1677f2);box-shadow:0 6px 14px rgba(22,119,242,.25)}.company-access-card input[type="checkbox"]:checked::after{transform:rotate(45deg) scale(1)}.company-access-copy{min-width:0}.company-access-copy strong{display:block;color:#14283d;font-size:12px;line-height:1.35}.company-access-copy span{display:block;margin-top:4px;color:#728395;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.company-access-pill{margin-left:auto;display:none;padding:5px 8px;border-radius:999px;background:#dff8ef;color:#087454;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.09em}.company-access-card.is-selected .company-access-pill{display:inline-flex}.company-access-empty{display:none;padding:16px;border:1px dashed #bfd0df;border-radius:14px;background:#fff;color:#64788b;font-size:12px}.company-access-errors{margin-top:10px}.company-access-help{margin-top:10px;color:#6b7d8d;font-size:11px;line-height:1.45}
+@media(max-width:700px){.access-mode-options,.company-access-grid{grid-template-columns:1fr}.company-access-head{flex-direction:column}.company-access-summary{white-space:normal}}
 </style>
 <form method="post" class="erp-form-shell">
     {% csrf_token %}
@@ -41,6 +42,35 @@
         <div class="erp-form-grid">
             {% for field in form %}
                 {% if field.name != 'groups' and field.name != 'modo_creacion' %}
+                {% if field.name == 'empresas_acceso' %}
+                <div class="company-access-shell" data-company-access>
+                    <div class="company-access-head">
+                        <div>
+                            <div class="company-access-kicker">{{ field.label }}</div>
+                            <div class="company-access-title">Selecciona las empresas donde puede ingresar</div>
+                        </div>
+                        <div class="company-access-summary"><span data-company-count>0</span> seleccionadas</div>
+                    </div>
+                    <div class="company-access-search">
+                        <input type="search" placeholder="Buscar empresa por nombre o RTN..." data-company-search autocomplete="off">
+                    </div>
+                    <div class="company-access-grid">
+                        {% for opcion in field %}
+                        <label class="company-access-card" data-company-card data-company-text="{{ opcion.choice_label|lower }}">
+                            {{ opcion.tag }}
+                            <span class="company-access-copy">
+                                <strong>{{ opcion.choice_label }}</strong>
+                                <span>Acceso autorizado</span>
+                            </span>
+                            <span class="company-access-pill">Activo</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div class="company-access-empty" data-company-empty>No encontramos empresas con ese filtro.</div>
+                    {% if field.help_text %}<div class="company-access-help">{{ field.help_text }}</div>{% endif %}
+                    <div class="company-access-errors">{{ field.errors }}</div>
+                </div>
+                {% else %}
                 <div
                     class="erp-field {% if field.name == 'username' or field.name == 'email' or field.name == 'empresas_acceso' %}erp-field-span-full{% endif %}"
                     {% if field.name == 'password1' or field.name == 'password2' %}data-quick-password-field{% endif %}
@@ -50,6 +80,7 @@
                     {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
                     {{ field.errors }}
                 </div>
+                {% endif %}
                 {% endif %}
             {% endfor %}
         </div>
@@ -71,7 +102,6 @@
     </div>
 </form>
 
-{% if not form.instance.pk %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const modeInputs = document.querySelectorAll('input[name="modo_creacion"]');
@@ -79,6 +109,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const submitButton = document.getElementById("usuarioSubmitButton");
 
     function updateCreationMode() {
+        if (!modeInputs.length || !submitButton) { return; }
         const selected = document.querySelector('input[name="modo_creacion"]:checked');
         const quickMode = selected && selected.value === "rapido";
         passwordFields.forEach(function (field) {
@@ -98,7 +129,45 @@ document.addEventListener("DOMContentLoaded", function () {
         input.addEventListener("change", updateCreationMode);
     });
     updateCreationMode();
+
+    const accessShell = document.querySelector("[data-company-access]");
+    if (accessShell) {
+        const cards = Array.from(accessShell.querySelectorAll("[data-company-card]"));
+        const search = accessShell.querySelector("[data-company-search]");
+        const count = accessShell.querySelector("[data-company-count]");
+        const empty = accessShell.querySelector("[data-company-empty]");
+
+        function updateCompanyCards() {
+            let selected = 0;
+            let visible = 0;
+            const term = (search ? search.value : "").trim().toLowerCase();
+            cards.forEach(function (card) {
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                const matches = !term || (card.dataset.companyText || "").includes(term);
+                card.hidden = !matches;
+                if (matches) { visible += 1; }
+                if (checkbox && checkbox.checked) {
+                    selected += 1;
+                    card.classList.add("is-selected");
+                } else {
+                    card.classList.remove("is-selected");
+                }
+            });
+            if (count) { count.textContent = selected; }
+            if (empty) { empty.style.display = visible ? "none" : "block"; }
+        }
+
+        cards.forEach(function (card) {
+            const checkbox = card.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.addEventListener("change", updateCompanyCards);
+            }
+        });
+        if (search) {
+            search.addEventListener("input", updateCompanyCards);
+        }
+        updateCompanyCards();
+    }
 });
 </script>
-{% endif %}
 {% endblock %}
