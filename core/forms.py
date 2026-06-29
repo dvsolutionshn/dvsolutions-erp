@@ -371,6 +371,17 @@ class UsuarioControlCreateForm(forms.ModelForm):
 
 
 class UsuarioControlUpdateForm(forms.ModelForm):
+    password1 = forms.CharField(
+        required=False,
+        label="Nueva contrasena",
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        help_text="Dejala vacia si no deseas cambiar la contrasena actual.",
+    )
+    password2 = forms.CharField(
+        required=False,
+        label="Confirmar nueva contrasena",
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
     groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all().order_by("name"),
         required=False,
@@ -423,6 +434,8 @@ class UsuarioControlUpdateForm(forms.ModelForm):
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si quieres permitir el ingreso al admin tecnico."),
             "is_superuser": ("Es superadministrador", "Esta opcion da control total del sistema."),
             "groups": ("Grupos complementarios", "Opcional. El acceso funcional se controla con Rol del sistema."),
+            "password1": ("Nueva contrasena", "Dejala vacia si no deseas cambiar la contrasena actual."),
+            "password2": ("Confirmar nueva contrasena", "Repite la nueva contrasena para confirmar el cambio."),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:
@@ -446,11 +459,28 @@ class UsuarioControlUpdateForm(forms.ModelForm):
                 Q(empresa_id__in=empresas_ids) | Q(empresas_acceso__id__in=empresas_ids)
             ).exclude(pk=self.instance.pk).distinct().exists():
                 self.add_error("email", "Ya existe otro usuario con este correo en alguna de las empresas permitidas.")
+        password1 = cleaned_data.get("password1") or ""
+        password2 = cleaned_data.get("password2") or ""
+        if password1 or password2:
+            if not password1:
+                self.add_error("password1", "Ingresa la nueva contrasena.")
+            elif not password2:
+                self.add_error("password2", "Confirma la nueva contrasena.")
+            elif password1 != password2:
+                self.add_error("password2", "Las contrasenas no coinciden.")
+            else:
+                try:
+                    validate_password(password1, user=self.instance)
+                except ValidationError as exc:
+                    self.add_error("password1", exc)
         return cleaned_data
 
     def save(self, commit=True):
-        usuario = super().save(commit=commit)
+        usuario = super().save(commit=False)
+        if self.cleaned_data.get("password1"):
+            usuario.set_password(self.cleaned_data["password1"])
         if commit:
+            usuario.save()
             usuario.groups.set(self.cleaned_data.get("groups", []))
             empresas = set(self.cleaned_data.get("empresas_acceso", []))
             if usuario.empresa_id:

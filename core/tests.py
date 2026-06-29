@@ -503,6 +503,44 @@ class SuperAdminControlTests(TestCase):
         self.assertContains(response, "Las contrasenas no coinciden")
         self.assertFalse(Usuario.objects.filter(email="laura@empresa.com").exists())
 
+    def test_superadmin_puede_cambiar_password_de_usuario_existente(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Cambio Clave",
+            slug="empresa-cambio-clave",
+            rtn="08011999000063",
+        )
+        usuario = Usuario.objects.create_user(
+            username="usuario-cambio-clave",
+            first_name="Usuario",
+            last_name="Prueba",
+            email="cambio@empresa.com",
+            password="ClaveAnteriorSegura2026",
+            empresa=empresa,
+            rol_sistema=self.rol_facturador,
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_edit", args=[usuario.id]),
+            {
+                "username": usuario.username,
+                "first_name": usuario.first_name,
+                "last_name": usuario.last_name,
+                "email": usuario.email,
+                "empresa": empresa.id,
+                "empresas_acceso": [empresa.id],
+                "rol_sistema": self.rol_facturador.id,
+                "is_active": "on",
+                "password1": "ClaveNuevaSegura2026",
+                "password2": "ClaveNuevaSegura2026",
+            },
+        )
+
+        self.assertRedirects(response, reverse("superadmin_usuarios"))
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.check_password("ClaveNuevaSegura2026"))
+        self.assertFalse(usuario.check_password("ClaveAnteriorSegura2026"))
+
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_invitacion_permite_crear_password_y_entrar_con_correo(self):
         import re
