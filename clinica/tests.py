@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -63,6 +64,22 @@ class ClinicaPacienteTests(TestCase):
         cita = CitaClinica.objects.get(empresa=self.empresa, paciente=paciente)
         self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
         self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 15)
+
+    def test_paciente_medico_exige_identidad_en_validacion(self):
+        for slug in ("hospital_mia", "medical_spa"):
+            with self.subTest(slug=slug):
+                self.empresa.slug = slug
+                self.empresa.save(update_fields=["slug"])
+                paciente = Paciente(
+                    empresa=self.empresa,
+                    expediente_codigo=f"{slug}-SIN-ID",
+                    primer_nombre="Paciente",
+                    primer_apellido="Sin Documento",
+                    nombre="Paciente Sin Documento",
+                )
+
+                with self.assertRaisesMessage(ValidationError, "La identidad es obligatoria"):
+                    paciente.full_clean()
 
     def test_nueva_cita_clinica_permite_crear_paciente_sin_salir(self):
         url = reverse("clinica_crear_cita", args=[self.empresa.slug])

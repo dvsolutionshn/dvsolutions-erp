@@ -16,6 +16,7 @@ EMPRESAS_CLIENTES_COMPARTIDOS = frozenset({
     "hospital_mia",
     "medical_spa",
 })
+EMPRESAS_IDENTIDAD_CLIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
 
 CAMPOS_GENERALES_COMPARTIDOS = (
     "nombre",
@@ -60,6 +61,14 @@ def sincronizar_cliente_compartido(cliente):
                 slug__in=EMPRESAS_CLIENTES_COMPARTIDOS
             ).exclude(pk=cliente.empresa_id)
             for empresa in empresas:
+                if empresa.slug in EMPRESAS_IDENTIDAD_CLIENTE_OBLIGATORIA and not rtn:
+                    resultado["conflictos"].append({
+                        "empresa": empresa.slug,
+                        "cliente_id": None,
+                        "motivo": "No se puede crear el cliente compartido sin identidad/RTN.",
+                    })
+                    continue
+
                 destino = Cliente.objects.filter(
                     empresa=empresa,
                     perfil_compartido_id=cliente.perfil_compartido_id,

@@ -2307,6 +2307,19 @@ class FacturacionTests(TestCase):
         self.assertFormError(response.context["form"], "telefono", "Este campo es obligatorio.")
         self.assertFalse(Cliente.objects.filter(empresa=self.empresa, nombre="Cliente incompleto").exists())
 
+    def test_cliente_medico_no_se_puede_crear_sin_identidad_desde_modelo(self):
+        for slug in ("hospital_mia", "medical_spa"):
+            with self.subTest(slug=slug):
+                self.empresa.slug = slug
+                self.empresa.save(update_fields=["slug"])
+
+                with self.assertRaisesMessage(ValidationError, "identidad/RTN es obligatoria"):
+                    Cliente.objects.create(
+                        empresa=self.empresa,
+                        nombre=f"Cliente sin identidad {slug}",
+                        telefono="99990000",
+                    )
+
     def test_cliente_se_comparte_entre_luque_hospital_y_medical_spa(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])

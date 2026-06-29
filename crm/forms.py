@@ -243,7 +243,11 @@ class PacienteRapidoCitaForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["primer_nombre"].required = True
         self.fields["primer_apellido"].required = True
-        self.fields["identidad"].required = False
+        self.fields["identidad"].required = bool(
+            empresa and empresa.slug in {"hospital_mia", "medical_spa"}
+        )
+        if self.fields["identidad"].required:
+            self.fields["identidad"].error_messages["required"] = "La identidad es obligatoria."
         self.fields["identidad"].widget.attrs.update({
             "inputmode": "numeric",
             "pattern": "[0-9]*",

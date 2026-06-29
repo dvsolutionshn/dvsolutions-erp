@@ -6,6 +6,8 @@ from django.utils import timezone
 from core.models import Empresa
 from facturacion.models import Cliente
 
+EMPRESAS_IDENTIDAD_PACIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
+
 
 class ConfiguracionClinica(models.Model):
     empresa = models.OneToOneField(Empresa, on_delete=models.CASCADE, related_name="configuracion_clinica")
@@ -178,6 +180,18 @@ class Paciente(models.Model):
 
     def __str__(self):
         return f"{self.expediente_codigo} - {self.nombre}"
+
+    def clean(self):
+        super().clean()
+        if (
+            self._state.adding
+            and self.empresa_id
+            and self.empresa.slug in EMPRESAS_IDENTIDAD_PACIENTE_OBLIGATORIA
+            and not (self.identidad or "").strip()
+        ):
+            raise ValidationError({
+                "identidad": "La identidad es obligatoria para crear pacientes en esta empresa."
+            })
 
     def save(self, *args, **kwargs):
         partes_nombre = [

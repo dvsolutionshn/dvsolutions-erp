@@ -14,6 +14,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Usuario
 
 DOS_DECIMALES = Decimal("0.01")
 EMPRESAS_PRECIO_FINAL_CON_IMPUESTO = frozenset({"hospital_mia", "medical_spa"})
+EMPRESAS_IDENTIDAD_CLIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
 
 
 def _monto_en_letras_con_centavos(total, moneda_codigo):
@@ -179,6 +180,16 @@ class Cliente(models.Model):
 
     def clean(self):
         super().clean()
+        if (
+            self._state.adding
+            and self.empresa_id
+            and self.empresa.slug in EMPRESAS_IDENTIDAD_CLIENTE_OBLIGATORIA
+            and not (self.rtn or "").strip()
+        ):
+            raise ValidationError({
+                "rtn": "La identidad/RTN es obligatoria para crear clientes en esta empresa."
+            })
+
         if self.empresa_id and self.nombre:
             nombre_normalizado = self.nombre.strip()
             existe_nombre = Cliente.objects.filter(
