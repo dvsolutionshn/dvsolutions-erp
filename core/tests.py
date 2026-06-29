@@ -662,6 +662,10 @@ class SuperAdminControlTests(TestCase):
             reverse("dashboard", args=[empresa_spa.slug]),
             fetch_redirect_response=False,
         )
+        dashboard_spa = self.client.get(reverse("dashboard", args=[empresa_spa.slug]))
+        self.assertContains(dashboard_spa, "Cambiar de empresa")
+        self.assertContains(dashboard_spa, reverse("dashboard", args=[empresa_hospital.slug]))
+        self.assertContains(dashboard_spa, "Entrar sin iniciar sesi")
 
     def test_mismo_correo_puede_tener_accesos_separados_por_empresa(self):
         empresa_hospital = Empresa.objects.create(

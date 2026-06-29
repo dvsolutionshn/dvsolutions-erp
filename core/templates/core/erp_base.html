@@ -322,7 +322,35 @@
             </div>
             <div class="erp-topbar-actions">
                 {% if empresa %}
+                {% with empresas_disponibles=request.user.empresas_operativas %}
+                {% if empresas_disponibles|length > 1 %}
+                <details class="erp-company-switcher">
+                    <summary>
+                        <span class="erp-company-switcher-icon">{{ empresa.nombre|slice:":1" }}</span>
+                        <span>
+                            <small>Empresa activa</small>
+                            <strong>{{ empresa.nombre }}</strong>
+                        </span>
+                        <span class="erp-company-switcher-chevron">⌄</span>
+                    </summary>
+                    <div class="erp-company-switcher-menu">
+                        <div class="erp-company-switcher-label">Cambiar de empresa</div>
+                        {% for empresa_disponible in empresas_disponibles %}
+                        <a href="{% url 'dashboard' empresa_disponible.slug %}" class="{% if empresa_disponible.id == empresa.id %}is-current{% endif %}">
+                            <span class="erp-company-option-icon">{{ empresa_disponible.nombre|slice:":1" }}</span>
+                            <span>
+                                <strong>{{ empresa_disponible.nombre }}</strong>
+                                <small>{% if empresa_disponible.id == empresa.id %}Empresa actual{% else %}Entrar sin iniciar sesión{% endif %}</small>
+                            </span>
+                            {% if empresa_disponible.id == empresa.id %}<span class="erp-company-check">✓</span>{% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% else %}
                 <div class="erp-user-chip">{{ empresa.nombre }}</div>
+                {% endif %}
+                {% endwith %}
                 {% endif %}
                 {% block topbar_actions %}{% endblock %}
             </div>
