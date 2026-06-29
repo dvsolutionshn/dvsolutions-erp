@@ -387,6 +387,61 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.tipo, "enfermeria")
         self.assertEqual(historia.observaciones, "Paciente recibe curacion y queda estable.")
 
+        editar_url = reverse(
+            "clinica_editar_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, historia.id],
+        )
+        response = self.client.post(
+            editar_url,
+            {
+                "fecha_atencion": "2026-06-17T12:00",
+                "observaciones": "Intento de modificación.",
+                "estado": "finalizada",
+            },
+        )
+        self.assertRedirects(
+            response,
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id]),
+        )
+        historia.refresh_from_db()
+        self.assertEqual(historia.observaciones, "Paciente recibe curacion y queda estable.")
+
+        response = self.client.get(editar_url)
+        self.assertContains(response, "bloqueada permanentemente")
+        self.assertNotContains(response, "Guardar historia")
+
+    def test_cada_especialidad_tiene_preconsulta_e_historial_independiente(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0303",
+            nombre="Paciente Preconsultas",
+            identidad="0801199000103",
+        )
+        for tipo in dict(HistoriaClinicaEspecialidad.TIPO_CHOICES):
+            response = self.client.post(
+                reverse(
+                    "clinica_generar_enlace_preconsulta_tipo",
+                    args=[self.empresa.slug, paciente.id, tipo],
+                )
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context["preconsulta"].tipo, tipo)
+
+        self.assertEqual(paciente.preconsultas.count(), 6)
+        selector = self.client.get(
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id])
+        )
+        for nombre in [
+            "Capilar",
+            "Cirugia plastica y reconstructiva",
+            "Medicina Estetica",
+            "Enfermeria",
+            "Terapias",
+            "Camara hiperbarica",
+        ]:
+            self.assertContains(selector, nombre)
+        self.assertContains(selector, "Nueva preconsulta", count=6)
+
     def test_historias_especialidad_no_estan_disponibles_para_otra_empresa(self):
         otra_empresa = Empresa.objects.create(
             nombre="Mia Medical Spa",

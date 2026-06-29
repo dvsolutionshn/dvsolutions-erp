@@ -78,6 +78,19 @@ class Command(BaseCommand):
                     f"- {conflicto['empresa']} cliente #{conflicto['cliente_id']}: {conflicto['motivo']}"
                 )
 
+        from clinica.services_pacientes import asegurar_paciente_desde_cliente
+
+        pacientes_creados = 0
+        clientes_hospital = Cliente.objects.filter(
+            empresa__slug="hospital_mia",
+        ).exclude(nombre__iexact="Consumidor Final")
+        for cliente in clientes_hospital.select_related("empresa"):
+            _paciente, creado = asegurar_paciente_desde_cliente(cliente)
+            pacientes_creados += int(creado)
+        self.stdout.write(self.style.SUCCESS(
+            f"Hospital MIA: {pacientes_creados} pacientes creados desde clientes existentes."
+        ))
+
     def _mostrar_coincidencias(self, etiqueta, grupos):
         coincidencias = [items for clave, items in grupos.items() if clave and len(items) > 1]
         self.stdout.write(f"Coincidencias por {etiqueta}: {len(coincidencias)}")

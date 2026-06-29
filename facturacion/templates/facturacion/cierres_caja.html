@@ -7,7 +7,7 @@
 {% block header_description %}Control diario por cajero para entregar efectivo, tarjeta y transferencia con trazabilidad por factura.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-action-link" href="{% url 'resumen_diario_caja' empresa.slug %}">Resumen Diario</a>
+{% if puede_ver_historial %}<a class="erp-action-link" href="{% url 'resumen_diario_caja' empresa.slug %}">Resumen Diario</a>{% endif %}
 <a class="erp-action-link" href="{% url 'facturacion_dashboard' empresa.slug %}">Volver a Facturacion</a>
 {% endblock %}
 
@@ -147,6 +147,7 @@
     </div>
 </section>
 
+{% if puede_ver_historial %}
 <section class="erp-table-card">
     <div class="erp-section-heading">
         <div>
@@ -187,4 +188,5 @@
         </table>
     </div>
 </section>
+{% endif %}
 {% endblock %}

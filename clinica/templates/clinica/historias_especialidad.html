@@ -1,9 +1,9 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Historias clinicas - {{ paciente.nombre }}{% endblock %}
+{% block title %}Historias clínicas - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
-{% block header_title %}Historial clinico especializado{% endblock %}
-{% block header_description %}Selecciona el area medica para registrar una nueva atencion o consulta las historias anteriores del paciente.{% endblock %}
+{% block header_title %}Historial clínico especializado{% endblock %}
+{% block header_description %}Selecciona el área médica para registrar una atención, generar su preconsulta o consultar el historial.{% endblock %}
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
@@ -14,16 +14,16 @@
 .specialty-patient{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .specialty-patient h3{margin:0 0 5px;color:#102338}.specialty-patient p{margin:0;color:var(--muted)}
 .specialty-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-top:22px}
-.specialty-option{position:relative;display:flex;flex-direction:column;min-height:180px;padding:18px;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit;overflow:hidden;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.specialty-option{position:relative;display:flex;flex-direction:column;min-height:210px;padding:18px;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit;overflow:hidden;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
 .specialty-option::before{content:"";position:absolute;left:0;top:0;width:4px;height:100%;background:#2367df}
 .specialty-option:hover{transform:translateY(-3px);border-color:#9ebbed;box-shadow:0 16px 32px rgba(16,35,56,.09)}
 .specialty-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:8px;background:#eaf2ff;color:#164fab;font-size:19px;font-weight:900}
 .specialty-option h3{margin:16px 0 7px;color:#102338;font-size:16px;line-height:1.3}
 .specialty-option p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}.specialty-count{margin-top:auto;padding-top:14px;color:#2367df;font-size:12px;font-weight:800}
+.specialty-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}.specialty-actions form{margin:0}.specialty-mini-btn{display:inline-flex;align-items:center;border:1px solid #bcd0e8;border-radius:8px;background:#f6faff;color:#174f9f;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer;text-decoration:none}.specialty-mini-btn.primary{background:#2367df;border-color:#2367df;color:#fff}
 .history-list{margin-top:26px}.history-row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:18px;align-items:center;padding:16px 0;border-bottom:1px solid var(--line)}
 .history-row:last-child{border-bottom:0}.history-date{color:#102338;font-weight:800}.history-meta{color:var(--muted);font-size:12px;margin-top:5px}.history-row h4{margin:0;color:#102338}
-.status-pill{display:inline-flex;padding:4px 9px;border-radius:999px;background:#e8f6f2;color:#087466;font-size:10px;font-weight:900;text-transform:uppercase}
-.status-pill.is-draft{background:#fff6dc;color:#926300}
+.status-pill{display:inline-flex;padding:4px 9px;border-radius:999px;background:#e8f6f2;color:#087466;font-size:10px;font-weight:900;text-transform:uppercase}.status-pill.is-draft{background:#fff6dc;color:#926300}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:8px;padding:10px 12px;font-weight:800}
 @media(max-width:1320px){.specialty-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.specialty-grid{grid-template-columns:1fr}.history-row{grid-template-columns:1fr}.history-row .erp-btn-secondary{justify-self:start}}
@@ -38,30 +38,37 @@
     </div>
     <div class="specialty-grid">
         {% for tipo in tipos %}
-        <a class="specialty-option" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id tipo.codigo %}">
+        <article class="specialty-option">
             <span class="specialty-icon">{{ forloop.counter|stringformat:"02d" }}</span>
             <h3>{{ tipo.nombre }}</h3>
-            <p>Crear una nueva evaluacion y dejarla integrada al expediente clinico.</p>
-            <span class="specialty-count">{{ tipo.total }} historia(s) · Nueva entrada</span>
-        </a>
+            <p>Nueva evaluación, preconsulta e historial independiente para esta área.</p>
+            <span class="specialty-count">{{ tipo.total }} historia(s) · {{ tipo.preconsultas }} preconsulta(s)</span>
+            <div class="specialty-actions">
+                <a class="specialty-mini-btn primary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id tipo.codigo %}">Nueva entrada</a>
+                <form method="post" action="{% url 'clinica_generar_enlace_preconsulta_tipo' empresa.slug paciente.id tipo.codigo %}">
+                    {% csrf_token %}
+                    <button class="specialty-mini-btn" type="submit">Nueva preconsulta</button>
+                </form>
+            </div>
+        </article>
         {% endfor %}
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px;padding:16px;border:1px solid #bcd0e8;border-radius:8px;background:#f6faff;flex-wrap:wrap;">
-        <div><strong style="display:block;color:#102338;">Preconsulta para el paciente</strong><span class="erp-card-muted">Genera un enlace privado, envialo por WhatsApp y recibe las paginas 1 a 5 directamente en el expediente.</span></div>
+        <div><strong style="display:block;color:#102338;">Preconsulta general del paciente</strong><span class="erp-card-muted">Conserva el formulario general de entrada adicional a las preconsultas de cada área.</span></div>
         <form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}">
             {% csrf_token %}
-            <button class="erp-btn" type="submit">Generar enlace seguro</button>
+            <button class="erp-btn" type="submit">Generar enlace general</button>
         </form>
     </div>
 </section>
 
 {% if preconsultas %}
 <section class="erp-card history-list">
-    <div class="erp-section-heading"><div><div class="erp-kpi-label">Formularios enviados</div><h3>Preconsultas del paciente</h3></div></div>
+    <div class="erp-section-heading"><div><div class="erp-kpi-label">Formularios enviados</div><h3>Historial de preconsultas</h3></div></div>
     {% for preconsulta in preconsultas %}
     <div class="history-row">
         <div><div class="history-date">{{ preconsulta.fecha_creacion|date:"d/m/Y" }}</div><div class="history-meta">{{ preconsulta.fecha_creacion|date:"H:i" }}</div></div>
-        <div><h4>Preconsulta general</h4><div class="history-meta">{% if preconsulta.fecha_completada %}Completada {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% else %}Vence {{ preconsulta.fecha_expiracion|date:"d/m/Y H:i" }}{% endif %}</div><span class="status-pill {% if preconsulta.estado == 'pendiente' %}is-draft{% endif %}">{{ preconsulta.get_estado_display }}</span></div>
+        <div><h4>Preconsulta · {{ preconsulta.get_tipo_display }}</h4><div class="history-meta">{% if preconsulta.fecha_completada %}Completada {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% else %}Vence {{ preconsulta.fecha_expiracion|date:"d/m/Y H:i" }}{% endif %}</div><span class="status-pill {% if preconsulta.estado == 'pendiente' %}is-draft{% endif %}">{{ preconsulta.get_estado_display }}</span></div>
         <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id preconsulta.id %}">Ver resumen</a>
     </div>
     {% endfor %}
@@ -69,7 +76,7 @@
 {% endif %}
 
 <section class="erp-card history-list">
-    <div class="erp-section-heading"><div><div class="erp-kpi-label">Registro cronologico</div><h3>Historias anteriores</h3></div></div>
+    <div class="erp-section-heading"><div><div class="erp-kpi-label">Registro cronológico</div><h3>Historias anteriores</h3></div></div>
     {% for historia in historias %}
     <div class="history-row">
         <div><div class="history-date">{{ historia.fecha_atencion|date:"d/m/Y" }}</div><div class="history-meta">{{ historia.fecha_atencion|date:"H:i" }}</div></div>
@@ -78,10 +85,10 @@
             <div class="history-meta">{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} · Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
             <span class="status-pill {% if historia.estado == 'borrador' %}is-draft{% endif %}">{{ historia.get_estado_display }}</span>
         </div>
-        <a class="erp-btn-secondary" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">Ver y editar</a>
+        <a class="erp-btn-secondary" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver nota bloqueada{% else %}Ver y editar{% endif %}</a>
     </div>
     {% empty %}
-    <div class="erp-empty">Todavia no hay historias especializadas para este paciente.</div>
+    <div class="erp-empty">Todavía no hay historias especializadas para este paciente.</div>
     {% endfor %}
 </section>
 {% endblock %}

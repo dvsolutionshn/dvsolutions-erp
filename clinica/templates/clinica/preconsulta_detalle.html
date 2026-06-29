@@ -1,8 +1,8 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Formulario general - {{ paciente.nombre }}{% endblock %}
+{% block title %}Preconsulta {{ preconsulta.get_tipo_display }} - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
-{% block header_title %}Formulario general del paciente{% endblock %}
+{% block header_title %}Preconsulta · {{ preconsulta.get_tipo_display }}{% endblock %}
 {% block header_description %}Información declarada por el paciente antes de su atención. Utilízala como apoyo y confirma los datos clínicos durante la consulta.{% endblock %}
 {% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>{% endblock %}
 

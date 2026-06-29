@@ -1,6 +1,6 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Enlace de preconsulta - {{ paciente.nombre }}{% endblock %}
+{% block title %}Enlace de preconsulta {{ tipo_nombre }} - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
 {% block header_title %}Enlace seguro generado{% endblock %}
 {% block header_description %}Comparte este acceso únicamente con el paciente. Vence en siete días y deja de aceptar cambios al completarse.{% endblock %}

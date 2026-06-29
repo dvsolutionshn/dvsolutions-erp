@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -428,8 +429,28 @@ class HistoriaClinicaEspecialidad(models.Model):
     def __str__(self):
         return f"{self.paciente.nombre} - {self.get_tipo_display()} - {self.fecha_atencion:%d/%m/%Y}"
 
+    @property
+    def bloqueada(self):
+        return self.tipo == "enfermeria" and self.estado == "finalizada"
+
+    def clean(self):
+        super().clean()
+        if not self.pk:
+            return
+        original = HistoriaClinicaEspecialidad.objects.filter(pk=self.pk).values("tipo", "estado").first()
+        if original and original["tipo"] == "enfermeria" and original["estado"] == "finalizada":
+            raise ValidationError("La nota de enfermeria finalizada esta bloqueada y no puede modificarse.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
 
 class PreconsultaClinica(models.Model):
+    TIPO_CHOICES = [
+        ("general", "General"),
+        *HistoriaClinicaEspecialidad.TIPO_CHOICES,
+    ]
     ESTADO_CHOICES = [
         ("pendiente", "Pendiente"),
         ("completada", "Completada"),
@@ -442,6 +463,7 @@ class PreconsultaClinica(models.Model):
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="preconsultas_clinicas")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="preconsultas")
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default="general")
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
     token_preview = models.CharField(max_length=16)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
@@ -482,6 +504,7 @@ class PreconsultaClinica(models.Model):
         ordering = ["-fecha_creacion", "-id"]
         indexes = [
             models.Index(fields=["empresa", "paciente", "estado"]),
+            models.Index(fields=["empresa", "paciente", "tipo"]),
             models.Index(fields=["empresa", "fecha_creacion"]),
         ]
         verbose_name = "Preconsulta clinica"
@@ -492,7 +515,7 @@ class PreconsultaClinica(models.Model):
         return self.estado == "pendiente" and self.fecha_expiracion > timezone.now()
 
     def __str__(self):
-        return f"Preconsulta {self.paciente.nombre} - {self.get_estado_display()}"
+        return f"Preconsulta {self.get_tipo_display()} - {self.paciente.nombre} - {self.get_estado_display()}"
 
 
 class MedicamentoPrescrito(models.Model):

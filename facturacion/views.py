@@ -91,6 +91,13 @@ def _empresa_usa_cierre_caja(empresa):
     )
 
 
+def _puede_ver_historial_cierres(request, empresa):
+    if empresa.slug != "hospital_mia":
+        return True
+    usuario = request.user
+    return bool(usuario.is_superuser or usuario.es_administrador_empresa)
+
+
 def _fecha_caja_desde_parametro(valor):
     if isinstance(valor, date):
         return valor
@@ -6797,7 +6804,12 @@ def cierres_caja(request, empresa_slug):
             messages.success(request, "Cierre de caja registrado correctamente.")
             return redirect(f"{request.path}?fecha={fecha.isoformat()}&turno={turno}")
 
-    cierres = CierreCaja.objects.filter(empresa=empresa).select_related("cajero")[:60]
+    puede_ver_historial = _puede_ver_historial_cierres(request, empresa)
+    cierres = (
+        CierreCaja.objects.filter(empresa=empresa).select_related("cajero")[:60]
+        if puede_ver_historial
+        else CierreCaja.objects.none()
+    )
     resumen = {
         "efectivo_sistema": efectivo_sistema,
         "tarjeta_sistema": tarjeta_sistema,
@@ -6817,6 +6829,7 @@ def cierres_caja(request, empresa_slug):
         "pagos_usuario": pagos_usuario[:120],
         "cierres": cierres,
         "resumen": resumen,
+        "puede_ver_historial": puede_ver_historial,
     })
 
 
@@ -6826,6 +6839,9 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
     if not _empresa_usa_cierre_caja(empresa):
         messages.error(request, "El cierre de caja no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
+    if not _puede_ver_historial_cierres(request, empresa):
+        messages.error(request, "Solo los administradores pueden consultar el historial de cierres.")
+        return redirect("cierres_caja", empresa_slug=empresa.slug)
 
     cierre = get_object_or_404(
         CierreCaja.objects.select_related("cajero", "empresa"),
@@ -6868,6 +6884,9 @@ def resumen_diario_caja(request, empresa_slug):
     if not _empresa_usa_cierre_caja(empresa):
         messages.error(request, "El resumen diario de caja no esta activo para esta empresa.")
         return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
+    if not _puede_ver_historial_cierres(request, empresa):
+        messages.error(request, "Solo los administradores pueden consultar el resumen e historial de cierres.")
+        return redirect("cierres_caja", empresa_slug=empresa.slug)
 
     fecha = _fecha_caja_desde_parametro(request.GET.get("fecha") or timezone.localdate())
     pagos = _preparar_pagos_caja(

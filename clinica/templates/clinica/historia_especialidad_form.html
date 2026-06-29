@@ -20,6 +20,7 @@
 .clinical-error{color:#b42318;font-size:12px}.clinical-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:8px;padding:10px 12px;font-weight:800}
 .general-summary{margin-bottom:18px;border:1px solid #c8d9ed;background:linear-gradient(135deg,#f8fbff,#f4fffc);border-radius:14px;padding:16px}.general-summary h3{margin:0 0 8px;color:#102338}.general-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.general-summary-item{padding:10px;border:1px solid #d9e7f4;border-radius:10px;background:#fff}.general-summary-item span{display:block;font-size:10px;text-transform:uppercase;font-weight:900;color:#60748d;margin-bottom:4px}.general-tags{display:flex;gap:6px;flex-wrap:wrap}.general-tag{padding:5px 8px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:11px;font-weight:800;font-style:normal}
+.preconsult-panel{margin-bottom:18px;padding:16px;border:1px solid #bcd0e8;border-radius:12px;background:#f7fbff}.preconsult-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.preconsult-head h3{margin:3px 0;color:#102338}.preconsult-history{display:grid;gap:7px;margin-top:12px}.preconsult-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;border:1px solid #d8e5f2;border-radius:8px;background:#fff;font-size:12px}.locked-note{margin-bottom:16px;padding:13px;border:1px solid #f0c4c4;border-radius:10px;background:#fff5f5;color:#9f1239;font-weight:800}
 @media(max-width:760px){.clinical-banner,.clinical-form-grid,.clinical-field ul{grid-template-columns:1fr}.clinical-field.is-wide{grid-column:auto}}
 @media(max-width:900px){.general-summary-grid{grid-template-columns:1fr}}
 </style>
@@ -30,6 +31,28 @@
     <div class="clinical-banner">
         <div><div class="erp-kpi-label">Formulario hospitalario</div><h3>{{ tipo_nombre }}</h3><p>{{ paciente.nombre }} · Documento {{ paciente.identidad|default:"No indicado" }}</p></div>
         {% if paciente.es_alergico %}<div class="patient-alert">Alergico: {{ paciente.alergias|default:"Sin detalle" }}</div>{% endif %}
+    </div>
+    {% if bloqueada %}
+    <div class="locked-note">Esta nota de enfermería fue finalizada y está bloqueada permanentemente. Su contenido es únicamente de lectura.</div>
+    {% endif %}
+    <div class="preconsult-panel">
+        <div class="preconsult-head">
+            <div><div class="erp-kpi-label">Preconsulta de {{ tipo_nombre }}</div><h3>Formulario previo e historial</h3><span class="erp-card-muted">Cada envío se conserva en el expediente del paciente.</span></div>
+            <form method="post" action="{% url 'clinica_generar_enlace_preconsulta_tipo' empresa.slug paciente.id tipo %}">
+                {% csrf_token %}
+                <button class="erp-btn-secondary" type="submit">Generar preconsulta</button>
+            </form>
+        </div>
+        <div class="preconsult-history">
+            {% for item in preconsultas_tipo %}
+            <div class="preconsult-row">
+                <span>{{ item.fecha_creacion|date:"d/m/Y H:i" }} · {{ item.get_estado_display }}</span>
+                <a href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id item.id %}">Ver</a>
+            </div>
+            {% empty %}
+            <span class="erp-card-muted">Aún no hay preconsultas registradas para esta área.</span>
+            {% endfor %}
+        </div>
     </div>
     {% if ultima_preconsulta and resumen_preconsulta %}
     <div class="general-summary">
@@ -63,7 +86,7 @@
             <span class="erp-card-muted">Guarda como borrador mientras completas la evaluacion o marca Finalizada al concluir.</span>
             <div style="display:flex;gap:10px;">
                 <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Cancelar</a>
-                <button class="erp-btn" type="submit">Guardar historia</button>
+                {% if not bloqueada %}<button class="erp-btn" type="submit">Guardar historia</button>{% endif %}
             </div>
         </div>
     </form>

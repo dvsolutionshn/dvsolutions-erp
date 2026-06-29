@@ -428,9 +428,14 @@ def historias_especialidad(request, empresa_slug, paciente_id):
     _requiere_hospital_mia(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
-    preconsultas = paciente.preconsultas.select_related("creada_por")[:10]
+    preconsultas = paciente.preconsultas.select_related("creada_por")[:30]
     tipos = [
-        {"codigo": codigo, "nombre": nombre, "total": historias.filter(tipo=codigo).count()}
+        {
+            "codigo": codigo,
+            "nombre": nombre,
+            "total": historias.filter(tipo=codigo).count(),
+            "preconsultas": paciente.preconsultas.filter(tipo=codigo).count(),
+        }
         for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
     ]
     return render(
@@ -455,7 +460,12 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
-    ultima_preconsulta = paciente.preconsultas.filter(estado="completada").first()
+    preconsultas_tipo = paciente.preconsultas.filter(tipo=tipo).select_related("creada_por")[:10]
+    ultima_preconsulta = (
+        paciente.preconsultas.filter(estado="completada", tipo__in=[tipo, "general"])
+        .order_by("-fecha_completada", "-fecha_creacion")
+        .first()
+    )
     if ultima_preconsulta:
         resumen = _resumen_preconsulta(ultima_preconsulta)
         bloques_antecedentes = []
@@ -500,6 +510,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             "titulo": f"Nueva historia: {tipos_validos[tipo]}",
             "ultima_preconsulta": ultima_preconsulta,
             "resumen_preconsulta": _resumen_preconsulta(ultima_preconsulta) if ultima_preconsulta else None,
+            "tipo": tipo,
+            "preconsultas_tipo": preconsultas_tipo,
         },
     )
 
@@ -515,13 +527,25 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         empresa=empresa,
         paciente=paciente,
     )
+    bloqueada = historia.bloqueada
+    if bloqueada and request.method == "POST":
+        messages.error(request, "La nota de enfermeria ya fue finalizada y no puede editarse.")
+        return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     form = HistoriaClinicaEspecialidadForm(
         request.POST or None,
         empresa=empresa,
         tipo=historia.tipo,
         instance=historia,
     )
-    ultima_preconsulta = paciente.preconsultas.filter(estado="completada").first()
+    if bloqueada:
+        for field in form.fields.values():
+            field.disabled = True
+    preconsultas_tipo = paciente.preconsultas.filter(tipo=historia.tipo).select_related("creada_por")[:10]
+    ultima_preconsulta = (
+        paciente.preconsultas.filter(estado="completada", tipo__in=[historia.tipo, "general"])
+        .order_by("-fecha_completada", "-fecha_creacion")
+        .first()
+    )
     if request.method == "POST" and form.is_valid():
         historia = form.save(commit=False)
         historia.actualizado_por = request.user
@@ -537,24 +561,35 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
             "historia": historia,
             "form": form,
             "tipo_nombre": historia.get_tipo_display(),
-            "titulo": f"Editar historia: {historia.get_tipo_display()}",
+            "titulo": (
+                f"Ver nota finalizada: {historia.get_tipo_display()}"
+                if bloqueada
+                else f"Editar historia: {historia.get_tipo_display()}"
+            ),
             "ultima_preconsulta": ultima_preconsulta,
             "resumen_preconsulta": _resumen_preconsulta(ultima_preconsulta) if ultima_preconsulta else None,
+            "tipo": historia.tipo,
+            "preconsultas_tipo": preconsultas_tipo,
+            "bloqueada": bloqueada,
         },
     )
 
 
 @login_required
 @require_POST
-def generar_enlace_preconsulta(request, empresa_slug, paciente_id):
+def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general"):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_hospital_mia(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    paciente.preconsultas.filter(estado="pendiente").update(estado="revocada")
+    tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
+    if tipo not in tipos_validos:
+        raise Http404("Tipo de preconsulta no valido.")
+    paciente.preconsultas.filter(estado="pendiente", tipo=tipo).update(estado="revocada")
     token_raw, token_hash, token_preview = generar_token_preconsulta()
     preconsulta = PreconsultaClinica.objects.create(
         empresa=empresa,
         paciente=paciente,
+        tipo=tipo,
         token_hash=token_hash,
         token_preview=token_preview,
         fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
@@ -567,7 +602,8 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id):
     if len(telefono) == 8:
         telefono = "504" + telefono
     mensaje = quote(
-        f"Hola {paciente.primer_nombre or paciente.nombre}. Hospital MIA le comparte su formulario de preconsulta. "
+        f"Hola {paciente.primer_nombre or paciente.nombre}. Hospital MIA le comparte su formulario de preconsulta "
+        f"de {tipos_validos[tipo]}. "
         f"Complete la informacion antes de su cita en este enlace seguro: {enlace_publico}"
     )
     whatsapp_url = f"https://wa.me/{telefono}?text={mensaje}" if telefono else ""
@@ -580,6 +616,7 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id):
             "preconsulta": preconsulta,
             "enlace_publico": enlace_publico,
             "whatsapp_url": whatsapp_url,
+            "tipo_nombre": tipos_validos[tipo],
         },
     )
 

@@ -520,6 +520,39 @@ class FacturacionTests(TestCase):
         permitido = self.client.get(reverse("cierres_caja", args=[self.empresa.slug]))
         self.assertEqual(permitido.status_code, 200)
 
+    def test_hospital_mia_solo_admin_ve_historial_y_resumen_de_cierres(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_cierre_caja = True
+        configuracion.save(update_fields=["usa_cierre_caja"])
+        cierre = CierreCaja.objects.create(
+            empresa=self.empresa,
+            cajero=self.user,
+            fecha=timezone.localdate(),
+            turno="general",
+        )
+
+        response = self.client.get(reverse("cierres_caja", args=[self.empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["puede_ver_historial"])
+        self.assertNotContains(response, "Historial de cierres")
+
+        detalle = self.client.get(reverse("ver_cierre_caja", args=[self.empresa.slug, cierre.id]))
+        resumen = self.client.get(reverse("resumen_diario_caja", args=[self.empresa.slug]))
+        self.assertRedirects(detalle, reverse("cierres_caja", args=[self.empresa.slug]))
+        self.assertRedirects(resumen, reverse("cierres_caja", args=[self.empresa.slug]))
+
+        self.user.es_administrador_empresa = True
+        self.user.save(update_fields=["es_administrador_empresa"])
+        response = self.client.get(reverse("cierres_caja", args=[self.empresa.slug]))
+        self.assertTrue(response.context["puede_ver_historial"])
+        self.assertContains(response, "Historial de cierres")
+        self.assertEqual(
+            self.client.get(reverse("ver_cierre_caja", args=[self.empresa.slug, cierre.id])).status_code,
+            200,
+        )
+
     def test_resumen_caja_cuenta_aperturas_solo_por_efectivo(self):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
         configuracion.usa_cierre_caja = True
@@ -591,6 +624,8 @@ class FacturacionTests(TestCase):
         self.assertEqual(cierre.efectivo_sistema, Decimal("115.00"))
         self.assertEqual(cierre.total_sistema, Decimal("115.00"))
 
+        self.user.es_administrador_empresa = True
+        self.user.save(update_fields=["es_administrador_empresa"])
         resumen = self.client.get(reverse("resumen_diario_caja", args=[self.empresa.slug]))
 
         self.assertEqual(resumen.status_code, 200)
@@ -2306,6 +2341,9 @@ class FacturacionTests(TestCase):
         self.assertEqual(fichas.count(), 3)
         self.assertEqual(len({ficha.perfil_compartido_id for ficha in fichas}), 1)
         self.assertEqual(len({ficha.empresa_id for ficha in fichas}), 3)
+        paciente = Paciente.objects.get(empresa=self.empresa, identidad="0801199912777")
+        self.assertEqual(paciente.cliente, fichas.get(empresa=self.empresa))
+        self.assertEqual(paciente.telefono, "99887766")
 
         origen = fichas.get(empresa=self.empresa)
         origen.telefono = "99991111"

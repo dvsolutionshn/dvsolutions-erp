@@ -28,6 +28,14 @@ def erp_access(request):
         "facturas": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_facturas"),
         "configuracion_facturacion": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_configuracion_facturacion"),
         "cierres_caja": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_cierres_caja"),
+        "historial_cierres_caja": bool(
+            empresa
+            and (
+                empresa.slug != "hospital_mia"
+                or user.is_superuser
+                or user.es_administrador_empresa
+            )
+        ),
         "clientes": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_clientes"),
         "productos": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_productos"),
         "proveedores": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_proveedores"),
