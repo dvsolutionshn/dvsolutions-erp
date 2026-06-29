@@ -15,6 +15,10 @@ from core.models import Empresa
 from core.audit_context import reset_audit_request, set_audit_request
 
 
+def _usuario_puede_acceder_empresa(usuario, empresa):
+    return bool(usuario.is_superuser or usuario.puede_acceder_empresa(empresa))
+
+
 class AuditoriaRequestMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -39,7 +43,7 @@ class EmpresaAccessMiddleware:
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
             if empresa and request.user.is_authenticated:
-                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                if not _usuario_puede_acceder_empresa(request.user, empresa):
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
@@ -69,7 +73,7 @@ class EmpresaAccessMiddleware:
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
             if empresa and request.user.is_authenticated:
-                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                if not _usuario_puede_acceder_empresa(request.user, empresa):
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
@@ -99,7 +103,7 @@ class EmpresaAccessMiddleware:
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
             if empresa and request.user.is_authenticated:
-                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                if not _usuario_puede_acceder_empresa(request.user, empresa):
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
@@ -125,7 +129,7 @@ class EmpresaAccessMiddleware:
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
             if empresa and request.user.is_authenticated:
-                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                if not _usuario_puede_acceder_empresa(request.user, empresa):
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
@@ -151,7 +155,7 @@ class EmpresaAccessMiddleware:
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
             if empresa and request.user.is_authenticated:
-                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                if not _usuario_puede_acceder_empresa(request.user, empresa):
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
@@ -172,7 +176,7 @@ class EmpresaAccessMiddleware:
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
             if empresa and request.user.is_authenticated:
-                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                if not _usuario_puede_acceder_empresa(request.user, empresa):
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
@@ -200,7 +204,7 @@ class EmpresaAccessMiddleware:
             if empresa and not request.user.is_authenticated:
                 return redirect("tecnicentro_login", empresa_slug=empresa.slug)
             if empresa and request.user.is_authenticated:
-                if not request.user.is_superuser and request.user.empresa_id != empresa.id:
+                if not _usuario_puede_acceder_empresa(request.user, empresa):
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
                 if not request.user.is_superuser and not empresa.licencia_operativa:

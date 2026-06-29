@@ -370,6 +370,12 @@ class ConfiguracionPowerBIEmpresa(models.Model):
 
 class Usuario(AbstractUser):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, null=True, blank=True)
+    empresas_acceso = models.ManyToManyField(
+        Empresa,
+        blank=True,
+        related_name="usuarios_con_acceso",
+        help_text="Empresas adicionales a las que este usuario puede ingresar con la misma cuenta.",
+    )
     es_administrador_empresa = models.BooleanField(default=False)
     rol_sistema = models.ForeignKey(
         RolSistema,
@@ -381,6 +387,28 @@ class Usuario(AbstractUser):
 
     def __str__(self):
         return f"{self.username} - {self.empresa.nombre if self.empresa else 'Sin empresa'}"
+
+    def puede_acceder_empresa(self, empresa):
+        if self.is_superuser:
+            return True
+        if not empresa:
+            return False
+        empresa_id = getattr(empresa, "id", empresa)
+        if self.empresa_id == empresa_id:
+            return True
+        if not self.pk:
+            return False
+        return self.empresas_acceso.filter(id=empresa_id).exists()
+
+    def empresas_operativas(self):
+        if self.is_superuser:
+            return Empresa.objects.filter(activa=True).order_by("nombre")
+        empresas = Empresa.objects.none()
+        if self.empresa_id:
+            empresas = Empresa.objects.filter(pk=self.empresa_id)
+        if self.pk:
+            empresas = empresas | self.empresas_acceso.all()
+        return empresas.filter(activa=True).distinct().order_by("nombre")
 
     def tiene_permiso_erp(self, permiso):
         if self.is_superuser or self.es_administrador_empresa:

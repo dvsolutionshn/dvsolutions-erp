@@ -30,8 +30,9 @@ class ConfiguracionAvanzadaEmpresaAdmin(admin.ModelAdmin):
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
-        ('Empresa Info', {'fields': ('empresa', 'es_administrador_empresa')}),
+        ('Empresa Info', {'fields': ('empresa', 'empresas_acceso', 'es_administrador_empresa')}),
     )
+    filter_horizontal = UserAdmin.filter_horizontal + ('empresas_acceso',)
 
 from .models import Modulo, EmpresaModulo
 

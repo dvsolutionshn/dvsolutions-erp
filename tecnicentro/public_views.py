@@ -25,7 +25,7 @@ def login_tecnicentro(request, empresa_slug):
 
     if request.user.is_authenticated:
         if request.user.is_superuser or (
-            request.user.empresa_id == empresa.id and request.user.tiene_alguna_permision_tecnicentro
+            request.user.puede_acceder_empresa(empresa) and request.user.tiene_alguna_permision_tecnicentro
         ):
             return redirect("tecnicentro_dashboard", empresa_slug=empresa.slug)
         logout(request)
@@ -39,7 +39,7 @@ def login_tecnicentro(request, empresa_slug):
             identificador = (request.POST.get("username") or "").strip()
             password = request.POST.get("password") or ""
             usuario = authenticate(request, username=identificador, password=password, empresa=empresa)
-            if usuario and usuario.empresa_id == empresa.id and usuario.tiene_alguna_permision_tecnicentro:
+            if usuario and usuario.puede_acceder_empresa(empresa) and usuario.tiene_alguna_permision_tecnicentro:
                 cache.delete(clave)
                 login(request, usuario)
                 return redirect("tecnicentro_dashboard", empresa_slug=empresa.slug)

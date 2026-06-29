@@ -4,6 +4,7 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils.text import slugify
 
 from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PagoLicenciaEmpresa, PlanComercial, PlanModulo, RolSistema, SolicitudComercial, Usuario
@@ -264,6 +265,13 @@ class UsuarioControlCreateForm(forms.ModelForm):
         widget=forms.CheckboxSelectMultiple,
         help_text="Opcional. No reemplaza el Rol del sistema que controla los permisos del ERP.",
     )
+    empresas_acceso = forms.ModelMultipleChoiceField(
+        queryset=Empresa.objects.filter(activa=True).order_by("nombre"),
+        required=False,
+        label="Empresas permitidas",
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Marca todas las empresas donde este usuario puede entrar. La empresa principal se incluye automaticamente.",
+    )
 
     class Meta:
         model = Usuario
@@ -272,6 +280,7 @@ class UsuarioControlCreateForm(forms.ModelForm):
             "last_name",
             "email",
             "empresa",
+            "empresas_acceso",
             "rol_sistema",
             "es_administrador_empresa",
             "is_staff",
@@ -286,7 +295,8 @@ class UsuarioControlCreateForm(forms.ModelForm):
             "first_name": ("Nombres", ""),
             "last_name": ("Apellidos", ""),
             "email": ("Correo electronico", "La invitacion y el acceso al ERP se realizaran con este correo."),
-            "empresa": ("Empresa", "Empresa a la que pertenecera este usuario."),
+            "empresa": ("Empresa principal", "Empresa principal del usuario; tambien se agregara a sus empresas permitidas."),
+            "empresas_acceso": ("Empresas permitidas", "Selecciona las empresas adicionales donde podra ingresar con la misma cuenta."),
             "rol_sistema": ("Rol del sistema", "Perfil funcional que define a que areas del ERP podra entrar."),
             "es_administrador_empresa": ("Es administrador de empresa", "Activalo solo si esta persona puede ver todo dentro de su empresa."),
             "is_staff": ("Acceso tecnico al admin Django", "Usalo solo si realmente quieres permitir acceso al admin tecnico."),
@@ -309,8 +319,15 @@ class UsuarioControlCreateForm(forms.ModelForm):
         cleaned_data = super().clean()
         email = cleaned_data.get("email")
         empresa = cleaned_data.get("empresa")
-        if email and Usuario.objects.filter(empresa=empresa, email__iexact=email).exists():
-            self.add_error("email", "Ya existe un usuario con este correo dentro de la empresa seleccionada.")
+        empresas = set(cleaned_data.get("empresas_acceso") or [])
+        if empresa:
+            empresas.add(empresa)
+        if email and empresas:
+            empresas_ids = [item.id for item in empresas]
+            if Usuario.objects.filter(email__iexact=email).filter(
+                Q(empresa_id__in=empresas_ids) | Q(empresas_acceso__id__in=empresas_ids)
+            ).distinct().exists():
+                self.add_error("email", "Ya existe un usuario con este correo en alguna de las empresas permitidas.")
 
         if cleaned_data.get("modo_creacion") != self.MODO_RAPIDO:
             return cleaned_data
@@ -346,6 +363,10 @@ class UsuarioControlCreateForm(forms.ModelForm):
         if commit:
             usuario.save()
             usuario.groups.set(self.cleaned_data.get("groups", []))
+            empresas = set(self.cleaned_data.get("empresas_acceso", []))
+            if usuario.empresa_id:
+                empresas.add(usuario.empresa)
+            usuario.empresas_acceso.set(empresas)
         return usuario
 
 
@@ -356,6 +377,13 @@ class UsuarioControlUpdateForm(forms.ModelForm):
         label="Grupos complementarios",
         widget=forms.CheckboxSelectMultiple,
     )
+    empresas_acceso = forms.ModelMultipleChoiceField(
+        queryset=Empresa.objects.filter(activa=True).order_by("nombre"),
+        required=False,
+        label="Empresas permitidas",
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Marca todas las empresas donde este usuario puede entrar. La empresa principal se incluye automaticamente.",
+    )
     class Meta:
         model = Usuario
         fields = [
@@ -364,6 +392,7 @@ class UsuarioControlUpdateForm(forms.ModelForm):
             "last_name",
             "email",
             "empresa",
+            "empresas_acceso",
             "rol_sistema",
             "es_administrador_empresa",
             "is_active",
@@ -377,12 +406,17 @@ class UsuarioControlUpdateForm(forms.ModelForm):
         self.fields["email"].required = True
         if self.instance.pk:
             self.fields["groups"].initial = self.instance.groups.all()
+            empresas_iniciales = set(self.instance.empresas_acceso.all())
+            if self.instance.empresa_id:
+                empresas_iniciales.add(self.instance.empresa)
+            self.fields["empresas_acceso"].initial = list(empresas_iniciales)
         textos = {
             "username": ("Identificador interno", "Se conserva por compatibilidad tecnica; el acceso normal se realiza con correo."),
             "first_name": ("Nombres", ""),
             "last_name": ("Apellidos", ""),
             "email": ("Correo electronico", ""),
-            "empresa": ("Empresa", "Empresa a la que pertenece este usuario."),
+            "empresa": ("Empresa principal", "Empresa principal del usuario; tambien se mantiene entre sus empresas permitidas."),
+            "empresas_acceso": ("Empresas permitidas", "Selecciona las empresas adicionales donde podra ingresar con la misma cuenta."),
             "rol_sistema": ("Rol del sistema", "Perfil funcional que determina a que secciones puede entrar."),
             "es_administrador_empresa": ("Es administrador de empresa", "Si esta activo, el usuario podra operar toda su empresa."),
             "is_active": ("Usuario activo", "Si lo desactivas, la cuenta queda bloqueada sin borrar el historial."),
@@ -403,17 +437,25 @@ class UsuarioControlUpdateForm(forms.ModelForm):
         cleaned_data = super().clean()
         email = cleaned_data.get("email")
         empresa = cleaned_data.get("empresa")
-        if email and Usuario.objects.filter(
-            empresa=empresa,
-            email__iexact=email,
-        ).exclude(pk=self.instance.pk).exists():
-            self.add_error("email", "Ya existe otro usuario con este correo dentro de la empresa seleccionada.")
+        empresas = set(cleaned_data.get("empresas_acceso") or [])
+        if empresa:
+            empresas.add(empresa)
+        if email and empresas:
+            empresas_ids = [item.id for item in empresas]
+            if Usuario.objects.filter(email__iexact=email).filter(
+                Q(empresa_id__in=empresas_ids) | Q(empresas_acceso__id__in=empresas_ids)
+            ).exclude(pk=self.instance.pk).distinct().exists():
+                self.add_error("email", "Ya existe otro usuario con este correo en alguna de las empresas permitidas.")
         return cleaned_data
 
     def save(self, commit=True):
         usuario = super().save(commit=commit)
         if commit:
             usuario.groups.set(self.cleaned_data.get("groups", []))
+            empresas = set(self.cleaned_data.get("empresas_acceso", []))
+            if usuario.empresa_id:
+                empresas.add(usuario.empresa)
+            usuario.empresas_acceso.set(empresas)
         return usuario
 
 

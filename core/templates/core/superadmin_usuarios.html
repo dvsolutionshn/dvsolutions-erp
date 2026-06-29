@@ -2,7 +2,7 @@
 
 {% block title %}Usuarios{% endblock %}
 {% block header_title %}Usuarios y Roles{% endblock %}
-{% block header_description %}Gestiona accesos independientes por empresa. Un mismo correo puede tener contrasenas y permisos distintos en cada organizacion.{% endblock %}
+{% block header_description %}Gestiona usuarios y define en que empresas puede ingresar cada persona con una sola cuenta.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'superadmin_usuario_create' %}" class="erp-action-link">Nuevo Usuario</a>
@@ -34,7 +34,7 @@
             <thead>
                 <tr>
                     <th>Persona y correo</th>
-                    <th>Empresa</th>
+                    <th>Empresas</th>
                     <th>Rol y permisos</th>
                     <th>Estado</th>
                     <th>Acciones</th>
@@ -44,7 +44,15 @@
                 {% for usuario in usuarios %}
                 <tr>
                     <td><strong>{{ usuario.get_full_name|default:usuario.username }}</strong><br><small>{{ usuario.email|default:"Sin correo" }}</small></td>
-                    <td>{{ usuario.empresa.nombre|default:"Sin empresa" }}</td>
+                    <td>
+                        <strong>{{ usuario.empresa.nombre|default:"Sin empresa principal" }}</strong>
+                        {% if usuario.empresas_acceso.all %}
+                            <br>
+                            {% for empresa_acceso in usuario.empresas_acceso.all %}
+                                <span class="erp-badge neutral">{{ empresa_acceso.nombre }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
                     <td>
                         {% if usuario.is_superuser %}<span class="erp-badge info">Superadmin</span>{% endif %}
                         {% if usuario.es_administrador_empresa %}<span class="erp-badge warning">Admin Empresa</span>{% endif %}

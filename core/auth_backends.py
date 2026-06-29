@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
+from django.db.models import Q
 
 
 class EmailOrUsernameBackend(ModelBackend):
@@ -13,7 +14,7 @@ class EmailOrUsernameBackend(ModelBackend):
         if "@" in identifier:
             users = UserModel._default_manager.filter(email__iexact=identifier)
             if empresa is not None:
-                users = users.filter(empresa=empresa)
+                users = users.filter(Q(empresa=empresa) | Q(empresas_acceso=empresa)).distinct()
             if users.count() != 1:
                 return None
             user = users.first()

@@ -4797,7 +4797,7 @@ def crear_factura(request, empresa_slug):
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
     impuestos_qs = TipoImpuesto.objects.filter(activo=True)
     clientes_qs = Cliente.objects.filter(empresa=empresa)
-    vendedores_qs = Usuario.objects.filter(empresa=empresa)
+    vendedores_qs = Usuario.objects.filter(Q(empresa=empresa) | Q(empresas_acceso=empresa)).distinct()
 
     def obtener_prefijo_manual(fecha_referencia=None, numero_actual=""):
         numero_actual = (numero_actual or "").strip()
@@ -5185,7 +5185,7 @@ def editar_factura(request, empresa_slug, factura_id):
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
     impuestos_qs = TipoImpuesto.objects.filter(activo=True)
     clientes_qs = Cliente.objects.filter(empresa=empresa)
-    vendedores_qs = Usuario.objects.filter(empresa=empresa)
+    vendedores_qs = Usuario.objects.filter(Q(empresa=empresa) | Q(empresas_acceso=empresa)).distinct()
 
     def obtener_prefijo_manual(fecha_referencia=None, numero_actual=""):
         numero_actual = (numero_actual or "").strip()
@@ -6650,7 +6650,7 @@ def dashboard_bi_facturacion(request, empresa_slug):
 def configuracion_power_bi_reportes(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
 
-    if request.user.empresa_id != empresa.id and not request.user.is_superuser:
+    if not request.user.is_superuser and not request.user.puede_acceder_empresa(empresa):
         messages.error(request, "No puedes configurar Power BI para otra empresa.")
         return redirect("reportes_facturacion", empresa_slug=empresa.slug)
 

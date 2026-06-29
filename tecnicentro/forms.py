@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 
 from core.models import Usuario
 from facturacion.models import Cliente
@@ -52,7 +53,10 @@ class AsignacionOrdenForm(forms.ModelForm):
 
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["tecnico_asignado"].queryset = Usuario.objects.filter(empresa=empresa, is_active=True).order_by("first_name", "username")
+        self.fields["tecnico_asignado"].queryset = Usuario.objects.filter(
+            Q(empresa=empresa) | Q(empresas_acceso=empresa),
+            is_active=True,
+        ).distinct().order_by("first_name", "username")
         self.fields["bahia"].queryset = BahiaServicio.objects.filter(empresa=empresa, activa=True).order_by("codigo")
 
 

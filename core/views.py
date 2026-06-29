@@ -411,7 +411,7 @@ def empresa_login(request, slug=None):
         user = authenticate(request, username=username, password=password, empresa=empresa)
 
         if user is not None:
-            if user.empresa == empresa:
+            if user.puede_acceder_empresa(empresa):
                 _clear_login_failures(throttle_scope, request)
                 login(request, user)
                 if es_perfil_clinico:
@@ -457,10 +457,10 @@ def solicitar_recuperacion(request, slug=None):
         if intentos < 3:
             cache.set(throttle_key, intentos + 1, timeout=15 * 60)
             usuario = Usuario.objects.filter(
-                empresa=empresa,
+                Q(empresa=empresa) | Q(empresas_acceso=empresa),
                 email__iexact=form.cleaned_data["email"],
                 is_active=True,
-            ).first()
+            ).distinct().first()
             if usuario:
                 token_raw, token = emitir_token_acceso(
                     usuario,
@@ -672,7 +672,7 @@ def dashboard(request, slug=None):
     if not request.user.is_authenticated:
         return _redirect_login_empresa(request, empresa)
 
-    if request.user.empresa != empresa:
+    if not request.user.puede_acceder_empresa(empresa):
         return _redirect_login_empresa(request, empresa)
 
     if not request.user.is_superuser and not empresa.licencia_operativa:
@@ -693,7 +693,7 @@ def empresa_respaldo(request, slug=None):
 
     if not request.user.is_authenticated:
         return _redirect_login_empresa(request, empresa)
-    if not request.user.is_superuser and request.user.empresa != empresa:
+    if not request.user.is_superuser and not request.user.puede_acceder_empresa(empresa):
         return _redirect_login_empresa(request, empresa)
     if not request.user.is_superuser and not request.user.es_administrador_empresa:
         messages.error(request, "Solo el administrador de la empresa puede descargar respaldos.")
@@ -808,7 +808,7 @@ def empresa_respaldo(request, slug=None):
 def asistente_consulta(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
 
-    if not request.user.is_superuser and request.user.empresa != empresa:
+    if not request.user.is_superuser and not request.user.puede_acceder_empresa(empresa):
         return JsonResponse({"error": "No autorizado para consultar esta empresa."}, status=403)
 
     pregunta = (request.POST.get("pregunta") or "").strip()
@@ -916,7 +916,7 @@ def _contexto_filtros_auditoria(queryset_base, request):
 def auditoria_empresa(request, slug):
     empresa = _resolver_empresa_request(request, slug)
     if not request.user.is_superuser and (
-        request.user.empresa_id != empresa.id or not request.user.es_administrador_empresa
+        not request.user.puede_acceder_empresa(empresa) or not request.user.es_administrador_empresa
     ):
         return JsonResponse({"error": "Solo el administrador de la empresa puede consultar la bitacora."}, status=403)
     base = RegistroAuditoria.objects.filter(empresa=empresa).select_related("usuario")
@@ -935,7 +935,7 @@ def auditoria_empresa(request, slug):
 def auditoria_objeto(request, slug, app_label, modelo, objeto_id):
     empresa = _resolver_empresa_request(request, slug)
     if not request.user.is_superuser and (
-        request.user.empresa_id != empresa.id or not request.user.es_administrador_empresa
+        not request.user.puede_acceder_empresa(empresa) or not request.user.es_administrador_empresa
     ):
         return JsonResponse({"error": "No autorizado."}, status=403)
     registros = RegistroAuditoria.objects.filter(
@@ -979,8 +979,9 @@ def _enriquecer_empresa(empresa):
     empresa.modulos_habilitados_preview = empresa.modulos_habilitados_lista[:4]
     empresa.modulos_habilitados_total = len(empresa.modulos_habilitados_lista)
     empresa.usuarios_relacionados = list(
-        Usuario.objects.filter(empresa=empresa)
+        Usuario.objects.filter(Q(empresa=empresa) | Q(empresas_acceso=empresa))
         .select_related("rol_sistema")
+        .distinct()
         .order_by("username")
     )
     empresa.usuarios_preview = empresa.usuarios_relacionados[:4]
@@ -1289,6 +1290,7 @@ def superadmin_empresa_edit(request, empresa_id):
 def superadmin_usuarios(request):
     usuarios = Usuario.objects.select_related("empresa", "rol_sistema").prefetch_related(
         "groups",
+        "empresas_acceso",
         Prefetch(
             "tokens_acceso",
             queryset=TokenAccesoUsuario.objects.filter(

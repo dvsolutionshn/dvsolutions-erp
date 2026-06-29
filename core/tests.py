@@ -612,8 +612,56 @@ class SuperAdminControlTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ya existe un usuario con este correo dentro de la empresa seleccionada.")
+        self.assertContains(response, "Ya existe un usuario con este correo en alguna de las empresas permitidas.")
         self.assertEqual(Usuario.objects.filter(email__iexact="duplicado@empresa.com").count(), 1)
+
+    def test_usuario_puede_acceder_a_varias_empresas_permitidas(self):
+        empresa_hospital = Empresa.objects.create(
+            nombre="Hospital Mia",
+            slug="hospital-mia-multi",
+            rtn="08011999000168",
+        )
+        empresa_spa = Empresa.objects.create(
+            nombre="Medical Spa",
+            slug="medical-spa-multi",
+            rtn="08011999000169",
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_create"),
+            {
+                "modo_creacion": "rapido",
+                "first_name": "Candy",
+                "last_name": "Luque",
+                "email": "candy@ejemplo.com",
+                "empresa": empresa_hospital.id,
+                "empresas_acceso": [empresa_hospital.id, empresa_spa.id],
+                "rol_sistema": self.rol_facturador.id,
+                "password1": "ClaveCandySegura2026",
+                "password2": "ClaveCandySegura2026",
+            },
+        )
+
+        self.assertRedirects(response, reverse("superadmin_usuarios"))
+        usuario = Usuario.objects.get(email__iexact="candy@ejemplo.com")
+        self.assertEqual(usuario.empresa, empresa_hospital)
+        self.assertTrue(usuario.puede_acceder_empresa(empresa_hospital))
+        self.assertTrue(usuario.puede_acceder_empresa(empresa_spa))
+
+        self.client.logout()
+        response_spa = self.client.post(
+            reverse("empresa_login", args=[empresa_spa.slug]),
+            {
+                "username": "candy@ejemplo.com",
+                "password": "ClaveCandySegura2026",
+            },
+        )
+        self.assertRedirects(
+            response_spa,
+            reverse("dashboard", args=[empresa_spa.slug]),
+            fetch_redirect_response=False,
+        )
 
     def test_mismo_correo_puede_tener_accesos_separados_por_empresa(self):
         empresa_hospital = Empresa.objects.create(
