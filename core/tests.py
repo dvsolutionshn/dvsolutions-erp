@@ -710,6 +710,42 @@ class SuperAdminControlTests(TestCase):
         self.assertContains(dashboard_spa, reverse("dashboard", args=[empresa_hospital.slug]))
         self.assertContains(dashboard_spa, "Entrar sin iniciar sesi")
 
+    def test_permisos_del_menu_usan_la_empresa_actual_y_no_solo_la_principal(self):
+        empresa_principal = Empresa.objects.create(
+            nombre="Empresa Principal Sin Facturacion",
+            slug="principal-sin-facturacion",
+            rtn="08011999000170",
+        )
+        empresa_secundaria = Empresa.objects.create(
+            nombre="Empresa Secundaria Con Facturacion",
+            slug="secundaria-con-facturacion",
+            rtn="08011999000171",
+        )
+        EmpresaModulo.objects.create(
+            empresa=empresa_secundaria,
+            modulo=self.modulo,
+            activo=True,
+        )
+        usuario = Usuario.objects.create_user(
+            username="rosa-prueba",
+            email="rosa@ejemplo.com",
+            password="ClaveRosaSegura2026",
+            empresa=empresa_principal,
+            rol_sistema=self.rol_facturador,
+        )
+        usuario.empresas_acceso.set([empresa_principal, empresa_secundaria])
+        self.client.force_login(usuario)
+
+        response = self.client.get(reverse("dashboard", args=[empresa_secundaria.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["erp_access"]["modulo_facturacion"])
+        self.assertTrue(response.context["erp_access"]["facturas"])
+        self.assertContains(
+            response,
+            reverse("facturacion_dashboard", args=[empresa_secundaria.slug]),
+        )
+
     def test_mismo_correo_puede_tener_accesos_separados_por_empresa(self):
         empresa_hospital = Empresa.objects.create(
             nombre="Hospital Mia",

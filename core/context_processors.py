@@ -1,6 +1,24 @@
+from core.models import Empresa
+
+
+def _empresa_actual(request, user):
+    if not user or not user.is_authenticated:
+        return None
+
+    resolver_match = getattr(request, "resolver_match", None)
+    kwargs = getattr(resolver_match, "kwargs", {}) if resolver_match else {}
+    slug = kwargs.get("empresa_slug") or kwargs.get("slug")
+    if slug:
+        empresa = Empresa.objects.filter(slug=slug, activa=True).first()
+        if empresa and (user.is_superuser or user.puede_acceder_empresa(empresa)):
+            return empresa
+
+    return getattr(user, "empresa", None)
+
+
 def erp_access(request):
     user = getattr(request, "user", None)
-    empresa = getattr(user, "empresa", None) if user and user.is_authenticated else None
+    empresa = _empresa_actual(request, user)
     config_avanzada = None
     if empresa:
         try:
