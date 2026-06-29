@@ -403,12 +403,17 @@ class Usuario(AbstractUser):
     def empresas_operativas(self):
         if self.is_superuser:
             return Empresa.objects.filter(activa=True).order_by("nombre")
-        empresas = Empresa.objects.none()
+        empresas_ids = set()
         if self.empresa_id:
-            empresas = Empresa.objects.filter(pk=self.empresa_id)
+            empresas_ids.add(self.empresa_id)
         if self.pk:
-            empresas = empresas | self.empresas_acceso.all()
-        return empresas.filter(activa=True).distinct().order_by("nombre")
+            empresas_ids.update(
+                self.empresas_acceso.values_list("id", flat=True)
+            )
+        return Empresa.objects.filter(
+            id__in=empresas_ids,
+            activa=True,
+        ).order_by("nombre")
 
     def tiene_permiso_erp(self, permiso):
         if self.is_superuser or self.es_administrador_empresa:

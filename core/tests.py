@@ -648,6 +648,11 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(usuario.empresa, empresa_hospital)
         self.assertTrue(usuario.puede_acceder_empresa(empresa_hospital))
         self.assertTrue(usuario.puede_acceder_empresa(empresa_spa))
+        self.assertQuerySetEqual(
+            usuario.empresas_operativas(),
+            [empresa_hospital, empresa_spa],
+            ordered=False,
+        )
 
         self.client.logout()
         response_spa = self.client.post(
