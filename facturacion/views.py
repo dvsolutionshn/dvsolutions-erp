@@ -1722,6 +1722,7 @@ def _registrar_movimiento_inventario(
     nota_credito=None,
     entrada_documento=None,
     compra_documento=None,
+    bodega=None,
 ):
     if not producto.controla_inventario:
         return None
@@ -1740,6 +1741,7 @@ def _registrar_movimiento_inventario(
     return MovimientoInventario.objects.create(
         empresa=empresa,
         producto=producto,
+        bodega=bodega,
         tipo=tipo,
         cantidad=cantidad,
         existencia_anterior=existencia_anterior,
@@ -2855,30 +2857,46 @@ def ajustar_inventario(request, empresa_slug):
 @login_required
 def entrada_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if empresa.slug in {"hospital_mia", "medical_spa"}:
+        _asegurar_bodegas_farmaceuticas(empresa)
 
     if request.method == "POST":
         form = EntradaInventarioForm(request.POST, empresa=empresa)
         if form.is_valid():
             producto = form.cleaned_data['producto']
+            bodega = form.cleaned_data.get('bodega')
             cantidad = form.cleaned_data['cantidad']
             referencia = form.cleaned_data['referencia']
             observacion = form.cleaned_data['observacion']
             stock_minimo = form.cleaned_data['stock_minimo']
 
-            inventario = _obtener_inventario_producto(producto)
-            if stock_minimo is not None:
-                inventario.stock_minimo = stock_minimo
-                inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
+            with transaction.atomic():
+                inventario = _obtener_inventario_producto(producto)
+                if stock_minimo is not None:
+                    inventario.stock_minimo = stock_minimo
+                    inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
 
-            _registrar_movimiento_inventario(
-                empresa=empresa,
-                producto=producto,
-                tipo='entrada',
-                cantidad=cantidad,
-                referencia=referencia,
-                observacion=observacion or 'Entrada formal de inventario.',
-            )
-            messages.success(request, "Entrada de inventario registrada correctamente.")
+                _registrar_movimiento_inventario(
+                    empresa=empresa,
+                    producto=producto,
+                    bodega=bodega,
+                    tipo='entrada',
+                    cantidad=cantidad,
+                    referencia=referencia,
+                    observacion=observacion or 'Entrada formal de inventario.',
+                )
+                if bodega:
+                    _registrar_movimiento_lote_bodega(
+                        empresa=empresa,
+                        bodega=bodega,
+                        lote=_obtener_lote_generico(producto),
+                        tipo='entrada',
+                        cantidad=cantidad,
+                        referencia=referencia,
+                        observacion=observacion or 'Entrada formal de inventario.',
+                    )
+            destino = f" en {bodega.nombre}" if bodega else ""
+            messages.success(request, f"Entrada de inventario registrada correctamente{destino}.")
             return redirect("inventario_facturacion", empresa_slug=empresa.slug)
     else:
         form = EntradaInventarioForm(empresa=empresa)
@@ -3714,7 +3732,7 @@ def kardex_inventario(request, empresa_slug):
 
     movimientos = MovimientoInventario.objects.filter(
         empresa=empresa
-    ).select_related('producto', 'factura', 'nota_credito', 'compra_documento')
+    ).select_related('producto', 'bodega', 'factura', 'nota_credito', 'compra_documento')
 
     if producto_id:
         try:

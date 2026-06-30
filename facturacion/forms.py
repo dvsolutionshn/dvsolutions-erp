@@ -621,6 +621,7 @@ class AjusteInventarioForm(forms.Form):
 
 class EntradaInventarioForm(forms.Form):
     producto = forms.ModelChoiceField(queryset=Producto.objects.none())
+    bodega = forms.ModelChoiceField(queryset=BodegaInventario.objects.none())
     cantidad = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0.01)
     referencia = forms.CharField(max_length=120)
     observacion = forms.CharField(widget=forms.Textarea, required=False)
@@ -635,7 +636,18 @@ class EntradaInventarioForm(forms.Form):
                 activo=True,
                 controla_inventario=True
             ).order_by('nombre')
+            bodegas = BodegaInventario.objects.filter(
+                empresa=empresa,
+                activa=True,
+            ).order_by('tipo', 'nombre')
+            if bodegas.exists():
+                self.fields['bodega'].queryset = bodegas
+            else:
+                self.fields.pop('bodega')
         self.fields['producto'].help_text = 'Selecciona el producto fisico al que deseas cargar existencias.'
+        if 'bodega' in self.fields:
+            self.fields['bodega'].label = 'Bodega de destino'
+            self.fields['bodega'].help_text = 'Selecciona la bodega exacta donde quedaran disponibles estas unidades.'
         self.fields['cantidad'].help_text = 'Cantidad de unidades que ingresan al inventario.'
         self.fields['referencia'].help_text = 'Usa una referencia clara: compra, carga inicial, lote, traslado, etc.'
         self.fields['stock_minimo'].help_text = 'Opcional. Si lo indicas, actualiza tambien el stock minimo esperado.'

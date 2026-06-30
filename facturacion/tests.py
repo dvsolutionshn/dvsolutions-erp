@@ -3084,6 +3084,55 @@ class FacturacionTests(TestCase):
         self.assertEqual(inventario.stock_minimo, Decimal("3.00"))
         self.assertTrue(MovimientoInventario.objects.filter(producto=self.producto, tipo="entrada", referencia="Carga inicial abril").exists())
 
+    def test_entrada_medical_spa_exige_bodega_y_carga_existencia_en_destino(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        bodega = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega Tratamientos",
+            tipo="principal",
+            activa=True,
+        )
+
+        formulario = self.client.get(reverse("entrada_inventario", args=[self.empresa.slug]))
+        self.assertContains(formulario, "Bodega de destino")
+        self.assertContains(formulario, "Bodega Tratamientos")
+
+        response = self.client.post(
+            reverse("entrada_inventario", args=[self.empresa.slug]),
+            {
+                "producto": str(self.producto.id),
+                "bodega": str(bodega.id),
+                "cantidad": "6.00",
+                "referencia": "Ingreso Medical Spa",
+                "observacion": "Producto recibido en bodega",
+                "stock_minimo": "2.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        movimiento = MovimientoInventario.objects.get(
+            producto=self.producto,
+            tipo="entrada",
+            referencia="Ingreso Medical Spa",
+        )
+        self.assertEqual(movimiento.bodega, bodega)
+        existencia = ExistenciaLoteBodega.objects.get(
+            empresa=self.empresa,
+            bodega=bodega,
+            lote__producto=self.producto,
+        )
+        self.assertEqual(existencia.cantidad, Decimal("6.00"))
+        self.assertTrue(
+            MovimientoLoteBodega.objects.filter(
+                empresa=self.empresa,
+                bodega=bodega,
+                lote__producto=self.producto,
+                tipo="entrada",
+                cantidad=Decimal("6.00"),
+            ).exists()
+        )
+
     def test_crear_documento_entrada_inventario_aplicada(self):
         response = self.client.post(
             reverse("crear_entrada_inventario_documento", args=[self.empresa.slug]),

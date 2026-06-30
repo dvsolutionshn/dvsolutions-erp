@@ -633,6 +633,13 @@ class MovimientoInventario(models.Model):
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='movimientos_inventario')
+    bodega = models.ForeignKey(
+        BodegaInventario,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='movimientos_generales',
+    )
     tipo = models.CharField(max_length=30, choices=TIPOS)
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
     existencia_anterior = models.DecimalField(max_digits=12, decimal_places=2, default=0)
