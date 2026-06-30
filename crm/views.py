@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.db.models import Count
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -50,9 +50,9 @@ def _fecha_agenda(valor):
         return timezone.localdate()
 
 
-def _contexto_calendario(empresa, request, form, *, modo_agenda=False):
+def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_predeterminada="mes"):
     es_clinica = bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica"))
-    vista = request.GET.get("vista", "mes")
+    vista = request.GET.get("vista", vista_predeterminada)
     if vista not in {"mes", "semana", "dia"}:
         vista = "mes"
     seleccionada = _fecha_agenda(request.GET.get("fecha"))
@@ -529,6 +529,151 @@ def agenda_citas(request, empresa_slug):
 
 
 @login_required
+def agenda_mobile(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    cita_id = request.POST.get("cita_id") or request.GET.get("editar")
+    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)
+    if request.method == "POST" and form.is_valid():
+        cita = form.save(commit=False)
+        cita.empresa = empresa
+        cita.save()
+        _sincronizar_cita_clinica(cita)
+        _programar_whatsapp_cita(request, cita)
+        messages.success(request, "Cita actualizada correctamente." if objeto else "Cita creada correctamente.")
+        fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
+        return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?fecha={fecha}")
+
+    contexto = _contexto_calendario(
+        empresa,
+        request,
+        form,
+        modo_agenda=True,
+        vista_predeterminada="dia",
+    )
+    seleccionada = contexto["fecha_seleccionada"]
+    dias_semana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+    dias_semana_largos = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    contexto["titulo_fecha_mobile"] = (
+        f"{dias_semana_largos[seleccionada.weekday()]}, "
+        f"{seleccionada.day} de {meses[seleccionada.month - 1]}"
+    )
+    inicio_tira = seleccionada - timedelta(days=3)
+    fin_tira = seleccionada + timedelta(days=3)
+    citas_tira = CitaCliente.objects.filter(
+        empresa=empresa,
+        fecha_hora__date__gte=inicio_tira,
+        fecha_hora__date__lte=fin_tira,
+    )
+    conteos = {
+        fila["fecha_hora__date"]: fila["total"]
+        for fila in citas_tira.values("fecha_hora__date").annotate(total=Count("id"))
+    }
+    contexto["dias_moviles"] = [
+        {
+            "fecha": inicio_tira + timedelta(days=indice),
+            "dia_corto": dias_semana[(inicio_tira + timedelta(days=indice)).weekday()],
+            "total": conteos.get(inicio_tira + timedelta(days=indice), 0),
+        }
+        for indice in range(7)
+    ]
+    ahora = timezone.now()
+    proximas = list(
+        CitaCliente.objects.filter(
+            empresa=empresa,
+            fecha_hora__gte=ahora,
+            fecha_hora__lte=ahora + timedelta(hours=24),
+        )
+        .select_related("paciente", "cliente", "servicio_clinico", "producto")
+        .order_by("fecha_hora")[:20]
+    )
+    contexto["proximas_app"] = [
+        {
+            "id": cita.id,
+            "title": f"Cita: {cita.display_cliente}",
+            "body": f"{cita.display_servicio} · {timezone.localtime(cita.fecha_hora).strftime('%I:%M %p')}",
+            "at": int(cita.fecha_hora.timestamp() * 1000),
+            "url": f"{reverse('agenda_mobile', args=[empresa.slug])}?fecha={timezone.localtime(cita.fecha_hora).date().isoformat()}&editar={cita.id}#editor",
+        }
+        for cita in proximas
+    ]
+    contexto["citas_hoy_total"] = CitaCliente.objects.filter(
+        empresa=empresa,
+        fecha_hora__date=timezone.localdate(),
+    ).count()
+    contexto["pendientes_hoy"] = CitaCliente.objects.filter(
+        empresa=empresa,
+        fecha_hora__date=timezone.localdate(),
+        estado__in=["pendiente", "confirmada"],
+    ).count()
+    return render(request, "crm/agenda_mobile.html", contexto)
+
+
+def agenda_mobile_manifest(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    inicio = reverse("agenda_mobile", args=[empresa.slug])
+    icono = empresa.logo.url if empresa.logo else "/static/crm/hospital-mia-app.svg"
+    icon_type = "image/svg+xml"
+    if icono.lower().endswith((".jpg", ".jpeg")):
+        icon_type = "image/jpeg"
+    elif icono.lower().endswith(".png"):
+        icon_type = "image/png"
+    return JsonResponse(
+        {
+            "name": f"Agenda · {empresa.nombre}",
+            "short_name": "Agenda MIA",
+            "description": "Calendario móvil de citas conectado a DV Solutions ERP.",
+            "id": inicio,
+            "start_url": inicio,
+            "scope": inicio,
+            "display": "standalone",
+            "orientation": "portrait-primary",
+            "background_color": "#f4f8fb",
+            "theme_color": "#12324a",
+            "icons": [
+                {"src": icono, "sizes": "any", "type": icon_type, "purpose": "any maskable"},
+            ],
+        },
+        content_type="application/manifest+json",
+    )
+
+
+def agenda_mobile_service_worker(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    inicio = reverse("agenda_mobile", args=[empresa.slug])
+    script = f"""
+const APP_HOME = {inicio!r};
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", event => event.waitUntil(self.clients.claim()));
+self.addEventListener("notificationclick", event => {{
+  event.notification.close();
+  const target = event.notification.data?.url || APP_HOME;
+  event.waitUntil(self.clients.matchAll({{type:"window", includeUncontrolled:true}}).then(clients => {{
+    const visible = clients.find(client => "focus" in client);
+    if (visible) {{ visible.navigate(target); return visible.focus(); }}
+    return self.clients.openWindow(target);
+  }}));
+}});
+self.addEventListener("message", event => {{
+  if (event.data?.type !== "SHOW_APPOINTMENT") return;
+  const payload = event.data.payload || {{}};
+  self.registration.showNotification(payload.title || "Próxima cita", {{
+    body: payload.body || "",
+    icon: payload.icon || "/static/crm/hospital-mia-app.svg",
+    badge: "/static/crm/hospital-mia-app.svg",
+    tag: `cita-${{payload.id || "agenda"}}`,
+    data: {{url: payload.url || APP_HOME}},
+  }});
+}});
+"""
+    response = HttpResponse(script, content_type="application/javascript")
+    response["Service-Worker-Allowed"] = inicio
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+@login_required
 @require_POST
 def crear_paciente_rapido_cita(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
@@ -596,9 +741,10 @@ def actualizar_estado_cita(request, empresa_slug, cita_id):
         _sincronizar_cita_clinica(cita)
         programar_notificaciones_cita(cita)
         messages.success(request, f"Cita marcada como {cita.get_estado_display()}.")
-    vista = request.POST.get("vista", "mes")
+    regreso_movil = request.POST.get("return_to") == "mobile"
+    vista = request.POST.get("vista", "dia" if regreso_movil else "mes")
     fecha = request.POST.get("fecha", timezone.localdate().isoformat())
-    url = reverse("agenda_citas", args=[empresa.slug])
+    url = reverse("agenda_mobile" if regreso_movil else "agenda_citas", args=[empresa.slug])
     return redirect(f"{url}?vista={vista}&fecha={fecha}")
 
 
@@ -608,9 +754,10 @@ def eliminar_cita(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
     cita = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id)
     motivo = (request.POST.get("motivo_eliminacion") or "").strip()
-    vista = request.POST.get("vista", "mes")
+    regreso_movil = request.POST.get("return_to") == "mobile"
+    vista = request.POST.get("vista", "dia" if regreso_movil else "mes")
     fecha = request.POST.get("fecha", timezone.localdate().isoformat())
-    url = reverse("agenda_citas", args=[empresa.slug])
+    url = reverse("agenda_mobile" if regreso_movil else "agenda_citas", args=[empresa.slug])
 
     if len(motivo) < 5:
         messages.error(request, "Explica el motivo de la eliminación con al menos 5 caracteres.")

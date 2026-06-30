@@ -66,9 +66,85 @@ class CRMTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Calendario de Citas")
+        self.assertContains(response, reverse("agenda_mobile", args=[self.empresa.slug]))
+
+    def test_app_movil_agenda_es_instalable_y_usa_los_mismos_datos(self):
+        cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Paciente App",
+            rtn="08011999000001",
+            telefono="99990001",
+            activo=True,
+        )
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            cliente=cliente,
+            titulo="Consulta desde app",
+            fecha_hora=timezone.make_aware(datetime(2026, 6, 30, 10, 0)),
+            responsable="Dra. Candy",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            {"fecha": "2026-06-30"},
+        )
+        manifest = self.client.get(reverse("agenda_mobile_manifest", args=[self.empresa.slug]))
+        service_worker = self.client.get(reverse("agenda_mobile_service_worker", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Paciente App")
+        self.assertContains(response, "Consulta desde app")
+        self.assertContains(response, 'rel="manifest"')
+        self.assertContains(response, "serviceWorker.register")
+        self.assertEqual(manifest.status_code, 200)
+        self.assertEqual(manifest.json()["display"], "standalone")
+        self.assertEqual(
+            manifest.json()["start_url"],
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+        )
+        self.assertEqual(service_worker.status_code, 200)
+        self.assertContains(service_worker, "notificationclick")
+        self.assertEqual(cita.empresa, self.empresa)
+
+    def test_estado_cita_desde_app_regresa_a_la_app_movil(self):
+        cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Paciente Estado App",
+            rtn="08011999000002",
+            telefono="99990002",
+            activo=True,
+        )
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            cliente=cliente,
+            titulo="Control móvil",
+            fecha_hora=timezone.make_aware(datetime(2026, 6, 30, 11, 0)),
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.post(
+            reverse("agenda_cita_estado", args=[self.empresa.slug, cita.id]),
+            {
+                "estado": "confirmada",
+                "fecha": "2026-06-30",
+                "return_to": "mobile",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('agenda_mobile', args=[self.empresa.slug])}?vista=dia&fecha=2026-06-30",
+            fetch_redirect_response=False,
+        )
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado, "confirmada")
 
     def test_calendario_ofrece_vistas_mes_semana_y_dia(self):
-        cliente = Cliente.objects.create(empresa=self.empresa, nombre="Paciente Calendario", activo=True)
+        cliente = Cliente.objects.create(
+            empresa=self.empresa, nombre="Paciente Calendario",
+            rtn="08011999000003", telefono="99990003", activo=True,
+        )
         cita = CitaCliente.objects.create(
             empresa=self.empresa,
             cliente=cliente,
@@ -89,7 +165,10 @@ class CRMTests(TestCase):
         self.assertContains(response, "45")
 
     def test_cita_puede_editarse_y_cambiar_estado_desde_calendario(self):
-        cliente = Cliente.objects.create(empresa=self.empresa, nombre="Paciente Estado", activo=True)
+        cliente = Cliente.objects.create(
+            empresa=self.empresa, nombre="Paciente Estado",
+            rtn="08011999000004", telefono="99990004", activo=True,
+        )
         cita = CitaCliente.objects.create(
             empresa=self.empresa, cliente=cliente, titulo="Consulta inicial",
             fecha_hora=timezone.make_aware(datetime(2026, 6, 23, 9, 0)),
@@ -495,6 +574,7 @@ class CRMTests(TestCase):
         cliente = Cliente.objects.create(
             empresa=self.empresa,
             nombre="Paciente Demo",
+            rtn="08011999000005",
             telefono_whatsapp="99999999",
             fecha_nacimiento=date(1990, 4, 18),
             acepta_promociones=True,
@@ -528,6 +608,7 @@ class CRMTests(TestCase):
         cliente = Cliente.objects.create(
             empresa=self.empresa,
             nombre="Paciente API",
+            rtn="08011999000006",
             telefono_whatsapp="99999998",
             acepta_promociones=True,
         )
@@ -571,6 +652,7 @@ class CRMTests(TestCase):
         cliente = Cliente.objects.create(
             empresa=self.empresa,
             nombre="Paciente Demo",
+            rtn="08011999000007",
             telefono_whatsapp="99999996",
             acepta_promociones=True,
         )
@@ -618,6 +700,7 @@ class CRMTests(TestCase):
         cliente = Cliente.objects.create(
             empresa=self.empresa,
             nombre="Paciente Imagen",
+            rtn="08011999000008",
             telefono_whatsapp="99999997",
             acepta_promociones=True,
         )

@@ -4,7 +4,7 @@
 {% block header_kicker %}Módulo de citas{% endblock %}
 {% block header_title %}Calendario de Citas{% endblock %}
 {% block header_description %}Vista mensual, semanal y diaria de la agenda de {{ empresa.nombre }}.{% endblock %}
-{% block topbar_actions %}{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
 
 {% block content %}
 <style>
