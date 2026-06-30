@@ -259,7 +259,8 @@ body::after{
     box-shadow:var(--shadow-soft);
     backdrop-filter:blur(22px);
     position:relative;
-    overflow:hidden;
+    overflow:visible;
+    z-index:20;
 }
 
 .erp-topbar::before{

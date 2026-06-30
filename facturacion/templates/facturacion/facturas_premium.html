@@ -5,7 +5,7 @@
 {% block header_kicker %}Operacion Comercial{% endblock %}
 {% block header_title %}Facturas{% endblock %}
 {% block header_description %}Visualiza y administra la cartera documental del negocio desde una experiencia mas ejecutiva, clara y uniforme con el resto del ERP.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_factura' empresa.slug %}">Nueva Factura</a>{% endblock %}
+{% block topbar_actions %}{% if erp_access.crear_facturas %}<a class="erp-action-link" href="{% url 'crear_factura' empresa.slug %}">Nueva Factura</a>{% endif %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -165,18 +165,24 @@
                         <td class="actions">
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'ver_factura' empresa.slug factura.id %}">Ver</a>
-                                {% if factura.puede_editar_emitida %}
+                                {% if erp_access.editar_facturas and factura.puede_editar_emitida %}
                                 <a class="erp-pill-link" href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
-                                {% else %}
+                                {% elif erp_access.editar_facturas %}
                                 <span class="erp-pill-btn muted" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
                                 {% endif %}
-                                {% if permite_gestion_fiscal_historica and factura.estado == "emitida" %}
+                                {% if erp_access.editar_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" %}
                                 <a class="erp-pill-link" href="{% url 'corregir_numero_factura' empresa.slug factura.id %}">Corregir numero</a>
                                 {% endif %}
+                                {% if erp_access.crear_facturas %}
                                 <form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn" type="submit">Duplicar</button></form>
+                                {% endif %}
+                                {% if erp_access.crear_notas_credito %}
                                 <form method="post" action="{% url 'generar_nota_credito_desde_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn" type="submit">Nota de Credito</button></form>
-                                {% if factura.estado == "borrador" and not factura.numero_factura or permite_gestion_fiscal_historica %}
-                                <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn danger" type="submit" onclick="return confirm('Seguro que desea eliminar este borrador?');">Eliminar</button></form>
+                                {% endif %}
+                                {% if erp_access.eliminar_borradores and factura.estado == "borrador" and not factura.numero_factura %}
+                                <form method="post" action="{% url 'eliminar_factura_borrador' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn danger" type="submit" onclick="return confirm('Seguro que desea eliminar este borrador?');">Eliminar borrador</button></form>
+                                {% elif erp_access.eliminar_facturas and permite_gestion_fiscal_historica %}
+                                <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" style="display:inline;">{% csrf_token %}<button class="erp-pill-btn danger" type="submit" onclick="return confirm('Seguro que desea eliminar esta factura emitida?');">Eliminar factura</button></form>
                                 {% endif %}
                             </div>
                         </td>

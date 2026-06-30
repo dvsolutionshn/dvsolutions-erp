@@ -50,6 +50,7 @@ class RolSistema(models.Model):
     puede_editar_facturas = models.BooleanField(default=False)
     puede_anular_facturas = models.BooleanField(default=False)
     puede_eliminar_borradores = models.BooleanField(default=False)
+    puede_eliminar_facturas = models.BooleanField(default=False)
     puede_registrar_pagos_clientes = models.BooleanField(default=False)
     puede_crear_clientes = models.BooleanField(default=False)
     puede_editar_clientes = models.BooleanField(default=False)

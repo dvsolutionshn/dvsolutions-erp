@@ -672,32 +672,36 @@
 
         <div class="erp-document-actions">
             <div class="erp-document-actions-group">
-                {% if factura.puede_editar_emitida %}
+                {% if erp_access.editar_facturas and factura.puede_editar_emitida %}
                 <a class="erp-btn-secondary" href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
-                {% else %}
+                {% elif erp_access.editar_facturas %}
                 <span class="erp-btn-secondary disabled" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
                 {% endif %}
-                {% if permite_gestion_fiscal_historica and factura.estado == "emitida" %}
+                {% if erp_access.editar_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" %}
                 <a class="erp-btn-secondary" href="{% url 'corregir_numero_factura' empresa.slug factura.id %}">Corregir numero fiscal</a>
                 {% endif %}
-                {% if factura.estado == "borrador" %}
+                {% if erp_access.editar_facturas and factura.estado == "borrador" %}
                 <form method="post" action="{% url 'validar_factura' empresa.slug factura.id %}" class="erp-inline-form">
                     {% csrf_token %}
                     <button class="erp-btn" type="submit">Validar factura</button>
                 </form>
                 {% endif %}
-                {% if factura.total > 0 and factura.estado != "anulada" and factura.saldo_pendiente > 0 %}
+                {% if erp_access.registrar_pagos_clientes and factura.total > 0 and factura.estado != "anulada" and factura.saldo_pendiente > 0 %}
                 <button class="erp-btn" type="button" data-payment-url="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/?modal=1">Registrar pago</button>
                 {% endif %}
             </div>
 
             <div class="erp-document-actions-group">
-                <form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-secondary" type="submit">Duplicar</button></form>
+                {% if erp_access.crear_facturas %}<form method="post" action="{% url 'duplicar_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-secondary" type="submit">Duplicar</button></form>{% endif %}
+                {% if erp_access.crear_notas_credito %}
                 <form method="post" action="{% url 'generar_nota_credito_desde_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-secondary" type="submit">Generar nota de credito</button></form>
-                {% if factura.estado == "borrador" and not factura.numero_factura or permite_gestion_fiscal_historica %}
-                <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea eliminar esta factura?');">{% if factura.estado == "borrador" and not factura.numero_factura %}Eliminar borrador{% else %}Eliminar factura{% endif %}</button></form>
                 {% endif %}
-                {% if factura.estado != "anulada" %}
+                {% if erp_access.eliminar_borradores and factura.estado == "borrador" and not factura.numero_factura %}
+                <form method="post" action="{% url 'eliminar_factura_borrador' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea eliminar este borrador?');">Eliminar borrador</button></form>
+                {% elif erp_access.eliminar_facturas and permite_gestion_fiscal_historica %}
+                <form method="post" action="{% url 'eliminar_factura' empresa.slug factura.id %}" class="erp-inline-form">{% csrf_token %}<button class="erp-btn-danger" type="submit" onclick="return confirm('Seguro que desea eliminar esta factura emitida?');">Eliminar factura</button></form>
+                {% endif %}
+                {% if erp_access.anular_facturas and factura.estado != "anulada" %}
                 <details class="erp-inline-form" style="min-width:min(100%,320px);">
                     <summary class="erp-btn-danger" style="cursor:pointer;list-style:none;text-align:center;">Anular factura</summary>
                     <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}" style="display:grid;gap:8px;margin-top:9px;padding:12px;border:1px solid #efc7c4;border-radius:12px;background:#fff7f6;">

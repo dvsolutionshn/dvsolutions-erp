@@ -59,6 +59,7 @@ class FacturacionTests(TestCase):
             puede_editar_facturas=True,
             puede_anular_facturas=True,
             puede_eliminar_borradores=True,
+            puede_eliminar_facturas=True,
             puede_registrar_pagos_clientes=True,
             puede_crear_clientes=True,
             puede_editar_clientes=True,
@@ -2134,10 +2135,50 @@ class FacturacionTests(TestCase):
         factura.numero_factura = None
         factura.save(update_fields=["cai", "numero_factura"])
 
-        response = self.client.post(reverse("eliminar_factura", args=[self.empresa.slug, factura.id]))
+        response = self.client.post(reverse("eliminar_factura_borrador", args=[self.empresa.slug, factura.id]))
 
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Factura.objects.filter(id=factura.id).exists())
+
+    def test_rol_facturacion_sin_permisos_criticos_no_ve_ni_ejecuta_anular_o_eliminar(self):
+        rol_facturacion = RolSistema.objects.create(
+            nombre="Facturacion Segura",
+            codigo="facturacion-segura",
+            puede_facturas=True,
+            puede_crear_facturas=True,
+            puede_editar_facturas=True,
+        )
+        self.user.rol_sistema = rol_facturacion
+        self.user.es_administrador_empresa = False
+        self.user.save(update_fields=["rol_sistema", "es_administrador_empresa"])
+        factura = self.crear_factura_con_linea(estado="emitida")
+
+        detalle = self.client.get(reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+
+        self.assertEqual(detalle.status_code, 200)
+        self.assertNotContains(detalle, "Anular factura")
+        self.assertNotContains(detalle, "Eliminar factura")
+
+        anulacion = self.client.post(
+            reverse("anular_factura", args=[self.empresa.slug, factura.id]),
+            {"motivo": "Intento no autorizado"},
+        )
+        eliminacion = self.client.post(
+            reverse("eliminar_factura", args=[self.empresa.slug, factura.id]),
+        )
+
+        self.assertRedirects(
+            anulacion,
+            reverse("dashboard", args=[self.empresa.slug]),
+            fetch_redirect_response=False,
+        )
+        self.assertRedirects(
+            eliminacion,
+            reverse("dashboard", args=[self.empresa.slug]),
+            fetch_redirect_response=False,
+        )
+        factura.refresh_from_db()
+        self.assertEqual(factura.estado, "emitida")
 
     def test_no_elimina_factura_emitida(self):
         factura = self.crear_factura_con_linea(estado="emitida")

@@ -144,9 +144,15 @@ def permiso_facturacion_accion(path_suffix):
             return "puede_editar_facturas"
         if len(parts) > 1 and parts[1] == "editar":
             return "puede_editar_facturas"
+        if len(parts) > 1 and parts[1] == "validar":
+            return "puede_editar_facturas"
+        if len(parts) > 1 and parts[1] == "duplicar":
+            return "puede_crear_facturas"
         if len(parts) > 1 and parts[1] == "anular":
             return "puede_anular_facturas"
         if len(parts) > 1 and parts[1] == "eliminar":
+            return "puede_eliminar_facturas"
+        if len(parts) > 1 and parts[1] == "eliminar-borrador":
             return "puede_eliminar_borradores"
         if len(parts) > 1 and parts[1] == "pago":
             return "puede_registrar_pagos_clientes"
