@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
@@ -414,6 +415,13 @@ def empresa_login(request, slug=None):
             if user.puede_acceder_empresa(empresa):
                 _clear_login_failures(throttle_scope, request)
                 login(request, user)
+                siguiente = (request.POST.get("next") or request.GET.get("next") or "").strip()
+                if siguiente and url_has_allowed_host_and_scheme(
+                    siguiente,
+                    allowed_hosts={request.get_host()},
+                    require_https=request.is_secure(),
+                ):
+                    return redirect(siguiente)
                 if es_perfil_clinico:
                     if (
                         empresa.tiene_modulo_activo("clinica_medica")

@@ -1,6 +1,7 @@
 import calendar
 from datetime import date, datetime, timedelta
 import logging
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -37,6 +38,17 @@ logger = logging.getLogger(__name__)
 
 def _empresa_desde_slug(empresa_slug):
     return get_object_or_404(Empresa, slug=empresa_slug, activa=True)
+
+
+def _proteger_agenda_mobile(request, empresa):
+    if not request.user.is_authenticated:
+        login_url = reverse("empresa_login", args=[empresa.slug])
+        return redirect(f"{login_url}?{urlencode({'next': request.get_full_path()})}")
+    if not request.user.puede_acceder_empresa(empresa):
+        return HttpResponse("Acceso no autorizado.", status=403)
+    if not request.user.tiene_permiso_erp("puede_citas"):
+        return HttpResponse("Tu usuario no tiene permiso para gestionar citas.", status=403)
+    return None
 
 
 def _configuracion_crm(empresa):
@@ -528,9 +540,11 @@ def agenda_citas(request, empresa_slug):
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
 
 
-@login_required
 def agenda_mobile(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado:
+        return acceso_denegado
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)
@@ -612,6 +626,9 @@ def agenda_mobile(request, empresa_slug):
 
 def agenda_mobile_manifest(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado:
+        return acceso_denegado
     inicio = reverse("agenda_mobile", args=[empresa.slug])
     icono = empresa.logo.url if empresa.logo else "/static/crm/hospital-mia-app.svg"
     icon_type = "image/svg+xml"
@@ -641,6 +658,9 @@ def agenda_mobile_manifest(request, empresa_slug):
 
 def agenda_mobile_service_worker(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado:
+        return acceso_denegado
     inicio = reverse("agenda_mobile", args=[empresa.slug])
     script = f"""
 const APP_HOME = {inicio!r};

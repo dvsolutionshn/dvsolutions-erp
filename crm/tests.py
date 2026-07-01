@@ -107,6 +107,48 @@ class CRMTests(TestCase):
         self.assertContains(service_worker, "notificationclick")
         self.assertEqual(cita.empresa, self.empresa)
 
+    def test_app_movil_y_archivos_de_instalacion_exigen_sesion_y_permiso(self):
+        app_url = reverse("agenda_mobile", args=[self.empresa.slug])
+        login_url = reverse("empresa_login", args=[self.empresa.slug])
+        rutas_protegidas = [
+            app_url,
+            reverse("agenda_mobile_manifest", args=[self.empresa.slug]),
+            reverse("agenda_mobile_service_worker", args=[self.empresa.slug]),
+        ]
+
+        for ruta in rutas_protegidas:
+            response = self.client.get(ruta)
+            self.assertEqual(response.status_code, 302)
+            self.assertTrue(response["Location"].startswith(f"{login_url}?next="))
+
+        response = self.client.post(
+            f"{login_url}?next={app_url}",
+            {
+                "username": "crmuser",
+                "password": "pass12345",
+                "next": app_url,
+            },
+        )
+        self.assertRedirects(response, app_url, fetch_redirect_response=False)
+
+        rol_sin_citas = RolSistema.objects.create(
+            nombre="Sin Citas",
+            codigo="sin-citas-app",
+        )
+        usuario_sin_permiso = Usuario.objects.create_user(
+            username="sin_citas",
+            password="pass12345",
+            empresa=self.empresa,
+            rol_sistema=rol_sin_citas,
+        )
+        self.client.force_login(usuario_sin_permiso)
+        response = self.client.get(app_url)
+        self.assertRedirects(
+            response,
+            reverse("dashboard", args=[self.empresa.slug]),
+            fetch_redirect_response=False,
+        )
+
     def test_estado_cita_desde_app_regresa_a_la_app_movil(self):
         cliente = Cliente.objects.create(
             empresa=self.empresa,
