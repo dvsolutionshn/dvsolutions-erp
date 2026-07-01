@@ -649,7 +649,8 @@ def agenda_mobile_manifest(request, empresa_slug):
             "background_color": "#f4f8fb",
             "theme_color": "#12324a",
             "icons": [
-                {"src": icono, "sizes": "any", "type": icon_type, "purpose": "any maskable"},
+                {"src": icono, "sizes": "192x192", "type": icon_type, "purpose": "any"},
+                {"src": icono, "sizes": "512x512", "type": icon_type, "purpose": "any maskable"},
             ],
         },
         content_type="application/manifest+json",

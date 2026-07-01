@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Agenda MIA">
   <title>Agenda · {{ empresa.nombre }}</title>
-  <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}">
+  <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}" crossorigin="use-credentials">
   <link rel="icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
   <link rel="apple-touch-icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
   <style>
@@ -22,6 +22,7 @@
   .sheet{position:fixed;z-index:100;inset:0;display:none;align-items:flex-end;justify-content:center;background:rgba(10,31,45,.48);backdrop-filter:blur(4px)}.sheet.open{display:flex}.sheet-card{width:min(760px,100%);max-height:92vh;overflow:auto;padding:20px 18px calc(24px + var(--safe-bottom));border-radius:28px 28px 0 0;background:#fff;box-shadow:0 -20px 60px rgba(0,0,0,.22)}.sheet-grip{width:48px;height:5px;margin:0 auto 18px;border-radius:99px;background:#d8e1e7}.sheet-head{display:flex;align-items:start;justify-content:space-between;gap:12px}.sheet-head small{color:var(--teal);font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.14em}.sheet-head h2{margin:5px 0 0}.close{width:38px;height:38px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font-size:20px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:18px}.field{display:grid;gap:6px}.field.wide{grid-column:1/-1}.field label{color:#53697a;font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.field input,.field select,.field textarea{width:100%;min-height:46px;border:1px solid #bfd0db;border-radius:13px;background:#fff;padding:10px 12px;color:var(--ink)}.field textarea{min-height:82px;resize:vertical}.field input[type=checkbox]{width:20px;min-height:20px;accent-color:var(--teal)}.datetime{display:grid;grid-template-columns:1fr 96px 72px;border:1px solid #bfd0db;border-radius:13px;overflow:hidden}.datetime input,.datetime select{border:0!important;border-radius:0!important}.datetime select{border-left:1px solid var(--line)!important}.errors{color:var(--danger);font-size:10px}.save{width:100%;min-height:50px;margin-top:18px;border:0;border-radius:15px;background:linear-gradient(135deg,var(--teal),#197ad0);color:#fff;font-weight:900;box-shadow:0 12px 28px rgba(31,151,178,.23)}.actions-menu{display:grid;gap:10px;margin-top:18px}.actions-menu form{display:grid;grid-template-columns:1fr auto;gap:8px}.actions-menu select,.actions-menu input{min-height:44px;border:1px solid var(--line);border-radius:12px;padding:0 11px}.actions-menu button,.action-link{min-height:44px;display:grid;place-items:center;border:0;border-radius:12px;background:var(--navy);color:#fff;padding:0 14px;text-decoration:none;font-size:11px;font-weight:900}.action-link.whatsapp{background:#168b65}.danger-block{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.danger-block button{background:var(--danger)}
   .bottom{position:fixed;z-index:70;left:50%;bottom:0;transform:translateX(-50%);width:min(760px,100%);display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;padding:10px 20px calc(10px + var(--safe-bottom));border-top:1px solid rgba(212,225,233,.8);background:rgba(255,255,255,.92);backdrop-filter:blur(20px)}.nav-item{display:grid;place-items:center;gap:4px;border:0;background:transparent;color:var(--muted);text-decoration:none;font-size:9px;font-weight:800}.nav-item b{font-size:20px;color:var(--navy)}.fab{width:58px;height:58px;margin:auto;border:0;border-radius:20px;background:linear-gradient(145deg,var(--pink),var(--teal));color:#fff;font-size:30px;box-shadow:0 12px 28px rgba(40,163,163,.35);transform:translateY(-15px)}.install-note{display:none;margin:12px 0 0;padding:12px;border-radius:14px;background:#eef6ff;color:#345b81;font-size:11px;line-height:1.5}.install-note.show{display:block}
   dialog{border:0}.patient-dialog{width:min(680px,94vw);max-height:88vh;padding:0;border-radius:24px}.patient-dialog::backdrop{background:rgba(10,31,45,.55)}.patient-body{padding:20px}.patient-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.secondary{min-height:44px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 14px}.new-patient{border:0;background:transparent;color:var(--teal);font-size:10px;font-weight:900;text-align:left;padding:0}
+  .install-grid{display:grid;gap:12px;margin-top:18px}.install-choice{display:grid;grid-template-columns:54px minmax(0,1fr);gap:13px;align-items:center;padding:15px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,#fff,#f6fafc)}.install-choice.recommended{border-color:#72cfc7;box-shadow:0 10px 28px rgba(34,184,173,.12)}.platform-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;background:var(--navy);color:#fff;font-size:25px}.install-choice strong,.install-choice span{display:block}.install-choice span{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.45}.platform-install{grid-column:1/-1;min-height:48px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--teal),#197ad0);color:#fff;font-weight:900}.platform-install.ios{background:linear-gradient(135deg,#25394b,#111d28)}.install-steps{display:none;grid-column:1/-1;padding:12px 13px;border-radius:13px;background:#edf5fa;color:#39566d;font-size:11px;line-height:1.6}.install-steps.show{display:block}.install-status{display:none;margin-top:12px;padding:12px 14px;border-radius:14px;background:#eef7f5;color:#25665f;font-size:11px;line-height:1.5}.install-status.show{display:block}.platform-badge{display:none;width:max-content;margin-bottom:5px;padding:4px 7px;border-radius:999px;background:#dff8f3;color:#14776d;font-size:8px!important;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.recommended .platform-badge{display:block}
   @media(max-width:520px){.form-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.appointment{grid-template-columns:58px minmax(0,1fr) auto}.days{gap:5px}.day{border-radius:13px}.content{padding-inline:11px}.hero{padding-inline:16px}.datetime{grid-template-columns:1fr 82px 62px}}
   </style>
 </head>
@@ -61,7 +62,7 @@
   <nav class="bottom">
     <a class="nav-item" href="{% url 'dashboard' empresa.slug %}"><b>⌂</b><span>Sistema</span></a>
     <button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>
-    <button class="nav-item" type="button" id="installButton"><b>⇩</b><span>Instalar</span></button>
+    <button class="nav-item" type="button" id="installButton"><b>⇩</b><span>Instalar app</span></button>
   </nav>
 </main>
 
@@ -98,6 +99,27 @@
 </section>
 {% endfor %}
 
+<section class="sheet" id="installSheet">
+  <div class="sheet-card">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head"><div><small>App móvil oficial</small><h2>Instalar Agenda MIA</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.55">Selecciona tu teléfono. La app conservará el acceso seguro y seguirá conectada al mismo sistema.</p>
+    <div class="install-grid">
+      <article class="install-choice" id="androidChoice">
+        <div class="platform-icon">A</div><div><span class="platform-badge">Recomendado para este teléfono</span><strong>Versión Android</strong><span>Instalación desde Chrome, sin descargar archivos desconocidos.</span></div>
+        <button class="platform-install" type="button" id="installAndroid">Instalar en Android</button>
+        <div class="install-steps" id="androidSteps">Si Chrome no abre el instalador: toca <strong>⋮</strong> arriba a la derecha y elige <strong>Instalar aplicación</strong> o <strong>Agregar a pantalla principal</strong>.</div>
+      </article>
+      <article class="install-choice" id="iosChoice">
+        <div class="platform-icon"></div><div><span class="platform-badge">Recomendado para este teléfono</span><strong>Versión iPhone / iPad</strong><span>Instalación segura desde Safari en la pantalla de inicio.</span></div>
+        <button class="platform-install ios" type="button" id="installIOS">Ver instalación para iPhone</button>
+        <div class="install-steps" id="iosSteps">En Safari toca <strong>Compartir</strong> (cuadro con flecha hacia arriba), luego <strong>Agregar a pantalla de inicio</strong> y finalmente <strong>Agregar</strong>.</div>
+      </article>
+    </div>
+    <div class="install-status" id="installStatus"></div>
+  </div>
+</section>
+
 {% if paciente_rapido_form %}
 <dialog class="patient-dialog" id="patientDialog"><div class="patient-body"><div class="sheet-head"><div><small>Nuevo expediente</small><h2>Crear paciente</h2></div><button class="close" type="button" id="closePatientDialog">×</button></div><form id="patientForm">{% csrf_token %}<div class="form-grid">{% for field in paciente_rapido_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}<div class="errors" data-error="{{ field.name }}"></div></div>{% endfor %}</div><div class="patient-actions"><button class="secondary" type="button" id="cancelPatient">Cancelar</button><button class="save" style="width:auto;margin:0;padding:0 18px" type="submit">Guardar paciente</button></div></form></div></dialog>
 {% endif %}
@@ -114,13 +136,29 @@
   document.querySelectorAll(".sheet").forEach(s=>s.addEventListener("click",e=>{if(e.target===s)closeSheet(s)}));
 
   let installPrompt=null;
-  const installButton=document.getElementById("installButton"),installNote=document.getElementById("installNote");
+  const installButton=document.getElementById("installButton"),installNote=document.getElementById("installNote"),installSheet=document.getElementById("installSheet");
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent),isAndroid=/android/i.test(navigator.userAgent);
+  if(isIOS)document.getElementById("iosChoice").classList.add("recommended");
+  if(isAndroid)document.getElementById("androidChoice").classList.add("recommended");
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;installNote.textContent="La app está lista para instalarse en este teléfono.";installNote.classList.add("show")});
-  installButton.addEventListener("click",async()=>{
-    if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;return}
-    const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
-    installNote.textContent=ios?"En iPhone: toca Compartir y luego “Agregar a pantalla de inicio”.":"Abre el menú del navegador y selecciona “Instalar aplicación” o “Agregar a pantalla de inicio”.";
-    installNote.classList.add("show");window.scrollTo({top:0,behavior:"smooth"});
+  installButton.addEventListener("click",()=>openSheet(installSheet));
+  document.getElementById("installAndroid").addEventListener("click",async()=>{
+    const status=document.getElementById("installStatus"),steps=document.getElementById("androidSteps");
+    if(installPrompt){
+      installPrompt.prompt();
+      const result=await installPrompt.userChoice;
+      status.textContent=result.outcome==="accepted"?"Instalación aceptada. Busca Agenda MIA entre tus aplicaciones.":"La instalación fue cancelada; puedes intentarlo nuevamente.";
+      status.classList.add("show");installPrompt=null;return;
+    }
+    steps.classList.add("show");
+    status.textContent="Chrome todavía no habilitó el instalador automático. Usa la opción del menú indicada arriba.";
+    status.classList.add("show");
+  });
+  document.getElementById("installIOS").addEventListener("click",()=>{
+    document.getElementById("iosSteps").classList.add("show");
+    const status=document.getElementById("installStatus");
+    status.textContent=isIOS?"Apple requiere confirmar la instalación desde el botón Compartir de Safari.":"Abre este enlace en Safari desde el iPhone y sigue los pasos.";
+    status.classList.add("show");
   });
 
   let sw=null;

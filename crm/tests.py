@@ -97,8 +97,14 @@ class CRMTests(TestCase):
         self.assertContains(response, "Consulta desde app")
         self.assertContains(response, 'rel="manifest"')
         self.assertContains(response, "serviceWorker.register")
+        self.assertContains(response, "Instalar en Android")
+        self.assertContains(response, "Versión iPhone / iPad")
         self.assertEqual(manifest.status_code, 200)
         self.assertEqual(manifest.json()["display"], "standalone")
+        self.assertEqual(
+            {icon["sizes"] for icon in manifest.json()["icons"]},
+            {"192x192", "512x512"},
+        )
         self.assertEqual(
             manifest.json()["start_url"],
             reverse("agenda_mobile", args=[self.empresa.slug]),
