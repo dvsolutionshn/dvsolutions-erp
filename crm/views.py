@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core import signing
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -107,6 +107,17 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         {"fecha": dia, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, [])}
         for dia in (inicio + timedelta(days=i) for i in range((fin - inicio).days + 1))
     ]
+    paciente_busqueda_inicial = None
+    paciente_id_inicial = form["paciente"].value() if es_clinica and "paciente" in form.fields else None
+    if paciente_id_inicial:
+        try:
+            paciente_busqueda_inicial = Paciente.objects.filter(
+                empresa=empresa,
+                id=paciente_id_inicial,
+            ).first()
+        except (TypeError, ValueError):
+            paciente_busqueda_inicial = None
+
     return {
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
         "vista": vista, "fecha_seleccionada": seleccionada, "titulo_periodo": titulo_periodo,
@@ -116,6 +127,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "es_clinica": es_clinica,
         "es_hospital_mia": empresa.slug == "hospital_mia",
         "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
+        "paciente_busqueda_inicial": paciente_busqueda_inicial,
     }
 
 
@@ -692,6 +704,49 @@ self.addEventListener("message", event => {{
     response["Service-Worker-Allowed"] = inicio
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
+
+@login_required
+def buscar_pacientes_cita(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"results": [], "error": "Acceso no autorizado."}, status=403)
+    if not request.user.tiene_permiso_erp("puede_citas"):
+        return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
+
+    query = (request.GET.get("q") or "").strip()
+    if not query:
+        return JsonResponse({"results": []})
+
+    pacientes = (
+        Paciente.objects.filter(empresa=empresa, activo=True)
+        .filter(
+            Q(nombre__icontains=query)
+            | Q(primer_nombre__icontains=query)
+            | Q(segundo_nombre__icontains=query)
+            | Q(primer_apellido__icontains=query)
+            | Q(segundo_apellido__icontains=query)
+            | Q(identidad__icontains=query)
+            | Q(expediente_codigo__icontains=query)
+            | Q(telefono__icontains=query)
+            | Q(whatsapp__icontains=query)
+            | Q(correo__icontains=query)
+        )
+        .order_by("nombre")[:12]
+    )
+    return JsonResponse({
+        "results": [
+            {
+                "id": paciente.id,
+                "nombre": paciente.nombre,
+                "documento": paciente.identidad or "",
+                "expediente": paciente.expediente_codigo,
+                "telefono": paciente.whatsapp or paciente.telefono or "",
+                "correo": paciente.correo or "",
+            }
+            for paciente in pacientes
+        ]
+    })
 
 
 @login_required

@@ -301,6 +301,8 @@ class CRMTests(TestCase):
         agenda = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
         self.assertContains(agenda, "+ Nuevo paciente")
         self.assertContains(agenda, "patientQuickModal")
+        self.assertContains(agenda, "Buscar por nombre, identidad, expediente, teléfono o correo")
+        self.assertContains(agenda, reverse("agenda_buscar_pacientes", args=[self.empresa.slug]))
 
         response = self.client.post(
             reverse("agenda_crear_paciente_rapido", args=[self.empresa.slug]),
@@ -330,6 +332,17 @@ class CRMTests(TestCase):
         self.assertEqual(paciente.cliente.nombre, paciente.nombre)
         self.assertEqual(paciente.cliente.telefono_whatsapp, "99991111")
         self.assertTrue(paciente.expediente_codigo.startswith("MIA-"))
+
+        busqueda = self.client.get(
+            reverse("agenda_buscar_pacientes", args=[self.empresa.slug]),
+            {"q": "9012345"},
+        )
+        self.assertEqual(busqueda.status_code, 200)
+        resultados = busqueda.json()["results"]
+        self.assertEqual(len(resultados), 1)
+        self.assertEqual(resultados[0]["id"], paciente.id)
+        self.assertEqual(resultados[0]["nombre"], paciente.nombre)
+        self.assertEqual(resultados[0]["telefono"], "99991111")
 
     def test_creacion_rapida_de_paciente_evitar_documento_duplicado(self):
         self.empresa.tipo_solucion = "clinica"
@@ -429,7 +442,10 @@ class CRMTests(TestCase):
         self.client.login(username="crmuser", password="pass12345")
         url = reverse("agenda_cita_eliminar", args=[self.empresa.slug, cita.id])
 
-        response = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
+        response = self.client.get(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {"vista": "dia", "fecha": "2026-06-25"},
+        )
         self.assertContains(response, "Eliminar cita")
         self.assertContains(response, "Motivo obligatorio")
 
