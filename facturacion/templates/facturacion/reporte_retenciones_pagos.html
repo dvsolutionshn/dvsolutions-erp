@@ -1,0 +1,115 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Retenciones en pagos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control de cobranza{% endblock %}
+{% block header_title %}Retenciones en pagos{% endblock %}
+{% block header_description %}Consolidado de ISR e ISV retenido por los clientes al realizar sus pagos.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'reportes_facturacion' empresa.slug %}">Volver a reportes</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.ret-shell{display:flex;flex-direction:column;gap:18px}
+.ret-periods{display:flex;gap:9px;flex-wrap:wrap}
+.ret-periods a{padding:10px 15px;border:1px solid var(--line);border-radius:999px;color:#274260;text-decoration:none;font-weight:750;background:#fff}
+.ret-periods a.active{color:#fff;border-color:transparent;background:linear-gradient(135deg,#15b8ae,#2676ed);box-shadow:0 10px 24px rgba(38,118,237,.2)}
+.ret-filters{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px;align-items:end}
+.ret-actions{display:flex;gap:10px}
+.ret-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.ret-kpi{padding:20px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(145deg,#fff,#f7fbff)}
+.ret-kpi.primary{background:linear-gradient(145deg,#0e766f,#236be8);color:#fff;border:0}
+.ret-kpi .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;opacity:.72}
+.ret-kpi .value{font-size:25px;font-weight:850;margin-top:10px}
+.ret-kpi .note{font-size:12px;margin-top:8px;opacity:.72;line-height:1.45}
+.ret-grid{display:grid;grid-template-columns:.75fr 1.25fr;gap:18px}
+.ret-card-title{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}
+.ret-card-title h3{margin:0;color:#102338}.ret-card-title p{margin:5px 0 0;color:var(--muted)}
+.ret-table-wrap{overflow:auto}.ret-table{min-width:720px;width:100%;border-collapse:collapse}
+.ret-table th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5c7188;text-align:left;padding:12px;border-bottom:1px solid var(--line)}
+.ret-table td{padding:13px 12px;border-bottom:1px solid #edf2f8;color:#20364e;font-size:13px}
+.ret-table .money{text-align:right;font-weight:750;white-space:nowrap}.ret-table th.money{text-align:right}
+.ret-badge{display:inline-flex;padding:6px 9px;border-radius:999px;background:#e8f8f4;color:#087b68;font-size:11px;font-weight:800}
+.ret-empty{padding:32px;text-align:center;color:var(--muted)}
+.ret-note{padding:14px 16px;border-radius:14px;background:#eef8f7;border:1px solid #ccebe6;color:#315c59;line-height:1.55;font-size:13px}
+@media(max-width:1150px){.ret-kpis{grid-template-columns:repeat(2,1fr)}.ret-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.ret-filters{grid-template-columns:1fr}.ret-kpis{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ret-shell">
+    <section class="erp-card">
+        <div class="ret-card-title">
+            <div>
+                <h3>Periodo de análisis</h3>
+                <p>Consulta desde {{ fecha_desde|date:"d/m/Y" }} hasta {{ fecha_hasta|date:"d/m/Y" }}.</p>
+            </div>
+            <span class="ret-badge">{{ resumen.cantidad }} pago{{ resumen.cantidad|pluralize }}</span>
+        </div>
+        <div class="ret-periods">
+            <a class="{% if periodo == 'dia' %}active{% endif %}" href="?periodo=dia&fecha={{ fecha_referencia|date:'Y-m-d' }}">Día</a>
+            <a class="{% if periodo == 'semana' %}active{% endif %}" href="?periodo=semana&fecha={{ fecha_referencia|date:'Y-m-d' }}">Semana</a>
+            <a class="{% if periodo == 'mes' %}active{% endif %}" href="?periodo=mes&fecha={{ fecha_referencia|date:'Y-m-d' }}">Mes</a>
+            <a class="{% if periodo == 'trimestre' %}active{% endif %}" href="?periodo=trimestre&fecha={{ fecha_referencia|date:'Y-m-d' }}">Trimestre</a>
+            <a class="{% if periodo == 'semestre' %}active{% endif %}" href="?periodo=semestre&fecha={{ fecha_referencia|date:'Y-m-d' }}">Semestre</a>
+            <a class="{% if periodo == 'anio' %}active{% endif %}" href="?periodo=anio&fecha={{ fecha_referencia|date:'Y-m-d' }}">Año</a>
+        </div>
+        <form method="get" class="ret-filters" style="margin-top:16px">
+            <input type="hidden" name="periodo" value="personalizado">
+            <div><label>Desde</label><input type="date" name="fecha_desde" value="{{ fecha_desde|date:'Y-m-d' }}" required></div>
+            <div><label>Hasta</label><input type="date" name="fecha_hasta" value="{{ fecha_hasta|date:'Y-m-d' }}" required></div>
+            <div><label>Fecha de referencia rápida</label><input type="date" name="fecha" value="{{ fecha_referencia|date:'Y-m-d' }}"></div>
+            <div class="ret-actions"><button class="erp-btn-primary" type="submit">Aplicar rango</button></div>
+        </form>
+    </section>
+
+    <section class="ret-kpis">
+        <article class="ret-kpi primary"><div class="label">Total retenido</div><div class="value">L. {{ resumen.total_retenciones|floatformat:2|intcomma }}</div><div class="note">ISR + ISV que el cliente retuvo.</div></article>
+        <article class="ret-kpi"><div class="label">Retención ISR</div><div class="value">L. {{ resumen.retencion_isr|floatformat:2|intcomma }}</div><div class="note">Retención sobre la renta.</div></article>
+        <article class="ret-kpi"><div class="label">Retención ISV</div><div class="value">L. {{ resumen.retencion_isv|floatformat:2|intcomma }}</div><div class="note">Retención sobre ventas.</div></article>
+        <article class="ret-kpi"><div class="label">Cobro recibido</div><div class="value">L. {{ resumen.cobrado|floatformat:2|intcomma }}</div><div class="note">Dinero realmente recibido.</div></article>
+        <article class="ret-kpi"><div class="label">Aplicado a facturas</div><div class="value">L. {{ resumen.total_aplicado|floatformat:2|intcomma }}</div><div class="note">Cobro recibido + retenciones.</div></article>
+    </section>
+
+    <div class="ret-note">Las retenciones no aumentan el dinero recibido en banco, pero sí forman parte del valor aplicado para cancelar la factura. Este reporte excluye facturas anuladas.</div>
+
+    <section class="ret-grid">
+        <article class="erp-card">
+            <div class="ret-card-title"><div><h3>Resumen por día</h3><p>Evolución dentro del periodo.</p></div></div>
+            <div class="ret-table-wrap">
+                <table class="ret-table">
+                    <thead><tr><th>Fecha</th><th>Pagos</th><th class="money">ISR</th><th class="money">ISV</th><th class="money">Total</th></tr></thead>
+                    <tbody>
+                    {% for fila in resumen_diario %}
+                    <tr><td>{{ fila.fecha|date:"d/m/Y" }}</td><td>{{ fila.operaciones }}</td><td class="money">L. {{ fila.retencion_isr|floatformat:2|intcomma }}</td><td class="money">L. {{ fila.retencion_isv|floatformat:2|intcomma }}</td><td class="money">L. {{ fila.total_retenciones|floatformat:2|intcomma }}</td></tr>
+                    {% empty %}<tr><td colspan="5" class="ret-empty">No hay retenciones registradas en este periodo.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        <article class="erp-card">
+            <div class="ret-card-title"><div><h3>Detalle de retenciones</h3><p>Hasta 500 pagos del periodo seleccionado.</p></div></div>
+            <div class="ret-table-wrap">
+                <table class="ret-table">
+                    <thead><tr><th>Fecha</th><th>Factura / cliente</th><th class="money">Cobro</th><th class="money">ISR</th><th class="money">ISV</th><th class="money">Retenido</th><th>Referencia</th></tr></thead>
+                    <tbody>
+                    {% for pago in pagos %}
+                    <tr>
+                        <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+                        <td><strong>{{ pago.factura.numero_factura|default:"Sin número" }}</strong><br><small>{{ pago.factura.cliente.nombre|default:"Cliente general" }}</small></td>
+                        <td class="money">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                        <td class="money">L. {{ pago.retencion_isr|floatformat:2|intcomma }}</td>
+                        <td class="money">L. {{ pago.retencion_isv|floatformat:2|intcomma }}</td>
+                        <td class="money">L. {{ pago.total_retenciones|floatformat:2|intcomma }}</td>
+                        <td>{{ pago.referencia|default:"—" }}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="7" class="ret-empty">No hay pagos con retenciones para mostrar.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    </section>
+</div>
+{% endblock %}

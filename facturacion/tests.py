@@ -2507,6 +2507,48 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.cliente.nombre)
 
+    def test_reporte_retenciones_digital_planning_consolida_periodo_y_componentes(self):
+        self.empresa.slug = "digital_planning"
+        self.empresa.save(update_fields=["slug"])
+        factura_abril = self.crear_factura_con_linea(estado="emitida", fecha_emision=date(2026, 4, 10))
+        factura_mayo = self.crear_factura_con_linea(estado="emitida", fecha_emision=date(2026, 5, 10))
+        PagoFactura.objects.create(
+            factura=factura_abril,
+            fecha=date(2026, 4, 28),
+            monto=Decimal("100.00"),
+            retencion_isr=Decimal("10.00"),
+            retencion_isv=Decimal("5.00"),
+            metodo="transferencia",
+            referencia="RET-ABRIL",
+        )
+        PagoFactura.objects.create(
+            factura=factura_mayo,
+            fecha=date(2026, 5, 2),
+            monto=Decimal("100.00"),
+            retencion_isr=Decimal("10.00"),
+            retencion_isv=Decimal("5.00"),
+            metodo="transferencia",
+            referencia="RET-MAYO",
+        )
+
+        response = self.client.get(
+            reverse("reporte_retenciones_pagos", args=[self.empresa.slug]),
+            {"periodo": "mes", "fecha": "2026-04-15"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["resumen"]["retencion_isr"], Decimal("10.00"))
+        self.assertEqual(response.context["resumen"]["retencion_isv"], Decimal("5.00"))
+        self.assertEqual(response.context["resumen"]["total_retenciones"], Decimal("15.00"))
+        self.assertEqual(response.context["resumen"]["total_aplicado"], Decimal("115.00"))
+        self.assertContains(response, "RET-ABRIL")
+        self.assertNotContains(response, "RET-MAYO")
+
+    def test_reporte_retenciones_no_se_habilita_para_otra_empresa(self):
+        response = self.client.get(reverse("reporte_retenciones_pagos", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 404)
+
     def test_listado_clientes_tiene_buscador_con_sugerencias(self):
         response = self.client.get(reverse("clientes_facturacion", args=[self.empresa.slug]))
 

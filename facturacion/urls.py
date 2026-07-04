@@ -107,6 +107,7 @@ urlpatterns = [
     path('reportes/dashboard-bi/', views.dashboard_bi_facturacion, name='dashboard_bi_facturacion'),
     path('reportes/power-bi/', views.configuracion_power_bi_reportes, name='configuracion_power_bi_reportes'),
     path('reportes/bancos/', views.reporte_ingresos_bancos, name='reporte_ingresos_bancos'),
+    path('reportes/retenciones/', views.reporte_retenciones_pagos, name='reporte_retenciones_pagos'),
 
     path('cxc/', views.reporte_cxc, name='reporte_cxc'),
     path('cxp/', views.reporte_cxp, name='reporte_cxp'),

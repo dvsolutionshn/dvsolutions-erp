@@ -7,6 +7,9 @@
 {% block header_title %}Reportes de Facturacion{% endblock %}
 {% block header_description %}Vista ejecutiva de ventas, impuestos, saldos y comportamiento de cobro con una presentacion mas clara y profesional.{% endblock %}
 {% block topbar_actions %}
+{% if empresa.slug == "digital_planning" %}
+<a class="erp-action-link" href="{% url 'reporte_retenciones_pagos' empresa.slug %}">Retenciones en pagos</a>
+{% endif %}
 <a class="erp-action-link" href="{% url 'dashboard_bi_facturacion' empresa.slug %}?{{ request.GET.urlencode }}">Dashboard BI</a>
 {% if puede_configurar_power_bi %}
 <a class="erp-action-link" href="{% url 'configuracion_power_bi_reportes' empresa.slug %}">Configurar embed externo</a>

@@ -6435,6 +6435,112 @@ def reportes_facturacion(request, empresa_slug):
     })
 
 
+def _rango_reporte_retenciones(periodo, fecha_referencia, fecha_desde="", fecha_hasta=""):
+    periodo = periodo if periodo in {"dia", "semana", "mes", "trimestre", "semestre", "anio", "personalizado"} else "mes"
+    if periodo == "personalizado":
+        try:
+            inicio = date.fromisoformat(fecha_desde)
+            fin = date.fromisoformat(fecha_hasta)
+        except (TypeError, ValueError):
+            inicio = date(fecha_referencia.year, fecha_referencia.month, 1)
+            fin = fecha_referencia
+            periodo = "mes"
+        if inicio > fin:
+            inicio, fin = fin, inicio
+        return periodo, inicio, fin
+
+    if periodo == "dia":
+        return periodo, fecha_referencia, fecha_referencia
+    if periodo == "semana":
+        inicio = fecha_referencia - timedelta(days=fecha_referencia.weekday())
+        return periodo, inicio, inicio + timedelta(days=6)
+    if periodo == "mes":
+        inicio = date(fecha_referencia.year, fecha_referencia.month, 1)
+        fin = date(fecha_referencia.year, fecha_referencia.month, calendar.monthrange(fecha_referencia.year, fecha_referencia.month)[1])
+        return periodo, inicio, fin
+    if periodo == "trimestre":
+        mes_inicio = ((fecha_referencia.month - 1) // 3) * 3 + 1
+        inicio = date(fecha_referencia.year, mes_inicio, 1)
+        mes_fin = mes_inicio + 2
+        fin = date(fecha_referencia.year, mes_fin, calendar.monthrange(fecha_referencia.year, mes_fin)[1])
+        return periodo, inicio, fin
+    if periodo == "semestre":
+        mes_inicio = 1 if fecha_referencia.month <= 6 else 7
+        inicio = date(fecha_referencia.year, mes_inicio, 1)
+        mes_fin = mes_inicio + 5
+        fin = date(fecha_referencia.year, mes_fin, calendar.monthrange(fecha_referencia.year, mes_fin)[1])
+        return periodo, inicio, fin
+    return periodo, date(fecha_referencia.year, 1, 1), date(fecha_referencia.year, 12, 31)
+
+
+@login_required
+def reporte_retenciones_pagos(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if empresa.slug != "digital_planning":
+        raise Http404("Este reporte solo esta habilitado para Digital Planning.")
+
+    hoy = timezone.localdate()
+    try:
+        fecha_referencia = date.fromisoformat(request.GET.get("fecha", ""))
+    except (TypeError, ValueError):
+        fecha_referencia = hoy
+
+    periodo, fecha_desde, fecha_hasta = _rango_reporte_retenciones(
+        request.GET.get("periodo", "mes"),
+        fecha_referencia,
+        request.GET.get("fecha_desde", "").strip(),
+        request.GET.get("fecha_hasta", "").strip(),
+    )
+    pagos = (
+        PagoFactura.objects.filter(
+            factura__empresa=empresa,
+            fecha__range=(fecha_desde, fecha_hasta),
+        )
+        .exclude(factura__estado="anulada")
+        .filter(Q(retencion_isr__gt=0) | Q(retencion_isv__gt=0))
+        .select_related("factura", "factura__cliente", "cuenta_financiera", "cajero")
+        .order_by("-fecha", "-id")
+    )
+    agregados = pagos.aggregate(
+        cobrado=Sum("monto"),
+        retencion_isr=Sum("retencion_isr"),
+        retencion_isv=Sum("retencion_isv"),
+    )
+    resumen = {
+        "cobrado": agregados["cobrado"] or Decimal("0.00"),
+        "retencion_isr": agregados["retencion_isr"] or Decimal("0.00"),
+        "retencion_isv": agregados["retencion_isv"] or Decimal("0.00"),
+        "cantidad": pagos.count(),
+    }
+    resumen["total_retenciones"] = resumen["retencion_isr"] + resumen["retencion_isv"]
+    resumen["total_aplicado"] = resumen["cobrado"] + resumen["total_retenciones"]
+
+    resumen_diario = []
+    for item in (
+        pagos.values("fecha")
+        .annotate(
+            cobrado=Sum("monto"),
+            retencion_isr=Sum("retencion_isr"),
+            retencion_isv=Sum("retencion_isv"),
+            operaciones=Count("id"),
+        )
+        .order_by("fecha")
+    ):
+        item["total_retenciones"] = (item["retencion_isr"] or Decimal("0.00")) + (item["retencion_isv"] or Decimal("0.00"))
+        resumen_diario.append(item)
+
+    return render(request, "facturacion/reporte_retenciones_pagos.html", {
+        "empresa": empresa,
+        "pagos": pagos[:500],
+        "resumen": resumen,
+        "resumen_diario": resumen_diario,
+        "periodo": periodo,
+        "fecha_referencia": fecha_referencia,
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+    })
+
+
 @login_required
 def dashboard_bi_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
