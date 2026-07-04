@@ -305,6 +305,7 @@
 })();
 </script>
 {% if es_clinica %}
+{{ pacientes_busqueda|json_script:"appointmentPatientsData" }}
 <script>
 (function(){
   const shell = document.querySelector("[data-patient-search-url]");
@@ -317,6 +318,36 @@
   let timer = null;
   let controller = null;
   let activeIndex = -1;
+  const patientDataNode = document.getElementById("appointmentPatientsData");
+  let localPatients = [];
+  try{
+    localPatients = patientDataNode ? JSON.parse(patientDataNode.textContent) : [];
+  }catch(error){
+    localPatients = [];
+  }
+
+  function normalize(value){
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase()
+      .trim();
+  }
+
+  function filterLocalPatients(query){
+    const terms = normalize(query).split(/\s+/).filter(Boolean);
+    if(!terms.length){ return localPatients.slice(0, 12); }
+    return localPatients.filter(function(patient){
+      const searchable = normalize([
+        patient.nombre,
+        patient.documento,
+        patient.expediente,
+        patient.telefono,
+        patient.correo,
+      ].filter(Boolean).join(" "));
+      return terms.every(term=>searchable.includes(term));
+    }).slice(0, 12);
+  }
 
   function closeResults(){
     results.classList.remove("is-open");
@@ -381,6 +412,10 @@
   }
 
   async function searchPatients(query){
+    if(localPatients.length){
+      renderPatients(filterLocalPatients(query));
+      return;
+    }
     if(controller){ controller.abort(); }
     controller = new AbortController();
     results.innerHTML = '<div class="appointment-patient-empty">Buscando pacientes…</div>';

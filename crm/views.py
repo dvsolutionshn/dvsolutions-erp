@@ -108,7 +108,20 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         for dia in (inicio + timedelta(days=i) for i in range((fin - inicio).days + 1))
     ]
     paciente_busqueda_inicial = None
+    pacientes_busqueda = []
     paciente_id_inicial = form["paciente"].value() if es_clinica and "paciente" in form.fields else None
+    if es_clinica and "paciente" in form.fields:
+        pacientes_busqueda = [
+            {
+                "id": paciente.id,
+                "nombre": paciente.nombre,
+                "documento": paciente.identidad or "",
+                "expediente": paciente.expediente_codigo,
+                "telefono": paciente.whatsapp or paciente.telefono or "",
+                "correo": paciente.correo or "",
+            }
+            for paciente in form.fields["paciente"].queryset
+        ]
     if paciente_id_inicial:
         try:
             paciente_busqueda_inicial = Paciente.objects.filter(
@@ -128,6 +141,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "es_hospital_mia": empresa.slug == "hospital_mia",
         "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
         "paciente_busqueda_inicial": paciente_busqueda_inicial,
+        "pacientes_busqueda": pacientes_busqueda,
     }
 
 

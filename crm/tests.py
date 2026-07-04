@@ -333,6 +333,13 @@ class CRMTests(TestCase):
         self.assertEqual(paciente.cliente.telefono_whatsapp, "99991111")
         self.assertTrue(paciente.expediente_codigo.startswith("MIA-"))
 
+        agenda_actualizada = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
+        self.assertContains(agenda_actualizada, "appointmentPatientsData")
+        paciente_embebido = agenda_actualizada.context["pacientes_busqueda"][0]
+        self.assertEqual(paciente_embebido["id"], paciente.id)
+        self.assertEqual(paciente_embebido["nombre"], paciente.nombre)
+        self.assertEqual(paciente_embebido["documento"], paciente.identidad)
+
         busqueda = self.client.get(
             reverse("agenda_buscar_pacientes", args=[self.empresa.slug]),
             {"q": "9012345"},
