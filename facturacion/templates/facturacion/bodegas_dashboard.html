@@ -6,6 +6,40 @@
 {% block header_title %}Bodegas{% endblock %}
 {% block header_description %}Controla el mismo producto dividido entre Bodega General, Bodega Hospital y Vitrina sin duplicar el catalogo.{% endblock %}
 
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .warehouse-value-grid{
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:10px;
+        margin-top:18px;
+    }
+    .warehouse-value{
+        padding:12px;
+        border:1px solid rgba(20,184,166,.14);
+        border-radius:14px;
+        background:linear-gradient(145deg,rgba(240,253,250,.88),rgba(239,246,255,.78));
+    }
+    .warehouse-value span{
+        display:block;
+        margin-bottom:5px;
+        color:#66788a;
+        font-size:10px;
+        font-weight:800;
+        letter-spacing:.08em;
+        text-transform:uppercase;
+    }
+    .warehouse-value strong{
+        color:#153447;
+        font-size:15px;
+    }
+    @media(max-width:680px){
+        .warehouse-value-grid{grid-template-columns:1fr;}
+    }
+</style>
+{% endblock %}
+
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'bodegas_dashboard' empresa.slug %}">Nuevo Producto</a>
 <a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
@@ -14,6 +48,28 @@
 
 {% block content %}
 <section class="erp-grid">
+    {% if mostrar_resumen_comercial %}
+    <article class="erp-card">
+        <div class="erp-kpi-label">Cantidad de productos</div>
+        <p class="erp-stat-value">{{ resumen.productos|intcomma }}</p>
+        <p class="erp-card-muted">{{ resumen.unidades|floatformat:2|intcomma }} unidades físicas distribuidas.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Servicios</div>
+        <p class="erp-stat-value">{{ resumen.servicios|intcomma }}</p>
+        <p class="erp-card-muted">Servicios activos del catálogo; no ocupan bodega.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Costo real</div>
+        <p class="erp-stat-value">L. {{ resumen.costo_real|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Inversión real acumulada en las existencias.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Valor de venta</div>
+        <p class="erp-stat-value">L. {{ resumen.valor_venta|floatformat:2|intcomma }}</p>
+        <p class="erp-card-muted">Valor potencial de venta del inventario disponible.</p>
+    </article>
+    {% else %}
     <article class="erp-card">
         <div class="erp-kpi-label">Bodegas activas</div>
         <p class="erp-stat-value">{{ resumen.bodegas }}</p>
@@ -34,6 +90,7 @@
         <p class="erp-stat-value">{{ resumen.lotes }}</p>
         <p class="erp-card-muted">Separacion para vencimientos y trazabilidad.</p>
     </article>
+    {% endif %}
 </section>
 
 <section class="erp-grid">
@@ -41,8 +98,26 @@
     <a class="erp-card erp-module-card" href="{% url 'ver_bodega_inventario' empresa.slug item.bodega.id %}">
         <div class="erp-kpi-label">{{ item.bodega.get_tipo_display }}</div>
         <h3>{{ item.bodega.nombre }}</h3>
+        {% if not mostrar_resumen_comercial %}
         <p class="erp-stat-value">{{ item.unidades|floatformat:2|intcomma }}</p>
+        {% endif %}
         <p class="erp-card-muted">{{ item.productos }} productos y {{ item.lotes }} lotes disponibles.</p>
+        {% if mostrar_resumen_comercial %}
+        <div class="warehouse-value-grid">
+            <div class="warehouse-value">
+                <span>Unidades</span>
+                <strong>{{ item.unidades|floatformat:2|intcomma }}</strong>
+            </div>
+            <div class="warehouse-value">
+                <span>Costo real</span>
+                <strong>L. {{ item.costo_real|floatformat:2|intcomma }}</strong>
+            </div>
+            <div class="warehouse-value">
+                <span>Valor venta</span>
+                <strong>L. {{ item.valor_venta|floatformat:2|intcomma }}</strong>
+            </div>
+        </div>
+        {% endif %}
     </a>
     {% empty %}
     <article class="erp-card">

@@ -2741,6 +2741,61 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Guantes")
 
+    def test_bodegas_medical_spa_muestra_resumen_comercial_valorizado(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        bodega = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega Comercial",
+            tipo="principal",
+        )
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Serum",
+            codigo="SER-001",
+            tipo_item="producto",
+            precio=Decimal("250.00"),
+            costo_real_inventario=Decimal("100.00"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=True,
+        )
+        Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta estética",
+            codigo="SRV-001",
+            tipo_item="servicio",
+            unidad_medida="servicio",
+            precio=Decimal("500.00"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=False,
+        )
+        lote = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="SER-LOTE-1",
+        )
+        ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=bodega,
+            lote=lote,
+            cantidad=Decimal("3.00"),
+        )
+
+        response = self.client.get(reverse("bodegas_dashboard", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cantidad de productos")
+        self.assertContains(response, "Servicios")
+        self.assertContains(response, "Costo real")
+        self.assertContains(response, "Valor de venta")
+        self.assertEqual(response.context["resumen"]["productos"], 1)
+        self.assertEqual(response.context["resumen"]["servicios"], 1)
+        self.assertEqual(response.context["resumen"]["costo_real"], Decimal("300.00"))
+        self.assertEqual(response.context["resumen"]["valor_venta"], Decimal("750.00"))
+
     def test_crear_lotes_del_mismo_producto_con_vencimientos_rapidos(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
         EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})

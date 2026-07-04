@@ -2516,27 +2516,59 @@ def bodegas_dashboard(request, empresa_slug):
     _asegurar_bodegas_farmaceuticas(empresa)
     bodegas = BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre")
     resumen_bodegas = []
+    productos_unicos = set()
     for bodega in bodegas:
-        existencias = ExistenciaLoteBodega.objects.filter(
-            empresa=empresa,
-            bodega=bodega,
-            cantidad__gt=0,
+        existencias = list(
+            ExistenciaLoteBodega.objects.filter(
+                empresa=empresa,
+                bodega=bodega,
+                cantidad__gt=0,
+            ).select_related("lote__producto")
+        )
+        producto_ids = {existencia.lote.producto_id for existencia in existencias}
+        productos_unicos.update(producto_ids)
+        unidades = sum((existencia.cantidad for existencia in existencias), Decimal("0.00"))
+        costo_real = sum(
+            (
+                existencia.cantidad * Decimal(existencia.lote.producto.costo_real_inventario or 0)
+                for existencia in existencias
+            ),
+            Decimal("0.00"),
+        )
+        valor_venta = sum(
+            (
+                existencia.cantidad * Decimal(existencia.lote.producto.precio or 0)
+                for existencia in existencias
+            ),
+            Decimal("0.00"),
         )
         resumen_bodegas.append({
             "bodega": bodega,
-            "unidades": existencias.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00"),
-            "productos": existencias.values("lote__producto").distinct().count(),
-            "lotes": existencias.values("lote").distinct().count(),
+            "unidades": unidades,
+            "productos": len(producto_ids),
+            "lotes": len({existencia.lote_id for existencia in existencias}),
+            "costo_real": costo_real,
+            "valor_venta": valor_venta,
         })
 
+    servicios = Producto.objects.filter(
+        empresa=empresa,
+        tipo_item="servicio",
+        activo=True,
+        eliminado=False,
+    ).count()
     return render(request, "facturacion/bodegas_dashboard.html", {
         "empresa": empresa,
         "resumen_bodegas": resumen_bodegas,
+        "mostrar_resumen_comercial": empresa.slug == "medical_spa",
         "resumen": {
             "bodegas": bodegas.count(),
             "unidades": sum((item["unidades"] for item in resumen_bodegas), Decimal("0.00")),
-            "productos": sum((item["productos"] for item in resumen_bodegas), 0),
+            "productos": len(productos_unicos),
+            "servicios": servicios,
             "lotes": sum((item["lotes"] for item in resumen_bodegas), 0),
+            "costo_real": sum((item["costo_real"] for item in resumen_bodegas), Decimal("0.00")),
+            "valor_venta": sum((item["valor_venta"] for item in resumen_bodegas), Decimal("0.00")),
         },
     })
 
