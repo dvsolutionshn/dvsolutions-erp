@@ -365,6 +365,8 @@ class ClinicaPacienteTests(TestCase):
                 "estado": "borrador",
                 "estetica_motivo": ["arrugas", "manchas_faciales"],
                 "estetica_motivo_otros": "Poros dilatados",
+                "estetica_objetivo_principal": ["verse_mas_joven", "calidad_piel"],
+                "estetica_objetivo_principal_otros": "Mantener un resultado natural",
                 "estetica_plan_recomendado": ["toxina", "hydrafacial"],
             },
         )
@@ -377,7 +379,24 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.tipo, "medicina_estetica")
         self.assertEqual(historia.datos_especialidad["estetica_motivo"], ["arrugas", "manchas_faciales"])
         self.assertEqual(historia.datos_especialidad["estetica_motivo_otros"], "Poros dilatados")
+        self.assertEqual(
+            historia.datos_especialidad["estetica_objetivo_principal"],
+            ["verse_mas_joven", "calidad_piel"],
+        )
+        self.assertEqual(
+            historia.datos_especialidad["estetica_objetivo_principal_otros"],
+            "Mantener un resultado natural",
+        )
         self.assertEqual(historia.datos_especialidad["estetica_plan_recomendado"], ["toxina", "hydrafacial"])
+
+        response = self.client.get(
+            reverse("clinica_editar_historia_especialidad", args=[self.empresa.slug, paciente.id, historia.id])
+        )
+        self.assertContains(response, "Motivo de consulta (puede marcar más de una opción)")
+        self.assertContains(response, "Hiperhidrosis (sudoración excesiva)")
+        self.assertContains(response, "Rejuvenecimiento íntimo femenino")
+        self.assertContains(response, "Objetivo principal del paciente")
+        self.assertContains(response, "Mantener resultados previos")
 
     def test_enfermeria_guarda_bitacora_simple(self):
         paciente = Paciente.objects.create(

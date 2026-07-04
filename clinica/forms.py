@@ -379,8 +379,45 @@ CAPILAR_FORMULARIO = [
 ]
 
 MEDICINA_ESTETICA_FORMULARIO = [
-    ("estetica_motivo", "Motivo de consulta - ¿Que le gustaria mejorar?", [
-        ("arrugas", "Arrugas"), ("flacidez_facial", "Flacidez facial"), ("flacidez_corporal", "Flacidez corporal"), ("manchas_faciales", "Manchas faciales"), ("manchas_corporales", "Manchas corporales"), ("acne", "Acne"), ("cicatrices_acne", "Cicatrices de acne"), ("ojeras", "Ojeras"), ("papada", "Papada"), ("volumen_facial", "Perdida de volumen facial"), ("labios", "Labios"), ("rejuvenecimiento_facial", "Rejuvenecimiento facial"), ("rejuvenecimiento_corporal", "Rejuvenecimiento corporal"), ("grasa_localizada", "Grasa localizada"), ("celulitis", "Celulitis"), ("estrias", "Estrias"), ("alopecia", "Alopecia o caida del cabello"),
+    ("estetica_motivo", "Motivo de consulta (puede marcar más de una opción)", [
+        ("rejuvenecimiento_facial", "Rejuvenecimiento facial"),
+        ("prevencion_envejecimiento", "Prevención del envejecimiento"),
+        ("arrugas", "Arrugas o líneas de expresión"),
+        ("flacidez_facial", "Flacidez facial"),
+        ("volumen_facial", "Pérdida de volumen facial"),
+        ("labios", "Aumento de labios"),
+        ("rinomodelacion", "Rinomodelación"),
+        ("mandibula_menton", "Definición de mandíbula y mentón"),
+        ("ojeras", "Ojeras"),
+        ("manchas_faciales", "Manchas faciales"),
+        ("melasma", "Melasma"),
+        ("acne", "Acné activo"),
+        ("cicatrices_acne", "Cicatrices de acné"),
+        ("poros_dilatados", "Poros dilatados"),
+        ("piel_grasa", "Piel grasa"),
+        ("piel_seca_deshidratada", "Piel seca o deshidratada"),
+        ("rosacea", "Rosácea"),
+        ("enrojecimiento_facial", "Enrojecimiento facial"),
+        ("textura_irregular", "Textura irregular de la piel"),
+        ("luminosidad_piel", "Luminosidad de la piel"),
+        ("cuello_escote", "Rejuvenecimiento de cuello y escote"),
+        ("papada", "Papada"),
+        ("celulitis", "Celulitis"),
+        ("flacidez_corporal", "Flacidez corporal"),
+        ("estrias", "Estrías"),
+        ("cicatrices_corporales", "Cicatrices corporales"),
+        ("hiperhidrosis", "Hiperhidrosis (sudoración excesiva)"),
+        ("alopecia", "Alopecia / caída del cabello"),
+        ("rejuvenecimiento_intimo", "Rejuvenecimiento íntimo femenino"),
+    ], True),
+    ("estetica_objetivo_principal", "Objetivo principal del paciente", [
+        ("verse_mas_joven", "Verse más joven"),
+        ("calidad_piel", "Mejorar la calidad de la piel"),
+        ("armonizar_rostro", "Armonizar el rostro"),
+        ("mejorar_autoestima", "Mejorar la autoestima"),
+        ("prevenir_envejecimiento", "Prevenir el envejecimiento"),
+        ("corregir_preocupacion", "Corregir una preocupación específica"),
+        ("mantener_resultados", "Mantener resultados previos"),
     ], True),
     ("estetica_tiempo", "¿Cuanto tiempo tiene esta preocupacion?", [("menos_6_meses", "Menos de 6 meses"), ("6_12_meses", "6 meses a 1 año"), ("1_3_anos", "1 a 3 años")], False),
     ("estetica_tratamientos_previos", "Antecedentes de tratamientos esteticos", [
@@ -514,7 +551,7 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             )
             self.fields[f"{nombre}_otros"] = forms.CharField(
                 required=False,
-                label="Otros / detalle",
+                label="Otro:" if nombre in {"estetica_motivo", "estetica_objetivo_principal"} else "Otros / detalle",
                 widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Detalle si aplica."}),
                 initial=datos.get(f"{nombre}_otros", ""),
             )
