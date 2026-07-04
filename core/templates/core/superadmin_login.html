@@ -32,7 +32,12 @@
                     </div>
                     <div class="erp-field">
                         <label for="{{ form.password.id_for_label }}">Contrasena</label>
-                        {{ form.password }}
+                        <div class="erp-password-shell">
+                            {{ form.password }}
+                            <button class="erp-password-toggle" type="button" data-password-toggle aria-controls="{{ form.password.id_for_label }}" aria-pressed="false" aria-label="Mostrar contraseña">
+                                <span data-password-toggle-label>Mostrar</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="erp-form-actions">
@@ -42,5 +47,11 @@
             </form>
         </div>
     </div>
+    <style>
+        .erp-password-shell{position:relative}
+        .erp-password-shell input{padding-right:92px}
+        .erp-password-toggle{position:absolute;top:50%;right:9px;transform:translateY(-50%);border:1px solid #cfe0f2;border-radius:10px;padding:8px 10px;background:#edf6ff;color:#155f82;font-weight:800;cursor:pointer}
+    </style>
+    <script src="{% static 'core/password-toggle.js' %}"></script>
 </body>
 </html>

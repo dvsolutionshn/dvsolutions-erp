@@ -372,6 +372,32 @@
             opacity:1;
         }
 
+        .input-shell.password-shell input{padding-right:98px;}
+        .password-toggle{
+            position:absolute;
+            z-index:2;
+            top:50%;
+            right:11px;
+            transform:translateY(-50%);
+            border:1px solid rgba(8,119,114,.14);
+            border-radius:12px;
+            padding:9px 11px;
+            background:rgba(230,249,247,.94);
+            color:#087772;
+            font:inherit;
+            font-size:12px;
+            font-weight:900;
+            cursor:pointer;
+            transition:.2s ease;
+        }
+        .password-toggle:hover,
+        .password-toggle:focus-visible{
+            background:#d6f5f1;
+            border-color:rgba(8,119,114,.3);
+            outline:none;
+            box-shadow:0 0 0 4px rgba(38,198,192,.12);
+        }
+
         .access-note{
             display:flex;
             gap:12px;
@@ -598,8 +624,11 @@
 
                 <div class="field">
                     <label for="id_password">Contrasena</label>
-                    <div class="input-shell">
-                        <input id="id_password" type="password" name="password" placeholder="Contrasena segura" required>
+                    <div class="input-shell password-shell">
+                        <input id="id_password" type="password" name="password" placeholder="Contrasena segura" autocomplete="current-password" required>
+                        <button class="password-toggle" type="button" data-password-toggle aria-controls="id_password" aria-pressed="false" aria-label="Mostrar contraseña">
+                            <span data-password-toggle-label>Mostrar</span>
+                        </button>
                     </div>
                 </div>
 
@@ -626,5 +655,6 @@
             </div>
         </section>
     </main>
+    <script src="{% static 'core/password-toggle.js' %}"></script>
 </body>
 </html>
