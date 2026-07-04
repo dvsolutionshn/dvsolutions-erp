@@ -8,6 +8,7 @@ urlpatterns = [
     path("pacientes/", views.pacientes, name="clinica_pacientes"),
     path("pacientes/sugerencias/", views.pacientes_sugerencias, name="clinica_pacientes_sugerencias"),
     path("pacientes/crear/", views.crear_paciente, name="clinica_crear_paciente"),
+    path("pacientes/enlace-registro/generar/", views.generar_enlace_registro_paciente, name="clinica_generar_enlace_registro_paciente"),
     path("pacientes/<int:paciente_id>/", views.paciente_detalle, name="clinica_paciente_detalle"),
     path("pacientes/<int:paciente_id>/editar/", views.editar_paciente, name="clinica_editar_paciente"),
     path("pacientes/<int:paciente_id>/expediente/agregar/", views.crear_evento_expediente, name="clinica_crear_evento_paciente"),

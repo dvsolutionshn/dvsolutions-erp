@@ -5,7 +5,15 @@
 {% block header_title %}Pacientes{% endblock %}
 {% block header_description %}Base maestra de pacientes con datos generales, contacto, riesgos y acceso directo al expediente.{% endblock %}
 
-{% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>{% endblock %}
+{% block topbar_actions %}
+{% if empresa.slug == "hospital_mia" %}
+<form method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}" style="display:inline;">
+    {% csrf_token %}
+    <button class="erp-btn-secondary" type="submit">Enlace para paciente nuevo</button>
+</form>
+{% endif %}
+<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>
+{% endblock %}
 
 {% block extra_head %}
 <style>

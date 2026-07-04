@@ -532,6 +532,57 @@ class PreconsultaClinica(models.Model):
         return f"Preconsulta {self.get_tipo_display()} - {self.paciente.nombre} - {self.get_estado_display()}"
 
 
+class InvitacionRegistroPaciente(models.Model):
+    ESTADO_CHOICES = [
+        ("pendiente", "Pendiente"),
+        ("completada", "Completada"),
+        ("revocada", "Revocada"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="invitaciones_registro_paciente")
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    token_preview = models.CharField(max_length=16)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
+    fecha_expiracion = models.DateTimeField()
+    fecha_completada = models.DateTimeField(blank=True, null=True)
+    paciente = models.ForeignKey(
+        Paciente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitaciones_registro",
+    )
+    preconsulta = models.OneToOneField(
+        PreconsultaClinica,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitacion_registro",
+    )
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitaciones_registro_paciente_creadas",
+    )
+    ip_completada = models.GenericIPAddressField(blank=True, null=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "estado", "fecha_expiracion"]),
+        ]
+
+    @property
+    def vigente(self):
+        return self.estado == "pendiente" and self.fecha_expiracion > timezone.now()
+
+    def __str__(self):
+        return f"Registro nuevo paciente {self.token_preview} - {self.get_estado_display()}"
+
+
 class MedicamentoPrescrito(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="medicamentos_prescritos")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="medicamentos_prescritos")

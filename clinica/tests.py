@@ -1,13 +1,18 @@
+from io import BytesIO
+from tempfile import TemporaryDirectory
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from facturacion.models import Cliente
 from .forms import PreconsultaClinicaPublicaForm
-from .models import CitaClinica, HistoriaClinicaEspecialidad, Paciente, PreconsultaClinica, ProfesionalSalud, ServicioClinico
+from .models import CitaClinica, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -499,6 +504,8 @@ class ClinicaPacienteTests(TestCase):
         )
         form = PreconsultaClinicaPublicaForm(
             data={
+                "nombres": "Carlos",
+                "apellidos": "Diaz",
                 "primer_nombre": "Carlos",
                 "segundo_nombre": "",
                 "primer_apellido": "Diaz",
@@ -564,10 +571,10 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Preparemos su consulta")
         self.assertContains(response, "Laura")
-        self.assertContains(response, "Paso 6 de 6")
-        self.assertContains(response, "Braquioplastia (Brazos)")
-        self.assertContains(response, "Musloplastia (Piernas)")
-        self.assertContains(response, "Gluteoplastia (Gluteos)")
+        self.assertContains(response, "Paso 8 de 8")
+        self.assertContains(response, "Braquioplastia (brazos: retirar flacidez o exceso de piel)")
+        self.assertContains(response, "Musloplastia (piernas/muslos: retirar flacidez o exceso de piel)")
+        self.assertContains(response, "Gluteoplastia (gluteos: mejorar forma o volumen)")
         self.assertContains(response, "Facebook")
         self.assertContains(response, "TikTok")
         self.assertContains(response, "YouTube")
@@ -582,6 +589,8 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.post(
             publica_url,
             {
+                "nombres": "Laura Maria",
+                "apellidos": "Perez Lopez",
                 "primer_nombre": "Laura Maria",
                 "segundo_nombre": "",
                 "primer_apellido": "Perez",
@@ -676,3 +685,66 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Información recibida")
+
+    def test_enlace_paciente_nuevo_crea_expediente_cliente_preconsulta_y_foto(self):
+        response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
+        self.assertContains(response, "Enlace para paciente nuevo")
+
+        response = self.client.post(
+            reverse("clinica_generar_enlace_registro_paciente", args=[self.empresa.slug])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Compartir por WhatsApp")
+        enlace = response.context["enlace_publico"]
+        token_raw = enlace.rstrip("/").rsplit("/", 1)[-1]
+        invitacion = InvitacionRegistroPaciente.objects.get()
+        self.assertEqual(invitacion.token_hash, hash_token_preconsulta(token_raw))
+        self.assertNotEqual(invitacion.token_hash, token_raw)
+
+        self.client.logout()
+        publica_url = reverse("clinica_registro_paciente_publico", args=[token_raw])
+        response = self.client.get(publica_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Abrir cámara")
+        self.assertContains(response, "Subir archivo")
+        self.assertContains(response, 'enctype="multipart/form-data"', html=False)
+
+        image_buffer = BytesIO()
+        Image.new("RGB", (32, 32), color=(24, 130, 160)).save(image_buffer, format="JPEG")
+        foto = SimpleUploadedFile("paciente.jpg", image_buffer.getvalue(), content_type="image/jpeg")
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                publica_url,
+                {
+                    "nombres": "Ana María",
+                    "apellidos": "López Rivera",
+                    "identidad": "0801199900012",
+                    "fecha_nacimiento": "1999-08-12",
+                    "sexo": "femenino",
+                    "estado_civil": "soltero",
+                    "correo": "ana@example.com",
+                    "telefono": "99998888",
+                    "direccion": "Tegucigalpa",
+                    "motivo_consulta": "Valoración estética",
+                    "consentimiento_datos": "on",
+                    "foto_perfil": foto,
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Expediente creado")
+            paciente = Paciente.objects.get(identidad="0801199900012")
+            self.assertEqual(paciente.nombre, "Ana María López Rivera")
+            self.assertTrue(bool(paciente.foto_perfil))
+            self.assertIsNotNone(paciente.cliente)
+            self.assertEqual(paciente.cliente.rtn, paciente.identidad)
+            self.assertTrue(PacienteFotoEvolucion.objects.filter(paciente=paciente, tipo="ingreso").exists())
+            preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
+            self.assertEqual(preconsulta.estado, "completada")
+            invitacion.refresh_from_db()
+            self.assertEqual(invitacion.estado, "completada")
+            self.assertEqual(invitacion.paciente, paciente)
+            self.assertEqual(invitacion.preconsulta, preconsulta)
+
+        response = self.client.get(publica_url)
+        self.assertContains(response, "Expediente creado")

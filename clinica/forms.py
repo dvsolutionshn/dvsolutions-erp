@@ -781,6 +781,15 @@ PSICOLOGICA_CHOICES = [
 
 
 class PreconsultaClinicaPublicaForm(forms.ModelForm):
+    foto_perfil = forms.ImageField(
+        required=False,
+        label="Fotografía del paciente",
+        help_text="Puede tomarla con la cámara o seleccionar una imagen del dispositivo.",
+        widget=forms.ClearableFileInput(attrs={
+            "accept": "image/jpeg,image/png,image/webp",
+            "class": "photo-file-input",
+        }),
+    )
     nombres = forms.CharField(max_length=170, label="Primer y segundo nombre")
     apellidos = forms.CharField(max_length=170, label="Primer y segundo apellido")
     primer_nombre = forms.CharField(max_length=80, required=False, widget=forms.HiddenInput())
@@ -985,8 +994,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "antecedentes_infecciosos": "Enfermedades infecciosas previas, incluido COVID-19",
         }
 
-    def __init__(self, *args, paciente=None, **kwargs):
+    def __init__(self, *args, paciente=None, empresa=None, **kwargs):
         self.paciente = paciente
+        self.empresa = empresa or getattr(paciente, "empresa", None)
         super().__init__(*args, **kwargs)
         if paciente and not self.is_bound:
             for campo in [
@@ -1033,12 +1043,20 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
         if not identidad.isdigit():
             raise forms.ValidationError("Utilice solamente numeros, sin espacios ni guiones.")
-        if self.paciente and Paciente.objects.filter(
-            empresa=self.paciente.empresa,
+        if self.empresa and Paciente.objects.filter(
+            empresa=self.empresa,
             identidad=identidad,
-        ).exclude(pk=self.paciente.pk).exists():
+        ).exclude(pk=getattr(self.paciente, "pk", None)).exists():
             raise forms.ValidationError("Este numero de identidad ya pertenece a otro expediente.")
         return identidad
+
+    def clean_foto_perfil(self):
+        foto = self.cleaned_data.get("foto_perfil")
+        if foto and foto.size > 8 * 1024 * 1024:
+            raise forms.ValidationError("La fotografía no puede superar 8 MB.")
+        if foto and getattr(foto, "content_type", "") not in {"image/jpeg", "image/png", "image/webp"}:
+            raise forms.ValidationError("Utilice una fotografía JPG, PNG o WebP.")
+        return foto
 
     def clean(self):
         cleaned_data = super().clean()

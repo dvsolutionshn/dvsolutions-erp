@@ -45,6 +45,7 @@ from .models import (
     ConfiguracionClinica,
     ExpedienteEvento,
     HistoriaClinicaEspecialidad,
+    InvitacionRegistroPaciente,
     MedicamentoPrescrito,
     Paciente,
     PacienteFotoEvolucion,
@@ -626,6 +627,38 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
 
 
 @login_required
+@require_POST
+def generar_enlace_registro_paciente(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    token_raw, token_hash, token_preview = generar_token_preconsulta()
+    invitacion = InvitacionRegistroPaciente.objects.create(
+        empresa=empresa,
+        token_hash=token_hash,
+        token_preview=token_preview,
+        fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+        creada_por=request.user,
+    )
+    enlace_publico = request.build_absolute_uri(
+        reverse("clinica_registro_paciente_publico", args=[token_raw])
+    )
+    mensaje = quote(
+        "Hola. Hospital MIA le comparte su formulario seguro para crear su expediente como paciente nuevo. "
+        f"Complete la informacion y adjunte su fotografia en este enlace: {enlace_publico}"
+    )
+    return render(
+        request,
+        "clinica/registro_paciente_enlace.html",
+        {
+            "empresa": empresa,
+            "invitacion": invitacion,
+            "enlace_publico": enlace_publico,
+            "whatsapp_url": f"https://api.whatsapp.com/send?text={mensaje}",
+        },
+    )
+
+
+@login_required
 def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_hospital_mia(empresa)
@@ -663,8 +696,10 @@ def preconsulta_publica(request, token):
 
     form = PreconsultaClinicaPublicaForm(
         request.POST or None,
+        request.FILES or None,
         instance=preconsulta,
         paciente=preconsulta.paciente,
+        empresa=preconsulta.empresa,
     )
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
@@ -681,6 +716,123 @@ def preconsulta_publica(request, token):
         request,
         "clinica/preconsulta_publica.html",
         {"form": form, "preconsulta": preconsulta, "paciente": preconsulta.paciente},
+    )
+
+
+@never_cache
+@sensitive_post_parameters()
+def registro_paciente_publico(request, token):
+    invitacion = get_object_or_404(
+        InvitacionRegistroPaciente.objects.select_related("empresa", "paciente"),
+        token_hash=hash_token_preconsulta(token),
+        empresa__slug="hospital_mia",
+    )
+    if invitacion.estado == "completada":
+        return render(
+            request,
+            "clinica/preconsulta_publica_finalizada.html",
+            {"completada": True, "registro_nuevo": True},
+        )
+    if not invitacion.vigente:
+        return render(
+            request,
+            "clinica/preconsulta_publica_finalizada.html",
+            {"completada": False, "registro_nuevo": True},
+            status=410,
+        )
+
+    preconsulta_base = PreconsultaClinica(
+        empresa=invitacion.empresa,
+        tipo="general",
+        token_hash=invitacion.token_hash,
+        token_preview=invitacion.token_preview,
+        fecha_expiracion=invitacion.fecha_expiracion,
+    )
+    form = PreconsultaClinicaPublicaForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=preconsulta_base,
+        empresa=invitacion.empresa,
+    )
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            paciente = Paciente(
+                empresa=invitacion.empresa,
+                expediente_codigo=_proximo_codigo_expediente(invitacion.empresa),
+                primer_nombre=form.cleaned_data.get("primer_nombre"),
+                segundo_nombre=form.cleaned_data.get("segundo_nombre"),
+                primer_apellido=form.cleaned_data.get("primer_apellido"),
+                segundo_apellido=form.cleaned_data.get("segundo_apellido"),
+                identidad=form.cleaned_data.get("identidad"),
+                fecha_nacimiento=form.cleaned_data.get("fecha_nacimiento"),
+                sexo=form.cleaned_data.get("sexo") or "no_indicado",
+                estado_civil=form.cleaned_data.get("estado_civil") or "no_indicado",
+                correo=form.cleaned_data.get("correo") or "",
+                telefono=form.cleaned_data.get("telefono") or "",
+                whatsapp=form.cleaned_data.get("telefono") or "",
+                direccion=form.cleaned_data.get("direccion") or "",
+                lugar_nacimiento=form.cleaned_data.get("lugar_nacimiento") or "",
+                ocupacion=form.cleaned_data.get("ocupacion") or "",
+                contacto_emergencia=form.cleaned_data.get("contacto_emergencia") or "",
+                telefono_emergencia=form.cleaned_data.get("telefono_emergencia") or "",
+                foto_perfil=form.cleaned_data.get("foto_perfil"),
+                creado_por=invitacion.creada_por,
+            )
+            paciente.save()
+
+            preconsulta = form.save(commit=False)
+            preconsulta.empresa = invitacion.empresa
+            preconsulta.paciente = paciente
+            preconsulta.tipo = "general"
+            preconsulta.token_hash = invitacion.token_hash
+            preconsulta.token_preview = invitacion.token_preview
+            preconsulta.fecha_expiracion = invitacion.fecha_expiracion
+            preconsulta.datos_generales = form.datos_generales_limpios()
+            preconsulta.estado = "completada"
+            preconsulta.fecha_completada = timezone.now()
+            preconsulta.ip_completada = _ip_cliente(request)
+            preconsulta.creada_por = invitacion.creada_por
+            preconsulta.save()
+            _actualizar_paciente_desde_preconsulta(paciente, form)
+
+            if paciente.foto_perfil:
+                PacienteFotoEvolucion.objects.create(
+                    empresa=invitacion.empresa,
+                    paciente=paciente,
+                    imagen=paciente.foto_perfil,
+                    tipo="ingreso",
+                    titulo="Foto de ingreso",
+                    descripcion="Fotografia adjuntada por el paciente durante su registro seguro.",
+                    creado_por=invitacion.creada_por,
+                )
+
+            invitacion.estado = "completada"
+            invitacion.fecha_completada = timezone.now()
+            invitacion.ip_completada = _ip_cliente(request)
+            invitacion.paciente = paciente
+            invitacion.preconsulta = preconsulta
+            invitacion.save(update_fields=[
+                "estado",
+                "fecha_completada",
+                "ip_completada",
+                "paciente",
+                "preconsulta",
+            ])
+        return render(
+            request,
+            "clinica/preconsulta_publica_finalizada.html",
+            {"completada": True, "registro_nuevo": True},
+        )
+
+    return render(
+        request,
+        "clinica/preconsulta_publica.html",
+        {
+            "form": form,
+            "preconsulta": preconsulta_base,
+            "paciente": None,
+            "registro_nuevo": True,
+        },
     )
 
 
