@@ -55,6 +55,21 @@ def _configuracion_crm(empresa):
     return ConfiguracionCRM.objects.get_or_create(empresa=empresa)[0]
 
 
+def _asegurar_pacientes_hospital_mia(empresa):
+    if empresa.slug != "hospital_mia":
+        return
+    from clinica.services_pacientes import asegurar_paciente_desde_cliente
+
+    clientes_sin_paciente = (
+        Cliente.objects.filter(empresa=empresa, activo=True)
+        .exclude(nombre__iexact="Consumidor final")
+        .filter(pacientes_clinicos__isnull=True)
+        .distinct()
+    )
+    for cliente in clientes_sin_paciente.iterator():
+        asegurar_paciente_desde_cliente(cliente)
+
+
 def _fecha_agenda(valor):
     try:
         return date.fromisoformat(valor or "")
@@ -552,6 +567,7 @@ def citas(request, empresa_slug):
 @login_required
 def agenda_citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    _asegurar_pacientes_hospital_mia(empresa)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)

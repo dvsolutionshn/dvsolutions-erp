@@ -364,6 +364,35 @@ class CRMTests(TestCase):
         self.assertEqual(pacientes_recientes.status_code, 200)
         self.assertEqual(pacientes_recientes.json()["results"][0]["id"], paciente.id)
 
+    def test_agenda_hospital_mia_recupera_cliente_historico_y_muestra_selector_nativo(self):
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica",
+            defaults={"nombre": "ClÃ­nica MÃ©dica", "es_comercial": True},
+        )
+        EmpresaModulo.objects.get_or_create(
+            empresa=self.empresa,
+            modulo=modulo_clinica,
+            defaults={"activo": True},
+        )
+        cliente_historico = Cliente(
+            empresa=self.empresa,
+            nombre="Paciente Prueba Historico",
+            rtn="0801199011111",
+            telefono="99990011",
+            activo=True,
+        )
+        Cliente.objects.bulk_create([cliente_historico])
+        self.assertFalse(Paciente.objects.filter(cliente=cliente_historico).exists())
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        paciente = Paciente.objects.get(cliente=cliente_historico)
+        self.assertEqual(paciente.nombre, "Paciente Prueba Historico")
+        self.assertContains(response, 'class="appointment-patient-native"')
+        self.assertContains(response, f'value="{paciente.id}"')
+
     def test_creacion_rapida_de_paciente_evitar_documento_duplicado(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
