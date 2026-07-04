@@ -714,26 +714,22 @@ def buscar_pacientes_cita(request, empresa_slug):
     if not request.user.tiene_permiso_erp("puede_citas"):
         return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
 
-    query = (request.GET.get("q") or "").strip()
-    if not query:
-        return JsonResponse({"results": []})
-
-    pacientes = (
-        Paciente.objects.filter(empresa=empresa, activo=True)
-        .filter(
-            Q(nombre__icontains=query)
-            | Q(primer_nombre__icontains=query)
-            | Q(segundo_nombre__icontains=query)
-            | Q(primer_apellido__icontains=query)
-            | Q(segundo_apellido__icontains=query)
-            | Q(identidad__icontains=query)
-            | Q(expediente_codigo__icontains=query)
-            | Q(telefono__icontains=query)
-            | Q(whatsapp__icontains=query)
-            | Q(correo__icontains=query)
+    query = " ".join((request.GET.get("q") or "").split())
+    pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
+    for termino in query.split():
+        pacientes = pacientes.filter(
+            Q(nombre__icontains=termino)
+            | Q(primer_nombre__icontains=termino)
+            | Q(segundo_nombre__icontains=termino)
+            | Q(primer_apellido__icontains=termino)
+            | Q(segundo_apellido__icontains=termino)
+            | Q(identidad__icontains=termino)
+            | Q(expediente_codigo__icontains=termino)
+            | Q(telefono__icontains=termino)
+            | Q(whatsapp__icontains=termino)
+            | Q(correo__icontains=termino)
         )
-        .order_by("nombre")[:12]
-    )
+    pacientes = pacientes.order_by("-fecha_creacion", "nombre")[:12]
     return JsonResponse({
         "results": [
             {

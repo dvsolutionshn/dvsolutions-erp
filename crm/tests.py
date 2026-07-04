@@ -344,6 +344,19 @@ class CRMTests(TestCase):
         self.assertEqual(resultados[0]["nombre"], paciente.nombre)
         self.assertEqual(resultados[0]["telefono"], "99991111")
 
+        busqueda_nombre_completo = self.client.get(
+            reverse("agenda_buscar_pacientes", args=[self.empresa.slug]),
+            {"q": "Ana Paz"},
+        )
+        self.assertEqual(busqueda_nombre_completo.status_code, 200)
+        self.assertEqual(busqueda_nombre_completo.json()["results"][0]["id"], paciente.id)
+
+        pacientes_recientes = self.client.get(
+            reverse("agenda_buscar_pacientes", args=[self.empresa.slug]),
+        )
+        self.assertEqual(pacientes_recientes.status_code, 200)
+        self.assertEqual(pacientes_recientes.json()["results"][0]["id"], paciente.id)
+
     def test_creacion_rapida_de_paciente_evitar_documento_duplicado(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
