@@ -761,9 +761,30 @@ class ClinicaPacienteTests(TestCase):
             preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
             self.assertEqual(preconsulta.estado, "completada")
             invitacion.refresh_from_db()
-            self.assertEqual(invitacion.estado, "completada")
+            self.assertEqual(invitacion.estado, "pendiente")
             self.assertEqual(invitacion.paciente, paciente)
-            self.assertEqual(invitacion.preconsulta, preconsulta)
+            self.assertIsNone(invitacion.preconsulta)
 
         response = self.client.get(publica_url)
+        self.assertContains(response, "Formulario general del paciente")
+
+        response = self.client.post(
+            publica_url,
+            {
+                "nombres": "Elvin Francisco",
+                "apellidos": "Romero",
+                "identidad": "0801199900099",
+                "fecha_nacimiento": "1990-01-15",
+                "sexo": "masculino",
+                "estado_civil": "soltero",
+                "telefono": "99997777",
+                "motivo_consulta": "Registro nuevo desde el mismo enlace",
+                "consentimiento_datos": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Expediente creado")
+        segundo_paciente = Paciente.objects.get(identidad="0801199900099")
+        self.assertEqual(segundo_paciente.nombre, "Elvin Francisco Romero")
+        self.assertIsNotNone(segundo_paciente.cliente)
+        self.assertEqual(PreconsultaClinica.objects.filter(paciente=segundo_paciente, estado="completada").count(), 1)

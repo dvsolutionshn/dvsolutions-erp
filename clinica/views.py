@@ -727,13 +727,7 @@ def registro_paciente_publico(request, token):
         token_hash=hash_token_preconsulta(token),
         empresa__slug="hospital_mia",
     )
-    if invitacion.estado == "completada":
-        return render(
-            request,
-            "clinica/preconsulta_publica_finalizada.html",
-            {"completada": True, "registro_nuevo": True},
-        )
-    if not invitacion.vigente:
+    if invitacion.estado == "revocada" or invitacion.fecha_expiracion <= timezone.now():
         return render(
             request,
             "clinica/preconsulta_publica_finalizada.html",
@@ -780,12 +774,13 @@ def registro_paciente_publico(request, token):
             )
             paciente.save()
 
+            _preconsulta_token_raw, preconsulta_token_hash, preconsulta_token_preview = generar_token_preconsulta()
             preconsulta = form.save(commit=False)
             preconsulta.empresa = invitacion.empresa
             preconsulta.paciente = paciente
             preconsulta.tipo = "general"
-            preconsulta.token_hash = invitacion.token_hash
-            preconsulta.token_preview = invitacion.token_preview
+            preconsulta.token_hash = preconsulta_token_hash
+            preconsulta.token_preview = preconsulta_token_preview
             preconsulta.fecha_expiracion = invitacion.fecha_expiracion
             preconsulta.datos_generales = form.datos_generales_limpios()
             preconsulta.estado = "completada"
@@ -806,17 +801,13 @@ def registro_paciente_publico(request, token):
                     creado_por=invitacion.creada_por,
                 )
 
-            invitacion.estado = "completada"
             invitacion.fecha_completada = timezone.now()
             invitacion.ip_completada = _ip_cliente(request)
             invitacion.paciente = paciente
-            invitacion.preconsulta = preconsulta
             invitacion.save(update_fields=[
-                "estado",
                 "fecha_completada",
                 "ip_completada",
                 "paciente",
-                "preconsulta",
             ])
         return render(
             request,
