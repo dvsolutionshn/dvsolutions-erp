@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 
 from core.models import Empresa
 from clinica.models import Paciente
@@ -30,8 +31,11 @@ class Command(BaseCommand):
         empresa = Empresa.objects.get(slug=options["empresa"])
         pacientes = Paciente.objects.filter(empresa=empresa).order_by("nombre", "id")
         nombres = [nombre.strip() for nombre in options["nombre"] if nombre and nombre.strip()]
-        for nombre in nombres:
-            pacientes = pacientes.filter(nombre__icontains=nombre)
+        if nombres:
+            filtro_nombres = Q()
+            for nombre in nombres:
+                filtro_nombres |= Q(nombre__icontains=nombre)
+            pacientes = pacientes.filter(filtro_nombres)
 
         revisados = pacientes.count()
         pendientes = pacientes.filter(cliente__isnull=True)
