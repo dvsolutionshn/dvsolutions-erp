@@ -115,6 +115,52 @@ class ClinicaPacienteTests(TestCase):
         self.assertIsNotNone(paciente.cliente_id)
         self.assertEqual(paciente.cliente.telefono_whatsapp, "99887766")
 
+    def test_rol_con_expediente_puede_ver_preconsultas_sin_permiso_pacientes(self):
+        rol_medico = RolSistema.objects.create(
+            nombre="Medico expediente",
+            codigo="medico-expediente-test",
+            activo=True,
+            puede_clinica=True,
+            puede_pacientes=False,
+            puede_expediente_clinico=True,
+        )
+        medico = get_user_model().objects.create_user(
+            username="medico-expediente",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=rol_medico,
+        )
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-PRE-001",
+            nombre="Paciente Preconsulta",
+            identidad="0801198800001",
+        )
+        preconsulta = PreconsultaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="general",
+            token_hash="hash-preconsulta-detalle-test",
+            token_preview="preview",
+            estado="completada",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=1),
+            fecha_completada=timezone.now(),
+            motivo_consulta="Consulta completada",
+            datos_generales={
+                "nombres": "Paciente",
+                "apellidos": "Preconsulta",
+                "formulario_general": {"historia_mejorar": "Desea mejorar"},
+            },
+        )
+        self.client.force_login(medico)
+
+        response = self.client.get(
+            reverse("clinica_preconsulta_detalle", args=[self.empresa.slug, paciente.id, preconsulta.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Consulta completada")
+
     def test_servicios_clinicos_incluyen_categoria_spa_estetica_no_medica(self):
         response = self.client.get(reverse("clinica_servicios", args=[self.empresa.slug]))
 

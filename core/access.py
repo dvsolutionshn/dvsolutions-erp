@@ -242,6 +242,10 @@ def permiso_clinica_desde_ruta(path_suffix):
     if not path_suffix:
         return None
     normalized = path_suffix if path_suffix.endswith("/") else f"{path_suffix}/"
+    parts = [part for part in normalized.split("/") if part]
+    if parts and parts[0] == "pacientes":
+        if any(part in {"historias", "preconsulta"} for part in parts):
+            return "puede_expediente_clinico"
     if normalized.startswith(tuple(str(i) for i in range(10))):
         return "puede_clinica"
     for prefix, permiso in CLINICA_PERMISSION_MAP:
