@@ -21,8 +21,9 @@
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:8px;padding:10px 12px;font-weight:800}
 .general-summary{margin-bottom:18px;border:1px solid #c8d9ed;background:linear-gradient(135deg,#f8fbff,#f4fffc);border-radius:14px;padding:16px}.general-summary h3{margin:0 0 8px;color:#102338}.general-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.general-summary-item{padding:10px;border:1px solid #d9e7f4;border-radius:10px;background:#fff}.general-summary-item span{display:block;font-size:10px;text-transform:uppercase;font-weight:900;color:#60748d;margin-bottom:4px}.general-tags{display:flex;gap:6px;flex-wrap:wrap}.general-tag{padding:5px 8px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:11px;font-weight:800;font-style:normal}
 .preconsult-panel{margin-bottom:18px;padding:16px;border:1px solid #bcd0e8;border-radius:12px;background:#f7fbff}.preconsult-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.preconsult-head h3{margin:3px 0;color:#102338}.preconsult-history{display:grid;gap:7px;margin-top:12px}.preconsult-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;border:1px solid #d8e5f2;border-radius:8px;background:#fff;font-size:12px}.locked-note{margin-bottom:16px;padding:13px;border:1px solid #f0c4c4;border-radius:10px;background:#fff5f5;color:#9f1239;font-weight:800}
+.doctor-workflow{margin-bottom:18px;border:1px solid #c6d8ec;border-radius:16px;background:linear-gradient(135deg,#ffffff,#f5fbff);padding:17px}.doctor-workflow h3{margin:0 0 7px;color:#102338}.doctor-workflow p{margin:0;color:#60748d;line-height:1.55}.doctor-workflow-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:13px}.doctor-step{padding:12px;border:1px solid #dbe7f3;border-radius:12px;background:#fff}.doctor-step strong{display:block;color:#17365c;font-size:13px}.doctor-step span{display:block;margin-top:5px;color:#6d7f92;font-size:11px;line-height:1.45}
 @media(max-width:760px){.clinical-banner,.clinical-form-grid,.clinical-field ul{grid-template-columns:1fr}.clinical-field.is-wide{grid-column:auto}}
-@media(max-width:900px){.general-summary-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.general-summary-grid,.doctor-workflow-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -67,6 +68,18 @@
             <div class="general-summary-item"><span>Medicamentos actuales</span>{% for valor in resumen_preconsulta.medicamentos_actuales %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}No indicado{% endfor %}</div>
             <div class="general-summary-item"><span>Riesgo tromboembólico</span>{% for valor in resumen_preconsulta.riesgo_tromboembolico %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}No indicado{% endfor %}</div>
             <div class="general-summary-item"><span>Examen físico</span>Peso {{ resumen_preconsulta.general.examen_peso|default:"-" }} kg · Talla {{ resumen_preconsulta.general.examen_talla|default:"-" }} cm · PA {{ resumen_preconsulta.general.examen_pa|default:"-" }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if tipo != "enfermeria" and tipo != "terapias" and tipo != "camara_hiperbarica" %}
+    <div class="doctor-workflow">
+        <div class="erp-kpi-label">Atención médica interna</div>
+        <h3>Formulario privado para la doctora durante la consulta</h3>
+        <p>La preconsulta es lo que llenó el paciente. Esta sección es la historia clínica profesional: aquí la doctora puede documentar HEA, examen físico, impresión clínica, conducta, plan e indicaciones sin mezclarlo con el formulario público.</p>
+        <div class="doctor-workflow-grid">
+            <div class="doctor-step"><strong>1. Confirmar datos</strong><span>Revisar motivo, antecedentes, medicamentos, alergias y riesgos reportados.</span></div>
+            <div class="doctor-step"><strong>2. Evaluar en consulta</strong><span>Completar historia de enfermedad actual, signos vitales y examen físico.</span></div>
+            <div class="doctor-step"><strong>3. Cerrar criterio médico</strong><span>Registrar diagnóstico, análisis, conducta, plan e indicaciones.</span></div>
         </div>
     </div>
     {% endif %}

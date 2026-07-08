@@ -464,22 +464,34 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
         "capilar": {
             "motivo_consulta": "Motivo de consulta capilar",
             "antecedentes": "Antecedentes personales y capilares",
+            "historia_enfermedad_actual": "Historia de la enfermedad actual capilar",
+            "examen_fisico": "Examen fisico capilar / tricologico",
             "evaluacion_clinica": "Evaluacion capilar y hallazgos",
+            "analisis_clinico": "Impresion diagnostica capilar",
             "procedimiento": "Procedimiento o tecnica realizada",
+            "conducta": "Conducta medica capilar",
             "plan_tratamiento": "Plan capilar",
         },
         "cirugia_plastica": {
             "motivo_consulta": "Motivo y expectativa quirurgica",
             "antecedentes": "Antecedentes medicos y quirurgicos",
+            "historia_enfermedad_actual": "Historia de la enfermedad actual / motivo quirurgico",
+            "examen_fisico": "Examen fisico preoperatorio",
             "evaluacion_clinica": "Examen fisico y valoracion preoperatoria",
+            "analisis_clinico": "Analisis del caso e impresion quirurgica",
             "procedimiento": "Procedimiento propuesto o realizado",
+            "conducta": "Conducta quirurgica",
             "plan_tratamiento": "Plan quirurgico y seguimiento",
         },
         "medicina_estetica": {
             "motivo_consulta": "Explique con sus propias palabras que desea mejorar",
             "antecedentes": "Antecedentes esteticos, quirurgicos y medicos relevantes",
+            "historia_enfermedad_actual": "Historia de la enfermedad actual estetica",
+            "examen_fisico": "Examen fisico / evaluacion objetiva",
             "evaluacion_clinica": "Evaluacion estetica facial/corporal",
+            "analisis_clinico": "Analisis estetico e impresion clinica",
             "procedimiento": "Procedimiento recomendado o realizado",
+            "conducta": "Conducta medica estetica",
             "plan_tratamiento": "HEA y plan estetico",
         },
         "enfermeria": {
@@ -500,13 +512,18 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             "fecha_atencion",
             "motivo_consulta",
             "antecedentes",
+            "historia_enfermedad_actual",
             "signos_vitales",
+            "examen_fisico",
             "evaluacion_clinica",
             "diagnostico",
+            "analisis_clinico",
             "procedimiento",
+            "conducta",
             "plan_tratamiento",
             "indicaciones",
             "observaciones",
+            "notas_privadas_doctor",
             "estado",
         ]
         widgets = {
@@ -529,8 +546,10 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             self.fields[campo].label = etiqueta
         if self.tipo in BITACORA_TIPOS:
             for campo in [
-                "motivo_consulta", "antecedentes", "signos_vitales", "evaluacion_clinica",
-                "diagnostico", "procedimiento", "plan_tratamiento", "indicaciones",
+                "motivo_consulta", "antecedentes", "historia_enfermedad_actual",
+                "signos_vitales", "examen_fisico", "evaluacion_clinica",
+                "diagnostico", "analisis_clinico", "procedimiento", "conducta",
+                "plan_tratamiento", "indicaciones", "notas_privadas_doctor",
             ]:
                 self.fields.pop(campo, None)
             self.fields["observaciones"].widget.attrs.update({
@@ -555,7 +574,42 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                 widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Detalle si aplica."}),
                 initial=datos.get(f"{nombre}_otros", ""),
             )
-        for nombre in ["motivo_consulta", "antecedentes", "evaluacion_clinica", "procedimiento", "plan_tratamiento"]:
+        placeholders = {
+            "motivo_consulta": "Resumen breve del motivo principal referido en consulta.",
+            "antecedentes": "Antecedentes relevantes tomados del paciente y confirmados por la doctora.",
+            "historia_enfermedad_actual": "Campo privado de la doctora: evolución, tiempo, síntomas, tratamientos previos y contexto clínico actual.",
+            "signos_vitales": "PA, FC, FR, temperatura, SatO2, peso, talla, IMC u otros datos tomados por enfermería.",
+            "examen_fisico": "Campo interno: hallazgos objetivos del examen físico por regiones o área evaluada.",
+            "evaluacion_clinica": "Valoración clínica, hallazgos relevantes y correlación con la preconsulta.",
+            "diagnostico": "Diagnóstico o diagnósticos clínicos.",
+            "analisis_clinico": "Impresión clínica, criterio médico y razonamiento del caso.",
+            "procedimiento": "Procedimiento recomendado, realizado o pendiente.",
+            "conducta": "Decisión tomada: indicar estudios, programar procedimiento, manejo médico, referir, observar o controlar.",
+            "plan_tratamiento": "Plan terapéutico, quirúrgico o estético acordado.",
+            "indicaciones": "Indicaciones para el paciente, cuidados, medicamentos, alarmas y seguimiento.",
+            "observaciones": "Notas complementarias visibles en esta historia.",
+            "notas_privadas_doctor": "Notas privadas internas de la doctora/equipo. No corresponden al formulario público del paciente.",
+        }
+        labels_generales = {
+            "historia_enfermedad_actual": "Historia de la enfermedad actual (privado doctora)",
+            "signos_vitales": "Signos vitales / datos de enfermería",
+            "examen_fisico": "Examen físico (médico o enfermería)",
+            "analisis_clinico": "Análisis clínico / impresión médica",
+            "conducta": "Conducta médica",
+            "notas_privadas_doctor": "Notas privadas del equipo médico",
+        }
+        for nombre, etiqueta in labels_generales.items():
+            if nombre in self.fields:
+                self.fields[nombre].label = etiqueta
+        for nombre, placeholder in placeholders.items():
+            if nombre in self.fields:
+                self.fields[nombre].widget.attrs.setdefault("placeholder", placeholder)
+        for nombre in [
+            "motivo_consulta", "antecedentes", "historia_enfermedad_actual",
+            "signos_vitales", "examen_fisico", "evaluacion_clinica", "diagnostico",
+            "analisis_clinico", "procedimiento", "conducta", "plan_tratamiento",
+            "indicaciones", "observaciones", "notas_privadas_doctor",
+        ]:
             if nombre in self.fields and self.tipo in FORMULARIOS_ESTRUCTURADOS:
                 self.fields[nombre].widget.attrs.setdefault("rows", 3)
 

@@ -338,13 +338,18 @@ class ClinicaPacienteTests(TestCase):
                 "fecha_atencion": "2026-06-17T10:30",
                 "motivo_consulta": "Caida de cabello",
                 "antecedentes": "Sin antecedentes relevantes",
+                "historia_enfermedad_actual": "Paciente refiere caida progresiva desde hace seis meses.",
                 "signos_vitales": "PA 120/80",
+                "examen_fisico": "Disminucion de densidad en region frontal.",
                 "evaluacion_clinica": "Evaluacion capilar inicial",
                 "diagnostico": "Alopecia en estudio",
+                "analisis_clinico": "Probable alopecia androgenetica inicial.",
                 "procedimiento": "Tricoscopia",
+                "conducta": "Solicitar laboratorios y documentar fotografias.",
                 "plan_tratamiento": "Control en 30 dias",
                 "indicaciones": "Aplicar tratamiento indicado",
                 "observaciones": "Sin complicaciones",
+                "notas_privadas_doctor": "Paciente ansiosa por evolucion del cuadro.",
                 "estado": "borrador",
             },
         )
@@ -355,6 +360,11 @@ class ClinicaPacienteTests(TestCase):
         historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente)
         self.assertEqual(historia.tipo, "capilar")
         self.assertEqual(historia.creado_por, self.user)
+        self.assertIn("caida progresiva", historia.historia_enfermedad_actual)
+        self.assertIn("region frontal", historia.examen_fisico)
+        self.assertIn("alopecia androgenetica", historia.analisis_clinico)
+        self.assertIn("laboratorios", historia.conducta)
+        self.assertIn("ansiosa", historia.notas_privadas_doctor)
 
         editar_url = reverse(
             "clinica_editar_historia_especialidad",
@@ -366,13 +376,18 @@ class ClinicaPacienteTests(TestCase):
                 "fecha_atencion": "2026-06-17T10:30",
                 "motivo_consulta": "Caida de cabello actualizada",
                 "antecedentes": historia.antecedentes,
+                "historia_enfermedad_actual": historia.historia_enfermedad_actual,
                 "signos_vitales": historia.signos_vitales,
+                "examen_fisico": historia.examen_fisico,
                 "evaluacion_clinica": historia.evaluacion_clinica,
                 "diagnostico": historia.diagnostico,
+                "analisis_clinico": historia.analisis_clinico,
                 "procedimiento": historia.procedimiento,
+                "conducta": historia.conducta,
                 "plan_tratamiento": historia.plan_tratamiento,
                 "indicaciones": historia.indicaciones,
                 "observaciones": historia.observaciones,
+                "notas_privadas_doctor": historia.notas_privadas_doctor,
                 "estado": "finalizada",
             },
         )
