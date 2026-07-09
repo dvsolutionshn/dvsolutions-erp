@@ -2048,6 +2048,13 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(factura.estado, "anulada")
+        self.assertEqual(factura.estado_pago, "pagado")
+        self.assertEqual(factura.subtotal, Decimal("0.00"))
+        self.assertEqual(factura.impuesto, Decimal("0.00"))
+        self.assertEqual(factura.total, Decimal("0.00"))
+        self.assertEqual(factura.total_lempiras, Decimal("0.00"))
+        self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+        self.assertEqual(factura.resumen_fiscal()["base_15"], Decimal("0.00"))
 
     def test_anular_factura_exige_motivo_y_lo_registra_en_bitacora(self):
         factura = self.crear_factura_con_linea()
@@ -2117,6 +2124,33 @@ class FacturacionTests(TestCase):
                 estado="contabilizado",
             ).exists()
         )
+
+    def test_exportar_excel_reportes_muestra_factura_anulada_en_cero(self):
+        factura_vigente = self.crear_factura_con_linea()
+        factura_anulada = self.crear_factura_con_linea()
+        factura_anulada.estado = "anulada"
+        factura_anulada.estado_pago = "pendiente"
+        factura_anulada.save(update_fields=["estado", "estado_pago"])
+
+        response = self.client.get(reverse("exportar_excel", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        ws_resumen = workbook["Resumen Ejecutivo"]
+        ws_detalle = workbook["Detalle Facturas"]
+        filas_por_numero = {
+            ws_detalle.cell(row=row, column=3).value: row
+            for row in range(2, ws_detalle.max_row + 1)
+        }
+
+        self.assertEqual(ws_resumen["B5"].value, float(factura_vigente.total_documento_ajustado))
+        fila_anulada = filas_por_numero[factura_anulada.numero_factura]
+        for columna in range(4, 13):
+            self.assertEqual(ws_detalle.cell(row=fila_anulada, column=columna).value, 0)
+        self.assertEqual(ws_detalle.cell(row=fila_anulada, column=13).value, "anulada")
+
+        response_reporte = self.client.get(reverse("reportes_facturacion", args=[self.empresa.slug]))
+        self.assertEqual(response_reporte.context["totales"]["total"], factura_vigente.total_documento_ajustado)
 
     def test_borrador_sin_cai_se_puede_ver(self):
         factura = self.crear_factura_con_linea(estado="borrador")

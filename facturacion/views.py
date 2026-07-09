@@ -6102,7 +6102,12 @@ def anular_factura(request, empresa_slug, factura_id):
                 creado_por=request.user,
             )
         factura.estado = 'anulada'
-        factura.save(update_fields=['estado'])
+        factura.estado_pago = 'pagado'
+        factura.subtotal = Decimal('0.00')
+        factura.impuesto = Decimal('0.00')
+        factura.total = Decimal('0.00')
+        factura.total_lempiras = Decimal('0.00')
+        factura.save(update_fields=['estado', 'estado_pago', 'subtotal', 'impuesto', 'total', 'total_lempiras'])
     messages.success(request, "Factura anulada correctamente y registrada en la bitacora.")
 
     return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
@@ -6430,11 +6435,11 @@ def reportes_facturacion(request, empresa_slug):
     facturas = _filtrar_facturas_reporte(empresa, request.GET)
     configuracion_power_bi, _ = ConfiguracionPowerBIEmpresa.objects.get_or_create(empresa=empresa)
 
-    totales = facturas.aggregate(
-        subtotal=Sum('subtotal'),
-        impuesto=Sum('impuesto'),
-        total=Sum('total')
-    )
+    totales = {
+        "subtotal": sum((f.subtotal_documento_ajustado for f in facturas), Decimal('0.00')),
+        "impuesto": sum((f.impuesto_documento_ajustado for f in facturas), Decimal('0.00')),
+        "total": sum((f.total_documento_ajustado for f in facturas), Decimal('0.00')),
+    }
 
     total_saldo = sum((f.saldo_pendiente for f in facturas), Decimal('0.00'))
 
@@ -6457,12 +6462,7 @@ def reportes_facturacion(request, empresa_slug):
         total_exonerado += Decimal(str(r["base_exonerado"]))
 
         # 🔥 CALCULO CORRECTO DEL DESCUENTO
-        descuento_factura = sum(
-            (l.descuento_monto or 0 for l in f.lineas.all()),
-            Decimal('0.00')
-        )
-
-        total_descuento += descuento_factura
+        total_descuento += Decimal(str(r.get("descuento_total", 0) or 0))
 
     clientes = Cliente.objects.filter(empresa=empresa)
     bi_interno = _construir_bi_interno_facturacion(facturas)
@@ -7338,7 +7338,7 @@ def exportar_excel_reportes(request, empresa_slug):
                 str(factura.fecha_emision),
                 str(factura.fecha_vencimiento or ""),
                 factura.estado_pago,
-                float(factura.total),
+                float(factura.total_documento_ajustado),
                 float(factura.saldo_pendiente),
             ])
 
@@ -7368,7 +7368,7 @@ def exportar_excel_reportes(request, empresa_slug):
     ws_resumen = wb.active
     ws_resumen.title = "Resumen Ejecutivo"
 
-    total_facturado = sum((f.total for f in facturas), Decimal('0.00'))
+    total_facturado = sum((f.total_documento_ajustado for f in facturas), Decimal('0.00'))
     total_saldo = sum((f.saldo_pendiente for f in facturas), Decimal('0.00'))
     total_cobrado = total_facturado - total_saldo
     porcentaje = (total_cobrado / total_facturado * 100) if total_facturado > 0 else 0
@@ -7411,11 +7411,7 @@ def exportar_excel_reportes(request, empresa_slug):
         r = f.resumen_fiscal()
 
 
-        #CALCULAR DESCUENTO POR FACTURA 
-        descuento_total = sum(
-            (l.descuento_monto or 0 for l in f.lineas.all()),
-            Decimal('0.00')
-        )
+        descuento_total = Decimal(str(r.get("descuento_total", 0) or 0))
 
         ws_detalle.cell(row=row, column=1, value=f.cliente.nombre)
         ws_detalle.cell(row=row, column=2, value=str(f.fecha_emision))
@@ -7428,9 +7424,9 @@ def exportar_excel_reportes(request, empresa_slug):
         ws_detalle.cell(row=row, column=8, value=float(r["base_exento"]))
         ws_detalle.cell(row=row, column=9, value=float(r["base_exonerado"]))
         ws_detalle.cell(row=row, column=10, value=float(descuento_total))
-        ws_detalle.cell(row=row, column=11, value=float(f.total))
+        ws_detalle.cell(row=row, column=11, value=float(f.total_documento_ajustado))
         ws_detalle.cell(row=row, column=12, value=float(f.saldo_pendiente))
-        ws_detalle.cell(row=row, column=13, value=f.estado_pago)
+        ws_detalle.cell(row=row, column=13, value=f.estado if f.estado == "anulada" else f.estado_pago)
 
         row += 1
 
@@ -7444,7 +7440,7 @@ def exportar_excel_reportes(request, empresa_slug):
         if c not in data_clientes:
             data_clientes[c] = {"total": 0, "saldo": 0}
 
-        data_clientes[c]["total"] += f.total
+        data_clientes[c]["total"] += f.total_documento_ajustado
         data_clientes[c]["saldo"] += f.saldo_pendiente
 
     for c, v in data_clientes.items():

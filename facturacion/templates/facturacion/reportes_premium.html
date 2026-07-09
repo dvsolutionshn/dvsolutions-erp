@@ -740,9 +740,9 @@
                                 <span>Exonerado: L. {{ r.base_exonerado|floatformat:2|intcomma }}</span>
                             </div>
                         </td>
-                        <td class="amount"><span class="erp-money">L. {{ f.lineas.all|sum_descuento|floatformat:2|intcomma }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ r.descuento_total|floatformat:2|intcomma }}</span></td>
                         <td class="erp-report-total">
-                            <strong>L. {{ f.total|floatformat:2|intcomma }}</strong>
+                            <strong>L. {{ f.total_documento_ajustado|floatformat:2|intcomma }}</strong>
                             <small>Total emitido</small>
                         </td>
                         <td class="erp-report-total">
@@ -750,7 +750,9 @@
                             <small>Saldo actual</small>
                         </td>
                         <td>
-                            {% if f.estado_pago == "pagado" %}
+                            {% if f.estado == "anulada" %}
+                            <span class="erp-badge danger">Anulada</span>
+                            {% elif f.estado_pago == "pagado" %}
                             <span class="erp-badge success">Pagado</span>
                             {% elif f.estado_pago == "parcial" %}
                             <span class="erp-badge warning">Parcial</span>

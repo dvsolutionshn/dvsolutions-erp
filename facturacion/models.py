@@ -1336,7 +1336,10 @@ class Factura(models.Model):
 
     @property
     def saldo_pendiente(self):
-        return self.total_documento_ajustado - self.total_pagado
+        if self.estado == 'anulada':
+            return Decimal('0.00')
+        saldo = self.total_documento_ajustado - self.total_pagado
+        return saldo if saldo > 0 else Decimal('0.00')
 
     @property
     def total_notas_credito(self):
@@ -1347,11 +1350,15 @@ class Factura(models.Model):
 
     @property
     def total_documento_ajustado(self):
+        if self.estado == 'anulada':
+            return Decimal('0.00')
         ajustado = self.total - self.total_notas_credito
         return ajustado if ajustado > 0 else Decimal('0.00')
 
     @property
     def subtotal_documento_ajustado(self):
+        if self.estado == 'anulada':
+            return Decimal('0.00')
         subtotal_creditos = sum(
             (Decimal(n.subtotal or 0) for n in self.notas_credito.filter(estado='emitida')),
             Decimal('0.00')
@@ -1361,6 +1368,8 @@ class Factura(models.Model):
 
     @property
     def impuesto_documento_ajustado(self):
+        if self.estado == 'anulada':
+            return Decimal('0.00')
         impuesto_creditos = sum(
             (Decimal(n.impuesto or 0) for n in self.notas_credito.filter(estado='emitida')),
             Decimal('0.00')
@@ -1401,14 +1410,17 @@ class Factura(models.Model):
     def resumen_fiscal(self):
 
         resumen = {
-            "base_15": 0,
-            "base_18": 0,
-            "base_exento": 0,
-            "base_exonerado": 0,
-            "isv_15": 0,
-            "isv_18": 0,
-            "descuento_total": 0,  # 🔥 NUEVO
+            "base_15": Decimal('0.00'),
+            "base_18": Decimal('0.00'),
+            "base_exento": Decimal('0.00'),
+            "base_exonerado": Decimal('0.00'),
+            "isv_15": Decimal('0.00'),
+            "isv_18": Decimal('0.00'),
+            "descuento_total": Decimal('0.00'),  # 🔥 NUEVO
         }
+
+        if self.estado == 'anulada':
+            return resumen
 
         for linea in self.lineas.all():
 
@@ -1434,7 +1446,7 @@ class Factura(models.Model):
         return resumen
 
     def total_en_letras(self):
-        return _monto_en_letras_con_centavos(self.total, self.moneda)
+        return _monto_en_letras_con_centavos(self.total_documento_ajustado, self.moneda)
 
     def __str__(self):
         return self.numero_factura or "Factura sin número"
