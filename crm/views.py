@@ -153,7 +153,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "cita_editando": getattr(form, "instance", None) if getattr(form, "instance", None) and form.instance.pk else None,
         "estados_cita": CitaCliente.ESTADO_CHOICES,
         "es_clinica": es_clinica,
-        "es_hospital_mia": empresa.slug == "hospital_mia",
+        "es_hospital_mia": empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS,
         "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
         "paciente_busqueda_inicial": paciente_busqueda_inicial,
         "pacientes_busqueda": pacientes_busqueda,

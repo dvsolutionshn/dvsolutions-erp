@@ -67,8 +67,11 @@ def _configuracion_clinica(empresa):
     return ConfiguracionClinica.objects.get_or_create(empresa=empresa)[0]
 
 
+EMPRESAS_FORMULARIOS_CLINICOS = {"hospital_mia", "medical_spa", "luque_aestetic"}
+
+
 def _requiere_hospital_mia(empresa):
-    if empresa.slug != "hospital_mia":
+    if empresa.slug not in EMPRESAS_FORMULARIOS_CLINICOS:
         raise Http404("Los formularios hospitalarios no estan habilitados para esta empresa.")
 
 
@@ -130,6 +133,7 @@ def _actualizar_paciente_desde_preconsulta(paciente, form):
         setattr(paciente, campo, form.cleaned_data.get(campo))
     paciente.telefono = form.cleaned_data.get("telefono")
     paciente.whatsapp = form.cleaned_data.get("telefono")
+    paciente.prefijo_telefono = form.cleaned_data.get("telefono_codigo_area") or paciente.prefijo_telefono or "504"
     alergias = (form.cleaned_data.get("alergias") or "").strip()
     paciente.alergias = alergias
     paciente.es_alergico = bool(alergias)
@@ -422,7 +426,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "medicamentos": medicamentos,
             "consentimientos": consentimientos,
             "historias_especialidad": historias_especialidad,
-            "formularios_hospitalarios": empresa.slug == "hospital_mia",
+            "formularios_hospitalarios": empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS,
         },
     )
 
@@ -607,7 +611,7 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
     if len(telefono) == 8:
         telefono = "504" + telefono
     mensaje = quote(
-        f"Hola {paciente.primer_nombre or paciente.nombre}. Hospital MIA le comparte su formulario de preconsulta "
+        f"Hola {paciente.primer_nombre or paciente.nombre}. {empresa.nombre} le comparte su formulario de preconsulta "
         f"de {tipos_validos[tipo]}. "
         f"Complete la informacion antes de su cita en este enlace seguro: {enlace_publico}"
     )
@@ -643,7 +647,7 @@ def generar_enlace_registro_paciente(request, empresa_slug):
         reverse("clinica_registro_paciente_publico", args=[token_raw])
     )
     mensaje = quote(
-        "Hola. Hospital MIA le comparte su formulario seguro para crear su expediente como paciente nuevo. "
+        f"Hola. {empresa.nombre} le comparte su formulario seguro para crear su expediente como paciente nuevo. "
         f"Complete la informacion y adjunte su fotografia en este enlace: {enlace_publico}"
     )
     return render(
@@ -687,7 +691,7 @@ def preconsulta_publica(request, token):
     preconsulta = get_object_or_404(
         PreconsultaClinica.objects.select_related("empresa", "paciente"),
         token_hash=hash_token_preconsulta(token),
-        empresa__slug="hospital_mia",
+        empresa__slug__in=EMPRESAS_FORMULARIOS_CLINICOS,
     )
     if preconsulta.estado == "completada":
         return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
@@ -725,7 +729,7 @@ def registro_paciente_publico(request, token):
     invitacion = get_object_or_404(
         InvitacionRegistroPaciente.objects.select_related("empresa", "paciente"),
         token_hash=hash_token_preconsulta(token),
-        empresa__slug="hospital_mia",
+        empresa__slug__in=EMPRESAS_FORMULARIOS_CLINICOS,
     )
     if invitacion.estado == "revocada" or invitacion.fecha_expiracion <= timezone.now():
         return render(
@@ -764,6 +768,7 @@ def registro_paciente_publico(request, token):
                 correo=form.cleaned_data.get("correo") or "",
                 telefono=form.cleaned_data.get("telefono") or "",
                 whatsapp=form.cleaned_data.get("telefono") or "",
+                prefijo_telefono=form.cleaned_data.get("telefono_codigo_area") or "504",
                 direccion=form.cleaned_data.get("direccion") or "",
                 lugar_nacimiento=form.cleaned_data.get("lugar_nacimiento") or "",
                 ocupacion=form.cleaned_data.get("ocupacion") or "",

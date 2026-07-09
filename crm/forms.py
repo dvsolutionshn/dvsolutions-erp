@@ -78,6 +78,8 @@ class CampaniaMarketingForm(forms.ModelForm):
 
 
 class CitaClienteForm(forms.ModelForm):
+    EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
+
     HORAS_12 = [
         (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
         for hora in range(1, 13)
@@ -109,7 +111,7 @@ class CitaClienteForm(forms.ModelForm):
         self.empresa = empresa
         super().__init__(*args, **kwargs)
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
-        self.es_hospital_mia = bool(empresa and empresa.slug == "hospital_mia")
+        self.notificaciones_cita_activas = bool(empresa and empresa.slug in self.EMPRESAS_WHATSAPP_CITAS)
         if empresa:
             self.fields["cliente"].queryset = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["producto"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
@@ -152,7 +154,11 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["enviar_confirmacion_whatsapp"].label = "Enviar confirmación por WhatsApp al guardar"
             self.fields["recordatorio_semana_whatsapp"].label = "Recordar 7 días antes"
             self.fields["recordatorio_dia_whatsapp"].label = "Recordar 1 día antes"
-            if not self.es_hospital_mia:
+            if self.notificaciones_cita_activas and not (self.instance and self.instance.pk):
+                self.initial.setdefault("enviar_confirmacion_whatsapp", True)
+                self.initial.setdefault("recordatorio_semana_whatsapp", True)
+                self.initial.setdefault("recordatorio_dia_whatsapp", True)
+            if not self.notificaciones_cita_activas:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
             self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
@@ -244,7 +250,7 @@ class PacienteRapidoCitaForm(forms.ModelForm):
         self.fields["primer_nombre"].required = True
         self.fields["primer_apellido"].required = True
         self.fields["identidad"].required = bool(
-            empresa and empresa.slug in {"hospital_mia", "medical_spa"}
+            empresa and empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS
         )
         if self.fields["identidad"].required:
             self.fields["identidad"].error_messages["required"] = "La identidad es obligatoria."

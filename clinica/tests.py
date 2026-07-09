@@ -595,13 +595,15 @@ class ClinicaPacienteTests(TestCase):
                 "sexo": "masculino",
                 "estado_civil": "soltero",
                 "correo": "carlos@example.com",
+                "telefono_codigo_area": "504",
                 "telefono": "99990003",
-                "direccion": "Tegucigalpa",
                 "lugar_nacimiento": "Tegucigalpa",
                 "ocupacion": "Ingeniero",
+                "informante": "yo_mismo",
                 "contacto_emergencia": "Ana Diaz",
                 "telefono_emergencia": "99990004",
                 "referido_por": "facebook",
+                "motivo_categoria": "cirugia_mamaria",
                 "motivo_consulta": "Valoracion",
                 "procedimientos_interes": ["aumento_mamario", "braquioplastia"],
                 "gine_gestas": "2",
@@ -680,18 +682,19 @@ class ClinicaPacienteTests(TestCase):
                 "sexo": "femenino",
                 "estado_civil": "soltero",
                 "correo": "laura@example.com",
+                "telefono_codigo_area": "504",
                 "telefono": "99990001",
-                "direccion": "Tegucigalpa",
                 "lugar_nacimiento": "Tegucigalpa",
                 "ocupacion": "Administradora",
                 "lugar_trabajo": "Empresa privada",
                 "redes_sociales": "@laura",
-                "informante": "Paciente",
+                "informante": "yo_mismo",
                 "contacto_emergencia": "Maria Perez",
                 "telefono_emergencia": "99990002",
                 "referido_por": "instagram",
+                "motivo_categoria": "cirugia_facial",
                 "motivo_consulta": "Valoracion de cirugia facial",
-                "procedimientos_interes": ["rinoplastia", "prp_capilar"],
+                "procedimientos_interes": ["rinoplastia"],
                 "procedimientos_interes_otros": "Revision de cicatriz previa",
                 "historia_mejorar": "Perfil facial y densidad capilar",
                 "historia_tiempo_preocupacion": "2 anos",
@@ -750,7 +753,8 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(preconsulta.estado, "completada")
         self.assertEqual(preconsulta.antecedentes_personales, ["asma", "hipertension"])
         formulario_general = preconsulta.datos_generales["formulario_general"]
-        self.assertEqual(formulario_general["procedimientos_interes"], ["rinoplastia", "prp_capilar"])
+        self.assertEqual(formulario_general["motivo_categoria"], "cirugia_facial")
+        self.assertEqual(formulario_general["procedimientos_interes"], ["rinoplastia"])
         self.assertEqual(formulario_general["alergias_seleccion"], ["medicamentos", "latex"])
         self.assertEqual(formulario_general["medicamentos_actuales_seleccion"], ["anticonceptivos", "multivitaminicos"])
         self.assertEqual(formulario_general["drogas_recreativas"], ["si"])
@@ -803,8 +807,10 @@ class ClinicaPacienteTests(TestCase):
                     "sexo": "femenino",
                     "estado_civil": "soltero",
                     "correo": "ana@example.com",
+                    "telefono_codigo_area": "504",
                     "telefono": "99998888",
-                    "direccion": "Tegucigalpa",
+                    "informante": "yo_mismo",
+                    "motivo_categoria": "medicina_estetica",
                     "motivo_consulta": "Valoración estética",
                     "consentimiento_datos": "on",
                     "foto_perfil": foto,
@@ -838,7 +844,10 @@ class ClinicaPacienteTests(TestCase):
                 "fecha_nacimiento": "1990-01-15",
                 "sexo": "masculino",
                 "estado_civil": "soltero",
+                "telefono_codigo_area": "504",
                 "telefono": "99997777",
+                "informante": "yo_mismo",
+                "motivo_categoria": "capilar",
                 "motivo_consulta": "Registro nuevo desde el mismo enlace",
                 "consentimiento_datos": "on",
             },

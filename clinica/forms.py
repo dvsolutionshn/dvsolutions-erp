@@ -687,6 +687,26 @@ REFERIDO_POR_CHOICES = [
     ("otro", "Otro"),
 ]
 
+CODIGO_AREA_CHOICES = [
+    ("504", "Honduras (+504)"),
+    ("1", "Estados Unidos / Canadá (+1)"),
+    ("52", "México (+52)"),
+    ("34", "España (+34)"),
+    ("502", "Guatemala (+502)"),
+    ("503", "El Salvador (+503)"),
+    ("505", "Nicaragua (+505)"),
+    ("506", "Costa Rica (+506)"),
+    ("507", "Panamá (+507)"),
+    ("57", "Colombia (+57)"),
+]
+
+INFORMANTE_CHOICES = [
+    ("yo_mismo", "Yo mismo/a"),
+    ("familiar", "Familiar"),
+    ("amigo", "Amigo/a"),
+    ("menor_edad", "Menor de edad"),
+]
+
 DROGAS_RECREATIVAS_CHOICES = [
     ("cocaina", "Cocaina"),
     ("marihuana", "Marihuana"),
@@ -782,6 +802,23 @@ PROCEDIMIENTOS_GENERALES_GRUPOS = [
             ("radiofrecuencia_microaguja", "Radiofrecuencia microaguja (firmeza y colageno)"),
         ],
     ),
+]
+
+MOTIVO_CATEGORIA_CHOICES = [
+    ("", "Seleccione el motivo principal"),
+    *[
+        (
+            titulo.lower()
+            .replace(" ", "_")
+            .replace("í", "i")
+            .replace("é", "e")
+            .replace("á", "a")
+            .replace("ó", "o")
+            .replace("ú", "u"),
+            titulo,
+        )
+        for titulo, _opciones in PROCEDIMIENTOS_GENERALES_GRUPOS
+    ],
 ]
 
 PROCEDIMIENTOS_GENERALES_CHOICES = [
@@ -892,12 +929,28 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     sexo = forms.ChoiceField(label="Sexo", choices=Paciente.SEXO_CHOICES)
     estado_civil = forms.ChoiceField(label="Estado civil", choices=Paciente.ESTADO_CIVIL_CHOICES)
     correo = forms.EmailField(required=False, label="Correo electronico")
+    telefono_codigo_area = forms.ChoiceField(
+        required=False,
+        choices=CODIGO_AREA_CHOICES,
+        initial="504",
+        label="Codigo de area",
+    )
     telefono = forms.CharField(max_length=30, label="Telefono o WhatsApp")
     direccion = forms.CharField(required=False, label="Lugar de residencia", widget=forms.Textarea(attrs={"rows": 2}))
     lugar_nacimiento = forms.CharField(max_length=160, required=False, label="Lugar de nacimiento")
     ocupacion = forms.CharField(max_length=160, required=False, label="Profesion u ocupacion")
     lugar_trabajo = forms.CharField(max_length=180, required=False, label="Lugar de trabajo")
-    informante = forms.CharField(max_length=180, required=False, label="Persona que proporciona la informacion")
+    informante = forms.ChoiceField(
+        choices=INFORMANTE_CHOICES,
+        initial="yo_mismo",
+        label="Persona que proporciona la informacion",
+    )
+    informante_detalle = forms.CharField(
+        max_length=180,
+        required=False,
+        label="Nombre de la persona que proporciona la informacion",
+        help_text="Completar cuando la informacion la proporciona un familiar, amigo o encargado de un menor de edad.",
+    )
     contacto_emergencia_completo = forms.CharField(
         max_length=220,
         required=False,
@@ -906,7 +959,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     )
     contacto_emergencia = forms.CharField(max_length=180, required=False, widget=forms.HiddenInput())
     telefono_emergencia = forms.CharField(max_length=30, required=False, widget=forms.HiddenInput())
-    referido_por = forms.ChoiceField(required=False, choices=REFERIDO_POR_CHOICES, label="Como conocio Hospital MIA")
+    referido_por = forms.ChoiceField(required=False, choices=REFERIDO_POR_CHOICES, label="Como conocio la clinica")
     referido_por_detalle = forms.CharField(
         max_length=180,
         required=False,
@@ -936,6 +989,12 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         choices=PROCEDIMIENTOS_GENERALES_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         label="Que procedimiento desea realizarse",
+    )
+    motivo_categoria = forms.ChoiceField(
+        required=True,
+        choices=MOTIVO_CATEGORIA_CHOICES,
+        label="Motivo principal de consulta",
+        help_text="Seleccione el área principal para mostrar las opciones correspondientes.",
     )
     procedimientos_interes_otros = forms.CharField(
         required=False,
@@ -1027,11 +1086,11 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         model = PreconsultaClinica
         fields = [
             "nombres", "apellidos", "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
-            "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono",
+            "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono_codigo_area", "telefono",
             "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo",
-            "informante", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
+            "informante", "informante_detalle", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
             "referido_por", "referido_por_detalle",
-            "procedimientos_interes", "procedimientos_interes_otros",
+            "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros",
             "motivo_consulta", "funciones_organicas", "funciones_detalle", "revision_sistemas",
             "revision_sistemas_detalle", "antecedentes_hospitalarios",
             "antecedentes_hospitalarios_detalle", "antecedentes_personales",
@@ -1096,6 +1155,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 "lugar_nacimiento", "ocupacion", "contacto_emergencia", "telefono_emergencia",
             ]:
                 self.fields[campo].initial = getattr(paciente, campo, None)
+            self.fields["telefono_codigo_area"].initial = (paciente.prefijo_telefono or "504").replace("Honduras (+504)", "504")
             self.fields["nombres"].initial = " ".join(
                 parte for parte in [paciente.primer_nombre, paciente.segundo_nombre] if parte
             ) or paciente.nombre
@@ -1111,6 +1171,10 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "inputmode": "numeric",
             "pattern": "[0-9]*",
             "placeholder": "Solo numeros, sin guiones",
+        })
+        self.fields["telefono"].widget.attrs.update({
+            "inputmode": "tel",
+            "placeholder": "Ejemplo: 9999-9999",
         })
         formulario_general = {}
         if self.instance and isinstance(self.instance.datos_generales, dict):
@@ -1171,6 +1235,23 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             cleaned_data["contacto_emergencia"] = nombre_contacto.strip()
             cleaned_data["telefono_emergencia"] = telefono_contacto.strip()
 
+        telefono = "".join(ch for ch in (cleaned_data.get("telefono") or "") if ch.isdigit())
+        codigo_area = "".join(ch for ch in (cleaned_data.get("telefono_codigo_area") or "504") if ch.isdigit()) or "504"
+        if telefono:
+            if telefono.startswith("00"):
+                telefono = telefono[2:]
+            if telefono.startswith(codigo_area):
+                cleaned_data["telefono"] = telefono
+            elif len(telefono) <= 10:
+                cleaned_data["telefono"] = f"{codigo_area}{telefono}"
+            else:
+                cleaned_data["telefono"] = telefono
+
+        if cleaned_data.get("informante") == "yo_mismo":
+            cleaned_data["informante_detalle"] = ""
+        elif not (cleaned_data.get("informante_detalle") or "").strip():
+            self.add_error("informante_detalle", "Indique el nombre de la persona que proporciona la informacion.")
+
         if cleaned_data.get("referido_por") != "referencia":
             cleaned_data["referido_por_detalle"] = ""
 
@@ -1193,6 +1274,15 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         return [
             {
                 "titulo": titulo,
+                "codigo": (
+                    titulo.lower()
+                    .replace(" ", "_")
+                    .replace("í", "i")
+                    .replace("é", "e")
+                    .replace("á", "a")
+                    .replace("ó", "o")
+                    .replace("ú", "u")
+                ),
                 "opciones": [
                     {
                         "value": valor,
@@ -1208,16 +1298,16 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     def datos_generales_limpios(self):
         campos = [
             "nombres", "apellidos", "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
-            "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono",
+            "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono_codigo_area", "telefono",
             "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo",
-            "informante", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
+            "informante", "informante_detalle", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
             "referido_por", "referido_por_detalle",
         ]
         datos = {campo: self.cleaned_data.get(campo) for campo in campos}
         if datos.get("fecha_nacimiento"):
             datos["fecha_nacimiento"] = datos["fecha_nacimiento"].isoformat()
         campos_generales = [
-            "procedimientos_interes", "procedimientos_interes_otros", "historia_mejorar",
+            "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros", "historia_mejorar",
             "historia_tiempo_preocupacion", "historia_tratamientos_previos", "historia_expectativas",
             "alergias_seleccion", "alergias_otras", "medicamentos_actuales_seleccion",
             "medicamentos_actuales_otros", "quirurgicos_operado", "quirurgicos_detalle",
