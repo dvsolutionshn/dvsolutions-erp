@@ -1361,7 +1361,12 @@ def _obtener_inventario_producto(producto):
 
 
 def _asegurar_bodegas_farmaceuticas(empresa):
-    if empresa.slug in {"hospital_mia", "medical_spa"}:
+    if empresa.slug == "luque_aestetic":
+        bodegas_base = [
+            ("Bodega Principal", "principal"),
+            ("Bodega Clinica", "provisional"),
+        ]
+    elif empresa.slug in {"hospital_mia", "medical_spa"}:
         bodegas_base = [
             ("Bodega General", "principal"),
             ("Bodega Hospital", "provisional"),
@@ -1375,15 +1380,45 @@ def _asegurar_bodegas_farmaceuticas(empresa):
         ]
     bodegas = {}
     for nombre, tipo in bodegas_base:
-        bodega, _ = BodegaInventario.objects.get_or_create(
-            empresa=empresa,
-            nombre=nombre,
-            defaults={"tipo": tipo, "activa": True},
+        bodega = (
+            BodegaInventario.objects.filter(empresa=empresa, nombre__iexact=nombre).first()
+            or BodegaInventario.objects.filter(empresa=empresa, tipo=tipo).order_by("id").first()
         )
+        if not bodega:
+            bodega = BodegaInventario.objects.create(
+                empresa=empresa,
+                nombre=nombre,
+                tipo=tipo,
+                activa=True,
+            )
+        cambios = []
+        if bodega.nombre != nombre and not BodegaInventario.objects.filter(
+            empresa=empresa,
+            nombre__iexact=nombre,
+        ).exclude(id=bodega.id).exists():
+            bodega.nombre = nombre
+            cambios.append("nombre")
         if bodega.tipo != tipo:
             bodega.tipo = tipo
-            bodega.save(update_fields=["tipo"])
+            cambios.append("tipo")
+        if not bodega.activa:
+            bodega.activa = True
+            cambios.append("activa")
+        if cambios:
+            bodega.save(update_fields=cambios)
         bodegas[tipo] = bodega
+    if empresa.slug == "luque_aestetic":
+        for bodega_extra in BodegaInventario.objects.filter(
+            empresa=empresa,
+            activa=True,
+        ).exclude(id__in=[bodega.id for bodega in bodegas.values()]):
+            if not ExistenciaLoteBodega.objects.filter(
+                empresa=empresa,
+                bodega=bodega_extra,
+                cantidad__gt=0,
+            ).exists():
+                bodega_extra.activa = False
+                bodega_extra.save(update_fields=["activa"])
     return bodegas
 
 
@@ -2560,7 +2595,7 @@ def bodegas_dashboard(request, empresa_slug):
     return render(request, "facturacion/bodegas_dashboard.html", {
         "empresa": empresa,
         "resumen_bodegas": resumen_bodegas,
-        "mostrar_resumen_comercial": empresa.slug == "medical_spa",
+        "mostrar_resumen_comercial": empresa.slug in {"medical_spa", "luque_aestetic"},
         "resumen": {
             "bodegas": bodegas.count(),
             "unidades": sum((item["unidades"] for item in resumen_bodegas), Decimal("0.00")),
@@ -2770,26 +2805,42 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
     bodegas = _asegurar_bodegas_farmaceuticas(empresa)
-    rutas = {
-        "principal_provisional": {
-            "label": "Principal -> Provisional",
-            "origen": bodegas["principal"],
-            "destino": bodegas["provisional"],
-        },
-        "principal_vitrina": {
-            "label": "Principal -> Vitrina",
-            "origen": bodegas["principal"],
-            "destino": bodegas["vitrina"],
-        },
-        "provisional_vitrina": {
-            "label": "Provisional -> Vitrina",
-            "origen": bodegas["provisional"],
-            "destino": bodegas["vitrina"],
-        },
-    }
+    if empresa.slug == "luque_aestetic":
+        rutas = {
+            "principal_clinica": {
+                "label": "Principal -> Clinica",
+                "origen": bodegas["principal"],
+                "destino": bodegas["provisional"],
+            },
+            "clinica_principal": {
+                "label": "Clinica -> Principal",
+                "origen": bodegas["provisional"],
+                "destino": bodegas["principal"],
+            },
+        }
+        ruta_default = "principal_clinica"
+    else:
+        rutas = {
+            "principal_provisional": {
+                "label": "Principal -> Provisional",
+                "origen": bodegas["principal"],
+                "destino": bodegas["provisional"],
+            },
+            "principal_vitrina": {
+                "label": "Principal -> Vitrina",
+                "origen": bodegas["principal"],
+                "destino": bodegas["vitrina"],
+            },
+            "provisional_vitrina": {
+                "label": "Provisional -> Vitrina",
+                "origen": bodegas["provisional"],
+                "destino": bodegas["vitrina"],
+            },
+        }
+        ruta_default = "principal_vitrina"
 
-    ruta_key = request.POST.get("ruta") or request.GET.get("ruta") or "principal_vitrina"
-    ruta = rutas.get(ruta_key, rutas["principal_vitrina"])
+    ruta_key = request.POST.get("ruta") or request.GET.get("ruta") or ruta_default
+    ruta = rutas.get(ruta_key, rutas[ruta_default])
     existencias = (
         ExistenciaLoteBodega.objects.filter(
             empresa=empresa,

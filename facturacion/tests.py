@@ -2838,6 +2838,83 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.context["resumen"]["costo_real"], Decimal("300.00"))
         self.assertEqual(response.context["resumen"]["valor_venta"], Decimal("750.00"))
 
+    def test_luque_aestetic_crea_dos_bodegas_y_muestra_cantidades_en_producto(self):
+        self.empresa.slug = "luque_aestetic"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.usa_inventario_farmaceutico = True
+        configuracion.save(update_fields=["usa_bodegas_internas", "usa_inventario_farmaceutico"])
+
+        response = self.client.get(reverse("bodegas_dashboard", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bodega Principal")
+        self.assertContains(response, "Bodega Clinica")
+        self.assertNotContains(response, "Vitrina")
+        self.assertEqual(response.context["resumen"]["bodegas"], 2)
+        self.assertTrue(response.context["mostrar_resumen_comercial"])
+
+        producto_form = self.client.get(reverse("crear_producto_facturacion", args=[self.empresa.slug]))
+        self.assertContains(producto_form, "Distribucion por bodegas")
+        self.assertContains(producto_form, "Bodega Principal")
+        self.assertContains(producto_form, "Bodega Clinica")
+
+    def test_luque_aestetic_registra_stock_inicial_y_transferencia_rapida(self):
+        self.empresa.slug = "luque_aestetic"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.usa_inventario_farmaceutico = True
+        configuracion.save(update_fields=["usa_bodegas_internas", "usa_inventario_farmaceutico"])
+
+        self.client.get(reverse("bodegas_dashboard", args=[self.empresa.slug]))
+        bodega_principal = BodegaInventario.objects.get(empresa=self.empresa, nombre="Bodega Principal")
+        bodega_clinica = BodegaInventario.objects.get(empresa=self.empresa, nombre="Bodega Clinica")
+
+        response = self.client.post(
+            reverse("crear_producto_facturacion", args=[self.empresa.slug]),
+            {
+                "nombre": "Tratamiento Capilar",
+                "codigo": "LUQ-001",
+                "tipo_item": "producto",
+                "unidad_medida": "unidad",
+                "descripcion": "Producto para clinica",
+                "precio": "750.00",
+                "impuesto_predeterminado": str(self.impuesto.id),
+                "activo": "on",
+                "controla_inventario": "on",
+                f"stock_bodega_{bodega_principal.id}": "5.00",
+                f"stock_bodega_{bodega_clinica.id}": "2.00",
+                "lote_inicial": "LUQ-LOTE-1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        producto = Producto.objects.get(empresa=self.empresa, codigo="LUQ-001")
+        self.assertEqual(producto.stock_actual, Decimal("7.00"))
+        self.assertEqual(
+            ExistenciaLoteBodega.objects.get(
+                empresa=self.empresa,
+                bodega=bodega_principal,
+                lote__producto=producto,
+            ).cantidad,
+            Decimal("5.00"),
+        )
+        self.assertEqual(
+            ExistenciaLoteBodega.objects.get(
+                empresa=self.empresa,
+                bodega=bodega_clinica,
+                lote__producto=producto,
+            ).cantidad,
+            Decimal("2.00"),
+        )
+
+        transferencia = self.client.get(reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]))
+        self.assertContains(transferencia, "Principal -&gt; Clinica")
+        self.assertContains(transferencia, "Clinica -&gt; Principal")
+        self.assertNotContains(transferencia, "Vitrina")
+
     def test_crear_lotes_del_mismo_producto_con_vencimientos_rapidos(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
         EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
