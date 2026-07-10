@@ -13,6 +13,7 @@ urlpatterns = [
     path("pacientes/<int:paciente_id>/editar/", views.editar_paciente, name="clinica_editar_paciente"),
     path("pacientes/<int:paciente_id>/expediente/agregar/", views.crear_evento_expediente, name="clinica_crear_evento_paciente"),
     path("pacientes/<int:paciente_id>/historias/", views.historias_especialidad, name="clinica_historias_especialidad"),
+    path("pacientes/<int:paciente_id>/historias/consolidado/", views.historial_clinico_consolidado, name="clinica_historial_clinico_consolidado"),
     path("pacientes/<int:paciente_id>/historias/nueva/<slug:tipo>/", views.crear_historia_especialidad, name="clinica_crear_historia_especialidad"),
     path("pacientes/<int:paciente_id>/historias/<int:historia_id>/editar/", views.editar_historia_especialidad, name="clinica_editar_historia_especialidad"),
     path("pacientes/<int:paciente_id>/preconsulta/generar/", views.generar_enlace_preconsulta, name="clinica_generar_enlace_preconsulta"),

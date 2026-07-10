@@ -23,9 +23,13 @@ from .forms import (
     ALERGIAS_GENERALES_CHOICES,
     CONSUMO_RIESGO_CHOICES,
     DECISION_CIRUGIA_CHOICES,
+    DIETA_CHOICES,
+    DROGAS_RECREATIVAS_CHOICES,
+    EJERCICIO_CHOICES,
     FRECUENCIA_CHOICES,
     MEDICAMENTOS_HABITUALES_CHOICES,
     MEDICAMENTOS_ACTUALES_CHOICES,
+    MOTIVO_CATEGORIA_CHOICES,
     PROCEDIMIENTOS_GENERALES_CHOICES,
     RIESGO_TROMBOEMBOLICO_CHOICES,
     PSICOLOGICA_CHOICES,
@@ -82,6 +86,8 @@ def _ip_cliente(request):
 
 def _etiquetas_seleccion(valores, choices):
     etiquetas = dict(choices)
+    if isinstance(valores, str):
+        valores = [valores]
     return [etiquetas.get(valor, valor) for valor in (valores or [])]
 
 
@@ -121,6 +127,140 @@ def _resumen_preconsulta(preconsulta):
         "multiples_cirugias_insatisfaccion": _etiquetas_seleccion(general.get("multiples_cirugias_insatisfaccion"), SI_NO_CHOICES),
         "evaluacion_psicologica": _etiquetas_seleccion(general.get("evaluacion_psicologica"), PSICOLOGICA_CHOICES),
     }
+
+
+def _valor_preconsulta(general, campo, choices=None):
+    valor = general.get(campo)
+    if valor in (None, "", []):
+        return ""
+    if choices:
+        if not isinstance(valor, (list, tuple)):
+            valor = [valor]
+        return _etiquetas_seleccion(valor, choices)
+    return valor
+
+
+def _campo_lectura_preconsulta(general, etiqueta, campo, choices=None, tipo="texto"):
+    valor = _valor_preconsulta(general, campo, choices)
+    if valor in (None, "", []):
+        return None
+    return {"label": etiqueta, "value": valor, "type": tipo}
+
+
+def _secciones_preconsulta(preconsulta):
+    general = {}
+    if isinstance(preconsulta.datos_generales, dict):
+        general = preconsulta.datos_generales.get("formulario_general", {}) or {}
+    secciones = [
+        {
+            "titulo": "1. Datos generales",
+            "descripcion": "Identificación y contacto reportado por el paciente.",
+            "campos": [
+                _campo_lectura_preconsulta(general, "Nombre completo", "nombres"),
+                _campo_lectura_preconsulta(general, "Apellidos", "apellidos"),
+                _campo_lectura_preconsulta(general, "Identidad", "identidad"),
+                _campo_lectura_preconsulta(general, "Fecha de nacimiento", "fecha_nacimiento"),
+                _campo_lectura_preconsulta(general, "Sexo", "sexo"),
+                _campo_lectura_preconsulta(general, "Estado civil", "estado_civil"),
+                _campo_lectura_preconsulta(general, "Teléfono / WhatsApp", "telefono"),
+                _campo_lectura_preconsulta(general, "Correo", "correo"),
+                _campo_lectura_preconsulta(general, "Residencia", "direccion"),
+                _campo_lectura_preconsulta(general, "Ocupación", "ocupacion"),
+                _campo_lectura_preconsulta(general, "Lugar de trabajo", "lugar_trabajo"),
+                _campo_lectura_preconsulta(general, "Contacto de emergencia", "contacto_emergencia_completo"),
+                _campo_lectura_preconsulta(general, "Persona que proporciona la información", "informante"),
+                _campo_lectura_preconsulta(general, "Nombre del informante", "informante_detalle"),
+                _campo_lectura_preconsulta(general, "Cómo conoció la clínica", "referido_por"),
+                _campo_lectura_preconsulta(general, "Referencia", "referido_por_detalle"),
+            ],
+        },
+        {
+            "titulo": "2. Motivo y procedimientos de interés",
+            "descripcion": "Áreas seleccionadas y procedimientos que motivan la consulta.",
+            "campos": [
+                _campo_lectura_preconsulta(general, "Motivo principal", "motivo_categoria", MOTIVO_CATEGORIA_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Procedimientos seleccionados", "procedimientos_interes", PROCEDIMIENTOS_GENERALES_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Otros procedimientos", "procedimientos_interes_otros"),
+                _campo_lectura_preconsulta(general, "Qué le gustaría mejorar", "historia_mejorar"),
+                _campo_lectura_preconsulta(general, "Tiempo con esta preocupación", "historia_tiempo_preocupacion"),
+                _campo_lectura_preconsulta(general, "Tratamientos previos", "historia_tratamientos_previos"),
+                _campo_lectura_preconsulta(general, "Expectativas", "historia_expectativas"),
+            ],
+        },
+        {
+            "titulo": "3. Antecedentes, alergias y medicamentos",
+            "descripcion": "Condiciones, alergias y tratamientos reportados.",
+            "campos": [
+                {"label": "Antecedentes personales", "value": _etiquetas_seleccion(preconsulta.antecedentes_personales, ANTECEDENTES_PERSONALES_CHOICES), "type": "chips"},
+                _campo_lectura_preconsulta(general, "Detalle de antecedentes", "antecedentes_personales_detalle"),
+                {"label": "Alergias marcadas", "value": _valor_preconsulta(general, "alergias_seleccion", ALERGIAS_GENERALES_CHOICES), "type": "chips"},
+                _campo_lectura_preconsulta(general, "Detalle de alergias", "alergias_otras"),
+                _campo_lectura_preconsulta(general, "Alergias declaradas", "alergias"),
+                {"label": "Medicamentos habituales", "value": _etiquetas_seleccion(preconsulta.medicamentos_habituales, MEDICAMENTOS_HABITUALES_CHOICES), "type": "chips"},
+                _campo_lectura_preconsulta(general, "Detalle medicamentos habituales", "medicamentos_habituales_detalle"),
+                {"label": "Medicamentos actuales", "value": _valor_preconsulta(general, "medicamentos_actuales_seleccion", MEDICAMENTOS_ACTUALES_CHOICES), "type": "chips"},
+                _campo_lectura_preconsulta(general, "Detalle medicamentos actuales", "medicamentos_actuales_otros"),
+                _campo_lectura_preconsulta(general, "Antecedentes infecciosos", "antecedentes_infecciosos"),
+                _campo_lectura_preconsulta(general, "Hospitalizaciones o cirugías previas", "antecedentes_hospitalarios_detalle"),
+            ],
+        },
+        {
+            "titulo": "4. Hábitos y estilo de vida",
+            "descripcion": "Datos no patológicos y riesgos de consumo.",
+            "campos": [
+                _campo_lectura_preconsulta(general, "Operado anteriormente", "quirurgicos_operado", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle quirúrgico", "quirurgicos_detalle"),
+                _campo_lectura_preconsulta(general, "Tabaco", "tabaco_frecuencia", FRECUENCIA_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Alcohol", "alcohol_frecuencia", FRECUENCIA_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Drogas recreativas", "drogas_recreativas", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Tipo de drogas", "drogas_recreativas_tipos", DROGAS_RECREATIVAS_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle consumo", "drogas_recreativas_detalle"),
+                _campo_lectura_preconsulta(general, "Hábitos de riesgo", "consumo_riesgo", CONSUMO_RIESGO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle hábitos", "consumo_riesgo_detalle"),
+                _campo_lectura_preconsulta(general, "Dieta", "dieta"),
+                _campo_lectura_preconsulta(general, "Ejercicio", "ejercicio"),
+            ],
+        },
+        {
+            "titulo": "5. Familiares, ginecología y riesgos",
+            "descripcion": "Antecedentes familiares y datos ginecológicos cuando aplican.",
+            "campos": [
+                {"label": "Antecedentes familiares", "value": _etiquetas_seleccion(preconsulta.antecedentes_familiares, ANTECEDENTES_FAMILIARES_CHOICES), "type": "chips"},
+                _campo_lectura_preconsulta(general, "Detalle familiares", "antecedentes_familiares_detalle"),
+                _campo_lectura_preconsulta(general, "Riesgo tromboembólico", "riesgo_tromboembolico", RIESGO_TROMBOEMBOLICO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle riesgo", "riesgo_tromboembolico_otros"),
+                _campo_lectura_preconsulta(general, "Menarca", "gine_menarca"),
+                _campo_lectura_preconsulta(general, "Gestas", "gine_gestas"),
+                _campo_lectura_preconsulta(general, "Partos", "gine_partos"),
+                _campo_lectura_preconsulta(general, "Cesáreas", "gine_cesareas"),
+                _campo_lectura_preconsulta(general, "Abortos", "gine_abortos"),
+                _campo_lectura_preconsulta(general, "Última menstruación", "gine_ultima_menstruacion"),
+                _campo_lectura_preconsulta(general, "Embarazada", "gine_embarazada", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Lactancia", "gine_lactancia", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Mamografía / ultrasonido", "gine_mamografia", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Fecha mamografía / ultrasonido", "gine_mamografia_fecha"),
+            ],
+        },
+        {
+            "titulo": "6. Evaluación psicológica y consentimiento",
+            "descripcion": "Expectativas y elementos emocionales declarados.",
+            "campos": [
+                _campo_lectura_preconsulta(general, "Evaluación psicológica", "evaluacion_psicologica", PSICOLOGICA_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle emocional", "evaluacion_psicologica_detalle"),
+                _campo_lectura_preconsulta(general, "Quién tomó la decisión de operarse", "decision_cirugia", DECISION_CIRUGIA_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Otra decisión", "decision_cirugia_otros"),
+                _campo_lectura_preconsulta(general, "Expectativas realistas", "expectativas_realistas", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Busca perfección absoluta", "busca_perfeccion", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Múltiples cirugías por insatisfacción", "multiples_cirugias_insatisfaccion", SI_NO_CHOICES, "chips"),
+            ],
+        },
+    ]
+    for seccion in secciones:
+        seccion["campos"] = [
+            campo for campo in seccion["campos"]
+            if campo and campo.get("value") not in (None, "", [])
+        ]
+    return [seccion for seccion in secciones if seccion["campos"]]
 
 
 def _actualizar_paciente_desde_preconsulta(paciente, form):
@@ -444,6 +584,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "nombre": nombre,
             "total": historias.filter(tipo=codigo).count(),
             "preconsultas": paciente.preconsultas.filter(tipo=codigo, estado="completada").count(),
+            "ultima_preconsulta": paciente.preconsultas.filter(tipo=codigo, estado="completada").order_by("-fecha_completada", "-fecha_creacion").first(),
         }
         for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
     ]
@@ -456,6 +597,50 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "historias": historias,
             "tipos": tipos,
             "preconsultas": preconsultas,
+        },
+    )
+
+
+@login_required
+def historial_clinico_consolidado(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    preconsultas = list(
+        paciente.preconsultas.filter(estado="completada")
+        .select_related("creada_por")
+        .order_by("-fecha_completada", "-fecha_creacion")
+    )
+    historias = list(
+        paciente.historias_especialidad.select_related("profesional", "actualizado_por")
+        .order_by("-fecha_atencion", "-id")
+    )
+    bloques_preconsulta = [
+        {
+            "preconsulta": preconsulta,
+            "secciones": _secciones_preconsulta(preconsulta),
+        }
+        for preconsulta in preconsultas
+    ]
+    tipos = [
+        {
+            "codigo": codigo,
+            "nombre": nombre,
+            "historias": [historia for historia in historias if historia.tipo == codigo],
+            "preconsultas": [preconsulta for preconsulta in preconsultas if preconsulta.tipo == codigo],
+        }
+        for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
+    ]
+    return render(
+        request,
+        "clinica/historial_clinico_consolidado.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "tipos": tipos,
+            "historias": historias,
+            "preconsultas": preconsultas,
+            "bloques_preconsulta": bloques_preconsulta,
         },
     )
 
@@ -681,6 +866,7 @@ def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
             "paciente": paciente,
             "preconsulta": preconsulta,
             "resumen": _resumen_preconsulta(preconsulta),
+            "secciones_preconsulta": _secciones_preconsulta(preconsulta),
         },
     )
 

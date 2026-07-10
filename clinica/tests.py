@@ -346,7 +346,7 @@ class ClinicaPacienteTests(TestCase):
                 "analisis_clinico": "Probable alopecia androgenetica inicial.",
                 "procedimiento": "Tricoscopia",
                 "conducta": "Solicitar laboratorios y documentar fotografias.",
-                "plan_tratamiento": "Control en 30 dias",
+                "plan_tratamiento": "Paciente refiere caida progresiva desde hace seis meses.\nDisminucion de densidad en region frontal.\nProbable alopecia androgenetica inicial.\nSolicitar laboratorios y documentar fotografias.\nControl en 30 dias.\nPaciente ansiosa por evolucion del cuadro.",
                 "indicaciones": "Aplicar tratamiento indicado",
                 "observaciones": "Sin complicaciones",
                 "notas_privadas_doctor": "Paciente ansiosa por evolucion del cuadro.",
@@ -360,11 +360,11 @@ class ClinicaPacienteTests(TestCase):
         historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente)
         self.assertEqual(historia.tipo, "capilar")
         self.assertEqual(historia.creado_por, self.user)
-        self.assertIn("caida progresiva", historia.historia_enfermedad_actual)
-        self.assertIn("region frontal", historia.examen_fisico)
-        self.assertIn("alopecia androgenetica", historia.analisis_clinico)
-        self.assertIn("laboratorios", historia.conducta)
-        self.assertIn("ansiosa", historia.notas_privadas_doctor)
+        self.assertIn("caida progresiva", historia.plan_tratamiento)
+        self.assertIn("region frontal", historia.plan_tratamiento)
+        self.assertIn("alopecia androgenetica", historia.plan_tratamiento)
+        self.assertIn("laboratorios", historia.plan_tratamiento)
+        self.assertIn("ansiosa", historia.plan_tratamiento)
 
         editar_url = reverse(
             "clinica_editar_historia_especialidad",
@@ -384,7 +384,7 @@ class ClinicaPacienteTests(TestCase):
                 "analisis_clinico": historia.analisis_clinico,
                 "procedimiento": historia.procedimiento,
                 "conducta": historia.conducta,
-                "plan_tratamiento": historia.plan_tratamiento,
+                "plan_tratamiento": "Caida de cabello actualizada\nControl en 30 dias",
                 "indicaciones": historia.indicaciones,
                 "observaciones": historia.observaciones,
                 "notas_privadas_doctor": historia.notas_privadas_doctor,
@@ -394,7 +394,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 302)
         historia.refresh_from_db()
         self.assertEqual(historia.estado, "finalizada")
-        self.assertEqual(historia.motivo_consulta, "Caida de cabello actualizada")
+        self.assertIn("Caida de cabello actualizada", historia.plan_tratamiento)
         self.assertEqual(historia.actualizado_por, self.user)
 
     def test_medicina_estetica_guarda_formulario_estructurado(self):

@@ -2,28 +2,88 @@
 
 {% block title %}Preconsulta {{ preconsulta.get_tipo_display }} - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
-{% block header_title %}Preconsulta · {{ preconsulta.get_tipo_display }}{% endblock %}
-{% block header_description %}Información declarada por el paciente antes de su atención. Confirma los datos clínicos durante la consulta.{% endblock %}
-{% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>{% endblock %}
+{% block header_title %}Formulario completado · {{ preconsulta.get_tipo_display }}{% endblock %}
+{% block header_description %}Lectura médica del formulario llenado por el paciente. Revise y confirme la información durante la consulta.{% endblock %}
+{% block topbar_actions %}
+{% if preconsulta.tipo != "general" %}
+<a class="erp-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id preconsulta.tipo %}">Escribir nota de consulta</a>
+{% endif %}
+<a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>
+{% endblock %}
 
-{% block extra_head %}<style>
-.pre-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.pre-section{padding:18px 0;border-bottom:1px solid var(--line)}.pre-section:last-child{border-bottom:0}.pre-section h3{margin:0 0 12px;color:#102338}.pre-item{padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff}.pre-item.wide{grid-column:1/-1}.pre-item span{display:block;font-size:10px;text-transform:uppercase;font-weight:900;color:var(--muted);margin-bottom:5px}.pre-tags{display:flex;gap:7px;flex-wrap:wrap}.pre-tag{padding:6px 9px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:12px;font-weight:800}.pre-tag.warn{background:#fff1f0;color:#b42318}@media(max-width:760px){.pre-grid{grid-template-columns:1fr}.pre-item.wide{grid-column:auto}}
-</style>{% endblock %}
+{% block extra_head %}
+<style>
+.medical-read-shell{max-width:1180px;margin:0 auto}.read-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;margin-bottom:18px;padding:20px;border:1px solid #cfe0f3;border-radius:18px;background:linear-gradient(135deg,#fff,#f6fbff)}
+.read-hero h3{margin:5px 0;color:#102338}.read-hero p{margin:0;color:var(--muted);line-height:1.55}.read-badge{padding:10px 13px;border-radius:999px;background:#e9f8f4;color:#087466;font-size:12px;font-weight:900;text-transform:uppercase}
+.read-confidential{margin-bottom:18px;padding:14px 16px;border:1px solid #b9d8d3;border-radius:14px;background:#f3fbf9;color:#315f5a;font-weight:700;line-height:1.55}
+.read-section{margin-bottom:16px;border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 14px 34px rgba(16,35,56,.05)}
+.read-section-head{padding:16px 18px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,#fbfdff,#f7fcfb)}.read-section-head h3{margin:0;color:#102338}.read-section-head p{margin:5px 0 0;color:var(--muted);font-size:13px}
+.read-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px}.read-field{padding:13px;border:1px solid #dbe8f5;border-radius:14px;background:#fbfdff}.read-label{display:block;margin-bottom:7px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#60748d}.read-value{color:#102338;line-height:1.55;font-weight:650}
+.read-chips{display:flex;gap:7px;flex-wrap:wrap}.read-chip{display:inline-flex;padding:7px 10px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:12px;font-weight:900}.read-chip.warn{background:#fff1f0;color:#b42318}
+.read-empty{padding:28px;text-align:center;color:var(--muted)}.doctor-cta{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:18px;padding:18px;border:1px solid #c8d9ed;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#f4fffc)}.doctor-cta h3{margin:0 0 6px;color:#102338}.doctor-cta p{margin:0;color:var(--muted);line-height:1.55}
+@media(max-width:760px){.read-hero,.read-grid{grid-template-columns:1fr}.read-badge{justify-self:start}}
+</style>
+{% endblock %}
 
 {% block content %}
-<section class="erp-card">
-    <div class="erp-section-heading"><div><div class="erp-kpi-label">Estado</div><h3>{{ preconsulta.get_estado_display }}</h3></div><span class="erp-card-muted">{% if preconsulta.fecha_completada %}Completada {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% else %}Pendiente de respuesta{% endif %}</span></div>
-    {% if preconsulta.estado == 'completada' %}
-    <div class="pre-section"><h3>Motivo principal</h3><p>{{ preconsulta.motivo_consulta|default:"No indicado"|linebreaksbr }}</p></div>
-    <div class="pre-section"><h3>Datos generales y referencia</h3><div class="pre-grid"><div class="pre-item"><span>Nombre</span>{{ resumen.general.nombres|default:paciente.nombre }} {{ resumen.general.apellidos|default:"" }}</div><div class="pre-item"><span>Contacto emergencia</span>{{ resumen.general.contacto_emergencia_completo|default:"No indicado" }}</div><div class="pre-item"><span>Cómo conoció la clínica</span>{{ resumen.general.referido_por|default:"No indicado" }}{% if resumen.general.referido_por_detalle %}<br>Referencia: {{ resumen.general.referido_por_detalle }}{% endif %}</div><div class="pre-item"><span>Ocupación / trabajo</span>{{ resumen.general.ocupacion|default:"No indicado" }}{% if resumen.general.lugar_trabajo %}<br>{{ resumen.general.lugar_trabajo }}{% endif %}</div></div></div>
-    <div class="pre-section"><h3>Procedimientos de interés</h3><div class="pre-tags">{% for valor in resumen.procedimientos %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó procedimientos.</span>{% endfor %}</div>{% if resumen.general.procedimientos_interes_otros %}<p><strong>Otros:</strong> {{ resumen.general.procedimientos_interes_otros|linebreaksbr }}</p>{% endif %}</div>
-    <div class="pre-section"><h3>Revisión general</h3><div class="pre-grid"><div class="pre-item"><span>Funciones orgánicas</span>{{ preconsulta.get_funciones_organicas_display|default:"No indicado" }}{% if preconsulta.funciones_detalle %}<br>{{ preconsulta.funciones_detalle }}{% endif %}</div><div class="pre-item"><span>Órganos y sistemas</span>{{ preconsulta.get_revision_sistemas_display|default:"No indicado" }}{% if preconsulta.revision_sistemas_detalle %}<br>{{ preconsulta.revision_sistemas_detalle }}{% endif %}</div></div></div>
-    <div class="pre-section"><h3>Antecedentes personales</h3><div class="pre-tags">{% for valor in resumen.antecedentes_personales %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó condiciones.</span>{% endfor %}</div>{% if preconsulta.antecedentes_personales_detalle %}<p>{{ preconsulta.antecedentes_personales_detalle|linebreaksbr }}</p>{% endif %}{% if preconsulta.antecedentes_hospitalarios_detalle %}<p><strong>Hospitalizaciones/cirugías:</strong> {{ preconsulta.antecedentes_hospitalarios_detalle|linebreaksbr }}</p>{% endif %}</div>
-    <div class="pre-section"><h3>Alergias y medicamentos</h3><div class="pre-grid"><div class="pre-item wide"><span>Alergias marcadas</span><div class="pre-tags">{% for valor in resumen.alergias_generales %}<span class="pre-tag warn">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó alergias.</span>{% endfor %}</div>{% if resumen.general.alergias_otras %}<p>{{ resumen.general.alergias_otras|linebreaksbr }}</p>{% endif %}<p><strong>Alergias declaradas:</strong> {{ preconsulta.alergias|default:"No declaradas" }}</p></div><div class="pre-item wide"><span>Medicamentos actuales</span><div class="pre-tags">{% for valor in resumen.medicamentos_actuales %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó medicamentos actuales.</span>{% endfor %}</div>{% if resumen.general.medicamentos_actuales_otros %}<p>{{ resumen.general.medicamentos_actuales_otros|linebreaksbr }}</p>{% endif %}</div><div class="pre-item wide"><span>Medicamentos habituales</span><div class="pre-tags">{% for valor in resumen.medicamentos %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó medicamentos habituales.</span>{% endfor %}</div><p>{{ preconsulta.medicamentos_habituales_detalle|default:"Sin detalle adicional"|linebreaksbr }}</p></div></div></div>
-    <div class="pre-section"><h3>Antecedentes familiares</h3><p class="erp-card-muted">Familiares cercanos: padre, madre y hermanos.</p><div class="pre-tags">{% for valor in resumen.antecedentes_familiares %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No seleccionó antecedentes familiares.</span>{% endfor %}</div><p>{{ preconsulta.antecedentes_familiares_detalle|default:"Sin detalle adicional"|linebreaksbr }}</p></div>
-    <div class="pre-section"><h3>Riesgos, ginecología y psicología</h3><div class="pre-grid"><div class="pre-item wide"><span>Hábitos de riesgo / consumo</span><div class="pre-tags">{% for valor in resumen.consumo_riesgo %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No indicado.</span>{% endfor %}</div>{% if resumen.general.consumo_riesgo_detalle %}<p>{{ resumen.general.consumo_riesgo_detalle|linebreaksbr }}</p>{% endif %}</div><div class="pre-item wide"><span>Riesgo tromboembólico</span><div class="pre-tags">{% for valor in resumen.riesgo_tromboembolico %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No indicado.</span>{% endfor %}</div>{% if resumen.general.riesgo_tromboembolico_otros %}<p>{{ resumen.general.riesgo_tromboembolico_otros|linebreaksbr }}</p>{% endif %}</div><div class="pre-item wide"><span>Evaluación psicológica</span><div class="pre-tags">{% for valor in resumen.evaluacion_psicologica %}<span class="pre-tag">{{ valor }}</span>{% empty %}<span class="erp-card-muted">No indicado.</span>{% endfor %}</div>{% if resumen.general.evaluacion_psicologica_detalle %}<p>{{ resumen.general.evaluacion_psicologica_detalle|linebreaksbr }}</p>{% endif %}</div><div class="pre-item"><span>Decisión de operarse</span>{{ resumen.decision_cirugia|join:", "|default:"No indicado" }}{% if resumen.general.decision_cirugia_otros %}<br>{{ resumen.general.decision_cirugia_otros }}{% endif %}</div><div class="pre-item"><span>Expectativas realistas</span>{{ resumen.expectativas_realistas|join:", "|default:"No indicado" }}</div><div class="pre-item"><span>Busca perfección absoluta</span>{{ resumen.busca_perfeccion|join:", "|default:"No indicado" }}</div><div class="pre-item"><span>Múltiples cirugías por insatisfacción</span>{{ resumen.multiples_cirugias_insatisfaccion|join:", "|default:"No indicado" }}</div><div class="pre-item"><span>Embarazada</span>{{ resumen.gine_embarazada|join:", "|default:"No indicado" }}</div><div class="pre-item"><span>Lactancia</span>{{ resumen.gine_lactancia|join:", "|default:"No indicado" }}</div><div class="pre-item"><span>Mamografía</span>{{ resumen.gine_mamografia|join:", "|default:"No indicado" }}{% if resumen.general.gine_mamografia_fecha %}<br>Fecha: {{ resumen.general.gine_mamografia_fecha }}{% endif %}</div></div></div>
-    <div class="pre-section"><h3>Estilo de vida</h3><div class="pre-grid"><div class="pre-item"><span>Alimentación</span>{{ preconsulta.dieta|default:"No indicada" }}</div><div class="pre-item"><span>Ejercicio</span>{{ preconsulta.ejercicio|default:"No indicado" }}</div><div class="pre-item"><span>Hábitos</span>{{ preconsulta.habitos|default:"No indicados" }}</div><div class="pre-item"><span>Infecciosos</span>{{ preconsulta.antecedentes_infecciosos|default:"No indicados" }}</div></div></div>
-    <div class="pre-section"><h3>Campos privados del equipo médico</h3><p class="erp-card-muted">Historia de la enfermedad actual y examen físico no fueron solicitados al paciente en el enlace público; deben completarse durante la consulta por el médico o enfermería.</p></div>
-    {% else %}<div class="erp-empty">El paciente todavía no ha completado este formulario.</div>{% endif %}
+<section class="medical-read-shell">
+    <div class="read-hero">
+        <div>
+            <div class="erp-kpi-label">Formulario recibido</div>
+            <h3>{{ paciente.nombre }}</h3>
+            <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · {{ preconsulta.get_tipo_display }}{% if preconsulta.fecha_completada %} · Completado {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% endif %}</p>
+            {% if preconsulta.estado == "completada" %}<p><strong>Consulta completada</strong></p>{% endif %}
+        </div>
+        <span class="read-badge">{{ preconsulta.get_estado_display }}</span>
+    </div>
+
+    <div class="read-confidential">
+        Información privada y confidencial. Este formulario fue completado por el paciente y debe ser confirmado por la doctora o personal autorizado durante la atención.
+    </div>
+
+    {% if preconsulta.estado == "completada" %}
+        {% for seccion in secciones_preconsulta %}
+        <article class="read-section">
+            <div class="read-section-head">
+                <h3>{{ seccion.titulo }}</h3>
+                <p>{{ seccion.descripcion }}</p>
+            </div>
+            <div class="read-grid">
+                {% for campo in seccion.campos %}
+                <div class="read-field">
+                    <span class="read-label">{{ campo.label }}</span>
+                    {% if campo.type == "chips" %}
+                    <div class="read-chips">
+                        {% for item in campo.value %}
+                        <span class="read-chip {% if 'Alergia' in campo.label or 'alergia' in campo.label %}warn{% endif %}">{{ item }}</span>
+                        {% empty %}
+                        <span class="erp-card-muted">No indicado</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="read-value">{{ campo.value|linebreaksbr }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+        {% empty %}
+        <div class="read-empty erp-card">No hay datos disponibles para mostrar.</div>
+        {% endfor %}
+
+        <div class="doctor-cta">
+            <div>
+                <h3>Nota profesional de la consulta</h3>
+                <p>Después de leer el formulario, la doctora puede documentar aquí lo ocurrido en la cita: evaluación, diagnóstico, plan, indicaciones y seguimiento.</p>
+            </div>
+            {% if preconsulta.tipo != "general" %}
+            <a class="erp-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id preconsulta.tipo %}">Escribir nota de consulta</a>
+            {% else %}
+            <a class="erp-btn" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Elegir área y escribir nota</a>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="read-empty erp-card">El paciente todavía no ha completado este formulario.</div>
+    {% endif %}
 </section>
 {% endblock %}

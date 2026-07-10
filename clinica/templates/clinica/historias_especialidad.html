@@ -6,6 +6,7 @@
 {% block header_description %}Selecciona el área médica para registrar una atención, generar su preconsulta o consultar el historial.{% endblock %}
 
 {% block topbar_actions %}
+<a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Vista clínica completa</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
 {% endblock %}
 
@@ -49,6 +50,12 @@
                     {% csrf_token %}
                     <button class="specialty-mini-btn" type="submit">Nueva preconsulta</button>
                 </form>
+                {% if tipo.ultima_preconsulta %}
+                <a class="specialty-mini-btn" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id tipo.ultima_preconsulta.id %}">Ver formulario</a>
+                {% endif %}
+                {% if tipo.total %}
+                <a class="specialty-mini-btn" href="#historial-{{ tipo.codigo }}">Ver historial</a>
+                {% endif %}
             </div>
         </article>
         {% endfor %}
@@ -78,7 +85,7 @@
 <section class="erp-card history-list">
     <div class="erp-section-heading"><div><div class="erp-kpi-label">Registro cronológico</div><h3>Historias anteriores</h3></div></div>
     {% for historia in historias %}
-    <div class="history-row">
+    <div class="history-row" id="historial-{{ historia.tipo }}">
         <div><div class="history-date">{{ historia.fecha_atencion|date:"d/m/Y" }}</div><div class="history-meta">{{ historia.fecha_atencion|date:"H:i" }}</div></div>
         <div>
             <h4>{{ historia.get_tipo_display }}</h4>

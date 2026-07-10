@@ -1,0 +1,117 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Vista clínica completa - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Vista clínica completa{% endblock %}
+{% block header_description %}Toda la información clínica del paciente en una sola pantalla: preconsultas, formularios por área, notas, diagnóstico y plan.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.consolidated-shell{max-width:1240px;margin:0 auto}.patient-cover{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,180px);gap:14px;align-items:stretch;margin-bottom:18px}
+.cover-main,.cover-stat{border:1px solid #cfe0f3;border-radius:18px;background:linear-gradient(135deg,#fff,#f6fbff);padding:18px}.cover-main h3{margin:5px 0;color:#102338;font-size:24px}.cover-main p,.cover-stat span{margin:0;color:var(--muted)}.cover-stat strong{display:block;color:#102338;font-size:24px;margin-bottom:5px}.allergy-alert{margin-top:10px;display:inline-flex;padding:8px 11px;border:1px solid rgba(220,38,38,.25);border-radius:999px;background:#fff5f5;color:#9f1239;font-weight:900}
+.timeline-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px}.area-nav{position:sticky;top:88px;align-self:start;border:1px solid var(--line);border-radius:18px;background:#fff;padding:14px}.area-nav h3{margin:0 0 12px;color:#102338}.area-nav a{display:flex;justify-content:space-between;gap:8px;padding:10px 11px;border-radius:12px;color:#17365c;text-decoration:none;font-weight:800}.area-nav a:hover{background:#f1f7ff}.area-nav em{font-style:normal;color:var(--muted);font-size:12px}
+.clinical-block{margin-bottom:18px;border:1px solid var(--line);border-radius:20px;background:#fff;overflow:hidden;box-shadow:0 14px 34px rgba(16,35,56,.05)}.block-head{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:17px 18px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,#fbfdff,#f7fcfb)}.block-head h3{margin:0;color:#102338}.block-head p{margin:5px 0 0;color:var(--muted);font-size:13px}.block-body{padding:16px 18px}
+.read-section-mini{margin-top:12px;border:1px solid #dbe8f5;border-radius:16px;overflow:hidden}.read-section-mini summary{cursor:pointer;padding:13px 15px;background:#f8fbff;font-weight:900;color:#102338}.mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px}.mini-field{padding:11px;border:1px solid #e0ebf6;border-radius:12px;background:#fff}.mini-label{display:block;margin-bottom:6px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.07em;color:#60748d}.mini-chips{display:flex;gap:6px;flex-wrap:wrap}.mini-chip{display:inline-flex;padding:6px 9px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:11px;font-weight:900}.note-card{padding:14px;border:1px solid #dbe8f5;border-radius:16px;background:#fbfdff;margin-bottom:12px}.note-card h4{margin:0 0 6px;color:#102338}.note-meta{color:var(--muted);font-size:12px;margin-bottom:10px}.note-plan{padding:12px;border-radius:12px;background:#fff;border:1px solid #e0ebf6;line-height:1.6}.status-pill{display:inline-flex;padding:4px 9px;border-radius:999px;background:#e8f6f2;color:#087466;font-size:10px;font-weight:900;text-transform:uppercase}.status-pill.is-draft{background:#fff6dc;color:#926300}.empty-zone{padding:22px;text-align:center;color:var(--muted);border:1px dashed #cbd9e8;border-radius:16px;background:#fbfdff}
+@media(max-width:980px){.patient-cover,.timeline-layout,.mini-grid{grid-template-columns:1fr}.area-nav{position:static}}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="consolidated-shell">
+    <div class="patient-cover">
+        <div class="cover-main">
+            <div class="erp-kpi-label">Paciente</div>
+            <h3>{{ paciente.nombre }}</h3>
+            <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · RH {{ paciente.rh|default:"No indicado" }}</p>
+            {% if paciente.es_alergico %}<span class="allergy-alert">Alerta de alergia: {{ paciente.alergias|default:"Sin detalle" }}</span>{% endif %}
+        </div>
+        <div class="cover-stat"><strong>{{ preconsultas|length }}</strong><span>preconsulta(s) completada(s)</span></div>
+        <div class="cover-stat"><strong>{{ historias|length }}</strong><span>nota(s) clínica(s)</span></div>
+        <div class="cover-stat"><strong>{{ tipos|length }}</strong><span>áreas clínicas</span></div>
+    </div>
+
+    <div class="timeline-layout">
+        <aside class="area-nav">
+            <h3>Áreas</h3>
+            <a href="#preconsultas">Preconsultas <em>{{ preconsultas|length }}</em></a>
+            {% for tipo in tipos %}
+            <a href="#area-{{ tipo.codigo }}">{{ tipo.nombre }} <em>{{ tipo.historias|length }}</em></a>
+            {% endfor %}
+        </aside>
+
+        <div>
+            <section class="clinical-block" id="preconsultas">
+                <div class="block-head">
+                    <div><h3>Formularios completados por el paciente</h3><p>Lectura rápida de todas las preconsultas finalizadas.</p></div>
+                </div>
+                <div class="block-body">
+                    {% for bloque in bloques_preconsulta %}
+                    <details class="read-section-mini" {% if forloop.first %}open{% endif %}>
+                        <summary>{{ bloque.preconsulta.get_tipo_display }} · {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i" }}</summary>
+                        {% for seccion in bloque.secciones %}
+                        <div class="mini-grid">
+                            {% for campo in seccion.campos %}
+                            <div class="mini-field">
+                                <span class="mini-label">{{ campo.label }}</span>
+                                {% if campo.type == "chips" %}
+                                <div class="mini-chips">
+                                    {% for item in campo.value %}<span class="mini-chip">{{ item }}</span>{% empty %}<span class="erp-card-muted">No indicado</span>{% endfor %}
+                                </div>
+                                {% else %}
+                                {{ campo.value|linebreaksbr }}
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                        <div style="padding:0 12px 12px;"><a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id bloque.preconsulta.id %}">Ver formulario completo</a></div>
+                    </details>
+                    {% empty %}
+                    <div class="empty-zone">Todavía no hay preconsultas completadas.</div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% for tipo in tipos %}
+            <section class="clinical-block" id="area-{{ tipo.codigo }}">
+                <div class="block-head">
+                    <div><h3>{{ tipo.nombre }}</h3><p>{{ tipo.historias|length }} historia(s) · {{ tipo.preconsultas|length }} preconsulta(s)</p></div>
+                    <a class="erp-btn-secondary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id tipo.codigo %}">Nueva entrada</a>
+                </div>
+                <div class="block-body">
+                    {% for historia in tipo.historias %}
+                    <article class="note-card">
+                        <h4>{{ historia.fecha_atencion|date:"d/m/Y H:i" }} · {{ historia.get_estado_display }}</h4>
+                        <div class="note-meta">{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} · Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
+                        {% if historia.datos_especialidad %}
+                        <div class="mini-chips" style="margin-bottom:10px;">
+                            {% for clave, valor in historia.datos_especialidad.items|slice:":8" %}
+                            <span class="mini-chip">{{ valor }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <div class="note-plan">
+                            {% if historia.plan_tratamiento %}
+                            {{ historia.plan_tratamiento|linebreaksbr }}
+                            {% elif historia.observaciones %}
+                            {{ historia.observaciones|linebreaksbr }}
+                            {% else %}
+                            <span class="erp-card-muted">Sin diagnóstico/plan registrado.</span>
+                            {% endif %}
+                        </div>
+                        <div style="margin-top:10px;"><a class="erp-btn-secondary" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver nota bloqueada{% else %}Ver detalle{% endif %}</a></div>
+                    </article>
+                    {% empty %}
+                    <div class="empty-zone">Sin historias registradas en esta área.</div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

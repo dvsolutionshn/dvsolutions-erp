@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from datetime import datetime
 
 from django import forms
@@ -451,8 +452,53 @@ MEDICINA_ESTETICA_FORMULARIO = [
     ], True),
 ]
 
+CIRUGIA_PLASTICA_FORMULARIO = [
+    ("cirugia_facial", "Cirugía facial de interés", [
+        ("blefaroplastia_superior", "Blefaroplastia superior (retirar exceso de piel del párpado superior)"),
+        ("blefaroplastia_inferior", "Blefaroplastia inferior (mejorar bolsas u ojeras del párpado inferior)"),
+        ("lifting_facial", "Lifting facial (rejuvenecimiento y flacidez del rostro)"),
+        ("lifting_cervical", "Lifting cervical (mejorar flacidez del cuello)"),
+        ("rinoplastia", "Rinoplastia (cirugía estética o funcional de la nariz)"),
+        ("otoplastia", "Otoplastia (corrección de orejas prominentes)"),
+        ("bichectomia", "Bichectomía (reducción de bolsas de Bichat en mejillas)"),
+        ("mentoplastia", "Mentoplastia (mejorar forma o proyección del mentón)"),
+    ], True),
+    ("cirugia_mamaria", "Cirugía mamaria de interés", [
+        ("aumento_mamario", "Aumento mamario (colocación de implantes o aumento de volumen)"),
+        ("levantamiento_mamario", "Levantamiento mamario / mastopexia (elevar y mejorar forma del busto)"),
+        ("reduccion_mamaria", "Reducción mamaria (disminuir volumen del busto)"),
+        ("recambio_implantes", "Recambio de implantes (cambiar implantes previos)"),
+        ("retiro_implantes", "Retiro de implantes (extraer implantes mamarios)"),
+        ("ginecomastia", "Ginecomastia (reducción de tejido mamario en hombres)"),
+    ], True),
+    ("contorno_corporal", "Contorno corporal de interés", [
+        ("liposuccion", "Liposucción (retirar grasa localizada)"),
+        ("lipoescultura", "Lipoescultura (moldear el contorno corporal)"),
+        ("abdominoplastia", "Abdominoplastia (retirar exceso de piel y reparar abdomen)"),
+        ("lipoabdominoplastia", "Lipoabdominoplastia (liposucción más abdominoplastia)"),
+        ("braquioplastia", "Braquioplastia (brazos: retirar flacidez o exceso de piel)"),
+        ("musloplastia", "Musloplastia (piernas/muslos: retirar flacidez o exceso de piel)"),
+        ("gluteoplastia", "Gluteoplastia (glúteos: mejorar forma o volumen)"),
+    ], True),
+    ("cirugia_intima", "Cirugía íntima femenina de interés", [
+        ("labioplastia", "Labioplastia (mejorar tamaño o forma de labios menores)"),
+        ("rejuvenecimiento_vaginal", "Rejuvenecimiento vaginal (mejorar tonicidad o molestias íntimas)"),
+        ("monte_venus", "Monte de Venus (mejorar volumen o contorno de la zona suprapúbica)"),
+    ], True),
+    ("riesgo_quirurgico", "Aspectos importantes para valorar riesgo quirúrgico", [
+        ("fumador", "Fuma actualmente"),
+        ("anticoagulantes", "Usa anticoagulantes o aspirina"),
+        ("diabetes", "Diabetes"),
+        ("hipertension", "Hipertensión"),
+        ("trombosis", "Antecedente de trombosis"),
+        ("cirugia_previa", "Cirugía previa relevante"),
+        ("ninguno", "Ninguno / no aplica"),
+    ], True),
+]
+
 FORMULARIOS_ESTRUCTURADOS = {
     "capilar": CAPILAR_FORMULARIO,
+    "cirugia_plastica": CIRUGIA_PLASTICA_FORMULARIO,
     "medicina_estetica": MEDICINA_ESTETICA_FORMULARIO,
 }
 
@@ -573,6 +619,30 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                 label="Otro:" if nombre in {"estetica_motivo", "estetica_objetivo_principal"} else "Otros / detalle",
                 widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Detalle si aplica."}),
                 initial=datos.get(f"{nombre}_otros", ""),
+            )
+        if self.campos_estructurados:
+            campos_texto_a_ocultar = [
+                "motivo_consulta", "antecedentes", "historia_enfermedad_actual",
+                "signos_vitales", "examen_fisico", "evaluacion_clinica",
+                "diagnostico", "analisis_clinico", "procedimiento", "conducta",
+                "indicaciones", "observaciones", "notas_privadas_doctor",
+            ]
+            for campo in campos_texto_a_ocultar:
+                self.fields.pop(campo, None)
+            if "plan_tratamiento" in self.fields:
+                self.fields["plan_tratamiento"].label = "Diagnóstico y plan"
+                self.fields["plan_tratamiento"].widget.attrs.update({
+                    "rows": 8,
+                    "placeholder": "Escriba aquí el diagnóstico, hallazgos relevantes, conducta médica, plan de tratamiento, indicaciones y seguimiento.",
+                })
+            orden = ["profesional", "fecha_atencion"]
+            for nombre, *_resto in self.campos_estructurados:
+                orden.extend([nombre, f"{nombre}_otros"])
+            orden.extend(["plan_tratamiento", "estado"])
+            self.fields = OrderedDict(
+                (nombre, self.fields[nombre])
+                for nombre in orden
+                if nombre in self.fields
             )
         placeholders = {
             "motivo_consulta": "Resumen breve del motivo principal referido en consulta.",

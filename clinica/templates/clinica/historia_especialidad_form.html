@@ -6,6 +6,7 @@
 {% block header_description %}Registro clinico de {{ paciente.nombre }}. Los cambios quedan asociados al usuario y fecha de actualizacion.{% endblock %}
 
 {% block topbar_actions %}
+<a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Vista clínica completa</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>
 {% endblock %}
 
@@ -75,11 +76,11 @@
     <div class="doctor-workflow">
         <div class="erp-kpi-label">Atención médica interna</div>
         <h3>Formulario privado para la doctora durante la consulta</h3>
-        <p>La preconsulta es lo que llenó el paciente. Esta sección es la historia clínica profesional: aquí la doctora puede documentar HEA, examen físico, impresión clínica, conducta, plan e indicaciones sin mezclarlo con el formulario público.</p>
+        <p>La preconsulta es lo que llenó el paciente. Esta sección es privada de la doctora/equipo: primero marque las opciones clínicas del área y al final escriba en un solo cuadro el diagnóstico, plan, indicaciones y seguimiento.</p>
         <div class="doctor-workflow-grid">
             <div class="doctor-step"><strong>1. Confirmar datos</strong><span>Revisar motivo, antecedentes, medicamentos, alergias y riesgos reportados.</span></div>
-            <div class="doctor-step"><strong>2. Evaluar en consulta</strong><span>Completar historia de enfermedad actual, signos vitales y examen físico.</span></div>
-            <div class="doctor-step"><strong>3. Cerrar criterio médico</strong><span>Registrar diagnóstico, análisis, conducta, plan e indicaciones.</span></div>
+            <div class="doctor-step"><strong>2. Marcar opciones</strong><span>Completar las preguntas de selección del área clínica.</span></div>
+            <div class="doctor-step"><strong>3. Diagnóstico y plan</strong><span>Documentar en un solo cuadro lo ocurrido en la cita y la conducta a seguir.</span></div>
         </div>
     </div>
     {% endif %}
