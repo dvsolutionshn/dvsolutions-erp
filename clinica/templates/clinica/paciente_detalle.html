@@ -75,7 +75,7 @@
 </section>
 
 <section class="patient-entry-grid">
-    <a class="erp-card patient-entry-card" href="{% if formularios_hospitalarios %}{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}{% else %}#historial-clinico{% endif %}"><div class="erp-kpi-label">Expediente</div><h3>Historial Clinico</h3><p>{% if formularios_hospitalarios %}Formularios de Capilar, Cirugia, Medicina Estetica, Enfermeria, Terapias y Camara hiperbarica.{% else %}Antecedentes, funciones, examen fisico, diagnosticos y plan.{% endif %}</p></a>
+    <a class="erp-card patient-entry-card" href="{% if formularios_hospitalarios %}{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}{% else %}#historial-clinico{% endif %}"><div class="erp-kpi-label">Expediente</div><h3>Historial Clinico</h3><p>{% if formularios_hospitalarios %}Formularios de Capilar, Cirugia, Tratamiento Estetico / Piel, Enfermeria, Terapias y Camara hiperbarica.{% else %}Antecedentes, funciones, examen fisico, diagnosticos y plan.{% endif %}</p></a>
     <a class="erp-card patient-entry-card" href="#plan-tratamiento"><div class="erp-kpi-label">Ruta medica</div><h3>Plan de tratamiento</h3><p>Tratamientos activos, objetivos, plan clinico, costos y seguimiento profesional.</p></a>
     <a class="erp-card patient-entry-card" href="#evolucion"><div class="erp-kpi-label">Bitacora visual</div><h3>Evolucion</h3><p>Fotos, fechas, procedimiento aplicado y registro cronologico del avance.</p></a>
     <a class="erp-card patient-entry-card" href="#citas"><div class="erp-kpi-label">Agenda</div><h3>Citas</h3><p>Citas pasadas, programadas y acceso rapido para agendar nuevas atenciones.</p></a>

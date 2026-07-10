@@ -437,13 +437,13 @@ def historias_especialidad(request, empresa_slug, paciente_id):
     _requiere_hospital_mia(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
-    preconsultas = paciente.preconsultas.select_related("creada_por")[:30]
+    preconsultas = paciente.preconsultas.filter(estado="completada").select_related("creada_por")[:30]
     tipos = [
         {
             "codigo": codigo,
             "nombre": nombre,
             "total": historias.filter(tipo=codigo).count(),
-            "preconsultas": paciente.preconsultas.filter(tipo=codigo).count(),
+            "preconsultas": paciente.preconsultas.filter(tipo=codigo, estado="completada").count(),
         }
         for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
     ]
