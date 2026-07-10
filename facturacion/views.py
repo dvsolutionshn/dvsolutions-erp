@@ -362,7 +362,12 @@ def punto_venta(request, empresa_slug):
                     "precio_unitario": precio_unitario,
                     "impuesto": impuesto,
                 })
-            regalos_promocion, promocion_pos = _calcular_regalos_promocion_pos(empresa, lineas_preparadas, fecha_venta)
+            regalos_promocion, promocion_pos = _calcular_regalos_promocion_pos(
+                empresa,
+                lineas_preparadas,
+                fecha_venta,
+                payload.get("promocion_regalos") or [],
+            )
 
             with transaction.atomic():
                 cliente = None
@@ -410,7 +415,13 @@ def punto_venta(request, empresa_slug):
                     for producto_id, cantidad_gratis in regalos_promocion.items():
                         if cantidad_gratis <= 0:
                             continue
-                        producto = productos.get(producto_id)
+                        producto = Producto.objects.filter(
+                            empresa=empresa,
+                            activo=True,
+                            eliminado=False,
+                            tipo_item="producto",
+                            id=producto_id,
+                        ).first()
                         if not producto:
                             continue
                         impuesto = producto.impuesto_predeterminado or impuesto_default
@@ -1394,6 +1405,7 @@ def _pos_producto_payload(producto, impuesto_default=None):
         "impuesto": float(impuesto.porcentaje if impuesto else Decimal("0.00")),
         "stock": float(producto.stock_actual),
         "unidad": producto.get_unidad_medida_display(),
+        "tipo_item": producto.tipo_item,
         "controla_inventario": producto.controla_inventario,
     }
 
@@ -1452,12 +1464,12 @@ def _promocion_pos_payload(empresa, fecha):
     }
 
 
-def _calcular_regalos_promocion_pos(empresa, lineas_preparadas, fecha_venta):
+def _calcular_regalos_promocion_pos(empresa, lineas_preparadas, fecha_venta, regalos_solicitados=None):
     promocion = _promocion_pos_vigente(empresa, fecha_venta)
     if not promocion:
         return {}, None
 
-    productos_permitidos = set(
+    productos_regalia = set(
         promocion.productos_configurados.filter(
             activo=True,
             producto__activo=True,
@@ -1465,33 +1477,40 @@ def _calcular_regalos_promocion_pos(empresa, lineas_preparadas, fecha_venta):
             producto__tipo_item="producto",
         ).values_list("producto_id", flat=True)
     )
-    elegibles = [
-        linea
-        for linea in lineas_preparadas
-        if linea["producto"].id in productos_permitidos and linea["cantidad"] > 0
-    ]
-    if not elegibles:
+    if not productos_regalia:
         return {}, promocion
 
     cantidad_pagada = Decimal(str(promocion.cantidad_pagada))
     cantidad_gratis = Decimal(str(promocion.cantidad_gratis))
-    total_pagado = sum((linea["cantidad"] for linea in elegibles), Decimal("0.00"))
+    total_pagado = sum(
+        (
+            linea["cantidad"]
+            for linea in lineas_preparadas
+            if linea["producto"].tipo_item == "producto" and linea["cantidad"] > 0
+        ),
+        Decimal("0.00"),
+    )
     grupos = (total_pagado / cantidad_pagada).to_integral_value(rounding=ROUND_FLOOR)
     total_gratis = grupos * cantidad_gratis
     if total_gratis <= 0:
         return {}, promocion
 
     regalos = {}
-    pendiente = total_gratis
-    for linea in sorted(elegibles, key=lambda item: (item["precio_unitario"], item["producto"].nombre)):
-        if pendiente <= 0:
-            break
-        cantidad_base = linea["cantidad"].to_integral_value(rounding=ROUND_FLOOR)
-        if cantidad_base <= 0:
+    for item in regalos_solicitados or []:
+        try:
+            producto_id = int(item.get("producto_id"))
+            cantidad = Decimal(str(item.get("cantidad") or "0")).quantize(Decimal("0.01"))
+        except (TypeError, ValueError, InvalidOperation):
+            raise ValidationError("Selecciona productos de regalia validos para aplicar la promocion.")
+        if cantidad <= 0:
             continue
-        cantidad_producto = min(cantidad_base, pendiente)
-        regalos[linea["producto"].id] = regalos.get(linea["producto"].id, Decimal("0.00")) + cantidad_producto
-        pendiente -= cantidad_producto
+        if producto_id not in productos_regalia:
+            raise ValidationError("Uno de los productos seleccionados como regalia no pertenece a la promocion activa.")
+        regalos[producto_id] = regalos.get(producto_id, Decimal("0.00")) + cantidad
+
+    total_solicitado = sum(regalos.values(), Decimal("0.00"))
+    if total_solicitado != total_gratis:
+        raise ValidationError(f"Esta venta permite {int(total_gratis)} producto(s) gratis. Selecciona exactamente esa cantidad en la promocion.")
 
     return regalos, promocion
 

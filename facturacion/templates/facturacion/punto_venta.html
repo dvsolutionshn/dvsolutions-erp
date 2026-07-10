@@ -44,6 +44,10 @@
 .pos-promo-box strong{color:#102338;font-size:15px}
 .pos-promo-box span{font-size:13px;line-height:1.35}
 .pos-promo-box .pos-promo-free{font-size:22px;font-weight:900;color:#0f766e}
+.pos-promo-gifts{display:grid;gap:8px;margin-top:6px}
+.pos-promo-gift-row{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;align-items:center}
+.pos-promo-gift-row b{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:#ccfbf1;color:#0f766e;font-size:12px}
+.pos-promo-select{width:100%;min-height:38px;border:1px solid #99f6e4;border-radius:10px;background:#fff;color:#102338;padding:0 10px;font-weight:700}
 .pos-cart-item{display:grid;grid-template-columns:42px minmax(0,1fr) 94px 30px;gap:10px;align-items:center;border:1px solid #d9e5f4;border-radius:10px;padding:10px;background:#fff}
 .pos-cart-item strong{display:block;font-size:14px;color:#102338}
 .pos-cart-item span{display:block;color:#5b6f8e;font-size:13px;margin-top:3px}
@@ -253,6 +257,7 @@
     const warehouses = JSON.parse(document.getElementById("pos-warehouses").textContent);
     const promotion = JSON.parse(document.getElementById("pos-promotion").textContent);
     const promotionProducts = new Set((promotion.productos || []).map(Number));
+    const promotionGiftProducts = () => products.filter(product => promotionProducts.has(Number(product.id)) && product.tipo_item === "producto");
     const clientRequired = {{ cliente_obligatorio|yesno:"true,false" }};
     const preciosIncluyenImpuesto = {{ precios_incluyen_impuesto|yesno:"true,false" }};
     const urls = {
@@ -452,7 +457,7 @@
             return {enabled:false, paidQty:0, freeQty:0};
         }
         const paidQty = Array.from(cart.values()).reduce((total, item) => {
-            if(!promotionProducts.has(Number(item.producto_id))){return total;}
+            if(item.tipo_item !== "producto"){return total;}
             return total + Math.floor(Number(item.cantidad || 0));
         }, 0);
         const paidRule = Number(promotion.cantidad_pagada || 3);
@@ -469,10 +474,31 @@
             return;
         }
         const faltan = state.freeQty > 0 ? 0 : Math.max(0, state.paidRule - state.paidQty);
+        const giftProducts = promotionGiftProducts();
+        const giftSelectors = state.freeQty > 0 && giftProducts.length
+            ? `<div class="pos-promo-gifts">${Array.from({length: state.freeQty}).map((_, index) => `
+                <label class="pos-promo-gift-row">
+                    <b>${index + 1}</b>
+                    <select class="pos-promo-select" data-promo-gift>
+                        ${giftProducts.map(product => `<option value="${product.id}">${product.nombre}</option>`).join("")}
+                    </select>
+                </label>
+            `).join("")}</div>`
+            : "";
         promoBox.innerHTML = state.freeQty > 0
-            ? `<strong>${promotion.nombre}</strong><span class="pos-promo-free">${state.freeQty} gratis</span><span>Se aplicara automaticamente al cobrar: por cada ${state.paidRule} productos participantes, ${state.freeRule} gratis con descuento 100%.</span>`
-            : `<strong>${promotion.nombre}</strong><span>Agrega ${faltan} producto(s) participante(s) mas para activar ${state.freeRule} gratis.</span>`;
+            ? `<strong>${promotion.nombre}</strong><span class="pos-promo-free">${state.freeQty} gratis</span><span>Selecciona de la lista el producto que se entregara como regalia. Por cada ${state.paidRule} productos comprados, ${state.freeRule} gratis.</span>${giftProducts.length ? giftSelectors : "<span>No hay productos de regalia configurados.</span>"}`
+            : `<strong>${promotion.nombre}</strong><span>Agrega ${faltan} producto(s) mas para activar ${state.freeRule} gratis. La compra puede ser variada.</span>`;
         promoBox.classList.add("is-visible");
+    }
+
+    function selectedPromotionGifts(){
+        const counts = new Map();
+        document.querySelectorAll("[data-promo-gift]").forEach(select => {
+            if(!select.value){return;}
+            const productId = Number(select.value);
+            counts.set(productId, (counts.get(productId) || 0) + 1);
+        });
+        return Array.from(counts.entries()).map(([producto_id, cantidad]) => ({producto_id, cantidad}));
     }
 
     function renderCart(){
@@ -593,7 +619,8 @@
             foto_url: product.foto_url || "",
             cantidad: 0,
             precio_unitario: Number(product.precio),
-            impuesto: Number(product.impuesto)
+            impuesto: Number(product.impuesto),
+            tipo_item: product.tipo_item || "producto"
         };
         current.cantidad += 1;
         cart.set(product.id, current);
@@ -786,6 +813,15 @@
             cashReceived.focus();
             return;
         }
+        const promoState = promotionState();
+        const promoGifts = selectedPromotionGifts();
+        const selectedGiftQty = promoGifts.reduce((total, item) => total + Number(item.cantidad || 0), 0);
+        if(promoState.freeQty > 0 && selectedGiftQty !== promoState.freeQty){
+            showCheckoutStatus(`Selecciona exactamente ${promoState.freeQty} producto(s) de regalia antes de cobrar.`, true);
+            const firstGiftSelect = document.querySelector("[data-promo-gift]");
+            if(firstGiftSelect){firstGiftSelect.focus();}
+            return;
+        }
 
         payloadInput.value = JSON.stringify({
             fecha: document.getElementById("saleDate").value,
@@ -794,7 +830,8 @@
             cliente_id: selectedClient ? selectedClient.id : "",
             referencia: document.getElementById("referenceInput").value,
             monto_recibido: paymentMethod.value === "efectivo" ? cashReceived.value : "",
-            promocion_pos: promotionState(),
+            promocion_pos: promoState,
+            promocion_regalos: promoGifts,
             items: Array.from(cart.values())
         });
         checkoutButton.disabled = true;

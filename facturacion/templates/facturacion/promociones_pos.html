@@ -3,7 +3,7 @@
 {% block title %}Promocion POS - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Punto de Venta{% endblock %}
 {% block header_title %}Promocion 3 + 1 gratis{% endblock %}
-{% block header_description %}Activa la promocion por temporadas y define que productos participan en el punto de venta.{% endblock %}
+{% block header_description %}Activa la promocion por temporadas y define que productos pueden entregarse como regalia.{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -43,7 +43,7 @@
         <div class="promo-hero">
             <small>Regla comercial</small>
             <h2>{{ promocion.cantidad_pagada|default:3 }} + {{ promocion.cantidad_gratis|default:1 }}</h2>
-            <p>Por cada {{ promocion.cantidad_pagada|default:3 }} productos participantes cobrados, el POS agrega {{ promocion.cantidad_gratis|default:1 }} gratis con descuento del 100%.</p>
+            <p>Por cada {{ promocion.cantidad_pagada|default:3 }} productos físicos comprados, el POS habilita {{ promocion.cantidad_gratis|default:1 }} producto gratis de la lista de regalías.</p>
         </div>
 
         <div class="promo-form">
@@ -97,8 +97,8 @@
     <section class="promo-card">
         <div class="promo-products-head">
             <div>
-                <div class="erp-kpi-label">Productos participantes</div>
-                <h3 class="erp-panel-title" style="margin:4px 0 0;">Selecciona que productos aplican</h3>
+                <div class="erp-kpi-label">Productos de regalía</div>
+                <h3 class="erp-panel-title" style="margin:4px 0 0;">Selecciona que productos se pueden regalar</h3>
             </div>
             <span class="erp-badge">{{ productos|length }} productos</span>
         </div>

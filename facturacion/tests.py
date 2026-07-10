@@ -445,9 +445,33 @@ class FacturacionTests(TestCase):
         self.producto.impuesto_predeterminado = self.impuesto
         self.producto.controla_inventario = True
         self.producto.save()
+        producto_variado = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto Variado",
+            precio=Decimal("50.00"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=True,
+        )
+        producto_regalia = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Regalia Configurada",
+            precio=Decimal("20.00"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=True,
+        )
         InventarioProducto.objects.update_or_create(
             empresa=self.empresa,
             producto=self.producto,
+            defaults={"existencias": Decimal("20.00"), "stock_minimo": Decimal("0.00")},
+        )
+        InventarioProducto.objects.update_or_create(
+            empresa=self.empresa,
+            producto=producto_variado,
+            defaults={"existencias": Decimal("20.00"), "stock_minimo": Decimal("0.00")},
+        )
+        InventarioProducto.objects.update_or_create(
+            empresa=self.empresa,
+            producto=producto_regalia,
             defaults={"existencias": Decimal("20.00"), "stock_minimo": Decimal("0.00")},
         )
         promocion = PromocionPuntoVenta.objects.create(
@@ -457,19 +481,27 @@ class FacturacionTests(TestCase):
             cantidad_pagada=3,
             cantidad_gratis=1,
         )
-        ProductoPromocionPuntoVenta.objects.create(promocion=promocion, producto=self.producto)
+        ProductoPromocionPuntoVenta.objects.create(promocion=promocion, producto=producto_regalia)
 
         response = self.client.post(
             reverse("punto_venta", args=[self.empresa.slug]),
             {
                 "payload": json.dumps({
                     "metodo": "efectivo",
-                    "monto_recibido": "1035.00",
+                    "monto_recibido": "287.50",
+                    "promocion_regalos": [
+                        {"producto_id": producto_regalia.id, "cantidad": "1"}
+                    ],
                     "items": [
                         {
                             "producto_id": self.producto.id,
-                            "cantidad": "9",
+                            "cantidad": "2",
                             "precio_unitario": "100.00",
+                        },
+                        {
+                            "producto_id": producto_variado.id,
+                            "cantidad": "1",
+                            "precio_unitario": "50.00",
                         }
                     ],
                 })
@@ -480,25 +512,46 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         factura = Factura.objects.get(pk=response.json()["factura_id"])
         lineas = list(factura.lineas.order_by("descuento_porcentaje", "id"))
-        self.assertEqual(len(lineas), 2)
-        self.assertEqual(lineas[0].cantidad, Decimal("9.00"))
+        self.assertEqual(len(lineas), 3)
+        self.assertEqual(lineas[0].cantidad, Decimal("2.00"))
         self.assertEqual(lineas[0].descuento_porcentaje, Decimal("0.00"))
-        self.assertEqual(lineas[1].cantidad, Decimal("3.00"))
-        self.assertEqual(lineas[1].descuento_porcentaje, Decimal("100.00"))
-        self.assertIn("Promo prueba", lineas[1].comentario)
-        self.assertEqual(factura.subtotal, Decimal("900.00"))
-        self.assertEqual(factura.impuesto, Decimal("135.00"))
-        self.assertEqual(factura.total, Decimal("1035.00"))
+        self.assertEqual(lineas[1].cantidad, Decimal("1.00"))
+        self.assertEqual(lineas[1].descuento_porcentaje, Decimal("0.00"))
+        self.assertEqual(lineas[2].producto, producto_regalia)
+        self.assertEqual(lineas[2].cantidad, Decimal("1.00"))
+        self.assertEqual(lineas[2].descuento_porcentaje, Decimal("100.00"))
+        self.assertIn("Promo prueba", lineas[2].comentario)
+        self.assertEqual(factura.subtotal, Decimal("250.00"))
+        self.assertEqual(factura.impuesto, Decimal("37.50"))
+        self.assertEqual(factura.total, Decimal("287.50"))
         self.assertEqual(
             MovimientoInventario.objects.filter(
                 factura=factura,
                 producto=self.producto,
                 tipo="salida_factura",
             ).aggregate(total=Sum("cantidad"))["total"],
-            Decimal("12.00"),
+            Decimal("2.00"),
+        )
+        self.assertEqual(
+            MovimientoInventario.objects.filter(
+                factura=factura,
+                producto=producto_variado,
+                tipo="salida_factura",
+            ).aggregate(total=Sum("cantidad"))["total"],
+            Decimal("1.00"),
+        )
+        self.assertEqual(
+            MovimientoInventario.objects.filter(
+                factura=factura,
+                producto=producto_regalia,
+                tipo="salida_factura",
+            ).aggregate(total=Sum("cantidad"))["total"],
+            Decimal("1.00"),
         )
         self.producto.inventario.refresh_from_db()
-        self.assertEqual(self.producto.inventario.existencias, Decimal("8.00"))
+        producto_regalia.inventario.refresh_from_db()
+        self.assertEqual(self.producto.inventario.existencias, Decimal("18.00"))
+        self.assertEqual(producto_regalia.inventario.existencias, Decimal("19.00"))
 
     def test_configuracion_promocion_pos_renderiza_y_guarda_productos(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
