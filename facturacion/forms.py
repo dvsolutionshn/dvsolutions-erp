@@ -2,7 +2,7 @@ from django import forms
 from django.db.models import Sum
 from decimal import Decimal
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
 EMPRESAS_COSTO_REAL_INVENTARIO = {"hospital_mia", "medical_spa"}
@@ -461,6 +461,34 @@ class ProductoForm(forms.ModelForm):
                 'alerta_vencimiento_dias': self.cleaned_data.get('alerta_vencimiento_dias') or 60,
             },
         )
+
+
+class PromocionPuntoVentaForm(forms.ModelForm):
+    class Meta:
+        model = PromocionPuntoVenta
+        fields = ['nombre', 'activa', 'cantidad_pagada', 'cantidad_gratis', 'fecha_inicio', 'fecha_fin']
+        labels = {
+            'nombre': 'Nombre de la promocion',
+            'activa': 'Promocion activa',
+            'cantidad_pagada': 'Productos pagados',
+            'cantidad_gratis': 'Productos gratis',
+            'fecha_inicio': 'Fecha inicial',
+            'fecha_fin': 'Fecha final',
+        }
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'pos-input',
+                'placeholder': 'Ej. Promocion 3 + 1 gratis',
+            }),
+            'activa': forms.CheckboxInput(attrs={'class': 'pos-toggle-input'}),
+            'cantidad_pagada': forms.NumberInput(attrs={'class': 'pos-input', 'min': '1'}),
+            'cantidad_gratis': forms.NumberInput(attrs={'class': 'pos-input', 'min': '1'}),
+            'fecha_inicio': forms.DateInput(attrs={'class': 'pos-input', 'type': 'date'}),
+            'fecha_fin': forms.DateInput(attrs={'class': 'pos-input', 'type': 'date'}),
+        }
+
+    def clean_nombre(self):
+        return (self.cleaned_data.get('nombre') or '').strip() or 'Promocion 3 + 1 gratis'
 
 
 class EliminarProductoForm(forms.Form):

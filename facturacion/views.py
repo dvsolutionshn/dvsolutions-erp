@@ -19,7 +19,7 @@ from django.db.models.functions import TruncMonth
 from django.urls import reverse
 from weasyprint import HTML
 from datetime import datetime, date, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_FLOOR
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.chart import BarChart, Reference
@@ -41,8 +41,8 @@ from contabilidad.services import (
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
-from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 
@@ -362,6 +362,7 @@ def punto_venta(request, empresa_slug):
                     "precio_unitario": precio_unitario,
                     "impuesto": impuesto,
                 })
+            regalos_promocion, promocion_pos = _calcular_regalos_promocion_pos(empresa, lineas_preparadas, fecha_venta)
 
             with transaction.atomic():
                 cliente = None
@@ -405,6 +406,24 @@ def punto_venta(request, empresa_slug):
                     )
                     for linea in lineas_preparadas
                 ]
+                if promocion_pos and regalos_promocion:
+                    for producto_id, cantidad_gratis in regalos_promocion.items():
+                        if cantidad_gratis <= 0:
+                            continue
+                        producto = productos.get(producto_id)
+                        if not producto:
+                            continue
+                        impuesto = producto.impuesto_predeterminado or impuesto_default
+                        lineas.append(LineaFactura(
+                            factura=factura,
+                            producto=producto,
+                            cantidad=cantidad_gratis,
+                            precio_unitario=producto.precio,
+                            impuesto=impuesto,
+                            precio_incluye_impuesto=precios_incluyen_impuesto,
+                            descuento_porcentaje=Decimal("100.00"),
+                            comentario=f"{promocion_pos.nombre}: unidad gratis aplicada automaticamente.",
+                        ))
                 for linea in lineas:
                     linea.save()
 
@@ -483,18 +502,78 @@ def punto_venta(request, empresa_slug):
         .exclude(nombre__iexact="Consumidor Final")
         .order_by("nombre")[:250]
     ]
+    promocion_pos_payload = _promocion_pos_payload(empresa, timezone.localdate())
 
     return render(request, "facturacion/punto_venta.html", {
         "empresa": empresa,
         "productos_payload": productos_payload,
         "clientes_payload": clientes_payload,
         "bodegas_payload": [_pos_bodega_payload(bodega) for bodega in bodegas_pos],
+        "promocion_pos_payload": promocion_pos_payload,
         "productos_count": len(productos_payload),
         "cuentas_financieras": cuentas_financieras,
         "fecha_hoy": timezone.localdate().strftime("%Y-%m-%d"),
         "metodos_pago": PagoFactura.METODOS,
         "cliente_obligatorio": cliente_obligatorio,
         "precios_incluyen_impuesto": precios_incluyen_impuesto,
+    })
+
+
+@login_required
+def configurar_promocion_pos(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not empresa.tiene_modulo_activo("punto_venta"):
+        messages.error(request, "El modulo de punto de venta no esta activo para esta empresa.")
+        return redirect("facturacion_dashboard", empresa_slug=empresa.slug)
+
+    promocion = PromocionPuntoVenta.objects.filter(empresa=empresa).order_by("-activa", "-fecha_actualizacion").first()
+    if not promocion:
+        promocion = PromocionPuntoVenta.objects.create(
+            empresa=empresa,
+            nombre="Promocion 3 + 1 gratis",
+            cantidad_pagada=3,
+            cantidad_gratis=1,
+        )
+    productos = Producto.objects.filter(
+        empresa=empresa,
+        activo=True,
+        eliminado=False,
+        tipo_item="producto",
+    ).order_by("nombre")
+    productos_seleccionados = set(
+        promocion.productos_configurados.filter(activo=True).values_list("producto_id", flat=True)
+    )
+
+    if request.method == "POST":
+        form = PromocionPuntoVentaForm(request.POST, instance=promocion)
+        productos_post = {
+            int(producto_id)
+            for producto_id in request.POST.getlist("productos")
+            if str(producto_id).isdigit()
+        }
+        productos_validos = set(productos.filter(id__in=productos_post).values_list("id", flat=True))
+        if form.is_valid():
+            promocion = form.save()
+            ProductoPromocionPuntoVenta.objects.filter(promocion=promocion).exclude(
+                producto_id__in=productos_validos
+            ).update(activo=False)
+            for producto_id in productos_validos:
+                ProductoPromocionPuntoVenta.objects.update_or_create(
+                    promocion=promocion,
+                    producto_id=producto_id,
+                    defaults={"activo": True},
+                )
+            messages.success(request, "Promocion de punto de venta actualizada correctamente.")
+            return redirect("configurar_promocion_pos", empresa_slug=empresa.slug)
+    else:
+        form = PromocionPuntoVentaForm(instance=promocion)
+
+    return render(request, "facturacion/promociones_pos.html", {
+        "empresa": empresa,
+        "form": form,
+        "promocion": promocion,
+        "productos": productos,
+        "productos_seleccionados": productos_seleccionados,
     })
 
 
@@ -1325,6 +1404,96 @@ def _pos_bodega_payload(bodega):
         "nombre": bodega.nombre,
         "tipo": bodega.tipo,
     }
+
+
+def _promocion_pos_vigente(empresa, fecha):
+    promocion = (
+        PromocionPuntoVenta.objects.filter(empresa=empresa)
+        .prefetch_related("productos_configurados")
+        .order_by("-activa", "-fecha_actualizacion")
+        .first()
+    )
+    if not promocion or not promocion.vigente_en(fecha):
+        return None
+    if not promocion.productos_configurados.filter(
+        activo=True,
+        producto__activo=True,
+        producto__eliminado=False,
+        producto__tipo_item="producto",
+    ).exists():
+        return None
+    return promocion
+
+
+def _promocion_pos_payload(empresa, fecha):
+    promocion = _promocion_pos_vigente(empresa, fecha)
+    if not promocion:
+        return {
+            "activa": False,
+            "nombre": "",
+            "cantidad_pagada": 3,
+            "cantidad_gratis": 1,
+            "productos": [],
+        }
+    productos_ids = list(
+        promocion.productos_configurados.filter(
+            activo=True,
+            producto__activo=True,
+            producto__eliminado=False,
+            producto__tipo_item="producto",
+        ).values_list("producto_id", flat=True)
+    )
+    return {
+        "activa": True,
+        "nombre": promocion.nombre,
+        "cantidad_pagada": promocion.cantidad_pagada,
+        "cantidad_gratis": promocion.cantidad_gratis,
+        "productos": productos_ids,
+    }
+
+
+def _calcular_regalos_promocion_pos(empresa, lineas_preparadas, fecha_venta):
+    promocion = _promocion_pos_vigente(empresa, fecha_venta)
+    if not promocion:
+        return {}, None
+
+    productos_permitidos = set(
+        promocion.productos_configurados.filter(
+            activo=True,
+            producto__activo=True,
+            producto__eliminado=False,
+            producto__tipo_item="producto",
+        ).values_list("producto_id", flat=True)
+    )
+    elegibles = [
+        linea
+        for linea in lineas_preparadas
+        if linea["producto"].id in productos_permitidos and linea["cantidad"] > 0
+    ]
+    if not elegibles:
+        return {}, promocion
+
+    cantidad_pagada = Decimal(str(promocion.cantidad_pagada))
+    cantidad_gratis = Decimal(str(promocion.cantidad_gratis))
+    total_pagado = sum((linea["cantidad"] for linea in elegibles), Decimal("0.00"))
+    grupos = (total_pagado / cantidad_pagada).to_integral_value(rounding=ROUND_FLOOR)
+    total_gratis = grupos * cantidad_gratis
+    if total_gratis <= 0:
+        return {}, promocion
+
+    regalos = {}
+    pendiente = total_gratis
+    for linea in sorted(elegibles, key=lambda item: (item["precio_unitario"], item["producto"].nombre)):
+        if pendiente <= 0:
+            break
+        cantidad_base = linea["cantidad"].to_integral_value(rounding=ROUND_FLOOR)
+        if cantidad_base <= 0:
+            continue
+        cantidad_producto = min(cantidad_base, pendiente)
+        regalos[linea["producto"].id] = regalos.get(linea["producto"].id, Decimal("0.00")) + cantidad_producto
+        pendiente -= cantidad_producto
+
+    return regalos, promocion
 
 
 def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, prefijo_archivo="Factura"):

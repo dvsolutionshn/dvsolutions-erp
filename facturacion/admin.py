@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ExistenciaLoteBodega, Factura, Cliente, LoteInventario, MovimientoLoteBodega, PerfilFarmaceuticoProducto, Producto, LineaFactura, TipoImpuesto, PagoFactura
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ExistenciaLoteBodega, Factura, Cliente, LoteInventario, MovimientoLoteBodega, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, LineaFactura, TipoImpuesto, PagoFactura
 
 
 # ==========================
@@ -40,6 +40,19 @@ class ClienteAdmin(admin.ModelAdmin):
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'empresa', 'precio', 'activo')
+
+
+class ProductoPromocionPuntoVentaInline(admin.TabularInline):
+    model = ProductoPromocionPuntoVenta
+    extra = 1
+
+
+@admin.register(PromocionPuntoVenta)
+class PromocionPuntoVentaAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'empresa', 'activa', 'cantidad_pagada', 'cantidad_gratis', 'fecha_inicio', 'fecha_fin')
+    list_filter = ('activa', 'empresa')
+    search_fields = ('nombre', 'empresa__nombre')
+    inlines = [ProductoPromocionPuntoVentaInline]
 
 
 # ==========================

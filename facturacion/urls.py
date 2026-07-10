@@ -8,6 +8,7 @@ urlpatterns = [
 
     path('facturas/', views.facturas_dashboard, name='facturas_dashboard'),
     path('pos/', views.punto_venta, name='punto_venta'),
+    path('pos/promociones/', views.configurar_promocion_pos, name='configurar_promocion_pos'),
     path('pos/clientes/buscar/', views.pos_buscar_clientes, name='pos_buscar_clientes'),
     path('pos/clientes/crear-rapido/', views.pos_crear_cliente_rapido, name='pos_crear_cliente_rapido'),
     path('pos/productos/crear-rapido/', views.pos_crear_producto_rapido, name='pos_crear_producto_rapido'),

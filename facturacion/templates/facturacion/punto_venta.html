@@ -39,6 +39,11 @@
 .pos-product-photo-placeholder{display:grid;place-items:center;color:#1f5fd7;font-size:12px;font-weight:900;letter-spacing:.14em}
 .pos-cart{position:sticky;top:18px}
 .pos-cart-list{display:grid;gap:10px;max-height:390px;overflow:auto;margin:14px 0}
+.pos-promo-box{display:none;margin:12px 0;padding:12px;border:1px solid #99f6e4;border-radius:12px;background:linear-gradient(135deg,#ecfeff,#f0fdf4);color:#0f766e;box-shadow:0 14px 34px rgba(20,184,166,.10)}
+.pos-promo-box.is-visible{display:grid;gap:5px}
+.pos-promo-box strong{color:#102338;font-size:15px}
+.pos-promo-box span{font-size:13px;line-height:1.35}
+.pos-promo-box .pos-promo-free{font-size:22px;font-weight:900;color:#0f766e}
 .pos-cart-item{display:grid;grid-template-columns:42px minmax(0,1fr) 94px 30px;gap:10px;align-items:center;border:1px solid #d9e5f4;border-radius:10px;padding:10px;background:#fff}
 .pos-cart-item strong{display:block;font-size:14px;color:#102338}
 .pos-cart-item span{display:block;color:#5b6f8e;font-size:13px;margin-top:3px}
@@ -89,6 +94,7 @@
 {{ productos_payload|json_script:"pos-products" }}
 {{ clientes_payload|json_script:"pos-clients" }}
 {{ bodegas_payload|json_script:"pos-warehouses" }}
+{{ promocion_pos_payload|json_script:"pos-promotion" }}
 
 {% if not cuentas_financieras %}
 <div class="pos-warning">Configura una caja o cuenta bancaria activa antes de cobrar en punto de venta.</div>
@@ -103,6 +109,9 @@
         <div class="pos-scanner-state"><span class="pos-scanner-dot"></span><span>Lector listo. Escanea un producto o escribe su codigo y presiona Enter.</span></div>
         <div class="pos-scan-feedback" id="scanFeedback" role="status" aria-live="polite"></div>
         <div class="erp-card-muted" style="margin-bottom:12px;">{{ productos_count }} productos disponibles para venta rapida.</div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <a class="erp-btn-secondary" href="{% url 'configurar_promocion_pos' empresa.slug %}">Configurar promocion 3+1</a>
+        </div>
         <div class="pos-grid" id="productGrid"></div>
     </article>
 
@@ -123,6 +132,7 @@
         </div>
         {% endif %}
         <h3 class="erp-panel-title" style="margin-top:6px;">Carrito de venta</h3>
+        <div class="pos-promo-box" id="promoBox" aria-live="polite"></div>
         <div class="pos-cart-list" id="cartList">
             <div class="pos-empty">Agrega productos para iniciar la venta.</div>
         </div>
@@ -241,6 +251,8 @@
     let products = JSON.parse(document.getElementById("pos-products").textContent);
     let clients = JSON.parse(document.getElementById("pos-clients").textContent);
     const warehouses = JSON.parse(document.getElementById("pos-warehouses").textContent);
+    const promotion = JSON.parse(document.getElementById("pos-promotion").textContent);
+    const promotionProducts = new Set((promotion.productos || []).map(Number));
     const clientRequired = {{ cliente_obligatorio|yesno:"true,false" }};
     const preciosIncluyenImpuesto = {{ precios_incluyen_impuesto|yesno:"true,false" }};
     const urls = {
@@ -252,6 +264,7 @@
     const grid = document.getElementById("productGrid");
     const search = document.getElementById("posSearch");
     const cartList = document.getElementById("cartList");
+    const promoBox = document.getElementById("promoBox");
     const subtotalLabel = document.getElementById("subtotalLabel");
     const taxLabel = document.getElementById("taxLabel");
     const totalLabel = document.getElementById("totalLabel");
@@ -434,6 +447,34 @@
         return {subtotal, tax, total: subtotal + tax};
     }
 
+    function promotionState(){
+        if(!promotion.activa || !promotionProducts.size){
+            return {enabled:false, paidQty:0, freeQty:0};
+        }
+        const paidQty = Array.from(cart.values()).reduce((total, item) => {
+            if(!promotionProducts.has(Number(item.producto_id))){return total;}
+            return total + Math.floor(Number(item.cantidad || 0));
+        }, 0);
+        const paidRule = Number(promotion.cantidad_pagada || 3);
+        const freeRule = Number(promotion.cantidad_gratis || 1);
+        const freeQty = paidRule > 0 ? Math.floor(paidQty / paidRule) * freeRule : 0;
+        return {enabled:true, paidQty, freeQty, paidRule, freeRule};
+    }
+
+    function renderPromotion(){
+        const state = promotionState();
+        if(!state.enabled || !state.paidQty){
+            promoBox.classList.remove("is-visible");
+            promoBox.innerHTML = "";
+            return;
+        }
+        const faltan = state.freeQty > 0 ? 0 : Math.max(0, state.paidRule - state.paidQty);
+        promoBox.innerHTML = state.freeQty > 0
+            ? `<strong>${promotion.nombre}</strong><span class="pos-promo-free">${state.freeQty} gratis</span><span>Se aplicara automaticamente al cobrar: por cada ${state.paidRule} productos participantes, ${state.freeRule} gratis con descuento 100%.</span>`
+            : `<strong>${promotion.nombre}</strong><span>Agrega ${faltan} producto(s) participante(s) mas para activar ${state.freeRule} gratis.</span>`;
+        promoBox.classList.add("is-visible");
+    }
+
     function renderCart(){
         const items = Array.from(cart.values());
         if(!items.length){
@@ -459,6 +500,7 @@
         taxLabel.textContent = money(total.tax);
         totalLabel.textContent = money(total.total);
         checkoutButton.disabled = !items.length || total.total <= 0;
+        renderPromotion();
         updateChange();
     }
 
@@ -752,6 +794,7 @@
             cliente_id: selectedClient ? selectedClient.id : "",
             referencia: document.getElementById("referenceInput").value,
             monto_recibido: paymentMethod.value === "efectivo" ? cashReceived.value : "",
+            promocion_pos: promotionState(),
             items: Array.from(cart.values())
         });
         checkoutButton.disabled = true;

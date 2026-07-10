@@ -19,7 +19,7 @@ from clinica.models import Paciente
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
-from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
 
 
@@ -438,6 +438,90 @@ class FacturacionTests(TestCase):
             impresion,
             reverse("vista_previa_factura_pdf", args=[self.empresa.slug, factura.id]),
         )
+
+    def test_punto_venta_aplica_promocion_tres_mas_uno_gratis(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = True
+        self.producto.save()
+        InventarioProducto.objects.update_or_create(
+            empresa=self.empresa,
+            producto=self.producto,
+            defaults={"existencias": Decimal("20.00"), "stock_minimo": Decimal("0.00")},
+        )
+        promocion = PromocionPuntoVenta.objects.create(
+            empresa=self.empresa,
+            nombre="Promo prueba 3 + 1",
+            activa=True,
+            cantidad_pagada=3,
+            cantidad_gratis=1,
+        )
+        ProductoPromocionPuntoVenta.objects.create(promocion=promocion, producto=self.producto)
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "efectivo",
+                    "monto_recibido": "1035.00",
+                    "items": [
+                        {
+                            "producto_id": self.producto.id,
+                            "cantidad": "9",
+                            "precio_unitario": "100.00",
+                        }
+                    ],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        factura = Factura.objects.get(pk=response.json()["factura_id"])
+        lineas = list(factura.lineas.order_by("descuento_porcentaje", "id"))
+        self.assertEqual(len(lineas), 2)
+        self.assertEqual(lineas[0].cantidad, Decimal("9.00"))
+        self.assertEqual(lineas[0].descuento_porcentaje, Decimal("0.00"))
+        self.assertEqual(lineas[1].cantidad, Decimal("3.00"))
+        self.assertEqual(lineas[1].descuento_porcentaje, Decimal("100.00"))
+        self.assertIn("Promo prueba", lineas[1].comentario)
+        self.assertEqual(factura.subtotal, Decimal("900.00"))
+        self.assertEqual(factura.impuesto, Decimal("135.00"))
+        self.assertEqual(factura.total, Decimal("1035.00"))
+        self.assertEqual(
+            MovimientoInventario.objects.filter(
+                factura=factura,
+                producto=self.producto,
+                tipo="salida_factura",
+            ).aggregate(total=Sum("cantidad"))["total"],
+            Decimal("12.00"),
+        )
+        self.producto.inventario.refresh_from_db()
+        self.assertEqual(self.producto.inventario.existencias, Decimal("8.00"))
+
+    def test_configuracion_promocion_pos_renderiza_y_guarda_productos(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+
+        response = self.client.get(reverse("configurar_promocion_pos", args=[self.empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Promocion 3 + 1 gratis")
+
+        response = self.client.post(
+            reverse("configurar_promocion_pos", args=[self.empresa.slug]),
+            {
+                "nombre": "Promo julio",
+                "activa": "on",
+                "cantidad_pagada": "3",
+                "cantidad_gratis": "1",
+                "productos": [str(self.producto.id)],
+            },
+        )
+        self.assertRedirects(response, reverse("configurar_promocion_pos", args=[self.empresa.slug]))
+        promocion = PromocionPuntoVenta.objects.get(empresa=self.empresa)
+        self.assertTrue(promocion.activa)
+        self.assertTrue(ProductoPromocionPuntoVenta.objects.filter(promocion=promocion, producto=self.producto, activo=True).exists())
 
     def test_punto_venta_usa_token_csrf_vigente_y_maneja_respuesta_no_json(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

@@ -352,6 +352,69 @@ class Producto(models.Model):
         return ((utilidad / self.precio) * Decimal('100')).quantize(Decimal('0.01'))
 
 
+class PromocionPuntoVenta(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='promociones_pos')
+    nombre = models.CharField(max_length=120, default='Promocion 3 + 1 gratis')
+    activa = models.BooleanField(default=False)
+    cantidad_pagada = models.PositiveIntegerField(default=3)
+    cantidad_gratis = models.PositiveIntegerField(default=1)
+    fecha_inicio = models.DateField(blank=True, null=True)
+    fecha_fin = models.DateField(blank=True, null=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Promocion de punto de venta'
+        verbose_name_plural = 'Promociones de punto de venta'
+        ordering = ['empresa__nombre', 'nombre']
+
+    def clean(self):
+        super().clean()
+        if self.cantidad_pagada < 1:
+            raise ValidationError({'cantidad_pagada': 'La cantidad pagada debe ser mayor que cero.'})
+        if self.cantidad_gratis < 1:
+            raise ValidationError({'cantidad_gratis': 'La cantidad gratis debe ser mayor que cero.'})
+        if self.fecha_inicio and self.fecha_fin and self.fecha_inicio > self.fecha_fin:
+            raise ValidationError({'fecha_fin': 'La fecha final no puede ser menor que la fecha inicial.'})
+
+    def vigente_en(self, fecha):
+        if not self.activa:
+            return False
+        if self.fecha_inicio and fecha < self.fecha_inicio:
+            return False
+        if self.fecha_fin and fecha > self.fecha_fin:
+            return False
+        return True
+
+    def __str__(self):
+        return f'{self.empresa} - {self.nombre}'
+
+
+class ProductoPromocionPuntoVenta(models.Model):
+    promocion = models.ForeignKey(
+        PromocionPuntoVenta,
+        on_delete=models.CASCADE,
+        related_name='productos_configurados',
+    )
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='promociones_pos')
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Producto en promocion POS'
+        verbose_name_plural = 'Productos en promocion POS'
+        unique_together = ('promocion', 'producto')
+        ordering = ['producto__nombre']
+
+    def clean(self):
+        super().clean()
+        if self.promocion_id and self.producto_id and self.promocion.empresa_id != self.producto.empresa_id:
+            raise ValidationError('El producto debe pertenecer a la misma empresa de la promocion.')
+
+    def __str__(self):
+        return f'{self.producto} en {self.promocion.nombre}'
+
+
 class HistorialCostoRealProducto(models.Model):
     empresa = models.ForeignKey(
         Empresa,
