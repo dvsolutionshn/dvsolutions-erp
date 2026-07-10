@@ -218,7 +218,7 @@ class CitaClinicaForm(BaseClinicaForm):
 
     class Meta:
         model = CitaClinica
-        fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "sala", "observaciones"]
+        fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "pagada", "sala", "observaciones"]
 
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
@@ -247,7 +247,7 @@ class CitaClinicaForm(BaseClinicaForm):
             })
         self.order_fields([
             "paciente", "profesional", "servicio", "fecha_cita", "hora_cita",
-            "periodo_cita", "estado", "canal", "motivo", "sala", "observaciones",
+            "periodo_cita", "estado", "canal", "motivo", "pagada", "sala", "observaciones",
         ])
 
     def clean(self):

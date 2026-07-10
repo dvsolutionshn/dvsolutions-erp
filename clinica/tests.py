@@ -62,15 +62,18 @@ class ClinicaPacienteTests(TestCase):
             "estado": "solicitada",
             "canal": "recepcion",
             "motivo": "Consulta de prueba",
+            "pagada": "on",
             "sala": "1",
             "observaciones": "",
         })
 
         self.assertEqual(response.status_code, 302)
         cita = CitaClinica.objects.get(empresa=self.empresa, paciente=paciente)
+        self.assertTrue(cita.pagada)
         self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
         self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 15)
         agenda = CitaCliente.objects.get(empresa=self.empresa, cita_clinica=cita)
+        self.assertTrue(agenda.pagada)
         self.assertTrue(agenda.enviar_confirmacion_whatsapp)
         self.assertTrue(agenda.recordatorio_semana_whatsapp)
         self.assertTrue(agenda.recordatorio_dia_whatsapp)

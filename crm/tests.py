@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+﻿from datetime import date, datetime, timedelta
 import os
 from pathlib import Path
 import tempfile
@@ -98,7 +98,7 @@ class CRMTests(TestCase):
         self.assertContains(response, 'rel="manifest"')
         self.assertContains(response, "serviceWorker.register")
         self.assertContains(response, "Instalar en Android")
-        self.assertContains(response, "Versión iPhone / iPad")
+        self.assertContains(response, "VersiÃ³n iPhone / iPad")
         self.assertEqual(manifest.status_code, 200)
         self.assertEqual(manifest.json()["display"], "standalone")
         self.assertEqual(
@@ -166,7 +166,7 @@ class CRMTests(TestCase):
         cita = CitaCliente.objects.create(
             empresa=self.empresa,
             cliente=cliente,
-            titulo="Control móvil",
+            titulo="Control mÃ³vil",
             fecha_hora=timezone.make_aware(datetime(2026, 6, 30, 11, 0)),
         )
         self.client.login(username="crmuser", password="pass12345")
@@ -196,7 +196,7 @@ class CRMTests(TestCase):
         cita = CitaCliente.objects.create(
             empresa=self.empresa,
             cliente=cliente,
-            titulo="Evaluación médica",
+            titulo="EvaluaciÃ³n mÃ©dica",
             fecha_hora=timezone.make_aware(datetime(2026, 6, 22, 10, 30)),
             duracion_minutos=45,
             responsable="Dra. Demo",
@@ -206,7 +206,7 @@ class CRMTests(TestCase):
         for vista in ["mes", "semana", "dia"]:
             response = self.client.get(url, {"vista": vista, "fecha": "2026-06-22"})
             self.assertEqual(response.status_code, 200)
-            self.assertContains(response, "Evaluación médica")
+            self.assertContains(response, "EvaluaciÃ³n mÃ©dica")
             self.assertContains(response, "Paciente Calendario")
         response = self.client.get(url, {"vista": "mes", "fecha": "2026-06-22", "editar": cita.id})
         self.assertContains(response, "Editando cita")
@@ -242,15 +242,15 @@ class CRMTests(TestCase):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
         modulo_clinica, _ = Modulo.objects.get_or_create(
-            codigo="clinica_medica", defaults={"nombre": "Clínica Médica", "es_comercial": True}
+            codigo="clinica_medica", defaults={"nombre": "ClÃ­nica MÃ©dica", "es_comercial": True}
         )
         EmpresaModulo.objects.get_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
-        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-001", nombre="Paciente Clínico")
+        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-001", nombre="Paciente ClÃ­nico")
         servicio = ServicioClinico.objects.create(
-            empresa=self.empresa, nombre="Consulta de cardiología", categoria="consulta", duracion_minutos=45
+            empresa=self.empresa, nombre="Consulta de cardiologÃ­a", categoria="consulta", duracion_minutos=45
         )
         doctor = ProfesionalSalud.objects.create(
-            empresa=self.empresa, nombre="Dr. Carlos Demo", especialidad="Cardiología"
+            empresa=self.empresa, nombre="Dr. Carlos Demo", especialidad="CardiologÃ­a"
         )
         self.client.login(username="crmuser", password="pass12345")
         url = reverse("agenda_citas", args=[self.empresa.slug])
@@ -268,11 +268,12 @@ class CRMTests(TestCase):
             "paciente": paciente.id, "servicio_clinico": servicio.id,
             "profesional_salud": doctor.id, "fecha_cita": "2026-06-24",
             "hora_cita": "02:30", "periodo_cita": "PM",
-            "duracion_minutos": "45", "estado": "confirmada", "observacion": "Primera valoración",
+            "duracion_minutos": "45", "estado": "confirmada", "pagada": "on", "observacion": "Primera valoracion",
         })
         self.assertEqual(response.status_code, 302)
         cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
-        self.assertEqual(cita.titulo, "Consulta de cardiología")
+        self.assertEqual(cita.titulo, "Consulta de cardiologÃ­a")
+        self.assertTrue(cita.pagada)
         self.assertEqual(cita.responsable, "Dr. Carlos Demo")
         self.assertEqual(cita.profesional_salud, doctor)
         self.assertEqual(cita.duracion_minutos, servicio.duracion_minutos)
@@ -283,13 +284,19 @@ class CRMTests(TestCase):
         self.assertEqual(cita_clinica.profesional, doctor)
         self.assertEqual(cita_clinica.servicio, servicio)
         self.assertEqual(cita_clinica.estado, "confirmada")
+        self.assertTrue(cita_clinica.pagada)
+
+        calendario = self.client.get(url, {"vista": "mes", "fecha": "2026-06-24"})
+        self.assertContains(calendario, "is-paid")
+        self.assertContains(calendario, "data-appointment-paid=\"Pagada\"")
+        self.assertContains(calendario, "appointment-paid-badge")
 
     def test_agenda_clinica_crea_paciente_rapido_y_lo_sincroniza_con_facturacion(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
         modulo_clinica, _ = Modulo.objects.get_or_create(
             codigo="clinica_medica",
-            defaults={"nombre": "Clínica Médica", "es_comercial": True},
+            defaults={"nombre": "ClÃ­nica MÃ©dica", "es_comercial": True},
         )
         EmpresaModulo.objects.get_or_create(
             empresa=self.empresa,
@@ -301,7 +308,7 @@ class CRMTests(TestCase):
         agenda = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
         self.assertContains(agenda, "+ Nuevo paciente")
         self.assertContains(agenda, "patientQuickModal")
-        self.assertContains(agenda, "Buscar por nombre, identidad, expediente, teléfono o correo")
+        self.assertContains(agenda, "Buscar por nombre, identidad, expediente, telÃ©fono o correo")
         self.assertContains(agenda, reverse("agenda_buscar_pacientes", args=[self.empresa.slug]))
 
         response = self.client.post(
@@ -310,8 +317,8 @@ class CRMTests(TestCase):
                 "tipo_id": "dni",
                 "identidad": "0801199012345",
                 "primer_nombre": "Ana",
-                "segundo_nombre": "María",
-                "primer_apellido": "López",
+                "segundo_nombre": "MarÃ­a",
+                "primer_apellido": "LÃ³pez",
                 "segundo_apellido": "Paz",
                 "fecha_nacimiento": "1990-05-12",
                 "sexo": "femenino",
@@ -325,7 +332,7 @@ class CRMTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["ok"])
         paciente = Paciente.objects.get(id=payload["paciente"]["id"])
-        self.assertEqual(paciente.nombre, "Ana María López Paz")
+        self.assertEqual(paciente.nombre, "Ana MarÃ­a LÃ³pez Paz")
         self.assertEqual(paciente.whatsapp, "99991111")
         self.assertEqual(paciente.creado_por, self.usuario)
         self.assertIsNotNone(paciente.cliente_id)
@@ -367,7 +374,7 @@ class CRMTests(TestCase):
     def test_agenda_hospital_mia_recupera_cliente_historico_y_muestra_selector_nativo(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(
             codigo="clinica_medica",
-            defaults={"nombre": "ClÃ­nica MÃ©dica", "es_comercial": True},
+            defaults={"nombre": "ClÃƒÂ­nica MÃƒÂ©dica", "es_comercial": True},
         )
         EmpresaModulo.objects.get_or_create(
             empresa=self.empresa,
@@ -424,7 +431,7 @@ class CRMTests(TestCase):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
         modulo_clinica, _ = Modulo.objects.get_or_create(
-            codigo="clinica_medica", defaults={"nombre": "Clínica Médica", "es_comercial": True}
+            codigo="clinica_medica", defaults={"nombre": "ClÃ­nica MÃ©dica", "es_comercial": True}
         )
         EmpresaModulo.objects.get_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
         paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-COLOR", nombre="Paciente Color")
@@ -460,12 +467,12 @@ class CRMTests(TestCase):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
         paciente = Paciente.objects.create(
-            empresa=self.empresa, expediente_codigo="EXP-DEL", nombre="Paciente Eliminación"
+            empresa=self.empresa, expediente_codigo="EXP-DEL", nombre="Paciente EliminaciÃ³n"
         )
         servicio = ServicioClinico.objects.create(
             empresa=self.empresa, nombre="Consulta para eliminar", duracion_minutos=30
         )
-        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. Auditoría")
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. AuditorÃ­a")
         fecha_hora = timezone.make_aware(datetime(2026, 6, 25, 14, 0))
         cita_clinica = CitaClinica.objects.create(
             empresa=self.empresa,
@@ -508,7 +515,7 @@ class CRMTests(TestCase):
         self.assertTrue(CitaClinica.objects.filter(id=cita_clinica.id).exists())
 
         response = self.client.post(url, {
-            "motivo_eliminacion": "El paciente canceló definitivamente",
+            "motivo_eliminacion": "El paciente cancelÃ³ definitivamente",
             "vista": "dia", "fecha": "2026-06-25",
         })
         self.assertEqual(response.status_code, 302)
@@ -522,7 +529,7 @@ class CRMTests(TestCase):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
         modulo_clinica, _ = Modulo.objects.get_or_create(
-            codigo="clinica_medica", defaults={"nombre": "Clínica Médica", "es_comercial": True}
+            codigo="clinica_medica", defaults={"nombre": "ClÃ­nica MÃ©dica", "es_comercial": True}
         )
         EmpresaModulo.objects.get_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
         paciente = Paciente.objects.create(
@@ -542,7 +549,7 @@ class CRMTests(TestCase):
         response = self.client.post(reverse("agenda_citas", args=[self.empresa.slug]), {
             "paciente": paciente.id, "servicio_clinico": servicio.id, "profesional_salud": doctor.id,
             "fecha_hora": fecha.strftime("%Y-%m-%dT%H:%M"), "duracion_minutos": "30",
-            "estado": "confirmada", "observacion": "Avisar automáticamente",
+            "estado": "confirmada", "observacion": "Avisar automÃ¡ticamente",
             "enviar_confirmacion_whatsapp": "on", "recordatorio_semana_whatsapp": "on",
             "recordatorio_dia_whatsapp": "on",
         })
@@ -566,7 +573,7 @@ class CRMTests(TestCase):
             call_command("procesar_recordatorios_citas")
         self.assertEqual(mock_enviar.call_count, 2)
 
-    @patch("crm.views.procesar_notificacion", side_effect=TimeoutError("Meta no respondió"))
+    @patch("crm.views.procesar_notificacion", side_effect=TimeoutError("Meta no respondiÃ³"))
     @patch("crm.appointment_notifications.enviar_plantilla_cita_whatsapp")
     def test_recordatorio_cita_incluye_enlace_solo_si_plantilla_lo_permite(self, mock_enviar, _mock_procesar):
         mock_enviar.return_value = {"messages": [{"id": "wamid.link"}]}

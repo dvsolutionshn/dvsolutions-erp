@@ -325,6 +325,7 @@ class CitaClinica(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="solicitada")
     canal = models.CharField(max_length=20, choices=CANAL_CHOICES, default="recepcion")
     motivo = models.CharField(max_length=220)
+    pagada = models.BooleanField(default=False)
     sala = models.CharField(max_length=80, blank=True, null=True)
     observaciones = models.TextField(blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)

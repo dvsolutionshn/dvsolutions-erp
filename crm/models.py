@@ -173,6 +173,7 @@ class CitaCliente(models.Model):
     duracion_minutos = models.PositiveIntegerField(default=60)
     responsable = models.CharField(max_length=120, blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
+    pagada = models.BooleanField(default=False)
     observacion = models.TextField(blank=True, null=True)
     enviar_confirmacion_whatsapp = models.BooleanField(default=False)
     recordatorio_semana_whatsapp = models.BooleanField(default=True)

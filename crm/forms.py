@@ -100,7 +100,7 @@ class CitaClienteForm(forms.ModelForm):
 
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "observacion": forms.Textarea(attrs={"rows": 3}),
@@ -152,6 +152,7 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["profesional_salud"].label = "Doctor / profesional"
             self.fields["profesional_salud"].required = True
             self.fields["observacion"].label = "Motivo o notas de la cita"
+            self.fields["pagada"].label = "Cita pagada"
             self.fields["enviar_confirmacion_whatsapp"].label = "Enviar confirmación por WhatsApp al guardar"
             self.fields["recordatorio_semana_whatsapp"].label = "Recordar 7 días antes"
             self.fields["recordatorio_dia_whatsapp"].label = "Recordar 1 día antes"
@@ -162,11 +163,12 @@ class CitaClienteForm(forms.ModelForm):
             if not self.notificaciones_cita_activas:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "estado", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
         else:
             for nombre in ["paciente", "servicio_clinico", "profesional_salud", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre)
-            self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "duracion_minutos", "responsable", "estado", "observacion"])
+            self.fields["pagada"].label = "Cita pagada"
+            self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "duracion_minutos", "responsable", "estado", "pagada", "observacion"])
 
     def clean(self):
         cleaned_data = super().clean()

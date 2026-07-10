@@ -174,6 +174,7 @@ def _sincronizar_cita_clinica(cita):
         "servicio": cita.servicio_clinico,
         "fecha_hora": cita.fecha_hora,
         "estado": estados.get(cita.estado, "solicitada"),
+        "pagada": cita.pagada,
         "canal": "recepcion",
         "motivo": cita.observacion or cita.titulo,
         "observaciones": cita.observacion,
