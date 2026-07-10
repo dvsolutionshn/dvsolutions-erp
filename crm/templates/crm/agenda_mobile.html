@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Agenda MIA">
-  <title>Agenda Â· {{ empresa.nombre }}</title>
+  <title>Agenda · {{ empresa.nombre }}</title>
   <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}" crossorigin="use-credentials">
   <link rel="icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
   <link rel="apple-touch-icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
@@ -33,8 +33,8 @@
 <main class="app">
   <header class="hero">
     <div class="hero-top">
-      <div class="brand"><div class="brand-logo"><img src="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}" alt=""></div><div><small>Agenda clÃ­nica</small><strong>{{ empresa.nombre }}</strong></div></div>
-      <button class="icon-btn" type="button" id="notificationButton" aria-label="Activar notificaciones">â™¢</button>
+      <div class="brand"><div class="brand-logo"><img src="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}" alt=""></div><div><small>Agenda clínica</small><strong>{{ empresa.nombre }}</strong></div></div>
+      <button class="icon-btn" type="button" id="notificationButton" aria-label="Activar notificaciones">◊</button>
     </div>
     <div class="hero-copy"><small>{{ request.user.get_full_name|default:request.user.username }}</small><h1>Tu agenda, clara<br>y siempre contigo.</h1></div>
     <div class="stats"><div class="stat"><strong>{{ citas_hoy_total }}</strong><span>Citas programadas hoy</span></div><div class="stat"><strong>{{ pendientes_hoy }}</strong><span>Pendientes por atender</span></div></div>
@@ -50,29 +50,29 @@
       {% endfor %}
     </nav>
 
-    <div class="section-head"><div><small>Agenda del dÃ­a</small><h2>{{ citas|length }} cita{{ citas|length|pluralize:"s" }}</h2></div></div>
+    <div class="section-head"><div><small>Agenda del día</small><h2>{{ citas|length }} cita{{ citas|length|pluralize:"s" }}</h2></div></div>
     <section class="appointments">
       {% for cita in citas %}
       <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %}">
         <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
         <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{% if es_clinica %}{{ cita.display_servicio }}{% else %}{{ cita.titulo }}{% endif %}<br>{{ cita.display_responsable }}</span><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada %}<em class="status paid">Pagada</em>{% endif %}</div>
-        <button class="more" type="button" data-cita-actions="{{ cita.id }}">â€¢â€¢â€¢</button>
+        <button class="more" type="button" data-cita-actions="{{ cita.id }}">•••</button>
       </article>
-      {% empty %}<div class="empty">No hay citas para este dÃ­a.<br>Toca el botÃ³n <strong>+</strong> para programar una.</div>{% endfor %}
+      {% empty %}<div class="empty">No hay citas para este día.<br>Toca el botón <strong>+</strong> para programar una.</div>{% endfor %}
     </section>
   </div>
 
   <nav class="bottom">
-    <a class="nav-item" href="{% url 'dashboard' empresa.slug %}"><b>âŒ‚</b><span>Sistema</span></a>
+    <a class="nav-item" href="{% url 'dashboard' empresa.slug %}"><b>⌂</b><span>Sistema</span></a>
     <button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>
-    <button class="nav-item" type="button" id="installButton"><b>â‡©</b><span>Instalar app</span></button>
+    <button class="nav-item" type="button" id="installButton"><b>⇩</b><span>Instalar app</span></button>
   </nav>
 </main>
 
 <section class="sheet {% if form.errors or cita_editando %}open{% endif %}" id="editor">
   <div class="sheet-card">
     <div class="sheet-grip"></div>
-    <div class="sheet-head"><div><small>{% if cita_editando %}Editar cita{% else %}Nueva cita{% endif %}</small><h2>{% if cita_editando %}{{ cita_editando.display_cliente }}{% else %}Programar atenciÃ³n{% endif %}</h2></div><button class="close" type="button" data-close-sheet>Ã—</button></div>
+    <div class="sheet-head"><div><small>{% if cita_editando %}Editar cita{% else %}Nueva cita{% endif %}</small><h2>{% if cita_editando %}{{ cita_editando.display_cliente }}{% else %}Programar atención{% endif %}</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
     <form method="post">
       {% csrf_token %}{% if cita_editando %}<input type="hidden" name="cita_id" value="{{ cita_editando.id }}">{% endif %}
       <div class="form-grid">
@@ -91,12 +91,12 @@
 
 {% for cita in citas %}
 <section class="sheet" id="actions-{{ cita.id }}">
-  <div class="sheet-card"><div class="sheet-grip"></div><div class="sheet-head"><div><small>Gestionar cita</small><h2>{{ cita.display_cliente }}</h2></div><button class="close" type="button" data-close-sheet>Ã—</button></div>
+  <div class="sheet-card"><div class="sheet-grip"></div><div class="sheet-head"><div><small>Gestionar cita</small><h2>{{ cita.display_cliente }}</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
     <div class="actions-menu">
-      <a class="action-link" href="?fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar informaciÃ³n</a>
+      <a class="action-link" href="?fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar información</a>
       {% if cita.whatsapp_url %}<a class="action-link whatsapp" href="{{ cita.whatsapp_url }}" target="_blank" rel="noopener">Escribir por WhatsApp</a>{% endif %}
       <form method="post" action="{% url 'agenda_cita_estado' empresa.slug cita.id %}">{% csrf_token %}<input type="hidden" name="return_to" value="mobile"><input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}"><select name="estado">{% for codigo,nombre in estados_cita %}<option value="{{ codigo }}" {% if cita.estado == codigo %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select><button type="submit">Actualizar</button></form>
-      <div class="danger-block"><form method="post" action="{% url 'agenda_cita_eliminar' empresa.slug cita.id %}" onsubmit="return confirm('Â¿Eliminar definitivamente esta cita?');">{% csrf_token %}<input type="hidden" name="return_to" value="mobile"><input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}"><input name="motivo_eliminacion" minlength="5" required placeholder="Motivo de eliminaciÃ³n"><button type="submit">Eliminar</button></form></div>
+      <div class="danger-block"><form method="post" action="{% url 'agenda_cita_eliminar' empresa.slug cita.id %}" onsubmit="return confirm('¿Eliminar definitivamente esta cita?');">{% csrf_token %}<input type="hidden" name="return_to" value="mobile"><input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}"><input name="motivo_eliminacion" minlength="5" required placeholder="Motivo de eliminación"><button type="submit">Eliminar</button></form></div>
     </div>
   </div>
 </section>
@@ -105,17 +105,17 @@
 <section class="sheet" id="installSheet">
   <div class="sheet-card">
     <div class="sheet-grip"></div>
-    <div class="sheet-head"><div><small>App mÃ³vil oficial</small><h2>Instalar Agenda MIA</h2></div><button class="close" type="button" data-close-sheet>Ã—</button></div>
-    <p style="margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.55">Selecciona tu telÃ©fono. La app conservarÃ¡ el acceso seguro y seguirÃ¡ conectada al mismo sistema.</p>
+    <div class="sheet-head"><div><small>App móvil oficial</small><h2>Instalar Agenda MIA</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.55">Selecciona tu teléfono. La app conservará el acceso seguro y seguirá conectada al mismo sistema.</p>
     <div class="install-grid">
       <article class="install-choice" id="androidChoice">
-        <div class="platform-icon">A</div><div><span class="platform-badge">Recomendado para este telÃ©fono</span><strong>VersiÃ³n Android</strong><span>InstalaciÃ³n desde Chrome, sin descargar archivos desconocidos.</span></div>
+        <div class="platform-icon">A</div><div><span class="platform-badge">Recomendado para este teléfono</span><strong>Versión Android</strong><span>Instalación desde Chrome, sin descargar archivos desconocidos.</span></div>
         <button class="platform-install" type="button" id="installAndroid">Instalar en Android</button>
-        <div class="install-steps" id="androidSteps">Si Chrome no abre el instalador: toca <strong>â‹®</strong> arriba a la derecha y elige <strong>Instalar aplicaciÃ³n</strong> o <strong>Agregar a pantalla principal</strong>.</div>
+        <div class="install-steps" id="androidSteps">Si Chrome no abre el instalador: toca <strong>⋮</strong> arriba a la derecha y elige <strong>Instalar aplicación</strong> o <strong>Agregar a pantalla principal</strong>.</div>
       </article>
       <article class="install-choice" id="iosChoice">
-        <div class="platform-icon">ï£¿</div><div><span class="platform-badge">Recomendado para este telÃ©fono</span><strong>VersiÃ³n iPhone / iPad</strong><span>InstalaciÃ³n segura desde Safari en la pantalla de inicio.</span></div>
-        <button class="platform-install ios" type="button" id="installIOS">Ver instalaciÃ³n para iPhone</button>
+        <div class="platform-icon"></div><div><span class="platform-badge">Recomendado para este teléfono</span><strong>Versión iPhone / iPad</strong><span>Instalación segura desde Safari en la pantalla de inicio.</span></div>
+        <button class="platform-install ios" type="button" id="installIOS">Ver instalación para iPhone</button>
         <div class="install-steps" id="iosSteps">En Safari toca <strong>Compartir</strong> (cuadro con flecha hacia arriba), luego <strong>Agregar a pantalla de inicio</strong> y finalmente <strong>Agregar</strong>.</div>
       </article>
     </div>
@@ -124,7 +124,7 @@
 </section>
 
 {% if paciente_rapido_form %}
-<dialog class="patient-dialog" id="patientDialog"><div class="patient-body"><div class="sheet-head"><div><small>Nuevo expediente</small><h2>Crear paciente</h2></div><button class="close" type="button" id="closePatientDialog">Ã—</button></div><form id="patientForm">{% csrf_token %}<div class="form-grid">{% for field in paciente_rapido_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}<div class="errors" data-error="{{ field.name }}"></div></div>{% endfor %}</div><div class="patient-actions"><button class="secondary" type="button" id="cancelPatient">Cancelar</button><button class="save" style="width:auto;margin:0;padding:0 18px" type="submit">Guardar paciente</button></div></form></div></dialog>
+<dialog class="patient-dialog" id="patientDialog"><div class="patient-body"><div class="sheet-head"><div><small>Nuevo expediente</small><h2>Crear paciente</h2></div><button class="close" type="button" id="closePatientDialog">×</button></div><form id="patientForm">{% csrf_token %}<div class="form-grid">{% for field in paciente_rapido_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}<div class="errors" data-error="{{ field.name }}"></div></div>{% endfor %}</div><div class="patient-actions"><button class="secondary" type="button" id="cancelPatient">Cancelar</button><button class="save" style="width:auto;margin:0;padding:0 18px" type="submit">Guardar paciente</button></div></form></div></dialog>
 {% endif %}
 
 {{ proximas_app|json_script:"upcomingAppointments" }}
@@ -143,24 +143,24 @@
   const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent),isAndroid=/android/i.test(navigator.userAgent);
   if(isIOS)document.getElementById("iosChoice").classList.add("recommended");
   if(isAndroid)document.getElementById("androidChoice").classList.add("recommended");
-  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;installNote.textContent="La app estÃ¡ lista para instalarse en este telÃ©fono.";installNote.classList.add("show")});
+  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;installNote.textContent="La app está lista para instalarse en este teléfono.";installNote.classList.add("show")});
   installButton.addEventListener("click",()=>openSheet(installSheet));
   document.getElementById("installAndroid").addEventListener("click",async()=>{
     const status=document.getElementById("installStatus"),steps=document.getElementById("androidSteps");
     if(installPrompt){
       installPrompt.prompt();
       const result=await installPrompt.userChoice;
-      status.textContent=result.outcome==="accepted"?"InstalaciÃ³n aceptada. Busca Agenda MIA entre tus aplicaciones.":"La instalaciÃ³n fue cancelada; puedes intentarlo nuevamente.";
+      status.textContent=result.outcome==="accepted"?"Instalación aceptada. Busca Agenda MIA entre tus aplicaciones.":"La instalación fue cancelada; puedes intentarlo nuevamente.";
       status.classList.add("show");installPrompt=null;return;
     }
     steps.classList.add("show");
-    status.textContent="Chrome todavÃ­a no habilitÃ³ el instalador automÃ¡tico. Usa la opciÃ³n del menÃº indicada arriba.";
+    status.textContent="Chrome todavía no habilitó el instalador automático. Usa la opción del menú indicada arriba.";
     status.classList.add("show");
   });
   document.getElementById("installIOS").addEventListener("click",()=>{
     document.getElementById("iosSteps").classList.add("show");
     const status=document.getElementById("installStatus");
-    status.textContent=isIOS?"Apple requiere confirmar la instalaciÃ³n desde el botÃ³n Compartir de Safari.":"Abre este enlace en Safari desde el iPhone y sigue los pasos.";
+    status.textContent=isIOS?"Apple requiere confirmar la instalación desde el botón Compartir de Safari.":"Abre este enlace en Safari desde el iPhone y sigue los pasos.";
     status.classList.add("show");
   });
 
@@ -184,7 +184,7 @@
   document.getElementById("notificationButton").addEventListener("click",async()=>{
     if(!("Notification" in window)){installNote.textContent="Este navegador no admite notificaciones.";installNote.classList.add("show");return}
     const permission=await Notification.requestPermission();
-    installNote.textContent=permission==="granted"?"Notificaciones activadas. Te avisaremos 30 minutos antes mientras la app estÃ© activa.":"No se autorizaron las notificaciones.";
+    installNote.textContent=permission==="granted"?"Notificaciones activadas. Te avisaremos 30 minutos antes mientras la app esté activa.":"No se autorizaron las notificaciones.";
     installNote.classList.add("show");scheduleVisibleReminders();
   });
   registerApp();

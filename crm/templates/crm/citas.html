@@ -1,10 +1,10 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Calendario de citas - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}MÃ³dulo de citas{% endblock %}
+{% block header_kicker %}Módulo de citas{% endblock %}
 {% block header_title %}Calendario de Citas{% endblock %}
 {% block header_description %}Vista mensual, semanal y diaria de la agenda de {{ empresa.nombre }}.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App mÃ³vil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
 
 {% block content %}
 <style>
@@ -26,24 +26,24 @@
   <section class="erp-card">
     <div class="calendar-toolbar">
       <div class="calendar-nav">
-        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}">â€¹ Anterior</a>
+        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}">‹ Anterior</a>
         <a class="calendar-chip" href="?vista={{ vista }}&fecha={% now 'Y-m-d' %}">Hoy</a>
-        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}">Siguiente â€º</a>
+        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}">Siguiente ›</a>
       </div>
       <div class="calendar-period"><h2>{{ titulo_periodo|title }}</h2></div>
       <div class="calendar-views">
         <a class="calendar-chip {% if vista == 'mes' %}active{% endif %}" href="?vista=mes&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Mes</a>
         <a class="calendar-chip {% if vista == 'semana' %}active{% endif %}" href="?vista=semana&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Semana</a>
-        <a class="calendar-chip {% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">DÃ­a</a>
+        <a class="calendar-chip {% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Día</a>
       </div>
     </div>
     {% if es_clinica %}
     <div class="calendar-legend">
       <span class="calendar-legend-title">Color principal por tipo de consulta</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-consulta"></i> Consulta</span>
-      <span class="calendar-legend-item"><i class="calendar-dot color-terapias"></i> Terapias / cÃ¡maras</span>
+      <span class="calendar-legend-item"><i class="calendar-dot color-terapias"></i> Terapias / cámaras</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-tratamientos"></i> Tratamientos</span>
-      <span class="calendar-legend-item"><i class="calendar-dot color-cirugias"></i> CirugÃ­as</span>
+      <span class="calendar-legend-item"><i class="calendar-dot color-cirugias"></i> Cirugías</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-spa"></i> Spa</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-control"></i> Control</span>
       <span class="calendar-legend-title">Acento lateral por doctor / profesional</span>
@@ -59,21 +59,21 @@
   <section class="calendar-grid">
     <div class="calendar-weekday">Lunes</div>
     <div class="calendar-weekday">Martes</div>
-    <div class="calendar-weekday">MiÃ©rcoles</div>
+    <div class="calendar-weekday">Miércoles</div>
     <div class="calendar-weekday">Jueves</div>
     <div class="calendar-weekday">Viernes</div>
-    <div class="calendar-weekday">SÃ¡bado</div>
+    <div class="calendar-weekday">Sábado</div>
     <div class="calendar-weekday">Domingo</div>
     {% for semana in semanas %}
       {% for dia in semana %}
       <div class="calendar-day {% if not dia.es_mes %}outside{% endif %} {% if dia.es_hoy %}today{% endif %}" data-calendar-day="{{ dia.fecha|date:'Y-m-d' }}" data-calendar-title="{{ dia.fecha|date:'l d/m/Y' }}">
         <div class="calendar-day-number">
           {{ dia.fecha.day }}
-          {% if dia.es_hoy %}<span>HOY</span>{% elif dia.citas %}<span class="calendar-day-hint">Ver dÃ­a</span>{% endif %}
+          {% if dia.es_hoy %}<span>HOY</span>{% elif dia.citas %}<span class="calendar-day-hint">Ver día</span>{% endif %}
         </div>
         {% for cita in dia.citas %}
         <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %}" data-appointment-open data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}" data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}">
-          <strong>{{ cita.fecha_hora|date:"h:i A" }} Â· {{ cita.titulo }}</strong>
+          <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}</span>
         </button>
         {% endfor %}
@@ -83,12 +83,12 @@
             <div class="calendar-modal-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
             <div class="calendar-modal-info">
               <strong>{{ cita.display_cliente }}</strong>
-              <span>{{ cita.display_servicio }} Â· {{ cita.display_responsable }}</span>
+              <span>{{ cita.display_servicio }} · {{ cita.display_responsable }}</span>
             </div>
-            <span class="calendar-modal-tag">{{ cita.agenda_color_label }} Ã‚Â· {{ cita.agenda_profesional_color_label }}</span>
+            <span class="calendar-modal-tag">{{ cita.agenda_color_label }} · {{ cita.agenda_profesional_color_label }}</span>
           </article>
           {% empty %}
-          <div class="calendar-empty">No hay citas programadas para este dÃ­a.</div>
+          <div class="calendar-empty">No hay citas programadas para este día.</div>
           {% endfor %}
         </div>
       </div>
@@ -103,8 +103,8 @@
       <div class="week-events">
         {% for cita in dia.citas %}
         <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %}" data-appointment-open data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}" data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}">
-          <strong>{{ cita.fecha_hora|date:"h:i A" }} Â· {{ cita.titulo }}</strong>
-          <span>{{ cita.display_cliente }}{% if not es_clinica %} Â· {{ cita.duracion_minutos }} min{% endif %}</span>
+          <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
+          <span>{{ cita.display_cliente }}{% if not es_clinica %} · {{ cita.duracion_minutos }} min{% endif %}</span>
         </button>
         {% empty %}
         <div class="calendar-empty">Sin citas</div>
@@ -121,12 +121,12 @@
         <div class="day-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
         <div class="day-content">
           <strong>{{ cita.titulo }}</strong>
-          <span>{{ cita.display_cliente }} Â· {{ cita.display_servicio }} Â· {{ cita.display_responsable }}{% if not es_clinica %} Â· {{ cita.duracion_minutos }} minutos{% endif %}</span>
+          <span>{{ cita.display_cliente }} · {{ cita.display_servicio }} · {{ cita.display_responsable }}{% if not es_clinica %} · {{ cita.duracion_minutos }} minutos{% endif %}</span>
         </div>
         <span class="calendar-chip">Ver cita</span>
       </article>
       {% empty %}
-      <div class="erp-card calendar-empty">No hay citas programadas para este dÃ­a.</div>
+      <div class="erp-card calendar-empty">No hay citas programadas para este día.</div>
       {% endfor %}
     {% endfor %}
   </section>
@@ -136,8 +136,8 @@
     <summary class="editor-title">
       <div>
         <div class="erp-kpi-label">{% if cita_editando %}Editando cita{% else %}Nueva cita{% endif %}</div>
-        <h3 class="erp-panel-title">{% if cita_editando %}{{ cita_editando.titulo }}{% elif es_clinica %}Programar consulta{% else %}Programar atenciÃ³n{% endif %}</h3>
-        {% if es_clinica %}<div class="erp-field-help">El tÃ­tulo se genera automÃ¡ticamente con el tipo de consulta.</div>{% endif %}
+        <h3 class="erp-panel-title">{% if cita_editando %}{{ cita_editando.titulo }}{% elif es_clinica %}Programar consulta{% else %}Programar atención{% endif %}</h3>
+        {% if es_clinica %}<div class="erp-field-help">El título se genera automáticamente con el tipo de consulta.</div>{% endif %}
       </div>
       <span class="erp-btn">{% if cita_editando %}Formulario abierto{% else %}+ Crear cita{% endif %}</span>
     </summary>
@@ -160,11 +160,11 @@
             {% if field.name == "paciente" and es_clinica %}
             <div class="appointment-patient-picker">
               <div class="appointment-patient-search{% if paciente_busqueda_inicial %} has-selection{% endif %}" data-patient-search-url="{% url 'agenda_buscar_pacientes' empresa.slug %}">
-                <input id="patientSearchInput" type="search" autocomplete="off" placeholder="Buscar por nombre, identidad, expediente, telÃ©fono o correo" value="{% if paciente_busqueda_inicial %}{{ paciente_busqueda_inicial.nombre }}{% endif %}" aria-autocomplete="list" aria-controls="patientSearchResults">
-                <span class="appointment-patient-search-icon">âŒ•</span>
+                <input id="patientSearchInput" type="search" autocomplete="off" placeholder="Buscar por nombre, identidad, expediente, teléfono o correo" value="{% if paciente_busqueda_inicial %}{{ paciente_busqueda_inicial.nombre }}{% endif %}" aria-autocomplete="list" aria-controls="patientSearchResults">
+                <span class="appointment-patient-search-icon">⌕</span>
                 <div class="appointment-patient-results" id="patientSearchResults" role="listbox"></div>
                 <div class="appointment-patient-native">
-                  <span>TambiÃ©n puedes desplegar y seleccionar directamente:</span>
+                  <span>También puedes desplegar y seleccionar directamente:</span>
                   {{ field }}
                 </div>
               </div>
@@ -179,31 +179,31 @@
         {% endfor %}
       </div>
       {% if es_hospital_mia %}
-      <div class="whatsapp-schedule-note"><strong>AutomatizaciÃ³n WhatsApp</strong><br>La confirmaciÃ³n se procesa automÃ¡ticamente al guardar. Los recordatorios de una semana y un dÃ­a se enviarÃ¡n a las 9:00 AM mediante la plantilla aprobada configurada en CRM.</div>
+      <div class="whatsapp-schedule-note"><strong>Automatización WhatsApp</strong><br>La confirmación se procesa automáticamente al guardar. Los recordatorios de una semana y un día se enviarán a las 9:00 AM mediante la plantilla aprobada configurada en CRM.</div>
       {% endif %}
       {% if es_clinica %}
-      <div class="erp-soft-panel" style="margin-top:14px">Â¿Falta un doctor o tipo de consulta? <a class="erp-inline-link" href="{% url 'clinica_profesionales' empresa.slug %}">Administrar doctores</a> Â· <a class="erp-inline-link" href="{% url 'clinica_servicios' empresa.slug %}">Administrar tipos de consulta</a></div>
+      <div class="erp-soft-panel" style="margin-top:14px">¿Falta un doctor o tipo de consulta? <a class="erp-inline-link" href="{% url 'clinica_profesionales' empresa.slug %}">Administrar doctores</a> · <a class="erp-inline-link" href="{% url 'clinica_servicios' empresa.slug %}">Administrar tipos de consulta</a></div>
       {% endif %}
       <div class="erp-form-actions">
         <button class="erp-btn" type="submit">{% if cita_editando %}Guardar cambios{% else %}Guardar cita{% endif %}</button>
-        {% if cita_editando %}<a class="erp-btn-secondary" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Cancelar ediciÃ³n</a>{% endif %}
+        {% if cita_editando %}<a class="erp-btn-secondary" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Cancelar edición</a>{% endif %}
       </div>
     </form>
   </details>
 
   <section class="erp-card erp-table-card appointment-detail-card">
     <div class="erp-section-heading">
-      <div><div class="erp-kpi-label">Detalle del perÃ­odo</div><h3 class="erp-panel-title">{{ citas|length }} cita(s)</h3></div>
+      <div><div class="erp-kpi-label">Detalle del período</div><h3 class="erp-panel-title">{{ citas|length }} cita(s)</h3></div>
     </div>
     <div class="erp-table-wrap">
       <table class="erp-table appointment-table">
-        <thead><tr><th>{% if es_clinica %}Consulta y profesional{% else %}Cita y responsable{% endif %}</th><th>{% if es_clinica %}Paciente{% else %}Cliente{% endif %}</th><th>Fecha y hora</th><th>Estado</th><th>GestiÃ³n</th></tr></thead>
+        <thead><tr><th>{% if es_clinica %}Consulta y profesional{% else %}Cita y responsable{% endif %}</th><th>{% if es_clinica %}Paciente{% else %}Cliente{% endif %}</th><th>Fecha y hora</th><th>Estado</th><th>Gestión</th></tr></thead>
         <tbody>
           {% for cita in citas %}
           <tr>
             <td><div class="appointment-main"><strong>{{ cita.display_servicio|default:cita.titulo }}</strong><span>{{ cita.display_responsable }}</span></div></td>
             <td><div class="appointment-patient">{{ cita.display_cliente }}</div></td>
-            <td><div class="appointment-date"><strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong><span>{{ cita.fecha_hora|date:"h:i A" }}{% if not es_clinica %} Â· {{ cita.duracion_minutos }} min{% endif %}</span></div></td>
+            <td><div class="appointment-date"><strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong><span>{{ cita.fecha_hora|date:"h:i A" }}{% if not es_clinica %} · {{ cita.duracion_minutos }} min{% endif %}</span></div></td>
             <td>
               <span class="appointment-status {{ cita.estado }}">{{ cita.get_estado_display }}</span>
               {% if cita.pagada %}<span class="appointment-paid-badge">Pagada</span>{% endif %}
@@ -223,20 +223,20 @@
                 </form>
                 <details class="appointment-delete">
                   <summary>Eliminar cita</summary>
-                  <form class="appointment-delete-form" method="post" action="{% url 'agenda_cita_eliminar' empresa.slug cita.id %}" onsubmit="return confirm('Â¿Confirmas que deseas eliminar definitivamente esta cita?');">
+                  <form class="appointment-delete-form" method="post" action="{% url 'agenda_cita_eliminar' empresa.slug cita.id %}" onsubmit="return confirm('¿Confirmas que deseas eliminar definitivamente esta cita?');">
                     {% csrf_token %}
                     <input type="hidden" name="vista" value="{{ vista }}">
                     <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
                     <label for="motivo-eliminar-{{ cita.id }}">Motivo obligatorio</label>
-                    <input id="motivo-eliminar-{{ cita.id }}" name="motivo_eliminacion" type="text" minlength="5" maxlength="500" required placeholder="Ej. El paciente cancelÃ³ la atenciÃ³n">
-                    <button type="submit">Confirmar eliminaciÃ³n</button>
+                    <input id="motivo-eliminar-{{ cita.id }}" name="motivo_eliminacion" type="text" minlength="5" maxlength="500" required placeholder="Ej. El paciente canceló la atención">
+                    <button type="submit">Confirmar eliminación</button>
                   </form>
                 </details>
               </div>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="erp-empty">No hay citas en este perÃ­odo.</td></tr>
+          <tr><td colspan="5" class="erp-empty">No hay citas en este período.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -250,11 +250,11 @@
     {% csrf_token %}
     <div class="patient-quick-head">
       <div>
-        <div class="erp-kpi-label">Alta rÃ¡pida desde citas</div>
+        <div class="erp-kpi-label">Alta rápida desde citas</div>
         <h3>Crear nuevo paciente</h3>
-        <p>El expediente y el cliente de facturaciÃ³n se crearÃ¡n automÃ¡ticamente.</p>
+        <p>El expediente y el cliente de facturación se crearán automáticamente.</p>
       </div>
-      <button class="patient-quick-close" type="button" data-close-patient-modal aria-label="Cerrar">Ã—</button>
+      <button class="patient-quick-close" type="button" data-close-patient-modal aria-label="Cerrar">×</button>
     </div>
     <div class="patient-quick-body">
       <div class="patient-quick-grid">
@@ -279,10 +279,10 @@
   <div class="calendar-modal-card" role="dialog" aria-modal="true" aria-labelledby="calendarDayModalTitle">
     <div class="calendar-modal-head">
       <div>
-        <div class="erp-kpi-label">Citas del dÃ­a</div>
+        <div class="erp-kpi-label">Citas del día</div>
         <h3 class="calendar-modal-title" id="calendarDayModalTitle">Agenda</h3>
       </div>
-      <button class="calendar-modal-close" type="button" data-calendar-modal-close aria-label="Cerrar">Ã—</button>
+      <button class="calendar-modal-close" type="button" data-calendar-modal-close aria-label="Cerrar">×</button>
     </div>
     <div class="calendar-modal-body" id="calendarDayModalBody"></div>
   </div>
@@ -347,8 +347,8 @@
     day.addEventListener("click", function(event){
       if(event.target.closest("a,button,summary,input,select,textarea,form")){ return; }
       const source = day.querySelector(".calendar-modal-source");
-      title.textContent = day.dataset.calendarTitle || "Agenda del dÃ­a";
-      body.innerHTML = source ? source.innerHTML : '<div class="calendar-empty">No hay citas programadas para este dÃ­a.</div>';
+      title.textContent = day.dataset.calendarTitle || "Agenda del día";
+      body.innerHTML = source ? source.innerHTML : '<div class="calendar-empty">No hay citas programadas para este día.</div>';
       modal.classList.add("is-open");
       modal.setAttribute("aria-hidden", "false");
     });
@@ -456,7 +456,7 @@
         patient.documento ? "ID " + patient.documento : "",
         patient.expediente ? "Exp. " + patient.expediente : "",
         patient.telefono || patient.correo || "",
-      ].filter(Boolean).join(" Â· ");
+      ].filter(Boolean).join(" · ");
       info.append(name, meta);
 
       const badge = document.createElement("em");
@@ -476,7 +476,7 @@
     }
     if(controller){ controller.abort(); }
     controller = new AbortController();
-    results.innerHTML = '<div class="appointment-patient-empty">Buscando pacientesâ€¦</div>';
+    results.innerHTML = '<div class="appointment-patient-empty">Buscando pacientes…</div>';
     results.classList.add("is-open");
     try{
       const url = new URL(shell.dataset.patientSearchUrl, window.location.origin);
@@ -490,13 +490,13 @@
         },
       });
       const contentType = response.headers.get("content-type") || "";
-      if(!contentType.includes("application/json")){ throw new Error("La sesiÃ³n no devolviÃ³ una respuesta vÃ¡lida."); }
+      if(!contentType.includes("application/json")){ throw new Error("La sesión no devolvió una respuesta válida."); }
       const data = await response.json();
       if(!response.ok){ throw new Error(data.error || "No fue posible buscar."); }
       renderPatients(data.results || []);
     }catch(error){
       if(error.name === "AbortError"){ return; }
-      results.innerHTML = '<div class="appointment-patient-empty">No fue posible realizar la bÃºsqueda.</div>';
+      results.innerHTML = '<div class="appointment-patient-empty">No fue posible realizar la búsqueda.</div>';
       results.classList.add("is-open");
     }
   }
@@ -573,7 +573,7 @@
   form.addEventListener("submit", async function(event){
     event.preventDefault();
     submit.disabled = true;
-    showStatus("Guardando pacienteâ€¦", true);
+    showStatus("Guardando paciente…", true);
     try{
       const response = await fetch("{% url 'agenda_crear_paciente_rapido' empresa.slug %}", {
         method: "POST",
