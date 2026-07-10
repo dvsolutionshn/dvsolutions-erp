@@ -260,6 +260,12 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(consentimiento.estado, "firmado")
         self.assertTrue(consentimiento.archivo.name.endswith(".pdf"))
 
+        detalle = self.client.get(reverse("clinica_consentimientos_paciente", args=[self.empresa.slug, paciente.id]))
+        self.assertEqual(detalle.status_code, 200)
+        self.assertContains(detalle, "Biblioteca de PDF firmados")
+        self.assertContains(detalle, "Consentimiento cirugía capilar")
+        self.assertContains(detalle, "Abrir PDF")
+
     def test_no_permite_identidad_con_guiones_o_espacios(self):
         response = self.client.post(
             reverse("clinica_crear_paciente", args=[self.empresa.slug]),

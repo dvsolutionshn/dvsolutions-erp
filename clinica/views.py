@@ -631,6 +631,34 @@ def paciente_detalle(request, empresa_slug, paciente_id):
 
 
 @login_required
+def consentimientos_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    consentimientos = list(
+        ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)
+        .select_related("tratamiento", "cita")
+        .order_by("-fecha_firma", "-fecha_creacion")
+    )
+    resumen = {
+        "total": len(consentimientos),
+        "firmados": sum(1 for item in consentimientos if item.estado == "firmado"),
+        "pendientes": sum(1 for item in consentimientos if item.estado == "pendiente"),
+        "revocados": sum(1 for item in consentimientos if item.estado == "revocado"),
+        "con_pdf": sum(1 for item in consentimientos if item.archivo),
+    }
+    return render(
+        request,
+        "clinica/consentimientos_paciente.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "consentimientos": consentimientos,
+            "resumen": resumen,
+        },
+    )
+
+
+@login_required
 def historias_especialidad(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_hospital_mia(empresa)
@@ -1163,12 +1191,12 @@ def subir_consentimiento_paciente(request, empresa_slug, paciente_id):
         consentimiento.contenido = consentimiento.contenido or "Plan de consentimiento firmado cargado en PDF."
         consentimiento.save()
         messages.success(request, "Plan de consentimiento PDF agregado correctamente.")
-        return redirect(f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#consentimientos")
+        return redirect("clinica_consentimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
     return render(request, "clinica/form.html", {
         "empresa": empresa,
         "form": form,
         "titulo": f"Subir plan de consentimiento: {paciente.nombre}",
-        "cancel_url": f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#consentimientos",
+        "cancel_url": reverse("clinica_consentimientos_paciente", args=[empresa.slug, paciente.id]),
     })
 
 

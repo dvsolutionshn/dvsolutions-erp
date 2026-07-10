@@ -1,0 +1,111 @@
+﻿{% extends "core/erp_base.html" %}
+
+{% block title %}Plan de consentimiento - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Plan de consentimiento{% endblock %}
+{% block header_description %}Biblioteca de PDF firmados, versiones, estados y fechas de consentimiento del paciente.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+<a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir consentimiento PDF</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.consent-hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:24px;background:linear-gradient(135deg,#fff,#f6fbff 55%,#eefbf8);padding:22px;box-shadow:0 18px 46px rgba(15,42,68,.07)}
+.consent-hero:after{content:"";position:absolute;right:-70px;top:-80px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(20,184,166,.18),transparent 70%)}
+.consent-hero-main{position:relative;z-index:1;display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.consent-patient strong{display:block;color:#102338;font-size:24px}.consent-patient span{display:block;margin-top:5px;color:var(--muted)}
+.consent-status-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:#eaf8f6;color:#0f766e;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.consent-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:18px}
+.consent-kpi{padding:15px;border:1px solid #d7e5ee;border-radius:18px;background:rgba(255,255,255,.86);box-shadow:0 12px 30px rgba(15,42,68,.05)}
+.consent-kpi span{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.consent-kpi strong{display:block;margin-top:6px;color:#102338;font-size:25px}
+.consent-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px;align-items:start}
+.consent-list{display:grid;gap:12px}
+.consent-card{position:relative;display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px;border:1px solid #dbe7ef;border-radius:20px;background:#fff;box-shadow:0 16px 38px rgba(15,42,68,.06)}
+.consent-icon{width:56px;height:56px;display:grid;place-items:center;border-radius:16px;background:linear-gradient(135deg,#0f766e,#2563eb);color:#fff;font-size:22px;font-weight:900}
+.consent-info h3{margin:0;color:#102338;font-size:17px}.consent-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;color:var(--muted);font-size:11px}
+.consent-tag{display:inline-flex;padding:5px 8px;border-radius:999px;background:#eef4f8;color:#526477;font-size:9px;font-weight:900;text-transform:uppercase}.consent-tag.firmado{background:#e8f7ef;color:#16724f}.consent-tag.pendiente{background:#fff7df;color:#8a6411}.consent-tag.revocado{background:#fdecec;color:#a43c3c}
+.consent-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.consent-empty{min-height:260px;display:grid;place-items:center;text-align:center;border:1px dashed #bcd0dd;border-radius:22px;background:#fff;color:var(--muted);padding:28px}
+.consent-guide{position:sticky;top:92px;display:grid;gap:12px}.consent-guide-card{padding:18px;border:1px solid var(--line);border-radius:20px;background:#fff;box-shadow:0 14px 34px rgba(15,42,68,.05)}.consent-guide-card h3{margin:0 0 8px;color:#102338}.consent-guide-card p{margin:0;color:var(--muted);line-height:1.55}.consent-check{display:grid;gap:8px;margin-top:12px}.consent-check span{display:flex;gap:8px;align-items:flex-start;color:#30465a;font-size:12px}.consent-check i{width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:#e8f7ef;color:#10725f;font-style:normal;font-weight:900;font-size:10px;flex:0 0 auto}
+@media(max-width:1100px){.consent-layout{grid-template-columns:1fr}.consent-guide{position:static}.consent-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.consent-card{grid-template-columns:48px minmax(0,1fr)}.consent-actions{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:620px){.consent-kpis{grid-template-columns:1fr}.consent-card{grid-template-columns:1fr}.consent-icon{width:48px;height:48px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="consent-hero">
+    <div class="consent-hero-main">
+        <div class="consent-patient">
+            <div class="erp-kpi-label">Paciente</div>
+            <strong>{{ paciente.nombre }}</strong>
+            <span>{{ paciente.identidad|default:"Sin identidad" }} · {{ paciente.edad|default:"-" }} anos · Expediente {{ paciente.expediente_codigo }}</span>
+        </div>
+        <span class="consent-status-pill">Archivo documental clinico</span>
+    </div>
+    <div class="consent-kpis">
+        <div class="consent-kpi"><span>Total planes</span><strong>{{ resumen.total }}</strong></div>
+        <div class="consent-kpi"><span>Firmados</span><strong>{{ resumen.firmados }}</strong></div>
+        <div class="consent-kpi"><span>Pendientes</span><strong>{{ resumen.pendientes }}</strong></div>
+        <div class="consent-kpi"><span>Revocados</span><strong>{{ resumen.revocados }}</strong></div>
+        <div class="consent-kpi"><span>Con PDF</span><strong>{{ resumen.con_pdf }}</strong></div>
+    </div>
+</section>
+
+<section class="consent-layout">
+    <div class="consent-list">
+        {% for consentimiento in consentimientos %}
+        <article class="consent-card">
+            <div class="consent-icon">PDF</div>
+            <div class="consent-info">
+                <h3>{{ consentimiento.titulo }}</h3>
+                <div class="consent-meta">
+                    <span class="consent-tag {{ consentimiento.estado }}">{{ consentimiento.get_estado_display }}</span>
+                    <span>Version {{ consentimiento.version }}</span>
+                    {% if consentimiento.fecha_firma %}<span>Firmado {{ consentimiento.fecha_firma|date:"d/m/Y h:i A" }}</span>{% endif %}
+                    {% if consentimiento.firmado_por %}<span>Firmado por {{ consentimiento.firmado_por }}</span>{% endif %}
+                    {% if consentimiento.tratamiento %}<span>Tratamiento: {{ consentimiento.tratamiento.nombre }}</span>{% endif %}
+                    {% if consentimiento.cita %}<span>Cita: {{ consentimiento.cita.fecha_hora|date:"d/m/Y" }}</span>{% endif %}
+                </div>
+            </div>
+            <div class="consent-actions">
+                {% if consentimiento.archivo %}
+                <a class="erp-btn-secondary" href="{{ consentimiento.archivo.url }}" target="_blank" rel="noopener">Abrir PDF</a>
+                {% else %}
+                <span class="consent-tag pendiente">Sin PDF</span>
+                {% endif %}
+            </div>
+        </article>
+        {% empty %}
+        <div class="consent-empty">
+            <div>
+                <div class="erp-kpi-label">Sin documentos</div>
+                <h3 style="margin:8px 0;color:#102338;">Aun no hay planes de consentimiento cargados</h3>
+                <p style="margin:0 0 16px;">Suba el primer PDF firmado para que la doctora pueda consultarlo desde una pantalla ordenada.</p>
+                <a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir primer PDF</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <aside class="consent-guide">
+        <div class="consent-guide-card">
+            <h3>Uso recomendado</h3>
+            <p>Esta pantalla centraliza todos los consentimientos y planes firmados del paciente. La doctora puede revisar rapidamente el estado documental antes de un procedimiento o control.</p>
+            <div class="consent-check">
+                <span><i>OK</i> Subir solo PDF firmado o escaneado.</span>
+                <span><i>OK</i> Colocar el tipo de plan en el titulo.</span>
+                <span><i>OK</i> Registrar fecha de firma cuando exista.</span>
+                <span><i>OK</i> Mantener version para controlar cambios del documento.</span>
+            </div>
+        </div>
+        <div class="consent-guide-card">
+            <h3>Acciones rapidas</h3>
+            <p style="margin-bottom:12px;">Mantenga el expediente limpio y deje los documentos legales en esta biblioteca.</p>
+            <a class="erp-btn" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}" style="width:100%;justify-content:center;">Subir nuevo PDF</a>
+            <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}" style="width:100%;justify-content:center;margin-top:8px;">Volver al expediente</a>
+        </div>
+    </aside>
+</section>
+{% endblock %}
+
