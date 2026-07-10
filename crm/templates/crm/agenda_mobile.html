@@ -25,6 +25,9 @@
   .install-grid{display:grid;gap:12px;margin-top:18px}.install-choice{display:grid;grid-template-columns:54px minmax(0,1fr);gap:13px;align-items:center;padding:15px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,#fff,#f6fafc)}.install-choice.recommended{border-color:#72cfc7;box-shadow:0 10px 28px rgba(34,184,173,.12)}.platform-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;background:var(--navy);color:#fff;font-size:25px}.install-choice strong,.install-choice span{display:block}.install-choice span{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.45}.platform-install{grid-column:1/-1;min-height:48px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--teal),#197ad0);color:#fff;font-weight:900}.platform-install.ios{background:linear-gradient(135deg,#25394b,#111d28)}.install-steps{display:none;grid-column:1/-1;padding:12px 13px;border-radius:13px;background:#edf5fa;color:#39566d;font-size:11px;line-height:1.6}.install-steps.show{display:block}.install-status{display:none;margin-top:12px;padding:12px 14px;border-radius:14px;background:#eef7f5;color:#25665f;font-size:11px;line-height:1.5}.install-status.show{display:block}.platform-badge{display:none;width:max-content;margin-bottom:5px;padding:4px 7px;border-radius:999px;background:#dff8f3;color:#14776d;font-size:8px!important;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.recommended .platform-badge{display:block}
   @media(max-width:520px){.form-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.appointment{grid-template-columns:58px minmax(0,1fr) auto}.days{gap:5px}.day{border-radius:13px}.content{padding-inline:11px}.hero{padding-inline:16px}.datetime{grid-template-columns:1fr 82px 62px}}
   </style>
+  <style>
+  .appointment.color-consulta{border-left-color:#2878d0}.appointment.color-control{border-left-color:#13a08a}.appointment.color-tratamientos{border-left-color:#2d9b65}.appointment.color-laboratorio{border-left-color:#7c5cff}.appointment.color-imagen{border-left-color:#1c9ac5}.appointment.color-general{border-left-color:#8796a8}.appointment[class*="professional-"]{border-right:4px solid #9aa8b6}.professional-doctor-luis{border-right-color:#2878d0!important}.professional-dra-candy{border-right-color:#e675a0!important}.professional-lic-enfermeria{border-right-color:#0f9f8f!important}.professional-enfermera{border-right-color:#22b8ad!important}.professional-medico{border-right-color:#805ad5!important}.professional-profesional{border-right-color:#8796a8!important}
+  </style>
 </head>
 <body>
 <main class="app">
@@ -50,7 +53,7 @@
     <div class="section-head"><div><small>Agenda del día</small><h2>{{ citas|length }} cita{{ citas|length|pluralize:"s" }}</h2></div></div>
     <section class="appointments">
       {% for cita in citas %}
-      <article class="appointment color-{{ cita.agenda_color }}">
+      <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}">
         <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
         <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{% if es_clinica %}{{ cita.display_servicio }}{% else %}{{ cita.titulo }}{% endif %}<br>{{ cita.display_responsable }}</span><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em></div>
         <button class="more" type="button" data-cita-actions="{{ cita.id }}">•••</button>

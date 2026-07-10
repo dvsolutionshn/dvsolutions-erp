@@ -10,6 +10,7 @@ from django.utils import timezone
 from PIL import Image
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
+from crm.models import CitaCliente
 from facturacion.models import Cliente
 from .forms import PreconsultaClinicaPublicaForm
 from .models import CitaClinica, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
@@ -69,6 +70,10 @@ class ClinicaPacienteTests(TestCase):
         cita = CitaClinica.objects.get(empresa=self.empresa, paciente=paciente)
         self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
         self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 15)
+        agenda = CitaCliente.objects.get(empresa=self.empresa, cita_clinica=cita)
+        self.assertTrue(agenda.enviar_confirmacion_whatsapp)
+        self.assertTrue(agenda.recordatorio_semana_whatsapp)
+        self.assertTrue(agenda.recordatorio_dia_whatsapp)
 
     def test_paciente_medico_exige_identidad_en_validacion(self):
         for slug in ("hospital_mia", "medical_spa"):

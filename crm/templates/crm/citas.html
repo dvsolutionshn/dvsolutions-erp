@@ -17,6 +17,9 @@
 .patient-quick-modal{width:min(780px,96vw);max-height:90vh;padding:0;border:0;border-radius:22px;background:#fff;box-shadow:0 26px 70px rgba(18,35,56,.3)}.patient-quick-modal::backdrop{background:rgba(15,28,42,.5);backdrop-filter:blur(5px)}.patient-quick-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:20px 22px;border-bottom:1px solid #e0e8f0;background:linear-gradient(135deg,#fff,#f3f8fd)}.patient-quick-head h3{margin:3px 0 0;color:#132338;font-size:21px}.patient-quick-head p{margin:6px 0 0;color:#6a7b8c;font-size:11px}.patient-quick-close{width:38px;height:38px;border:1px solid #ccd9e5;border-radius:12px;background:#fff;color:#26394d;font-size:20px;cursor:pointer}.patient-quick-body{padding:20px 22px}.patient-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.patient-quick-field{display:grid;gap:6px}.patient-quick-field label{color:#617486;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.patient-quick-field input,.patient-quick-field select{width:100%;min-height:44px;border:1px solid #b8ccdc;border-radius:10px;background:#fff;padding:0 12px;color:#25384a}.patient-quick-field input:focus,.patient-quick-field select:focus{outline:0;border-color:#2878d0;box-shadow:0 0 0 3px rgba(40,120,208,.1)}.patient-quick-status{display:none;margin-top:15px;padding:11px 13px;border-radius:10px;background:#f8eceb;color:#943d38;font-size:11px;line-height:1.45}.patient-quick-status.is-visible{display:block}.patient-quick-status.is-success{background:#e9f5ef;color:#28654d}.patient-quick-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid #e4eaf0}.patient-quick-actions button[disabled]{opacity:.55;cursor:wait}
 @media(max-width:900px){.calendar-toolbar{align-items:flex-start}.calendar-period{order:3;width:100%;justify-content:center}.calendar-grid{grid-template-columns:repeat(7,120px)}.day-event{grid-template-columns:70px 1fr}.day-event .appointment-actions{grid-column:1/-1}.calendar-modal-item{grid-template-columns:1fr}.calendar-modal-tag{width:max-content}.appointment-patient-picker{grid-template-columns:1fr}.patient-quick-grid{grid-template-columns:1fr}.patient-quick-modal{width:94vw}}
 </style>
+<style>
+.calendar-event.color-consulta,.day-event.color-consulta,.calendar-modal-item.color-consulta{border-left-color:#2878d0;background:#eaf3ff}.calendar-event.color-control,.day-event.color-control,.calendar-modal-item.color-control{border-left-color:#13a08a;background:#eafaf7}.calendar-event.color-laboratorio,.day-event.color-laboratorio,.calendar-modal-item.color-laboratorio{border-left-color:#7c5cff;background:#f2efff}.calendar-event.color-imagen,.day-event.color-imagen,.calendar-modal-item.color-imagen{border-left-color:#1c9ac5;background:#edf9ff}.calendar-event.color-general,.day-event.color-general,.calendar-modal-item.color-general{border-left-color:#8796a8;background:#f4f7fa}.calendar-dot.color-consulta{background:#2878d0}.calendar-dot.color-control{background:#13a08a}.calendar-dot.color-laboratorio{background:#7c5cff}.calendar-dot.color-imagen{background:#1c9ac5}.calendar-dot.color-general{background:#8796a8}.calendar-event[class*="professional-"],.day-event[class*="professional-"],.calendar-modal-item[class*="professional-"]{border-right:4px solid #9aa8b6}.professional-doctor-luis{border-right-color:#2878d0!important}.professional-dra-candy{border-right-color:#d85c97!important}.professional-lic-enfermeria{border-right-color:#0f9f8f!important}.professional-enfermera{border-right-color:#22b8ad!important}.professional-medico{border-right-color:#805ad5!important}.professional-profesional{border-right-color:#8796a8!important}.calendar-pro-dot{width:20px;height:4px;border-radius:999px;background:#8796a8}.calendar-pro-dot.professional-doctor-luis,.calendar-pro-dot.professional-dra-candy,.calendar-pro-dot.professional-lic-enfermeria,.calendar-pro-dot.professional-enfermera,.calendar-pro-dot.professional-medico,.calendar-pro-dot.professional-profesional{border-right:0!important}.calendar-legend-title{width:100%;margin-top:2px;color:#617487;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+</style>
 
 <div class="calendar-shell">
   <section class="erp-card">
@@ -35,12 +38,18 @@
     </div>
     {% if es_clinica %}
     <div class="calendar-legend">
-      <span class="calendar-legend-item"><i class="calendar-dot color-doctor-luis"></i> Dr Luis</span>
-      <span class="calendar-legend-item"><i class="calendar-dot color-dra-candy"></i> Dra Candy</span>
+      <span class="calendar-legend-title">Color principal por tipo de consulta</span>
+      <span class="calendar-legend-item"><i class="calendar-dot color-consulta"></i> Consulta</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-terapias"></i> Terapias / cámaras</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-tratamientos"></i> Tratamientos</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-cirugias"></i> Cirugías</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-spa"></i> Spa</span>
+      <span class="calendar-legend-item"><i class="calendar-dot color-control"></i> Control</span>
+      <span class="calendar-legend-title">Acento lateral por doctor / profesional</span>
+      <span class="calendar-legend-item"><i class="calendar-pro-dot professional-doctor-luis"></i> Dr Luis</span>
+      <span class="calendar-legend-item"><i class="calendar-pro-dot professional-dra-candy"></i> Dra Candy</span>
+      <span class="calendar-legend-item"><i class="calendar-pro-dot professional-lic-enfermeria"></i> Lic. Enfermeria</span>
+      <span class="calendar-legend-item"><i class="calendar-pro-dot professional-enfermera"></i> Enfermera</span>
     </div>
     {% endif %}
   </section>
@@ -62,20 +71,20 @@
           {% if dia.es_hoy %}<span>HOY</span>{% elif dia.citas %}<span class="calendar-day-hint">Ver día</span>{% endif %}
         </div>
         {% for cita in dia.citas %}
-        <a class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }}" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">
+        <a class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}</span>
         </a>
         {% endfor %}
         <div class="calendar-modal-source">
           {% for cita in dia.citas %}
-          <article class="calendar-modal-item color-{{ cita.agenda_color }}">
+          <article class="calendar-modal-item color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}">
             <div class="calendar-modal-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
             <div class="calendar-modal-info">
               <strong>{{ cita.display_cliente }}</strong>
               <span>{{ cita.display_servicio }} · {{ cita.display_responsable }}</span>
             </div>
-            <span class="calendar-modal-tag">{{ cita.agenda_color_label }}</span>
+            <span class="calendar-modal-tag">{{ cita.agenda_color_label }} Â· {{ cita.agenda_profesional_color_label }}</span>
           </article>
           {% empty %}
           <div class="calendar-empty">No hay citas programadas para este día.</div>
@@ -92,7 +101,7 @@
       <div class="week-head"><strong>{{ dia.fecha|date:"D d" }}</strong><span>{{ dia.fecha|date:"F" }}</span></div>
       <div class="week-events">
         {% for cita in dia.citas %}
-        <a class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }}" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">
+        <a class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}{% if not es_clinica %} · {{ cita.duracion_minutos }} min{% endif %}</span>
         </a>
@@ -107,7 +116,7 @@
   <section class="day-board">
     {% for dia in dias %}
       {% for cita in dia.citas %}
-      <article class="day-event color-{{ cita.agenda_color }}">
+      <article class="day-event color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}">
         <div class="day-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
         <div class="day-content">
           <strong>{{ cita.titulo }}</strong>
@@ -169,7 +178,7 @@
         {% endfor %}
       </div>
       {% if es_hospital_mia %}
-      <div class="whatsapp-schedule-note"><strong>Automatización WhatsApp</strong><br>La confirmación se procesa al guardar. Los recordatorios de una semana y un día se enviarán automáticamente mediante la plantilla aprobada configurada en CRM.</div>
+      <div class="whatsapp-schedule-note"><strong>Automatización WhatsApp</strong><br>La confirmación se procesa automáticamente al guardar. Los recordatorios de una semana y un día se enviarán a las 9:00 AM mediante la plantilla aprobada configurada en CRM.</div>
       {% endif %}
       {% if es_clinica %}
       <div class="erp-soft-panel" style="margin-top:14px">¿Falta un doctor o tipo de consulta? <a class="erp-inline-link" href="{% url 'clinica_profesionales' empresa.slug %}">Administrar doctores</a> · <a class="erp-inline-link" href="{% url 'clinica_servicios' empresa.slug %}">Administrar tipos de consulta</a></div>

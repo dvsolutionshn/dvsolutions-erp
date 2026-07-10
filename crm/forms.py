@@ -4,7 +4,7 @@ from django import forms
 from django.utils import timezone
 
 from facturacion.models import Cliente, Producto
-from clinica.models import Paciente, ProfesionalSalud, ServicioClinico
+from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
 
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, PlantillaMensaje
 
@@ -113,6 +113,7 @@ class CitaClienteForm(forms.ModelForm):
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
         self.notificaciones_cita_activas = bool(empresa and empresa.slug in self.EMPRESAS_WHATSAPP_CITAS)
         if empresa:
+            asegurar_profesionales_agenda_base(empresa)
             self.fields["cliente"].queryset = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["producto"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["paciente"].queryset = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre")

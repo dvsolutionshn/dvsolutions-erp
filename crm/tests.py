@@ -450,8 +450,10 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "calendarDayModal")
         self.assertContains(response, "data-calendar-day=\"2026-06-23\"")
-        self.assertContains(response, "color-doctor-luis")
-        self.assertContains(response, "color-dra-candy")
+        self.assertContains(response, "color-consulta")
+        self.assertContains(response, "color-spa")
+        self.assertContains(response, "professional-doctor-luis")
+        self.assertContains(response, "professional-dra-candy")
         self.assertContains(response, "Spa")
 
     def test_eliminar_cita_exige_motivo_y_limpia_registros_vinculados(self):
@@ -550,7 +552,12 @@ class CRMTests(TestCase):
         confirmacion = cita.notificaciones_whatsapp.get(tipo="confirmacion")
         self.assertEqual(confirmacion.estado, "enviado")
         semana = cita.notificaciones_whatsapp.get(tipo="semana")
-        momento_semana = cita.fecha_hora - timedelta(days=7) + timedelta(minutes=1)
+        self.assertEqual(timezone.localtime(semana.programada_para).hour, 9)
+        self.assertEqual(timezone.localtime(semana.programada_para).minute, 0)
+        dia = cita.notificaciones_whatsapp.get(tipo="dia")
+        self.assertEqual(timezone.localtime(dia.programada_para).hour, 9)
+        self.assertEqual(timezone.localtime(dia.programada_para).minute, 0)
+        momento_semana = semana.programada_para + timedelta(minutes=1)
         with patch("crm.appointment_notifications.timezone.now", return_value=momento_semana):
             call_command("procesar_recordatorios_citas")
         semana.refresh_from_db()

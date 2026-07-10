@@ -7,25 +7,24 @@
 {% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}">Nueva cita</a>{% endblock %}
 
 {% block content %}
+<style>
+.clinical-agenda{display:grid;gap:12px}.clinical-row{display:grid;grid-template-columns:150px minmax(0,1.2fr) minmax(0,1fr) 130px;gap:14px;align-items:center;padding:16px;border:1px solid #d9e6ef;border-left:6px solid #8796a8;border-right:5px solid #9aa8b6;border-radius:16px;background:#fff;box-shadow:0 10px 26px rgba(20,45,70,.06)}.clinical-row.color-consulta{border-left-color:#2878d0;background:#f4f9ff}.clinical-row.color-terapias{border-left-color:#805ad5;background:#f7f3ff}.clinical-row.color-tratamientos{border-left-color:#2d9b65;background:#f1fbf5}.clinical-row.color-cirugias{border-left-color:#c9413a;background:#fff5f4}.clinical-row.color-spa{border-left-color:#d7a51f;background:#fffbea}.clinical-row.color-control{border-left-color:#13a08a;background:#effbf8}.clinical-row.color-laboratorio{border-left-color:#7c5cff;background:#f4f1ff}.clinical-row.color-imagen{border-left-color:#1c9ac5;background:#effaff}.clinical-row.professional-doctor-luis{border-right-color:#2878d0}.clinical-row.professional-dra-candy{border-right-color:#d85c97}.clinical-row.professional-lic-enfermeria{border-right-color:#0f9f8f}.clinical-row.professional-enfermera{border-right-color:#22b8ad}.clinical-row.professional-medico{border-right-color:#805ad5}.clinical-date strong,.clinical-main strong{display:block;color:#14283b}.clinical-date span,.clinical-main span,.clinical-meta{display:block;margin-top:4px;color:#637588;font-size:11px}.clinical-status{display:inline-flex;padding:7px 10px;border-radius:999px;background:#eef4f8;color:#526477;font-size:10px;font-weight:900;text-transform:uppercase}@media(max-width:900px){.clinical-row{grid-template-columns:1fr}}
+</style>
 <section class="erp-card">
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead><tr><th>Fecha</th><th>Paciente</th><th>Servicio</th><th>Profesional</th><th>Estado</th><th>Canal</th></tr></thead>
-            <tbody>
-                {% for cita in citas %}
-                <tr>
-                    <td>{{ cita.fecha_hora|date:"d/m/Y H:i" }}</td>
-                    <td><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug cita.paciente.id %}">{{ cita.paciente.nombre }}</a></td>
-                    <td>{{ cita.servicio.nombre|default:cita.motivo }}</td>
-                    <td>{{ cita.profesional.nombre|default:"-" }}</td>
-                    <td>{{ cita.get_estado_display }}</td>
-                    <td>{{ cita.get_canal_display }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty">No hay citas clinicas registradas.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="clinical-agenda">
+        {% for cita in citas %}
+        <article class="clinical-row color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }}">
+            <div class="clinical-date"><strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong><span>{{ cita.fecha_hora|date:"h:i A" }}</span></div>
+            <div class="clinical-main">
+                <strong><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug cita.paciente.id %}">{{ cita.paciente.nombre }}</a></strong>
+                <span>{{ cita.servicio.nombre|default:cita.motivo }} · {{ cita.agenda_color_label }}</span>
+            </div>
+            <div class="clinical-meta">{{ cita.profesional.nombre|default:"Sin profesional" }}<br>{{ cita.agenda_profesional_color_label }}</div>
+            <div><span class="clinical-status">{{ cita.get_estado_display }}</span><span class="clinical-meta">{{ cita.get_canal_display }}</span></div>
+        </article>
+        {% empty %}
+        <div class="erp-empty">No hay citas clinicas registradas.</div>
+        {% endfor %}
     </div>
 </section>
 {% endblock %}

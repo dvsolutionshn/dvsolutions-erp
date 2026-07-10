@@ -15,6 +15,7 @@ from .models import (
     ProfesionalSalud,
     ServicioClinico,
     TratamientoPaciente,
+    asegurar_profesionales_agenda_base,
 )
 
 RH_CHOICES = [
@@ -221,6 +222,7 @@ class CitaClinicaForm(BaseClinicaForm):
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
         if empresa:
+            asegurar_profesionales_agenda_base(empresa)
             self.fields["paciente"].queryset = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["servicio"].queryset = ServicioClinico.objects.filter(empresa=empresa, activo=True).order_by("nombre")

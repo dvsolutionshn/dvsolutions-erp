@@ -199,17 +199,14 @@ class CitaCliente(models.Model):
 
     @property
     def agenda_color(self):
-        responsable = _normalizar_texto(self.display_responsable)
         servicio = _normalizar_texto(self.display_servicio)
         categoria = _normalizar_texto(
             self.servicio_clinico.categoria if self.servicio_clinico_id else ""
         )
-        if "luis" in responsable:
-            return "doctor-luis"
-        if "candy" in responsable:
-            return "dra-candy"
         if "terapia" in servicio or "camara" in servicio or "hiperbar" in servicio:
             return "terapias"
+        if categoria == "consulta" or "consulta" in servicio or "evaluacion" in servicio or "valoracion" in servicio:
+            return "consulta"
         if categoria == "spa" or any(
             palabra in servicio
             for palabra in ["facial", "masaje", "hidratacion", "spa", "estetico no medico"]
@@ -219,20 +216,59 @@ class CitaCliente(models.Model):
             return "cirugias"
         if categoria in {"tratamiento", "procedimiento"} or "tratamiento" in servicio:
             return "tratamientos"
+        if categoria == "control" or "control" in servicio or "seguimiento" in servicio:
+            return "control"
+        if categoria == "laboratorio" or "laboratorio" in servicio or "lab" in servicio:
+            return "laboratorio"
+        if categoria == "imagen" or "ultrasonido" in servicio or "imagen" in servicio:
+            return "imagen"
         return "general"
 
     @property
     def agenda_color_label(self):
         etiquetas = {
-            "doctor-luis": "Dr Luis",
-            "dra-candy": "Dra Candy",
+            "consulta": "Consulta",
             "terapias": "Terapias / camaras hiperbaricas",
             "tratamientos": "Tratamientos",
             "cirugias": "Cirugias",
             "spa": "Spa",
+            "control": "Control / seguimiento",
+            "laboratorio": "Laboratorio",
+            "imagen": "Imagen",
             "general": "General",
         }
         return etiquetas.get(self.agenda_color, "General")
+
+    @property
+    def agenda_profesional_color(self):
+        responsable = _normalizar_texto(self.display_responsable)
+        especialidad = _normalizar_texto(
+            self.profesional_salud.especialidad if self.profesional_salud_id else ""
+        )
+        combinado = f"{responsable} {especialidad}"
+        if "luis" in combinado:
+            return "doctor-luis"
+        if "candy" in combinado or "luque" in combinado:
+            return "dra-candy"
+        if "licenciada" in combinado and "enfermer" in combinado:
+            return "lic-enfermeria"
+        if "enfermer" in combinado:
+            return "enfermera"
+        if "doctor" in combinado or "dr " in combinado or "dra " in combinado:
+            return "medico"
+        return "profesional"
+
+    @property
+    def agenda_profesional_color_label(self):
+        etiquetas = {
+            "doctor-luis": "Dr Luis",
+            "dra-candy": "Dra Candy",
+            "lic-enfermeria": "Licenciada en enfermeria",
+            "enfermera": "Enfermera",
+            "medico": "Medico",
+            "profesional": "Profesional",
+        }
+        return etiquetas.get(self.agenda_profesional_color, "Profesional")
 
     @property
     def whatsapp_url(self):

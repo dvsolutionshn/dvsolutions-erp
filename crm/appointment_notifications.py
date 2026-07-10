@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.conf import settings
 from django.db import transaction
@@ -7,6 +7,9 @@ from django.utils import timezone
 from .models import CitaCliente, ConfiguracionCRM, NotificacionCitaWhatsApp
 from .services import WhatsAppAPIError, enviar_plantilla_cita_whatsapp
 from .tokens import construir_url_respuesta_cita
+
+EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
+HORA_RECORDATORIO_CITA = time(9, 0)
 
 
 def _numero_cita(cita):
@@ -18,13 +21,20 @@ def _numero_cita(cita):
 
 
 def programar_notificaciones_cita(cita, ahora=None):
-    if cita.empresa.slug != "hospital_mia":
+    if cita.empresa.slug not in EMPRESAS_WHATSAPP_CITAS:
         return []
     ahora = ahora or timezone.now()
+    zona = timezone.get_current_timezone()
+    fecha_local = timezone.localtime(cita.fecha_hora, zona).date()
+
+    def a_las_nueve(dias_antes):
+        fecha_recordatorio = fecha_local - timedelta(days=dias_antes)
+        return timezone.make_aware(datetime.combine(fecha_recordatorio, HORA_RECORDATORIO_CITA), zona)
+
     reglas = [
         (NotificacionCitaWhatsApp.TIPO_CONFIRMACION, cita.enviar_confirmacion_whatsapp, ahora),
-        (NotificacionCitaWhatsApp.TIPO_SEMANA, cita.recordatorio_semana_whatsapp, cita.fecha_hora - timedelta(days=7)),
-        (NotificacionCitaWhatsApp.TIPO_DIA, cita.recordatorio_dia_whatsapp, cita.fecha_hora - timedelta(days=1)),
+        (NotificacionCitaWhatsApp.TIPO_SEMANA, cita.recordatorio_semana_whatsapp, a_las_nueve(7)),
+        (NotificacionCitaWhatsApp.TIPO_DIA, cita.recordatorio_dia_whatsapp, a_las_nueve(1)),
     ]
     resultado = []
     for tipo, activo, programada in reglas:
@@ -119,14 +129,14 @@ def procesar_notificacion(notificacion_id, ahora=None):
 def procesar_recordatorios_hospital_mia(ahora=None):
     ahora = ahora or timezone.now()
     citas = CitaCliente.objects.filter(
-        empresa__slug="hospital_mia",
+        empresa__slug__in=EMPRESAS_WHATSAPP_CITAS,
         fecha_hora__gt=ahora,
         estado__in=["pendiente", "confirmada"],
     ).select_related("empresa")
     for cita in citas.iterator():
         programar_notificaciones_cita(cita, ahora=ahora)
     pendientes = list(NotificacionCitaWhatsApp.objects.filter(
-        cita__empresa__slug="hospital_mia",
+        cita__empresa__slug__in=EMPRESAS_WHATSAPP_CITAS,
         estado__in=["pendiente", "error"],
         intentos__lt=3,
         programada_para__lte=ahora,

@@ -556,6 +556,10 @@ def citas(request, empresa_slug):
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
+        if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
+            cita.enviar_confirmacion_whatsapp = True
+            cita.recordatorio_semana_whatsapp = True
+            cita.recordatorio_dia_whatsapp = True
         cita.save()
         _sincronizar_cita_clinica(cita)
         _programar_whatsapp_cita(request, cita)
@@ -574,6 +578,10 @@ def agenda_citas(request, empresa_slug):
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
+        if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
+            cita.enviar_confirmacion_whatsapp = True
+            cita.recordatorio_semana_whatsapp = True
+            cita.recordatorio_dia_whatsapp = True
         cita.save()
         _sincronizar_cita_clinica(cita)
         _programar_whatsapp_cita(request, cita)
@@ -593,6 +601,10 @@ def agenda_mobile(request, empresa_slug):
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
+        if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
+            cita.enviar_confirmacion_whatsapp = True
+            cita.recordatorio_semana_whatsapp = True
+            cita.recordatorio_dia_whatsapp = True
         cita.save()
         _sincronizar_cita_clinica(cita)
         _programar_whatsapp_cita(request, cita)

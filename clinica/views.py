@@ -63,6 +63,63 @@ from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from crm.forms import PacienteRapidoCitaForm
 
 
+def _sincronizar_agenda_desde_cita_clinica(cita):
+    if not cita.paciente_id:
+        return None
+    from crm.appointment_notifications import procesar_notificacion, programar_notificaciones_cita
+    from crm.models import CitaCliente, NotificacionCitaWhatsApp
+
+    estados = {
+        "solicitada": "pendiente",
+        "confirmada": "confirmada",
+        "en_atencion": "pendiente",
+        "completada": "realizada",
+        "cancelada": "cancelada",
+        "no_asistio": "cancelada",
+    }
+    titulo = cita.servicio.nombre if cita.servicio_id else cita.motivo
+    agenda, _ = CitaCliente.objects.get_or_create(
+        empresa=cita.empresa,
+        cita_clinica=cita,
+        defaults={
+            "paciente": cita.paciente,
+            "servicio_clinico": cita.servicio,
+            "profesional_salud": cita.profesional,
+            "titulo": titulo,
+            "responsable": cita.profesional.nombre if cita.profesional_id else "",
+            "fecha_hora": cita.fecha_hora,
+            "duracion_minutos": cita.servicio.duracion_minutos if cita.servicio_id else 60,
+            "estado": estados.get(cita.estado, "pendiente"),
+            "observacion": cita.observaciones or cita.motivo,
+            "enviar_confirmacion_whatsapp": True,
+            "recordatorio_semana_whatsapp": True,
+            "recordatorio_dia_whatsapp": True,
+        },
+    )
+    agenda.paciente = cita.paciente
+    agenda.servicio_clinico = cita.servicio
+    agenda.profesional_salud = cita.profesional
+    agenda.titulo = titulo
+    agenda.responsable = cita.profesional.nombre if cita.profesional_id else ""
+    agenda.fecha_hora = cita.fecha_hora
+    agenda.duracion_minutos = cita.servicio.duracion_minutos if cita.servicio_id else agenda.duracion_minutos or 60
+    agenda.estado = estados.get(cita.estado, "pendiente")
+    agenda.observacion = cita.observaciones or cita.motivo
+    agenda.enviar_confirmacion_whatsapp = True
+    agenda.recordatorio_semana_whatsapp = True
+    agenda.recordatorio_dia_whatsapp = True
+    agenda.save()
+
+    notificaciones = programar_notificaciones_cita(agenda)
+    confirmacion = next(
+        (item for item in notificaciones if item.tipo == NotificacionCitaWhatsApp.TIPO_CONFIRMACION),
+        None,
+    )
+    if confirmacion and confirmacion.estado != "enviado":
+        procesar_notificacion(confirmacion.id)
+    return agenda
+
+
 def _empresa_desde_slug(empresa_slug):
     return get_object_or_404(Empresa, slug=empresa_slug, activa=True)
 
@@ -1033,6 +1090,10 @@ def crear_cita(request, empresa_slug):
         cita = form.save(commit=False)
         cita.empresa = empresa
         cita.save()
+        try:
+            _sincronizar_agenda_desde_cita_clinica(cita)
+        except Exception:
+            messages.warning(request, "La cita se guardo, pero no se pudo sincronizar WhatsApp/agenda en este momento.")
         messages.success(request, "Cita clinica guardada correctamente.")
         return redirect("clinica_citas", empresa_slug=empresa.slug)
     return render(request, "clinica/form.html", {

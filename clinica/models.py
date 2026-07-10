@@ -1,3 +1,5 @@
+import unicodedata
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -7,6 +9,11 @@ from core.models import Empresa
 from facturacion.models import Cliente
 
 EMPRESAS_IDENTIDAD_PACIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
+
+
+def _normalizar_texto(valor):
+    texto = unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii")
+    return texto.lower().strip()
 
 
 class ConfiguracionClinica(models.Model):
@@ -43,6 +50,23 @@ class ProfesionalSalud(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+PROFESIONALES_AGENDA_BASE = [
+    ("Licenciada en enfermeria", "Enfermeria"),
+    ("Enfermera", "Enfermeria"),
+]
+
+
+def asegurar_profesionales_agenda_base(empresa):
+    if not empresa or empresa.slug not in {"hospital_mia", "medical_spa", "luque_aestetic"}:
+        return
+    for nombre, especialidad in PROFESIONALES_AGENDA_BASE:
+        ProfesionalSalud.objects.get_or_create(
+            empresa=empresa,
+            nombre=nombre,
+            defaults={"especialidad": especialidad, "activo": True},
+        )
 
 
 class Paciente(models.Model):
@@ -311,6 +335,76 @@ class CitaClinica(models.Model):
 
     def __str__(self):
         return f"{self.paciente.nombre} - {self.fecha_hora:%d/%m/%Y %H:%M}"
+
+    @property
+    def agenda_color(self):
+        servicio = _normalizar_texto(self.servicio.nombre if self.servicio_id else self.motivo)
+        categoria = _normalizar_texto(self.servicio.categoria if self.servicio_id else "")
+        if "terapia" in servicio or "camara" in servicio or "hiperbar" in servicio:
+            return "terapias"
+        if categoria == "consulta" or "consulta" in servicio or "evaluacion" in servicio or "valoracion" in servicio:
+            return "consulta"
+        if categoria == "spa" or any(
+            palabra in servicio
+            for palabra in ["facial", "masaje", "hidratacion", "spa", "estetico no medico"]
+        ):
+            return "spa"
+        if categoria == "cirugia" or "cirug" in servicio:
+            return "cirugias"
+        if categoria in {"tratamiento", "procedimiento"} or "tratamiento" in servicio:
+            return "tratamientos"
+        if categoria == "control" or "control" in servicio or "seguimiento" in servicio:
+            return "control"
+        if categoria == "laboratorio" or "laboratorio" in servicio or "lab" in servicio:
+            return "laboratorio"
+        if categoria == "imagen" or "ultrasonido" in servicio or "imagen" in servicio:
+            return "imagen"
+        return "general"
+
+    @property
+    def agenda_color_label(self):
+        etiquetas = {
+            "consulta": "Consulta",
+            "terapias": "Terapias / camaras hiperbaricas",
+            "tratamientos": "Tratamientos",
+            "cirugias": "Cirugias",
+            "spa": "Spa",
+            "control": "Control / seguimiento",
+            "laboratorio": "Laboratorio",
+            "imagen": "Imagen",
+            "general": "General",
+        }
+        return etiquetas.get(self.agenda_color, "General")
+
+    @property
+    def agenda_profesional_color(self):
+        profesional = self.profesional
+        combinado = _normalizar_texto(
+            f"{profesional.nombre if profesional else ''} {profesional.especialidad if profesional else ''}"
+        )
+        if "luis" in combinado:
+            return "doctor-luis"
+        if "candy" in combinado or "luque" in combinado:
+            return "dra-candy"
+        if "licenciada" in combinado and "enfermer" in combinado:
+            return "lic-enfermeria"
+        if "enfermer" in combinado:
+            return "enfermera"
+        if "doctor" in combinado or "dr " in combinado or "dra " in combinado:
+            return "medico"
+        return "profesional"
+
+    @property
+    def agenda_profesional_color_label(self):
+        etiquetas = {
+            "doctor-luis": "Dr Luis",
+            "dra-candy": "Dra Candy",
+            "lic-enfermeria": "Licenciada en enfermeria",
+            "enfermera": "Enfermera",
+            "medico": "Medico",
+            "profesional": "Profesional",
+        }
+        return etiquetas.get(self.agenda_profesional_color, "Profesional")
 
 
 class TratamientoPaciente(models.Model):
