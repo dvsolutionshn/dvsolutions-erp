@@ -11,6 +11,7 @@ from .models import (
     HistoriaClinicaEspecialidad,
     MedicamentoPrescrito,
     Paciente,
+    PacienteFotoEvolucion,
     PreconsultaClinica,
     ProfesionalSalud,
     ServicioClinico,
@@ -333,6 +334,53 @@ class ExpedienteEventoForm(BaseClinicaForm):
         self.fields["cita"].required = False
         self.fields["tratamiento"].required = False
         self.fields["profesional"].required = False
+
+
+class PacienteFotoEvolucionForm(BaseClinicaForm):
+    class Meta:
+        model = PacienteFotoEvolucion
+        fields = ["tipo", "titulo", "descripcion", "fecha", "imagen"]
+        widgets = {
+            "fecha": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "imagen": forms.ClearableFileInput(attrs={"accept": "image/*"}),
+        }
+
+    def clean_imagen(self):
+        imagen = self.cleaned_data.get("imagen")
+        if imagen and imagen.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("La foto no puede superar 10 MB.")
+        if imagen and getattr(imagen, "content_type", "") not in {"image/jpeg", "image/png", "image/webp"}:
+            raise forms.ValidationError("Utilice una foto JPG, PNG o WebP.")
+        return imagen
+
+
+class PlanConsentimientoPDFForm(BaseClinicaForm):
+    class Meta:
+        model = ConsentimientoClinico
+        fields = ["titulo", "version", "firmado_por", "fecha_firma", "estado", "archivo"]
+        widgets = {
+            "fecha_firma": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "archivo": forms.ClearableFileInput(attrs={"accept": "application/pdf,.pdf"}),
+        }
+        labels = {
+            "titulo": "Tipo de plan / consentimiento",
+            "archivo": "PDF firmado",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["archivo"].required = True
+        self.fields["fecha_firma"].required = False
+        self.fields["firmado_por"].required = False
+        self.fields["version"].help_text = "Ejemplo: 1.0, 2026-07 o version interna del documento."
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if archivo and archivo.size > 15 * 1024 * 1024:
+            raise forms.ValidationError("El PDF no puede superar 15 MB.")
+        if archivo and getattr(archivo, "content_type", "") not in {"application/pdf", "application/x-pdf"}:
+            raise forms.ValidationError("Solo se permiten archivos PDF.")
+        return archivo
 
 
 CAPILAR_FORMULARIO = [

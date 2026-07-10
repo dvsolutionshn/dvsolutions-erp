@@ -160,7 +160,7 @@
         <div class="clinic-form-actions">
             <span class="clinic-help">Al guardar, la informacion queda integrada al expediente y a los flujos clinicos.</span>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <a class="erp-btn-secondary" href="{% url 'clinica_dashboard' empresa.slug %}">Cancelar</a>
+            <a class="erp-btn-secondary" href="{% if cancel_url %}{{ cancel_url }}{% else %}{% url 'clinica_dashboard' empresa.slug %}{% endif %}">Cancelar</a>
             <button class="erp-btn" type="submit">Guardar</button>
             </div>
         </div>

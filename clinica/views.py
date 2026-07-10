@@ -38,6 +38,8 @@ from .forms import (
     ExpedienteEventoForm,
     HistoriaClinicaEspecialidadForm,
     PacienteForm,
+    PacienteFotoEvolucionForm,
+    PlanConsentimientoPDFForm,
     PreconsultaClinicaPublicaForm,
     ProfesionalSaludForm,
     ServicioClinicoForm,
@@ -1126,6 +1128,48 @@ def crear_evento_expediente(request, empresa_slug, paciente_id=None):
         messages.success(request, "Evento agregado al expediente.")
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=evento.paciente_id)
     return render(request, "clinica/form.html", {"empresa": empresa, "form": form, "titulo": "Agregar evento al expediente"})
+
+
+@login_required
+def registrar_foto_evolucion(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    form = PacienteFotoEvolucionForm(request.POST or None, request.FILES or None, empresa=empresa)
+    if request.method == "POST" and form.is_valid():
+        foto = form.save(commit=False)
+        foto.empresa = empresa
+        foto.paciente = paciente
+        foto.creado_por = request.user
+        foto.save()
+        messages.success(request, "Foto de evolucion registrada correctamente.")
+        return redirect(f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#evolucion")
+    return render(request, "clinica/form.html", {
+        "empresa": empresa,
+        "form": form,
+        "titulo": f"Registrar evolucion: {paciente.nombre}",
+        "cancel_url": f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#evolucion",
+    })
+
+
+@login_required
+def subir_consentimiento_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    form = PlanConsentimientoPDFForm(request.POST or None, request.FILES or None, empresa=empresa)
+    if request.method == "POST" and form.is_valid():
+        consentimiento = form.save(commit=False)
+        consentimiento.empresa = empresa
+        consentimiento.paciente = paciente
+        consentimiento.contenido = consentimiento.contenido or "Plan de consentimiento firmado cargado en PDF."
+        consentimiento.save()
+        messages.success(request, "Plan de consentimiento PDF agregado correctamente.")
+        return redirect(f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#consentimientos")
+    return render(request, "clinica/form.html", {
+        "empresa": empresa,
+        "form": form,
+        "titulo": f"Subir plan de consentimiento: {paciente.nombre}",
+        "cancel_url": f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#consentimientos",
+    })
 
 
 @login_required

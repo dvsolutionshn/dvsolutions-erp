@@ -30,12 +30,9 @@
 .patient-mini-card strong{display:block;color:#102338;margin-bottom:5px}
 .patient-timeline-item{border-bottom:1px solid var(--line);padding:15px 0}
 .patient-timeline-item:last-child{border-bottom:0}
-.patient-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
-.patient-evolution-photo{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
-.patient-evolution-photo img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
-.patient-evolution-photo div{padding:11px}
-.patient-evolution-photo strong{display:block;font-size:13px;color:#102338}
-.patient-evolution-photo span{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.patient-evolution-carousel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,320px);gap:16px;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:inline mandatory;padding:4px 4px 18px}
+.patient-evolution-carousel::-webkit-scrollbar{height:9px}.patient-evolution-carousel::-webkit-scrollbar-thumb{background:#c8d8e6;border-radius:999px}.patient-evolution-photo{position:relative;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 16px 38px rgba(16,40,62,.08);scroll-snap-align:start;text-align:left;cursor:zoom-in;transition:transform .18s ease,box-shadow .18s ease}.patient-evolution-photo:hover{transform:translateY(-4px);box-shadow:0 24px 52px rgba(16,40,62,.13)}.patient-evolution-photo img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}.patient-evolution-photo div{padding:14px}.patient-evolution-photo strong{display:block;font-size:14px;color:#102338}.patient-evolution-photo span{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.45}.patient-evolution-chip{position:absolute;top:12px;left:12px;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.92);color:#0f766e;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.patient-photo-modal{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(10,24,38,.78);backdrop-filter:blur(8px)}.patient-photo-modal.is-open{display:flex}.patient-photo-modal-card{width:min(980px,96vw);max-height:92vh;overflow:auto;border-radius:24px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.35)}.patient-photo-modal-card img{width:100%;max-height:72vh;object-fit:contain;background:#071422;display:block}.patient-photo-modal-info{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:18px 20px}.patient-photo-modal-info h3{margin:0;color:#102338}.patient-photo-modal-info p{margin:6px 0 0;color:var(--muted);line-height:1.55}.patient-photo-close{width:40px;height:40px;border:1px solid var(--line);border-radius:14px;background:#fff;color:#102338;font-size:22px;font-weight:900;cursor:pointer}
+.patient-consent-list{display:grid;gap:12px;margin-top:14px}.patient-consent-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#fff,#f8fbff)}.patient-consent-card strong{display:block;color:#102338}.patient-consent-card span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.patient-consent-actions{display:flex;gap:8px;flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:14px;padding:12px 14px;font-weight:800}
 .patient-anchor-offset{scroll-margin-top:100px}
 @media (max-width:1180px){
@@ -44,6 +41,7 @@
 @media (max-width:760px){
     .patient-hero,.patient-entry-grid,.patient-quick-grid,.patient-section-grid{grid-template-columns:1fr}
     .patient-profile-photo{width:120px;height:120px}
+    .patient-evolution-carousel{grid-auto-columns:82vw}.patient-consent-card{grid-template-columns:1fr}
 }
 </style>
 {% endblock %}
@@ -78,6 +76,7 @@
     <a class="erp-card patient-entry-card" href="{% if formularios_hospitalarios %}{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}{% else %}#historial-clinico{% endif %}"><div class="erp-kpi-label">Expediente</div><h3>Historial Clinico</h3><p>{% if formularios_hospitalarios %}Formularios de Capilar, Cirugia, Tratamiento Estetico / Piel, Enfermeria, Terapias y Camara hiperbarica.{% else %}Antecedentes, funciones, examen fisico, diagnosticos y plan.{% endif %}</p></a>
     <a class="erp-card patient-entry-card" href="#plan-tratamiento"><div class="erp-kpi-label">Ruta medica</div><h3>Plan de tratamiento</h3><p>Tratamientos activos, objetivos, plan clinico, costos y seguimiento profesional.</p></a>
     <a class="erp-card patient-entry-card" href="#evolucion"><div class="erp-kpi-label">Bitacora visual</div><h3>Evolucion</h3><p>Fotos, fechas, procedimiento aplicado y registro cronologico del avance.</p></a>
+    <a class="erp-card patient-entry-card" href="#consentimientos"><div class="erp-kpi-label">Documentos firmados</div><h3>Plan de consentimiento</h3><p>PDF firmados, fecha, tipo de plan y control documental del paciente.</p></a>
     <a class="erp-card patient-entry-card" href="#citas"><div class="erp-kpi-label">Agenda</div><h3>Citas</h3><p>Citas pasadas, programadas y acceso rapido para agendar nuevas atenciones.</p></a>
 </section>
 
@@ -138,16 +137,29 @@
         </div>
     </article>
     <article class="erp-card patient-anchor-offset" id="consentimientos">
-        <div class="erp-kpi-label">Consentimiento</div>
-        <h3 class="erp-panel-title">Consentimientos impresos</h3>
-        {% for consentimiento in consentimientos %}
-        <div class="patient-timeline-item">
-            <strong>{{ consentimiento.titulo }}</strong>
-            <p class="erp-card-muted">{{ consentimiento.get_estado_display }} - Version {{ consentimiento.version }}</p>
+        <div class="erp-section-heading" style="align-items:flex-start;">
+            <div>
+                <div class="erp-kpi-label">Plan de consentimiento</div>
+                <h3 class="erp-panel-title">PDF firmados por el paciente</h3>
+                <p class="erp-card-muted">Control por fecha, tipo de plan, version y estado del documento firmado.</p>
+            </div>
+            <a class="erp-action-link" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir PDF</a>
         </div>
+        <div class="patient-consent-list">
+        {% for consentimiento in consentimientos %}
+        <article class="patient-consent-card">
+            <div>
+                <strong>{{ consentimiento.titulo }}</strong>
+                <span>{{ consentimiento.get_estado_display }} · Version {{ consentimiento.version }}{% if consentimiento.fecha_firma %} · Firmado {{ consentimiento.fecha_firma|date:"d/m/Y H:i" }}{% endif %}{% if consentimiento.firmado_por %} · {{ consentimiento.firmado_por }}{% endif %}</span>
+            </div>
+            <div class="patient-consent-actions">
+                {% if consentimiento.archivo %}<a class="erp-btn-secondary" href="{{ consentimiento.archivo.url }}" target="_blank" rel="noopener">Ver PDF</a>{% endif %}
+            </div>
+        </article>
         {% empty %}
         <div class="erp-empty">Sin consentimientos impresos registrados.</div>
         {% endfor %}
+        </div>
     </article>
 </section>
 
@@ -171,18 +183,19 @@
 <section id="evolucion" class="erp-card patient-anchor-offset">
     <div class="erp-section-heading">
         <div><div class="erp-kpi-label">Evolucion</div><h3>Fotos, fechas y procedimientos</h3></div>
-        <a class="erp-action-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Registrar evolucion</a>
+        <a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Registrar evolucion</a>
     </div>
-    <div class="patient-photo-grid">
+    <div class="patient-evolution-carousel" aria-label="Carrusel de fotos de evolucion">
         {% for foto in fotos_evolucion %}
-        <article class="patient-evolution-photo">
+        <button type="button" class="patient-evolution-photo" data-photo-open data-photo-src="{{ foto.imagen.url }}" data-photo-title="{{ foto.titulo }}" data-photo-meta="{{ foto.get_tipo_display }} · {{ foto.fecha|date:'d/m/Y H:i' }}" data-photo-description="{{ foto.descripcion|default:'' }}">
+            <span class="patient-evolution-chip">{{ foto.get_tipo_display }}</span>
             <img src="{{ foto.imagen.url }}" alt="{{ foto.titulo }}">
             <div>
                 <strong>{{ foto.titulo }}</strong>
                 <span>{{ foto.get_tipo_display }} - {{ foto.fecha|date:"d/m/Y H:i" }}</span>
                 {% if foto.descripcion %}<span>{{ foto.descripcion }}</span>{% endif %}
             </div>
-        </article>
+        </button>
         {% empty %}
         <div class="erp-empty">Aun no hay fotos de evolucion registradas.</div>
         {% endfor %}
@@ -204,4 +217,51 @@
     <div class="erp-empty">Sin citas registradas para este paciente.</div>
     {% endfor %}
 </section>
+
+<div class="patient-photo-modal" id="patientPhotoModal" aria-hidden="true">
+    <div class="patient-photo-modal-card" role="dialog" aria-modal="true" aria-labelledby="patientPhotoModalTitle">
+        <img id="patientPhotoModalImage" alt="">
+        <div class="patient-photo-modal-info">
+            <div>
+                <h3 id="patientPhotoModalTitle">Foto de evolucion</h3>
+                <p id="patientPhotoModalMeta"></p>
+                <p id="patientPhotoModalDescription"></p>
+            </div>
+            <button class="patient-photo-close" type="button" data-photo-close aria-label="Cerrar">×</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const modal = document.getElementById("patientPhotoModal");
+    const image = document.getElementById("patientPhotoModalImage");
+    const title = document.getElementById("patientPhotoModalTitle");
+    const meta = document.getElementById("patientPhotoModalMeta");
+    const description = document.getElementById("patientPhotoModalDescription");
+    if(!modal || !image || !title || !meta || !description){ return; }
+    function closePhoto(){
+        modal.classList.remove("is-open");
+        modal.setAttribute("aria-hidden", "true");
+        image.removeAttribute("src");
+    }
+    document.querySelectorAll("[data-photo-open]").forEach(function(button){
+        button.addEventListener("click", function(){
+            image.src = button.dataset.photoSrc || "";
+            image.alt = button.dataset.photoTitle || "Foto de evolucion";
+            title.textContent = button.dataset.photoTitle || "Foto de evolucion";
+            meta.textContent = button.dataset.photoMeta || "";
+            description.textContent = button.dataset.photoDescription || "";
+            modal.classList.add("is-open");
+            modal.setAttribute("aria-hidden", "false");
+        });
+    });
+    modal.addEventListener("click", function(event){
+        if(event.target === modal || event.target.closest("[data-photo-close]")){ closePhoto(); }
+    });
+    document.addEventListener("keydown", function(event){
+        if(event.key === "Escape" && modal.classList.contains("is-open")){ closePhoto(); }
+    });
+})();
+</script>
 {% endblock %}

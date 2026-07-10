@@ -13,7 +13,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from crm.models import CitaCliente
 from facturacion.models import Cliente
 from .forms import PreconsultaClinicaPublicaForm
-from .models import CitaClinica, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
+from .models import CitaClinica, ConsentimientoClinico, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -226,7 +226,39 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Evolucion")
         self.assertContains(response, "Citas")
         self.assertContains(response, "Anexos")
-        self.assertContains(response, "Consentimientos impresos")
+        self.assertContains(response, "Plan de consentimiento")
+        self.assertContains(response, "patient-evolution-carousel")
+        self.assertContains(response, "patientPhotoModal")
+
+    def test_paciente_permite_subir_plan_consentimiento_pdf(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-CONS",
+            nombre="Paciente Consentimiento",
+            identidad="0801199900001",
+        )
+        pdf = SimpleUploadedFile(
+            "consentimiento.pdf",
+            b"%PDF-1.4\n%test\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF",
+            content_type="application/pdf",
+        )
+        response = self.client.post(
+            reverse("clinica_subir_consentimiento_paciente", args=[self.empresa.slug, paciente.id]),
+            {
+                "titulo": "Consentimiento cirugía capilar",
+                "version": "2026-07",
+                "firmado_por": "Paciente Consentimiento",
+                "fecha_firma": "2026-07-09T09:30",
+                "estado": "firmado",
+                "archivo": pdf,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        consentimiento = ConsentimientoClinico.objects.get(paciente=paciente)
+        self.assertEqual(consentimiento.titulo, "Consentimiento cirugía capilar")
+        self.assertEqual(consentimiento.estado, "firmado")
+        self.assertTrue(consentimiento.archivo.name.endswith(".pdf"))
 
     def test_no_permite_identidad_con_guiones_o_espacios(self):
         response = self.client.post(
