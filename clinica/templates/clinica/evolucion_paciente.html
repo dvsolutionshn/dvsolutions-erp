@@ -1,0 +1,226 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Evolucion - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Evolucion clinica visual{% endblock %}
+{% block header_description %}Biblioteca ordenada de fotos, videos, fechas, procedimientos y descripcion del avance del paciente.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+<a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir foto o video</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.evo-hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:26px;background:linear-gradient(135deg,#ffffff,#f4fbff 54%,#f1fff9);padding:22px;box-shadow:0 18px 46px rgba(15,42,68,.07)}
+.evo-hero:after{content:"";position:absolute;right:-60px;top:-90px;width:240px;height:240px;border-radius:999px;background:radial-gradient(circle,rgba(37,99,235,.16),transparent 70%)}
+.evo-hero-main{position:relative;z-index:1;display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.evo-patient strong{display:block;color:#102338;font-size:24px}.evo-patient span{display:block;margin-top:5px;color:var(--muted)}
+.evo-status-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:#eaf8f6;color:#0f766e;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.evo-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.evo-kpi{padding:15px;border:1px solid #d7e5ee;border-radius:18px;background:rgba(255,255,255,.88);box-shadow:0 12px 30px rgba(15,42,68,.05)}.evo-kpi span{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.evo-kpi strong{display:block;margin-top:6px;color:#102338;font-size:25px}
+.evo-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px;align-items:start}.evo-section{border:1px solid var(--line);border-radius:24px;background:#fff;padding:18px;box-shadow:0 16px 40px rgba(15,42,68,.06)}.evo-section + .evo-section{margin-top:16px}.evo-heading{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}.evo-heading h3{margin:0;color:#102338}.evo-heading p{margin:5px 0 0;color:var(--muted)}
+.evo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.evo-card{position:relative;overflow:hidden;border:1px solid #dbe7ef;border-radius:22px;background:#fff;text-align:left;box-shadow:0 14px 34px rgba(15,42,68,.06);transition:transform .18s ease,box-shadow .18s ease}.evo-card:hover{transform:translateY(-4px);box-shadow:0 22px 48px rgba(15,42,68,.12)}.evo-card button{display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;cursor:zoom-in;color:inherit}.evo-media{position:relative;background:#071422}.evo-media img,.evo-media video{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}.evo-card-body{padding:14px}.evo-card-body strong{display:block;color:#102338}.evo-card-body span{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.45}.evo-chip{position:absolute;top:12px;left:12px;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.93);color:#0f766e;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.evo-play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:42px;text-shadow:0 6px 18px rgba(0,0,0,.35);pointer-events:none}
+.evo-timeline{position:relative;display:grid;gap:12px}.evo-timeline:before{content:"";position:absolute;left:13px;top:8px;bottom:8px;width:2px;background:#dce8f0}.evo-line{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px}.evo-dot{width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,#14b8a6,#2563eb);box-shadow:0 0 0 5px #eef8fb;z-index:1}.evo-line-card{padding:12px;border:1px solid #dce8f0;border-radius:16px;background:#fbfdff}.evo-line-card strong{display:block;color:#102338}.evo-line-card span{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.evo-empty{min-height:210px;display:grid;place-items:center;text-align:center;border:1px dashed #bcd0dd;border-radius:22px;background:#fff;color:var(--muted);padding:28px}.evo-guide{position:sticky;top:92px;display:grid;gap:12px}.evo-guide-card{padding:18px;border:1px solid var(--line);border-radius:20px;background:#fff;box-shadow:0 14px 34px rgba(15,42,68,.05)}.evo-guide-card h3{margin:0 0 8px;color:#102338}.evo-guide-card p{margin:0;color:var(--muted);line-height:1.55}.evo-guide-list{display:grid;gap:8px;margin-top:12px}.evo-guide-list span{display:flex;gap:8px;align-items:flex-start;color:#30465a;font-size:12px}.evo-guide-list i{width:22px;height:18px;display:grid;place-items:center;border-radius:999px;background:#e8f7ef;color:#10725f;font-style:normal;font-weight:900;font-size:9px;flex:0 0 auto}
+.evo-modal{position:fixed;inset:0;z-index:140;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(10,24,38,.80);backdrop-filter:blur(8px)}.evo-modal.is-open{display:flex}.evo-modal-card{width:min(1080px,96vw);max-height:92vh;overflow:auto;border-radius:24px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.35)}.evo-modal-media{background:#071422}.evo-modal-media img,.evo-modal-media video{width:100%;max-height:72vh;object-fit:contain;display:none}.evo-modal-media img.is-visible,.evo-modal-media video.is-visible{display:block}.evo-modal-info{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:18px 20px}.evo-modal-info h3{margin:0;color:#102338}.evo-modal-info p{margin:6px 0 0;color:var(--muted);line-height:1.55}.evo-close{width:42px;height:42px;border:1px solid var(--line);border-radius:14px;background:#fff;color:#102338;font-size:24px;font-weight:900;cursor:pointer}
+@media(max-width:1100px){.evo-layout{grid-template-columns:1fr}.evo-guide{position:static}.evo-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.evo-kpis{grid-template-columns:1fr}.evo-heading{display:block}.evo-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="evo-hero">
+    <div class="evo-hero-main">
+        <div class="evo-patient">
+            <div class="erp-kpi-label">Paciente</div>
+            <strong>{{ paciente.nombre }}</strong>
+            <span>{{ paciente.identidad|default:"Sin identidad" }} · {{ paciente.edad|default:"-" }} anos · Expediente {{ paciente.expediente_codigo }}</span>
+        </div>
+        <span class="evo-status-pill">Evolucion visual clinica</span>
+    </div>
+    <div class="evo-kpis">
+        <div class="evo-kpi"><span>Total registros</span><strong>{{ resumen.total }}</strong></div>
+        <div class="evo-kpi"><span>Fotos</span><strong>{{ resumen.fotos }}</strong></div>
+        <div class="evo-kpi"><span>Videos</span><strong>{{ resumen.videos }}</strong></div>
+        <div class="evo-kpi"><span>Ultimo control</span><strong>{% if resumen.ultimo %}{{ resumen.ultimo.fecha|date:"d/m" }}{% else %}-{% endif %}</strong></div>
+    </div>
+</section>
+
+<section class="evo-layout">
+    <div>
+        <article class="evo-section">
+            <div class="evo-heading">
+                <div>
+                    <div class="erp-kpi-label">Fotos</div>
+                    <h3>Galeria fotografica</h3>
+                    <p>Orden cronologico para comparar avances por fecha, tipo y descripcion.</p>
+                </div>
+                <a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir foto</a>
+            </div>
+            {% if fotos %}
+            <div class="evo-grid">
+                {% for foto in fotos %}
+                <article class="evo-card">
+                    <button type="button" data-evo-open data-evo-kind="image" data-evo-src="{{ foto.imagen.url }}" data-evo-title="{{ foto.titulo }}" data-evo-meta="{{ foto.get_tipo_display }} · {{ foto.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ foto.descripcion|default:'' }}">
+                        <div class="evo-media">
+                            <span class="evo-chip">{{ foto.get_tipo_display }}</span>
+                            <img src="{{ foto.imagen.url }}" alt="{{ foto.titulo }}">
+                        </div>
+                        <div class="evo-card-body">
+                            <strong>{{ foto.titulo }}</strong>
+                            <span>{{ foto.fecha|date:"d/m/Y H:i" }}</span>
+                            {% if foto.descripcion %}<span>{{ foto.descripcion }}</span>{% endif %}
+                        </div>
+                    </button>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="evo-empty">
+                <div>
+                    <div class="erp-kpi-label">Sin fotos</div>
+                    <h3 style="margin:8px 0;color:#102338;">Aun no hay fotografias registradas</h3>
+                    <p style="margin:0 0 16px;">Suba la primera foto para comenzar la comparacion visual del paciente.</p>
+                    <a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir primera foto</a>
+                </div>
+            </div>
+            {% endif %}
+        </article>
+
+        <article class="evo-section">
+            <div class="evo-heading">
+                <div>
+                    <div class="erp-kpi-label">Videos</div>
+                    <h3>Registro audiovisual</h3>
+                    <p>Videos separados de las fotos para revisar movilidad, gestos, proceso y controles.</p>
+                </div>
+                <a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir video</a>
+            </div>
+            {% if videos %}
+            <div class="evo-grid">
+                {% for video in videos %}
+                <article class="evo-card">
+                    <button type="button" data-evo-open data-evo-kind="video" data-evo-src="{{ video.video.url }}" data-evo-title="{{ video.titulo }}" data-evo-meta="{{ video.get_tipo_display }} · {{ video.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ video.descripcion|default:'' }}">
+                        <div class="evo-media">
+                            <span class="evo-chip">{{ video.get_tipo_display }}</span>
+                            <video muted preload="metadata" src="{{ video.video.url }}"></video>
+                            <span class="evo-play">▶</span>
+                        </div>
+                        <div class="evo-card-body">
+                            <strong>{{ video.titulo }}</strong>
+                            <span>{{ video.fecha|date:"d/m/Y H:i" }}</span>
+                            {% if video.descripcion %}<span>{{ video.descripcion }}</span>{% endif %}
+                        </div>
+                    </button>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="evo-empty">
+                <div>
+                    <div class="erp-kpi-label">Sin videos</div>
+                    <h3 style="margin:8px 0;color:#102338;">Aun no hay videos registrados</h3>
+                    <p style="margin:0 0 16px;">Puede subir videos MP4, MOV o WebM cuando necesite documentar la evolucion con movimiento.</p>
+                    <a class="erp-btn" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir primer video</a>
+                </div>
+            </div>
+            {% endif %}
+        </article>
+    </div>
+
+    <aside class="evo-guide">
+        <div class="evo-guide-card">
+            <h3>Linea de tiempo</h3>
+            {% if registros %}
+            <div class="evo-timeline">
+                {% for registro in registros %}
+                <div class="evo-line">
+                    <div class="evo-dot"></div>
+                    <div class="evo-line-card">
+                        <strong>{{ registro.fecha|date:"d/m/Y" }} · {{ registro.titulo }}</strong>
+                        <span>{{ registro.get_tipo_display }} · {% if registro.video %}Video{% else %}Foto{% endif %}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p>Cuando suba fotos o videos, aqui se vera el recorrido cronologico del paciente.</p>
+            {% endif %}
+        </div>
+        <div class="evo-guide-card">
+            <h3>Uso recomendado</h3>
+            <p>Mantenga cada registro con fecha real, tipo de control y una descripcion corta para que la doctora pueda comparar el avance rapidamente.</p>
+            <div class="evo-guide-list">
+                <span><i>OK</i> Una foto o un video por registro.</span>
+                <span><i>OK</i> Use la fecha en que se tomo el archivo.</span>
+                <span><i>OK</i> Describa procedimiento, zona o control.</span>
+                <span><i>OK</i> Abra cualquier archivo para verlo en grande.</span>
+            </div>
+        </div>
+    </aside>
+</section>
+
+<div class="evo-modal" id="evoModal" aria-hidden="true">
+    <div class="evo-modal-card" role="dialog" aria-modal="true" aria-labelledby="evoModalTitle">
+        <div class="evo-modal-media">
+            <img id="evoModalImage" alt="">
+            <video id="evoModalVideo" controls playsinline></video>
+        </div>
+        <div class="evo-modal-info">
+            <div>
+                <h3 id="evoModalTitle">Evolucion</h3>
+                <p id="evoModalMeta"></p>
+                <p id="evoModalDescription"></p>
+            </div>
+            <button class="evo-close" type="button" data-evo-close aria-label="Cerrar">×</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const modal = document.getElementById("evoModal");
+    const image = document.getElementById("evoModalImage");
+    const video = document.getElementById("evoModalVideo");
+    const title = document.getElementById("evoModalTitle");
+    const meta = document.getElementById("evoModalMeta");
+    const description = document.getElementById("evoModalDescription");
+    if(!modal || !image || !video || !title || !meta || !description){ return; }
+    function closeModal(){
+        modal.classList.remove("is-open");
+        modal.setAttribute("aria-hidden", "true");
+        image.classList.remove("is-visible");
+        video.classList.remove("is-visible");
+        image.removeAttribute("src");
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+    }
+    document.querySelectorAll("[data-evo-open]").forEach(function(button){
+        button.addEventListener("click", function(){
+            const kind = button.dataset.evoKind || "image";
+            const src = button.dataset.evoSrc || "";
+            title.textContent = button.dataset.evoTitle || "Evolucion";
+            meta.textContent = button.dataset.evoMeta || "";
+            description.textContent = button.dataset.evoDescription || "";
+            if(kind === "video"){
+                video.src = src;
+                video.classList.add("is-visible");
+            } else {
+                image.src = src;
+                image.alt = button.dataset.evoTitle || "Foto de evolucion";
+                image.classList.add("is-visible");
+            }
+            modal.classList.add("is-open");
+            modal.setAttribute("aria-hidden", "false");
+        });
+    });
+    modal.addEventListener("click", function(event){
+        if(event.target === modal || event.target.closest("[data-evo-close]")){ closeModal(); }
+    });
+    document.addEventListener("keydown", function(event){
+        if(event.key === "Escape" && modal.classList.contains("is-open")){ closeModal(); }
+    });
+})();
+</script>
+{% endblock %}

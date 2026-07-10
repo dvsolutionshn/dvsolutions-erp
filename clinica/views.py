@@ -659,6 +659,37 @@ def consentimientos_paciente(request, empresa_slug, paciente_id):
 
 
 @login_required
+def evolucion_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    registros = list(
+        PacienteFotoEvolucion.objects.filter(empresa=empresa, paciente=paciente)
+        .select_related("creado_por")
+        .order_by("fecha", "id")
+    )
+    fotos = [registro for registro in registros if registro.imagen]
+    videos = [registro for registro in registros if registro.video]
+    resumen = {
+        "total": len(registros),
+        "fotos": len(fotos),
+        "videos": len(videos),
+        "ultimo": registros[-1] if registros else None,
+    }
+    return render(
+        request,
+        "clinica/evolucion_paciente.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "registros": registros,
+            "fotos": fotos,
+            "videos": videos,
+            "resumen": resumen,
+        },
+    )
+
+
+@login_required
 def historias_especialidad(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_hospital_mia(empresa)
@@ -1169,13 +1200,14 @@ def registrar_foto_evolucion(request, empresa_slug, paciente_id):
         foto.paciente = paciente
         foto.creado_por = request.user
         foto.save()
-        messages.success(request, "Foto de evolucion registrada correctamente.")
-        return redirect(f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#evolucion")
+        tipo_archivo = "Video" if foto.video else "Foto"
+        messages.success(request, f"{tipo_archivo} de evolucion registrada correctamente.")
+        return redirect("clinica_evolucion_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
     return render(request, "clinica/form.html", {
         "empresa": empresa,
         "form": form,
         "titulo": f"Registrar evolucion: {paciente.nombre}",
-        "cancel_url": f"{reverse('clinica_paciente_detalle', args=[empresa.slug, paciente.id])}#evolucion",
+        "cancel_url": reverse("clinica_evolucion_paciente", args=[empresa.slug, paciente.id]),
     })
 
 

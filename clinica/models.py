@@ -252,7 +252,8 @@ class PacienteFotoEvolucion(models.Model):
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="fotos_evolucion_pacientes")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="fotos_evolucion")
-    imagen = models.ImageField(upload_to="clinica/pacientes/evolucion/")
+    imagen = models.ImageField(upload_to="clinica/pacientes/evolucion/", blank=True, null=True)
+    video = models.FileField(upload_to="clinica/pacientes/evolucion/videos/", blank=True, null=True)
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="ingreso")
     titulo = models.CharField(max_length=160, default="Foto de ingreso")
     descripcion = models.TextField(blank=True, null=True)

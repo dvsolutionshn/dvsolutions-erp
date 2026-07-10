@@ -293,7 +293,7 @@
                 {% if erp_access.clinica %}<a class="erp-nav-link {% if '/dashboard/clinica/citas/' in request.path %}is-active{% endif %}" href="{{ clinica_citas_url }}"><span class="erp-nav-bullet"></span><span>Citas clinicas</span></a>{% endif %}
                 {% if erp_access.tratamientos_clinicos %}<a class="erp-nav-link {% if '/dashboard/clinica/tratamientos/' in request.path %}is-active{% endif %}" href="{{ clinica_tratamientos_url }}"><span class="erp-nav-bullet"></span><span>Tratamientos</span></a>{% endif %}
                 {% if paciente %}
-                <a class="erp-nav-link" href="#evolucion"><span class="erp-nav-bullet"></span><span>Evolucion</span></a>
+                <a class="erp-nav-link {% if '/evolucion/' in request.path %}is-active{% endif %}" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}"><span class="erp-nav-bullet"></span><span>Evolucion</span></a>
                 <a class="erp-nav-link {% if '/consentimientos/' in request.path %}is-active{% endif %}" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><span class="erp-nav-bullet"></span><span>Plan de consentimiento</span></a>
                 {% endif %}
                 {% if erp_access.configuracion_clinica %}<a class="erp-nav-link {% if '/dashboard/clinica/profesionales/' in request.path %}is-active{% endif %}" href="{{ clinica_profesionales_url }}"><span class="erp-nav-bullet"></span><span>Profesionales</span></a>{% endif %}

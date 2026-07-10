@@ -266,6 +266,57 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(detalle, "Consentimiento cirugía capilar")
         self.assertContains(detalle, "Abrir PDF")
 
+    def test_paciente_evolucion_muestra_fotos_y_videos_separados(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-EVO",
+            nombre="Paciente Evolucion",
+            identidad="0801199900002",
+        )
+        image_buffer = BytesIO()
+        Image.new("RGB", (32, 32), color=(24, 130, 160)).save(image_buffer, format="JPEG")
+        foto = SimpleUploadedFile("control.jpg", image_buffer.getvalue(), content_type="image/jpeg")
+        video = SimpleUploadedFile("control.mp4", b"video-test", content_type="video/mp4")
+
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                reverse("clinica_registrar_foto_evolucion", args=[self.empresa.slug, paciente.id]),
+                {
+                    "tipo": "control",
+                    "titulo": "Foto control inicial",
+                    "descripcion": "Comparacion frontal",
+                    "fecha": "2026-07-10T09:00",
+                    "imagen": foto,
+                },
+            )
+            self.assertRedirects(
+                response,
+                reverse("clinica_evolucion_paciente", args=[self.empresa.slug, paciente.id]),
+            )
+
+            response = self.client.post(
+                reverse("clinica_registrar_foto_evolucion", args=[self.empresa.slug, paciente.id]),
+                {
+                    "tipo": "evolucion",
+                    "titulo": "Video movilidad facial",
+                    "descripcion": "Revision con movimiento",
+                    "fecha": "2026-07-10T10:00",
+                    "video": video,
+                },
+            )
+            self.assertRedirects(
+                response,
+                reverse("clinica_evolucion_paciente", args=[self.empresa.slug, paciente.id]),
+            )
+
+            detalle = self.client.get(reverse("clinica_evolucion_paciente", args=[self.empresa.slug, paciente.id]))
+            self.assertEqual(detalle.status_code, 200)
+            self.assertContains(detalle, "Galeria fotografica")
+            self.assertContains(detalle, "Registro audiovisual")
+            self.assertContains(detalle, "Foto control inicial")
+            self.assertContains(detalle, "Video movilidad facial")
+            self.assertContains(detalle, "evoModal")
+
     def test_no_permite_identidad_con_guiones_o_espacios(self):
         response = self.client.post(
             reverse("clinica_crear_paciente", args=[self.empresa.slug]),

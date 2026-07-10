@@ -339,10 +339,19 @@ class ExpedienteEventoForm(BaseClinicaForm):
 class PacienteFotoEvolucionForm(BaseClinicaForm):
     class Meta:
         model = PacienteFotoEvolucion
-        fields = ["tipo", "titulo", "descripcion", "fecha", "imagen"]
+        fields = ["tipo", "titulo", "descripcion", "fecha", "imagen", "video"]
         widgets = {
             "fecha": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "imagen": forms.ClearableFileInput(attrs={"accept": "image/*"}),
+            "video": forms.ClearableFileInput(attrs={"accept": "video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"}),
+        }
+        labels = {
+            "imagen": "Foto de evolucion",
+            "video": "Video de evolucion",
+        }
+        help_texts = {
+            "imagen": "Use JPG, PNG o WebP. Puede dejarlo vacio si subira video.",
+            "video": "Use MP4, MOV o WebM. Puede dejarlo vacio si subira foto.",
         }
 
     def clean_imagen(self):
@@ -352,6 +361,25 @@ class PacienteFotoEvolucionForm(BaseClinicaForm):
         if imagen and getattr(imagen, "content_type", "") not in {"image/jpeg", "image/png", "image/webp"}:
             raise forms.ValidationError("Utilice una foto JPG, PNG o WebP.")
         return imagen
+
+    def clean_video(self):
+        video = self.cleaned_data.get("video")
+        if video and video.size > 120 * 1024 * 1024:
+            raise forms.ValidationError("El video no puede superar 120 MB.")
+        tipos_permitidos = {"video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"}
+        if video and getattr(video, "content_type", "") not in tipos_permitidos:
+            raise forms.ValidationError("Utilice un video MP4, MOV o WebM.")
+        return video
+
+    def clean(self):
+        cleaned_data = super().clean()
+        imagen = cleaned_data.get("imagen")
+        video = cleaned_data.get("video")
+        if not imagen and not video:
+            raise forms.ValidationError("Suba una foto o un video para registrar la evolucion.")
+        if imagen and video:
+            raise forms.ValidationError("Suba solo una foto o solo un video por registro para mantener el historial ordenado.")
+        return cleaned_data
 
 
 class PlanConsentimientoPDFForm(BaseClinicaForm):
