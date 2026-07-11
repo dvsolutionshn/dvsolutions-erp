@@ -2,79 +2,158 @@
 
 {% block title %}CRM - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}CRM y Marketing{% endblock %}
-{% block header_title %}Relacion con Clientes{% endblock %}
-{% block header_description %}Campanias, cumpleanos, promociones y seguimiento comercial conectado con los clientes del ERP.{% endblock %}
+{% block header_title %}Relación con clientes{% endblock %}
+{% block header_description %}Campañas, cumpleaños, promociones, fuentes de pacientes y automatización WhatsApp en una sola vista.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-action-link" href="{% url 'crm_configuracion' empresa.slug %}">Configuracion</a>
-<a class="erp-action-link" href="{% url 'crm_crear_campania' empresa.slug %}">Nueva Campania</a>
+<a class="erp-action-link" href="{% url 'crm_configuracion' empresa.slug %}">Configuración</a>
+<a class="erp-action-link" href="{% url 'crm_crear_campania' empresa.slug %}">Nueva campaña</a>
 {% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Clientes</div><p class="erp-stat-value">{{ resumen.clientes }}</p><p class="erp-card-muted">Contactos activos registrados.</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Aceptan Promos</div><p class="erp-stat-value">{{ resumen.aceptan_promos }}</p><p class="erp-card-muted">Base autorizada para campanias.</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Campanias</div><p class="erp-stat-value">{{ resumen.campanias }}</p><p class="erp-card-muted">Promociones y mensajes preparados.</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">WhatsApp</div><p class="erp-stat-value">{% if config.whatsapp_activo %}API{% else %}Links{% endif %}</p><p class="erp-card-muted">Preparado para Cloud API por empresa.</p></article>
+<style>
+.crm-hero{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-bottom:18px}
+.crm-hero-main{position:relative;overflow:hidden;border:1px solid #cde3ee;border-radius:26px;padding:26px;background:linear-gradient(135deg,#ffffff 0%,#eefbff 48%,#fff5fb 100%);box-shadow:0 22px 55px rgba(15,43,73,.08)}
+.crm-hero-main:after{content:"";position:absolute;right:-65px;top:-70px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(32,206,190,.22),rgba(37,99,235,.02));}
+.crm-hero-main h3{font-size:28px;line-height:1.12;margin:0;color:#0f2338}
+.crm-hero-main p{margin:10px 0 0;color:#5f7588;max-width:740px;line-height:1.55}
+.crm-hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.crm-hero-side{border:1px solid #cde3ee;border-radius:26px;padding:22px;background:#0e3442;color:white;box-shadow:0 22px 55px rgba(14,52,66,.14)}
+.crm-hero-side h3{margin:0;color:white}
+.crm-hero-side p{margin:8px 0 16px;color:#d7f4f5;line-height:1.45}
+.crm-status-grid{display:grid;gap:10px}
+.crm-status-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:12px;background:rgba(255,255,255,.08)}
+.crm-status-item span{color:#d7f4f5;font-size:12px;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
+.crm-status-item strong{font-size:14px;color:white;text-align:right}
+.crm-kpis{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:14px;margin-bottom:18px}
+.crm-kpi{position:relative;overflow:hidden;border:1px solid #cfe1ec;border-radius:22px;background:#fff;padding:20px;box-shadow:0 16px 45px rgba(15,43,73,.055)}
+.crm-kpi:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#20c7b5,#287be8,#ff8cc6)}
+.crm-kpi .label{text-transform:uppercase;letter-spacing:.16em;color:#6d8292;font-size:11px;font-weight:900}
+.crm-kpi .value{font-size:32px;font-weight:900;color:#0e2436;margin:7px 0 4px}
+.crm-kpi .note{color:#64798a;line-height:1.4}
+.crm-modules{display:grid;grid-template-columns:repeat(3,minmax(240px,1fr));gap:16px;margin-bottom:18px}
+.crm-module{border:1px solid #cfe1ec;border-radius:24px;background:linear-gradient(145deg,#fff,#f7fcff);padding:22px;box-shadow:0 16px 45px rgba(15,43,73,.055)}
+.crm-module .icon{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,#20c7b5,#287be8);color:#fff;font-weight:900;margin-bottom:14px}
+.crm-module h3{margin:0;color:#0f2338}
+.crm-module p{color:#607789;line-height:1.5;min-height:46px}
+.crm-lower{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.crm-panel{border:1px solid #cfe1ec;border-radius:24px;background:#fff;padding:20px;box-shadow:0 16px 45px rgba(15,43,73,.055)}
+.crm-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
+.crm-panel-head h3{margin:0;color:#0f2338}
+.crm-panel-head small{display:block;color:#708596;margin-top:5px}
+.crm-badge{display:inline-flex;align-items:center;border-radius:999px;background:#e8f9f7;color:#087d76;font-weight:900;font-size:12px;padding:7px 11px}
+.crm-list{display:grid;gap:10px}
+.crm-list-item{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #e0edf3;border-radius:16px;padding:12px;background:#fbfdff}
+.crm-list-item strong{display:block;color:#102335}
+.crm-list-item small{display:block;color:#6b8192;margin-top:3px}
+.crm-empty{border:1px dashed #c7ddea;border-radius:16px;padding:20px;text-align:center;color:#6a7f91;background:#fbfdff}
+.crm-source-bar{height:8px;border-radius:999px;background:#eef5f8;margin-top:8px;overflow:hidden}
+.crm-source-bar span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#20c7b5,#287be8);min-width:10%}
+@media(max-width:1150px){.crm-hero,.crm-lower{grid-template-columns:1fr}.crm-kpis,.crm-modules{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.crm-kpis,.crm-modules{grid-template-columns:1fr}}
+</style>
+
+<section class="crm-hero">
+    <article class="crm-hero-main">
+        <div class="erp-kpi-label">Centro comercial</div>
+        <h3>Todo el seguimiento del cliente, claro y accionable.</h3>
+        <p>Controla promociones, plantillas, cumpleaños, fuentes de pacientes y alertas comerciales sin perderte entre pantallas. Esta vista está pensada para decidir rápido qué hacer hoy.</p>
+        <div class="crm-hero-actions">
+            <a class="erp-btn" href="{% url 'crm_campanias' empresa.slug %}">Ver campañas</a>
+            <a class="erp-btn-secondary" href="{% url 'crm_plantillas' empresa.slug %}">Gestionar plantillas</a>
+            <a class="erp-btn-secondary" href="{% url 'crm_configuracion' empresa.slug %}">Automatizaciones</a>
+        </div>
+    </article>
+    <article class="crm-hero-side">
+        <h3>Estado de WhatsApp</h3>
+        <p>Resumen rápido de cómo está configurada la comunicación automática de esta empresa.</p>
+        <div class="crm-status-grid">
+            <div class="crm-status-item"><span>Cloud API</span><strong>{% if config.whatsapp_activo %}Activa{% else %}Pendiente{% endif %}</strong></div>
+            <div class="crm-status-item"><span>Citas</span><strong>{% if config.recordatorio_citas_activo %}Recordatorios activos{% else %}Inactivos{% endif %}</strong></div>
+            <div class="crm-status-item"><span>Cumpleaños</span><strong>{% if config.recordatorio_cumpleanos_activo %}{% if config.cumpleanos_recordatorio_7_dias %}7 días{% endif %}{% if config.cumpleanos_recordatorio_7_dias and config.cumpleanos_recordatorio_1_dia %} + {% endif %}{% if config.cumpleanos_recordatorio_1_dia %}1 día{% endif %}{% else %}Inactivo{% endif %}</strong></div>
+        </div>
+    </article>
 </section>
 
-<section class="erp-grid">
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Marketing</div>
-        <h3>Campanias</h3>
-        <p>Prepara promociones para clientes con consentimiento y genera enlaces WhatsApp por contacto.</p>
-        <a class="erp-btn" href="{% url 'crm_campanias' empresa.slug %}">Ver Campanias</a>
+<section class="crm-kpis">
+    <article class="crm-kpi"><div class="label">Clientes activos</div><div class="value">{{ resumen.clientes }}</div><div class="note">Contactos disponibles en la empresa.</div></article>
+    <article class="crm-kpi"><div class="label">Base autorizada</div><div class="value">{{ resumen.tasa_promos }}%</div><div class="note">{{ resumen.aceptan_promos }} aceptan promociones.</div></article>
+    <article class="crm-kpi"><div class="label">Campañas</div><div class="value">{{ resumen.campanias }}</div><div class="note">{{ resumen.campanias_enviadas }} enviadas históricamente.</div></article>
+    <article class="crm-kpi"><div class="label">Plantillas activas</div><div class="value">{{ resumen.plantillas_activas }}</div><div class="note">Mensajes listos para usar.</div></article>
+</section>
+
+<section class="crm-modules">
+    <article class="crm-module">
+        <div class="icon">01</div>
+        <h3>Campañas</h3>
+        <p>Prepara promociones, segmenta clientes y envía por WhatsApp con trazabilidad.</p>
+        <a class="erp-btn" href="{% url 'crm_campanias' empresa.slug %}">Abrir campañas</a>
     </article>
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Comunicacion</div>
+    <article class="crm-module">
+        <div class="icon">02</div>
         <h3>Plantillas</h3>
-        <p>Mensajes reutilizables para promociones, cumpleanos y citas.</p>
-        <a class="erp-btn" href="{% url 'crm_plantillas' empresa.slug %}">Ver Plantillas</a>
+        <p>Edita mensajes internos del ERP para promociones, cumpleaños y avisos.</p>
+        <a class="erp-btn" href="{% url 'crm_plantillas' empresa.slug %}">Abrir plantillas</a>
+    </article>
+    <article class="crm-module">
+        <div class="icon">03</div>
+        <h3>Configuración</h3>
+        <p>Controla WhatsApp API, plantillas de Meta y automatizaciones de cumpleaños.</p>
+        <a class="erp-btn" href="{% url 'crm_configuracion' empresa.slug %}">Configurar CRM</a>
     </article>
 </section>
 
-<section class="erp-grid">
-    <article class="erp-card erp-table-card">
-        <h3 class="erp-panel-title">Cumpleanos de Manana</h3>
-        <div class="erp-table-wrap">
-            <table class="erp-table">
-                <tbody>
-                {% for cliente in cumpleanos_manana %}
-                <tr><td><strong>{{ cliente.nombre }}</strong><small>{{ cliente.telefono_whatsapp|default:cliente.telefono|default:"Sin telefono" }}</small></td></tr>
-                {% empty %}
-                <tr><td class="erp-empty">No hay cumpleanos programados para manana.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
+<section class="crm-lower">
+    <article class="crm-panel">
+        <div class="crm-panel-head">
+            <div><h3>Próximos cumpleaños</h3><small>Clientes con cumpleaños en los próximos 30 días.</small></div>
+            <span class="crm-badge">{{ proximos_cumpleanos|length }}</span>
+        </div>
+        <div class="crm-list">
+            {% for item in proximos_cumpleanos %}
+            <div class="crm-list-item">
+                <div><strong>{{ item.cliente.nombre }}</strong><small>{{ item.cliente.telefono_whatsapp|default:item.cliente.telefono|default:"Sin teléfono" }}</small></div>
+                <span class="crm-badge">{% if item.dias == 0 %}Hoy{% elif item.dias == 1 %}Mañana{% else %}{{ item.dias }} días{% endif %}</span>
+            </div>
+            {% empty %}
+            <div class="crm-empty">No hay cumpleaños cercanos registrados.</div>
+            {% endfor %}
         </div>
     </article>
-    <article class="erp-card erp-table-card">
-        <h3 class="erp-panel-title">Productos con Alerta</h3>
-        <div class="erp-table-wrap">
-            <table class="erp-table">
-                <tbody>
-                {% for producto in productos_alerta %}
-                <tr><td><strong>{{ producto.nombre }}</strong><small>Alerta: {{ producto.fecha_alerta|date:"d/m/Y" }}</small></td></tr>
-                {% empty %}
-                <tr><td class="erp-empty">No hay productos con alerta cercana.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
+
+    <article class="crm-panel">
+        <div class="crm-panel-head">
+            <div><h3>Productos con alerta</h3><small>Seguimiento comercial o vencimientos próximos.</small></div>
+            <span class="crm-badge">{{ productos_alerta|length }}</span>
+        </div>
+        <div class="crm-list">
+            {% for producto in productos_alerta %}
+            <div class="crm-list-item">
+                <div><strong>{{ producto.nombre }}</strong><small>Alerta: {{ producto.fecha_alerta|date:"d/m/Y" }}</small></div>
+            </div>
+            {% empty %}
+            <div class="crm-empty">No hay productos con alerta cercana.</div>
+            {% endfor %}
         </div>
     </article>
-    <article class="erp-card erp-table-card">
-        <h3 class="erp-panel-title">Fuentes de Pacientes</h3>
-        <p class="erp-card-muted">Origen reportado en el formulario general de Hospital MIA.</p>
-        <div class="erp-table-wrap">
-            <table class="erp-table">
-                <tbody>
-                {% for fuente in fuentes_preconsulta %}
-                <tr><td><strong>{{ fuente.fuente }}</strong><small>{{ fuente.total }} formulario(s)</small></td></tr>
-                {% empty %}
-                <tr><td class="erp-empty">Aun no hay fuentes registradas desde preconsultas.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
+
+    <article class="crm-panel">
+        <div class="crm-panel-head">
+            <div><h3>Fuentes de pacientes</h3><small>Origen reportado en preconsultas.</small></div>
+            <span class="crm-badge">{{ fuentes_preconsulta|length }}</span>
+        </div>
+        <div class="crm-list">
+            {% for fuente in fuentes_preconsulta %}
+            <div class="crm-list-item">
+                <div style="width:100%;">
+                    <strong>{{ fuente.fuente }}</strong>
+                    <small>{{ fuente.total }} formulario(s)</small>
+                    <div class="crm-source-bar"><span style="width:{% widthratio fuente.total resumen.clientes 100 %}%;"></span></div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="crm-empty">Aún no hay fuentes registradas desde preconsultas.</div>
+            {% endfor %}
         </div>
     </article>
 </section>

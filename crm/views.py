@@ -270,10 +270,35 @@ def crm_dashboard(request, empresa_slug):
     manana = hoy + timezone.timedelta(days=1)
     config = _configuracion_crm(empresa)
     clientes = Cliente.objects.filter(empresa=empresa, activo=True)
+    total_clientes = clientes.count()
+    aceptan_promos = clientes.filter(acepta_promociones=True).count()
+    tasa_promos = round((aceptan_promos / total_clientes) * 100) if total_clientes else 0
     cumpleanos_manana = clientes.filter(
         fecha_nacimiento__month=manana.month,
         fecha_nacimiento__day=manana.day,
     ).order_by("nombre")
+    proximos_cumpleanos = []
+    clientes_con_fecha = clientes.exclude(fecha_nacimiento__isnull=True).only(
+        "nombre", "telefono", "telefono_whatsapp", "fecha_nacimiento"
+    )
+    for cliente in clientes_con_fecha:
+        try:
+            fecha_cumple = cliente.fecha_nacimiento.replace(year=hoy.year)
+        except ValueError:
+            fecha_cumple = cliente.fecha_nacimiento.replace(year=hoy.year, day=28)
+        if fecha_cumple < hoy:
+            try:
+                fecha_cumple = fecha_cumple.replace(year=hoy.year + 1)
+            except ValueError:
+                fecha_cumple = fecha_cumple.replace(year=hoy.year + 1, day=28)
+        dias_faltantes = (fecha_cumple - hoy).days
+        if 0 <= dias_faltantes <= 30:
+            proximos_cumpleanos.append({
+                "cliente": cliente,
+                "fecha": fecha_cumple,
+                "dias": dias_faltantes,
+            })
+    proximos_cumpleanos = sorted(proximos_cumpleanos, key=lambda item: (item["dias"], item["cliente"].nombre))[:8]
     fecha_alerta = hoy + timezone.timedelta(days=config.dias_alerta_producto)
     productos_alerta = Producto.objects.filter(
         empresa=empresa,
@@ -313,11 +338,15 @@ def crm_dashboard(request, empresa_slug):
             "empresa": empresa,
             "config": config,
             "resumen": {
-                "clientes": clientes.count(),
-                "aceptan_promos": clientes.filter(acepta_promociones=True).count(),
+                "clientes": total_clientes,
+                "aceptan_promos": aceptan_promos,
+                "tasa_promos": tasa_promos,
                 "campanias": CampaniaMarketing.objects.filter(empresa=empresa).count(),
+                "campanias_enviadas": CampaniaMarketing.objects.filter(empresa=empresa, estado="enviada").count(),
+                "plantillas_activas": PlantillaMensaje.objects.filter(empresa=empresa, activa=True).count(),
             },
             "cumpleanos_manana": cumpleanos_manana,
+            "proximos_cumpleanos": proximos_cumpleanos,
             "productos_alerta": productos_alerta,
             "fuentes_preconsulta": fuentes_preconsulta,
         },
