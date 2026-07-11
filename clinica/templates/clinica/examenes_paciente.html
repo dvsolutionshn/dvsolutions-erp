@@ -3,7 +3,7 @@
 {% block title %}Examenes - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
 {% block header_title %}Examenes del paciente{% endblock %}
-{% block header_description %}Biblioteca de examenes, resultados, fotos y PDF recibidos para el expediente clinico.{% endblock %}
+{% block header_description %}Biblioteca clinica para PDF, fotos, resultados y documentos recibidos del paciente.{% endblock %}
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
@@ -12,38 +12,106 @@
 
 {% block content %}
 <style>
-.exam-hero{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}.exam-stat{border:1px solid var(--line);border-radius:20px;background:#fff;padding:18px;box-shadow:0 14px 32px rgba(16,40,62,.06)}.exam-stat span{display:block;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.exam-stat strong{display:block;margin-top:7px;color:#102338;font-size:30px}.exam-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}.exam-card{border:1px solid var(--line);border-radius:22px;background:#fff;overflow:hidden;box-shadow:0 16px 38px rgba(16,40,62,.07)}.exam-preview{height:180px;background:linear-gradient(135deg,#edf8ff,#fff7fb);display:grid;place-items:center;color:#5a7082;font-weight:900}.exam-preview img{width:100%;height:100%;object-fit:cover}.exam-body{padding:16px}.exam-body h3{margin:0;color:#102338}.exam-meta{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.exam-tag{padding:6px 9px;border-radius:999px;background:#eef7fb;color:#0f6f8a;font-size:10px;font-weight:900}.exam-body p{color:var(--muted);line-height:1.55}.exam-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}@media(max-width:800px){.exam-hero{grid-template-columns:1fr}}
+.exam-hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:24px;background:linear-gradient(135deg,#fff,#f6fbff 55%,#f2fbf7);padding:22px;box-shadow:0 18px 46px rgba(15,42,68,.07);margin-bottom:16px}
+.exam-hero:after{content:"";position:absolute;right:-80px;top:-90px;width:250px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.14),transparent 70%)}
+.exam-hero-main{position:relative;z-index:1;display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.exam-patient strong{display:block;color:#102338;font-size:24px}.exam-patient span{display:block;margin-top:5px;color:var(--muted)}
+.exam-status-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:#eaf8f6;color:#0f766e;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.exam-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+.exam-kpi{padding:15px;border:1px solid #d7e5ee;border-radius:18px;background:rgba(255,255,255,.88);box-shadow:0 12px 30px rgba(15,42,68,.05)}
+.exam-kpi span{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.exam-kpi strong{display:block;margin-top:6px;color:#102338;font-size:25px}
+.exam-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.exam-list{display:grid;gap:12px}
+.exam-card{position:relative;display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:15px;align-items:center;padding:16px;border:1px solid #dbe7ef;border-radius:22px;background:#fff;box-shadow:0 16px 38px rgba(15,42,68,.06)}
+.exam-preview{width:92px;height:78px;border-radius:18px;background:linear-gradient(135deg,#edf8ff,#fff7fb);display:grid;place-items:center;overflow:hidden;color:#0f6f8a;font-size:13px;font-weight:900;text-align:center}
+.exam-preview img{width:100%;height:100%;object-fit:cover;transition:transform .2s ease}.exam-card:hover .exam-preview img{transform:scale(1.05)}
+.exam-info h3{margin:0;color:#102338;font-size:17px}.exam-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;color:var(--muted);font-size:11px}
+.exam-tag{display:inline-flex;padding:5px 8px;border-radius:999px;background:#eef4f8;color:#526477;font-size:9px;font-weight:900;text-transform:uppercase}.exam-tag.image{background:#e8f7ef;color:#16724f}.exam-tag.pdf{background:#edf2ff;color:#2453bd}
+.exam-description{margin:10px 0 0;color:var(--muted);line-height:1.5;font-size:12px}.exam-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.exam-empty{min-height:260px;display:grid;place-items:center;text-align:center;border:1px dashed #bcd0dd;border-radius:22px;background:#fff;color:var(--muted);padding:28px}
+.exam-guide{position:sticky;top:92px;display:grid;gap:12px}
+.exam-guide-card{padding:18px;border:1px solid var(--line);border-radius:20px;background:#fff;box-shadow:0 14px 34px rgba(15,42,68,.05)}
+.exam-guide-card h3{margin:0 0 8px;color:#102338}.exam-guide-card p{margin:0;color:var(--muted);line-height:1.55}.exam-check{display:grid;gap:8px;margin-top:12px}.exam-check span{display:flex;gap:8px;align-items:flex-start;color:#30465a;font-size:12px}.exam-check i{width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:#e8f7ef;color:#10725f;font-style:normal;font-weight:900;font-size:10px;flex:0 0 auto}
+@media(max-width:1100px){.exam-layout{grid-template-columns:1fr}.exam-guide{position:static}.exam-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.exam-card{grid-template-columns:78px minmax(0,1fr)}.exam-actions{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:620px){.exam-kpis{grid-template-columns:1fr}.exam-card{grid-template-columns:1fr}.exam-preview{width:100%;height:180px}}
 </style>
+
 <section class="exam-hero">
-    <article class="exam-stat"><span>Total</span><strong>{{ resumen.total }}</strong></article>
-    <article class="exam-stat"><span>PDF</span><strong>{{ resumen.pdf }}</strong></article>
-    <article class="exam-stat"><span>Fotos</span><strong>{{ resumen.imagenes }}</strong></article>
-</section>
-<section class="exam-grid">
-    {% for examen in examenes %}
-    <article class="exam-card">
-        <div class="exam-preview">
-            {% if examen.es_imagen %}
-            <img src="{{ examen.archivo.url }}" alt="{{ examen.titulo }}">
-            {% else %}
-            PDF / Resultado
-            {% endif %}
+    <div class="exam-hero-main">
+        <div class="exam-patient">
+            <strong>{{ paciente.nombre }}</strong>
+            <span>{{ paciente.identidad|default:"Identidad no indicada" }} - {{ paciente.edad|default:"Edad no indicada" }} anos - Expediente {{ paciente.expediente_codigo }}</span>
         </div>
-        <div class="exam-body">
-            <h3>{{ examen.titulo }}</h3>
-            <div class="exam-meta">
-                <span class="exam-tag">{{ examen.get_tipo_display }}</span>
-                <span class="exam-tag">{{ examen.fecha_examen|date:"d/m/Y" }}</span>
+        <span class="exam-status-pill">Archivo clinico de examenes</span>
+    </div>
+    <div class="exam-kpis">
+        <div class="exam-kpi"><span>Total examenes</span><strong>{{ resumen.total }}</strong></div>
+        <div class="exam-kpi"><span>PDF cargados</span><strong>{{ resumen.pdf }}</strong></div>
+        <div class="exam-kpi"><span>Fotos</span><strong>{{ resumen.imagenes }}</strong></div>
+        <div class="exam-kpi"><span>Paciente</span><strong>{{ paciente.expediente_codigo|default:"-" }}</strong></div>
+    </div>
+</section>
+
+<section class="exam-layout">
+    <div class="exam-list">
+        {% for examen in examenes %}
+        <article class="exam-card">
+            <a class="exam-preview" href="{{ examen.archivo.url }}" target="_blank" rel="noopener" title="Abrir archivo">
+                {% if examen.es_imagen %}
+                <img src="{{ examen.archivo.url }}" alt="{{ examen.titulo }}">
+                {% else %}
+                PDF<br>Resultado
+                {% endif %}
+            </a>
+            <div class="exam-info">
+                <h3>{{ examen.titulo }}</h3>
+                <div class="exam-meta">
+                    <span class="exam-tag {% if examen.es_imagen %}image{% else %}pdf{% endif %}">{{ examen.get_tipo_display }}</span>
+                    <span>{{ examen.fecha_examen|date:"d/m/Y" }}</span>
+                    {% if examen.laboratorio %}<span>Centro: {{ examen.laboratorio }}</span>{% endif %}
+                    {% if examen.fecha_creacion %}<span>Cargado {{ examen.fecha_creacion|date:"d/m/Y h:i A" }}</span>{% endif %}
+                </div>
+                {% if examen.descripcion %}<p class="exam-description">{{ examen.descripcion }}</p>{% endif %}
             </div>
-            {% if examen.laboratorio %}<p><strong>Centro:</strong> {{ examen.laboratorio }}</p>{% endif %}
-            {% if examen.descripcion %}<p>{{ examen.descripcion }}</p>{% endif %}
             <div class="exam-actions">
                 <a class="erp-btn-secondary" href="{{ examen.archivo.url }}" target="_blank" rel="noopener">Abrir archivo</a>
             </div>
+        </article>
+        {% empty %}
+        <div class="exam-empty">
+            <div>
+                <div style="font-size:42px;margin-bottom:8px;">LAB</div>
+                <h3 style="margin:8px 0;color:#102338;">Aun no hay examenes cargados</h3>
+                <p style="margin:0 0 14px;">Suba el primer PDF o fotografia para dejarlo integrado al expediente.</p>
+                <a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}">Subir primer examen</a>
+            </div>
         </div>
-    </article>
-    {% empty %}
-    <div class="erp-empty">Todavia no hay examenes cargados para este paciente.</div>
-    {% endfor %}
+        {% endfor %}
+    </div>
+
+    <aside class="exam-guide">
+        <div class="exam-guide-card">
+            <h3>Revision rapida</h3>
+            <p>Esta pantalla centraliza examenes, resultados de laboratorio, ultrasonidos, imagenes y documentos que el paciente trae a consulta.</p>
+            <div class="exam-check">
+                <span><i>1</i>Revise fecha y tipo de resultado antes de la atencion.</span>
+                <span><i>2</i>Abra PDF o foto en grande para confirmar detalles.</span>
+                <span><i>3</i>Use la descripcion para dejar notas de procedencia o contexto.</span>
+            </div>
+        </div>
+        <div class="exam-guide-card">
+            <h3>Nuevo documento</h3>
+            <p>Puede subir archivos PDF o imagenes tomadas desde telefono, camara o computadora.</p>
+            <a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}" style="width:100%;justify-content:center;margin-top:14px;">Subir examen</a>
+        </div>
+        <div class="exam-guide-card">
+            <h3>Accesos del paciente</h3>
+            <div class="exam-check">
+                <span><i>OK</i><a href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}">Plan de consentimiento</a></span>
+                <span><i>OK</i><a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas medicas</a></span>
+                <span><i>OK</i><a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a></span>
+            </div>
+        </div>
+    </aside>
 </section>
 {% endblock %}
