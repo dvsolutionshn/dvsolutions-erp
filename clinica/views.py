@@ -63,6 +63,8 @@ from .models import (
 )
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from crm.forms import PacienteRapidoCitaForm
+from crm.models import ConfiguracionCRM
+from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
 
 def _sincronizar_agenda_desde_cita_clinica(cita):
@@ -921,6 +923,18 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
         f"Complete la informacion antes de su cita en este enlace seguro: {enlace_publico}"
     )
     whatsapp_url = f"https://wa.me/{telefono}?text={mensaje}" if telefono else ""
+    return _render_preconsulta_enlace(
+        request,
+        empresa=empresa,
+        paciente=paciente,
+        preconsulta=preconsulta,
+        enlace_publico=enlace_publico,
+        whatsapp_url=whatsapp_url,
+        tipo_nombre=tipos_validos[tipo],
+    )
+
+
+def _render_preconsulta_enlace(request, *, empresa, paciente, preconsulta, enlace_publico, whatsapp_url, tipo_nombre):
     return render(
         request,
         "clinica/preconsulta_enlace.html",
@@ -930,8 +944,62 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
             "preconsulta": preconsulta,
             "enlace_publico": enlace_publico,
             "whatsapp_url": whatsapp_url,
-            "tipo_nombre": tipos_validos[tipo],
+            "tipo_nombre": tipo_nombre,
         },
+    )
+
+
+@login_required
+@require_POST
+def enviar_preconsulta_whatsapp(request, empresa_slug, paciente_id, preconsulta_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_hospital_mia(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    preconsulta = get_object_or_404(
+        PreconsultaClinica,
+        id=preconsulta_id,
+        empresa=empresa,
+        paciente=paciente,
+    )
+    tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
+    tipo_nombre = tipos_validos.get(preconsulta.tipo, preconsulta.get_tipo_display())
+    enlace_publico = (request.POST.get("enlace_publico") or "").strip()
+    telefono = paciente.whatsapp or paciente.telefono or ""
+    mensaje = quote(
+        f"Hola {paciente.primer_nombre or paciente.nombre}. {empresa.nombre} le comparte su formulario de preconsulta "
+        f"de {tipo_nombre}. "
+        f"Complete la informacion antes de su cita en este enlace seguro: {enlace_publico}"
+    )
+    telefono_limpio = "".join(c for c in telefono if c.isdigit())
+    if len(telefono_limpio) == 8:
+        telefono_limpio = "504" + telefono_limpio
+    whatsapp_url = f"https://wa.me/{telefono_limpio}?text={mensaje}" if telefono_limpio else ""
+
+    try:
+        if not enlace_publico:
+            raise WhatsAppAPIError("No se encontro el enlace seguro de preconsulta para enviar.")
+        config = ConfiguracionCRM.objects.filter(empresa=empresa).first()
+        if not config or not config.whatsapp_activo:
+            raise WhatsAppAPIError("WhatsApp API no esta activo en CRM para esta empresa.")
+        enviar_plantilla_preconsulta_whatsapp(
+            config,
+            telefono,
+            paciente=paciente.nombre,
+            tipo_preconsulta=tipo_nombre,
+            enlace=enlace_publico,
+        )
+        messages.success(request, f"Preconsulta enviada por WhatsApp a {paciente.nombre}.")
+    except WhatsAppAPIError as exc:
+        messages.error(request, f"No se pudo enviar directo por WhatsApp: {exc}")
+
+    return _render_preconsulta_enlace(
+        request,
+        empresa=empresa,
+        paciente=paciente,
+        preconsulta=preconsulta,
+        enlace_publico=enlace_publico,
+        whatsapp_url=whatsapp_url,
+        tipo_nombre=tipo_nombre,
     )
 
 

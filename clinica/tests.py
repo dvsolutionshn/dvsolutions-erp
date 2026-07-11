@@ -1,5 +1,6 @@
 from io import BytesIO
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -10,7 +11,7 @@ from django.utils import timezone
 from PIL import Image
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
-from crm.models import CitaCliente
+from crm.models import CitaCliente, ConfiguracionCRM
 from facturacion.models import Cliente
 from .forms import PreconsultaClinicaPublicaForm
 from .models import CitaClinica, ConsentimientoClinico, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
@@ -773,7 +774,8 @@ class ClinicaPacienteTests(TestCase):
         preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
         self.assertEqual(preconsulta.token_hash, hash_token_preconsulta(token_raw))
         self.assertNotEqual(preconsulta.token_hash, token_raw)
-        self.assertContains(response, "Enviar por WhatsApp")
+        self.assertContains(response, "Enviar directo por WhatsApp")
+        self.assertContains(response, "Abrir WhatsApp manual")
 
         self.client.logout()
         publica_url = reverse("clinica_preconsulta_publica", args=[token_raw])
@@ -783,6 +785,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Laura")
         self.assertContains(response, "Paso 8 de 8")
         self.assertContains(response, "Braquioplastia (brazos: retirar flacidez o exceso de piel)")
+
         self.assertContains(response, "Musloplastia (piernas/muslos: retirar flacidez o exceso de piel)")
         self.assertContains(response, "Gluteoplastia (gluteos: mejorar forma o volumen)")
         self.assertContains(response, "Facebook")
@@ -908,6 +911,52 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Información recibida")
+
+    @patch("clinica.views.enviar_plantilla_preconsulta_whatsapp")
+    def test_preconsulta_se_envia_directo_por_whatsapp_api(self, enviar_mock):
+        ConfiguracionCRM.objects.create(
+            empresa=self.empresa,
+            whatsapp_activo=True,
+            whatsapp_phone_number_id="123",
+            whatsapp_token="token-test",
+            whatsapp_plantilla_preconsulta="preconsulta_paciente",
+            whatsapp_idioma_preconsulta="es",
+        )
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-0401",
+            primer_nombre="Laura",
+            primer_apellido="Perez",
+            nombre="Laura Perez",
+            identidad="0801199600002",
+            whatsapp="99990002",
+        )
+        token_raw = "token-preconsulta-directa"
+        preconsulta = PreconsultaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="general",
+            token_hash=hash_token_preconsulta(token_raw),
+            token_preview="token...",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+            creada_por=self.user,
+        )
+        enlace_publico = f"https://dvsolutionshn.com/preconsulta/{token_raw}/"
+
+        response = self.client.post(
+            reverse("clinica_enviar_preconsulta_whatsapp", args=[self.empresa.slug, paciente.id, preconsulta.id]),
+            {"enlace_publico": enlace_publico},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        enviar_mock.assert_called_once()
+        _, numero = enviar_mock.call_args.args
+        self.assertEqual(numero, "99990002")
+        self.assertEqual(enviar_mock.call_args.kwargs["paciente"], "Laura Perez")
+        self.assertEqual(enviar_mock.call_args.kwargs["tipo_preconsulta"], "General")
+        self.assertEqual(enviar_mock.call_args.kwargs["enlace"], enlace_publico)
+        self.assertContains(response, "Enviar directo por WhatsApp")
+        self.assertContains(response, "Abrir WhatsApp manual")
 
     def test_enlace_paciente_nuevo_crea_expediente_cliente_preconsulta_y_foto(self):
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))

@@ -26,6 +26,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_plantilla_cita",
             "whatsapp_idioma_cita",
             "whatsapp_cita_incluir_enlace",
+            "whatsapp_plantilla_preconsulta",
+            "whatsapp_idioma_preconsulta",
             "remitente_correo",
             "recordatorio_cumpleanos_activo",
             "recordatorio_citas_activo",

@@ -18,9 +18,15 @@
         <button class="erp-btn-secondary" type="button" id="copyPreconsulta">Copiar</button>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">
-        {% if whatsapp_url %}<a class="erp-btn" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Enviar por WhatsApp</a>{% endif %}
+        <form method="post" action="{% url 'clinica_enviar_preconsulta_whatsapp' empresa.slug paciente.id preconsulta.id %}" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="enlace_publico" value="{{ enlace_publico }}">
+            <button class="erp-btn" type="submit">Enviar directo por WhatsApp</button>
+        </form>
+        {% if whatsapp_url %}<a class="erp-btn-secondary" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Abrir WhatsApp manual</a>{% endif %}
         <a class="erp-btn-secondary" href="{{ enlace_publico }}" target="_blank" rel="noopener">Vista del paciente</a>
     </div>
+    <p class="erp-card-muted" style="margin-top:12px;">El envío directo usa la plantilla de WhatsApp configurada en CRM. Si Meta rechaza el envío, usa el respaldo manual.</p>
     <p id="copyStatus" class="erp-card-muted" style="margin-top:14px;"></p>
 </section>
 <script>

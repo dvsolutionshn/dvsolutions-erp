@@ -213,6 +213,41 @@ def enviar_plantilla_cita_whatsapp(
     return _post_whatsapp(config, payload)
 
 
+def enviar_plantilla_preconsulta_whatsapp(
+    config,
+    numero,
+    *,
+    paciente,
+    tipo_preconsulta,
+    enlace,
+):
+    telefono = normalizar_telefono_hn(numero)
+    if not telefono:
+        raise WhatsAppAPIError("El paciente no tiene un numero de WhatsApp valido.")
+    nombre_plantilla = (config.whatsapp_plantilla_preconsulta or "").strip()
+    if not nombre_plantilla:
+        raise WhatsAppAPIError("Configura una plantilla de preconsulta aprobada por Meta.")
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": telefono,
+        "type": "template",
+        "template": {
+            "name": nombre_plantilla,
+            "language": {"code": config.whatsapp_idioma_preconsulta or "es"},
+            "components": [{
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": _texto_parametro(paciente, "paciente")},
+                    {"type": "text", "text": _texto_parametro(tipo_preconsulta, "preconsulta")},
+                    {"type": "text", "text": _texto_parametro(enlace, "-")},
+                ],
+            }],
+        },
+    }
+    return _post_whatsapp(config, payload)
+
+
 def _texto_parametro(valor, fallback="-"):
     texto = str(valor or fallback).strip()
     return texto or fallback
