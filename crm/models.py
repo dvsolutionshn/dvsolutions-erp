@@ -33,6 +33,8 @@ class ConfiguracionCRM(models.Model):
     whatsapp_idioma_preconsulta = models.CharField(max_length=12, default="es")
     remitente_correo = models.EmailField(blank=True, null=True)
     recordatorio_cumpleanos_activo = models.BooleanField(default=True)
+    cumpleanos_recordatorio_1_dia = models.BooleanField(default=True)
+    cumpleanos_recordatorio_7_dias = models.BooleanField(default=False)
     recordatorio_citas_activo = models.BooleanField(default=True)
     dias_alerta_producto = models.PositiveIntegerField(default=7)
 
@@ -324,3 +326,36 @@ class NotificacionCitaWhatsApp(models.Model):
 
     def __str__(self):
         return f"{self.cita} · {self.get_tipo_display()}"
+
+class NotificacionCumpleanosWhatsApp(models.Model):
+    ESTADO_CHOICES = [
+        ("pendiente", "Pendiente"), ("enviado", "Enviado"),
+        ("error", "Error"), ("omitido", "Omitido"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="notificaciones_cumpleanos_whatsapp")
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="notificaciones_cumpleanos_whatsapp")
+    plantilla = models.ForeignKey(PlantillaMensaje, on_delete=models.SET_NULL, null=True, blank=True)
+    dias_antes = models.PositiveSmallIntegerField(default=1)
+    cumpleanos_fecha = models.DateField(db_index=True)
+    programada_para = models.DateTimeField(db_index=True)
+    mensaje = models.TextField(blank=True)
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="pendiente", db_index=True)
+    intentos = models.PositiveIntegerField(default=0)
+    ultimo_error = models.TextField(blank=True)
+    respuesta = models.JSONField(default=dict, blank=True)
+    enviada_en = models.DateTimeField(null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["programada_para", "cliente__nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["empresa", "cliente", "dias_antes", "cumpleanos_fecha"],
+                name="unique_notificacion_cumpleanos_cliente_fecha",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.cliente} - cumpleanos {self.cumpleanos_fecha:%d/%m/%Y}"

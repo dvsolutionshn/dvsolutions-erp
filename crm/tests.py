@@ -15,7 +15,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from facturacion.models import Cliente
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, PlantillaMensaje
 from .services import subir_media_whatsapp
 from .tokens import generar_token_respuesta_cita
 
@@ -728,6 +728,79 @@ class CRMTests(TestCase):
         envio = EnvioCampania.objects.get(campania=campania, cliente=cliente)
         self.assertIn("Paciente Demo", envio.mensaje)
         self.assertIn("50499999999", envio.whatsapp_url)
+
+    def test_plantilla_existente_se_puede_editar_desde_crm(self):
+        plantilla = PlantillaMensaje.objects.create(
+            empresa=self.empresa,
+            nombre="Cumpleaños",
+            tipo="cumpleanos",
+            canal="whatsapp",
+            mensaje="Mensaje original",
+        )
+
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.get(f"{reverse('crm_plantillas', args=[self.empresa.slug])}?editar={plantilla.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Editar plantilla")
+        self.assertContains(response, "Mensaje original")
+
+        response = self.client.post(reverse("crm_plantillas", args=[self.empresa.slug]), {
+            "plantilla_id": plantilla.id,
+            "nombre": "Cumpleaños Premium",
+            "tipo": "cumpleanos",
+            "canal": "whatsapp",
+            "asunto": "",
+            "mensaje": "Hola {{cliente}}, tenemos una atención especial para ti.",
+            "activa": "on",
+        })
+
+        self.assertRedirects(response, reverse("crm_plantillas", args=[self.empresa.slug]))
+        plantilla.refresh_from_db()
+        self.assertEqual(plantilla.nombre, "Cumpleaños Premium")
+        self.assertIn("atención especial", plantilla.mensaje)
+
+    @patch("crm.appointment_notifications.enviar_plantilla_marketing_whatsapp")
+    def test_recordatorio_cumpleanos_automatico_envia_1_y_7_dias(self, mock_enviar):
+        mock_enviar.return_value = {"messages": [{"id": "wamid.birthday"}]}
+        ahora = timezone.make_aware(datetime(2026, 7, 11, 9, 5))
+        config, _ = ConfiguracionCRM.objects.get_or_create(empresa=self.empresa)
+        config.whatsapp_activo = True
+        config.whatsapp_phone_number_id = "123"
+        config.whatsapp_token = "token-test"
+        config.recordatorio_cumpleanos_activo = True
+        config.cumpleanos_recordatorio_1_dia = True
+        config.cumpleanos_recordatorio_7_dias = True
+        config.save()
+        PlantillaMensaje.objects.create(
+            empresa=self.empresa,
+            nombre="Cumpleaños",
+            tipo="cumpleanos",
+            canal="whatsapp",
+            mensaje="Hola {{cliente}}, feliz cumpleaños de parte de {{empresa}}.",
+        )
+        Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Paciente Manana",
+            rtn="08011999000031",
+            telefono_whatsapp="99990031",
+            fecha_nacimiento=date(1990, 7, 12),
+            activo=True,
+        )
+        Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Paciente Semana",
+            rtn="08011999000032",
+            telefono_whatsapp="99990032",
+            fecha_nacimiento=date(1990, 7, 18),
+            activo=True,
+        )
+
+        from crm.appointment_notifications import procesar_recordatorios_cumpleanos
+        resultado = procesar_recordatorios_cumpleanos(ahora=ahora)
+
+        self.assertEqual(resultado["enviadas"], 2)
+        self.assertEqual(NotificacionCumpleanosWhatsApp.objects.filter(empresa=self.empresa, estado="enviado").count(), 2)
+        self.assertEqual(mock_enviar.call_count, 2)
 
     @patch("crm.views.enviar_plantilla_marketing_whatsapp")
     def test_enviar_campania_por_api_actualiza_envios(self, mock_enviar):

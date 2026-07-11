@@ -30,6 +30,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_idioma_preconsulta",
             "remitente_correo",
             "recordatorio_cumpleanos_activo",
+            "cumpleanos_recordatorio_1_dia",
+            "cumpleanos_recordatorio_7_dias",
             "recordatorio_citas_activo",
             "dias_alerta_producto",
         ]
@@ -40,6 +42,9 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_cita_incluir_enlace": "La plantilla de citas incluye enlace de confirmacion",
             "whatsapp_plantilla_preconsulta": "Plantilla WhatsApp para preconsulta",
             "whatsapp_idioma_preconsulta": "Idioma plantilla preconsulta",
+            "recordatorio_cumpleanos_activo": "Enviar cumpleaños automaticamente",
+            "cumpleanos_recordatorio_1_dia": "Enviar 1 día antes",
+            "cumpleanos_recordatorio_7_dias": "Enviar 7 días antes",
         }
         help_texts = {
             "whatsapp_token": "Token de Meta/WhatsApp Cloud API. Guardalo solo si el cliente ya tiene credenciales.",
@@ -53,6 +58,9 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_cita_incluir_enlace": "Activalo solo cuando la plantilla aprobada en Meta tenga la variable del enlace para confirmar o cancelar la cita.",
             "whatsapp_plantilla_preconsulta": "Nombre exacto aprobado en Meta. Debe tener 3 variables de cuerpo: paciente, tipo de preconsulta y enlace seguro.",
             "whatsapp_idioma_preconsulta": "Idioma exacto aprobado para esa plantilla. Si Meta la aprobo como Spanish, normalmente usa es.",
+            "recordatorio_cumpleanos_activo": "El sistema revisa clientes activos con fecha de nacimiento y usa la plantilla activa de tipo Cumpleanos.",
+            "cumpleanos_recordatorio_1_dia": "Programa el saludo a las 9:00 AM un dia antes del cumpleaños.",
+            "cumpleanos_recordatorio_7_dias": "Programa el saludo a las 9:00 AM siete dias antes del cumpleaños.",
             "dias_alerta_producto": "Dias antes para alertar productos con fecha de seguimiento o vencimiento.",
         }
 
@@ -62,7 +70,11 @@ class PlantillaMensajeForm(forms.ModelForm):
         model = PlantillaMensaje
         fields = ["nombre", "tipo", "canal", "asunto", "mensaje", "imagen_promocional", "activa"]
         widgets = {
-            "mensaje": forms.Textarea(attrs={"rows": 5}),
+            "mensaje": forms.Textarea(attrs={"rows": 6, "placeholder": "Ejemplo: Hola {{cliente}}, en {{empresa}} queremos celebrar contigo. Tenemos una atención especial por tu cumpleaños."}),
+        }
+        help_texts = {
+            "mensaje": "Variables disponibles: {{cliente}}, {{empresa}}, {{fecha}}, {{producto}}.",
+            "imagen_promocional": "Opcional. Se usa en campañas con imagen.",
         }
 
 

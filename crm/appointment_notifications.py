@@ -4,8 +4,10 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .models import CitaCliente, ConfiguracionCRM, NotificacionCitaWhatsApp
-from .services import WhatsAppAPIError, enviar_plantilla_cita_whatsapp
+from facturacion.models import Cliente
+
+from .models import CitaCliente, ConfiguracionCRM, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, PlantillaMensaje
+from .services import WhatsAppAPIError, enviar_plantilla_cita_whatsapp, enviar_plantilla_marketing_whatsapp
 from .tokens import construir_url_respuesta_cita
 
 EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
@@ -142,6 +144,112 @@ def procesar_recordatorios_hospital_mia(ahora=None):
         programada_para__lte=ahora,
     ).values_list("id", flat=True))
     resultados = [procesar_notificacion(notificacion_id, ahora=ahora) for notificacion_id in pendientes]
+    resultado_cumpleanos = procesar_recordatorios_cumpleanos(ahora=ahora)
+    return {
+        "procesadas": len(resultados),
+        "enviadas": sum(1 for item in resultados if item.estado == "enviado"),
+        "errores": sum(1 for item in resultados if item.estado == "error"),
+        "cumpleanos_procesadas": resultado_cumpleanos["procesadas"],
+        "cumpleanos_enviadas": resultado_cumpleanos["enviadas"],
+        "cumpleanos_errores": resultado_cumpleanos["errores"],
+    }
+
+
+def programar_notificaciones_cumpleanos(ahora=None):
+    ahora = ahora or timezone.now()
+    zona = timezone.get_current_timezone()
+    hoy = timezone.localtime(ahora, zona).date()
+    creadas = 0
+    empresas = ConfiguracionCRM.objects.filter(
+        whatsapp_activo=True,
+        recordatorio_cumpleanos_activo=True,
+    ).select_related("empresa")
+    for config in empresas:
+        plantilla = PlantillaMensaje.objects.filter(
+            empresa=config.empresa,
+            tipo="cumpleanos",
+            activa=True,
+            canal__in=["whatsapp", "ambos"],
+        ).order_by("nombre").first()
+        if not plantilla:
+            continue
+        reglas = []
+        if config.cumpleanos_recordatorio_7_dias:
+            reglas.append(7)
+        if config.cumpleanos_recordatorio_1_dia:
+            reglas.append(1)
+        for dias_antes in reglas:
+            fecha_objetivo = hoy + timedelta(days=dias_antes)
+            clientes = Cliente.objects.filter(
+                empresa=config.empresa,
+                activo=True,
+                fecha_nacimiento__month=fecha_objetivo.month,
+                fecha_nacimiento__day=fecha_objetivo.day,
+            ).exclude(fecha_nacimiento__isnull=True)
+            programada_para = timezone.make_aware(datetime.combine(hoy, HORA_RECORDATORIO_CITA), zona)
+            for cliente in clientes.iterator():
+                mensaje = plantilla.render(cliente=cliente)
+                _, creado = NotificacionCumpleanosWhatsApp.objects.get_or_create(
+                    empresa=config.empresa,
+                    cliente=cliente,
+                    dias_antes=dias_antes,
+                    cumpleanos_fecha=fecha_objetivo,
+                    defaults={
+                        "plantilla": plantilla,
+                        "programada_para": programada_para,
+                        "mensaje": mensaje,
+                    },
+                )
+                if creado:
+                    creadas += 1
+    return creadas
+
+
+def procesar_notificacion_cumpleanos(notificacion_id, ahora=None):
+    ahora = ahora or timezone.now()
+    with transaction.atomic():
+        notificacion = NotificacionCumpleanosWhatsApp.objects.select_for_update().select_related(
+            "empresa", "cliente", "plantilla"
+        ).get(id=notificacion_id)
+        if notificacion.estado == "enviado" or notificacion.programada_para > ahora:
+            return notificacion
+        config = ConfiguracionCRM.objects.filter(empresa=notificacion.empresa).first()
+        if not config or not config.whatsapp_activo or not config.recordatorio_cumpleanos_activo:
+            return notificacion
+        numero = notificacion.cliente.telefono_whatsapp or notificacion.cliente.telefono
+        try:
+            respuesta = enviar_plantilla_marketing_whatsapp(
+                config,
+                numero,
+                nombre_cliente=notificacion.cliente.nombre,
+                promocion=notificacion.mensaje,
+                vigencia=f"cumpleaños {notificacion.cumpleanos_fecha:%d/%m/%Y}",
+                enlace="responde a este mensaje",
+            )
+        except WhatsAppAPIError as exc:
+            notificacion.estado = "error"
+            notificacion.intentos += 1
+            notificacion.ultimo_error = str(exc)
+            notificacion.save(update_fields=["estado", "intentos", "ultimo_error", "fecha_actualizacion"])
+            return notificacion
+        notificacion.estado = "enviado"
+        notificacion.intentos += 1
+        notificacion.ultimo_error = ""
+        notificacion.respuesta = respuesta or {}
+        notificacion.enviada_en = ahora
+        notificacion.save(update_fields=["estado", "intentos", "ultimo_error", "respuesta", "enviada_en", "fecha_actualizacion"])
+        return notificacion
+
+
+def procesar_recordatorios_cumpleanos(ahora=None):
+    ahora = ahora or timezone.now()
+    programar_notificaciones_cumpleanos(ahora=ahora)
+    pendientes = list(NotificacionCumpleanosWhatsApp.objects.filter(
+        estado__in=["pendiente", "error"],
+        intentos__lt=3,
+        programada_para__lte=ahora,
+    ).values_list("id", flat=True))
+    resultados = [procesar_notificacion_cumpleanos(notificacion_id, ahora=ahora) for notificacion_id in pendientes]
     return {
         "procesadas": len(resultados),
         "enviadas": sum(1 for item in resultados if item.estado == "enviado"),

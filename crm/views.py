@@ -355,15 +355,33 @@ def enviar_prueba_whatsapp(request, empresa_slug):
 @login_required
 def plantillas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    form = PlantillaMensajeForm(request.POST or None, request.FILES or None)
+    plantilla_id = request.POST.get("plantilla_id") or request.GET.get("editar")
+    plantilla_obj = get_object_or_404(PlantillaMensaje, id=plantilla_id, empresa=empresa) if plantilla_id else None
+    form = PlantillaMensajeForm(request.POST or None, request.FILES or None, instance=plantilla_obj)
     if request.method == "POST" and form.is_valid():
         plantilla = form.save(commit=False)
         plantilla.empresa = empresa
         plantilla.save()
-        messages.success(request, "Plantilla guardada correctamente.")
+        messages.success(request, "Plantilla actualizada correctamente." if plantilla_obj else "Plantilla guardada correctamente.")
         return redirect("crm_plantillas", empresa_slug=empresa.slug)
     plantillas_qs = PlantillaMensaje.objects.filter(empresa=empresa)
-    return render(request, "crm/plantillas.html", {"empresa": empresa, "form": form, "plantillas": plantillas_qs})
+    resumen_tipos = {
+        "total": plantillas_qs.count(),
+        "activas": plantillas_qs.filter(activa=True).count(),
+        "cumpleanos": plantillas_qs.filter(tipo="cumpleanos", activa=True).count(),
+        "promocion": plantillas_qs.filter(tipo="promocion", activa=True).count(),
+    }
+    return render(
+        request,
+        "crm/plantillas.html",
+        {
+            "empresa": empresa,
+            "form": form,
+            "plantillas": plantillas_qs,
+            "plantilla_obj": plantilla_obj,
+            "resumen_tipos": resumen_tipos,
+        },
+    )
 
 
 @login_required
