@@ -697,7 +697,7 @@ class CRMTests(TestCase):
         cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
         self.assertIsNotNone(cita.cita_clinica_id)
 
-    @patch("crm.views.enviar_mensaje_whatsapp_texto")
+    @patch("crm.views.enviar_plantilla_cita_whatsapp")
     def test_modal_cita_permite_cancelar_y_reagendar_con_whatsapp(self, mock_whatsapp):
         mock_whatsapp.return_value = {"messages": [{"id": "wamid.action"}]}
         self.empresa.tipo_solucion = "clinica"
@@ -730,12 +730,14 @@ class CRMTests(TestCase):
         self.assertEqual(cita.estado, "cancelada")
 
         response = self.client.post(reverse("agenda_cita_reagendar_whatsapp", args=[self.empresa.slug, cita.id]), {
-            "nueva_fecha_hora": "2026-07-16T11:30", "vista": "dia", "fecha": "2026-07-15",
+            "nueva_fecha": "2026-07-16", "nueva_hora": "11:30", "nueva_periodo": "AM", "vista": "dia", "fecha": "2026-07-15",
         })
         self.assertEqual(response.status_code, 302)
         cita.refresh_from_db()
         self.assertEqual(timezone.localtime(cita.fecha_hora).strftime("%Y-%m-%dT%H:%M"), "2026-07-16T11:30")
         self.assertEqual(mock_whatsapp.call_count, 2)
+        self.assertEqual(mock_whatsapp.call_args_list[0].kwargs["aviso"], "cita cancelada")
+        self.assertEqual(mock_whatsapp.call_args_list[1].kwargs["aviso"], "cita reagendada")
 
     def test_preparar_envios_de_campania_crea_whatsapp_por_cliente(self):
         cliente = Cliente.objects.create(
