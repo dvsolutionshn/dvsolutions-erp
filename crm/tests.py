@@ -759,6 +759,53 @@ class CRMTests(TestCase):
         self.assertEqual(plantilla.nombre, "Cumpleaños Premium")
         self.assertIn("atención especial", plantilla.mensaje)
 
+    def test_plantillas_y_campanias_estan_aisladas_por_empresa(self):
+        otra_empresa = Empresa.objects.create(
+            nombre="Mia Medical Spa",
+            slug="medical_spa",
+            rtn="08011999111114",
+            estado_licencia="activa",
+        )
+        EmpresaModulo.objects.create(empresa=otra_empresa, modulo=self.modulo, activo=True)
+        plantilla_hospital = PlantillaMensaje.objects.create(
+            empresa=self.empresa,
+            nombre="Cumpleaños Hospital",
+            tipo="cumpleanos",
+            canal="whatsapp",
+            mensaje="Mensaje Hospital Mia",
+        )
+        plantilla_spa = PlantillaMensaje.objects.create(
+            empresa=otra_empresa,
+            nombre="Cumpleaños Spa",
+            tipo="cumpleanos",
+            canal="whatsapp",
+            mensaje="Mensaje Medical Spa",
+        )
+        CampaniaMarketing.objects.create(
+            empresa=self.empresa,
+            nombre="Campaña Hospital",
+            plantilla=plantilla_hospital,
+            audiencia="promociones",
+        )
+        CampaniaMarketing.objects.create(
+            empresa=otra_empresa,
+            nombre="Campaña Spa",
+            plantilla=plantilla_spa,
+            audiencia="promociones",
+        )
+
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.get(reverse("crm_plantillas", args=[self.empresa.slug]))
+        self.assertContains(response, "Cumpleaños Hospital")
+        self.assertNotContains(response, "Cumpleaños Spa")
+
+        response = self.client.get(reverse("crm_campanias", args=[self.empresa.slug]))
+        self.assertContains(response, "Campaña Hospital")
+        self.assertNotContains(response, "Campaña Spa")
+
+        response = self.client.get(f"{reverse('crm_plantillas', args=[self.empresa.slug])}?editar={plantilla_spa.id}")
+        self.assertEqual(response.status_code, 404)
+
     @patch("crm.appointment_notifications.enviar_plantilla_marketing_whatsapp")
     def test_recordatorio_cumpleanos_automatico_envia_1_y_7_dias(self, mock_enviar):
         mock_enviar.return_value = {"messages": [{"id": "wamid.birthday"}]}
