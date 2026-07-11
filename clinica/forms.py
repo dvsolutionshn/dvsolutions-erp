@@ -7,6 +7,7 @@ from django.utils import timezone
 from .models import (
     CitaClinica,
     ConsentimientoClinico,
+    ExamenPaciente,
     ExpedienteEvento,
     HistoriaClinicaEspecialidad,
     MedicamentoPrescrito,
@@ -14,6 +15,7 @@ from .models import (
     PacienteFotoEvolucion,
     PreconsultaClinica,
     ProfesionalSalud,
+    RecetaMedica,
     ServicioClinico,
     TratamientoPaciente,
     asegurar_profesionales_agenda_base,
@@ -409,6 +411,63 @@ class PlanConsentimientoPDFForm(BaseClinicaForm):
         if archivo and getattr(archivo, "content_type", "") not in {"application/pdf", "application/x-pdf"}:
             raise forms.ValidationError("Solo se permiten archivos PDF.")
         return archivo
+
+
+class ExamenPacienteForm(BaseClinicaForm):
+    class Meta:
+        model = ExamenPaciente
+        fields = ["titulo", "tipo", "fecha_examen", "laboratorio", "descripcion", "archivo"]
+        widgets = {
+            "fecha_examen": forms.DateInput(attrs={"type": "date"}),
+            "descripcion": forms.Textarea(attrs={"rows": 4}),
+            "archivo": forms.ClearableFileInput(attrs={"accept": "application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp"}),
+        }
+        labels = {
+            "titulo": "Nombre del examen",
+            "fecha_examen": "Fecha del examen",
+            "laboratorio": "Laboratorio / centro",
+            "archivo": "PDF o foto del examen",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["archivo"].required = True
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if archivo and archivo.size > 20 * 1024 * 1024:
+            raise forms.ValidationError("El archivo no puede superar 20 MB.")
+        permitidos = {"application/pdf", "application/x-pdf", "image/jpeg", "image/png", "image/webp"}
+        if archivo and getattr(archivo, "content_type", "") not in permitidos:
+            raise forms.ValidationError("Solo se permiten PDF o imagenes JPG, PNG o WebP.")
+        return archivo
+
+
+class RecetaMedicaForm(BaseClinicaForm):
+    class Meta:
+        model = RecetaMedica
+        fields = ["fecha", "profesional", "diagnostico", "productos", "indicaciones", "observaciones"]
+        widgets = {
+            "fecha": forms.DateInput(attrs={"type": "date"}),
+            "indicaciones": forms.Textarea(attrs={"rows": 8, "placeholder": "Ejemplo:\n1. Medicamento - dosis - frecuencia - duracion.\nIndicaciones especiales..."}),
+            "observaciones": forms.Textarea(attrs={"rows": 3}),
+        }
+        labels = {
+            "productos": "Productos / medicamentos del catalogo",
+            "indicaciones": "Receta e indicaciones",
+        }
+
+    def __init__(self, *args, **kwargs):
+        empresa = kwargs.pop("empresa", None)
+        super().__init__(*args, **kwargs)
+        self.fields["productos"].required = False
+        self.fields["profesional"].required = False
+        if empresa:
+            from facturacion.models import Producto
+
+            self.fields["productos"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+        self.fields["productos"].widget.attrs.update({"size": "8"})
 
 
 CAPILAR_FORMULARIO = [

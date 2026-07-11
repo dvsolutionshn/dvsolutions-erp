@@ -12,6 +12,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 
 from core.models import Empresa
@@ -886,6 +887,92 @@ def crear_paciente_rapido_cita(request, empresa_slug):
             "label": str(paciente),
         },
     })
+
+
+def _numero_contacto_cita(cita):
+    if cita.paciente_id:
+        return cita.paciente.whatsapp or cita.paciente.telefono or ""
+    if cita.cliente_id:
+        return cita.cliente.telefono_whatsapp or cita.cliente.telefono or ""
+    return ""
+
+
+def _enviar_aviso_cita_whatsapp(cita, mensaje):
+    config = ConfiguracionCRM.objects.filter(empresa=cita.empresa).first()
+    if not config or not config.whatsapp_activo:
+        raise WhatsAppAPIError("WhatsApp API no esta activo en CRM.")
+    return enviar_mensaje_whatsapp_texto(config, _numero_contacto_cita(cita), mensaje)
+
+
+def _redirect_agenda_accion(request, empresa):
+    vista = request.POST.get("vista", "mes")
+    fecha = request.POST.get("fecha", timezone.localdate().isoformat())
+    return redirect(f"{reverse('agenda_citas', args=[empresa.slug])}?vista={vista}&fecha={fecha}")
+
+
+@login_required
+@require_POST
+def cancelar_cita_whatsapp(request, empresa_slug, cita_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    cita = get_object_or_404(CitaCliente.objects.select_related("paciente", "cliente", "servicio_clinico", "profesional_salud"), empresa=empresa, id=cita_id)
+    motivo = (request.POST.get("motivo") or "").strip()
+    nota = f"Cita cancelada desde agenda el {timezone.localtime(timezone.now()):%d/%m/%Y %I:%M %p}."
+    if motivo:
+        nota = f"{nota} Motivo: {motivo}"
+    cita.estado = "cancelada"
+    cita.observacion = f"{cita.observacion}\n{nota}".strip() if cita.observacion else nota
+    cita.save(update_fields=["estado", "observacion"])
+    cita.notificaciones_whatsapp.filter(estado__in=["pendiente", "error"]).update(estado="omitido")
+    _sincronizar_cita_clinica(cita)
+    local = timezone.localtime(cita.fecha_hora)
+    mensaje = (
+        f"Hola {cita.display_cliente}, le informamos que su cita de {cita.display_servicio} "
+        f"programada para el {local:%d/%m/%Y} a las {local:%I:%M %p} fue cancelada."
+    )
+    if motivo:
+        mensaje = f"{mensaje} Motivo: {motivo}."
+    try:
+        _enviar_aviso_cita_whatsapp(cita, mensaje)
+        messages.success(request, "Cita cancelada y aviso enviado por WhatsApp.")
+    except WhatsAppAPIError as exc:
+        messages.warning(request, f"Cita cancelada, pero no se pudo enviar WhatsApp: {exc}")
+    return _redirect_agenda_accion(request, empresa)
+
+
+@login_required
+@require_POST
+def reagendar_cita_whatsapp(request, empresa_slug, cita_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    cita = get_object_or_404(CitaCliente.objects.select_related("paciente", "cliente", "servicio_clinico", "profesional_salud"), empresa=empresa, id=cita_id)
+    nueva_fecha_raw = request.POST.get("nueva_fecha_hora")
+    nueva_fecha = parse_datetime(nueva_fecha_raw or "")
+    if not nueva_fecha:
+        messages.error(request, "Selecciona una nueva fecha y hora valida para reagendar.")
+        return _redirect_agenda_accion(request, empresa)
+    if timezone.is_naive(nueva_fecha):
+        nueva_fecha = timezone.make_aware(nueva_fecha, timezone.get_current_timezone())
+    fecha_anterior = timezone.localtime(cita.fecha_hora)
+    cita.fecha_hora = nueva_fecha
+    cita.estado = "confirmada" if cita.estado == "cancelada" else cita.estado
+    nota = (
+        f"Cita reagendada desde agenda el {timezone.localtime(timezone.now()):%d/%m/%Y %I:%M %p}. "
+        f"Antes: {fecha_anterior:%d/%m/%Y %I:%M %p}. Nueva: {timezone.localtime(nueva_fecha):%d/%m/%Y %I:%M %p}."
+    )
+    cita.observacion = f"{cita.observacion}\n{nota}".strip() if cita.observacion else nota
+    cita.save(update_fields=["fecha_hora", "estado", "observacion"])
+    _sincronizar_cita_clinica(cita)
+    programar_notificaciones_cita(cita)
+    local = timezone.localtime(cita.fecha_hora)
+    mensaje = (
+        f"Hola {cita.display_cliente}, su cita de {cita.display_servicio} fue reagendada "
+        f"para el {local:%d/%m/%Y} a las {local:%I:%M %p}. Le esperamos."
+    )
+    try:
+        _enviar_aviso_cita_whatsapp(cita, mensaje)
+        messages.success(request, "Cita reagendada y aviso enviado por WhatsApp.")
+    except WhatsAppAPIError as exc:
+        messages.warning(request, f"Cita reagendada, pero no se pudo enviar WhatsApp: {exc}")
+    return redirect(f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={local.date().isoformat()}")
 
 
 @login_required

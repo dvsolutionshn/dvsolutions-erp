@@ -697,6 +697,46 @@ class CRMTests(TestCase):
         cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
         self.assertIsNotNone(cita.cita_clinica_id)
 
+    @patch("crm.views.enviar_mensaje_whatsapp_texto")
+    def test_modal_cita_permite_cancelar_y_reagendar_con_whatsapp(self, mock_whatsapp):
+        mock_whatsapp.return_value = {"messages": [{"id": "wamid.action"}]}
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        config, _ = ConfiguracionCRM.objects.get_or_create(empresa=self.empresa)
+        config.whatsapp_activo = True
+        config.whatsapp_phone_number_id = "123"
+        config.whatsapp_token = "token"
+        config.save()
+        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-ACT", nombre="Paciente Accion", whatsapp="99990000")
+        servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta accion")
+        fecha_hora = timezone.make_aware(datetime(2026, 7, 15, 10, 0))
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            titulo=servicio.nombre,
+            fecha_hora=fecha_hora,
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        agenda = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]), {"vista": "dia", "fecha": "2026-07-15"})
+        self.assertContains(agenda, reverse("agenda_cita_cancelar_whatsapp", args=[self.empresa.slug, cita.id]))
+        self.assertContains(agenda, reverse("agenda_cita_reagendar_whatsapp", args=[self.empresa.slug, cita.id]))
+
+        response = self.client.post(reverse("agenda_cita_cancelar_whatsapp", args=[self.empresa.slug, cita.id]), {
+            "motivo": "Cambio medico", "vista": "dia", "fecha": "2026-07-15",
+        })
+        self.assertEqual(response.status_code, 302)
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado, "cancelada")
+
+        response = self.client.post(reverse("agenda_cita_reagendar_whatsapp", args=[self.empresa.slug, cita.id]), {
+            "nueva_fecha_hora": "2026-07-16T11:30", "vista": "dia", "fecha": "2026-07-15",
+        })
+        self.assertEqual(response.status_code, 302)
+        cita.refresh_from_db()
+        self.assertEqual(timezone.localtime(cita.fecha_hora).strftime("%Y-%m-%dT%H:%M"), "2026-07-16T11:30")
+        self.assertEqual(mock_whatsapp.call_count, 2)
+
     def test_preparar_envios_de_campania_crea_whatsapp_por_cliente(self):
         cliente = Cliente.objects.create(
             empresa=self.empresa,

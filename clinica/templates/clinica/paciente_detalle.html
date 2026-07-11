@@ -77,6 +77,8 @@
     <a class="erp-card patient-entry-card" href="#plan-tratamiento"><div class="erp-kpi-label">Ruta medica</div><h3>Plan de tratamiento</h3><p>Tratamientos activos, objetivos, plan clinico, costos y seguimiento profesional.</p></a>
     <a class="erp-card patient-entry-card" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Bitacora visual</div><h3>Evolucion</h3><p>Pantalla propia para fotos, videos, fechas, procedimiento aplicado y registro cronologico del avance.</p></a>
     <a class="erp-card patient-entry-card" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Documentos firmados</div><h3>Plan de consentimiento</h3><p>Pantalla propia para PDF firmados, fecha, tipo de plan y control documental del paciente.</p></a>
+    <a class="erp-card patient-entry-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Resultados</div><h3>Examenes</h3><p>Subida y consulta de examenes en PDF o fotografia, organizados por fecha y tipo.</p></a>
+    <a class="erp-card patient-entry-card" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Prescripcion</div><h3>Recetas</h3><p>Crea recetas medicas profesionales con productos, indicaciones e impresion con logo.</p></a>
     <a class="erp-card patient-entry-card" href="#citas"><div class="erp-kpi-label">Agenda</div><h3>Citas</h3><p>Citas pasadas, programadas y acceso rapido para agendar nuevas atenciones.</p></a>
 </section>
 
@@ -126,13 +128,13 @@
         <div class="erp-kpi-label">Anexos</div>
         <h3 class="erp-panel-title">Documentos clinicos</h3>
         <div class="patient-section-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:12px;">
-            <div class="patient-mini-card"><strong>Examenes</strong><span>Preparado para cargas y resultados.</span></div>
+            <a class="patient-mini-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}" style="text-decoration:none;"><strong>Examenes</strong><span>{% if examenes %}{{ examenes|length }} examen(es) cargados.{% else %}Subir PDF o foto de resultados.{% endif %}</span></a>
             <div class="patient-mini-card"><strong>Trabajos de laboratorio</strong><span>Resultados y solicitudes por fecha.</span></div>
             <div class="patient-mini-card"><strong>Solicitud Estudio Radiologico</strong><span>Ordenes e imagenologia.</span></div>
             <div class="patient-mini-card"><strong>Documentos</strong><span>Adjuntos generales del paciente.</span></div>
             <div class="patient-mini-card"><strong>Remision y contraremision</strong><span>Control de referencias externas.</span></div>
             <div class="patient-mini-card"><strong>Detalle Remisiones</strong><span>Seguimiento de cada remision.</span></div>
-            <div class="patient-mini-card"><strong>Prescripciones</strong><span>{% if medicamentos %}{{ medicamentos|length }} prescripciones registradas.{% else %}Sin prescripciones registradas.{% endif %}</span></div>
+            <a class="patient-mini-card" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}" style="text-decoration:none;"><strong>Recetas</strong><span>{% if recetas %}{{ recetas|length }} receta(s) emitidas.{% else %}Crear receta imprimible.{% endif %}</span></a>
             <div class="patient-mini-card"><strong>Incapacidades</strong><span>Certificados e incapacidades emitidas.</span></div>
         </div>
     </article>

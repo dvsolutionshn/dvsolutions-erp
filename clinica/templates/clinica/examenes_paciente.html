@@ -1,0 +1,49 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Examenes - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Examenes del paciente{% endblock %}
+{% block header_description %}Biblioteca de examenes, resultados, fotos y PDF recibidos para el expediente clinico.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+<a class="erp-btn" href="{% url 'clinica_subir_examen_paciente' empresa.slug paciente.id %}">Subir examen</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.exam-hero{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}.exam-stat{border:1px solid var(--line);border-radius:20px;background:#fff;padding:18px;box-shadow:0 14px 32px rgba(16,40,62,.06)}.exam-stat span{display:block;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.exam-stat strong{display:block;margin-top:7px;color:#102338;font-size:30px}.exam-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}.exam-card{border:1px solid var(--line);border-radius:22px;background:#fff;overflow:hidden;box-shadow:0 16px 38px rgba(16,40,62,.07)}.exam-preview{height:180px;background:linear-gradient(135deg,#edf8ff,#fff7fb);display:grid;place-items:center;color:#5a7082;font-weight:900}.exam-preview img{width:100%;height:100%;object-fit:cover}.exam-body{padding:16px}.exam-body h3{margin:0;color:#102338}.exam-meta{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.exam-tag{padding:6px 9px;border-radius:999px;background:#eef7fb;color:#0f6f8a;font-size:10px;font-weight:900}.exam-body p{color:var(--muted);line-height:1.55}.exam-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}@media(max-width:800px){.exam-hero{grid-template-columns:1fr}}
+</style>
+<section class="exam-hero">
+    <article class="exam-stat"><span>Total</span><strong>{{ resumen.total }}</strong></article>
+    <article class="exam-stat"><span>PDF</span><strong>{{ resumen.pdf }}</strong></article>
+    <article class="exam-stat"><span>Fotos</span><strong>{{ resumen.imagenes }}</strong></article>
+</section>
+<section class="exam-grid">
+    {% for examen in examenes %}
+    <article class="exam-card">
+        <div class="exam-preview">
+            {% if examen.es_imagen %}
+            <img src="{{ examen.archivo.url }}" alt="{{ examen.titulo }}">
+            {% else %}
+            PDF / Resultado
+            {% endif %}
+        </div>
+        <div class="exam-body">
+            <h3>{{ examen.titulo }}</h3>
+            <div class="exam-meta">
+                <span class="exam-tag">{{ examen.get_tipo_display }}</span>
+                <span class="exam-tag">{{ examen.fecha_examen|date:"d/m/Y" }}</span>
+            </div>
+            {% if examen.laboratorio %}<p><strong>Centro:</strong> {{ examen.laboratorio }}</p>{% endif %}
+            {% if examen.descripcion %}<p>{{ examen.descripcion }}</p>{% endif %}
+            <div class="exam-actions">
+                <a class="erp-btn-secondary" href="{{ examen.archivo.url }}" target="_blank" rel="noopener">Abrir archivo</a>
+            </div>
+        </div>
+    </article>
+    {% empty %}
+    <div class="erp-empty">Todavia no hay examenes cargados para este paciente.</div>
+    {% endfor %}
+</section>
+{% endblock %}

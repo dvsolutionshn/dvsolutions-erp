@@ -12,9 +12,9 @@ from PIL import Image
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from crm.models import CitaCliente, ConfiguracionCRM
-from facturacion.models import Cliente
+from facturacion.models import Cliente, Producto
 from .forms import PreconsultaClinicaPublicaForm
-from .models import CitaClinica, ConsentimientoClinico, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
+from .models import CitaClinica, ConsentimientoClinico, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, RecetaMedica, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -269,6 +269,55 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(detalle, "Biblioteca de PDF firmados")
         self.assertContains(detalle, "Consentimiento cirugía capilar")
         self.assertContains(detalle, "Abrir PDF")
+
+    def test_paciente_permite_subir_examen_y_crear_receta_imprimible(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-RX",
+            nombre="Paciente Receta",
+            identidad="0801199900099",
+        )
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Antibiotico demo",
+            codigo="RX-001",
+            precio=100,
+        )
+        archivo = SimpleUploadedFile("examen.pdf", b"%PDF-1.4 test", content_type="application/pdf")
+
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                reverse("clinica_subir_examen_paciente", args=[self.empresa.slug, paciente.id]),
+                {
+                    "titulo": "Hemograma",
+                    "tipo": "laboratorio",
+                    "fecha_examen": "2026-07-11",
+                    "laboratorio": "Lab Demo",
+                    "descripcion": "Resultado preoperatorio",
+                    "archivo": archivo,
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+            self.assertTrue(ExamenPaciente.objects.filter(paciente=paciente, titulo="Hemograma").exists())
+            response = self.client.get(reverse("clinica_examenes_paciente", args=[self.empresa.slug, paciente.id]))
+            self.assertContains(response, "Hemograma")
+
+        response = self.client.post(
+            reverse("clinica_crear_receta_paciente", args=[self.empresa.slug, paciente.id]),
+            {
+                "fecha": "2026-07-11",
+                "diagnostico": "Control postoperatorio",
+                "productos": [producto.id],
+                "indicaciones": "Tomar 1 tableta cada 12 horas por 5 dias.",
+                "observaciones": "No suspender sin indicacion medica.",
+            },
+        )
+        receta = RecetaMedica.objects.get(paciente=paciente)
+        self.assertRedirects(response, reverse("clinica_receta_imprimir", args=[self.empresa.slug, paciente.id, receta.id]))
+        response = self.client.get(reverse("clinica_receta_imprimir", args=[self.empresa.slug, paciente.id, receta.id]))
+        self.assertContains(response, "Receta medica")
+        self.assertContains(response, "Antibiotico demo")
+        self.assertContains(response, "Tomar 1 tableta")
 
     def test_paciente_evolucion_muestra_fotos_y_videos_separados(self):
         paciente = Paciente.objects.create(

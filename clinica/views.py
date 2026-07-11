@@ -35,6 +35,7 @@ from .forms import (
     PSICOLOGICA_CHOICES,
     SI_NO_CHOICES,
     CitaClinicaForm,
+    ExamenPacienteForm,
     ExpedienteEventoForm,
     HistoriaClinicaEspecialidadForm,
     PacienteForm,
@@ -42,12 +43,14 @@ from .forms import (
     PlanConsentimientoPDFForm,
     PreconsultaClinicaPublicaForm,
     ProfesionalSaludForm,
+    RecetaMedicaForm,
     ServicioClinicoForm,
     TratamientoPacienteForm,
 )
 from .models import (
     CitaClinica,
     ConsentimientoClinico,
+    ExamenPaciente,
     ConfiguracionClinica,
     ExpedienteEvento,
     HistoriaClinicaEspecialidad,
@@ -57,6 +60,7 @@ from .models import (
     PacienteFotoEvolucion,
     PreconsultaClinica,
     ProfesionalSalud,
+    RecetaMedica,
     SeguimientoPostOperatorio,
     ServicioClinico,
     TratamientoPaciente,
@@ -615,6 +619,8 @@ def paciente_detalle(request, empresa_slug, paciente_id):
     fotos_evolucion = paciente.fotos_evolucion.select_related("creado_por")[:12]
     medicamentos = MedicamentoPrescrito.objects.filter(empresa=empresa, paciente=paciente)[:10]
     consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10]
+    examenes = ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente)[:10]
+    recetas = RecetaMedica.objects.filter(empresa=empresa, paciente=paciente).select_related("profesional")[:10]
     historias_especialidad = paciente.historias_especialidad.select_related("profesional", "actualizado_por")[:20]
     return render(
         request,
@@ -628,9 +634,32 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "fotos_evolucion": fotos_evolucion,
             "medicamentos": medicamentos,
             "consentimientos": consentimientos,
+            "examenes": examenes,
+            "recetas": recetas,
             "historias_especialidad": historias_especialidad,
             "formularios_hospitalarios": empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS,
         },
+    )
+
+
+@login_required
+def examenes_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    examenes = list(
+        ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente)
+        .select_related("subido_por")
+        .order_by("-fecha_examen", "-fecha_creacion")
+    )
+    resumen = {
+        "total": len(examenes),
+        "pdf": sum(1 for item in examenes if not item.es_imagen),
+        "imagenes": sum(1 for item in examenes if item.es_imagen),
+    }
+    return render(
+        request,
+        "clinica/examenes_paciente.html",
+        {"empresa": empresa, "paciente": paciente, "examenes": examenes, "resumen": resumen},
     )
 
 
@@ -659,6 +688,40 @@ def consentimientos_paciente(request, empresa_slug, paciente_id):
             "consentimientos": consentimientos,
             "resumen": resumen,
         },
+    )
+
+
+@login_required
+def recetas_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    recetas = list(
+        RecetaMedica.objects.filter(empresa=empresa, paciente=paciente)
+        .select_related("profesional", "creada_por")
+        .prefetch_related("productos")
+        .order_by("-fecha", "-fecha_creacion")
+    )
+    return render(
+        request,
+        "clinica/recetas_paciente.html",
+        {"empresa": empresa, "paciente": paciente, "recetas": recetas},
+    )
+
+
+@login_required
+def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    receta = get_object_or_404(
+        RecetaMedica.objects.select_related("profesional", "creada_por").prefetch_related("productos"),
+        id=receta_id,
+        empresa=empresa,
+        paciente=paciente,
+    )
+    return render(
+        request,
+        "clinica/receta_imprimir.html",
+        {"empresa": empresa, "paciente": paciente, "receta": receta},
     )
 
 
@@ -1299,6 +1362,49 @@ def subir_consentimiento_paciente(request, empresa_slug, paciente_id):
         "form": form,
         "titulo": f"Subir plan de consentimiento: {paciente.nombre}",
         "cancel_url": reverse("clinica_consentimientos_paciente", args=[empresa.slug, paciente.id]),
+    })
+
+
+@login_required
+def subir_examen_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    form = ExamenPacienteForm(request.POST or None, request.FILES or None, empresa=empresa)
+    if request.method == "POST" and form.is_valid():
+        examen = form.save(commit=False)
+        examen.empresa = empresa
+        examen.paciente = paciente
+        examen.subido_por = request.user
+        examen.save()
+        messages.success(request, "Examen agregado correctamente al expediente.")
+        return redirect("clinica_examenes_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    return render(request, "clinica/form.html", {
+        "empresa": empresa,
+        "form": form,
+        "titulo": f"Subir examen: {paciente.nombre}",
+        "cancel_url": reverse("clinica_examenes_paciente", args=[empresa.slug, paciente.id]),
+    })
+
+
+@login_required
+def crear_receta_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    form = RecetaMedicaForm(request.POST or None, empresa=empresa)
+    if request.method == "POST" and form.is_valid():
+        receta = form.save(commit=False)
+        receta.empresa = empresa
+        receta.paciente = paciente
+        receta.creada_por = request.user
+        receta.save()
+        form.save_m2m()
+        messages.success(request, "Receta medica creada correctamente.")
+        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+    return render(request, "clinica/form.html", {
+        "empresa": empresa,
+        "form": form,
+        "titulo": f"Nueva receta: {paciente.nombre}",
+        "cancel_url": reverse("clinica_recetas_paciente", args=[empresa.slug, paciente.id]),
     })
 
 

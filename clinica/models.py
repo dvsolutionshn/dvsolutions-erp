@@ -6,7 +6,7 @@ from django.db import models
 from django.utils import timezone
 
 from core.models import Empresa
-from facturacion.models import Cliente
+from facturacion.models import Cliente, Producto
 
 EMPRESAS_IDENTIDAD_PACIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
 
@@ -733,6 +733,60 @@ class ConsentimientoClinico(models.Model):
 
     def __str__(self):
         return f"{self.titulo} - {self.paciente.nombre}"
+
+
+class ExamenPaciente(models.Model):
+    TIPO_CHOICES = [
+        ("laboratorio", "Laboratorio"),
+        ("imagen", "Imagen / radiologia"),
+        ("preoperatorio", "Preoperatorio"),
+        ("otro", "Otro"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="examenes_pacientes")
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="examenes")
+    titulo = models.CharField(max_length=180)
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default="laboratorio")
+    fecha_examen = models.DateField(default=timezone.localdate)
+    laboratorio = models.CharField(max_length=180, blank=True, null=True)
+    descripcion = models.TextField(blank=True, null=True)
+    archivo = models.FileField(upload_to="clinica/examenes/")
+    subido_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_examen", "-fecha_creacion"]
+        verbose_name = "Examen de paciente"
+        verbose_name_plural = "Examenes de pacientes"
+
+    def __str__(self):
+        return f"{self.titulo} - {self.paciente.nombre}"
+
+    @property
+    def es_imagen(self):
+        nombre = (self.archivo.name or "").lower()
+        return nombre.endswith((".jpg", ".jpeg", ".png", ".webp"))
+
+
+class RecetaMedica(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="recetas_medicas")
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="recetas")
+    fecha = models.DateField(default=timezone.localdate)
+    diagnostico = models.CharField(max_length=240, blank=True, null=True)
+    indicaciones = models.TextField(help_text="Detalle libre de medicamentos, dosis, frecuencia, duracion e indicaciones.")
+    productos = models.ManyToManyField(Producto, blank=True, related_name="recetas_clinicas")
+    profesional = models.ForeignKey(ProfesionalSalud, on_delete=models.SET_NULL, null=True, blank=True, related_name="recetas_emitidas")
+    observaciones = models.TextField(blank=True, null=True)
+    creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-fecha_creacion"]
+        verbose_name = "Receta medica"
+        verbose_name_plural = "Recetas medicas"
+
+    def __str__(self):
+        return f"Receta {self.fecha:%d/%m/%Y} - {self.paciente.nombre}"
 
 
 class SeguimientoPostOperatorio(models.Model):
