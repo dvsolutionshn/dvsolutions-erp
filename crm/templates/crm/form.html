@@ -10,13 +10,24 @@
 {% endblock %}
 
 {% block content %}
+<style>
+.crm-config-note{border:1px solid #cfe1ec;border-radius:18px;background:linear-gradient(135deg,#f7fcff,#f2fbf7);padding:16px 18px;margin-bottom:16px;color:#536b7f;line-height:1.55}
+.crm-config-note strong{display:block;color:#102338;margin-bottom:4px}
+.crm-config-wide{grid-column:1/-1}
+</style>
 <section class="erp-form-card">
+    {% if form.mensaje_cita_confirmacion %}
+    <div class="crm-config-note">
+        <strong>Mensajes automaticos de citas</strong>
+        Estos textos se envian como la variable aviso de la plantilla aprobada en Meta. El sistema mantiene automaticos el paciente, fecha, hora, tipo de consulta y profesional.
+    </div>
+    {% endif %}
     <form method="post" class="erp-form-shell">
         {% csrf_token %}
         {% if form.non_field_errors %}<div class="erp-message">{{ form.non_field_errors }}</div>{% endif %}
         <div class="erp-form-grid two">
             {% for field in form %}
-            <div class="erp-field">
+            <div class="erp-field {% if field.name == 'mensaje_cita_confirmacion' or field.name == 'mensaje_cita_recordatorio_7_dias' or field.name == 'mensaje_cita_recordatorio_1_dia' or field.name == 'mensaje_cita_cancelada' or field.name == 'mensaje_cita_reagendada' %}crm-config-wide{% endif %}">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}

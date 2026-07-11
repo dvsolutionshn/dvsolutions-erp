@@ -16,7 +16,7 @@ from facturacion.models import Cliente
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, PlantillaMensaje
-from .services import subir_media_whatsapp
+from .services import enviar_plantilla_cita_whatsapp, subir_media_whatsapp
 from .tokens import generar_token_respuesta_cita
 
 
@@ -59,6 +59,37 @@ class CRMTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CRM y Marketing")
+
+    @patch("crm.services._post_whatsapp")
+    def test_plantilla_cita_usa_texto_editable_de_configuracion(self, mock_post):
+        mock_post.return_value = {"messages": [{"id": "wamid.cita"}]}
+        config = SimpleNamespace(
+            whatsapp_api_version="v25.0",
+            whatsapp_phone_number_id="123",
+            whatsapp_token="token-test",
+            whatsapp_plantilla_cita="recordatorio_cita",
+            whatsapp_idioma_cita="es",
+            mensaje_cita_recordatorio_1_dia="le escribimos de Hospital MIA para recordarle su cita de manana",
+        )
+
+        enviar_plantilla_cita_whatsapp(
+            config,
+            "99990000",
+            paciente="Paciente Demo",
+            aviso="recordatorio: su cita es manana",
+            fecha="12/07/2026",
+            hora="01:00 AM",
+            consulta="Hidrofacial",
+            profesional="Dr. Candy Luque",
+        )
+
+        payload = mock_post.call_args.args[1]
+        parametros = payload["template"]["components"][0]["parameters"]
+        self.assertEqual(parametros[1]["text"], "le escribimos de Hospital MIA para recordarle su cita de manana")
+        self.assertEqual(parametros[2]["text"], "12/07/2026")
+        self.assertEqual(parametros[3]["text"], "01:00 AM")
+        self.assertEqual(parametros[4]["text"], "Hidrofacial")
+        self.assertEqual(parametros[5]["text"], "Dr. Candy Luque")
 
     def test_agenda_citas_responde_como_modulo_separado(self):
         self.client.login(username="crmuser", password="pass12345")

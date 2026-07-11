@@ -202,6 +202,16 @@ def enviar_plantilla_cita_whatsapp(
     nombre_plantilla = (config.whatsapp_plantilla_cita or "").strip()
     if not nombre_plantilla:
         raise WhatsAppAPIError("Configura una plantilla de citas aprobada por Meta.")
+    avisos_editables = {
+        "confirmacion de cita": getattr(config, "mensaje_cita_confirmacion", "") or "confirmacion de cita",
+        "confirmaciÃ³n de cita": getattr(config, "mensaje_cita_confirmacion", "") or "confirmacion de cita",
+        "recordatorio: falta una semana": getattr(config, "mensaje_cita_recordatorio_7_dias", "") or "recordatorio: falta una semana",
+        "recordatorio: su cita es maÃ±ana": getattr(config, "mensaje_cita_recordatorio_1_dia", "") or "recordatorio: su cita es manana",
+        "recordatorio: su cita es manana": getattr(config, "mensaje_cita_recordatorio_1_dia", "") or "recordatorio: su cita es manana",
+        "cita cancelada": getattr(config, "mensaje_cita_cancelada", "") or "cita cancelada",
+        "cita reagendada": getattr(config, "mensaje_cita_reagendada", "") or "cita reagendada",
+    }
+    aviso = avisos_editables.get(str(aviso or "").strip().lower(), aviso)
     valores = [paciente, aviso, fecha, hora, consulta, profesional]
     if enlace:
         valores.append(enlace)
