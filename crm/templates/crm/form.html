@@ -11,23 +11,147 @@
 
 {% block content %}
 <style>
-.crm-config-note{border:1px solid #cfe1ec;border-radius:18px;background:linear-gradient(135deg,#f7fcff,#f2fbf7);padding:16px 18px;margin-bottom:16px;color:#536b7f;line-height:1.55}
-.crm-config-note strong{display:block;color:#102338;margin-bottom:4px}
-.crm-config-wide{grid-column:1/-1}
+.crm-config-shell{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.crm-config-hero{position:relative;overflow:hidden;border:1px solid #cfe1ec;border-radius:26px;background:linear-gradient(135deg,#fff,#f4fbff 48%,#f6fff9);padding:24px;box-shadow:0 22px 55px rgba(15,43,73,.075);margin-bottom:18px}
+.crm-config-hero:after{content:"";position:absolute;right:-70px;top:-80px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(32,199,181,.22),transparent 70%)}
+.crm-config-hero h3{position:relative;margin:0;color:#0f2338;font-size:26px}.crm-config-hero p{position:relative;margin:8px 0 0;color:#607789;line-height:1.55;max-width:900px}
+.crm-config-status{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+.crm-status-chip{border:1px solid #d6e5ee;border-radius:18px;background:rgba(255,255,255,.86);padding:14px}.crm-status-chip span{display:block;color:#6b8192;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.crm-status-chip strong{display:block;margin-top:6px;color:#102338;font-size:16px}
+.crm-section{border:1px solid #cfe1ec;border-radius:24px;background:#fff;box-shadow:0 18px 48px rgba(15,43,73,.06);padding:22px;margin-bottom:16px}
+.crm-section-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px}.crm-section-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(135deg,#20c7b5,#287be8);color:#fff;font-weight:900;flex:0 0 auto}.crm-section-head h3{margin:0;color:#102338}.crm-section-head p{margin:5px 0 0;color:#607789;line-height:1.5}
+.crm-config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.crm-config-grid.one{grid-template-columns:1fr}
+.crm-config-field{display:flex;flex-direction:column;gap:7px}.crm-config-field.wide{grid-column:1/-1}.crm-config-field label{font-size:10px;font-weight:900;letter-spacing:.13em;text-transform:uppercase;color:#587082}.crm-config-field input,.crm-config-field select,.crm-config-field textarea{width:100%;border:1px solid #bfd0e1;border-radius:14px;background:#fff;padding:12px 13px;color:#102338;font:inherit;outline:none}.crm-config-field textarea{min-height:76px;resize:vertical}.crm-config-field input:focus,.crm-config-field select:focus,.crm-config-field textarea:focus{border-color:#287be8;box-shadow:0 0 0 4px rgba(40,123,232,.11)}
+.crm-help{color:#6b8192;font-size:11px;line-height:1.45}.crm-error{color:#9f1239;font-size:11px;font-weight:800}
+.crm-switch-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid #d7e7ef;border-radius:18px;background:linear-gradient(135deg,#fbfeff,#f5fbf9);padding:15px}.crm-switch-card label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#334e63;font-weight:900}.crm-switch-card p{margin:4px 0 0;color:#6b8192;font-size:11px;line-height:1.4}.crm-switch-card input[type=checkbox]{appearance:none;width:54px!important;height:30px!important;border:0!important;border-radius:999px;background:#d7e4ee;position:relative;padding:0!important;cursor:pointer;transition:.18s}.crm-switch-card input[type=checkbox]:before{content:"";position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(15,43,73,.18);transition:.18s}.crm-switch-card input[type=checkbox]:checked{background:linear-gradient(135deg,#20c7b5,#287be8)}.crm-switch-card input[type=checkbox]:checked:before{left:28px}
+.crm-config-side{position:sticky;top:92px;display:grid;gap:14px}.crm-side-card{border:1px solid #cfe1ec;border-radius:22px;background:#fff;padding:18px;box-shadow:0 18px 48px rgba(15,43,73,.06)}.crm-side-card.dark{background:linear-gradient(145deg,#102c3a,#0f5960);color:white}.crm-side-card h3{margin:0 0 8px;color:#102338}.crm-side-card.dark h3{color:white}.crm-side-card p{margin:0;color:#63798b;line-height:1.55}.crm-side-card.dark p{color:#dcfbfb}.crm-check-list{display:grid;gap:9px;margin-top:13px}.crm-check-list span{display:flex;gap:8px;align-items:flex-start;color:#30465a;font-size:12px}.crm-side-card.dark .crm-check-list span{color:#eafdfb}.crm-check-list i{width:19px;height:19px;display:grid;place-items:center;border-radius:50%;background:#e8f7ef;color:#10725f;font-style:normal;font-weight:900;font-size:10px;flex:0 0 auto}
+.crm-form-actions{position:sticky;bottom:12px;z-index:2;display:flex;justify-content:flex-end;gap:10px;padding:14px;border:1px solid #d7e6ef;border-radius:20px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);box-shadow:0 18px 45px rgba(15,43,73,.11)}
+.crm-test-box{margin-top:16px;border:1px solid #cfe1ec;border-radius:20px;padding:18px;background:linear-gradient(135deg,#fff,#f7fcff)}
+@media(max-width:1100px){.crm-config-shell{grid-template-columns:1fr}.crm-config-side{position:static}.crm-config-status{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.crm-config-grid,.crm-config-status{grid-template-columns:1fr}.crm-section-head{flex-direction:column}}
 </style>
-<section class="erp-form-card">
-    {% if form.mensaje_cita_confirmacion %}
-    <div class="crm-config-note">
-        <strong>Mensajes automaticos de citas</strong>
-        Estos textos se envian como la variable aviso de la plantilla aprobada en Meta. El sistema mantiene automaticos el paciente, fecha, hora, tipo de consulta y profesional.
+
+{% if form.whatsapp_activo %}
+<section class="crm-config-hero">
+    <h3>Centro de automatizaciones CRM</h3>
+    <p>Configura WhatsApp Cloud API, plantillas aprobadas de Meta y los textos editables que usa el sistema para citas, cumpleanos, campanas y preconsultas.</p>
+    <div class="crm-config-status">
+        <div class="crm-status-chip"><span>WhatsApp</span><strong>{% if form.instance.whatsapp_activo %}Activo{% else %}Inactivo{% endif %}</strong></div>
+        <div class="crm-status-chip"><span>Plantilla citas</span><strong>{{ form.instance.whatsapp_plantilla_cita|default:"-" }}</strong></div>
+        <div class="crm-status-chip"><span>Marketing</span><strong>{{ form.instance.whatsapp_plantilla_marketing|default:"-" }}</strong></div>
+        <div class="crm-status-chip"><span>Recordatorios</span><strong>{% if form.instance.recordatorio_citas_activo %}Activos{% else %}Inactivos{% endif %}</strong></div>
     </div>
-    {% endif %}
+</section>
+
+<form method="post" class="crm-config-shell">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="erp-message" style="grid-column:1/-1;">{{ form.non_field_errors }}</div>{% endif %}
+    <main>
+        <section class="crm-section">
+            <div class="crm-section-head"><div class="crm-section-icon">01</div><div><h3>Estado general</h3><p>Activa o pausa los envios automaticos sin borrar credenciales ni plantillas.</p></div></div>
+            <div class="crm-config-grid">
+                <div class="crm-switch-card"><div><label for="{{ form.whatsapp_activo.id_for_label }}">{{ form.whatsapp_activo.label }}</label><p>Habilita WhatsApp Cloud API para esta empresa.</p></div>{{ form.whatsapp_activo }}</div>
+                <div class="crm-switch-card"><div><label for="{{ form.recordatorio_citas_activo.id_for_label }}">{{ form.recordatorio_citas_activo.label }}</label><p>Permite confirmaciones y recordatorios de citas.</p></div>{{ form.recordatorio_citas_activo }}</div>
+                <div class="crm-switch-card"><div><label for="{{ form.recordatorio_cumpleanos_activo.id_for_label }}">{{ form.recordatorio_cumpleanos_activo.label }}</label><p>Activa mensajes automaticos de cumpleanos.</p></div>{{ form.recordatorio_cumpleanos_activo }}</div>
+                <div class="crm-switch-card"><div><label for="{{ form.whatsapp_cita_incluir_enlace.id_for_label }}">{{ form.whatsapp_cita_incluir_enlace.label }}</label><p>Solo si la plantilla de Meta trae enlace.</p></div>{{ form.whatsapp_cita_incluir_enlace }}</div>
+            </div>
+        </section>
+
+        <section class="crm-section">
+            <div class="crm-section-head"><div class="crm-section-icon">02</div><div><h3>Credenciales Meta / WhatsApp</h3><p>Datos tecnicos del numero conectado a WhatsApp Business Cloud API.</p></div></div>
+            <div class="crm-config-grid">
+                <div class="crm-config-field"><label for="{{ form.whatsapp_api_version.id_for_label }}">{{ form.whatsapp_api_version.label }}</label>{{ form.whatsapp_api_version }}{% if form.whatsapp_api_version.help_text %}<div class="crm-help">{{ form.whatsapp_api_version.help_text }}</div>{% endif %}{% for error in form.whatsapp_api_version.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_phone_number_id.id_for_label }}">{{ form.whatsapp_phone_number_id.label }}</label>{{ form.whatsapp_phone_number_id }}{% if form.whatsapp_phone_number_id.help_text %}<div class="crm-help">{{ form.whatsapp_phone_number_id.help_text }}</div>{% endif %}{% for error in form.whatsapp_phone_number_id.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_business_account_id.id_for_label }}">{{ form.whatsapp_business_account_id.label }}</label>{{ form.whatsapp_business_account_id }}{% if form.whatsapp_business_account_id.help_text %}<div class="crm-help">{{ form.whatsapp_business_account_id.help_text }}</div>{% endif %}{% for error in form.whatsapp_business_account_id.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_numero_prueba.id_for_label }}">{{ form.whatsapp_numero_prueba.label }}</label>{{ form.whatsapp_numero_prueba }}{% if form.whatsapp_numero_prueba.help_text %}<div class="crm-help">{{ form.whatsapp_numero_prueba.help_text }}</div>{% endif %}{% for error in form.whatsapp_numero_prueba.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
+                <div class="crm-config-field wide"><label for="{{ form.whatsapp_token.id_for_label }}">{{ form.whatsapp_token.label }}</label>{{ form.whatsapp_token }}{% if form.whatsapp_token.help_text %}<div class="crm-help">{{ form.whatsapp_token.help_text }}</div>{% endif %}{% for error in form.whatsapp_token.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
+            </div>
+        </section>
+
+        <section class="crm-section">
+            <div class="crm-section-head"><div class="crm-section-icon">03</div><div><h3>Plantillas aprobadas en Meta</h3><p>Nombres exactos de las plantillas. El contenido editable se administra abajo desde el ERP.</p></div></div>
+            <div class="crm-config-grid">
+                <div class="crm-config-field"><label for="{{ form.whatsapp_plantilla_prueba.id_for_label }}">{{ form.whatsapp_plantilla_prueba.label }}</label>{{ form.whatsapp_plantilla_prueba }}<div class="crm-help">{{ form.whatsapp_plantilla_prueba.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_idioma_plantilla.id_for_label }}">{{ form.whatsapp_idioma_plantilla.label }}</label>{{ form.whatsapp_idioma_plantilla }}<div class="crm-help">{{ form.whatsapp_idioma_plantilla.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_plantilla_marketing.id_for_label }}">{{ form.whatsapp_plantilla_marketing.label }}</label>{{ form.whatsapp_plantilla_marketing }}<div class="crm-help">{{ form.whatsapp_plantilla_marketing.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_idioma_marketing.id_for_label }}">{{ form.whatsapp_idioma_marketing.label }}</label>{{ form.whatsapp_idioma_marketing }}<div class="crm-help">{{ form.whatsapp_idioma_marketing.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_plantilla_cita.id_for_label }}">{{ form.whatsapp_plantilla_cita.label }}</label>{{ form.whatsapp_plantilla_cita }}<div class="crm-help">{{ form.whatsapp_plantilla_cita.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_idioma_cita.id_for_label }}">{{ form.whatsapp_idioma_cita.label }}</label>{{ form.whatsapp_idioma_cita }}<div class="crm-help">{{ form.whatsapp_idioma_cita.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_plantilla_preconsulta.id_for_label }}">{{ form.whatsapp_plantilla_preconsulta.label }}</label>{{ form.whatsapp_plantilla_preconsulta }}<div class="crm-help">{{ form.whatsapp_plantilla_preconsulta.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.whatsapp_idioma_preconsulta.id_for_label }}">{{ form.whatsapp_idioma_preconsulta.label }}</label>{{ form.whatsapp_idioma_preconsulta }}<div class="crm-help">{{ form.whatsapp_idioma_preconsulta.help_text }}</div></div>
+            </div>
+        </section>
+
+        <section class="crm-section">
+            <div class="crm-section-head"><div class="crm-section-icon">04</div><div><h3>Mensajes automaticos de citas</h3><p>Estos textos viajan como la variable aviso de la plantilla. Fecha, hora, tipo de consulta y profesional siguen automaticos.</p></div></div>
+            <div class="crm-config-grid one">
+                <div class="crm-config-field"><label for="{{ form.mensaje_cita_confirmacion.id_for_label }}">{{ form.mensaje_cita_confirmacion.label }}</label>{{ form.mensaje_cita_confirmacion }}<div class="crm-help">{{ form.mensaje_cita_confirmacion.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.mensaje_cita_recordatorio_7_dias.id_for_label }}">{{ form.mensaje_cita_recordatorio_7_dias.label }}</label>{{ form.mensaje_cita_recordatorio_7_dias }}<div class="crm-help">{{ form.mensaje_cita_recordatorio_7_dias.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.mensaje_cita_recordatorio_1_dia.id_for_label }}">{{ form.mensaje_cita_recordatorio_1_dia.label }}</label>{{ form.mensaje_cita_recordatorio_1_dia }}<div class="crm-help">{{ form.mensaje_cita_recordatorio_1_dia.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.mensaje_cita_cancelada.id_for_label }}">{{ form.mensaje_cita_cancelada.label }}</label>{{ form.mensaje_cita_cancelada }}<div class="crm-help">{{ form.mensaje_cita_cancelada.help_text }}</div></div>
+                <div class="crm-config-field"><label for="{{ form.mensaje_cita_reagendada.id_for_label }}">{{ form.mensaje_cita_reagendada.label }}</label>{{ form.mensaje_cita_reagendada }}<div class="crm-help">{{ form.mensaje_cita_reagendada.help_text }}</div></div>
+            </div>
+        </section>
+
+        <section class="crm-section">
+            <div class="crm-section-head"><div class="crm-section-icon">05</div><div><h3>Automatizaciones comerciales</h3><p>Cumpleanos, alertas de producto y remitente de correo para seguimiento comercial.</p></div></div>
+            <div class="crm-config-grid">
+                <div class="crm-switch-card"><div><label for="{{ form.cumpleanos_recordatorio_1_dia.id_for_label }}">{{ form.cumpleanos_recordatorio_1_dia.label }}</label><p>Programa el saludo a las 9:00 AM un dia antes.</p></div>{{ form.cumpleanos_recordatorio_1_dia }}</div>
+                <div class="crm-switch-card"><div><label for="{{ form.cumpleanos_recordatorio_7_dias.id_for_label }}">{{ form.cumpleanos_recordatorio_7_dias.label }}</label><p>Programa el saludo a las 9:00 AM siete dias antes.</p></div>{{ form.cumpleanos_recordatorio_7_dias }}</div>
+                <div class="crm-config-field"><label for="{{ form.remitente_correo.id_for_label }}">{{ form.remitente_correo.label }}</label>{{ form.remitente_correo }}{% if form.remitente_correo.help_text %}<div class="crm-help">{{ form.remitente_correo.help_text }}</div>{% endif %}</div>
+                <div class="crm-config-field"><label for="{{ form.dias_alerta_producto.id_for_label }}">{{ form.dias_alerta_producto.label }}</label>{{ form.dias_alerta_producto }}<div class="crm-help">{{ form.dias_alerta_producto.help_text }}</div></div>
+            </div>
+        </section>
+
+        <div class="crm-form-actions">
+            <a class="erp-btn-secondary" href="{% url 'crm_dashboard' empresa.slug %}">Cancelar</a>
+            <button class="erp-btn" type="submit">Guardar configuracion</button>
+        </div>
+    </main>
+
+    <aside class="crm-config-side">
+        <div class="crm-side-card dark">
+            <h3>Vista previa conceptual</h3>
+            <p>Hola Paciente, [texto editable]. Su cita esta programada para la fecha y hora del calendario. Tipo y profesional se completan solos.</p>
+            <div class="crm-check-list">
+                <span><i>OK</i>Paciente automatico</span>
+                <span><i>OK</i>Fecha y hora automaticas</span>
+                <span><i>OK</i>Tipo y profesional automaticos</span>
+            </div>
+        </div>
+        <div class="crm-side-card">
+            <h3>Regla importante</h3>
+            <p>No cambies la cantidad de variables en Meta sin ajustar el ERP. Esta pantalla edita solo los textos internos que viajan dentro de las variables ya aprobadas.</p>
+        </div>
+        {% if form.whatsapp_numero_prueba %}
+        <div class="crm-side-card">
+            <h3>Prueba rapida</h3>
+            <p>Guarda primero la configuracion. Luego envia una prueba al numero autorizado en Meta.</p>
+        </div>
+        {% endif %}
+    </aside>
+</form>
+
+{% if form.whatsapp_numero_prueba %}
+<form method="post" action="{% url 'crm_enviar_prueba_whatsapp' empresa.slug %}" class="crm-test-box">
+    {% csrf_token %}
+    <div class="erp-card-header">
+        <div>
+            <h3>Prueba de WhatsApp Cloud API</h3>
+            <p>Envia la plantilla de prueba al numero configurado para confirmar que Meta responde correctamente.</p>
+        </div>
+        <button class="erp-btn-secondary" type="submit">Enviar prueba WhatsApp</button>
+    </div>
+</form>
+{% endif %}
+
+{% else %}
+<section class="erp-form-card">
     <form method="post" class="erp-form-shell">
         {% csrf_token %}
         {% if form.non_field_errors %}<div class="erp-message">{{ form.non_field_errors }}</div>{% endif %}
         <div class="erp-form-grid two">
             {% for field in form %}
-            <div class="erp-field {% if field.name == 'mensaje_cita_confirmacion' or field.name == 'mensaje_cita_recordatorio_7_dias' or field.name == 'mensaje_cita_recordatorio_1_dia' or field.name == 'mensaje_cita_cancelada' or field.name == 'mensaje_cita_reagendada' %}crm-config-wide{% endif %}">
+            <div class="erp-field">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
@@ -40,17 +164,6 @@
             <button class="erp-btn" type="submit">Guardar</button>
         </div>
     </form>
-    {% if form.whatsapp_numero_prueba %}
-    <form method="post" action="{% url 'crm_enviar_prueba_whatsapp' empresa.slug %}" class="erp-form-shell" style="margin-top:18px;">
-        {% csrf_token %}
-        <div class="erp-card-header">
-            <div>
-                <h3>Prueba de WhatsApp Cloud API</h3>
-                <p>Guarda primero la configuracion. Luego envia la plantilla de prueba al numero autorizado en Meta. Para campanias usa la plantilla comercial aprobada configurada arriba.</p>
-            </div>
-            <button class="erp-btn-secondary" type="submit">Enviar prueba WhatsApp</button>
-        </div>
-    </form>
-    {% endif %}
 </section>
+{% endif %}
 {% endblock %}

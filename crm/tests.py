@@ -60,6 +60,15 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CRM y Marketing")
 
+    def test_configuracion_crm_muestra_panel_premium_de_automatizaciones(self):
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.get(reverse("crm_configuracion", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Centro de automatizaciones CRM")
+        self.assertContains(response, "Mensajes automaticos de citas")
+        self.assertContains(response, "Plantillas aprobadas en Meta")
+
     @patch("crm.services._post_whatsapp")
     def test_plantilla_cita_usa_texto_editable_de_configuracion(self, mock_post):
         mock_post.return_value = {"messages": [{"id": "wamid.cita"}]}
