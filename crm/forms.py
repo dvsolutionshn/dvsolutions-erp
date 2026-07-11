@@ -38,6 +38,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
         }
         labels = {
             "whatsapp_cita_incluir_enlace": "La plantilla de citas incluye enlace de confirmacion",
+            "whatsapp_plantilla_preconsulta": "Plantilla WhatsApp para preconsulta",
+            "whatsapp_idioma_preconsulta": "Idioma plantilla preconsulta",
         }
         help_texts = {
             "whatsapp_token": "Token de Meta/WhatsApp Cloud API. Guardalo solo si el cliente ya tiene credenciales.",
@@ -49,6 +51,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_plantilla_cita": "Nombre exacto de la plantilla transaccional aprobada en Meta. Debe tener 6 variables: paciente, aviso, fecha, hora, tipo de consulta y profesional.",
             "whatsapp_idioma_cita": "Código de idioma aprobado para la plantilla de citas, normalmente es.",
             "whatsapp_cita_incluir_enlace": "Activalo solo cuando la plantilla aprobada en Meta tenga la variable del enlace para confirmar o cancelar la cita.",
+            "whatsapp_plantilla_preconsulta": "Nombre exacto aprobado en Meta. Debe tener 3 variables de cuerpo: paciente, tipo de preconsulta y enlace seguro.",
+            "whatsapp_idioma_preconsulta": "Idioma exacto aprobado para esa plantilla. Si Meta la aprobo como Spanish, normalmente usa es.",
             "dias_alerta_producto": "Dias antes para alertar productos con fecha de seguimiento o vencimiento.",
         }
 

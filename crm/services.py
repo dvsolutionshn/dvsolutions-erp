@@ -61,6 +61,17 @@ def _post_whatsapp(config, payload):
             return json.loads(body or "{}")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
+        try:
+            meta_error = json.loads(detail or "{}").get("error", {})
+        except json.JSONDecodeError:
+            meta_error = {}
+        if meta_error.get("code") == 132001:
+            template_name = payload.get("template", {}).get("name", "")
+            language = payload.get("template", {}).get("language", {}).get("code", "")
+            raise WhatsAppAPIError(
+                f"La plantilla '{template_name}' no existe aprobada en Meta para idioma '{language}'. "
+                "Creala en WhatsApp Manager o cambia el nombre/idioma en Configuracion CRM."
+            ) from exc
         raise WhatsAppAPIError(f"Meta respondio con error {exc.code}: {detail}") from exc
     except URLError as exc:
         raise WhatsAppAPIError(f"No se pudo conectar con WhatsApp Cloud API: {exc}") from exc
