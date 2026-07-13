@@ -22,6 +22,7 @@
 .patient-name-stack strong{display:block;color:#102338}
 .patient-name-stack span{display:block;margin-top:3px;color:var(--muted);font-size:12px}
 .patient-action-strip{display:flex;gap:8px;flex-wrap:wrap}
+.patient-delete-button{border:1px solid #f2b8b5!important;background:#fff5f5!important;color:#b42318!important}
 .patient-search-panel{
     display:grid;
     grid-template-columns:minmax(0,1fr) auto auto;
@@ -198,6 +199,12 @@
                         <div class="patient-action-strip">
                             <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Ver</a>
                             <a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a>
+                            {% if puede_eliminar_pacientes %}
+                            <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
+                                {% csrf_token %}
+                                <button class="erp-btn-secondary patient-delete-button" type="submit">Eliminar</button>
+                            </form>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

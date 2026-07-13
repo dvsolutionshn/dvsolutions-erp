@@ -833,6 +833,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Preparemos su consulta")
         self.assertContains(response, "Laura")
         self.assertContains(response, "Paso 8 de 8")
+        self.assertContains(response, "No aplica / no estoy seguro todavia")
         self.assertContains(response, "Braquioplastia (brazos: retirar flacidez o exceso de piel)")
 
         self.assertContains(response, "Musloplastia (piernas/muslos: retirar flacidez o exceso de piel)")
@@ -960,6 +961,29 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Información recibida")
+
+    def test_solo_admin_empresa_puede_eliminar_paciente(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-DEL",
+            primer_nombre="Paciente",
+            primer_apellido="Prueba",
+            nombre="Paciente Prueba",
+            identidad="0801199900001",
+        )
+        url = reverse("clinica_eliminar_paciente", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url)
+
+        self.assertRedirects(response, reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]))
+        self.assertTrue(Paciente.objects.filter(id=paciente.id).exists())
+
+        self.user.es_administrador_empresa = True
+        self.user.save(update_fields=["es_administrador_empresa"])
+        response = self.client.post(url)
+
+        self.assertRedirects(response, reverse("clinica_pacientes", args=[self.empresa.slug]))
+        self.assertFalse(Paciente.objects.filter(id=paciente.id).exists())
 
     @patch("clinica.views.enviar_plantilla_preconsulta_whatsapp")
     def test_preconsulta_se_envia_directo_por_whatsapp_api(self, enviar_mock):

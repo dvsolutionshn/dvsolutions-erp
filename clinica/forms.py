@@ -1087,6 +1087,7 @@ MOTIVO_CATEGORIA_CHOICES = [
     ("medicina_estetica" if etiqueta == "Tratamiento Estetico / Piel" else valor, etiqueta)
     for valor, etiqueta in MOTIVO_CATEGORIA_CHOICES
 ]
+MOTIVO_CATEGORIA_CHOICES.append(("no_aplica", "No aplica / no estoy seguro todavia"))
 
 def _codigo_grupo_procedimiento(titulo):
     if "Tratamiento Estetico" in titulo:
@@ -1498,7 +1499,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                         valor = [valor]
                     self.fields[campo].initial = valor
         for campo in [
-            "motivo_categoria", "procedimientos_interes", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
+            "motivo_categoria", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
             "quirurgicos_operado", "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos",
             "consumo_riesgo", "dieta", "ejercicio", "riesgo_tromboembolico", "gine_embarazada", "gine_lactancia", "gine_mamografia",
@@ -1596,6 +1597,13 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         if cleaned_data.get("funciones_organicas") != "alterada":
             cleaned_data["funciones_detalle"] = ""
 
+        categorias = set(cleaned_data.get("motivo_categoria") or [])
+        if categorias == {"no_aplica"}:
+            cleaned_data["procedimientos_interes"] = []
+            cleaned_data["procedimientos_interes_otros"] = ""
+        elif not cleaned_data.get("procedimientos_interes"):
+            self.add_error("procedimientos_interes", "Seleccione al menos una opcion o marque No aplica en el motivo principal.")
+
         if cleaned_data.get("sexo") == "masculino":
             for campo in [
                 "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos",
@@ -1617,7 +1625,6 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         categorias_cirugia = {
             "cirugia_facial", "cirugia_mamaria", "contorno_corporal", "cirugia_intima_femenina"
         }
-        categorias = set(cleaned_data.get("motivo_categoria") or [])
         if categorias.isdisjoint(categorias_cirugia):
             cleaned_data["decision_cirugia"] = []
             cleaned_data["decision_cirugia_otros"] = ""

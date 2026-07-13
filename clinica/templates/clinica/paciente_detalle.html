@@ -8,6 +8,12 @@
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>
+{% if puede_eliminar_pacientes %}
+<form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" class="erp-inline-form" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
+    {% csrf_token %}
+    <button class="erp-btn-secondary" style="border-color:#f2b8b5;background:#fff5f5;color:#b42318;" type="submit">Eliminar paciente</button>
+</form>
+{% endif %}
 <a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar historial</a>
 {% endblock %}
 

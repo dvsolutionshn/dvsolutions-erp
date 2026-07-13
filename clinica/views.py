@@ -519,6 +519,7 @@ def pacientes(request, empresa_slug):
         "q": q,
         "mes_actual": hoy,
         "cumpleaneros_mes": cumpleaneros_mes,
+        "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
     })
 
 
@@ -609,6 +610,29 @@ def editar_paciente(request, empresa_slug, paciente_id):
     return render(request, "clinica/paciente_form.html", {"empresa": empresa, "form": form, "titulo": f"Editar paciente: {paciente.nombre}"})
 
 
+def _puede_eliminar_pacientes(user, empresa):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and (user.is_superuser or getattr(user, "es_administrador_empresa", False))
+        and user.puede_acceder_empresa(empresa)
+    )
+
+
+@login_required
+@require_POST
+def eliminar_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    if not _puede_eliminar_pacientes(request.user, empresa):
+        messages.error(request, "Solo administradores de la empresa pueden eliminar pacientes.")
+        return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
+
+    nombre = paciente.nombre
+    paciente.delete()
+    messages.success(request, f"Paciente {nombre} eliminado correctamente.")
+    return redirect("clinica_pacientes", empresa_slug=empresa.slug)
+
+
 @login_required
 def paciente_detalle(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
@@ -638,6 +662,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "recetas": recetas,
             "historias_especialidad": historias_especialidad,
             "formularios_hospitalarios": empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS,
+            "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
         },
     )
 
