@@ -13,7 +13,7 @@ from num2words import num2words
 from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Usuario
 
 DOS_DECIMALES = Decimal("0.01")
-EMPRESAS_PRECIO_FINAL_CON_IMPUESTO = frozenset({"hospital_mia", "medical_spa"})
+EMPRESAS_PRECIO_FINAL_CON_IMPUESTO = frozenset({"hospital_mia", "medical_spa", "luque_aestetic"})
 EMPRESAS_IDENTIDAD_CLIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
 
 

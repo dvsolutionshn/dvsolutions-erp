@@ -352,8 +352,8 @@ class FacturacionTests(TestCase):
         self.assertEqual(linea.total_linea, Decimal("2500.00"))
         self.assertEqual(factura.total, Decimal("2500.00"))
 
-    def test_pos_medical_spa_interpreta_precio_catalogo_como_total_final(self):
-        self.empresa.slug = "medical_spa"
+    def test_pos_luque_aestetic_interpreta_precio_catalogo_como_total_final(self):
+        self.empresa.slug = "luque_aestetic"
         self.empresa.save(update_fields=["slug"])
         ConfiguracionFacturacionEmpresa.objects.update_or_create(
             empresa=self.empresa,
@@ -1039,7 +1039,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(form_general.fields["precio"].label, "Precio")
         self.assertIn("Precio base", form_general.fields["precio"].help_text)
 
-        for slug in ["hospital_mia", "medical_spa"]:
+        for slug in ["hospital_mia", "medical_spa", "luque_aestetic"]:
             self.empresa.slug = slug
             self.empresa.save(update_fields=["slug"])
             form_medico = ProductoForm(empresa=self.empresa)
