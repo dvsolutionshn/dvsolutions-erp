@@ -572,6 +572,7 @@ class PreconsultaClinica(models.Model):
         ("revocada", "Revocada"),
     ]
     REVISION_CHOICES = [
+        ("no_aplica", "No aplica"),
         ("normal", "Normal"),
         ("alterada", "Alterada"),
     ]

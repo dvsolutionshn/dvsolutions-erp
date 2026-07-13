@@ -95,7 +95,7 @@
         <section class="form-step" data-step="3">
             <div class="step-kicker">Paso 4 de 8</div><h2>Funciones orgánicas generales</h2><p class="step-copy">Marque si estas funciones están normales o alteradas. La revisión por sistemas la completará el doctor durante la consulta.</p>
             <div class="field-grid">
-                <div class="field wide radio-row"><span class="group-label">{{ form.funciones_organicas.label }}</span>{{ form.funciones_organicas }}<div class="field-help">Apetito, sueño, sed, micción y evacuaciones.</div></div>
+                <div class="field wide check-grid"><span class="group-label">{{ form.funciones_organicas.label }}</span>{{ form.funciones_organicas }}<div class="field-help">Apetito, sueño, sed, micción y evacuaciones.</div>{% for error in form.funciones_organicas.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <div class="field wide"><label for="{{ form.funciones_detalle.id_for_label }}">{{ form.funciones_detalle.label }}</label>{{ form.funciones_detalle }}</div>
             </div>
             <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
@@ -182,7 +182,21 @@
     function toggleDecisionCirugia(){const selected=selectedMotivos();const requiere=["cirugia_facial","cirugia_mamaria","contorno_corporal","cirugia_intima_femenina"].some(value=>selected.has(value));document.querySelectorAll(".decision-surgery-field").forEach(panel=>{panel.hidden=!requiere;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!requiere;if(!requiere){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});refreshChecks();}
     function toggleMamografiaFecha(){const show=[...form.querySelectorAll('[name="gine_mamografia"]:checked')].some(input=>input.value==="si");document.querySelectorAll(".mamografia-fecha").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
     function show(index){current=index;steps.forEach((step,i)=>step.classList.toggle("active",i===index));bars.forEach((bar,i)=>bar.classList.toggle("active",i<=index));refreshChecks();toggleGineFields();toggleReferral();toggleInformante();toggleProcedureGroups();toggleMamografiaFecha();window.scrollTo({top:0,behavior:"smooth"});}
-    function validCurrent(){const required=[...steps[current].querySelectorAll("input[required],select[required],textarea[required]")];for(const input of required){if(!input.checkValidity()){input.reportValidity();return false;}}return true;}
+    function validCurrent(){
+        const required=[...steps[current].querySelectorAll("input[required],select[required],textarea[required]")];
+        for(const input of required){if(!input.checkValidity()){input.reportValidity();return false;}}
+        const groups=[...steps[current].querySelectorAll(".check-grid")].filter(group=>!group.hidden&&group.offsetParent!==null);
+        for(const group of groups){
+            const inputs=[...group.querySelectorAll('input[type="checkbox"]')].filter(input=>!input.disabled);
+            if(inputs.length&&!inputs.some(input=>input.checked)){
+                const label=group.querySelector(".group-label")?.textContent?.trim()||"esta pregunta";
+                alert("Seleccione una opcion en: "+label);
+                inputs[0].focus();
+                return false;
+            }
+        }
+        return true;
+    }
     document.querySelectorAll(".next-step").forEach(button=>button.addEventListener("click",()=>{if(validCurrent())show(Math.min(current+1,steps.length-1));}));
     document.querySelectorAll(".prev-step").forEach(button=>button.addEventListener("click",()=>show(Math.max(current-1,0))));
     document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input"))refreshChecks();if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]'))toggleProcedureGroups();if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();});

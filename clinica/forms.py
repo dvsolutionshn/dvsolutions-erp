@@ -1088,13 +1088,29 @@ MOTIVO_CATEGORIA_CHOICES = [
     for valor, etiqueta in MOTIVO_CATEGORIA_CHOICES
 ]
 
+def _codigo_grupo_procedimiento(titulo):
+    if "Tratamiento Estetico" in titulo:
+        return "medicina_estetica"
+    return (
+        titulo.lower()
+        .replace(" ", "_")
+        .replace("/", "")
+        .replace("Ã­", "i")
+        .replace("Ã©", "e")
+        .replace("Ã¡", "a")
+        .replace("Ã³", "o")
+        .replace("Ãº", "u")
+    )
+
+
 PROCEDIMIENTOS_GENERALES_CHOICES = [
     opcion
-    for _, opciones in PROCEDIMIENTOS_GENERALES_GRUPOS
-    for opcion in opciones
+    for titulo, opciones in PROCEDIMIENTOS_GENERALES_GRUPOS
+    for opcion in [*opciones, (f"no_aplica_{_codigo_grupo_procedimiento(titulo)}", "No aplica / solo deseo valoracion")]
 ]
 
 ALERGIAS_GENERALES_CHOICES = [
+    ("no_aplica", "No aplica"),
     ("medicamentos", "Medicamentos"),
     ("penicilina", "Penicilina u otros antibioticos"),
     ("aines", "Antiinflamatorios / analgesicos"),
@@ -1111,6 +1127,7 @@ ALERGIAS_GENERALES_CHOICES = [
 ]
 
 MEDICAMENTOS_ACTUALES_CHOICES = [
+    ("no_aplica", "No aplica"),
     ("aspirina", "Aspirina"),
     ("clopidogrel", "Clopidogrel"),
     ("warfarina", "Warfarina"),
@@ -1129,6 +1146,7 @@ MEDICAMENTOS_ACTUALES_CHOICES = [
 ]
 
 RIESGO_TROMBOEMBOLICO_CHOICES = [
+    ("no_aplica", "No aplica"),
     ("trombosis_venosa_profunda", "Trombosis venosa profunda"),
     ("embolia_pulmonar", "Embolia pulmonar"),
     ("trombofilia", "Trombofilia"),
@@ -1165,6 +1183,7 @@ CONSUMO_RIESGO_CHOICES = [
 ]
 
 PSICOLOGICA_CHOICES = [
+    ("no_aplica", "No aplica"),
     ("ansiedad", "Ansiedad"),
     ("depresion", "Depresion"),
     ("tratamiento_psicologico", "Recibe o ha recibido tratamiento psicologico"),
@@ -1174,6 +1193,13 @@ PSICOLOGICA_CHOICES = [
     ("presion_externa", "Siente presion de otra persona para operarse"),
     ("ninguna", "Ninguna de las anteriores"),
 ]
+
+
+class LenientMultipleChoiceField(forms.MultipleChoiceField):
+    def to_python(self, value):
+        if isinstance(value, str):
+            value = [value]
+        return super().to_python(value)
 
 
 class PreconsultaClinicaPublicaForm(forms.ModelForm):
@@ -1264,6 +1290,12 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         widget=forms.CheckboxSelectMultiple,
         label="Motivo principal de consulta",
         help_text="Seleccione el área principal para mostrar las opciones correspondientes.",
+    )
+    funciones_organicas = LenientMultipleChoiceField(
+        required=True,
+        choices=PreconsultaClinica.REVISION_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label="Funciones organicas generales: apetito, sueno, sed, miccion y evacuaciones",
     )
     procedimientos_interes_otros = forms.CharField(
         required=False,
@@ -1393,7 +1425,6 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         ]
         widgets = {
             "motivo_consulta": forms.Textarea(attrs={"rows": 3, "placeholder": "Cuentenos brevemente que desea consultar o que procedimiento le interesa."}),
-            "funciones_organicas": forms.RadioSelect,
             "funciones_detalle": forms.Textarea(attrs={"rows": 2}),
             "revision_sistemas": forms.RadioSelect,
             "revision_sistemas_detalle": forms.Textarea(attrs={"rows": 2}),
@@ -1467,7 +1498,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                         valor = [valor]
                     self.fields[campo].initial = valor
         for campo in [
-            "motivo_categoria", "procedimientos_interes", "antecedentes_personales", "medicamentos_habituales",
+            "motivo_categoria", "procedimientos_interes", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
             "quirurgicos_operado", "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos",
             "consumo_riesgo", "dieta", "ejercicio", "riesgo_tromboembolico", "gine_embarazada", "gine_lactancia", "gine_mamografia",
@@ -1477,7 +1508,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             if campo in self.fields:
                 self.fields[campo].widget.attrs["class"] = "animated-check-list"
         for campo in [
-            "motivo_categoria", "procedimientos_interes", "antecedentes_personales", "medicamentos_habituales",
+            "motivo_categoria", "procedimientos_interes", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
             "quirurgicos_operado", "consumo_riesgo", "dieta", "ejercicio", "riesgo_tromboembolico",
             "evaluacion_psicologica", "expectativas_realistas", "busca_perfeccion", "multiples_cirugias_insatisfaccion",
@@ -1494,8 +1525,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "evaluacion_psicologica_detalle",
         ]:
             if campo in self.fields:
-                self.fields[campo].required = True
-                self.fields[campo].widget.attrs.setdefault("placeholder", "Si no aplica, escriba No aplica.")
+                self.fields[campo].required = False
 
     def clean_identidad(self):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
@@ -1558,6 +1588,14 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         if cleaned_data.get("referido_por") != "referencia":
             cleaned_data["referido_por_detalle"] = ""
 
+        funciones_organicas = cleaned_data.get("funciones_organicas") or []
+        if isinstance(funciones_organicas, list):
+            if len(funciones_organicas) > 1:
+                self.add_error("funciones_organicas", "Seleccione solo una opcion.")
+            cleaned_data["funciones_organicas"] = funciones_organicas[0] if funciones_organicas else ""
+        if cleaned_data.get("funciones_organicas") != "alterada":
+            cleaned_data["funciones_detalle"] = ""
+
         if cleaned_data.get("sexo") == "masculino":
             for campo in [
                 "gine_menarca", "gine_gestas", "gine_partos", "gine_cesareas", "gine_abortos",
@@ -1609,14 +1647,17 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         return [
             {
                 "titulo": titulo,
-                "codigo": codigo_grupo(titulo),
+                "codigo": _codigo_grupo_procedimiento(titulo),
                 "opciones": [
                     {
                         "value": valor,
                         "label": etiqueta,
                         "selected": str(valor) in seleccionados,
                     }
-                    for valor, etiqueta in opciones
+                    for valor, etiqueta in [
+                        *opciones,
+                        (f"no_aplica_{_codigo_grupo_procedimiento(titulo)}", "No aplica / solo deseo valoracion"),
+                    ]
                 ],
             }
             for titulo, opciones in PROCEDIMIENTOS_GENERALES_GRUPOS
