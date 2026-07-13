@@ -27,6 +27,7 @@ import os
 import logging
 import json
 import calendar
+import tempfile
 from pathlib import Path
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
@@ -45,6 +46,8 @@ from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaP
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
+from crm.models import ConfiguracionCRM
+from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_documento_whatsapp
 
 logger = logging.getLogger(__name__)
 
@@ -1515,24 +1518,30 @@ def _calcular_regalos_promocion_pos(empresa, lineas_preparadas, fecha_venta, reg
     return regalos, promocion
 
 
-def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, prefijo_archivo="Factura"):
+def _generar_factura_pdf_bytes(empresa, factura, plantilla):
     contexto = _contexto_documento_factura(empresa, factura)
-
     html_string = render_to_string(
         plantilla,
         contexto,
     )
-
-    pdf_file = HTML(
+    return HTML(
         string=html_string,
         base_url=str(settings.BASE_DIR)
     ).write_pdf()
 
+
+def _nombre_factura_pdf(factura, prefijo_archivo="Factura"):
     nombre_archivo = _nombre_archivo_pdf(
         prefijo_archivo,
         factura.numero_factura or f"factura_{factura.id}",
         factura.cliente.nombre,
     )
+    return nombre_archivo
+
+
+def _render_factura_pdf_response(empresa, factura, plantilla, inline=False, prefijo_archivo="Factura"):
+    pdf_file = _generar_factura_pdf_bytes(empresa, factura, plantilla)
+    nombre_archivo = _nombre_factura_pdf(factura, prefijo_archivo)
 
     response = HttpResponse(pdf_file, content_type="application/pdf")
     disposition = "inline" if inline else "attachment"
@@ -6470,6 +6479,58 @@ def validar_factura(request, empresa_slug, factura_id):
     except ValueError as exc:
         messages.error(request, str(exc))
 
+    return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+
+@login_required
+@require_POST
+def enviar_factura_whatsapp(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    factura = get_object_or_404(
+        Factura.objects.select_related("cliente"),
+        id=factura_id,
+        empresa=empresa,
+    )
+    if factura.estado == "borrador":
+        messages.error(request, "Valida o emite la factura antes de enviarla por WhatsApp.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    config = ConfiguracionCRM.objects.filter(empresa=empresa).first()
+    if not config or not config.whatsapp_activo:
+        messages.error(request, "Activa y configura WhatsApp Cloud API en CRM antes de enviar facturas.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    telefono = (
+        getattr(factura.cliente, "telefono_whatsapp", None)
+        or getattr(factura.cliente, "telefono", None)
+        or ""
+    )
+    if not telefono:
+        messages.error(request, "El cliente no tiene telefono o WhatsApp registrado.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
+    plantilla = _resolver_plantilla_factura(configuracion, empresa)
+    nombre_archivo = _nombre_factura_pdf(factura)
+    pdf_bytes = _generar_factura_pdf_bytes(empresa, factura, plantilla)
+    ruta_temporal = None
+    enviado = False
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temporal:
+            temporal.write(pdf_bytes)
+            ruta_temporal = Path(temporal.name)
+        media_id = subir_documento_whatsapp(config, ruta_temporal, "application/pdf")
+        caption = f"{empresa.nombre} le comparte la factura {factura.numero_factura or factura.id}."
+        enviar_documento_whatsapp(config, telefono, media_id, nombre_archivo, caption=caption)
+        enviado = True
+    except WhatsAppAPIError as exc:
+        messages.error(request, f"No se pudo enviar la factura por WhatsApp: {exc}")
+    finally:
+        if ruta_temporal:
+            ruta_temporal.unlink(missing_ok=True)
+
+    if enviado:
+        messages.success(request, f"Factura enviada por WhatsApp a {factura.cliente.nombre}.")
     return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
 

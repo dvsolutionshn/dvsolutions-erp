@@ -85,6 +85,7 @@ urlpatterns = [
     path('<int:factura_id>/corregir-numero/', views.corregir_numero_factura, name='corregir_numero_factura'),
     path('<int:factura_id>/editar/', views.editar_factura, name='editar_factura'),
     path('<int:factura_id>/validar/', views.validar_factura, name='validar_factura'),
+    path('<int:factura_id>/enviar-whatsapp/', views.enviar_factura_whatsapp, name='enviar_factura_whatsapp'),
 
     path('<int:factura_id>/pdf/', views.descargar_factura_pdf, name='descargar_factura_pdf'),
     path('<int:factura_id>/pdf/alternativo/', views.descargar_factura_pdf_alternativo, name='descargar_factura_pdf_alternativo'),

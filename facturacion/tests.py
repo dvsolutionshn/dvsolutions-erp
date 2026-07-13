@@ -18,6 +18,7 @@ from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpres
 from clinica.models import Paciente
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaContable, CuentaFinanciera
 from contabilidad.services import registrar_asiento_pago_cliente
+from crm.models import ConfiguracionCRM
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
 from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _registrar_entrada_nota_credito
@@ -210,6 +211,40 @@ class FacturacionTests(TestCase):
         texto = pdf.pages[0].extract_text()
         self.assertIn("FACTURA", texto)
         self.assertIn("Cliente Demo", texto)
+
+    @patch("facturacion.views.enviar_documento_whatsapp")
+    @patch("facturacion.views.subir_documento_whatsapp", return_value="media-pdf-123")
+    @patch("facturacion.views._generar_factura_pdf_bytes", return_value=b"%PDF-1.4 factura")
+    def test_enviar_factura_whatsapp_envia_pdf_al_cliente(self, _pdf_mock, subir_mock, enviar_mock):
+        self.cliente.telefono_whatsapp = "99998888"
+        self.cliente.save(update_fields=["telefono_whatsapp"])
+        ConfiguracionCRM.objects.create(
+            empresa=self.empresa,
+            whatsapp_activo=True,
+            whatsapp_phone_number_id="phone-id",
+            whatsapp_token="token-test",
+        )
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            numero_factura="001-001-01-00000001",
+            estado="emitida",
+            cai=self.cai,
+            cai_numero=self.cai.numero_cai,
+            fecha_emision=date.today(),
+            subtotal=Decimal("100.00"),
+            total=Decimal("115.00"),
+        )
+        response = self.client.post(reverse("enviar_factura_whatsapp", args=[self.empresa.slug, factura.id]))
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        subir_mock.assert_called_once()
+        enviar_mock.assert_called_once()
+        args, kwargs = enviar_mock.call_args
+        self.assertEqual(args[1], "99998888")
+        self.assertEqual(args[2], "media-pdf-123")
+        self.assertIn("001-001-01-00000001", args[3])
+        self.assertIn("caption", kwargs)
 
     def test_factura_termica_genera_pdf_de_80_mm_para_empresa_medica(self):
         self.empresa.slug = "hospital_mia"

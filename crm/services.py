@@ -388,3 +388,43 @@ def enviar_imagen_whatsapp(config, numero, media_id, caption=""):
         },
     }
     return _post_whatsapp(config, payload)
+
+
+def subir_documento_whatsapp(config, archivo_path, content_type="application/pdf"):
+    file_path = Path(archivo_path)
+    if not file_path.exists():
+        raise WhatsAppAPIError("No se encontro el documento fisico para subirlo a WhatsApp.")
+    content_type = content_type or mimetypes.guess_type(file_path)[0] or "application/pdf"
+    response = _post_multipart(
+        config,
+        _media_endpoint(config),
+        {"messaging_product": "whatsapp", "type": content_type},
+        "file",
+        file_path,
+        content_type,
+    )
+    media_id = response.get("id")
+    if not media_id:
+        raise WhatsAppAPIError(f"Meta no devolvio id de documento. Respuesta: {response}")
+    return media_id
+
+
+def enviar_documento_whatsapp(config, numero, media_id, filename, caption=""):
+    telefono = normalizar_telefono_hn(numero)
+    if not telefono:
+        raise WhatsAppAPIError("Falta el numero destino para WhatsApp.")
+    if not media_id:
+        raise WhatsAppAPIError("Falta el identificador del documento de WhatsApp.")
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": telefono,
+        "type": "document",
+        "document": {
+            "id": media_id,
+            "filename": filename or "factura.pdf",
+        },
+    }
+    if caption:
+        payload["document"]["caption"] = caption
+    return _post_whatsapp(config, payload)

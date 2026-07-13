@@ -12,6 +12,12 @@
     <button class="erp-btn" type="submit">Validar factura</button>
 </form>
 {% endif %}
+{% if factura.estado != "borrador" %}
+<form method="post" action="{% url 'enviar_factura_whatsapp' empresa.slug factura.id %}" class="erp-inline-form">
+    {% csrf_token %}
+    <button class="erp-action-link" type="submit">Enviar WhatsApp</button>
+</form>
+{% endif %}
 <button
     class="erp-action-link erp-print-button"
     type="button"
@@ -442,6 +448,10 @@
             </div>
             <div class="erp-actions-right">
                 <a class="erp-btn" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}">Generar PDF</a>
+                <form method="post" action="{% url 'enviar_factura_whatsapp' empresa.slug factura.id %}" class="erp-inline-form">
+                    {% csrf_token %}
+                    <button class="erp-btn-secondary" type="submit">Enviar por WhatsApp</button>
+                </form>
                 <a class="erp-btn-secondary" href="{% url 'descargar_factura_pdf_alternativo' empresa.slug factura.id %}">Probar PDF alternativo</a>
                 <a class="erp-btn-secondary" href="{% url 'facturas_dashboard' empresa.slug %}">Volver a facturas</a>
             </div>
