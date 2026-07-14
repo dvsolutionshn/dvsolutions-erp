@@ -319,6 +319,8 @@
     const fileInput = document.getElementById("{{ form.foto_perfil.id_for_label }}");
     const preview = document.querySelector(".patient-photo-preview");
     let stream = null;
+    const MAX_CAMERA_WIDTH = 1280;
+    const CAMERA_QUALITY = 0.82;
 
     const stopCamera = () => {
         if (stream) {
@@ -348,8 +350,11 @@
 
     if (captureCamera && video && canvas && fileInput) {
         captureCamera.addEventListener("click", () => {
-            const width = video.videoWidth || 640;
-            const height = video.videoHeight || 480;
+            const sourceWidth = video.videoWidth || 640;
+            const sourceHeight = video.videoHeight || 480;
+            const scale = Math.min(1, MAX_CAMERA_WIDTH / sourceWidth);
+            const width = Math.round(sourceWidth * scale);
+            const height = Math.round(sourceHeight * scale);
             canvas.width = width;
             canvas.height = height;
             canvas.getContext("2d").drawImage(video, 0, 0, width, height);
@@ -367,7 +372,7 @@
                     preview.appendChild(image);
                 }
                 stopCamera();
-            }, "image/jpeg", 0.92);
+            }, "image/jpeg", CAMERA_QUALITY);
         });
     }
 })();

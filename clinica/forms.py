@@ -169,7 +169,19 @@ class PacienteForm(BaseClinicaForm):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
         if identidad and not identidad.isdigit():
             raise forms.ValidationError("El No. de documento solo debe contener numeros, sin guiones ni espacios.")
+        if identidad and len(identidad) > 20:
+            raise forms.ValidationError("El No. de documento no puede superar 20 digitos.")
         return identidad
+
+    def clean_foto_perfil(self):
+        foto = self.cleaned_data.get("foto_perfil")
+        if not foto or isinstance(foto, bool):
+            return foto
+        if foto.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("La foto inicial no puede superar 5 MB. Use una imagen mas liviana.")
+        if getattr(foto, "content_type", "") not in {"image/jpeg", "image/png", "image/webp"}:
+            raise forms.ValidationError("Utilice una foto JPG, PNG o WebP.")
+        return foto
 
     def clean(self):
         cleaned_data = super().clean()

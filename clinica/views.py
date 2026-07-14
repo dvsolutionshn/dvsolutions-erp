@@ -1,7 +1,9 @@
+import logging
 from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
@@ -69,6 +71,8 @@ from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from crm.forms import PacienteRapidoCitaForm
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
+
+logger = logging.getLogger(__name__)
 
 
 def _sincronizar_agenda_desde_cita_clinica(cita):
@@ -565,23 +569,45 @@ def crear_paciente(request, empresa_slug):
     initial = {"expediente_codigo": _proximo_codigo_expediente(empresa)}
     form = PacienteForm(request.POST or None, request.FILES or None, empresa=empresa, initial=initial)
     if request.method == "POST" and form.is_valid():
-        paciente = form.save(commit=False)
-        paciente.empresa = empresa
-        paciente.creado_por = request.user
-        paciente.save()
-        _sincronizar_cliente_facturacion_paciente(paciente)
-        if paciente.foto_perfil:
-            PacienteFotoEvolucion.objects.create(
-                empresa=empresa,
-                paciente=paciente,
-                imagen=paciente.foto_perfil,
-                tipo="ingreso",
-                titulo="Foto de ingreso",
-                descripcion="Foto registrada al crear el expediente del paciente.",
-                creado_por=request.user,
+        try:
+            with transaction.atomic():
+                paciente = form.save(commit=False)
+                paciente.empresa = empresa
+                paciente.creado_por = request.user
+                paciente.save()
+                _sincronizar_cliente_facturacion_paciente(paciente)
+                if paciente.foto_perfil:
+                    PacienteFotoEvolucion.objects.create(
+                        empresa=empresa,
+                        paciente=paciente,
+                        imagen=paciente.foto_perfil,
+                        tipo="ingreso",
+                        titulo="Foto de ingreso",
+                        descripcion="Foto registrada al crear el expediente del paciente.",
+                        creado_por=request.user,
+                    )
+        except ValidationError as exc:
+            logger.warning(
+                "No se pudo crear paciente en %s por validacion al sincronizar cliente: %s",
+                empresa.slug,
+                exc,
             )
-        messages.success(request, "Paciente creado correctamente.")
-        return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
+            if hasattr(exc, "message_dict"):
+                for campo, errores in exc.message_dict.items():
+                    form.add_error(campo if campo in form.fields else None, errores)
+            else:
+                form.add_error(None, exc)
+            messages.error(request, "Revisa los datos marcados. No se guardo el paciente para evitar un registro incompleto.")
+        except Exception:
+            logger.exception("Error inesperado al crear paciente en %s", empresa.slug)
+            form.add_error(
+                None,
+                "No se pudo guardar el paciente por un error interno. Intenta nuevamente; si persiste, avisa a soporte.",
+            )
+            messages.error(request, "No se pudo crear el paciente. El formulario quedo listo para corregir o reintentar.")
+        else:
+            messages.success(request, "Paciente creado correctamente.")
+            return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
     return render(request, "clinica/paciente_form.html", {"empresa": empresa, "form": form, "titulo": "Nuevo paciente"})
 
 

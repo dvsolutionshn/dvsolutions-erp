@@ -234,6 +234,73 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "patient-evolution-carousel")
         self.assertContains(response, "patientPhotoModal")
 
+    @patch("clinica.views._sincronizar_cliente_facturacion_paciente")
+    def test_crear_paciente_muestra_error_si_falla_sincronizacion_cliente(self, sincronizar):
+        sincronizar.side_effect = ValidationError({"rtn": "Ya existe un cliente con este RTN en la empresa."})
+
+        response = self.client.post(
+            reverse("clinica_crear_paciente", args=[self.empresa.slug]),
+            {
+                "expediente_codigo": "HM-ERROR-SYNC",
+                "tipo_id": "cc",
+                "identidad": "0801199912350",
+                "primer_nombre": "Paciente",
+                "primer_apellido": "ConError",
+                "rh": "O+",
+                "sexo": "femenino",
+                "genero": "femenino",
+                "estado_civil": "soltero",
+                "prefijo_telefono": "Honduras (+504)",
+                "zona_residencial": "urbana",
+                "pais": "Honduras",
+                "acompanante_relacion": "no_indicada",
+                "responsable_relacion": "no_indicada",
+                "escolaridad": "no_indicada",
+                "pertenencia_etnica": "no_indicada",
+                "nacionalidad": "Honduras",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No se guardo el paciente")
+        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-ERROR-SYNC").exists())
+
+    def test_crear_paciente_rechaza_foto_inicial_mayor_a_5_mb(self):
+        image_buffer = BytesIO()
+        Image.effect_noise((3200, 3200), 100).convert("RGB").save(image_buffer, format="JPEG", quality=95)
+        self.assertGreater(len(image_buffer.getvalue()), 5 * 1024 * 1024)
+        foto_grande = SimpleUploadedFile("grande.jpg", image_buffer.getvalue(), content_type="image/jpeg")
+
+        response = self.client.post(
+            reverse("clinica_crear_paciente", args=[self.empresa.slug]),
+            {
+                "expediente_codigo": "HM-FOTO-GRANDE",
+                "tipo_id": "cc",
+                "identidad": "0801199912351",
+                "primer_nombre": "Foto",
+                "primer_apellido": "Grande",
+                "rh": "O+",
+                "sexo": "femenino",
+                "genero": "femenino",
+                "estado_civil": "soltero",
+                "prefijo_telefono": "Honduras (+504)",
+                "zona_residencial": "urbana",
+                "pais": "Honduras",
+                "acompanante_relacion": "no_indicada",
+                "responsable_relacion": "no_indicada",
+                "escolaridad": "no_indicada",
+                "pertenencia_etnica": "no_indicada",
+                "nacionalidad": "Honduras",
+                "activo": "on",
+                "foto_perfil": foto_grande,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "La foto inicial no puede superar 5 MB")
+        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-FOTO-GRANDE").exists())
+
     def test_paciente_permite_subir_plan_consentimiento_pdf(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
