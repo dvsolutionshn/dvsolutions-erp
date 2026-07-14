@@ -1,4 +1,5 @@
 import logging
+import re
 from urllib.parse import quote
 
 from django.contrib import messages
@@ -366,8 +367,20 @@ def _actualizar_paciente_desde_preconsulta(paciente, form):
 
 def _proximo_codigo_expediente(empresa):
     prefijo = "MIA" if "mia" in (empresa.slug or "").lower() or "mia" in (empresa.nombre or "").lower() else "EXP"
-    total = Paciente.objects.filter(empresa=empresa).count() + 1
-    return f"{prefijo}-{total:05d}"
+    patron = re.compile(rf"^{re.escape(prefijo)}-(\d+)$", re.IGNORECASE)
+    mayor = 0
+    codigos = Paciente.objects.filter(
+        empresa=empresa,
+        expediente_codigo__istartswith=f"{prefijo}-",
+    ).values_list("expediente_codigo", flat=True)
+    for codigo in codigos:
+        coincidencia = patron.match(codigo or "")
+        if coincidencia:
+            mayor = max(mayor, int(coincidencia.group(1)))
+    siguiente = mayor + 1
+    while Paciente.objects.filter(empresa=empresa, expediente_codigo=f"{prefijo}-{siguiente:05d}").exists():
+        siguiente += 1
+    return f"{prefijo}-{siguiente:05d}"
 
 
 def _sincronizar_cliente_facturacion_paciente(paciente):
@@ -574,6 +587,14 @@ def crear_paciente(request, empresa_slug):
                 paciente = form.save(commit=False)
                 paciente.empresa = empresa
                 paciente.creado_por = request.user
+                if (
+                    not paciente.expediente_codigo
+                    or Paciente.objects.filter(
+                        empresa=empresa,
+                        expediente_codigo=paciente.expediente_codigo,
+                    ).exists()
+                ):
+                    paciente.expediente_codigo = _proximo_codigo_expediente(empresa)
                 paciente.save()
                 _sincronizar_cliente_facturacion_paciente(paciente)
                 if paciente.foto_perfil:

@@ -301,6 +301,48 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "La foto inicial no puede superar 5 MB")
         self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-FOTO-GRANDE").exists())
 
+    def test_crear_paciente_refresca_expediente_si_el_codigo_ya_existe(self):
+        Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-00001",
+            nombre="Paciente Inicial",
+            identidad="0801199900001",
+        )
+        Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-00118",
+            nombre="Paciente Existente",
+            identidad="0801199900118",
+        )
+
+        response = self.client.post(
+            reverse("clinica_crear_paciente", args=[self.empresa.slug]),
+            {
+                "expediente_codigo": "MIA-00118",
+                "tipo_id": "cc",
+                "identidad": "0801199912352",
+                "primer_nombre": "Codigo",
+                "primer_apellido": "Nuevo",
+                "rh": "O+",
+                "sexo": "femenino",
+                "genero": "femenino",
+                "estado_civil": "soltero",
+                "prefijo_telefono": "Honduras (+504)",
+                "zona_residencial": "urbana",
+                "pais": "Honduras",
+                "acompanante_relacion": "no_indicada",
+                "responsable_relacion": "no_indicada",
+                "escolaridad": "no_indicada",
+                "pertenencia_etnica": "no_indicada",
+                "nacionalidad": "Honduras",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        paciente = Paciente.objects.get(empresa=self.empresa, identidad="0801199912352")
+        self.assertEqual(paciente.expediente_codigo, "MIA-00119")
+
     def test_paciente_permite_subir_plan_consentimiento_pdf(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
