@@ -13,9 +13,9 @@
     overflow:hidden;
     display:grid;
     grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);
-    gap:clamp(14px, 1.15vw, 22px);
+    gap:clamp(10px, .9vw, 18px);
     align-items:stretch;
-    padding:clamp(18px, 1.45vw, 28px);
+    padding:clamp(14px, 1.05vw, 22px);
 }
 .erp-dashboard-hero::after{
     content:"";
@@ -30,7 +30,7 @@
 }
 .erp-dashboard-hero-copy h3{
     margin:0 0 10px;
-    font-size:clamp(20px, 1.7vw, 28px);
+    font-size:clamp(18px, 1.38vw, 25px);
     line-height:1.15;
     color:#102338;
 }
@@ -38,23 +38,23 @@
     margin:0;
     max-width:760px;
     color:var(--muted);
-    font-size:clamp(12px, .9vw, 15px);
-    line-height:1.55;
+    font-size:clamp(11px, .78vw, 14px);
+    line-height:1.42;
 }
 .erp-dashboard-signals{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(128px,1fr));
-    gap:clamp(10px, .85vw, 14px);
+    grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+    gap:clamp(8px, .7vw, 12px);
 }
 .erp-dashboard-signal{
-    padding:clamp(12px, .95vw, 16px) clamp(13px, 1vw, 18px);
+    padding:clamp(10px, .75vw, 14px) clamp(10px, .82vw, 15px);
     border:1px solid var(--line);
     border-radius:14px;
     background:#fbfcfe;
 }
 .erp-dashboard-signal span{
     display:block;
-    font-size:11px;
+    font-size:9px;
     text-transform:uppercase;
     letter-spacing:.15em;
     color:var(--muted);
@@ -62,14 +62,14 @@
 .erp-dashboard-signal strong{
     display:block;
     margin-top:8px;
-    font-size:clamp(20px, 1.5vw, 26px);
+    font-size:clamp(17px, 1.18vw, 22px);
     color:#102338;
     overflow-wrap:anywhere;
 }
 .erp-dashboard-card-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));
-    gap:clamp(12px, 1vw, 18px);
+    grid-template-columns:repeat(auto-fit,minmax(min(168px,100%),1fr));
+    gap:clamp(9px, .76vw, 14px);
     align-items:stretch;
 }
 .erp-dashboard-module{
@@ -91,8 +91,8 @@
 .erp-module-visual{
     position:relative;
     z-index:1;
-    height:clamp(78px, 6.2vw, 116px);
-    margin:-4px -4px clamp(12px, .95vw, 18px);
+    height:clamp(62px, 4.6vw, 92px);
+    margin:-3px -3px clamp(8px, .72vw, 14px);
     border-radius:14px;
     overflow:hidden;
     background:linear-gradient(135deg, #f8fbff, #eef6ff);
@@ -149,15 +149,15 @@
     box-shadow:0 18px 40px rgba(12,34,56,.08);
 }
 .erp-dashboard-module h3{
-    margin:6px 0 8px;
-    font-size:clamp(16px, 1.16vw, 22px);
+    margin:4px 0 7px;
+    font-size:clamp(14px, 1vw, 19px);
     color:#102338;
 }
 .erp-dashboard-module p{
-    margin:0 0 clamp(12px, .95vw, 18px);
+    margin:0 0 clamp(8px, .7vw, 14px);
     color:var(--muted);
-    font-size:clamp(12px, .82vw, 14px);
-    line-height:1.5;
+    font-size:clamp(10px, .72vw, 12px);
+    line-height:1.42;
 }
 .erp-dashboard-module-action{
     margin-top:auto;
@@ -166,11 +166,11 @@
 .erp-module-status{
     display:inline-flex;
     align-items:center;
-    padding:6px 10px;
+    padding:5px 8px;
     border-radius:999px;
     background:rgba(31,94,168,.09);
     color:var(--primary);
-    font-size:11px;
+    font-size:8px;
     font-weight:700;
     letter-spacing:.08em;
     text-transform:uppercase;
@@ -178,10 +178,10 @@
 .erp-dashboard-module .erp-btn{
     width:100%;
     justify-content:center;
-    min-height:clamp(38px, 2.5vw, 44px);
-    padding-top:9px;
-    padding-bottom:9px;
-    font-size:clamp(11px, .75vw, 13px);
+    min-height:clamp(34px, 2.2vw, 40px);
+    padding-top:7px;
+    padding-bottom:7px;
+    font-size:clamp(10px, .68vw, 12px);
 }
 .erp-module-status.upgrade{
     background:rgba(23,166,161,.1);

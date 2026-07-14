@@ -66,7 +66,7 @@ body::after{
 .erp-shell{
     min-height:100vh;
     display:grid;
-    grid-template-columns:clamp(236px, 15.4vw, 300px) minmax(0,1fr);
+    grid-template-columns:clamp(188px, 13vw, 260px) minmax(0,1fr);
     align-items:stretch;
 }
 
@@ -81,10 +81,10 @@ body::after{
     background:
         linear-gradient(180deg, rgba(7,24,35,.94) 0%, rgba(13,42,53,.93) 54%, rgba(22,32,50,.94) 100%);
     color:#eff4fb;
-    padding:clamp(16px, 1.25vw, 24px) clamp(14px, 1.05vw, 20px);
+    padding:clamp(12px, 1vw, 20px) clamp(10px, .85vw, 16px);
     display:flex;
     flex-direction:column;
-    gap:clamp(14px, 1.15vw, 22px);
+    gap:clamp(10px, .95vw, 18px);
     position:relative;
     min-height:100vh;
     height:100%;
@@ -120,12 +120,12 @@ body::after{
 }
 
 .erp-brand-logo-wrap{
-    width:clamp(58px, 4.5vw, 84px);
-    height:clamp(58px, 4.5vw, 84px);
+    width:clamp(46px, 3.7vw, 72px);
+    height:clamp(46px, 3.7vw, 72px);
     max-width:84px;
     max-height:84px;
-    flex:0 0 clamp(58px, 4.5vw, 84px);
-    margin-bottom:clamp(9px, .85vw, 14px);
+    flex:0 0 clamp(46px, 3.7vw, 72px);
+    margin-bottom:clamp(7px, .7vw, 12px);
     border-radius:22px;
     border:1px solid rgba(255,255,255,.34);
     background:rgba(255,255,255,.96);
@@ -152,7 +152,7 @@ body::after{
 }
 
 .erp-brand-kicker{
-    font-size:11px;
+    font-size:clamp(8px, .62vw, 10px);
     text-transform:uppercase;
     letter-spacing:.22em;
     color:#aebed1;
@@ -161,7 +161,7 @@ body::after{
 
 .erp-brand h1{
     margin:0;
-    font-size:clamp(16px, 1.24vw, 22px);
+    font-size:clamp(14px, 1.05vw, 19px);
     font-weight:700;
     letter-spacing:.02em;
     overflow-wrap:anywhere;
@@ -170,8 +170,8 @@ body::after{
 .erp-brand p{
     margin:8px 0 0;
     color:#bfd0e3;
-    font-size:clamp(11px, .82vw, 13px);
-    line-height:1.45;
+    font-size:clamp(10px, .72vw, 12px);
+    line-height:1.38;
 }
 
 .erp-nav-group-title{
@@ -245,7 +245,7 @@ body::after{
 
 .erp-main{
     min-width:0;
-    padding:clamp(16px, 1.45vw, 26px) clamp(16px, 1.55vw, 28px) clamp(24px, 1.8vw, 34px);
+    padding:clamp(12px, 1.05vw, 22px) clamp(12px, 1.15vw, 24px) clamp(20px, 1.55vw, 30px);
 }
 
 .erp-topbar{
@@ -254,7 +254,7 @@ body::after{
     gap:clamp(14px, 1.35vw, 24px);
     align-items:flex-start;
     margin-bottom:clamp(14px, 1.25vw, 22px);
-    padding:clamp(16px, 1.25vw, 22px) clamp(16px, 1.35vw, 24px);
+    padding:clamp(12px, 1vw, 18px) clamp(14px, 1.1vw, 20px);
     border:1px solid var(--line);
     border-radius:24px;
     background:linear-gradient(135deg, rgba(255,255,255,.82), rgba(255,255,255,.58));
@@ -287,7 +287,7 @@ body::after{
 
 .erp-topbar h2{
     margin:0;
-    font-size:clamp(24px, 1.8vw, 31px);
+    font-size:clamp(21px, 1.55vw, 28px);
     line-height:1.1;
     font-weight:700;
     color:#0d1b2d;
@@ -298,7 +298,7 @@ body::after{
     max-width:760px;
     color:var(--muted);
     font-size:clamp(12px, .9vw, 15px);
-    line-height:1.55;
+    line-height:1.45;
 }
 
 .erp-assistant-fab{
@@ -607,8 +607,8 @@ body::after{
 
 .erp-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));
-    gap:clamp(12px, 1vw, 18px);
+    grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));
+    gap:clamp(10px, .82vw, 16px);
 }
 
 .erp-card{
@@ -618,7 +618,7 @@ body::after{
     border:1px solid var(--line);
     border-radius:clamp(16px, 1.25vw, 22px);
     box-shadow:var(--shadow-soft);
-    padding:clamp(16px, 1.25vw, 22px);
+    padding:clamp(13px, 1vw, 19px);
     backdrop-filter:blur(18px);
     transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
 }
@@ -2164,15 +2164,15 @@ body::after{
 
 @media (min-width: 761px) and (max-width: 1440px){
     .erp-shell{
-        grid-template-columns:clamp(194px, 16vw, 238px) minmax(0,1fr);
+        grid-template-columns:clamp(176px, 13.5vw, 216px) minmax(0,1fr);
     }
     .erp-brand{
         border-radius:15px;
     }
     .erp-brand-logo-wrap{
-        width:54px;
-        height:54px;
-        flex-basis:54px;
+        width:44px;
+        height:44px;
+        flex-basis:44px;
         border-radius:15px;
         padding:7px;
     }
@@ -2182,12 +2182,12 @@ body::after{
         margin-bottom:5px;
     }
     .erp-brand h1{
-        font-size:clamp(14px, 1.15vw, 17px);
+        font-size:clamp(13px, 1vw, 16px);
         line-height:1.28;
     }
     .erp-brand p{
-        font-size:10px;
-        line-height:1.42;
+        font-size:9px;
+        line-height:1.35;
     }
     .erp-nav-group-title{
         font-size:9px;
@@ -2198,10 +2198,10 @@ body::after{
         gap:6px;
     }
     .erp-nav-link{
-        min-height:38px;
+        min-height:34px;
         gap:9px;
         border-radius:12px;
-        font-size:13px;
+        font-size:12px;
         line-height:1.2;
     }
     .erp-nav-bullet{
@@ -2212,13 +2212,13 @@ body::after{
         border-radius:14px;
     }
     .erp-main{
-        padding:18px 18px 26px;
+        padding:12px 14px 22px;
     }
     .erp-topbar{
         border-radius:18px;
     }
     .erp-topbar h2{
-        font-size:clamp(22px, 1.65vw, 27px);
+        font-size:clamp(20px, 1.45vw, 25px);
     }
     .erp-topbar p{
         max-width:680px;
@@ -2244,7 +2244,7 @@ body::after{
         font-size:8px;
     }
     .erp-grid{
-        grid-template-columns:repeat(auto-fit,minmax(min(198px,100%),1fr));
+        grid-template-columns:repeat(auto-fit,minmax(min(172px,100%),1fr));
     }
     .erp-module-card h3{
         font-size:clamp(16px, 1.2vw, 19px);
@@ -2257,13 +2257,13 @@ body::after{
     .erp-btn-secondary,
     .erp-btn-danger,
     .erp-action-link{
-        min-height:40px;
-        padding:9px 12px;
-        font-size:clamp(11px, .82vw, 13px);
+        min-height:36px;
+        padding:8px 10px;
+        font-size:clamp(10px, .72vw, 12px);
     }
 }
 
-@media (max-width: 1180px){
+@media (max-width: 1024px){
     .erp-shell{grid-template-columns:1fr;}
     .erp-sidebar{
         position:relative;
