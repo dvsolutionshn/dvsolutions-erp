@@ -6388,41 +6388,49 @@ def eliminar_factura_historica(request, empresa_slug, factura_id):
 def duplicar_factura(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    factura_original = get_object_or_404(Factura, id=factura_id, empresa=empresa)
-
-    factura_nueva = Factura.objects.create(
+    factura_original = get_object_or_404(
+        Factura.objects.prefetch_related("lineas"),
+        id=factura_id,
         empresa=empresa,
-        cliente=factura_original.cliente,
-        vendedor=factura_original.vendedor,
-        moneda=factura_original.moneda,
-        tipo_cambio=factura_original.tipo_cambio,
-        fecha_emision=timezone.now().date(),
-        fecha_vencimiento=None,
-        estado='borrador',
-        orden_compra_exenta=factura_original.orden_compra_exenta,
-        registro_exonerado=factura_original.registro_exonerado,
-        registro_sag=factura_original.registro_sag,
     )
 
-    for linea in factura_original.lineas.all():
-        LineaFactura.objects.create(
-            factura=factura_nueva,
-            producto=linea.producto,
-            cantidad=linea.cantidad,
-            precio_unitario=linea.precio_unitario,
-            precio_incluye_impuesto=linea.precio_incluye_impuesto,
-            descuento_porcentaje=linea.descuento_porcentaje,
-            comentario=linea.comentario,
-            impuesto=linea.impuesto,
+    with transaction.atomic():
+        factura_nueva = Factura.objects.create(
+            empresa=empresa,
+            cliente=factura_original.cliente,
+            vendedor=factura_original.vendedor,
+            moneda=factura_original.moneda,
+            tipo_cambio=factura_original.tipo_cambio,
+            fecha_emision=timezone.now().date(),
+            fecha_vencimiento=None,
+            estado='borrador',
+            estado_pago='pendiente',
+            orden_compra_exenta=factura_original.orden_compra_exenta,
+            registro_exonerado=factura_original.registro_exonerado,
+            registro_sag=factura_original.registro_sag,
         )
 
-    factura_nueva.calcular_totales()
-    factura_nueva.save(update_fields=[
-        'subtotal',
-        'impuesto',
-        'total',
-        'total_lempiras'
-    ])
+        for linea in factura_original.lineas.all():
+            LineaFactura.objects.create(
+                factura=factura_nueva,
+                producto=linea.producto,
+                descripcion_manual=linea.descripcion_manual,
+                cantidad=linea.cantidad,
+                precio_unitario=linea.precio_unitario,
+                precio_incluye_impuesto=linea.precio_incluye_impuesto,
+                costo_unitario=linea.costo_unitario,
+                descuento_porcentaje=linea.descuento_porcentaje,
+                comentario=linea.comentario,
+                impuesto=linea.impuesto,
+            )
+
+        factura_nueva.calcular_totales()
+        factura_nueva.save(update_fields=[
+            'subtotal',
+            'impuesto',
+            'total',
+            'total_lempiras'
+        ])
 
     messages.success(request, "Factura duplicada como borrador. Revise los datos antes de guardarla o emitirla.")
     return redirect("editar_factura", empresa_slug=empresa.slug, factura_id=factura_nueva.id)

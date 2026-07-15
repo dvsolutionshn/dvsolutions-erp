@@ -2515,6 +2515,34 @@ class FacturacionTests(TestCase):
         self.assertEqual(factura_nueva.lineas.count(), factura.lineas.count())
         self.assertEqual(factura_nueva.total, factura.total)
 
+    def test_duplicar_factura_con_linea_manual_copia_descripcion(self):
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            estado="emitida",
+            fecha_emision=date.today(),
+        )
+        LineaFactura.objects.create(
+            factura=factura,
+            descripcion_manual="Servicio profesional de traduccion",
+            cantidad=Decimal("1.00"),
+            precio_unitario=Decimal("500.00"),
+            impuesto=self.impuesto,
+        )
+        factura.calcular_totales()
+        factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
+
+        response = self.client.post(reverse("duplicar_factura", args=[self.empresa.slug, factura.id]))
+        factura_nueva = Factura.objects.exclude(id=factura.id).get()
+        linea_nueva = factura_nueva.lineas.get()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(factura_nueva.estado, "borrador")
+        self.assertIsNone(factura_nueva.numero_factura)
+        self.assertEqual(linea_nueva.descripcion_manual, "Servicio profesional de traduccion")
+        self.assertIsNone(linea_nueva.producto)
+        self.assertEqual(factura_nueva.total, factura.total)
+
     def test_crear_cliente_desde_facturacion(self):
         response = self.client.post(
             reverse("crear_cliente_facturacion", args=[self.empresa.slug]),
