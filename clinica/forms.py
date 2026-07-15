@@ -906,6 +906,7 @@ REFERIDO_POR_CHOICES = [
     ("whatsapp", "WhatsApp"),
     ("referencia", "Referencia"),
     ("otro", "Otro"),
+    ("no_aplica", "No aplica / no deseo responder"),
 ]
 
 CODIGO_AREA_CHOICES = [
@@ -1233,8 +1234,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     segundo_apellido = forms.CharField(max_length=80, required=False, widget=forms.HiddenInput())
     identidad = forms.CharField(max_length=30, label="Numero de identidad")
     fecha_nacimiento = forms.DateField(label="Fecha de nacimiento", widget=forms.DateInput(attrs={"type": "date"}))
-    sexo = forms.ChoiceField(label="Sexo", choices=Paciente.SEXO_CHOICES)
-    estado_civil = forms.ChoiceField(label="Estado civil", choices=Paciente.ESTADO_CIVIL_CHOICES)
+    sexo = forms.ChoiceField(label="Sexo", choices=[("", "Seleccione una opcion"), *Paciente.SEXO_CHOICES])
+    estado_civil = forms.ChoiceField(label="Estado civil", choices=[("", "Seleccione una opcion"), *Paciente.ESTADO_CIVIL_CHOICES])
     correo = forms.EmailField(required=False, label="Correo electronico")
     telefono_codigo_area = forms.ChoiceField(
         required=False,
@@ -1266,7 +1267,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     )
     contacto_emergencia = forms.CharField(max_length=180, required=False, widget=forms.HiddenInput())
     telefono_emergencia = forms.CharField(max_length=30, required=False, widget=forms.HiddenInput())
-    referido_por = forms.ChoiceField(required=False, choices=REFERIDO_POR_CHOICES, label="Como conocio la clinica")
+    referido_por = forms.ChoiceField(required=True, choices=REFERIDO_POR_CHOICES, label="Como conocio la clinica")
     referido_por_detalle = forms.CharField(
         max_length=180,
         required=False,
@@ -1479,6 +1480,9 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         self.paciente = paciente
         self.empresa = empresa or getattr(paciente, "empresa", None)
         super().__init__(*args, **kwargs)
+        if paciente is None:
+            self.fields["foto_perfil"].required = True
+            self.fields["foto_perfil"].widget.attrs["data-required-photo"] = "1"
         if paciente and not self.is_bound:
             for campo in [
                 "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
