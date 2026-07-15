@@ -197,8 +197,10 @@
         <div class="pos-modal-grid">
             <div class="pos-field span-2"><label>Nombre completo</label><input class="pos-input" name="nombre" required></div>
             <div class="pos-field"><label>DNI / RTN</label><input class="pos-input" name="rtn" required inputmode="numeric"></div>
+            <div class="pos-field"><label>Prefijo telefono</label><select class="pos-select" name="prefijo_telefono">{% for codigo, etiqueta in phone_prefix_choices %}<option value="{{ codigo }}"{% if codigo == "504" %} selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
             <div class="pos-field"><label>Telefono</label><input class="pos-input" name="telefono" required inputmode="tel"></div>
             <div class="pos-field"><label>Correo (opcional)</label><input class="pos-input" name="correo" type="email"></div>
+            <div class="pos-field"><label>Prefijo WhatsApp</label><select class="pos-select" name="prefijo_whatsapp">{% for codigo, etiqueta in phone_prefix_choices %}<option value="{{ codigo }}"{% if codigo == "504" %} selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
             <div class="pos-field"><label>WhatsApp</label><input class="pos-input" name="telefono_whatsapp" inputmode="tel"></div>
             <div class="pos-field"><label>Fecha nacimiento</label><input class="pos-input" name="fecha_nacimiento" type="date"></div>
             <div class="pos-field"><label>Ciudad</label><input class="pos-input" name="ciudad" value="{{ empresa.ciudad|default:'' }}"></div>

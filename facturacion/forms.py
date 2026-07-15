@@ -1,6 +1,7 @@
 from django import forms
 from django.db.models import Sum
 from decimal import Decimal
+from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
 from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
@@ -194,13 +195,28 @@ class PagoCompraForm(forms.ModelForm):
 
 
 class ClienteForm(forms.ModelForm):
+    prefijo_telefono = forms.ChoiceField(
+        required=False,
+        choices=PHONE_PREFIX_CHOICES,
+        initial="504",
+        label="Prefijo telefono",
+    )
+    prefijo_whatsapp = forms.ChoiceField(
+        required=False,
+        choices=PHONE_PREFIX_CHOICES,
+        initial="504",
+        label="Prefijo WhatsApp",
+    )
+
     class Meta:
         model = Cliente
         fields = [
             'nombre',
             'rtn',
             'correo',
+            'prefijo_telefono',
             'telefono',
+            'prefijo_whatsapp',
             'telefono_whatsapp',
             'fecha_nacimiento',
             'acepta_promociones',
@@ -217,6 +233,12 @@ class ClienteForm(forms.ModelForm):
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
         self.fields['canal_preferido'].required = False
+        self.fields['prefijo_telefono'].initial = normalize_phone_prefix(
+            self.initial.get('prefijo_telefono') or self.data.get(self.add_prefix('prefijo_telefono')) or '504'
+        )
+        self.fields['prefijo_whatsapp'].initial = normalize_phone_prefix(
+            self.initial.get('prefijo_whatsapp') or self.data.get(self.add_prefix('prefijo_whatsapp')) or '504'
+        )
         if empresa and empresa.slug in {'hospital_mia', 'medical_spa'}:
             self.fields['correo'].required = False
             self.fields['correo'].label = 'Correo (opcional)'
@@ -228,6 +250,19 @@ class ClienteForm(forms.ModelForm):
 
     def clean_canal_preferido(self):
         return self.cleaned_data.get('canal_preferido') or 'whatsapp'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        prefijo_telefono = normalize_phone_prefix(cleaned_data.get('prefijo_telefono'))
+        prefijo_whatsapp = normalize_phone_prefix(cleaned_data.get('prefijo_whatsapp') or prefijo_telefono)
+        cleaned_data['prefijo_telefono'] = prefijo_telefono
+        cleaned_data['prefijo_whatsapp'] = prefijo_whatsapp
+        cleaned_data['telefono'] = apply_phone_prefix(cleaned_data.get('telefono'), prefijo_telefono)
+        if cleaned_data.get('telefono_whatsapp'):
+            cleaned_data['telefono_whatsapp'] = apply_phone_prefix(cleaned_data.get('telefono_whatsapp'), prefijo_whatsapp)
+        elif cleaned_data.get('telefono'):
+            cleaned_data['telefono_whatsapp'] = cleaned_data.get('telefono')
+        return cleaned_data
 
 
 class ProductoForm(forms.ModelForm):

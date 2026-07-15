@@ -31,6 +31,7 @@ import tempfile
 from pathlib import Path
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
+from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from contabilidad.services import (
     asegurar_cuenta_contable_cliente,
     asegurar_cuentas_financieras_base_honduras,
@@ -530,6 +531,7 @@ def punto_venta(request, empresa_slug):
         "metodos_pago": PagoFactura.METODOS,
         "cliente_obligatorio": cliente_obligatorio,
         "precios_incluyen_impuesto": precios_incluyen_impuesto,
+        "phone_prefix_choices": PHONE_PREFIX_CHOICES,
     })
 
 
@@ -616,9 +618,11 @@ def pos_crear_cliente_rapido(request, empresa_slug):
 
     nombre = (payload.get("nombre") or "").strip()
     rtn = (payload.get("rtn") or "").strip()
-    telefono = (payload.get("telefono") or "").strip()
+    prefijo_telefono = normalize_phone_prefix(payload.get("prefijo_telefono"))
+    prefijo_whatsapp = normalize_phone_prefix(payload.get("prefijo_whatsapp") or prefijo_telefono)
+    telefono = apply_phone_prefix(payload.get("telefono"), prefijo_telefono)
     correo = (payload.get("correo") or "").strip().lower()
-    telefono_whatsapp = (payload.get("telefono_whatsapp") or telefono).strip()
+    telefono_whatsapp = apply_phone_prefix(payload.get("telefono_whatsapp") or telefono, prefijo_whatsapp)
     ciudad = (payload.get("ciudad") or empresa.ciudad or "").strip()
     direccion = (payload.get("direccion") or "").strip()
     fecha_nacimiento = _parsear_fecha_latam(payload.get("fecha_nacimiento"))

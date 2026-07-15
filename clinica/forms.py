@@ -4,6 +4,8 @@ from datetime import datetime
 from django import forms
 from django.utils import timezone
 
+from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
+
 from .models import (
     CitaClinica,
     ConsentimientoClinico,
@@ -155,13 +157,15 @@ class PacienteForm(BaseClinicaForm):
         super().__init__(*args, empresa=empresa, **kwargs)
         self.fields["nombre"].required = False
         self.fields["expediente_codigo"].widget.attrs["readonly"] = "readonly"
+        self.fields["prefijo_telefono"].widget = forms.Select(choices=CODIGO_AREA_CHOICES)
         self.fields["identidad"].widget.attrs.update({
             "inputmode": "numeric",
             "pattern": "[0-9]*",
             "autocomplete": "off",
             "placeholder": "Solo numeros, sin guiones",
         })
-        self.fields["prefijo_telefono"].initial = self.fields["prefijo_telefono"].initial or "Honduras (+504)"
+        prefijo_actual = self.fields["prefijo_telefono"].initial or getattr(self.instance, "prefijo_telefono", "") or "504"
+        self.fields["prefijo_telefono"].initial = normalize_phone_prefix(prefijo_actual)
         for field_name in ["primer_nombre", "primer_apellido", "identidad"]:
             self.fields[field_name].required = True
 
@@ -185,6 +189,7 @@ class PacienteForm(BaseClinicaForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        cleaned_data["prefijo_telefono"] = normalize_phone_prefix(cleaned_data.get("prefijo_telefono"))
         partes_nombre = [
             cleaned_data.get("primer_nombre"),
             cleaned_data.get("segundo_nombre"),
@@ -922,6 +927,8 @@ CODIGO_AREA_CHOICES = [
     ("57", "Colombia (+57)"),
 ]
 
+CODIGO_AREA_CHOICES = PHONE_PREFIX_CHOICES
+
 INFORMANTE_CHOICES = [
     ("yo_mismo", "Yo mismo/a"),
     ("familiar", "Familiar"),
@@ -1591,17 +1598,11 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             cleaned_data["contacto_emergencia"] = nombre_contacto.strip()
             cleaned_data["telefono_emergencia"] = telefono_contacto.strip()
 
-        telefono = "".join(ch for ch in (cleaned_data.get("telefono") or "") if ch.isdigit())
-        codigo_area = "".join(ch for ch in (cleaned_data.get("telefono_codigo_area") or "504") if ch.isdigit()) or "504"
-        if telefono:
-            if telefono.startswith("00"):
-                telefono = telefono[2:]
-            if telefono.startswith(codigo_area):
-                cleaned_data["telefono"] = telefono
-            elif len(telefono) <= 10:
-                cleaned_data["telefono"] = f"{codigo_area}{telefono}"
-            else:
-                cleaned_data["telefono"] = telefono
+        cleaned_data["telefono_codigo_area"] = normalize_phone_prefix(cleaned_data.get("telefono_codigo_area"))
+        cleaned_data["telefono"] = apply_phone_prefix(
+            cleaned_data.get("telefono"),
+            cleaned_data.get("telefono_codigo_area"),
+        )
 
         if cleaned_data.get("informante") == "yo_mismo":
             cleaned_data["informante_detalle"] = ""
