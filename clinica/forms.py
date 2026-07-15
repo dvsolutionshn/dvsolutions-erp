@@ -1340,6 +1340,12 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         label="Ha sido operado anteriormente",
     )
     quirurgicos_detalle = forms.CharField(required=False, label="Detalle cirugias previas, plasticas u otras", widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Indique año, procedimiento, lugar y si tuvo alguna complicacion."}))
+    antecedentes_hospitalarios = forms.MultipleChoiceField(
+        required=True,
+        choices=SI_NO_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        label="He tenido hospitalizaciones, accidentes, fracturas o cirugias previas",
+    )
     tabaco_frecuencia = forms.MultipleChoiceField(required=False, choices=FRECUENCIA_CHOICES, widget=forms.CheckboxSelectMultiple, label="Tabaco")
     alcohol_frecuencia = forms.MultipleChoiceField(required=False, choices=FRECUENCIA_CHOICES, widget=forms.CheckboxSelectMultiple, label="Alcohol")
     drogas_recreativas = forms.MultipleChoiceField(required=False, choices=SI_NO_CHOICES, widget=forms.CheckboxSelectMultiple, label="Drogas recreativas")
@@ -1513,7 +1519,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         for campo in [
             "motivo_categoria", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
-            "quirurgicos_operado", "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos",
+            "antecedentes_hospitalarios", "quirurgicos_operado", "tabaco_frecuencia", "alcohol_frecuencia", "drogas_recreativas", "drogas_recreativas_tipos",
             "consumo_riesgo", "dieta", "ejercicio", "riesgo_tromboembolico", "gine_embarazada", "gine_lactancia", "gine_mamografia",
             "decision_cirugia", "expectativas_realistas", "busca_perfeccion",
             "multiples_cirugias_insatisfaccion", "evaluacion_psicologica",
@@ -1523,7 +1529,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         for campo in [
             "motivo_categoria", "procedimientos_interes", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
-            "quirurgicos_operado", "consumo_riesgo", "dieta", "ejercicio", "riesgo_tromboembolico",
+            "antecedentes_hospitalarios", "quirurgicos_operado", "consumo_riesgo", "dieta", "ejercicio", "riesgo_tromboembolico",
             "evaluacion_psicologica", "expectativas_realistas", "busca_perfeccion", "multiples_cirugias_insatisfaccion",
         ]:
             if campo in self.fields:
@@ -1608,6 +1614,27 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             cleaned_data["funciones_organicas"] = funciones_organicas[0] if funciones_organicas else ""
         if cleaned_data.get("funciones_organicas") != "alterada":
             cleaned_data["funciones_detalle"] = ""
+
+        antecedentes_hospitalarios = cleaned_data.get("antecedentes_hospitalarios") or []
+        if isinstance(antecedentes_hospitalarios, list):
+            if len(antecedentes_hospitalarios) > 1:
+                self.add_error("antecedentes_hospitalarios", "Seleccione solo una opcion.")
+            tiene_hospitalarios = antecedentes_hospitalarios[:1] == ["si"]
+        else:
+            tiene_hospitalarios = bool(antecedentes_hospitalarios)
+        cleaned_data["antecedentes_hospitalarios"] = tiene_hospitalarios
+        if tiene_hospitalarios and not (cleaned_data.get("antecedentes_hospitalarios_detalle") or "").strip():
+            self.add_error("antecedentes_hospitalarios_detalle", "Detalle fechas, lugar, motivo, procedimiento y si hubo complicaciones.")
+        if not tiene_hospitalarios:
+            cleaned_data["antecedentes_hospitalarios_detalle"] = ""
+
+        quirurgicos_operado = cleaned_data.get("quirurgicos_operado") or []
+        if isinstance(quirurgicos_operado, list) and len(quirurgicos_operado) > 1:
+            self.add_error("quirurgicos_operado", "Seleccione solo una opcion.")
+        if "si" in quirurgicos_operado and not (cleaned_data.get("quirurgicos_detalle") or "").strip():
+            self.add_error("quirurgicos_detalle", "Detalle cirugias previas, plasticas u otras.")
+        if "si" not in quirurgicos_operado:
+            cleaned_data["quirurgicos_detalle"] = ""
 
         categorias = set(cleaned_data.get("motivo_categoria") or [])
         if categorias == {"no_aplica"}:
