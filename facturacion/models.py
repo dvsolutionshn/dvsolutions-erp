@@ -33,6 +33,7 @@ class ConfiguracionFacturacionEmpresa(models.Model):
         ('notas_extensas', 'Factura notas extensas'),
         ('independiente', 'Factura independiente'),
         ('termica_80mm', 'Factura termica 80 mm'),
+        ('ejecutiva_amkt', 'Factura ejecutiva AMKT'),
     )
 
     empresa = models.OneToOneField(Empresa, on_delete=models.CASCADE, related_name='configuracion_facturacion')

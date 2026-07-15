@@ -278,6 +278,29 @@ class FacturacionTests(TestCase):
         self.assertIn("DATOS FISCALES", texto)
         self.assertIn("Documento generado por DV Solutions ERP", texto)
 
+    def test_factura_ejecutiva_amkt_genera_pdf_para_empresa_amkt(self):
+        self.empresa.nombre = "AMKT Digital, S. de R.L."
+        self.empresa.slug = "amkt-digital"
+        self.empresa.save(update_fields=["nombre", "slug"])
+        configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=self.empresa)
+        configuracion.plantilla_factura_pdf = "ejecutiva_amkt"
+        configuracion.save(update_fields=["plantilla_factura_pdf"])
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.get(
+            reverse("descargar_factura_pdf", args=[self.empresa.slug, factura.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        pdf = PdfReader(BytesIO(response.content))
+        self.assertEqual(len(pdf.pages), 1)
+        texto = pdf.pages[0].extract_text()
+        self.assertIn("FACTURA", texto)
+        self.assertIn("AMKT Digital", texto)
+        self.assertIn("Cliente Demo", texto)
+        self.assertIn("AUTORIZACION FISCAL", texto)
+
     def test_plantilla_termica_solo_aparece_en_empresas_autorizadas(self):
         configuracion = ConfiguracionFacturacionEmpresa(empresa=self.empresa)
         form = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
@@ -289,6 +312,19 @@ class FacturacionTests(TestCase):
         form_medico = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
         opciones_medicas = dict(form_medico.fields["plantilla_factura_pdf"].choices)
         self.assertEqual(opciones_medicas["termica_80mm"], "Factura termica 80 mm")
+
+    def test_plantilla_ejecutiva_amkt_solo_aparece_en_amkt(self):
+        configuracion = ConfiguracionFacturacionEmpresa(empresa=self.empresa)
+        form = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
+        opciones = dict(form.fields["plantilla_factura_pdf"].choices)
+        self.assertNotIn("ejecutiva_amkt", opciones)
+
+        self.empresa.nombre = "AMKT Digital, S. de R.L."
+        self.empresa.slug = "amkt-digital"
+        self.empresa.save(update_fields=["nombre", "slug"])
+        form_amkt = ConfiguracionFacturacionEmpresaForm(instance=configuracion)
+        opciones_amkt = dict(form_amkt.fields["plantilla_factura_pdf"].choices)
+        self.assertEqual(opciones_amkt["ejecutiva_amkt"], "Factura ejecutiva AMKT")
 
     def test_demo_1_puede_usar_plantilla_termica_y_autoimpresion_pos(self):
         self.empresa.slug = "demo_1"

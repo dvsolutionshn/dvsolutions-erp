@@ -80,6 +80,12 @@ class ConfiguracionFacturacionEmpresaForm(forms.ModelForm):
                 for choice in self.fields["plantilla_factura_pdf"].choices
                 if choice[0] != "termica_80mm"
             ]
+        if not empresa or "amkt" not in f"{empresa.slug} {empresa.nombre}".lower():
+            self.fields["plantilla_factura_pdf"].choices = [
+                choice
+                for choice in self.fields["plantilla_factura_pdf"].choices
+                if choice[0] != "ejecutiva_amkt"
+            ]
         if not permite_plantilla_notas_extensas:
             self.fields["plantilla_factura_pdf"].choices = [
                 choice

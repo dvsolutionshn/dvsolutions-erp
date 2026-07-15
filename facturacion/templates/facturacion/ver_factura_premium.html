@@ -21,11 +21,11 @@
 <button
     class="erp-action-link erp-print-button"
     type="button"
-    data-preview-title="{% if configuracion_facturacion.plantilla_factura_pdf == 'termica_80mm' %}Factura termica 80 mm{% else %}Factura clasica{% endif %}"
+    data-preview-title="{% if configuracion_facturacion.plantilla_factura_pdf == 'termica_80mm' %}Factura termica 80 mm{% elif configuracion_facturacion.plantilla_factura_pdf == 'ejecutiva_amkt' %}Factura ejecutiva AMKT{% else %}Factura clasica{% endif %}"
     data-preview-url="{% url 'vista_previa_factura_pdf' empresa.slug factura.id %}"
     data-download-url="{% url 'descargar_factura_pdf' empresa.slug factura.id %}"
 >
-    {% if configuracion_facturacion.plantilla_factura_pdf == 'termica_80mm' %}Epson 80 mm{% else %}PDF{% endif %}
+    {% if configuracion_facturacion.plantilla_factura_pdf == 'termica_80mm' %}Epson 80 mm{% elif configuracion_facturacion.plantilla_factura_pdf == 'ejecutiva_amkt' %}PDF Ejecutivo AMKT{% else %}PDF{% endif %}
 </button>
 <button
     class="erp-action-link erp-print-button"
@@ -36,6 +36,17 @@
 >
     PDF Alternativo
 </button>
+{% if permite_plantilla_amkt and configuracion_facturacion.plantilla_factura_pdf != 'ejecutiva_amkt' %}
+<button
+    class="erp-action-link erp-print-button"
+    type="button"
+    data-preview-title="Factura ejecutiva AMKT"
+    data-preview-url="{% url 'vista_previa_factura_pdf_ejecutiva_amkt' empresa.slug factura.id %}"
+    data-download-url="{% url 'descargar_factura_pdf_ejecutiva_amkt' empresa.slug factura.id %}"
+>
+    PDF Ejecutivo AMKT
+</button>
+{% endif %}
 {% if permite_plantilla_independiente %}
 <button
     class="erp-action-link erp-print-button"

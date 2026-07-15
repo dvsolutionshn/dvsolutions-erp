@@ -333,6 +333,12 @@
                         <strong>PDF alternativo</strong>
                         <p>Presentacion mas comercial y moderna para empresas que quieren una factura con identidad visual mas marcada.</p>
                     </div>
+                    {% if permite_plantilla_amkt %}
+                    <div class="erp-template-option{% if configuracion.plantilla_factura_pdf == 'ejecutiva_amkt' %} is-active{% endif %}">
+                        <strong>Factura ejecutiva AMKT</strong>
+                        <p>PDF tipo propuesta corporativa, con franja editorial, resumen financiero y lectura premium totalmente separada del estilo ERP.</p>
+                    </div>
+                    {% endif %}
                     {% if permite_plantilla_independiente %}
                     <div class="erp-template-option{% if configuracion.plantilla_factura_pdf == 'independiente' %} is-active{% endif %}">
                         <strong>Factura independiente</strong>

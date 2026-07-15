@@ -89,10 +89,12 @@ urlpatterns = [
 
     path('<int:factura_id>/pdf/', views.descargar_factura_pdf, name='descargar_factura_pdf'),
     path('<int:factura_id>/pdf/alternativo/', views.descargar_factura_pdf_alternativo, name='descargar_factura_pdf_alternativo'),
+    path('<int:factura_id>/pdf/ejecutiva-amkt/', views.descargar_factura_pdf_ejecutiva_amkt, name='descargar_factura_pdf_ejecutiva_amkt'),
     path('<int:factura_id>/pdf/notas-extensas/', views.descargar_factura_pdf_notas_extensas, name='descargar_factura_pdf_notas_extensas'),
     path('<int:factura_id>/pdf/independiente/', views.descargar_factura_pdf_independiente, name='descargar_factura_pdf_independiente'),
     path('<int:factura_id>/pdf/vista-previa/', views.vista_previa_factura_pdf, name='vista_previa_factura_pdf'),
     path('<int:factura_id>/pdf/alternativo/vista-previa/', views.vista_previa_factura_pdf_alternativo, name='vista_previa_factura_pdf_alternativo'),
+    path('<int:factura_id>/pdf/ejecutiva-amkt/vista-previa/', views.vista_previa_factura_pdf_ejecutiva_amkt, name='vista_previa_factura_pdf_ejecutiva_amkt'),
     path('<int:factura_id>/pdf/notas-extensas/vista-previa/', views.vista_previa_factura_pdf_notas_extensas, name='vista_previa_factura_pdf_notas_extensas'),
     path('<int:factura_id>/pdf/independiente/vista-previa/', views.vista_previa_factura_pdf_independiente, name='vista_previa_factura_pdf_independiente'),
 

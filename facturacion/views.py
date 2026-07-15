@@ -220,6 +220,7 @@ def configuracion_facturacion(request, empresa_slug):
     )
     permite_plantilla_notas_extensas = _empresa_permite_plantilla_notas_extensas(empresa)
     permite_plantilla_independiente = _empresa_permite_plantilla_independiente(empresa)
+    permite_plantilla_amkt = _empresa_permite_plantilla_amkt(empresa)
     form = ConfiguracionFacturacionEmpresaForm(
         request.POST or None,
         instance=configuracion,
@@ -241,6 +242,7 @@ def configuracion_facturacion(request, empresa_slug):
         "configuracion": configuracion,
         "permite_plantilla_notas_extensas": permite_plantilla_notas_extensas,
         "permite_plantilla_independiente": permite_plantilla_independiente,
+        "permite_plantilla_amkt": permite_plantilla_amkt,
         "precios_incluyen_impuesto": precios_incluyen_impuesto,
     })
 
@@ -992,10 +994,17 @@ def _empresa_permite_plantilla_independiente(empresa):
     return bool(config.permite_plantilla_factura_independiente)
 
 
+def _empresa_permite_plantilla_amkt(empresa):
+    identificador = f"{empresa.slug or ''} {empresa.nombre or ''}".strip().lower()
+    return "amkt" in identificador
+
+
 def _resolver_plantilla_factura(configuracion, empresa, plantilla_forzada=None):
     plantilla_activa = plantilla_forzada or configuracion.plantilla_factura_pdf
     if plantilla_activa == "termica_80mm" and empresa.slug in {"hospital_mia", "medical_spa", "demo_1"}:
         return "facturacion/factura_pdf_termica_80mm.html"
+    if plantilla_activa == "ejecutiva_amkt" and _empresa_permite_plantilla_amkt(empresa):
+        return "facturacion/factura_pdf_ejecutiva_amkt.html"
     if plantilla_activa == "independiente" and _empresa_permite_plantilla_independiente(empresa):
         return "facturacion/factura_pdf_independiente.html"
     if plantilla_activa == "alternativa":
@@ -6471,6 +6480,7 @@ def ver_factura(request, empresa_slug, factura_id):
         "permite_gestion_fiscal_historica": config_avanzada.permite_gestion_fiscal_historica,
         "permite_plantilla_notas_extensas": _empresa_permite_plantilla_notas_extensas(empresa),
         "permite_plantilla_independiente": _empresa_permite_plantilla_independiente(empresa),
+        "permite_plantilla_amkt": _empresa_permite_plantilla_amkt(empresa),
         "configuracion_facturacion": ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)[0],
         "historial_auditoria": historial_auditoria,
     })
@@ -6581,6 +6591,21 @@ def descargar_factura_pdf_alternativo(request, empresa_slug, factura_id):
 
 
 @login_required
+def descargar_factura_pdf_ejecutiva_amkt(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not _empresa_permite_plantilla_amkt(empresa):
+        raise Http404("Esta plantilla no esta disponible para esta empresa.")
+    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    return _render_factura_pdf_response(
+        empresa=empresa,
+        factura=factura,
+        plantilla="facturacion/factura_pdf_ejecutiva_amkt.html",
+        inline=False,
+        prefijo_archivo="Factura_Ejecutiva_AMKT",
+    )
+
+
+@login_required
 def descargar_factura_pdf_notas_extensas(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     if not _empresa_permite_plantilla_notas_extensas(empresa):
@@ -6650,6 +6675,22 @@ def vista_previa_factura_pdf_alternativo(request, empresa_slug, factura_id):
         plantilla="facturacion/factura_pdf_alternativa.html",
         inline=True,
         prefijo_archivo="Factura_Alternativa",
+    )
+
+
+@login_required
+@xframe_options_sameorigin
+def vista_previa_factura_pdf_ejecutiva_amkt(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not _empresa_permite_plantilla_amkt(empresa):
+        raise Http404("Esta plantilla no esta disponible para esta empresa.")
+    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    return _render_factura_pdf_response(
+        empresa=empresa,
+        factura=factura,
+        plantilla="facturacion/factura_pdf_ejecutiva_amkt.html",
+        inline=True,
+        prefijo_archivo="Factura_Ejecutiva_AMKT",
     )
 
 
