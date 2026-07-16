@@ -43,7 +43,7 @@ from contabilidad.services import (
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, Cotizacion, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaCotizacion, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
@@ -86,6 +86,19 @@ def _precios_incluyen_impuesto(empresa):
         configuracion.precios_incluyen_impuesto = debe_incluir
         configuracion.save(update_fields=["precios_incluyen_impuesto", "fecha_actualizacion"])
     return debe_incluir
+
+
+def _empresa_permite_cotizaciones(empresa):
+    identidad = f"{getattr(empresa, 'slug', '')} {getattr(empresa, 'nombre', '')}".lower()
+    return any(
+        marcador in identidad
+        for marcador in ("iss", "integrated sales", "integrated_sales", "integrated-sales")
+    )
+
+
+def _exigir_empresa_cotizaciones(empresa):
+    if not _empresa_permite_cotizaciones(empresa):
+        raise Http404("Modulo de cotizaciones no habilitado para esta empresa.")
 
 
 def _empresa_usa_cierre_caja(empresa):
@@ -5058,6 +5071,294 @@ def anular_nota_credito(request, empresa_slug, nota_id):
         messages.success(request, "Nota de crédito anulada correctamente.")
 
     return redirect("ver_nota_credito", empresa_slug=empresa.slug, nota_id=nota.id)
+
+
+# =====================================================
+# COTIZACIONES
+# =====================================================
+
+def _preparar_cotizacion_form(form, empresa):
+    configurar_campo_fecha(form.fields['fecha'])
+    configurar_campo_fecha(form.fields['fecha_vencimiento'])
+    form.fields['fecha_vencimiento'].required = False
+    form.fields['cliente'].queryset = Cliente.objects.filter(empresa=empresa).order_by('nombre')
+    form.fields['vendedor'].queryset = Usuario.objects.filter(Q(empresa=empresa) | Q(empresas_acceso=empresa)).distinct()
+    form.fields['condiciones'].required = False
+    form.fields['notas'].required = False
+    form.fields['asunto'].required = False
+    return form
+
+
+def _preparar_lineas_cotizacion(formset, empresa):
+    productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
+    impuestos_qs = TipoImpuesto.objects.filter(activo=True)
+    for form in formset.forms:
+        form.fields['producto'].queryset = productos_qs
+        form.fields['producto'].required = False
+        form.fields['descripcion_manual'].required = False
+        form.fields['comentario'].required = False
+        form.fields['descuento_porcentaje'].required = False
+        form.fields['impuesto'].queryset = impuestos_qs
+    return formset
+
+
+def _lineas_cotizacion_validas(formset):
+    lineas = []
+    for form in formset.forms:
+        if form.cleaned_data.get('DELETE'):
+            continue
+        producto = form.cleaned_data.get('producto')
+        descripcion = (form.cleaned_data.get('descripcion_manual') or '').strip()
+        cantidad = form.cleaned_data.get('cantidad')
+        precio = form.cleaned_data.get('precio_unitario')
+        impuesto = form.cleaned_data.get('impuesto')
+        if producto or descripcion or cantidad or precio or impuesto:
+            lineas.append(form)
+    return lineas
+
+
+@login_required
+def cotizaciones_dashboard(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _exigir_empresa_cotizaciones(empresa)
+    cotizaciones = (
+        Cotizacion.objects.filter(empresa=empresa)
+        .select_related('cliente', 'vendedor')
+        .prefetch_related('facturas_generadas')
+        .order_by('-fecha', '-fecha_creacion')
+    )
+    resumen = cotizaciones.aggregate(total=Sum('total'), cantidad=Count('id'))
+    pendientes = cotizaciones.filter(estado__in=['borrador', 'enviada']).count()
+    aprobadas = cotizaciones.filter(estado='aprobada').count()
+    convertidas = cotizaciones.filter(estado='convertida').count()
+    return render(request, "facturacion/cotizaciones_dashboard.html", {
+        "empresa": empresa,
+        "cotizaciones": cotizaciones,
+        "total_cotizado": resumen["total"] or Decimal("0.00"),
+        "cantidad_cotizaciones": resumen["cantidad"] or 0,
+        "pendientes": pendientes,
+        "aprobadas": aprobadas,
+        "convertidas": convertidas,
+    })
+
+
+@login_required
+def crear_cotizacion(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _exigir_empresa_cotizaciones(empresa)
+
+    CotizacionForm = modelform_factory(
+        Cotizacion,
+        fields=['cliente', 'fecha', 'fecha_vencimiento', 'vendedor', 'moneda', 'tipo_cambio', 'asunto', 'condiciones', 'notas', 'estado'],
+    )
+    LineaFormSet = inlineformset_factory(
+        Cotizacion,
+        LineaCotizacion,
+        fields=['producto', 'descripcion_manual', 'cantidad', 'precio_unitario', 'descuento_porcentaje', 'comentario', 'impuesto'],
+        extra=5,
+        can_delete=True,
+    )
+
+    if request.method == "POST":
+        form = _preparar_cotizacion_form(CotizacionForm(request.POST), empresa)
+        cotizacion_tmp = Cotizacion(empresa=empresa)
+        formset = _preparar_lineas_cotizacion(LineaFormSet(request.POST, instance=cotizacion_tmp), empresa)
+        if form.is_valid() and formset.is_valid():
+            lineas_validas = _lineas_cotizacion_validas(formset)
+            if not lineas_validas:
+                messages.error(request, "Debe agregar al menos una linea valida a la cotizacion.")
+            else:
+                with transaction.atomic():
+                    cotizacion = form.save(commit=False)
+                    cotizacion.empresa = empresa
+                    if not cotizacion.vendedor_id:
+                        cotizacion.vendedor = request.user
+                    cotizacion.save()
+                    for linea_form in lineas_validas:
+                        linea = linea_form.save(commit=False)
+                        linea.cotizacion = cotizacion
+                        linea.precio_incluye_impuesto = _precios_incluyen_impuesto(empresa)
+                        linea.save()
+                    cotizacion.calcular_totales()
+                    cotizacion.save(update_fields=['subtotal', 'impuesto', 'total', 'total_lempiras'])
+                messages.success(request, "Cotizacion creada correctamente.")
+                return redirect("ver_cotizacion", empresa_slug=empresa.slug, cotizacion_id=cotizacion.id)
+    else:
+        form = _preparar_cotizacion_form(CotizacionForm(initial={
+            "fecha": timezone.localdate(),
+            "estado": "borrador",
+            "tipo_cambio": Decimal("1.0000"),
+        }), empresa)
+        formset = _preparar_lineas_cotizacion(LineaFormSet(), empresa)
+
+    return render(request, "facturacion/cotizacion_form.html", {
+        "empresa": empresa,
+        "form": form,
+        "formset": formset,
+        "modo_edicion": False,
+        "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
+    })
+
+
+@login_required
+def editar_cotizacion(request, empresa_slug, cotizacion_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _exigir_empresa_cotizaciones(empresa)
+    cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id, empresa=empresa)
+
+    if cotizacion.estado == "convertida":
+        messages.error(request, "Esta cotizacion ya fue convertida a factura y no puede editarse.")
+        return redirect("ver_cotizacion", empresa_slug=empresa.slug, cotizacion_id=cotizacion.id)
+
+    CotizacionForm = modelform_factory(
+        Cotizacion,
+        fields=['cliente', 'fecha', 'fecha_vencimiento', 'vendedor', 'moneda', 'tipo_cambio', 'asunto', 'condiciones', 'notas', 'estado'],
+    )
+    LineaFormSet = inlineformset_factory(
+        Cotizacion,
+        LineaCotizacion,
+        fields=['producto', 'descripcion_manual', 'cantidad', 'precio_unitario', 'descuento_porcentaje', 'comentario', 'impuesto'],
+        extra=2,
+        can_delete=True,
+    )
+
+    if request.method == "POST":
+        form = _preparar_cotizacion_form(CotizacionForm(request.POST, instance=cotizacion), empresa)
+        formset = _preparar_lineas_cotizacion(LineaFormSet(request.POST, instance=cotizacion), empresa)
+        if form.is_valid() and formset.is_valid():
+            lineas_validas = _lineas_cotizacion_validas(formset)
+            if not lineas_validas:
+                messages.error(request, "Debe mantener al menos una linea valida.")
+            else:
+                with transaction.atomic():
+                    cotizacion = form.save()
+                    guardadas = formset.save(commit=False)
+                    for borrada in formset.deleted_objects:
+                        borrada.delete()
+                    for linea in guardadas:
+                        linea.cotizacion = cotizacion
+                        if not linea.pk:
+                            linea.precio_incluye_impuesto = _precios_incluyen_impuesto(empresa)
+                        linea.save()
+                    cotizacion.calcular_totales()
+                    cotizacion.save(update_fields=['subtotal', 'impuesto', 'total', 'total_lempiras', 'fecha_actualizacion'])
+                messages.success(request, "Cotizacion actualizada correctamente.")
+                return redirect("ver_cotizacion", empresa_slug=empresa.slug, cotizacion_id=cotizacion.id)
+    else:
+        form = _preparar_cotizacion_form(CotizacionForm(instance=cotizacion), empresa)
+        formset = _preparar_lineas_cotizacion(LineaFormSet(instance=cotizacion), empresa)
+
+    return render(request, "facturacion/cotizacion_form.html", {
+        "empresa": empresa,
+        "cotizacion": cotizacion,
+        "form": form,
+        "formset": formset,
+        "modo_edicion": True,
+        "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
+    })
+
+
+@login_required
+def ver_cotizacion(request, empresa_slug, cotizacion_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _exigir_empresa_cotizaciones(empresa)
+    cotizacion = get_object_or_404(
+        Cotizacion.objects.select_related('cliente', 'vendedor').prefetch_related('lineas__producto', 'lineas__impuesto', 'facturas_generadas'),
+        id=cotizacion_id,
+        empresa=empresa,
+    )
+    return render(request, "facturacion/ver_cotizacion.html", {
+        "empresa": empresa,
+        "cotizacion": cotizacion,
+        "factura_generada": cotizacion.factura_generada,
+    })
+
+
+@login_required
+@require_POST
+def aprobar_cotizacion(request, empresa_slug, cotizacion_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _exigir_empresa_cotizaciones(empresa)
+    cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id, empresa=empresa)
+    if cotizacion.estado == "convertida":
+        messages.info(request, "La cotizacion ya fue convertida a factura.")
+    else:
+        cotizacion.estado = "aprobada"
+        cotizacion.save(update_fields=["estado", "fecha_actualizacion"])
+        messages.success(request, "Cotizacion marcada como aprobada.")
+    return redirect("ver_cotizacion", empresa_slug=empresa.slug, cotizacion_id=cotizacion.id)
+
+
+@login_required
+@require_POST
+def convertir_cotizacion_factura(request, empresa_slug, cotizacion_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _exigir_empresa_cotizaciones(empresa)
+    cotizacion = get_object_or_404(
+        Cotizacion.objects.select_related('cliente', 'vendedor').prefetch_related('lineas__producto', 'lineas__impuesto'),
+        id=cotizacion_id,
+        empresa=empresa,
+    )
+    factura_existente = cotizacion.factura_generada
+    if factura_existente:
+        messages.info(request, "Esta cotizacion ya tiene una factura generada.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura_existente.id)
+    if cotizacion.estado != "aprobada":
+        messages.error(request, "Primero debes aprobar la cotizacion antes de convertirla en factura.")
+        return redirect("ver_cotizacion", empresa_slug=empresa.slug, cotizacion_id=cotizacion.id)
+
+    with transaction.atomic():
+        factura = Factura.objects.create(
+            empresa=empresa,
+            cliente=cotizacion.cliente,
+            vendedor=cotizacion.vendedor or request.user,
+            moneda=cotizacion.moneda,
+            tipo_cambio=cotizacion.tipo_cambio,
+            fecha_emision=timezone.localdate(),
+            fecha_vencimiento=cotizacion.fecha_vencimiento,
+            estado="borrador",
+            cotizacion_origen=cotizacion,
+        )
+        for linea in cotizacion.lineas.all():
+            LineaFactura.objects.create(
+                factura=factura,
+                producto=linea.producto,
+                descripcion_manual=linea.descripcion_manual,
+                cantidad=linea.cantidad,
+                precio_unitario=linea.precio_unitario,
+                precio_incluye_impuesto=linea.precio_incluye_impuesto,
+                costo_unitario=linea.costo_unitario,
+                comentario=linea.comentario,
+                descuento_porcentaje=linea.descuento_porcentaje,
+                impuesto=linea.impuesto,
+            )
+        _actualizar_totales_factura(factura)
+        cotizacion.estado = "convertida"
+        cotizacion.save(update_fields=["estado", "fecha_actualizacion"])
+
+    messages.success(request, f"Cotizacion {cotizacion.numero} convertida en factura borrador.")
+    return redirect(f"{redirect('ver_factura', empresa_slug=empresa.slug, factura_id=factura.id).url}?nueva=1")
+
+
+@login_required
+def descargar_cotizacion_pdf(request, empresa_slug, cotizacion_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _exigir_empresa_cotizaciones(empresa)
+    cotizacion = get_object_or_404(
+        Cotizacion.objects.select_related('cliente', 'vendedor').prefetch_related('lineas__producto', 'lineas__impuesto'),
+        id=cotizacion_id,
+        empresa=empresa,
+    )
+    html_string = render_to_string("facturacion/cotizacion_pdf.html", {
+        "empresa": empresa,
+        "cotizacion": cotizacion,
+        "configuracion_facturacion": ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)[0],
+    })
+    pdf_file = HTML(string=html_string, base_url=str(settings.BASE_DIR)).write_pdf()
+    nombre_archivo = _nombre_archivo_pdf("Cotizacion", cotizacion.numero, cotizacion.cliente.nombre)
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
 
 
 # =====================================================

@@ -1128,6 +1128,13 @@ class Factura(models.Model):
 
     estado = models.CharField(max_length=10, choices=ESTADOS, default='borrador')
     estado_pago = models.CharField(max_length=10, choices=ESTADO_PAGO, default='pendiente')
+    cotizacion_origen = models.ForeignKey(
+        'Cotizacion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='facturas_generadas',
+    )
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
@@ -1855,6 +1862,156 @@ class LineaFactura(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
 
+        if self._state.adding and self.producto_id and not self.costo_unitario:
+            self.costo_unitario = self.producto.costo_promedio or Decimal('0')
+
+        subtotal_base = (self.cantidad * self.precio_unitario).quantize(DOS_DECIMALES)
+        descuento = self.descuento_porcentaje or Decimal('0')
+        if self.precio_incluye_impuesto and self.impuesto.porcentaje:
+            divisor = Decimal('1') + (self.impuesto.porcentaje / Decimal('100'))
+            total_final = (
+                subtotal_base - (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
+            ).quantize(DOS_DECIMALES)
+            subtotal_sin_descuento = (subtotal_base / divisor).quantize(DOS_DECIMALES)
+            self.subtotal = (total_final / divisor).quantize(DOS_DECIMALES)
+            self.descuento_monto = (subtotal_sin_descuento - self.subtotal).quantize(DOS_DECIMALES)
+            self.impuesto_monto = (total_final - self.subtotal).quantize(DOS_DECIMALES)
+        else:
+            self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
+            self.subtotal = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
+            self.impuesto_monto = (self.subtotal * (self.impuesto.porcentaje / Decimal('100'))).quantize(DOS_DECIMALES)
+
+        super().save(*args, **kwargs)
+
+    @property
+    def total_linea(self):
+        return ((self.subtotal or Decimal('0.00')) + (self.impuesto_monto or Decimal('0.00'))).quantize(DOS_DECIMALES)
+
+    @property
+    def descripcion_visual(self):
+        if self.producto_id and self.producto:
+            return self.producto.nombre
+        return self.descripcion_manual or "Linea sin descripcion"
+
+    def __str__(self):
+        return self.descripcion_visual
+
+
+class Cotizacion(models.Model):
+    ESTADOS = (
+        ('borrador', 'Borrador'),
+        ('enviada', 'Enviada'),
+        ('aprobada', 'Aprobada'),
+        ('rechazada', 'Rechazada'),
+        ('convertida', 'Convertida a factura'),
+    )
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='cotizaciones')
+    cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='cotizaciones')
+    vendedor = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cotizaciones_vendidas',
+    )
+    numero = models.CharField(max_length=30, blank=True, null=True)
+    fecha = models.DateField(default=timezone.now)
+    fecha_vencimiento = models.DateField(blank=True, null=True)
+    moneda = models.CharField(max_length=3, choices=Factura.MONEDAS, default='HNL')
+    tipo_cambio = models.DecimalField(max_digits=10, decimal_places=4, default=1)
+    asunto = models.CharField(max_length=180, blank=True, null=True)
+    condiciones = models.TextField(blank=True, null=True)
+    notas = models.TextField(blank=True, null=True)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    impuesto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_lempiras = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    estado = models.CharField(max_length=12, choices=ESTADOS, default='borrador')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-fecha', '-fecha_creacion']
+        unique_together = [('empresa', 'numero')]
+        verbose_name = 'Cotizacion'
+        verbose_name_plural = 'Cotizaciones'
+
+    def save(self, *args, **kwargs):
+        if not self.numero and self.empresa_id:
+            self.numero = self._generar_numero()
+        super().save(*args, **kwargs)
+
+    def _generar_numero(self):
+        anio = (self.fecha or timezone.localdate()).year
+        prefijo = f"COT-{anio}-"
+        existentes = Cotizacion.objects.filter(
+            empresa=self.empresa,
+            numero__startswith=prefijo,
+        ).values_list('numero', flat=True)
+        mayor = 0
+        for numero in existentes:
+            try:
+                mayor = max(mayor, int(str(numero).replace(prefijo, "")))
+            except (TypeError, ValueError):
+                continue
+        return f"{prefijo}{mayor + 1:05d}"
+
+    def calcular_totales(self):
+        subtotal_general = Decimal('0.00')
+        impuesto_general = Decimal('0.00')
+        for linea in self.lineas.all():
+            subtotal_general += linea.subtotal
+            impuesto_general += linea.impuesto_monto
+        self.subtotal = subtotal_general.quantize(DOS_DECIMALES)
+        self.impuesto = impuesto_general.quantize(DOS_DECIMALES)
+        self.total = (self.subtotal + self.impuesto).quantize(DOS_DECIMALES)
+        if self.moneda == 'USD':
+            self.total_lempiras = (self.total * self.tipo_cambio).quantize(DOS_DECIMALES)
+        else:
+            self.total_lempiras = Decimal(self.total).quantize(DOS_DECIMALES)
+
+    @property
+    def factura_generada(self):
+        return self.facturas_generadas.first()
+
+    def total_en_letras(self):
+        return _monto_en_letras_con_centavos(self.total, self.moneda)
+
+    def __str__(self):
+        return self.numero or f"Cotizacion {self.id or 'nueva'}"
+
+
+class LineaCotizacion(models.Model):
+    cotizacion = models.ForeignKey(
+        Cotizacion,
+        on_delete=models.CASCADE,
+        related_name='lineas',
+    )
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT, null=True, blank=True)
+    descripcion_manual = models.CharField(max_length=255, blank=True, null=True)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+    precio_incluye_impuesto = models.BooleanField(default=False)
+    costo_unitario = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    comentario = models.TextField(blank=True, null=True)
+    descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0, blank=True, null=True)
+    descuento_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    impuesto = models.ForeignKey(TipoImpuesto, on_delete=models.PROTECT)
+    impuesto_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    def clean(self):
+        super().clean()
+        if self.descripcion_manual:
+            self.descripcion_manual = self.descripcion_manual.strip()
+        if not self.producto and not self.descripcion_manual:
+            raise ValidationError({
+                "producto": "Selecciona un producto o escribe una descripcion manual para la linea."
+            })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
         if self._state.adding and self.producto_id and not self.costo_unitario:
             self.costo_unitario = self.producto.costo_promedio or Decimal('0')
 

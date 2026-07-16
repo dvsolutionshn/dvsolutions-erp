@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Cotizacion {{ cotizacion.numero }}</title>
+    <style>
+        @page { size: letter; margin: 22mm 16mm; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; color:#0f2235; font-size:12px; }
+        .top { display:flex; justify-content:space-between; gap:24px; border-bottom:3px solid #14b8a6; padding-bottom:18px; }
+        .brand h1 { margin:0; font-size:24px; letter-spacing:.04em; }
+        .brand p { margin:6px 0 0; color:#64748b; line-height:1.5; }
+        .doc { text-align:right; }
+        .doc .label { color:#64748b; text-transform:uppercase; letter-spacing:.16em; font-size:10px; }
+        .doc .number { font-size:22px; font-weight:800; margin-top:6px; }
+        .badge { display:inline-block; margin-top:10px; padding:6px 10px; border-radius:999px; background:#ecfeff; color:#0f766e; font-weight:700; }
+        .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:24px; }
+        .card { border:1px solid #d8e6f3; border-radius:12px; padding:14px; background:#fbfdff; }
+        .kicker { color:#64748b; text-transform:uppercase; letter-spacing:.16em; font-size:10px; margin-bottom:8px; }
+        .strong { font-size:15px; font-weight:800; }
+        table { width:100%; border-collapse:collapse; margin-top:24px; }
+        th { background:#0f2235; color:white; text-align:left; padding:9px; font-size:10px; text-transform:uppercase; letter-spacing:.1em; }
+        td { border-bottom:1px solid #e5edf5; padding:10px 9px; vertical-align:top; }
+        td.num, th.num { text-align:right; }
+        .muted { color:#64748b; font-size:10px; }
+        .totals { width:280px; margin-left:auto; margin-top:18px; border:1px solid #d8e6f3; border-radius:12px; overflow:hidden; }
+        .totals div { display:flex; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #e5edf5; }
+        .totals div:last-child { border-bottom:none; background:#ecfeff; font-size:15px; font-weight:900; }
+        .notes { margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .footer { margin-top:30px; color:#64748b; font-size:10px; text-align:center; }
+    </style>
+</head>
+<body>
+    <div class="top">
+        <div class="brand">
+            <h1>{{ configuracion_facturacion.nombre_comercial_documentos|default:empresa.nombre }}</h1>
+            <p>{{ empresa.rtn|default:"" }}<br>{{ empresa.direccion|default:"" }}</p>
+        </div>
+        <div class="doc">
+            <div class="label">Cotizacion formal</div>
+            <div class="number">{{ cotizacion.numero }}</div>
+            <span class="badge">{{ cotizacion.get_estado_display }}</span>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="kicker">Cliente</div>
+            <div class="strong">{{ cotizacion.cliente.nombre }}</div>
+            <div class="muted">{{ cotizacion.cliente.rtn|default:"" }}</div>
+            <div class="muted">{{ cotizacion.cliente.direccion|default:"" }}</div>
+        </div>
+        <div class="card">
+            <div class="kicker">Datos de la propuesta</div>
+            <div>Fecha: <strong>{{ cotizacion.fecha|date:"d/m/Y" }}</strong></div>
+            <div>Vencimiento: <strong>{{ cotizacion.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</strong></div>
+            <div>Vendedor: <strong>{{ cotizacion.vendedor|default:"-" }}</strong></div>
+            <div>Moneda: <strong>{{ cotizacion.get_moneda_display }}</strong></div>
+        </div>
+    </div>
+
+    {% if cotizacion.asunto %}
+        <p style="margin-top:18px;"><strong>Asunto:</strong> {{ cotizacion.asunto }}</p>
+    {% endif %}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Descripcion</th>
+                <th class="num">Cantidad</th>
+                <th class="num">Precio</th>
+                <th class="num">Desc.</th>
+                <th class="num">Impuesto</th>
+                <th class="num">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linea in cotizacion.lineas.all %}
+            <tr>
+                <td>
+                    <strong>{{ linea.descripcion_visual }}</strong>
+                    {% if linea.comentario %}<br><span class="muted">{{ linea.comentario }}</span>{% endif %}
+                </td>
+                <td class="num">{{ linea.cantidad|floatformat:2 }}</td>
+                <td class="num">{{ linea.precio_unitario|floatformat:2 }}</td>
+                <td class="num">{{ linea.descuento_porcentaje|default:"0"|floatformat:2 }}%</td>
+                <td class="num">{{ linea.impuesto_monto|floatformat:2 }}</td>
+                <td class="num"><strong>{{ linea.total_linea|floatformat:2 }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <div><span>Subtotal</span><strong>{{ cotizacion.moneda }} {{ cotizacion.subtotal|floatformat:2 }}</strong></div>
+        <div><span>Impuesto</span><strong>{{ cotizacion.moneda }} {{ cotizacion.impuesto|floatformat:2 }}</strong></div>
+        <div><span>Total</span><strong>{{ cotizacion.moneda }} {{ cotizacion.total|floatformat:2 }}</strong></div>
+    </div>
+
+    {% if cotizacion.condiciones or cotizacion.notas %}
+    <div class="notes">
+        {% if cotizacion.condiciones %}
+        <div class="card">
+            <div class="kicker">Condiciones comerciales</div>
+            {{ cotizacion.condiciones|linebreaksbr }}
+        </div>
+        {% endif %}
+        {% if cotizacion.notas %}
+        <div class="card">
+            <div class="kicker">Notas</div>
+            {{ cotizacion.notas|linebreaksbr }}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        Esta cotizacion no representa factura fiscal. Al aprobarse puede convertirse en factura dentro del ERP.
+    </div>
+</body>
+</html>

@@ -1,0 +1,101 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Cotizaciones - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Operacion Comercial{% endblock %}
+{% block header_title %}Cotizaciones{% endblock %}
+{% block header_description %}Propuestas formales para ISS con aprobacion, PDF y conversion directa a factura borrador.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'crear_cotizacion' empresa.slug %}">Nueva cotizacion</a>
+<a class="erp-action-link" href="{% url 'facturas_dashboard' empresa.slug %}">Ver facturas</a>
+{% endblock %}
+
+{% block content %}
+<div class="erp-grid erp-grid-4">
+    <section class="erp-card">
+        <div class="erp-card-kicker">Cotizaciones</div>
+        <div class="erp-metric">{{ cantidad_cotizaciones }}</div>
+        <p class="erp-card-muted">Propuestas registradas.</p>
+    </section>
+    <section class="erp-card">
+        <div class="erp-card-kicker">Monto cotizado</div>
+        <div class="erp-metric">L. {{ total_cotizado|floatformat:2 }}</div>
+        <p class="erp-card-muted">Total historico de cotizaciones.</p>
+    </section>
+    <section class="erp-card">
+        <div class="erp-card-kicker">Pendientes</div>
+        <div class="erp-metric">{{ pendientes }}</div>
+        <p class="erp-card-muted">Borrador o enviadas.</p>
+    </section>
+    <section class="erp-card">
+        <div class="erp-card-kicker">Convertidas</div>
+        <div class="erp-metric">{{ convertidas }}</div>
+        <p class="erp-card-muted">Ya generaron factura.</p>
+    </section>
+</div>
+
+<section class="erp-card">
+    <div class="erp-form-actions" style="margin-bottom:18px;">
+        <div>
+            <div class="erp-card-kicker">Pipeline comercial</div>
+            <h3 class="erp-panel-title" style="margin:0;">Historial de cotizaciones</h3>
+        </div>
+        <a class="erp-btn" href="{% url 'crear_cotizacion' empresa.slug %}">+ Nueva cotizacion</a>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Numero</th>
+                    <th>Cliente</th>
+                    <th>Fecha</th>
+                    <th>Vence</th>
+                    <th>Estado</th>
+                    <th>Total</th>
+                    <th>Factura</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cotizacion in cotizaciones %}
+                <tr>
+                    <td><strong>{{ cotizacion.numero }}</strong></td>
+                    <td>{{ cotizacion.cliente.nombre }}</td>
+                    <td>{{ cotizacion.fecha|date:"d/m/Y" }}</td>
+                    <td>{{ cotizacion.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</td>
+                    <td>
+                        {% if cotizacion.estado == "aprobada" %}
+                            <span class="erp-badge success">Aprobada</span>
+                        {% elif cotizacion.estado == "convertida" %}
+                            <span class="erp-badge info">Convertida</span>
+                        {% elif cotizacion.estado == "rechazada" %}
+                            <span class="erp-badge danger">Rechazada</span>
+                        {% else %}
+                            <span class="erp-badge warning">{{ cotizacion.get_estado_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ cotizacion.moneda }} {{ cotizacion.total|floatformat:2 }}</strong></td>
+                    <td>
+                        {% with factura=cotizacion.factura_generada %}
+                            {% if factura %}
+                                <a href="{% url 'ver_factura' empresa.slug factura.id %}">{{ factura.numero_factura|default:"Borrador" }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>
+                        <a href="{% url 'ver_cotizacion' empresa.slug cotizacion.id %}">Ver</a>
+                        · <a href="{% url 'editar_cotizacion' empresa.slug cotizacion.id %}">Editar</a>
+                        · <a href="{% url 'descargar_cotizacion_pdf' empresa.slug cotizacion.id %}">PDF</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="text-align:center; padding:34px;">Todavia no hay cotizaciones registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Cotizacion {{ cotizacion.numero }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Cotizacion formal{% endblock %}
+{% block header_title %}{{ cotizacion.numero }}{% endblock %}
+{% block header_description %}Propuesta comercial con trazabilidad hasta factura cuando el cliente la apruebe.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'cotizaciones_dashboard' empresa.slug %}">Volver</a>
+<a class="erp-action-link" href="{% url 'editar_cotizacion' empresa.slug cotizacion.id %}">Editar</a>
+<a class="erp-action-link" href="{% url 'descargar_cotizacion_pdf' empresa.slug cotizacion.id %}">Descargar PDF</a>
+{% endblock %}
+
+{% block content %}
+<div class="erp-document-flow">
+    <section class="erp-document-sheet">
+        <div class="erp-document-header">
+            <div>
+                <div class="erp-document-kicker">Propuesta comercial</div>
+                <h3 class="erp-document-number">{{ cotizacion.numero }}</h3>
+                <div class="erp-document-meta">
+                    <div class="erp-document-meta-item"><span>Cliente</span><strong>{{ cotizacion.cliente.nombre }}</strong></div>
+                    <div class="erp-document-meta-item"><span>Fecha</span><strong>{{ cotizacion.fecha|date:"d/m/Y" }}</strong></div>
+                    <div class="erp-document-meta-item"><span>Vencimiento</span><strong>{{ cotizacion.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</strong></div>
+                    <div class="erp-document-meta-item"><span>Vendedor</span><strong>{{ cotizacion.vendedor|default:"-" }}</strong></div>
+                    <div class="erp-document-meta-item"><span>Moneda</span><strong>{{ cotizacion.get_moneda_display }}</strong></div>
+                    <div class="erp-document-meta-item"><span>Asunto</span><strong>{{ cotizacion.asunto|default:"Cotizacion de servicios" }}</strong></div>
+                </div>
+            </div>
+            <div class="erp-document-state">
+                <div class="erp-document-kicker" style="margin-bottom:14px;">Estado</div>
+                {% if cotizacion.estado == "aprobada" %}
+                    <span class="erp-badge success">Aprobada</span>
+                {% elif cotizacion.estado == "convertida" %}
+                    <span class="erp-badge info">Convertida a factura</span>
+                {% elif cotizacion.estado == "rechazada" %}
+                    <span class="erp-badge danger">Rechazada</span>
+                {% else %}
+                    <span class="erp-badge warning">{{ cotizacion.get_estado_display }}</span>
+                {% endif %}
+                <div style="margin-top:18px;">
+                    {% if factura_generada %}
+                        <a class="erp-btn" href="{% url 'ver_factura' empresa.slug factura_generada.id %}">Ver factura generada</a>
+                    {% else %}
+                        {% if cotizacion.estado != "aprobada" %}
+                        <form method="post" action="{% url 'aprobar_cotizacion' empresa.slug cotizacion.id %}" style="margin-bottom:10px;">
+                            {% csrf_token %}
+                            <button class="erp-btn-secondary" type="submit">Marcar aprobada</button>
+                        </form>
+                        {% endif %}
+                        <form method="post" action="{% url 'convertir_cotizacion_factura' empresa.slug cotizacion.id %}">
+                            {% csrf_token %}
+                            <button class="erp-btn" type="submit" {% if cotizacion.estado != "aprobada" %}disabled{% endif %}>Convertir a factura</button>
+                        </form>
+                        {% if cotizacion.estado != "aprobada" %}
+                            <p class="erp-card-muted" style="margin-top:8px;">Primero marca la cotizacion como aprobada.</p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="erp-table-wrap" style="margin-top:24px;">
+            <table class="erp-table">
+                <thead>
+                    <tr>
+                        <th>Descripcion</th>
+                        <th>Cantidad</th>
+                        <th>Precio</th>
+                        <th>Desc.</th>
+                        <th>Impuesto</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in cotizacion.lineas.all %}
+                    <tr>
+                        <td>
+                            <strong>{{ linea.descripcion_visual }}</strong>
+                            {% if linea.comentario %}<br><span class="erp-card-muted">{{ linea.comentario }}</span>{% endif %}
+                        </td>
+                        <td>{{ linea.cantidad|floatformat:2 }}</td>
+                        <td>{{ cotizacion.moneda }} {{ linea.precio_unitario|floatformat:2 }}</td>
+                        <td>{{ linea.descuento_porcentaje|default:"0"|floatformat:2 }}%</td>
+                        <td>{{ linea.impuesto_monto|floatformat:2 }}</td>
+                        <td><strong>{{ cotizacion.moneda }} {{ linea.total_linea|floatformat:2 }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="erp-document-totals">
+            <div><span>Subtotal</span><strong>{{ cotizacion.moneda }} {{ cotizacion.subtotal|floatformat:2 }}</strong></div>
+            <div><span>Impuesto</span><strong>{{ cotizacion.moneda }} {{ cotizacion.impuesto|floatformat:2 }}</strong></div>
+            <div class="erp-document-total-final"><span>Total</span><strong>{{ cotizacion.moneda }} {{ cotizacion.total|floatformat:2 }}</strong></div>
+        </div>
+
+        {% if cotizacion.condiciones or cotizacion.notas %}
+        <div class="erp-grid erp-grid-2" style="margin-top:22px;">
+            {% if cotizacion.condiciones %}
+            <section class="erp-card">
+                <div class="erp-card-kicker">Condiciones</div>
+                <p>{{ cotizacion.condiciones|linebreaksbr }}</p>
+            </section>
+            {% endif %}
+            {% if cotizacion.notas %}
+            <section class="erp-card">
+                <div class="erp-card-kicker">Notas</div>
+                <p>{{ cotizacion.notas|linebreaksbr }}</p>
+            </section>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

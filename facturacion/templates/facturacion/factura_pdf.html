@@ -345,6 +345,9 @@ body {
                         Moneda: {{ factura.get_moneda_display }}<br>
                         Emision: {{ factura.fecha_emision|date:"d/m/Y" }}<br>
                         Vencimiento: {{ factura.fecha_vencimiento|date:"d/m/Y"|default:"-" }}
+                        {% if factura.cotizacion_origen %}
+                        <br>Cotizacion origen: {{ factura.cotizacion_origen.numero }}
+                        {% endif %}
                     </div>
                 </div>
             </td>

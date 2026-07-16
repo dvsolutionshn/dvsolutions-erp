@@ -7,6 +7,13 @@ urlpatterns = [
     path('configuracion/', views.configuracion_facturacion, name='configuracion_facturacion'),
 
     path('facturas/', views.facturas_dashboard, name='facturas_dashboard'),
+    path('cotizaciones/', views.cotizaciones_dashboard, name='cotizaciones_dashboard'),
+    path('cotizaciones/crear/', views.crear_cotizacion, name='crear_cotizacion'),
+    path('cotizaciones/<int:cotizacion_id>/', views.ver_cotizacion, name='ver_cotizacion'),
+    path('cotizaciones/<int:cotizacion_id>/editar/', views.editar_cotizacion, name='editar_cotizacion'),
+    path('cotizaciones/<int:cotizacion_id>/aprobar/', views.aprobar_cotizacion, name='aprobar_cotizacion'),
+    path('cotizaciones/<int:cotizacion_id>/convertir-factura/', views.convertir_cotizacion_factura, name='convertir_cotizacion_factura'),
+    path('cotizaciones/<int:cotizacion_id>/pdf/', views.descargar_cotizacion_pdf, name='descargar_cotizacion_pdf'),
     path('pos/', views.punto_venta, name='punto_venta'),
     path('pos/promociones/', views.configurar_promocion_pos, name='configurar_promocion_pos'),
     path('pos/clientes/buscar/', views.pos_buscar_clientes, name='pos_buscar_clientes'),

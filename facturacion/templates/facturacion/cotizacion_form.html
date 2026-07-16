@@ -1,0 +1,128 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{% if modo_edicion %}Editar cotizacion{% else %}Nueva cotizacion{% endif %} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Cotizaciones ISS{% endblock %}
+{% block header_title %}{% if modo_edicion %}Editar cotizacion {{ cotizacion.numero }}{% else %}Nueva cotizacion formal{% endif %}{% endblock %}
+{% block header_description %}Prepara una propuesta comercial con productos, servicios, impuestos y condiciones antes de convertirla a factura.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'cotizaciones_dashboard' empresa.slug %}">Volver a cotizaciones</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.quote-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.75fr);gap:20px;align-items:start}
+.quote-lines{display:flex;flex-direction:column;gap:12px}
+.quote-line{display:grid;grid-template-columns:1.2fr 1.2fr .55fr .7fr .55fr .7fr 44px;gap:10px;align-items:end;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,#fff,#f8fcff)}
+.quote-line .erp-field{margin:0}
+.quote-line textarea{min-height:44px}
+.quote-side-total{font-size:2rem;font-weight:900;color:#102338;margin:8px 0}
+@media (max-width:1100px){.quote-layout{grid-template-columns:1fr}.quote-line{grid-template-columns:1fr 1fr}.quote-line .delete-cell{justify-content:flex-start}}
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="quote-layout">
+    {% csrf_token %}
+    <div class="erp-form-main">
+        <section class="erp-card">
+            <div class="erp-card-kicker">Datos comerciales</div>
+            <h3 class="erp-panel-title">Encabezado de la cotizacion</h3>
+            {% if form.non_field_errors %}
+                <div class="erp-alert error">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="erp-form-grid">
+                {% for field in form %}
+                    {% if field.name != "condiciones" and field.name != "notas" %}
+                    <div class="erp-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}<div class="erp-field-error">{{ field.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="erp-card">
+            <div class="erp-card-kicker">Detalle</div>
+            <h3 class="erp-panel-title">Productos y servicios cotizados</h3>
+            <p class="erp-card-muted">Puedes elegir un producto o escribir una descripcion manual para servicios especiales.</p>
+            {{ formset.management_form }}
+            {% if formset.non_form_errors %}
+                <div class="erp-alert error">{{ formset.non_form_errors }}</div>
+            {% endif %}
+            <div class="quote-lines">
+                {% for line_form in formset %}
+                <div class="quote-line">
+                    {{ line_form.id }}
+                    <div class="erp-field">
+                        <label>Producto</label>
+                        {{ line_form.producto }}
+                        {% if line_form.producto.errors %}<div class="erp-field-error">{{ line_form.producto.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="erp-field">
+                        <label>Descripcion manual</label>
+                        {{ line_form.descripcion_manual }}
+                        {% if line_form.descripcion_manual.errors %}<div class="erp-field-error">{{ line_form.descripcion_manual.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="erp-field">
+                        <label>Cantidad</label>
+                        {{ line_form.cantidad }}
+                        {% if line_form.cantidad.errors %}<div class="erp-field-error">{{ line_form.cantidad.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="erp-field">
+                        <label>Precio</label>
+                        {{ line_form.precio_unitario }}
+                        {% if line_form.precio_unitario.errors %}<div class="erp-field-error">{{ line_form.precio_unitario.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="erp-field">
+                        <label>Desc. %</label>
+                        {{ line_form.descuento_porcentaje }}
+                    </div>
+                    <div class="erp-field">
+                        <label>Impuesto</label>
+                        {{ line_form.impuesto }}
+                        {% if line_form.impuesto.errors %}<div class="erp-field-error">{{ line_form.impuesto.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div class="erp-field delete-cell">
+                        <label>Quitar</label>
+                        {{ line_form.DELETE }}
+                    </div>
+                    <div class="erp-field" style="grid-column:1/-1;">
+                        <label>Comentario de linea</label>
+                        {{ line_form.comentario }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+
+    <aside class="erp-form-side">
+        <section class="erp-card">
+            <div class="erp-card-kicker">Resumen</div>
+            <h3 class="erp-panel-title">Cotizacion formal</h3>
+            <p class="erp-card-muted">Los totales se recalculan al guardar. La factura se generara como borrador cuando la cotizacion este aprobada.</p>
+            {% if cotizacion %}
+                <div class="quote-side-total">{{ cotizacion.moneda }} {{ cotizacion.total|floatformat:2 }}</div>
+            {% endif %}
+            <div class="erp-form-actions">
+                <button class="erp-btn" type="submit">Guardar cotizacion</button>
+                <a class="erp-btn-secondary" href="{% url 'cotizaciones_dashboard' empresa.slug %}">Cancelar</a>
+            </div>
+        </section>
+
+        <section class="erp-card">
+            <div class="erp-card-kicker">Condiciones</div>
+            <div class="erp-field">
+                <label for="{{ form.condiciones.id_for_label }}">Condiciones comerciales</label>
+                {{ form.condiciones }}
+            </div>
+            <div class="erp-field">
+                <label for="{{ form.notas.id_for_label }}">Notas internas o visibles</label>
+                {{ form.notas }}
+            </div>
+        </section>
+    </aside>
+</form>
+{% endblock %}

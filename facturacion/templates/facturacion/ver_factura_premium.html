@@ -500,6 +500,12 @@
                         <span>Vencimiento</span>
                         <strong>{{ factura.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</strong>
                     </div>
+                    {% if factura.cotizacion_origen %}
+                    <div class="erp-document-meta-item">
+                        <span>Cotizacion origen</span>
+                        <strong><a href="{% url 'ver_cotizacion' empresa.slug factura.cotizacion_origen.id %}">{{ factura.cotizacion_origen.numero }}</a></strong>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
