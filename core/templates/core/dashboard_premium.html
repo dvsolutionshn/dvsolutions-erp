@@ -490,6 +490,16 @@
                 <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/recibos/">Ingresar al modulo</a></div>
             </article>
                 {% endif %}
+            {% elif modulo.codigo == "cotizaciones" %}
+                {% if erp_access.cotizaciones %}
+            <article class="erp-card erp-module-card erp-dashboard-module">
+                <div class="erp-module-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div>
+                <div class="erp-kpi-label">Propuestas Comerciales</div>
+                <h3>Cotizaciones</h3>
+                <p>Cotizaciones formales con PDF, aprobacion y conversion directa a factura borrador con trazabilidad comercial.</p>
+                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/cotizaciones/">Ingresar al modulo</a></div>
+            </article>
+                {% endif %}
             {% elif modulo.codigo == "punto_venta" %}
                 {% if erp_access.modulo_pos %}
             <article class="erp-card erp-module-card erp-dashboard-module">

@@ -34,6 +34,7 @@ def erp_access(request):
     citas_activa = bool(empresa and empresa.tiene_modulo_activo("agenda_citas"))
     clinica_activa = bool(empresa and empresa.tiene_modulo_activo("clinica_medica"))
     tecnicentro_activo = bool(empresa and empresa.tiene_modulo_activo("tecnicentro"))
+    cotizaciones_activa = bool(empresa and empresa.tiene_modulo_activo("cotizaciones"))
     base = {
         "modulo_facturacion": facturacion_activa and getattr(user, "tiene_alguna_permision_facturacion", False),
         "modulo_contabilidad": contabilidad_activa and getattr(user, "tiene_alguna_permision_contabilidad", False),
@@ -44,6 +45,7 @@ def erp_access(request):
         "modulo_clinica": clinica_activa and getattr(user, "tiene_alguna_permision_clinica", False),
         "modulo_tecnicentro": tecnicentro_activo and getattr(user, "tiene_alguna_permision_tecnicentro", False),
         "facturas": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_facturas"),
+        "cotizaciones": facturacion_activa and cotizaciones_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_facturas"),
         "configuracion_facturacion": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_configuracion_facturacion"),
         "cierres_caja": facturacion_activa and getattr(user, "tiene_permiso_erp", lambda *_: False)("puede_cierres_caja"),
         "historial_cierres_caja": bool(

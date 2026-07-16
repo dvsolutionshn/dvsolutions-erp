@@ -89,10 +89,10 @@ def _precios_incluyen_impuesto(empresa):
 
 
 def _empresa_permite_cotizaciones(empresa):
-    identidad = f"{getattr(empresa, 'slug', '')} {getattr(empresa, 'nombre', '')}".lower()
-    return any(
-        marcador in identidad
-        for marcador in ("iss", "integrated sales", "integrated_sales", "integrated-sales")
+    return bool(
+        empresa
+        and empresa.tiene_modulo_activo("facturacion")
+        and empresa.tiene_modulo_activo("cotizaciones")
     )
 
 

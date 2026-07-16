@@ -185,9 +185,7 @@
             <div class="erp-nav-group-title">Operacion</div>
             <nav class="erp-nav">
                 {% if erp_access.facturas %}<a class="erp-nav-link {% if '/dashboard/facturacion/facturas/' in request.path or '/dashboard/facturacion/crear/' in request.path %}is-active{% endif %}" href="{{ facturas_url }}"><span class="erp-nav-bullet"></span><span>Facturas</span></a>{% endif %}
-                {% if erp_access.facturas %}
-                    {% if "integrated" in empresa.slug or "iss" in empresa.slug %}<a class="erp-nav-link {% if '/dashboard/facturacion/cotizaciones/' in request.path %}is-active{% endif %}" href="{{ cotizaciones_url }}"><span class="erp-nav-bullet"></span><span>Cotizaciones</span></a>{% endif %}
-                {% endif %}
+                {% if erp_access.cotizaciones %}<a class="erp-nav-link {% if '/dashboard/facturacion/cotizaciones/' in request.path %}is-active{% endif %}" href="{{ cotizaciones_url }}"><span class="erp-nav-bullet"></span><span>Cotizaciones</span></a>{% endif %}
                 {% if erp_access.modulo_pos %}<a class="erp-nav-link {% if '/dashboard/facturacion/pos/' in request.path and '/dashboard/facturacion/pos/promociones/' not in request.path %}is-active{% endif %}" href="{{ punto_venta_url }}"><span class="erp-nav-bullet"></span><span>Punto de Venta</span></a>{% endif %}
                 {% if erp_access.modulo_pos %}<a class="erp-nav-link {% if '/dashboard/facturacion/pos/promociones/' in request.path %}is-active{% endif %}" href="{{ promociones_pos_url }}"><span class="erp-nav-bullet"></span><span>Promociones POS</span></a>{% endif %}
                 {% if erp_access.configuracion_facturacion %}<a class="erp-nav-link {% if '/dashboard/facturacion/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_facturacion_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}

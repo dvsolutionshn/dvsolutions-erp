@@ -21,6 +21,7 @@ FACTURACION_PERMISSION_MAP = [
     ("reportes/", "puede_reportes"),
     ("cxc/", "puede_cxc"),
     ("cxp/", "puede_cxp"),
+    ("cotizaciones/", "puede_facturas"),
     ("facturas/", "puede_facturas"),
     ("crear/", "puede_facturas"),
 ]
