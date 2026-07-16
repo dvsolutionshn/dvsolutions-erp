@@ -431,6 +431,8 @@ class PlanConsentimientoPDFForm(BaseClinicaForm):
 
 
 class ExamenPacienteForm(BaseClinicaForm):
+    MAX_ARCHIVO_MB = 50
+
     class Meta:
         model = ExamenPaciente
         fields = ["titulo", "tipo", "fecha_examen", "laboratorio", "descripcion", "archivo"]
@@ -449,11 +451,14 @@ class ExamenPacienteForm(BaseClinicaForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["archivo"].required = True
+        self.fields["archivo"].help_text = (
+            f"Puede subir PDF o imagen JPG, PNG o WebP. Tamano maximo: {self.MAX_ARCHIVO_MB} MB."
+        )
 
     def clean_archivo(self):
         archivo = self.cleaned_data.get("archivo")
-        if archivo and archivo.size > 20 * 1024 * 1024:
-            raise forms.ValidationError("El archivo no puede superar 20 MB.")
+        if archivo and archivo.size > self.MAX_ARCHIVO_MB * 1024 * 1024:
+            raise forms.ValidationError(f"El archivo no puede superar {self.MAX_ARCHIVO_MB} MB.")
         permitidos = {"application/pdf", "application/x-pdf", "image/jpeg", "image/png", "image/webp"}
         if archivo and getattr(archivo, "content_type", "") not in permitidos:
             raise forms.ValidationError("Solo se permiten PDF o imagenes JPG, PNG o WebP.")
