@@ -12,16 +12,18 @@
 {% block extra_head %}
 <style>
 .quote-form-shell{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+.quote-form-shell .erp-card{overflow:visible}
 .quote-main{display:flex;flex-direction:column;gap:18px}
 .quote-header-actions{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .quote-quick-actions,.quote-section-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .quote-field-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .quote-field-head label{margin:0}
-.quote-lines-card{overflow:hidden}
-.quote-line-layout{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff}
+.quote-lines-card{overflow:visible}
+.quote-line-layout{border:1px solid var(--line);border-radius:18px;overflow:visible;background:#fff}
 .quote-line-header,.quote-line-row{display:grid;grid-template-columns:minmax(300px,1.6fr) 110px 130px 100px 64px 140px 124px 52px;gap:12px;align-items:center}
 .quote-line-header{padding:13px 14px;background:#f6fbff;color:#64778c;font-size:.72rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line)}
-.quote-line-row{padding:14px;border-bottom:1px solid #eaf1f7}
+.quote-line-row{position:relative;padding:14px;border-bottom:1px solid #eaf1f7;background:#fff}
+.quote-line-row:focus-within{z-index:60}
 .quote-line-row:last-child{border-bottom:0}
 .quote-line-row input,.quote-line-row select,.quote-line-row textarea,.quote-client-search{
     width:100%;min-height:44px;border:1px solid #b9d4e8;border-radius:12px;background:#fff;
@@ -36,7 +38,7 @@
 .quote-product-search{width:100%;border:1px solid #b9d4e8;border-radius:12px;padding:12px 13px;font:inherit}
 .quote-product-search:focus{outline:0;border-color:#10b7b0;box-shadow:0 0 0 3px rgba(16,183,176,.12)}
 .quote-product-select,.quote-client-select{display:none!important}
-.quote-suggestions{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;display:none;background:#fff;border:1px solid #c8d9e8;border-radius:14px;box-shadow:0 18px 45px rgba(17,37,58,.16);max-height:260px;overflow:auto;padding:6px}
+.quote-suggestions{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:300;display:none;background:#fff;border:1px solid #c8d9e8;border-radius:14px;box-shadow:0 18px 45px rgba(17,37,58,.16);max-height:260px;overflow:auto;padding:6px}
 .quote-suggestion{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;color:#102338}
 .quote-suggestion:hover{background:#edf8fb}
 .quote-suggestion strong{display:block;font-size:.9rem}
@@ -48,7 +50,7 @@
 .quote-note-btn,.quote-delete-btn{border:1px solid #c8d9e8;border-radius:12px;background:#fff;color:#0f2842;font-weight:900;min-height:42px;cursor:pointer}
 .quote-note-btn:hover,.quote-delete-btn:hover{background:#eef8fb}
 .quote-delete-btn{color:#b42318;border-color:#ffc8c3}
-.quote-client-picker{position:relative}
+.quote-client-picker{position:relative;z-index:80}
 .quote-client-meta{margin-top:7px;color:#6a7b8f;font-size:.78rem}
 .quote-line-row .descuento{text-align:right}
 .quote-line-row .line-total{font-weight:900;color:#102338;background:#f8fbfe}
