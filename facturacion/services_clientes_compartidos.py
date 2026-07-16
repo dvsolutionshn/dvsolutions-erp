@@ -15,6 +15,7 @@ EMPRESAS_CLIENTES_COMPARTIDOS = frozenset({
     "luque_aestetic",
     "hospital_mia",
     "medical_spa",
+    "serviciosmedicos",
 })
 EMPRESAS_IDENTIDAD_CLIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
 

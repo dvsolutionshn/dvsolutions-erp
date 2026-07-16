@@ -143,7 +143,7 @@ def _configuracion_clinica(empresa):
     return ConfiguracionClinica.objects.get_or_create(empresa=empresa)[0]
 
 
-EMPRESAS_FORMULARIOS_CLINICOS = {"hospital_mia", "medical_spa", "luque_aestetic"}
+EMPRESAS_FORMULARIOS_CLINICOS = {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"}
 
 
 def _requiere_hospital_mia(empresa):

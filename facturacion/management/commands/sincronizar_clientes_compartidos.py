@@ -81,14 +81,14 @@ class Command(BaseCommand):
         from clinica.services_pacientes import asegurar_paciente_desde_cliente
 
         pacientes_creados = 0
-        clientes_hospital = Cliente.objects.filter(
-            empresa__slug="hospital_mia",
+        clientes_compartidos = Cliente.objects.filter(
+            empresa__slug__in=EMPRESAS_CLIENTES_COMPARTIDOS,
         ).exclude(nombre__iexact="Consumidor Final")
-        for cliente in clientes_hospital.select_related("empresa"):
+        for cliente in clientes_compartidos.select_related("empresa"):
             _paciente, creado = asegurar_paciente_desde_cliente(cliente)
             pacientes_creados += int(creado)
         self.stdout.write(self.style.SUCCESS(
-            f"Hospital MIA: {pacientes_creados} pacientes creados desde clientes existentes."
+            f"Empresas compartidas: {pacientes_creados} pacientes creados desde clientes existentes."
         ))
 
     def _mostrar_coincidencias(self, etiqueta, grupos):

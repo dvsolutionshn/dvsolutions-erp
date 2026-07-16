@@ -2642,7 +2642,7 @@ class FacturacionTests(TestCase):
                         telefono="99990000",
                     )
 
-    def test_cliente_se_comparte_entre_luque_hospital_y_medical_spa(self):
+    def test_cliente_se_comparte_entre_luque_hospital_medical_spa_y_serviciosmedicos(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])
         luque = Empresa.objects.create(
@@ -2654,6 +2654,11 @@ class FacturacionTests(TestCase):
             nombre="Medical Spa",
             slug="medical_spa",
             rtn="08011999100002",
+        )
+        serviciosmedicos = Empresa.objects.create(
+            nombre="Servicios Medicos",
+            slug="serviciosmedicos",
+            rtn="08011999100003",
         )
 
         response = self.client.post(
@@ -2670,15 +2675,18 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         fichas = Cliente.objects.filter(
-            empresa__in=[self.empresa, luque, medical_spa],
+            empresa__in=[self.empresa, luque, medical_spa, serviciosmedicos],
             rtn="0801199912777",
         ).select_related("empresa")
-        self.assertEqual(fichas.count(), 3)
+        self.assertEqual(fichas.count(), 4)
         self.assertEqual(len({ficha.perfil_compartido_id for ficha in fichas}), 1)
-        self.assertEqual(len({ficha.empresa_id for ficha in fichas}), 3)
+        self.assertEqual(len({ficha.empresa_id for ficha in fichas}), 4)
         paciente = Paciente.objects.get(empresa=self.empresa, identidad="0801199912777")
         self.assertEqual(paciente.cliente, fichas.get(empresa=self.empresa))
-        self.assertEqual(paciente.telefono, "99887766")
+        self.assertEqual(paciente.telefono, "50499887766")
+        self.assertTrue(Paciente.objects.filter(empresa=luque, identidad="0801199912777").exists())
+        self.assertTrue(Paciente.objects.filter(empresa=medical_spa, identidad="0801199912777").exists())
+        self.assertTrue(Paciente.objects.filter(empresa=serviciosmedicos, identidad="0801199912777").exists())
 
         origen = fichas.get(empresa=self.empresa)
         origen.telefono = "99991111"
@@ -2694,7 +2702,7 @@ class FacturacionTests(TestCase):
         self.assertIsNotNone(origen.cuenta_contable_id)
         self.assertTrue(
             Cliente.objects.filter(
-                empresa__in=[luque, medical_spa],
+                empresa__in=[luque, medical_spa, serviciosmedicos],
                 rtn="0801199912777",
                 cuenta_contable__isnull=True,
             ).exists()

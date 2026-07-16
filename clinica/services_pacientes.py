@@ -3,8 +3,26 @@ from django.db import transaction
 from .models import Paciente
 
 
+EMPRESAS_PACIENTES_COMPARTIDOS = frozenset({
+    "hospital_mia",
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+})
+
+
 def _codigo_expediente_disponible(empresa):
-    prefijo = "MIA"
+    identificador = f"{empresa.slug or ''} {empresa.nombre or ''}".lower()
+    if "mia" in identificador:
+        prefijo = "MIA"
+    elif "medical" in identificador or "spa" in identificador:
+        prefijo = "MMS"
+    elif "luque" in identificador:
+        prefijo = "LQ"
+    elif "serviciosmedicos" in identificador or "servicios medicos" in identificador:
+        prefijo = "SM"
+    else:
+        prefijo = "EXP"
     consecutivo = Paciente.objects.filter(empresa=empresa).count() + 1
     while True:
         codigo = f"{prefijo}-{consecutivo:05d}"
@@ -14,7 +32,10 @@ def _codigo_expediente_disponible(empresa):
 
 
 def asegurar_paciente_desde_cliente(cliente):
-    if cliente.empresa.slug != "hospital_mia" or (cliente.nombre or "").strip().casefold() == "consumidor final":
+    if (
+        cliente.empresa.slug not in EMPRESAS_PACIENTES_COMPARTIDOS
+        or (cliente.nombre or "").strip().casefold() == "consumidor final"
+    ):
         return None, False
 
     identidad = (cliente.rtn or "").strip()
