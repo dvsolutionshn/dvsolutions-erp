@@ -13,6 +13,7 @@
 <style>
 .quote-form-shell{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
 .quote-form-shell .erp-card{overflow:visible}
+.quote-form-shell .erp-field{overflow:visible}
 .quote-main{display:flex;flex-direction:column;gap:18px}
 .quote-header-actions{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .quote-quick-actions,.quote-section-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -51,6 +52,8 @@
 .quote-note-btn:hover,.quote-delete-btn:hover{background:#eef8fb}
 .quote-delete-btn{color:#b42318;border-color:#ffc8c3}
 .quote-client-picker{position:relative;z-index:80}
+.quote-client-field{position:relative;z-index:120}
+.quote-client-field:focus-within{z-index:400}
 .quote-client-meta{margin-top:7px;color:#6a7b8f;font-size:.78rem}
 .quote-line-row .descuento{text-align:right}
 .quote-line-row .line-total{font-weight:900;color:#102338;background:#f8fbfe}
@@ -93,7 +96,7 @@
                 <div class="erp-alert error">{{ form.non_field_errors }}</div>
             {% endif %}
             <div class="erp-form-grid">
-                <div class="erp-field">
+                <div class="erp-field quote-client-field">
                     <div class="quote-field-head">
                         <label for="{{ form.cliente.id_for_label }}">{{ form.cliente.label }}</label>
                         <a class="erp-btn-secondary quote-new-client-trigger" href="{% url 'crear_cliente_facturacion' empresa.slug %}">+ Crear cliente</a>
