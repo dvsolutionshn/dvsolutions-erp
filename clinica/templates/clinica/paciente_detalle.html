@@ -41,13 +41,31 @@
 .patient-consent-list{display:grid;gap:12px;margin-top:14px}.patient-consent-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#fff,#f8fbff)}.patient-consent-card strong{display:block;color:#102338}.patient-consent-card span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.patient-consent-actions{display:flex;gap:8px;flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:14px;padding:12px 14px;font-weight:800}
 .patient-anchor-offset{scroll-margin-top:100px}
+.patient-reminder-card{position:relative;overflow:hidden;border:1px solid rgba(137,92,246,.22);background:radial-gradient(circle at top right,rgba(168,85,247,.13),transparent 30%),linear-gradient(135deg,#fff,#f8fbff)}
+.patient-reminder-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#7c3aed,#06b6d4,#14b8a6)}
+.patient-reminder-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.patient-reminder-head h3{margin:6px 0 0;color:#102338}
+.patient-reminder-head p{margin:8px 0 0;color:var(--muted);line-height:1.55;max-width:760px}
+.patient-reminder-badge{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:999px;background:#f2eafe;color:#6d28d9;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.patient-reminder-list{display:grid;gap:10px;margin-top:18px}
+.patient-reminder-row{display:grid;grid-template-columns:minmax(210px,1.35fr) 150px 110px 82px minmax(190px,1fr) 42px;gap:10px;align-items:end;padding:12px;border:1px solid #dfe8f2;border-radius:16px;background:rgba(255,255,255,.88);box-shadow:0 10px 24px rgba(17,35,54,.04)}
+.patient-reminder-field label{display:block;margin-bottom:6px;color:#60768b;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+.patient-reminder-field input,.patient-reminder-field select{width:100%;min-height:42px;border:1px solid #bfd2e5;border-radius:12px;background:#fff;padding:0 11px;color:#102338;font:inherit}
+.patient-reminder-field input:focus,.patient-reminder-field select:focus{outline:0;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.11)}
+.patient-reminder-remove{min-height:42px;border:1px solid #ffc7c2;border-radius:12px;background:#fff5f4;color:#b42318;font-weight:900;cursor:pointer}
+.patient-reminder-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+.patient-reminder-upcoming{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:16px}
+.patient-reminder-chip{padding:12px 13px;border:1px solid #dfd2ff;border-radius:15px;background:#fbf9ff}
+.patient-reminder-chip strong{display:block;color:#3b217a}.patient-reminder-chip span{display:block;margin-top:5px;color:#64758a;font-size:12px;line-height:1.4}
 @media (max-width:1180px){
     .patient-entry-grid,.patient-quick-grid,.patient-section-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .patient-reminder-row{grid-template-columns:1fr 1fr}
 }
 @media (max-width:760px){
     .patient-hero,.patient-entry-grid,.patient-quick-grid,.patient-section-grid{grid-template-columns:1fr}
     .patient-profile-photo{width:120px;height:120px}
     .patient-evolution-carousel{grid-auto-columns:82vw}.patient-consent-card{grid-template-columns:1fr}
+    .patient-reminder-row{grid-template-columns:1fr}
 }
 </style>
 {% endblock %}
@@ -86,6 +104,79 @@
     <a class="erp-card patient-entry-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Resultados</div><h3>Examenes</h3><p>Subida y consulta de examenes en PDF o fotografia, organizados por fecha y tipo.</p></a>
     <a class="erp-card patient-entry-card" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Prescripcion</div><h3>Recetas</h3><p>Crea recetas medicas profesionales con productos, indicaciones e impresion con logo.</p></a>
     <a class="erp-card patient-entry-card" href="#citas"><div class="erp-kpi-label">Agenda</div><h3>Citas</h3><p>Citas pasadas, programadas y acceso rapido para agendar nuevas atenciones.</p></a>
+</section>
+
+<section class="erp-card patient-reminder-card patient-anchor-offset" id="recordatorios-tratamiento">
+    <div class="patient-reminder-head">
+        <div>
+            <div class="erp-kpi-label">Seguimiento estetico / clinico</div>
+            <h3>Recordatorios de tratamiento al calendario</h3>
+            <p>Agende controles o siguientes aplicaciones desde este expediente. Cada linea se envia al calendario como recordatorio destacado, con color propio y franja visible para diferenciarlo de una cita normal.</p>
+        </div>
+        <span class="patient-reminder-badge">◆ Calendario + seguimiento</span>
+    </div>
+    <form method="post" action="{% url 'clinica_crear_recordatorios_tratamiento' empresa.slug paciente.id %}" id="treatmentReminderForm">
+        {% csrf_token %}
+        <div class="patient-reminder-list" id="treatmentReminderRows">
+            <div class="patient-reminder-row">
+                <div class="patient-reminder-field">
+                    <label>Tratamiento / seguimiento</label>
+                    <input type="text" name="tratamiento[]" placeholder="Ej. Relleno de botox, revision de botox">
+                </div>
+                <div class="patient-reminder-field">
+                    <label>Fecha</label>
+                    <input type="date" name="fecha[]">
+                </div>
+                <div class="patient-reminder-field">
+                    <label>Hora</label>
+                    <select name="hora[]">
+                        <option value="">Hora</option>
+                        <option value="08:00">08:00</option><option value="08:15">08:15</option><option value="08:30">08:30</option><option value="08:45">08:45</option>
+                        <option value="09:00">09:00</option><option value="09:15">09:15</option><option value="09:30">09:30</option><option value="09:45">09:45</option>
+                        <option value="10:00">10:00</option><option value="10:15">10:15</option><option value="10:30">10:30</option><option value="10:45">10:45</option>
+                        <option value="11:00">11:00</option><option value="11:15">11:15</option><option value="11:30">11:30</option><option value="11:45">11:45</option>
+                        <option value="12:00">12:00</option><option value="12:15">12:15</option><option value="12:30">12:30</option><option value="12:45">12:45</option>
+                        <option value="01:00">01:00</option><option value="01:15">01:15</option><option value="01:30">01:30</option><option value="01:45">01:45</option>
+                        <option value="02:00">02:00</option><option value="02:15">02:15</option><option value="02:30">02:30</option><option value="02:45">02:45</option>
+                        <option value="03:00">03:00</option><option value="03:15">03:15</option><option value="03:30">03:30</option><option value="03:45">03:45</option>
+                        <option value="04:00">04:00</option><option value="04:15">04:15</option><option value="04:30">04:30</option><option value="04:45">04:45</option>
+                        <option value="05:00">05:00</option><option value="05:15">05:15</option><option value="05:30">05:30</option><option value="05:45">05:45</option>
+                        <option value="06:00">06:00</option><option value="06:15">06:15</option><option value="06:30">06:30</option><option value="06:45">06:45</option>
+                        <option value="07:00">07:00</option>
+                    </select>
+                </div>
+                <div class="patient-reminder-field">
+                    <label>AM/PM</label>
+                    <select name="periodo[]"><option value="AM">AM</option><option value="PM" selected>PM</option></select>
+                </div>
+                <div class="patient-reminder-field">
+                    <label>Doctor / profesional</label>
+                    <select name="profesional[]">
+                        <option value="">Sin asignar</option>
+                        {% for profesional in profesionales %}
+                        <option value="{{ profesional.id }}">{{ profesional.nombre }}{% if profesional.especialidad %} · {{ profesional.especialidad }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="nota[]" value="">
+                </div>
+                <button type="button" class="patient-reminder-remove" data-remove-reminder>×</button>
+            </div>
+        </div>
+        <div class="patient-reminder-actions">
+            <button type="button" class="erp-btn-secondary" id="addTreatmentReminder">+ Agregar otro seguimiento</button>
+            <button type="submit" class="erp-btn">Enviar al calendario</button>
+        </div>
+    </form>
+    {% if recordatorios_tratamiento %}
+    <div class="patient-reminder-upcoming">
+        {% for recordatorio in recordatorios_tratamiento %}
+        <div class="patient-reminder-chip">
+            <strong>{{ recordatorio.tratamiento_recordatorio|default:recordatorio.motivo }}</strong>
+            <span>{{ recordatorio.fecha_hora|date:"d/m/Y h:i A" }}{% if recordatorio.profesional %} · {{ recordatorio.profesional.nombre }}{% endif %}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </section>
 
 <section id="historial-clinico" class="erp-card patient-anchor-offset">
@@ -251,6 +342,42 @@
 </div>
 
 <script>
+(function(){
+    const rows = document.getElementById("treatmentReminderRows");
+    const addButton = document.getElementById("addTreatmentReminder");
+    if(!rows || !addButton){ return; }
+    function wireRow(row){
+        const remove = row.querySelector("[data-remove-reminder]");
+        if(remove){
+            remove.addEventListener("click", function(){
+                const allRows = rows.querySelectorAll(".patient-reminder-row");
+                if(allRows.length <= 1){
+                    row.querySelectorAll("input").forEach(input => input.value = "");
+                    row.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
+                    const periodo = row.querySelector('select[name="periodo[]"]');
+                    if(periodo){ periodo.value = "PM"; }
+                    return;
+                }
+                row.remove();
+            });
+        }
+    }
+    rows.querySelectorAll(".patient-reminder-row").forEach(wireRow);
+    addButton.addEventListener("click", function(){
+        const base = rows.querySelector(".patient-reminder-row");
+        if(!base){ return; }
+        const clone = base.cloneNode(true);
+        clone.querySelectorAll("input").forEach(input => input.value = "");
+        clone.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
+        const periodo = clone.querySelector('select[name="periodo[]"]');
+        if(periodo){ periodo.value = "PM"; }
+        rows.appendChild(clone);
+        wireRow(clone);
+        const firstInput = clone.querySelector('input[name="tratamiento[]"]');
+        if(firstInput){ firstInput.focus(); }
+    });
+})();
+
 (function(){
     const modal = document.getElementById("patientPhotoModal");
     const image = document.getElementById("patientPhotoModalImage");

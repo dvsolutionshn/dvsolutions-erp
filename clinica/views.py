@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 from urllib.parse import quote
 
 from django.contrib import messages
@@ -67,6 +68,7 @@ from .models import (
     SeguimientoPostOperatorio,
     ServicioClinico,
     TratamientoPaciente,
+    asegurar_profesionales_agenda_base,
 )
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from crm.forms import PacienteRapidoCitaForm
@@ -91,6 +93,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
         "no_asistio": "cancelada",
     }
     titulo = cita.servicio.nombre if cita.servicio_id else cita.motivo
+    es_recordatorio = bool(getattr(cita, "es_recordatorio_tratamiento", False))
     agenda, _ = CitaCliente.objects.get_or_create(
         empresa=cita.empresa,
         cita_clinica=cita,
@@ -105,7 +108,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
             "estado": estados.get(cita.estado, "pendiente"),
             "pagada": cita.pagada,
             "observacion": cita.observaciones or cita.motivo,
-            "enviar_confirmacion_whatsapp": True,
+            "enviar_confirmacion_whatsapp": not es_recordatorio,
             "recordatorio_semana_whatsapp": True,
             "recordatorio_dia_whatsapp": True,
         },
@@ -120,18 +123,19 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
     agenda.estado = estados.get(cita.estado, "pendiente")
     agenda.pagada = cita.pagada
     agenda.observacion = cita.observaciones or cita.motivo
-    agenda.enviar_confirmacion_whatsapp = True
+    agenda.enviar_confirmacion_whatsapp = not es_recordatorio
     agenda.recordatorio_semana_whatsapp = True
     agenda.recordatorio_dia_whatsapp = True
     agenda.save()
 
     notificaciones = programar_notificaciones_cita(agenda)
-    confirmacion = next(
-        (item for item in notificaciones if item.tipo == NotificacionCitaWhatsApp.TIPO_CONFIRMACION),
-        None,
-    )
-    if confirmacion and confirmacion.estado != "enviado":
-        procesar_notificacion(confirmacion.id)
+    if not es_recordatorio:
+        confirmacion = next(
+            (item for item in notificaciones if item.tipo == NotificacionCitaWhatsApp.TIPO_CONFIRMACION),
+            None,
+        )
+        if confirmacion and confirmacion.estado != "enviado":
+            procesar_notificacion(confirmacion.id)
     return agenda
 
 
@@ -684,9 +688,16 @@ def eliminar_paciente(request, empresa_slug, paciente_id):
 def paciente_detalle(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    asegurar_profesionales_agenda_base(empresa)
     eventos = paciente.eventos_expediente.select_related("profesional", "tratamiento")[:20]
     citas = paciente.citas.select_related("profesional", "servicio")[:10]
+    recordatorios_tratamiento = (
+        paciente.citas.filter(es_recordatorio_tratamiento=True)
+        .select_related("profesional", "servicio")
+        .order_by("fecha_hora")[:8]
+    )
     tratamientos = paciente.tratamientos.select_related("profesional", "servicio")[:10]
+    profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
     fotos_evolucion = paciente.fotos_evolucion.select_related("creado_por")[:12]
     medicamentos = MedicamentoPrescrito.objects.filter(empresa=empresa, paciente=paciente)[:10]
     consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10]
@@ -701,7 +712,9 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "paciente": paciente,
             "eventos": eventos,
             "citas": citas,
+            "recordatorios_tratamiento": recordatorios_tratamiento,
             "tratamientos": tratamientos,
+            "profesionales": profesionales,
             "fotos_evolucion": fotos_evolucion,
             "medicamentos": medicamentos,
             "consentimientos": consentimientos,
@@ -712,6 +725,93 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
         },
     )
+
+
+@login_required
+@require_POST
+def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    asegurar_profesionales_agenda_base(empresa)
+
+    tratamientos = request.POST.getlist("tratamiento[]")
+    fechas = request.POST.getlist("fecha[]")
+    horas = request.POST.getlist("hora[]")
+    periodos = request.POST.getlist("periodo[]")
+    profesionales_ids = request.POST.getlist("profesional[]")
+    notas = request.POST.getlist("nota[]")
+
+    creadas = 0
+    errores = []
+    total_filas = max(len(tratamientos), len(fechas), len(horas), len(periodos), len(profesionales_ids), len(notas))
+    zona = timezone.get_current_timezone()
+
+    for index in range(total_filas):
+        tratamiento = (tratamientos[index] if index < len(tratamientos) else "").strip()
+        fecha_texto = (fechas[index] if index < len(fechas) else "").strip()
+        hora_texto = (horas[index] if index < len(horas) else "").strip()
+        periodo = (periodos[index] if index < len(periodos) else "").strip().upper()
+        profesional_id = (profesionales_ids[index] if index < len(profesionales_ids) else "").strip()
+        nota = (notas[index] if index < len(notas) else "").strip()
+
+        if not any([tratamiento, fecha_texto, hora_texto, profesional_id, nota]):
+            continue
+        fila = index + 1
+        if not tratamiento:
+            errores.append(f"Fila {fila}: indique el tratamiento o seguimiento.")
+            continue
+        if not fecha_texto:
+            errores.append(f"Fila {fila}: seleccione la fecha.")
+            continue
+        if not hora_texto or periodo not in {"AM", "PM"}:
+            errores.append(f"Fila {fila}: seleccione hora y AM/PM.")
+            continue
+
+        profesional = None
+        if profesional_id:
+            profesional = ProfesionalSalud.objects.filter(id=profesional_id, empresa=empresa, activo=True).first()
+            if not profesional:
+                errores.append(f"Fila {fila}: el profesional seleccionado no esta disponible.")
+                continue
+
+        try:
+            fecha = datetime.strptime(fecha_texto, "%Y-%m-%d").date()
+            hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
+            if hora_12 < 1 or hora_12 > 12 or minuto not in {0, 15, 30, 45}:
+                raise ValueError
+            hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
+            fecha_hora = timezone.make_aware(datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto), zona)
+        except ValueError:
+            errores.append(f"Fila {fila}: fecha u hora invalida.")
+            continue
+
+        cita = CitaClinica.objects.create(
+            empresa=empresa,
+            paciente=paciente,
+            profesional=profesional,
+            fecha_hora=fecha_hora,
+            estado="confirmada",
+            canal="recepcion",
+            motivo=f"Recordatorio: {tratamiento}",
+            es_recordatorio_tratamiento=True,
+            tratamiento_recordatorio=tratamiento,
+            observaciones=nota or "Seguimiento programado desde expediente clinico.",
+        )
+        try:
+            _sincronizar_agenda_desde_cita_clinica(cita)
+        except Exception:
+            logger.exception("No se pudo sincronizar recordatorio clinico %s", cita.id)
+            messages.warning(request, "Uno de los recordatorios se guardo, pero no pudo sincronizarse con WhatsApp/agenda externa.")
+        creadas += 1
+
+    for error in errores:
+        messages.error(request, error)
+    if creadas:
+        messages.success(request, f"{creadas} recordatorio(s) de tratamiento enviados al calendario.")
+    elif not errores:
+        messages.info(request, "No se agregaron recordatorios porque no habia filas completas.")
+
+    return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
 
 
 @login_required

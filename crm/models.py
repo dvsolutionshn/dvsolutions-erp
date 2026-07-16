@@ -209,6 +209,8 @@ class CitaCliente(models.Model):
 
     @property
     def agenda_color(self):
+        if self.cita_clinica_id and getattr(self.cita_clinica, "es_recordatorio_tratamiento", False):
+            return "recordatorio"
         servicio = _normalizar_texto(self.display_servicio)
         categoria = _normalizar_texto(
             self.servicio_clinico.categoria if self.servicio_clinico_id else ""
@@ -246,6 +248,7 @@ class CitaCliente(models.Model):
             "laboratorio": "Laboratorio",
             "imagen": "Imagen",
             "general": "General",
+            "recordatorio": "Recordatorio de tratamiento",
         }
         return etiquetas.get(self.agenda_color, "General")
 

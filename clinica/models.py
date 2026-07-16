@@ -326,6 +326,8 @@ class CitaClinica(models.Model):
     canal = models.CharField(max_length=20, choices=CANAL_CHOICES, default="recepcion")
     motivo = models.CharField(max_length=220)
     pagada = models.BooleanField(default=False)
+    es_recordatorio_tratamiento = models.BooleanField(default=False)
+    tratamiento_recordatorio = models.CharField(max_length=180, blank=True, null=True)
     sala = models.CharField(max_length=80, blank=True, null=True)
     observaciones = models.TextField(blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -340,6 +342,8 @@ class CitaClinica(models.Model):
 
     @property
     def agenda_color(self):
+        if self.es_recordatorio_tratamiento:
+            return "recordatorio"
         servicio = _normalizar_texto(self.servicio.nombre if self.servicio_id else self.motivo)
         categoria = _normalizar_texto(self.servicio.categoria if self.servicio_id else "")
         if "terapia" in servicio or "camara" in servicio or "hiperbar" in servicio:
@@ -375,6 +379,7 @@ class CitaClinica(models.Model):
             "laboratorio": "Laboratorio",
             "imagen": "Imagen",
             "general": "General",
+            "recordatorio": "Recordatorio de tratamiento",
         }
         return etiquetas.get(self.agenda_color, "General")
 

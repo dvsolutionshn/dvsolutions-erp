@@ -12,6 +12,7 @@ urlpatterns = [
     path("pacientes/<int:paciente_id>/", views.paciente_detalle, name="clinica_paciente_detalle"),
     path("pacientes/<int:paciente_id>/editar/", views.editar_paciente, name="clinica_editar_paciente"),
     path("pacientes/<int:paciente_id>/eliminar/", views.eliminar_paciente, name="clinica_eliminar_paciente"),
+    path("pacientes/<int:paciente_id>/recordatorios-tratamiento/crear/", views.crear_recordatorios_tratamiento, name="clinica_crear_recordatorios_tratamiento"),
     path("pacientes/<int:paciente_id>/expediente/agregar/", views.crear_evento_expediente, name="clinica_crear_evento_paciente"),
     path("pacientes/<int:paciente_id>/evolucion/", views.evolucion_paciente, name="clinica_evolucion_paciente"),
     path("pacientes/<int:paciente_id>/evolucion/registrar/", views.registrar_foto_evolucion, name="clinica_registrar_foto_evolucion"),
