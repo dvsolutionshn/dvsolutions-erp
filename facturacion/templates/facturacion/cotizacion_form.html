@@ -1,4 +1,5 @@
 {% extends "core/erp_base.html" %}
+{% load custom_filters %}
 
 {% block title %}{% if modo_edicion %}Editar cotizacion{% else %}Nueva cotizacion{% endif %} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Cotizaciones ISS{% endblock %}
@@ -10,90 +11,173 @@
 
 {% block extra_head %}
 <style>
-.quote-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.75fr);gap:20px;align-items:start}
-.quote-lines{display:flex;flex-direction:column;gap:12px}
-.quote-line{display:grid;grid-template-columns:1.2fr 1.2fr .55fr .7fr .55fr .7fr 44px;gap:10px;align-items:end;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,#fff,#f8fcff)}
-.quote-line .erp-field{margin:0}
-.quote-line textarea{min-height:44px}
-.quote-side-total{font-size:2rem;font-weight:900;color:#102338;margin:8px 0}
-@media (max-width:1100px){.quote-layout{grid-template-columns:1fr}.quote-line{grid-template-columns:1fr 1fr}.quote-line .delete-cell{justify-content:flex-start}}
+.quote-form-shell{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+.quote-main{display:flex;flex-direction:column;gap:18px}
+.quote-header-actions{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.quote-quick-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.quote-lines-card{overflow:hidden}
+.quote-line-layout{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff}
+.quote-line-header,.quote-line-row{display:grid;grid-template-columns:minmax(230px,1.35fr) 100px 125px 95px 58px 118px 118px 46px;gap:10px;align-items:center}
+.quote-line-header{padding:13px 14px;background:#f6fbff;color:#64778c;font-size:.72rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+.quote-line-row{padding:14px;border-bottom:1px solid #eaf1f7}
+.quote-line-row:last-child{border-bottom:0}
+.quote-line-row input,.quote-line-row select,.quote-line-row textarea{width:100%}
+.quote-product-cell{min-width:0}
+.quote-product-cell textarea{display:none}
+.quote-search-wrap{position:relative}
+.quote-product-search{width:100%;border:1px solid #b9d4e8;border-radius:12px;padding:12px 13px;font:inherit}
+.quote-product-search:focus{outline:0;border-color:#10b7b0;box-shadow:0 0 0 3px rgba(16,183,176,.12)}
+.quote-product-select{display:none!important}
+.quote-suggestions{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;display:none;background:#fff;border:1px solid #c8d9e8;border-radius:14px;box-shadow:0 18px 45px rgba(17,37,58,.16);max-height:260px;overflow:auto;padding:6px}
+.quote-suggestion{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;color:#102338}
+.quote-suggestion:hover{background:#edf8fb}
+.quote-suggestion strong{display:block;font-size:.9rem}
+.quote-suggestion span{display:block;font-size:.74rem;color:#668096;margin-top:2px}
+.quote-suggestion-price{font-weight:900;color:#0b8d86;white-space:nowrap}
+.quote-empty-suggestion{padding:12px;color:#6a7b8f;font-size:.86rem}
+.quote-line-comment{grid-column:1/-1;display:none;padding-top:4px}
+.quote-line-comment.is-open{display:block}
+.quote-note-btn,.quote-delete-btn{border:1px solid #c8d9e8;border-radius:12px;background:#fff;color:#0f2842;font-weight:900;min-height:42px;cursor:pointer}
+.quote-note-btn:hover,.quote-delete-btn:hover{background:#eef8fb}
+.quote-delete-btn{color:#b42318;border-color:#ffc8c3}
+.quote-lines-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.quote-summary-total{font-size:2.1rem;font-weight:950;color:#102338;letter-spacing:-.04em;margin:8px 0 12px}
+.quote-summary-list{display:grid;gap:10px;margin-top:16px}
+.quote-summary-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #edf2f7;color:#587087}
+.quote-summary-row strong{color:#102338}
+.quote-summary-row.total{font-size:1.1rem;border-bottom:0}
+.quote-field-hidden{display:none!important}
+.quote-inline-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(9,23,38,.55);backdrop-filter:blur(4px);padding:24px}
+.quote-inline-modal.is-open{display:flex}
+.quote-inline-modal-dialog{width:min(980px,96vw);height:min(760px,92vh);background:#fff;border-radius:24px;box-shadow:0 28px 80px rgba(4,18,34,.32);overflow:hidden;display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.5)}
+.quote-inline-modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid #e4eef7;background:#f8fcff}
+.quote-inline-modal-head h3{margin:0;color:#102338}
+.quote-inline-modal-head p{margin:4px 0 0;color:#65798f}
+.quote-inline-modal-frame{border:0;width:100%;height:100%;background:#f6f9fc}
+@media (max-width:1280px){.quote-form-shell{grid-template-columns:1fr}.quote-line-header{display:none}.quote-line-row{grid-template-columns:1fr 1fr}.quote-product-cell,.quote-line-comment{grid-column:1/-1}.quote-line-row{border:1px solid #e2edf6;border-radius:16px;margin:10px}.quote-line-layout{border:0;background:transparent}}
+@media (max-width:760px){.quote-header-actions,.quote-lines-footer{align-items:flex-start;flex-direction:column}.quote-line-row{grid-template-columns:1fr}.quote-form-shell{gap:14px}}
 </style>
 {% endblock %}
 
 {% block content %}
-<form method="post" class="quote-layout">
+<form method="post" class="quote-form-shell" id="quote-form">
     {% csrf_token %}
-    <div class="erp-form-main">
+    <div class="quote-main">
         <section class="erp-card">
-            <div class="erp-card-kicker">Datos comerciales</div>
-            <h3 class="erp-panel-title">Encabezado de la cotizacion</h3>
+            <div class="quote-header-actions">
+                <div>
+                    <div class="erp-card-kicker">Datos comerciales</div>
+                    <h3 class="erp-panel-title">Encabezado de la cotizacion</h3>
+                    <p class="erp-card-muted">Define cliente, vigencia, moneda, vendedor y estado de la propuesta.</p>
+                </div>
+                <div class="quote-quick-actions">
+                    <a class="erp-btn-secondary" href="{% url 'crear_producto_facturacion' empresa.slug %}" id="quote-new-product">+ Nuevo producto</a>
+                </div>
+            </div>
             {% if form.non_field_errors %}
                 <div class="erp-alert error">{{ form.non_field_errors }}</div>
             {% endif %}
             <div class="erp-form-grid">
-                {% for field in form %}
-                    {% if field.name != "condiciones" and field.name != "notas" %}
-                    <div class="erp-field">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}<div class="erp-field-error">{{ field.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    {% endif %}
-                {% endfor %}
+                <div class="erp-field">
+                    <label for="{{ form.cliente.id_for_label }}">{{ form.cliente.label }}</label>
+                    {{ form.cliente }}
+                    {% if form.cliente.errors %}<div class="erp-field-error">{{ form.cliente.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.fecha.id_for_label }}">{{ form.fecha.label }}</label>
+                    {{ form.fecha }}
+                    {% if form.fecha.errors %}<div class="erp-field-error">{{ form.fecha.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.fecha_vencimiento.id_for_label }}">{{ form.fecha_vencimiento.label }}</label>
+                    {{ form.fecha_vencimiento }}
+                    {% if form.fecha_vencimiento.errors %}<div class="erp-field-error">{{ form.fecha_vencimiento.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.vendedor.id_for_label }}">{{ form.vendedor.label }}</label>
+                    {{ form.vendedor }}
+                    {% if form.vendedor.errors %}<div class="erp-field-error">{{ form.vendedor.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.moneda.id_for_label }}">{{ form.moneda.label }}</label>
+                    {{ form.moneda }}
+                    {% if form.moneda.errors %}<div class="erp-field-error">{{ form.moneda.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="erp-field" id="quote-exchange-field">
+                    <label for="{{ form.tipo_cambio.id_for_label }}">{{ form.tipo_cambio.label }}</label>
+                    {{ form.tipo_cambio }}
+                    {% if form.tipo_cambio.errors %}<div class="erp-field-error">{{ form.tipo_cambio.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+                    {{ form.estado }}
+                    {% if form.estado.errors %}<div class="erp-field-error">{{ form.estado.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="erp-field">
+                    <label for="{{ form.asunto.id_for_label }}">{{ form.asunto.label }}</label>
+                    {{ form.asunto }}
+                    {% if form.asunto.errors %}<div class="erp-field-error">{{ form.asunto.errors|join:", " }}</div>{% endif %}
+                </div>
             </div>
         </section>
 
-        <section class="erp-card">
+        <section class="erp-card quote-lines-card">
             <div class="erp-card-kicker">Detalle</div>
             <h3 class="erp-panel-title">Productos y servicios cotizados</h3>
-            <p class="erp-card-muted">Puedes elegir un producto o escribir una descripcion manual para servicios especiales.</p>
+            <p class="erp-card-muted">Busca productos igual que en facturacion. Tambien puedes escribir un servicio manual si aun no existe en catalogo.</p>
             {{ formset.management_form }}
             {% if formset.non_form_errors %}
                 <div class="erp-alert error">{{ formset.non_form_errors }}</div>
             {% endif %}
-            <div class="quote-lines">
+            <div class="quote-line-layout" id="quote-lines">
+                <div class="quote-line-header">
+                    <div>Producto / servicio</div>
+                    <div>Cantidad</div>
+                    <div>Precio</div>
+                    <div>% Desc.</div>
+                    <div>Nota</div>
+                    <div>Impuesto</div>
+                    <div>Monto</div>
+                    <div></div>
+                </div>
                 {% for line_form in formset %}
-                <div class="quote-line">
+                <div class="quote-line-row" data-precio-incluye-impuesto="{{ precios_incluyen_impuesto|yesno:'1,0' }}">
                     {{ line_form.id }}
-                    <div class="erp-field">
-                        <label>Producto</label>
-                        {{ line_form.producto }}
+                    <div style="display:none;">{{ line_form.DELETE }}</div>
+                    <div class="quote-product-cell">
+                        <div class="quote-search-wrap">
+                            <input type="text" class="quote-product-search" placeholder="Buscar producto o escribir servicio manual" autocomplete="off">
+                            <div class="quote-suggestions"></div>
+                            {{ line_form.producto|add_class:"quote-product-select producto" }}
+                            {{ line_form.descripcion_manual|add_class:"descripcion-manual" }}
+                        </div>
                         {% if line_form.producto.errors %}<div class="erp-field-error">{{ line_form.producto.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div class="erp-field">
-                        <label>Descripcion manual</label>
-                        {{ line_form.descripcion_manual }}
                         {% if line_form.descripcion_manual.errors %}<div class="erp-field-error">{{ line_form.descripcion_manual.errors|join:", " }}</div>{% endif %}
                     </div>
-                    <div class="erp-field">
-                        <label>Cantidad</label>
-                        {{ line_form.cantidad }}
-                        {% if line_form.cantidad.errors %}<div class="erp-field-error">{{ line_form.cantidad.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div class="erp-field">
-                        <label>Precio</label>
-                        {{ line_form.precio_unitario }}
-                        {% if line_form.precio_unitario.errors %}<div class="erp-field-error">{{ line_form.precio_unitario.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div class="erp-field">
-                        <label>Desc. %</label>
-                        {{ line_form.descuento_porcentaje }}
-                    </div>
-                    <div class="erp-field">
-                        <label>Impuesto</label>
-                        {{ line_form.impuesto }}
-                        {% if line_form.impuesto.errors %}<div class="erp-field-error">{{ line_form.impuesto.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div class="erp-field delete-cell">
-                        <label>Quitar</label>
-                        {{ line_form.DELETE }}
-                    </div>
-                    <div class="erp-field" style="grid-column:1/-1;">
+                    <div>{{ line_form.cantidad|add_class:"cantidad" }}</div>
+                    <div>{{ line_form.precio_unitario|add_class:"precio" }}</div>
+                    <div>{{ line_form.descuento_porcentaje|add_class:"descuento" }}</div>
+                    <div><button type="button" class="quote-note-btn" title="Comentario">+</button></div>
+                    <div>{{ line_form.impuesto|add_class:"impuesto" }}</div>
+                    <div><input type="text" class="line-total" readonly value="0.00"></div>
+                    <div><button type="button" class="quote-delete-btn" title="Quitar linea">X</button></div>
+                    <div class="quote-line-comment">
                         <label>Comentario de linea</label>
                         {{ line_form.comentario }}
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+            <div class="quote-lines-footer">
+                <div class="erp-field-help">Puedes agregar tantas lineas como necesites antes de guardar la cotizacion.</div>
+                <button type="button" class="erp-btn-secondary" id="quote-add-line">Agregar linea</button>
+            </div>
+        </section>
+
+        <section class="erp-card">
+            <div class="erp-form-actions">
+                <a class="erp-btn-secondary" href="{% url 'cotizaciones_dashboard' empresa.slug %}">Cancelar</a>
+                <button class="erp-btn" type="submit">Guardar cotizacion</button>
             </div>
         </section>
     </div>
@@ -101,14 +185,14 @@
     <aside class="erp-form-side">
         <section class="erp-card">
             <div class="erp-card-kicker">Resumen</div>
-            <h3 class="erp-panel-title">Cotizacion formal</h3>
-            <p class="erp-card-muted">Los totales se recalculan al guardar. La factura se generara como borrador cuando la cotizacion este aprobada.</p>
-            {% if cotizacion %}
-                <div class="quote-side-total">{{ cotizacion.moneda }} {{ cotizacion.total|floatformat:2 }}</div>
-            {% endif %}
-            <div class="erp-form-actions">
-                <button class="erp-btn" type="submit">Guardar cotizacion</button>
-                <a class="erp-btn-secondary" href="{% url 'cotizaciones_dashboard' empresa.slug %}">Cancelar</a>
+            <h3 class="erp-panel-title">Totales en vivo</h3>
+            <p class="erp-card-muted">Los montos se recalculan en pantalla y se confirman al guardar.</p>
+            <div class="quote-summary-total"><span class="quote-currency-symbol">L.</span> <span id="quote-total">0.00</span></div>
+            <div class="quote-summary-list">
+                <div class="quote-summary-row"><span>Subtotal</span><strong><span class="quote-currency-symbol">L.</span> <span id="quote-subtotal">0.00</span></strong></div>
+                <div class="quote-summary-row"><span>Descuento</span><strong><span class="quote-currency-symbol">L.</span> <span id="quote-discount">0.00</span></strong></div>
+                <div class="quote-summary-row"><span>Impuesto</span><strong><span class="quote-currency-symbol">L.</span> <span id="quote-tax">0.00</span></strong></div>
+                <div class="quote-summary-row total"><span>Total</span><strong><span class="quote-currency-symbol">L.</span> <span id="quote-total-small">0.00</span></strong></div>
             </div>
         </section>
 
@@ -125,4 +209,366 @@
         </section>
     </aside>
 </form>
+
+<div id="quote-inline-modal" class="quote-inline-modal" aria-hidden="true">
+    <div class="quote-inline-modal-dialog">
+        <div class="quote-inline-modal-head">
+            <div>
+                <h3>Crear producto rapido</h3>
+                <p>Al guardar quedara disponible para seleccionarlo en la cotizacion.</p>
+            </div>
+            <button type="button" class="erp-btn-secondary" id="quote-inline-close">Cerrar</button>
+        </div>
+        <iframe id="quote-inline-frame" class="quote-inline-modal-frame" src="about:blank" title="Crear producto rapido"></iframe>
+    </div>
+</div>
+
+{{ productos_payload|json_script:"quote-products-data" }}
+{{ impuestos_payload|json_script:"quote-taxes-data" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const products = JSON.parse(document.getElementById("quote-products-data").textContent || "[]");
+    const taxes = JSON.parse(document.getElementById("quote-taxes-data").textContent || "[]");
+    const productMap = {};
+    const taxMap = {};
+    products.forEach(product => productMap[String(product.id)] = product);
+    taxes.forEach(tax => taxMap[String(tax.id)] = parseFloat(tax.porcentaje || 0) || 0);
+
+    const form = document.getElementById("quote-form");
+    const linesContainer = document.getElementById("quote-lines");
+    const totalFormsInput = form.querySelector("[name$='-TOTAL_FORMS']");
+    const monedaSelect = document.getElementById("id_moneda");
+    const exchangeField = document.getElementById("quote-exchange-field");
+    const addLineButton = document.getElementById("quote-add-line");
+    const newProductLink = document.getElementById("quote-new-product");
+    const modal = document.getElementById("quote-inline-modal");
+    const modalFrame = document.getElementById("quote-inline-frame");
+    const modalClose = document.getElementById("quote-inline-close");
+    let pendingProductLine = null;
+    let lastFocusedProductLine = null;
+
+    function money(value){
+        return (parseFloat(value) || 0).toFixed(2);
+    }
+
+    function currencySymbol(){
+        return monedaSelect && monedaSelect.value === "USD" ? "$" : "L.";
+    }
+
+    function syncCurrency(){
+        const isUsd = monedaSelect && monedaSelect.value === "USD";
+        if(exchangeField){
+            exchangeField.classList.toggle("quote-field-hidden", !isUsd);
+        }
+        document.querySelectorAll(".quote-currency-symbol").forEach(item => item.textContent = currencySymbol());
+    }
+
+    function activeRows(){
+        return Array.from(document.querySelectorAll(".quote-line-row")).filter(row => row.dataset.deleted !== "1");
+    }
+
+    function recalculate(){
+        let subtotal = 0;
+        let discount = 0;
+        let tax = 0;
+        activeRows().forEach(row => {
+            const qty = parseFloat(row.querySelector(".cantidad")?.value || 0) || 0;
+            const price = parseFloat(row.querySelector(".precio")?.value || 0) || 0;
+            const discountPercent = parseFloat(row.querySelector(".descuento")?.value || 0) || 0;
+            const taxId = row.querySelector(".impuesto")?.value || "";
+            const taxPercent = taxMap[String(taxId)] || 0;
+            const gross = qty * price;
+            const discountAmount = gross * (discountPercent / 100);
+            const discounted = gross - discountAmount;
+            const includesTax = row.dataset.precioIncluyeImpuesto === "1" && taxPercent > 0;
+            const lineSubtotal = includesTax ? discounted / (1 + taxPercent / 100) : discounted;
+            const lineTax = includesTax ? discounted - lineSubtotal : lineSubtotal * (taxPercent / 100);
+            subtotal += lineSubtotal;
+            discount += discountAmount;
+            tax += lineTax;
+            const totalInput = row.querySelector(".line-total");
+            if(totalInput){ totalInput.value = money(lineSubtotal + lineTax); }
+        });
+        const total = subtotal + tax;
+        document.getElementById("quote-subtotal").textContent = money(subtotal);
+        document.getElementById("quote-discount").textContent = money(discount);
+        document.getElementById("quote-tax").textContent = money(tax);
+        document.getElementById("quote-total").textContent = money(total);
+        document.getElementById("quote-total-small").textContent = money(total);
+    }
+
+    function renderSuggestions(row){
+        const input = row.querySelector(".quote-product-search");
+        const panel = row.querySelector(".quote-suggestions");
+        if(!input || !panel){ return; }
+        const term = (input.value || "").trim().toLowerCase();
+        const matches = products.filter(product => {
+            const haystack = `${product.nombre || ""} ${product.codigo || ""}`.toLowerCase();
+            return !term || haystack.includes(term);
+        }).slice(0, 10);
+        if(!matches.length){
+            panel.innerHTML = '<div class="quote-empty-suggestion">Sin coincidencias. Puedes crear el producto o dejarlo como servicio manual.</div>';
+        }else{
+            panel.innerHTML = matches.map(product => `
+                <button type="button" class="quote-suggestion" data-product-id="${product.id}">
+                    <span><strong>${escapeHtml(product.nombre)}</strong><span>${escapeHtml(product.codigo || "Sin codigo")}</span></span>
+                    <span class="quote-suggestion-price">${currencySymbol()} ${money(product.precio)}</span>
+                </button>
+            `).join("");
+        }
+        panel.style.display = "block";
+    }
+
+    function escapeHtml(value){
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function selectProduct(row, productId){
+        const product = productMap[String(productId)];
+        if(!product){ return; }
+        const select = row.querySelector(".producto");
+        const search = row.querySelector(".quote-product-search");
+        const description = row.querySelector(".descripcion-manual");
+        const price = row.querySelector(".precio");
+        const tax = row.querySelector(".impuesto");
+        if(select){ select.value = String(product.id); }
+        if(search){ search.value = product.nombre || ""; }
+        if(description){ description.value = ""; }
+        if(price){ price.value = money(product.precio); }
+        if(tax && product.impuesto_id){ tax.value = String(product.impuesto_id); }
+        row.querySelector(".quote-suggestions").style.display = "none";
+        recalculate();
+    }
+
+    function syncManualDescription(row){
+        const select = row.querySelector(".producto");
+        const input = row.querySelector(".quote-product-search");
+        const description = row.querySelector(".descripcion-manual");
+        if(!select || !input || !description){ return; }
+        if(!select.value){
+            description.value = input.value || "";
+        }
+    }
+
+    function refreshSearchFromSelect(row){
+        const select = row.querySelector(".producto");
+        const input = row.querySelector(".quote-product-search");
+        const description = row.querySelector(".descripcion-manual");
+        if(!select || !input){ return; }
+        if(select.value && select.selectedOptions.length){
+            input.value = select.selectedOptions[0].text.trim();
+        }else if(description && description.value){
+            input.value = description.value;
+        }
+    }
+
+    function initLine(row){
+        if(row.dataset.quoteReady === "1"){ return; }
+        row.dataset.quoteReady = "1";
+        row.dataset.precioIncluyeImpuesto = row.dataset.precioIncluyeImpuesto || "{{ precios_incluyen_impuesto|yesno:'1,0' }}";
+        refreshSearchFromSelect(row);
+        const search = row.querySelector(".quote-product-search");
+        const panel = row.querySelector(".quote-suggestions");
+        const select = row.querySelector(".producto");
+        if(search){
+            search.addEventListener("focus", () => {
+                lastFocusedProductLine = row;
+                renderSuggestions(row);
+            });
+            search.addEventListener("input", () => {
+                lastFocusedProductLine = row;
+                if(select){ select.value = ""; }
+                syncManualDescription(row);
+                renderSuggestions(row);
+                recalculate();
+            });
+            search.addEventListener("blur", () => {
+                syncManualDescription(row);
+                window.setTimeout(() => { if(panel){ panel.style.display = "none"; } }, 150);
+            });
+        }
+        if(panel){
+            panel.addEventListener("click", event => {
+                const button = event.target.closest(".quote-suggestion");
+                if(button){ selectProduct(row, button.dataset.productId); }
+            });
+        }
+        if(select){
+            select.addEventListener("change", () => selectProduct(row, select.value));
+        }
+        ["input", "change"].forEach(eventName => {
+            row.querySelectorAll(".cantidad,.precio,.descuento,.impuesto").forEach(field => {
+                field.addEventListener(eventName, recalculate);
+            });
+        });
+        row.querySelector(".quote-note-btn")?.addEventListener("click", () => {
+            row.querySelector(".quote-line-comment")?.classList.toggle("is-open");
+        });
+        row.querySelector(".quote-delete-btn")?.addEventListener("click", () => deleteLine(row));
+    }
+
+    function renumberFormset(){
+        const rows = Array.from(document.querySelectorAll(".quote-line-row"));
+        rows.forEach((row, index) => {
+            row.querySelectorAll("input, select, textarea").forEach(field => {
+                if(field.name){
+                    field.name = field.name.replace(/lineas-\d+-/, `lineas-${index}-`);
+                    field.id = `id_${field.name}`;
+                }
+            });
+        });
+        if(totalFormsInput){ totalFormsInput.value = rows.length; }
+    }
+
+    function addLine(){
+        const template = document.querySelector(".quote-line-row");
+        if(!template){ return null; }
+        const index = document.querySelectorAll(".quote-line-row").length;
+        const row = template.cloneNode(true);
+        delete row.dataset.quoteReady;
+        delete row.dataset.deleted;
+        row.style.display = "";
+        row.querySelectorAll("input, select, textarea").forEach(field => {
+            if(field.name){
+                field.name = field.name.replace(/lineas-\d+-/, `lineas-${index}-`);
+                field.id = `id_${field.name}`;
+            }
+            if(field.type === "checkbox"){
+                field.checked = false;
+            }else if(!field.classList.contains("line-total")){
+                field.value = "";
+            }else{
+                field.value = "0.00";
+            }
+        });
+        row.querySelectorAll("input[name$='-id']").forEach(field => field.remove());
+        row.querySelector(".quote-product-search").value = "";
+        row.querySelector(".quote-suggestions").innerHTML = "";
+        row.querySelector(".quote-suggestions").style.display = "none";
+        row.querySelector(".quote-line-comment")?.classList.remove("is-open");
+        linesContainer.appendChild(row);
+        if(totalFormsInput){ totalFormsInput.value = document.querySelectorAll(".quote-line-row").length; }
+        initLine(row);
+        recalculate();
+        return row;
+    }
+
+    function deleteLine(row){
+        const deleteField = row.querySelector("input[name$='-DELETE']");
+        const visibleRows = activeRows();
+        if(visibleRows.length <= 1){
+            row.querySelectorAll("input, textarea").forEach(field => {
+                if(field.type !== "hidden"){ field.value = ""; }
+            });
+            row.querySelector(".producto").value = "";
+            row.querySelector(".line-total").value = "0.00";
+            recalculate();
+            return;
+        }
+        if(deleteField){
+            deleteField.checked = true;
+            row.dataset.deleted = "1";
+            row.style.display = "none";
+        }else{
+            row.remove();
+            renumberFormset();
+        }
+        recalculate();
+    }
+
+    function openModal(url, productLine){
+        pendingProductLine = productLine || null;
+        if(!modal || !modalFrame){
+            window.open(url, "_blank", "noopener");
+            return;
+        }
+        modalFrame.src = url;
+        modal.classList.add("is-open");
+        modal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeModal(){
+        if(!modal || !modalFrame){ return; }
+        modal.classList.remove("is-open");
+        modal.setAttribute("aria-hidden", "true");
+        modalFrame.src = "about:blank";
+        pendingProductLine = null;
+    }
+
+    function addProductToSelects(product){
+        document.querySelectorAll(".producto").forEach(select => {
+            let option = Array.from(select.options).find(item => String(item.value) === String(product.id));
+            if(!option){
+                option = document.createElement("option");
+                option.value = String(product.id);
+                select.appendChild(option);
+            }
+            option.text = product.nombre;
+        });
+    }
+
+    function registerCreatedProduct(product){
+        if(!product){ return; }
+        const normalized = {
+            id: product.id,
+            nombre: product.nombre,
+            codigo: product.codigo || "",
+            precio: parseFloat(product.precio || 0) || 0,
+            impuesto_id: product.impuesto_id || "",
+        };
+        products.push(normalized);
+        productMap[String(normalized.id)] = normalized;
+        addProductToSelects(normalized);
+        if(pendingProductLine){
+            selectProduct(pendingProductLine, normalized.id);
+        }
+        closeModal();
+    }
+
+    document.querySelectorAll(".quote-line-row").forEach(initLine);
+    addLineButton?.addEventListener("click", addLine);
+    newProductLink?.addEventListener("click", event => {
+        event.preventDefault();
+        const url = new URL(newProductLink.href, window.location.origin);
+        url.searchParams.set("modal", "1");
+        const targetRow = lastFocusedProductLine && lastFocusedProductLine.dataset.deleted !== "1"
+            ? lastFocusedProductLine
+            : (activeRows()[0] || null);
+        const typedName = targetRow?.querySelector(".quote-product-search")?.value || "";
+        if(typedName.trim()){
+            url.searchParams.set("nombre", typedName.trim());
+        }
+        openModal(url.toString(), targetRow);
+    });
+    modalClose?.addEventListener("click", closeModal);
+    modal?.addEventListener("click", event => {
+        if(event.target === modal){ closeModal(); }
+    });
+    window.addEventListener("message", event => {
+        const data = event.data || {};
+        if(data.type === "erp-inline-modal-close"){
+            closeModal();
+        }
+        if(data.type === "erp-producto-creado"){
+            registerCreatedProduct(data.producto);
+        }
+    });
+    form.addEventListener("submit", function(){
+        document.querySelectorAll(".quote-line-row").forEach(syncManualDescription);
+        renumberFormset();
+    });
+    monedaSelect?.addEventListener("change", () => {
+        syncCurrency();
+        recalculate();
+    });
+    syncCurrency();
+    recalculate();
+});
+</script>
 {% endblock %}

@@ -5102,6 +5102,38 @@ def _preparar_lineas_cotizacion(formset, empresa):
     return formset
 
 
+def _contexto_cotizacion_form(empresa):
+    productos_qs = (
+        Producto.objects.filter(empresa=empresa, activo=True)
+        .select_related("impuesto_predeterminado")
+        .order_by("nombre")
+    )
+    impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")
+    productos_payload = [
+        {
+            "id": producto.id,
+            "nombre": producto.nombre,
+            "codigo": producto.codigo or "",
+            "precio": float(producto.precio or Decimal("0.00")),
+            "impuesto_id": producto.impuesto_predeterminado_id or "",
+        }
+        for producto in productos_qs
+    ]
+    impuestos_payload = [
+        {
+            "id": impuesto.id,
+            "nombre": impuesto.nombre,
+            "porcentaje": float(impuesto.porcentaje or Decimal("0.00")),
+        }
+        for impuesto in impuestos_qs
+    ]
+    return {
+        "productos_payload": productos_payload,
+        "impuestos_payload": impuestos_payload,
+        "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
+    }
+
+
 def _lineas_cotizacion_validas(formset):
     lineas = []
     for form in formset.forms:
@@ -5196,7 +5228,7 @@ def crear_cotizacion(request, empresa_slug):
         "form": form,
         "formset": formset,
         "modo_edicion": False,
-        "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
+        **_contexto_cotizacion_form(empresa),
     })
 
 
@@ -5254,7 +5286,7 @@ def editar_cotizacion(request, empresa_slug, cotizacion_id):
         "form": form,
         "formset": formset,
         "modo_edicion": True,
-        "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
+        **_contexto_cotizacion_form(empresa),
     })
 
 
