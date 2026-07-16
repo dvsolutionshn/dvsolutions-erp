@@ -5109,6 +5109,7 @@ def _contexto_cotizacion_form(empresa):
         .order_by("nombre")
     )
     impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")
+    clientes_qs = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
     productos_payload = [
         {
             "id": producto.id,
@@ -5127,9 +5128,20 @@ def _contexto_cotizacion_form(empresa):
         }
         for impuesto in impuestos_qs
     ]
+    clientes_payload = [
+        {
+            "id": cliente.id,
+            "nombre": cliente.nombre,
+            "rtn": cliente.rtn or "",
+            "telefono": cliente.telefono or "",
+            "correo": cliente.correo or "",
+        }
+        for cliente in clientes_qs
+    ]
     return {
         "productos_payload": productos_payload,
         "impuestos_payload": impuestos_payload,
+        "clientes_payload": clientes_payload,
         "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
     }
 

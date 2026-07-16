@@ -14,20 +14,28 @@
 .quote-form-shell{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
 .quote-main{display:flex;flex-direction:column;gap:18px}
 .quote-header-actions{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.quote-quick-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.quote-quick-actions,.quote-section-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.quote-field-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.quote-field-head label{margin:0}
 .quote-lines-card{overflow:hidden}
 .quote-line-layout{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff}
-.quote-line-header,.quote-line-row{display:grid;grid-template-columns:minmax(230px,1.35fr) 100px 125px 95px 58px 118px 118px 46px;gap:10px;align-items:center}
+.quote-line-header,.quote-line-row{display:grid;grid-template-columns:minmax(300px,1.6fr) 110px 130px 100px 64px 140px 124px 52px;gap:12px;align-items:center}
 .quote-line-header{padding:13px 14px;background:#f6fbff;color:#64778c;font-size:.72rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line)}
 .quote-line-row{padding:14px;border-bottom:1px solid #eaf1f7}
 .quote-line-row:last-child{border-bottom:0}
-.quote-line-row input,.quote-line-row select,.quote-line-row textarea{width:100%}
+.quote-line-row input,.quote-line-row select,.quote-line-row textarea,.quote-client-search{
+    width:100%;min-height:44px;border:1px solid #b9d4e8;border-radius:12px;background:#fff;
+    padding:10px 12px;font:inherit;color:#102338;box-sizing:border-box;
+}
+.quote-line-row input:focus,.quote-line-row select:focus,.quote-line-row textarea:focus,.quote-client-search:focus{
+    outline:0;border-color:#10b7b0;box-shadow:0 0 0 3px rgba(16,183,176,.12);
+}
 .quote-product-cell{min-width:0}
-.quote-product-cell textarea{display:none}
+.quote-product-cell textarea,.quote-product-cell .descripcion-manual{display:none!important}
 .quote-search-wrap{position:relative}
 .quote-product-search{width:100%;border:1px solid #b9d4e8;border-radius:12px;padding:12px 13px;font:inherit}
 .quote-product-search:focus{outline:0;border-color:#10b7b0;box-shadow:0 0 0 3px rgba(16,183,176,.12)}
-.quote-product-select{display:none!important}
+.quote-product-select,.quote-client-select{display:none!important}
 .quote-suggestions{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;display:none;background:#fff;border:1px solid #c8d9e8;border-radius:14px;box-shadow:0 18px 45px rgba(17,37,58,.16);max-height:260px;overflow:auto;padding:6px}
 .quote-suggestion{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;color:#102338}
 .quote-suggestion:hover{background:#edf8fb}
@@ -40,6 +48,10 @@
 .quote-note-btn,.quote-delete-btn{border:1px solid #c8d9e8;border-radius:12px;background:#fff;color:#0f2842;font-weight:900;min-height:42px;cursor:pointer}
 .quote-note-btn:hover,.quote-delete-btn:hover{background:#eef8fb}
 .quote-delete-btn{color:#b42318;border-color:#ffc8c3}
+.quote-client-picker{position:relative}
+.quote-client-meta{margin-top:7px;color:#6a7b8f;font-size:.78rem}
+.quote-line-row .descuento{text-align:right}
+.quote-line-row .line-total{font-weight:900;color:#102338;background:#f8fbfe}
 .quote-lines-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
 .quote-summary-total{font-size:2.1rem;font-weight:950;color:#102338;letter-spacing:-.04em;margin:8px 0 12px}
 .quote-summary-list{display:grid;gap:10px;margin-top:16px}
@@ -71,7 +83,8 @@
                     <p class="erp-card-muted">Define cliente, vigencia, moneda, vendedor y estado de la propuesta.</p>
                 </div>
                 <div class="quote-quick-actions">
-                    <a class="erp-btn-secondary" href="{% url 'crear_producto_facturacion' empresa.slug %}" id="quote-new-product">+ Nuevo producto</a>
+                    <a class="erp-btn-secondary quote-new-client-trigger" href="{% url 'crear_cliente_facturacion' empresa.slug %}" id="quote-new-client">+ Nuevo cliente</a>
+                    <a class="erp-btn-secondary quote-new-product-trigger" href="{% url 'crear_producto_facturacion' empresa.slug %}" id="quote-new-product">+ Nuevo producto</a>
                 </div>
             </div>
             {% if form.non_field_errors %}
@@ -79,8 +92,16 @@
             {% endif %}
             <div class="erp-form-grid">
                 <div class="erp-field">
-                    <label for="{{ form.cliente.id_for_label }}">{{ form.cliente.label }}</label>
-                    {{ form.cliente }}
+                    <div class="quote-field-head">
+                        <label for="{{ form.cliente.id_for_label }}">{{ form.cliente.label }}</label>
+                        <a class="erp-btn-secondary quote-new-client-trigger" href="{% url 'crear_cliente_facturacion' empresa.slug %}">+ Crear cliente</a>
+                    </div>
+                    <div class="quote-client-picker">
+                        <input type="text" class="quote-client-search" id="quote-client-search" placeholder="Buscar cliente por nombre, RTN, telefono o correo" autocomplete="off">
+                        <div class="quote-suggestions" id="quote-client-suggestions"></div>
+                        {{ form.cliente|add_class:"quote-client-select" }}
+                    </div>
+                    <div class="quote-client-meta" id="quote-client-meta">Selecciona un cliente o crealo sin salir de la cotizacion.</div>
                     {% if form.cliente.errors %}<div class="erp-field-error">{{ form.cliente.errors|join:", " }}</div>{% endif %}
                 </div>
                 <div class="erp-field">
@@ -122,9 +143,16 @@
         </section>
 
         <section class="erp-card quote-lines-card">
-            <div class="erp-card-kicker">Detalle</div>
-            <h3 class="erp-panel-title">Productos y servicios cotizados</h3>
-            <p class="erp-card-muted">Busca productos igual que en facturacion. Tambien puedes escribir un servicio manual si aun no existe en catalogo.</p>
+            <div class="quote-header-actions">
+                <div>
+                    <div class="erp-card-kicker">Detalle</div>
+                    <h3 class="erp-panel-title">Productos y servicios cotizados</h3>
+                    <p class="erp-card-muted">Busca productos igual que en facturacion. Tambien puedes escribir un servicio manual si aun no existe en catalogo.</p>
+                </div>
+                <div class="quote-section-actions">
+                    <a class="erp-btn-secondary quote-new-product-trigger" href="{% url 'crear_producto_facturacion' empresa.slug %}">+ Crear producto</a>
+                </div>
+            </div>
             {{ formset.management_form }}
             {% if formset.non_form_errors %}
                 <div class="erp-alert error">{{ formset.non_form_errors }}</div>
@@ -214,8 +242,8 @@
     <div class="quote-inline-modal-dialog">
         <div class="quote-inline-modal-head">
             <div>
-                <h3>Crear producto rapido</h3>
-                <p>Al guardar quedara disponible para seleccionarlo en la cotizacion.</p>
+                <h3 id="quote-modal-title">Crear rapido</h3>
+                <p id="quote-modal-copy">Al guardar quedara disponible para seleccionarlo en la cotizacion.</p>
             </div>
             <button type="button" class="erp-btn-secondary" id="quote-inline-close">Cerrar</button>
         </div>
@@ -225,15 +253,19 @@
 
 {{ productos_payload|json_script:"quote-products-data" }}
 {{ impuestos_payload|json_script:"quote-taxes-data" }}
+{{ clientes_payload|json_script:"quote-clients-data" }}
 
 <script>
 document.addEventListener("DOMContentLoaded", function(){
     const products = JSON.parse(document.getElementById("quote-products-data").textContent || "[]");
     const taxes = JSON.parse(document.getElementById("quote-taxes-data").textContent || "[]");
+    const clients = JSON.parse(document.getElementById("quote-clients-data").textContent || "[]");
     const productMap = {};
     const taxMap = {};
+    const clientMap = {};
     products.forEach(product => productMap[String(product.id)] = product);
     taxes.forEach(tax => taxMap[String(tax.id)] = parseFloat(tax.porcentaje || 0) || 0);
+    clients.forEach(client => clientMap[String(client.id)] = client);
 
     const form = document.getElementById("quote-form");
     const linesContainer = document.getElementById("quote-lines");
@@ -241,10 +273,17 @@ document.addEventListener("DOMContentLoaded", function(){
     const monedaSelect = document.getElementById("id_moneda");
     const exchangeField = document.getElementById("quote-exchange-field");
     const addLineButton = document.getElementById("quote-add-line");
-    const newProductLink = document.getElementById("quote-new-product");
+    const newClientLinks = document.querySelectorAll(".quote-new-client-trigger");
+    const newProductLinks = document.querySelectorAll(".quote-new-product-trigger");
     const modal = document.getElementById("quote-inline-modal");
     const modalFrame = document.getElementById("quote-inline-frame");
     const modalClose = document.getElementById("quote-inline-close");
+    const modalTitle = document.getElementById("quote-modal-title");
+    const modalCopy = document.getElementById("quote-modal-copy");
+    const clientSearch = document.getElementById("quote-client-search");
+    const clientSelect = document.getElementById("id_cliente");
+    const clientSuggestions = document.getElementById("quote-client-suggestions");
+    const clientMeta = document.getElementById("quote-client-meta");
     let pendingProductLine = null;
     let lastFocusedProductLine = null;
 
@@ -327,6 +366,58 @@ document.addEventListener("DOMContentLoaded", function(){
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
+    }
+
+    function renderClientSuggestions(){
+        if(!clientSearch || !clientSuggestions){ return; }
+        const term = (clientSearch.value || "").trim().toLowerCase();
+        const matches = clients.filter(client => {
+            const haystack = `${client.nombre || ""} ${client.rtn || ""} ${client.telefono || ""} ${client.correo || ""}`.toLowerCase();
+            return !term || haystack.includes(term);
+        }).slice(0, 10);
+        if(!matches.length){
+            clientSuggestions.innerHTML = '<div class="quote-empty-suggestion">Sin clientes encontrados. Puedes crear uno nuevo desde el boton superior.</div>';
+        }else{
+            clientSuggestions.innerHTML = matches.map(client => `
+                <button type="button" class="quote-suggestion" data-client-id="${client.id}">
+                    <span><strong>${escapeHtml(client.nombre)}</strong><span>${escapeHtml(client.rtn || client.telefono || client.correo || "Sin datos adicionales")}</span></span>
+                </button>
+            `).join("");
+        }
+        clientSuggestions.style.display = "block";
+    }
+
+    function selectClient(clientId){
+        const client = clientMap[String(clientId)];
+        if(!client || !clientSelect){ return; }
+        clientSelect.value = String(client.id);
+        if(clientSearch){ clientSearch.value = client.nombre || ""; }
+        if(clientMeta){
+            const parts = [client.rtn ? `RTN ${client.rtn}` : "", client.telefono || "", client.correo || ""].filter(Boolean);
+            clientMeta.textContent = parts.length ? parts.join(" · ") : "Cliente seleccionado para esta cotizacion.";
+        }
+        if(clientSuggestions){ clientSuggestions.style.display = "none"; }
+    }
+
+    function syncClientFromSelect(){
+        if(!clientSelect || !clientSearch){ return; }
+        if(clientSelect.value && clientMap[String(clientSelect.value)]){
+            selectClient(clientSelect.value);
+            return;
+        }
+        const option = clientSelect.selectedOptions && clientSelect.selectedOptions[0];
+        clientSearch.value = option && option.value ? option.text.trim() : "";
+    }
+
+    function syncClientFromSearch(){
+        if(!clientSearch || !clientSelect){ return; }
+        const exact = clients.find(client => (client.nombre || "").trim().toLowerCase() === clientSearch.value.trim().toLowerCase());
+        if(exact){
+            selectClient(exact.id);
+        }else if(!clientSearch.value.trim()){
+            clientSelect.value = "";
+            if(clientMeta){ clientMeta.textContent = "Selecciona un cliente o crealo sin salir de la cotizacion."; }
+        }
     }
 
     function selectProduct(row, productId){
@@ -482,12 +573,14 @@ document.addEventListener("DOMContentLoaded", function(){
         recalculate();
     }
 
-    function openModal(url, productLine){
-        pendingProductLine = productLine || null;
+    function openModal(url, options = {}){
         if(!modal || !modalFrame){
             window.open(url, "_blank", "noopener");
             return;
         }
+        pendingProductLine = options.productLine || null;
+        if(modalTitle){ modalTitle.textContent = options.title || "Crear rapido"; }
+        if(modalCopy){ modalCopy.textContent = options.copy || "Al guardar quedara disponible para seleccionarlo en la cotizacion."; }
         modalFrame.src = url;
         modal.classList.add("is-open");
         modal.setAttribute("aria-hidden", "false");
@@ -499,6 +592,17 @@ document.addEventListener("DOMContentLoaded", function(){
         modal.setAttribute("aria-hidden", "true");
         modalFrame.src = "about:blank";
         pendingProductLine = null;
+    }
+
+    function addClientToSelect(client){
+        if(!clientSelect || !client){ return; }
+        let option = Array.from(clientSelect.options).find(item => String(item.value) === String(client.id));
+        if(!option){
+            option = document.createElement("option");
+            option.value = String(client.id);
+            clientSelect.appendChild(option);
+        }
+        option.text = client.nombre;
     }
 
     function addProductToSelects(product){
@@ -531,20 +635,71 @@ document.addEventListener("DOMContentLoaded", function(){
         closeModal();
     }
 
+    function registerCreatedClient(client){
+        if(!client){ return; }
+        const normalized = {
+            id: client.id,
+            nombre: client.nombre,
+            rtn: client.rtn || "",
+            telefono: client.telefono || "",
+            correo: client.correo || "",
+        };
+        clients.push(normalized);
+        clientMap[String(normalized.id)] = normalized;
+        addClientToSelect(normalized);
+        selectClient(normalized.id);
+        closeModal();
+    }
+
     document.querySelectorAll(".quote-line-row").forEach(initLine);
+    syncClientFromSelect();
+    clientSearch?.addEventListener("focus", renderClientSuggestions);
+    clientSearch?.addEventListener("input", () => {
+        syncClientFromSearch();
+        renderClientSuggestions();
+    });
+    clientSearch?.addEventListener("blur", () => {
+        syncClientFromSearch();
+        window.setTimeout(() => { if(clientSuggestions){ clientSuggestions.style.display = "none"; } }, 150);
+    });
+    clientSuggestions?.addEventListener("click", event => {
+        const button = event.target.closest(".quote-suggestion");
+        if(button){ selectClient(button.dataset.clientId); }
+    });
+    clientSelect?.addEventListener("change", syncClientFromSelect);
     addLineButton?.addEventListener("click", addLine);
-    newProductLink?.addEventListener("click", event => {
-        event.preventDefault();
-        const url = new URL(newProductLink.href, window.location.origin);
-        url.searchParams.set("modal", "1");
-        const targetRow = lastFocusedProductLine && lastFocusedProductLine.dataset.deleted !== "1"
-            ? lastFocusedProductLine
-            : (activeRows()[0] || null);
-        const typedName = targetRow?.querySelector(".quote-product-search")?.value || "";
-        if(typedName.trim()){
-            url.searchParams.set("nombre", typedName.trim());
-        }
-        openModal(url.toString(), targetRow);
+    newClientLinks.forEach(link => {
+        link.addEventListener("click", event => {
+            event.preventDefault();
+            const url = new URL(link.href, window.location.origin);
+            url.searchParams.set("modal", "1");
+            if(clientSearch && clientSearch.value.trim()){
+                url.searchParams.set("nombre", clientSearch.value.trim());
+            }
+            openModal(url.toString(), {
+                title: "Crear cliente rapido",
+                copy: "Registra el cliente sin salir de la cotizacion y quedara seleccionado automaticamente."
+            });
+        });
+    });
+    newProductLinks.forEach(link => {
+        link.addEventListener("click", event => {
+            event.preventDefault();
+            const url = new URL(link.href, window.location.origin);
+            url.searchParams.set("modal", "1");
+            const targetRow = lastFocusedProductLine && lastFocusedProductLine.dataset.deleted !== "1"
+                ? lastFocusedProductLine
+                : (activeRows()[0] || null);
+            const typedName = targetRow?.querySelector(".quote-product-search")?.value || "";
+            if(typedName.trim()){
+                url.searchParams.set("nombre", typedName.trim());
+            }
+            openModal(url.toString(), {
+                productLine: targetRow,
+                title: "Crear producto rapido",
+                copy: "Crea el producto sin salir de la cotizacion y luego lo podras usar en cualquier linea."
+            });
+        });
     });
     modalClose?.addEventListener("click", closeModal);
     modal?.addEventListener("click", event => {
@@ -558,8 +713,12 @@ document.addEventListener("DOMContentLoaded", function(){
         if(data.type === "erp-producto-creado"){
             registerCreatedProduct(data.producto);
         }
+        if(data.type === "erp-cliente-creado"){
+            registerCreatedClient(data.cliente);
+        }
     });
     form.addEventListener("submit", function(){
+        syncClientFromSearch();
         document.querySelectorAll(".quote-line-row").forEach(syncManualDescription);
         renumberFormset();
     });
