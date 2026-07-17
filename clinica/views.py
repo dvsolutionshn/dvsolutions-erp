@@ -669,6 +669,14 @@ def _puede_eliminar_pacientes(user, empresa):
     )
 
 
+def _puede_administrar_catalogo_clinico(user, empresa):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and (user.is_superuser or getattr(user, "es_administrador_empresa", False))
+        and user.puede_acceder_empresa(empresa)
+    )
+
+
 @login_required
 @require_POST
 def eliminar_paciente(request, empresa_slug, paciente_id):
@@ -1611,7 +1619,52 @@ def profesionales(request, empresa_slug):
         messages.success(request, "Profesional guardado correctamente.")
         return redirect("clinica_profesionales", empresa_slug=empresa.slug)
     profesionales_qs = ProfesionalSalud.objects.filter(empresa=empresa)
-    return render(request, "clinica/catalogo.html", {"empresa": empresa, "form": form, "items": profesionales_qs, "titulo": "Profesionales"})
+    return render(
+        request,
+        "clinica/catalogo.html",
+        {
+            "empresa": empresa,
+            "form": form,
+            "items": profesionales_qs,
+            "titulo": "Profesionales",
+            "form_titulo": "Agregar",
+            "form_descripcion": "Configura este registro para agenda, tratamientos y operacion clinica.",
+            "puede_editar_catalogo": _puede_administrar_catalogo_clinico(request.user, empresa),
+            "editar_url_name": "clinica_profesional_editar",
+        },
+    )
+
+
+@login_required
+def editar_profesional(request, empresa_slug, profesional_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    profesional = get_object_or_404(ProfesionalSalud, id=profesional_id, empresa=empresa)
+    if not _puede_administrar_catalogo_clinico(request.user, empresa):
+        messages.error(request, "Solo administradores de la empresa pueden editar profesionales.")
+        return redirect("clinica_profesionales", empresa_slug=empresa.slug)
+
+    form = ProfesionalSaludForm(request.POST or None, empresa=empresa, instance=profesional)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Profesional actualizado correctamente.")
+        return redirect("clinica_profesionales", empresa_slug=empresa.slug)
+
+    profesionales_qs = ProfesionalSalud.objects.filter(empresa=empresa)
+    return render(
+        request,
+        "clinica/catalogo.html",
+        {
+            "empresa": empresa,
+            "form": form,
+            "items": profesionales_qs,
+            "titulo": "Profesionales",
+            "form_titulo": "Editar registro",
+            "form_descripcion": "Actualiza el nombre, especialidad, telefono o estado del profesional seleccionado.",
+            "puede_editar_catalogo": True,
+            "editar_url_name": "clinica_profesional_editar",
+            "objeto_editando": profesional,
+        },
+    )
 
 
 @login_required

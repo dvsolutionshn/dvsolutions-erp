@@ -38,5 +38,6 @@ urlpatterns = [
     path("tratamientos/", views.tratamientos, name="clinica_tratamientos"),
     path("tratamientos/crear/", views.crear_tratamiento, name="clinica_crear_tratamiento"),
     path("profesionales/", views.profesionales, name="clinica_profesionales"),
+    path("profesionales/<int:profesional_id>/editar/", views.editar_profesional, name="clinica_profesional_editar"),
     path("servicios/", views.servicios, name="clinica_servicios"),
 ]
