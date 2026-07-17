@@ -136,8 +136,8 @@
             <span><strong>Hilos tensores</strong><span>Control sugerido en 10 meses</span></span>
         </label>
         <label class="patient-reminder-preset">
-            <input type="checkbox" data-reminder-preset data-treatment="Control de Bioestimulador" data-months="10">
-            <span><strong>Bioestimulador</strong><span>Control sugerido en 10 meses</span></span>
+            <input type="checkbox" data-reminder-preset data-treatment="Control de Bioestimuladores Colageno" data-months="10">
+            <span><strong>Bioestimuladores Colageno</strong><span>Control sugerido en 10 meses</span></span>
         </label>
         <label class="patient-reminder-preset">
             <input type="checkbox" data-reminder-preset data-treatment="Seguimiento de Manchas" data-months="1">
@@ -151,9 +151,77 @@
             <input type="checkbox" data-reminder-preset data-treatment="Control de Sueroterapia" data-months="2">
             <span><strong>Sueroterapias</strong><span>Control sugerido en 2 meses</span></span>
         </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Revision post trasplante" data-months="3">
+            <span><strong>Revision post trasplante</strong><span>Control sugerido cada 3 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Seguimiento de Acne" data-months="1">
+            <span><strong>Acne</strong><span>Seguimiento sugerido cada mes</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Control de Skinbooster" data-months="3">
+            <span><strong>Skinbooster</strong><span>Control sugerido en 3 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Control de PDRN salmon" data-months="1">
+            <span><strong>PDRN salmon</strong><span>Control sugerido en 1 mes</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="PRP facial" data-months="3">
+            <span><strong>PRP facial</strong><span>Control sugerido cada 3 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Exosomas" data-months="3">
+            <span><strong>Exosomas</strong><span>Control sugerido cada 3 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Rejuvenecimiento facial" data-months="10">
+            <span><strong>Rejuvenecimiento facial</strong><span>Control sugerido en 10 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Fototerapia LED" data-months="1">
+            <span><strong>Fototerapia LED</strong><span>Control sugerido en 1 mes</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Radiofrecuencia facial Exilis" data-weeks="1">
+            <span><strong>Radiofrecuencia facial (Exilis)</strong><span>Seguimiento semanal</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Radiofrecuencia fraccionada con microagujas Matrix Pro" data-months="3">
+            <span><strong>Matrix Pro</strong><span>Control sugerido cada 3 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="IPL para manchas" data-months="2">
+            <span><strong>IPL para manchas</strong><span>Control sugerido en 2 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Laser CO2 fraccionado" data-months="3">
+            <span><strong>Laser CO2 fraccionado</strong><span>Control sugerido en 3 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Hollywood Peel" data-months="1">
+            <span><strong>Hollywood Peel</strong><span>Control sugerido en 1 mes</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Spectra laser" data-months="2">
+            <span><strong>Spectra laser</strong><span>Control sugerido en 2 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Depilacion laser" data-months="1">
+            <span><strong>Depilacion laser</strong><span>Sesion sugerida cada mes</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Reposicion linea cremas piel/cabello" data-months="3">
+            <span><strong>Reposicion cremas piel/cabello</strong><span>Seguimiento sugerido cada 3 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Paciente que no ha venido" data-months="7">
+            <span><strong>Paciente que no ha venido</strong><span>Alerta sugerida en 7 meses</span></span>
+        </label>
     </div>
     <div class="patient-reminder-preset-actions">
-        <span>Seleccione uno o varios retoques y el sistema calculara la fecha automaticamente desde hoy.</span>
+        <span>Seleccione uno o varios retoques y el sistema calculara automaticamente la fecha sugerida desde hoy, segun el intervalo configurado.</span>
         <button type="button" class="erp-btn-secondary" id="addReminderPresets">Agregar seleccionados</button>
     </div>
     <form method="post" action="{% url 'clinica_crear_recordatorios_tratamiento' empresa.slug paciente.id %}" id="treatmentReminderForm">
@@ -397,6 +465,30 @@
         }
         return target;
     }
+    function addDays(date, days){
+        const target = new Date(date.getTime());
+        target.setDate(target.getDate() + days);
+        return target;
+    }
+    function calculatePresetDate(preset){
+        const base = new Date();
+        const months = Number(preset.dataset.months || "0");
+        const weeks = Number(preset.dataset.weeks || "0");
+        const days = Number(preset.dataset.days || "0");
+        if(months){ return addMonths(base, months); }
+        if(weeks){ return addDays(base, weeks * 7); }
+        if(days){ return addDays(base, days); }
+        return base;
+    }
+    function presetIntervalLabel(preset){
+        const months = Number(preset.dataset.months || "0");
+        const weeks = Number(preset.dataset.weeks || "0");
+        const days = Number(preset.dataset.days || "0");
+        if(months){ return `${months} mes(es)`; }
+        if(weeks){ return `${weeks} semana(s)`; }
+        if(days){ return `${days} dia(s)`; }
+        return "fecha sugerida";
+    }
     function toDateInputValue(date){
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -454,11 +546,11 @@
                 const treatment = row.querySelector('input[name="tratamiento[]"]');
                 const date = row.querySelector('input[name="fecha[]"]');
                 const note = row.querySelector('input[name="nota[]"]');
-                const months = Number(preset.dataset.months || "0");
-                const calculatedDate = addMonths(new Date(), months);
+                const calculatedDate = calculatePresetDate(preset);
+                const intervalLabel = presetIntervalLabel(preset);
                 if(treatment){ treatment.value = preset.dataset.treatment || ""; }
                 if(date){ date.value = toDateInputValue(calculatedDate); }
-                if(note){ note.value = `Retoque automatico sugerido a ${months} mes(es).`; }
+                if(note){ note.value = `Retoque automatico sugerido a ${intervalLabel}.`; }
                 preset.checked = false;
             });
             const lastRow = rows.querySelector(".patient-reminder-row:last-child");
