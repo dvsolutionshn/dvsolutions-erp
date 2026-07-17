@@ -462,6 +462,46 @@ class FacturacionTests(TestCase):
         self.assertEqual(linea.impuesto_monto, Decimal("326.09"))
         self.assertEqual(factura.total, Decimal("2500.00"))
 
+    def test_pos_serviciosmedicos_interpreta_precio_catalogo_como_total_final(self):
+        self.empresa.slug = "serviciosmedicos"
+        self.empresa.save(update_fields=["slug"])
+        ConfiguracionFacturacionEmpresa.objects.update_or_create(
+            empresa=self.empresa,
+            defaults={"precios_incluyen_impuesto": True},
+        )
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.precio = Decimal("115.00")
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "metodo": "efectivo",
+                    "cliente_id": self.cliente.id,
+                    "monto_recibido": "115.00",
+                    "items": [{
+                        "producto_id": self.producto.id,
+                        "cantidad": "1",
+                        "precio_unitario": "115.00",
+                    }],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        factura = Factura.objects.get(pk=response.json()["factura_id"])
+        linea = factura.lineas.get()
+        self.assertTrue(linea.precio_incluye_impuesto)
+        self.assertEqual(linea.subtotal, Decimal("100.00"))
+        self.assertEqual(linea.impuesto_monto, Decimal("15.00"))
+        self.assertEqual(linea.total_linea, Decimal("115.00"))
+        self.assertEqual(factura.total, Decimal("115.00"))
+
     def test_punto_venta_ajax_cobra_y_devuelve_ticket_para_imprimir(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])
@@ -1110,7 +1150,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(form_general.fields["precio"].label, "Precio")
         self.assertIn("Precio base", form_general.fields["precio"].help_text)
 
-        for slug in ["hospital_mia", "medical_spa", "luque_aestetic"]:
+        for slug in ["hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"]:
             self.empresa.slug = slug
             self.empresa.save(update_fields=["slug"])
             form_medico = ProductoForm(empresa=self.empresa)
