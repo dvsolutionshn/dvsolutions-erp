@@ -47,6 +47,13 @@
 .patient-reminder-head h3{margin:6px 0 0;color:#102338}
 .patient-reminder-head p{margin:8px 0 0;color:var(--muted);line-height:1.55;max-width:760px}
 .patient-reminder-badge{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:999px;background:#f2eafe;color:#6d28d9;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.patient-reminder-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:18px;padding:12px;border:1px solid rgba(124,58,237,.16);border-radius:18px;background:rgba(255,255,255,.68)}
+.patient-reminder-preset{position:relative;display:flex;align-items:center;gap:10px;min-height:58px;padding:11px 12px;border:1px solid #d9e4f2;border-radius:15px;background:#fff;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.patient-reminder-preset:hover{transform:translateY(-2px);border-color:rgba(124,58,237,.38);box-shadow:0 14px 30px rgba(91,65,180,.09)}
+.patient-reminder-preset input{width:18px;height:18px;accent-color:#7c3aed;flex:0 0 auto}
+.patient-reminder-preset strong{display:block;color:#102338;font-size:13px}.patient-reminder-preset span{display:block;margin-top:3px;color:#6b7d90;font-size:11px;font-weight:800}
+.patient-reminder-preset:has(input:checked){border-color:#7c3aed;background:linear-gradient(135deg,#fbf7ff,#f1fcff);box-shadow:0 14px 30px rgba(124,58,237,.12)}
+.patient-reminder-preset-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;color:#64758a;font-size:12px}
 .patient-reminder-list{display:grid;gap:10px;margin-top:18px}
 .patient-reminder-row{display:grid;grid-template-columns:minmax(210px,1.35fr) 150px 110px 82px minmax(190px,1fr) 42px;gap:10px;align-items:end;padding:12px;border:1px solid #dfe8f2;border-radius:16px;background:rgba(255,255,255,.88);box-shadow:0 10px 24px rgba(17,35,54,.04)}
 .patient-reminder-field label{display:block;margin-bottom:6px;color:#60768b;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
@@ -114,6 +121,40 @@
             <p>Agende controles o siguientes aplicaciones desde este expediente. Cada linea se envia al calendario como recordatorio destacado, con color propio y franja visible para diferenciarlo de una cita normal.</p>
         </div>
         <span class="patient-reminder-badge">◆ Calendario + seguimiento</span>
+    </div>
+    <div class="patient-reminder-presets" aria-label="Retoques sugeridos">
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Retoque de Botox" data-months="4">
+            <span><strong>Botox</strong><span>Retoque sugerido en 4 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Retoque de Fillers" data-months="10">
+            <span><strong>Fillers</strong><span>Retoque sugerido en 10 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Control de Hilos tensores" data-months="10">
+            <span><strong>Hilos tensores</strong><span>Control sugerido en 10 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Control de Bioestimulador" data-months="10">
+            <span><strong>Bioestimulador</strong><span>Control sugerido en 10 meses</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Seguimiento de Manchas" data-months="1">
+            <span><strong>Manchas</strong><span>Seguimiento sugerido en 1 mes</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Seguimiento de Alopecia" data-months="1">
+            <span><strong>Alopecia</strong><span>Seguimiento sugerido en 1 mes</span></span>
+        </label>
+        <label class="patient-reminder-preset">
+            <input type="checkbox" data-reminder-preset data-treatment="Control de Sueroterapia" data-months="2">
+            <span><strong>Sueroterapias</strong><span>Control sugerido en 2 meses</span></span>
+        </label>
+    </div>
+    <div class="patient-reminder-preset-actions">
+        <span>Seleccione uno o varios retoques y el sistema calculara la fecha automaticamente desde hoy.</span>
+        <button type="button" class="erp-btn-secondary" id="addReminderPresets">Agregar seleccionados</button>
     </div>
     <form method="post" action="{% url 'clinica_crear_recordatorios_tratamiento' empresa.slug paciente.id %}" id="treatmentReminderForm">
         {% csrf_token %}
@@ -345,17 +386,51 @@
 (function(){
     const rows = document.getElementById("treatmentReminderRows");
     const addButton = document.getElementById("addTreatmentReminder");
+    const presetButton = document.getElementById("addReminderPresets");
     if(!rows || !addButton){ return; }
+    function addMonths(date, months){
+        const target = new Date(date.getTime());
+        const day = target.getDate();
+        target.setMonth(target.getMonth() + months);
+        if(target.getDate() !== day){
+            target.setDate(0);
+        }
+        return target;
+    }
+    function toDateInputValue(date){
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+    function resetRow(row){
+        row.querySelectorAll("input").forEach(input => input.value = "");
+        row.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
+        const periodo = row.querySelector('select[name="periodo[]"]');
+        if(periodo){ periodo.value = "PM"; }
+        const hora = row.querySelector('select[name="hora[]"]');
+        if(hora){ hora.value = "09:00"; }
+    }
+    function createRow(){
+        const base = rows.querySelector(".patient-reminder-row");
+        if(!base){ return null; }
+        const allRows = rows.querySelectorAll(".patient-reminder-row");
+        const firstEmpty = allRows.length === 1 && !base.querySelector('input[name="tratamiento[]"]')?.value && !base.querySelector('input[name="fecha[]"]')?.value;
+        const row = firstEmpty ? base : base.cloneNode(true);
+        resetRow(row);
+        if(!firstEmpty){
+            rows.appendChild(row);
+            wireRow(row);
+        }
+        return row;
+    }
     function wireRow(row){
         const remove = row.querySelector("[data-remove-reminder]");
         if(remove){
             remove.addEventListener("click", function(){
                 const allRows = rows.querySelectorAll(".patient-reminder-row");
                 if(allRows.length <= 1){
-                    row.querySelectorAll("input").forEach(input => input.value = "");
-                    row.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
-                    const periodo = row.querySelector('select[name="periodo[]"]');
-                    if(periodo){ periodo.value = "PM"; }
+                    resetRow(row);
                     return;
                 }
                 row.remove();
@@ -364,18 +439,32 @@
     }
     rows.querySelectorAll(".patient-reminder-row").forEach(wireRow);
     addButton.addEventListener("click", function(){
-        const base = rows.querySelector(".patient-reminder-row");
-        if(!base){ return; }
-        const clone = base.cloneNode(true);
-        clone.querySelectorAll("input").forEach(input => input.value = "");
-        clone.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
-        const periodo = clone.querySelector('select[name="periodo[]"]');
-        if(periodo){ periodo.value = "PM"; }
-        rows.appendChild(clone);
-        wireRow(clone);
-        const firstInput = clone.querySelector('input[name="tratamiento[]"]');
+        const row = createRow();
+        if(!row){ return; }
+        const firstInput = row.querySelector('input[name="tratamiento[]"]');
         if(firstInput){ firstInput.focus(); }
     });
+    if(presetButton){
+        presetButton.addEventListener("click", function(){
+            const selected = Array.from(document.querySelectorAll("[data-reminder-preset]:checked"));
+            if(!selected.length){ return; }
+            selected.forEach(function(preset){
+                const row = createRow();
+                if(!row){ return; }
+                const treatment = row.querySelector('input[name="tratamiento[]"]');
+                const date = row.querySelector('input[name="fecha[]"]');
+                const note = row.querySelector('input[name="nota[]"]');
+                const months = Number(preset.dataset.months || "0");
+                const calculatedDate = addMonths(new Date(), months);
+                if(treatment){ treatment.value = preset.dataset.treatment || ""; }
+                if(date){ date.value = toDateInputValue(calculatedDate); }
+                if(note){ note.value = `Retoque automatico sugerido a ${months} mes(es).`; }
+                preset.checked = false;
+            });
+            const lastRow = rows.querySelector(".patient-reminder-row:last-child");
+            if(lastRow){ lastRow.scrollIntoView({behavior:"smooth", block:"center"}); }
+        });
+    }
 })();
 
 (function(){
