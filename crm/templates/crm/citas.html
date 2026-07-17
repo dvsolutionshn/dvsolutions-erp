@@ -237,6 +237,116 @@
   .calendar-event,.calendar-modal-card{animation:none}
   .calendar-chip,.calendar-day,.calendar-event,.day-event{transition:none}
 }
+.appointment-detail-card{
+  border-radius:24px;
+  box-shadow:0 22px 58px rgba(20,45,70,.09);
+}
+.appointment-table tbody tr{
+  transition:background .18s ease,box-shadow .18s ease;
+}
+.appointment-table tbody tr:hover{
+  background:linear-gradient(90deg,rgba(20,184,166,.035),rgba(37,99,235,.035));
+}
+.appointment-table td:last-child{min-width:310px}
+.appointment-manage{
+  width:min(100%,360px);
+  gap:10px!important;
+  padding:11px;
+  border:1px solid rgba(207,222,235,.9);
+  border-radius:18px;
+  background:
+    radial-gradient(circle at top right,rgba(37,99,235,.08),transparent 42%),
+    linear-gradient(135deg,#fff,#f8fcff);
+  box-shadow:0 14px 34px rgba(20,45,70,.07);
+}
+.appointment-links{
+  justify-content:flex-start;
+  gap:8px!important;
+  flex-wrap:wrap;
+}
+.appointment-links a,
+.appointment-delete summary{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:30px;
+  padding:0 11px;
+  border-radius:999px;
+  text-decoration:none;
+  letter-spacing:.03em;
+  transition:transform .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.appointment-links a:first-child{
+  border:1px solid rgba(37,99,235,.18);
+  background:#eff6ff;
+  color:#1d5fb8;
+}
+.appointment-links a:last-child{
+  border:1px solid rgba(20,184,166,.22);
+  background:#ecfdf8;
+  color:#0f766e;
+}
+.appointment-links a:hover,
+.appointment-delete summary:hover{
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(20,45,70,.10);
+}
+.appointment-state-form{
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:8px!important;
+}
+.appointment-state-form select{
+  min-height:42px!important;
+  border-color:#bed1e3!important;
+  border-radius:13px!important;
+  background:#fff!important;
+  color:#203448!important;
+  font-size:11px!important;
+  font-weight:800;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92);
+}
+.appointment-state-form select:focus{
+  outline:0;
+  border-color:#2563eb!important;
+  box-shadow:0 0 0 3px rgba(37,99,235,.10);
+}
+.appointment-state-form button{
+  min-height:42px!important;
+  border-radius:13px!important;
+  padding:0 16px!important;
+  background:linear-gradient(135deg,#203448,#102338)!important;
+  box-shadow:0 12px 24px rgba(16,35,56,.18);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.appointment-state-form button:hover{
+  transform:translateY(-1px);
+  box-shadow:0 16px 30px rgba(16,35,56,.24);
+}
+.appointment-delete summary{
+  width:max-content;
+  border:1px solid rgba(180,35,24,.18);
+  background:#fff5f4;
+  color:#b42318!important;
+}
+.appointment-delete[open]{
+  margin-top:2px;
+  padding:12px!important;
+  border-radius:16px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95);
+}
+.appointment-delete-form input{
+  min-height:40px!important;
+  border-radius:12px!important;
+}
+.appointment-delete-form button{
+  min-height:38px!important;
+  border-radius:12px!important;
+  background:linear-gradient(135deg,#dc2626,#991b1b)!important;
+}
+@media(max-width:900px){
+  .appointment-table td:last-child{min-width:250px}
+  .appointment-manage{width:100%}
+}
 </style>
 
 <div class="calendar-shell">
