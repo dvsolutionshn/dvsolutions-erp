@@ -502,6 +502,40 @@ class FacturacionTests(TestCase):
         self.assertEqual(linea.total_linea, Decimal("115.00"))
         self.assertEqual(factura.total, Decimal("115.00"))
 
+    def test_empresas_solo_contado_validan_factura_como_pagada_automaticamente(self):
+        self.producto.controla_inventario = False
+        self.producto.save(update_fields=["controla_inventario"])
+
+        for indice, slug in enumerate(["medical_spa", "luque_aestetic", "serviciosmedicos"], start=1):
+            self.empresa.slug = slug
+            self.empresa.rtn = f"08011999000{indice:03d}"
+            self.empresa.save(update_fields=["slug", "rtn"])
+            factura = self.crear_factura_con_linea(estado="borrador")
+
+            response = self.client.post(reverse("validar_factura", args=[self.empresa.slug, factura.id]))
+
+            self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+            factura.refresh_from_db()
+            self.assertEqual(factura.estado, "emitida")
+            self.assertEqual(factura.estado_pago, "pagado")
+            self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+            pago = PagoFactura.objects.get(factura=factura)
+            self.assertEqual(pago.monto, factura.total_documento_ajustado)
+            self.assertIn("Contado automatico", pago.referencia)
+
+    def test_empresa_general_validar_factura_no_crea_pago_automatico(self):
+        self.producto.controla_inventario = False
+        self.producto.save(update_fields=["controla_inventario"])
+        factura = self.crear_factura_con_linea(estado="borrador")
+
+        response = self.client.post(reverse("validar_factura", args=[self.empresa.slug, factura.id]))
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        factura.refresh_from_db()
+        self.assertEqual(factura.estado, "emitida")
+        self.assertEqual(factura.estado_pago, "pendiente")
+        self.assertEqual(PagoFactura.objects.filter(factura=factura).count(), 0)
+
     def test_punto_venta_ajax_cobra_y_devuelve_ticket_para_imprimir(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])

@@ -43,7 +43,7 @@ from contabilidad.services import (
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, Cotizacion, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaCotizacion, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, Cotizacion, EMPRESAS_FACTURACION_SOLO_CONTADO, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaCotizacion, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
@@ -186,6 +186,37 @@ def _cuenta_financiera_por_defecto(cuentas_financieras, metodo=None):
     if metodo == "tarjeta":
         return cuentas_financieras.filter(tipo="banco").first() or cuentas_financieras.first()
     return cuentas_financieras.filter(tipo="banco").first() or cuentas_financieras.first()
+
+
+def _empresa_factura_solo_contado(empresa):
+    return bool(empresa and empresa.slug in EMPRESAS_FACTURACION_SOLO_CONTADO)
+
+
+def _asegurar_pago_contado_factura(factura, usuario=None, referencia=None):
+    if not factura or not _empresa_factura_solo_contado(factura.empresa):
+        return None
+    if factura.estado != "emitida":
+        return None
+
+    factura.actualizar_estado_pago()
+    saldo = Decimal(factura.saldo_pendiente or 0).quantize(Decimal("0.01"))
+    if saldo <= 0:
+        return None
+
+    cuentas_financieras = _cuentas_financieras_activas_para_pago(factura.empresa)
+    cuenta_financiera = _cuenta_financiera_por_defecto(cuentas_financieras, "efectivo")
+    pago = PagoFactura.objects.create(
+        factura=factura,
+        fecha=factura.fecha_emision or timezone.now().date(),
+        monto=saldo,
+        metodo="efectivo",
+        referencia=(referencia or f"Contado automatico {factura.numero_factura or factura.id}")[:100],
+        cuenta_financiera=cuenta_financiera,
+        cajero=usuario if getattr(usuario, "is_authenticated", False) else None,
+    )
+    registrar_asiento_pago_cliente(pago)
+    factura.actualizar_estado_pago()
+    return pago
 
 
 def _empresa_usa_perfil_farmaceutico(empresa):
@@ -1193,7 +1224,7 @@ def _actualizar_totales_factura(factura):
     ])
 
 
-def _emitir_factura_desde_borrador(factura):
+def _emitir_factura_desde_borrador(factura, usuario=None):
     if factura.estado == 'anulada':
         raise ValidationError("No se puede validar una factura anulada.")
     if factura.estado == 'emitida':
@@ -1211,6 +1242,7 @@ def _emitir_factura_desde_borrador(factura):
 
     _registrar_salida_factura(factura)
     registrar_asiento_factura_emitida(factura)
+    _asegurar_pago_contado_factura(factura, usuario)
 
 
 def _contexto_documento_factura(empresa, factura):
@@ -5631,6 +5663,7 @@ def crear_factura(request, empresa_slug):
                     if estado_emitida:
                         _registrar_salida_factura(factura)
                         registrar_asiento_factura_emitida(factura)
+                        _asegurar_pago_contado_factura(factura, request.user)
 
                 messages.success(request, "Factura guardada correctamente.")
                 return redirect(f"{redirect('ver_factura', empresa_slug=empresa.slug, factura_id=factura.id).url}?nueva=1")
@@ -5992,6 +6025,7 @@ def editar_factura(request, empresa_slug, factura_id):
                     if estado_original != 'emitida' and factura.estado == 'emitida':
                         _registrar_salida_factura(factura)
                         registrar_asiento_factura_emitida(factura)
+                        _asegurar_pago_contado_factura(factura, request.user)
                     elif estado_original == 'emitida' and factura.estado == 'anulada':
                         _revertir_salida_factura(factura)
                         registrar_reversion_documento(
@@ -6839,7 +6873,7 @@ def validar_factura(request, empresa_slug, factura_id):
 
     try:
         with transaction.atomic():
-            _emitir_factura_desde_borrador(factura)
+            _emitir_factura_desde_borrador(factura, request.user)
         messages.success(request, "Factura validada correctamente.")
     except ValidationError as exc:
         messages.error(request, exc.message if hasattr(exc, "message") else str(exc))
