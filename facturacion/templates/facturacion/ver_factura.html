@@ -169,8 +169,9 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
 }
 
 .modal-dialog{
-    width:min(980px,100%);
-    height:min(88vh,860px);
+    width:min(980px, calc(100vw - 40px));
+    height:min(820px, calc(100dvh - 40px));
+    max-height:calc(100dvh - 40px);
     background:white;
     border-radius:18px;
     overflow:hidden;
@@ -212,7 +213,20 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
 .modal-frame{
     flex:1;
     width:100%;
+    min-height:0;
     border:0;
+    background:#f5f8fc;
+    overflow:auto;
+}
+
+@media (max-width: 760px){
+    .modal-overlay{padding:8px;}
+    .modal-dialog{
+        width:100%;
+        height:calc(100dvh - 16px);
+        max-height:none;
+        border-radius:14px;
+    }
 }
 </style>
 </head>
@@ -497,7 +511,7 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
             </div>
             <button type="button" class="modal-close" id="cerrarPagoModal">Cerrar</button>
         </div>
-        <iframe id="paymentModalFrame" class="modal-frame" src="about:blank" title="Registrar pago"></iframe>
+        <iframe id="paymentModalFrame" class="modal-frame" src="about:blank" title="Registrar pago" scrolling="yes"></iframe>
     </div>
 </div>
 
@@ -524,6 +538,11 @@ document.addEventListener("DOMContentLoaded", () => {
         modal.classList.add("visible");
         modal.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
+        modal.scrollTop = 0;
+        requestAnimationFrame(() => {
+            modal.scrollIntoView({block: "center", inline: "nearest"});
+            frame.focus();
+        });
     });
 
     closeBtn.addEventListener("click", closeModal);

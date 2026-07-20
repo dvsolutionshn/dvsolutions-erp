@@ -346,6 +346,10 @@
 .erp-preview-modal.is-nonblocking{
     pointer-events:none;
 }
+.erp-preview-modal.erp-payment-modal{
+    align-items:center;
+    padding:18px;
+}
 .erp-preview-dialog{
     width:min(1180px, 100%);
     height:calc(100dvh - clamp(20px, 4vh, 44px));
@@ -359,6 +363,21 @@
     box-shadow:0 30px 80px rgba(7,20,36,.16);
     margin:auto 0;
     pointer-events:auto;
+}
+.erp-payment-dialog{
+    width:min(1060px, calc(100vw - 36px));
+    height:min(820px, calc(100dvh - 36px));
+    max-height:calc(100dvh - 36px);
+    margin:0;
+    border-radius:24px;
+}
+.erp-payment-dialog .erp-preview-frame-shell{
+    overflow:hidden;
+    background:#f5f8fc;
+}
+.erp-payment-dialog iframe{
+    display:block;
+    overflow:auto;
 }
 .erp-preview-toolbar{
     flex:0 0 auto;
@@ -443,6 +462,16 @@
     }
     .erp-preview-toolbar-actions{
         justify-content:stretch;
+    }
+    .erp-preview-modal.erp-payment-modal{
+        align-items:stretch;
+        padding:8px;
+    }
+    .erp-payment-dialog{
+        width:100%;
+        height:calc(100dvh - 16px);
+        max-height:none;
+        border-radius:16px;
     }
 }
 </style>
@@ -764,8 +793,8 @@
     </div>
 </div>
 
-<div class="erp-preview-modal" id="paymentModal" aria-hidden="true">
-    <div class="erp-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
+<div class="erp-preview-modal erp-payment-modal" id="paymentModal" aria-hidden="true">
+    <div class="erp-preview-dialog erp-payment-dialog" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
         <div class="erp-preview-toolbar">
             <div>
                 <h4 id="paymentModalTitle">Registrar pago</h4>
@@ -776,7 +805,7 @@
             </div>
         </div>
         <div class="erp-preview-frame-shell">
-            <iframe id="paymentModalFrame" src="about:blank" title="Registrar pago"></iframe>
+            <iframe id="paymentModalFrame" src="about:blank" title="Registrar pago" scrolling="yes"></iframe>
         </div>
     </div>
 </div>
@@ -829,6 +858,11 @@ document.addEventListener("DOMContentLoaded", () => {
         paymentModal.classList.add("is-visible");
         paymentModal.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
+        paymentModal.scrollTop = 0;
+        requestAnimationFrame(() => {
+            paymentModal.scrollIntoView({block: "center", inline: "nearest"});
+            paymentFrame.focus();
+        });
     };
 
     const closePayment = () => {

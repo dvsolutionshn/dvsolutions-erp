@@ -15,7 +15,12 @@ from core.models import ConfiguracionAvanzadaEmpresa, Empresa, Usuario
 DOS_DECIMALES = Decimal("0.01")
 EMPRESAS_PRECIO_FINAL_CON_IMPUESTO = frozenset({"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
 EMPRESAS_IDENTIDAD_CLIENTE_OBLIGATORIA = frozenset({"hospital_mia", "medical_spa"})
-EMPRESAS_FACTURACION_SOLO_CONTADO = frozenset({"medical_spa", "luque_aestetic", "serviciosmedicos"})
+EMPRESAS_FACTURACION_SOLO_CONTADO = frozenset({
+    "hospital_mia",
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+})
 
 
 def _monto_en_letras_con_centavos(total, moneda_codigo):

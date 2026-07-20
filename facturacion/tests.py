@@ -506,7 +506,7 @@ class FacturacionTests(TestCase):
         self.producto.controla_inventario = False
         self.producto.save(update_fields=["controla_inventario"])
 
-        for indice, slug in enumerate(["medical_spa", "luque_aestetic", "serviciosmedicos"], start=1):
+        for indice, slug in enumerate(["hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"], start=1):
             self.empresa.slug = slug
             self.empresa.rtn = f"08011999000{indice:03d}"
             self.empresa.save(update_fields=["slug", "rtn"])
@@ -533,6 +533,83 @@ class FacturacionTests(TestCase):
         self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
         factura.refresh_from_db()
         self.assertEqual(factura.estado, "emitida")
+        self.assertEqual(factura.estado_pago, "pendiente")
+        self.assertEqual(PagoFactura.objects.filter(factura=factura).count(), 0)
+
+    def test_empresa_solo_contado_fuerza_emitida_al_crear_factura(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        self.producto.controla_inventario = False
+        self.producto.save(update_fields=["controla_inventario"])
+
+        response = self.client.post(
+            reverse("crear_factura", args=[self.empresa.slug]),
+            {
+                "cliente": str(self.cliente.id),
+                "fecha_emision": str(date.today()),
+                "fecha_vencimiento": "",
+                "vendedor": "",
+                "tipo_cambio": "1.0000",
+                "moneda": "HNL",
+                "estado": "borrador",
+                "orden_compra_exenta": "",
+                "registro_exonerado": "",
+                "registro_sag": "",
+                "lineas-TOTAL_FORMS": "1",
+                "lineas-INITIAL_FORMS": "0",
+                "lineas-MIN_NUM_FORMS": "0",
+                "lineas-MAX_NUM_FORMS": "1000",
+                "lineas-0-producto": str(self.producto.id),
+                "lineas-0-descripcion_manual": "",
+                "lineas-0-cantidad": "1.00",
+                "lineas-0-precio_unitario": "100.00",
+                "lineas-0-descuento_porcentaje": "0",
+                "lineas-0-comentario": "",
+                "lineas-0-impuesto": str(self.impuesto.id),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        factura = Factura.objects.get()
+        self.assertEqual(factura.estado, "emitida")
+        self.assertEqual(factura.estado_pago, "pagado")
+        self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+        self.assertEqual(PagoFactura.objects.filter(factura=factura).count(), 1)
+
+    def test_empresa_general_conserva_borrador_al_crear_factura(self):
+        self.producto.controla_inventario = False
+        self.producto.save(update_fields=["controla_inventario"])
+
+        response = self.client.post(
+            reverse("crear_factura", args=[self.empresa.slug]),
+            {
+                "cliente": str(self.cliente.id),
+                "fecha_emision": str(date.today()),
+                "fecha_vencimiento": "",
+                "vendedor": "",
+                "tipo_cambio": "1.0000",
+                "moneda": "HNL",
+                "estado": "borrador",
+                "orden_compra_exenta": "",
+                "registro_exonerado": "",
+                "registro_sag": "",
+                "lineas-TOTAL_FORMS": "1",
+                "lineas-INITIAL_FORMS": "0",
+                "lineas-MIN_NUM_FORMS": "0",
+                "lineas-MAX_NUM_FORMS": "1000",
+                "lineas-0-producto": str(self.producto.id),
+                "lineas-0-descripcion_manual": "",
+                "lineas-0-cantidad": "1.00",
+                "lineas-0-precio_unitario": "100.00",
+                "lineas-0-descuento_porcentaje": "0",
+                "lineas-0-comentario": "",
+                "lineas-0-impuesto": str(self.impuesto.id),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        factura = Factura.objects.get()
+        self.assertEqual(factura.estado, "borrador")
         self.assertEqual(factura.estado_pago, "pendiente")
         self.assertEqual(PagoFactura.objects.filter(factura=factura).count(), 0)
 

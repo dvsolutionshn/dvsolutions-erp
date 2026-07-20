@@ -192,6 +192,13 @@ def _empresa_factura_solo_contado(empresa):
     return bool(empresa and empresa.slug in EMPRESAS_FACTURACION_SOLO_CONTADO)
 
 
+def _forzar_factura_emitida_si_contado(post_data, empresa):
+    post_data = post_data.copy()
+    if _empresa_factura_solo_contado(empresa):
+        post_data["estado"] = "emitida"
+    return post_data
+
+
 def _asegurar_pago_contado_factura(factura, usuario=None, referencia=None):
     if not factura or not _empresa_factura_solo_contado(factura.empresa):
         return None
@@ -5384,6 +5391,7 @@ def convertir_cotizacion_factura(request, empresa_slug, cotizacion_id):
         return redirect("ver_cotizacion", empresa_slug=empresa.slug, cotizacion_id=cotizacion.id)
 
     with transaction.atomic():
+        estado_factura = "emitida" if _empresa_factura_solo_contado(empresa) else "borrador"
         factura = Factura.objects.create(
             empresa=empresa,
             cliente=cotizacion.cliente,
@@ -5392,11 +5400,12 @@ def convertir_cotizacion_factura(request, empresa_slug, cotizacion_id):
             tipo_cambio=cotizacion.tipo_cambio,
             fecha_emision=timezone.localdate(),
             fecha_vencimiento=cotizacion.fecha_vencimiento,
-            estado="borrador",
+            estado=estado_factura,
             cotizacion_origen=cotizacion,
         )
+        lineas_guardadas = []
         for linea in cotizacion.lineas.all():
-            LineaFactura.objects.create(
+            lineas_guardadas.append(LineaFactura.objects.create(
                 factura=factura,
                 producto=linea.producto,
                 descripcion_manual=linea.descripcion_manual,
@@ -5407,12 +5416,24 @@ def convertir_cotizacion_factura(request, empresa_slug, cotizacion_id):
                 comentario=linea.comentario,
                 descuento_porcentaje=linea.descuento_porcentaje,
                 impuesto=linea.impuesto,
-            )
+            ))
         _actualizar_totales_factura(factura)
+        if factura.estado == "emitida":
+            _validar_stock_disponible_para_lineas(lineas_guardadas)
+            _registrar_salida_factura(factura)
+            registrar_asiento_factura_emitida(factura)
+            _asegurar_pago_contado_factura(
+                factura,
+                request.user,
+                referencia=f"Contado automatico cotizacion {cotizacion.numero}",
+            )
         cotizacion.estado = "convertida"
         cotizacion.save(update_fields=["estado", "fecha_actualizacion"])
 
-    messages.success(request, f"Cotizacion {cotizacion.numero} convertida en factura borrador.")
+    if _empresa_factura_solo_contado(empresa):
+        messages.success(request, f"Cotizacion {cotizacion.numero} convertida en factura emitida y pagada.")
+    else:
+        messages.success(request, f"Cotizacion {cotizacion.numero} convertida en factura borrador.")
     return redirect(f"{redirect('ver_factura', empresa_slug=empresa.slug, factura_id=factura.id).url}?nueva=1")
 
 
@@ -5511,10 +5532,10 @@ def crear_factura(request, empresa_slug):
         return prefijo, ""
 
     def preparar_post_factura(post_data):
+        post_data = _forzar_factura_emitida_si_contado(post_data, empresa)
         if not config_avanzada.permite_gestion_fiscal_historica:
             return post_data
 
-        post_data = post_data.copy()
         fecha_referencia = _parsear_fecha_latam(post_data.get("fecha_emision")) or timezone.localdate()
         prefijo, _ = obtener_prefijo_manual(
             fecha_referencia=fecha_referencia,
@@ -5546,10 +5567,18 @@ def crear_factura(request, empresa_slug):
                 label=form.fields['tipo_cambio'].label,
             )
         if 'estado' in form.fields:
-            form.fields['estado'].choices = [
-                ('borrador', 'Borrador'),
-                ('emitida', 'Emitida'),
-            ]
+            if _empresa_factura_solo_contado(empresa):
+                form.fields['estado'].choices = [('emitida', 'Emitida')]
+                form.fields['estado'].initial = 'emitida'
+                form.initial['estado'] = 'emitida'
+                form.fields['estado'].help_text = (
+                    'Esta empresa factura al contado: las facturas se emiten automaticamente.'
+                )
+            else:
+                form.fields['estado'].choices = [
+                    ('borrador', 'Borrador'),
+                    ('emitida', 'Emitida'),
+                ]
         if 'numero_factura' in form.fields:
             form.fields['numero_factura'].required = False
             if config_avanzada.permite_gestion_fiscal_historica:
@@ -5900,10 +5929,10 @@ def editar_factura(request, empresa_slug, factura_id):
         return prefijo, ""
 
     def preparar_post_factura(post_data):
+        post_data = _forzar_factura_emitida_si_contado(post_data, empresa)
         if not config_avanzada.permite_gestion_fiscal_historica:
             return post_data
 
-        post_data = post_data.copy()
         fecha_referencia = _parsear_fecha_latam(post_data.get("fecha_emision")) or factura.fecha_emision or timezone.localdate()
         prefijo, _ = obtener_prefijo_manual(
             fecha_referencia=fecha_referencia,
@@ -5935,10 +5964,18 @@ def editar_factura(request, empresa_slug, factura_id):
                 label=form.fields['tipo_cambio'].label,
             )
         if 'estado' in form.fields:
-            form.fields['estado'].choices = [
-                ('borrador', 'Borrador'),
-                ('emitida', 'Emitida'),
-            ]
+            if _empresa_factura_solo_contado(empresa):
+                form.fields['estado'].choices = [('emitida', 'Emitida')]
+                form.fields['estado'].initial = 'emitida'
+                form.initial['estado'] = 'emitida'
+                form.fields['estado'].help_text = (
+                    'Esta empresa factura al contado: las facturas se emiten automaticamente.'
+                )
+            else:
+                form.fields['estado'].choices = [
+                    ('borrador', 'Borrador'),
+                    ('emitida', 'Emitida'),
+                ]
         if 'numero_factura' in form.fields:
             form.fields['numero_factura'].required = False
             if config_avanzada.permite_gestion_fiscal_historica:
@@ -6783,6 +6820,7 @@ def duplicar_factura(request, empresa_slug, factura_id):
     )
 
     with transaction.atomic():
+        estado_factura = "emitida" if _empresa_factura_solo_contado(empresa) else "borrador"
         factura_nueva = Factura.objects.create(
             empresa=empresa,
             cliente=factura_original.cliente,
@@ -6791,15 +6829,16 @@ def duplicar_factura(request, empresa_slug, factura_id):
             tipo_cambio=factura_original.tipo_cambio,
             fecha_emision=timezone.now().date(),
             fecha_vencimiento=None,
-            estado='borrador',
+            estado=estado_factura,
             estado_pago='pendiente',
             orden_compra_exenta=factura_original.orden_compra_exenta,
             registro_exonerado=factura_original.registro_exonerado,
             registro_sag=factura_original.registro_sag,
         )
 
+        lineas_guardadas = []
         for linea in factura_original.lineas.all():
-            LineaFactura.objects.create(
+            lineas_guardadas.append(LineaFactura.objects.create(
                 factura=factura_nueva,
                 producto=linea.producto,
                 descripcion_manual=linea.descripcion_manual,
@@ -6810,7 +6849,7 @@ def duplicar_factura(request, empresa_slug, factura_id):
                 descuento_porcentaje=linea.descuento_porcentaje,
                 comentario=linea.comentario,
                 impuesto=linea.impuesto,
-            )
+            ))
 
         factura_nueva.calcular_totales()
         factura_nueva.save(update_fields=[
@@ -6819,7 +6858,19 @@ def duplicar_factura(request, empresa_slug, factura_id):
             'total',
             'total_lempiras'
         ])
+        if factura_nueva.estado == "emitida":
+            _validar_stock_disponible_para_lineas(lineas_guardadas)
+            _registrar_salida_factura(factura_nueva)
+            registrar_asiento_factura_emitida(factura_nueva)
+            _asegurar_pago_contado_factura(
+                factura_nueva,
+                request.user,
+                referencia=f"Contado automatico duplicado {factura_original.numero_factura or factura_original.id}",
+            )
 
+    if _empresa_factura_solo_contado(empresa):
+        messages.success(request, "Factura duplicada como emitida y pagada automaticamente.")
+        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura_nueva.id)
     messages.success(request, "Factura duplicada como borrador. Revise los datos antes de guardarla o emitirla.")
     return redirect("editar_factura", empresa_slug=empresa.slug, factura_id=factura_nueva.id)
 
