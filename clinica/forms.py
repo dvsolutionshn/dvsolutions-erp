@@ -1112,6 +1112,11 @@ MOTIVO_CATEGORIA_CHOICES = [
     ("medicina_estetica" if etiqueta == "Tratamiento Estetico / Piel" else valor, etiqueta)
     for valor, etiqueta in MOTIVO_CATEGORIA_CHOICES
 ]
+MOTIVO_CATEGORIA_CHOICES.extend([
+    ("camara_hiperbarica", "Camara hiperbarica"),
+    ("enfermeria", "Enfermeria"),
+    ("tratamientos", "Tratamientos"),
+])
 MOTIVO_CATEGORIA_CHOICES.append(("no_aplica", "No aplica / no estoy seguro todavia"))
 
 def _codigo_grupo_procedimiento(titulo):
@@ -1647,10 +1652,15 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             cleaned_data["quirurgicos_detalle"] = ""
 
         categorias = set(cleaned_data.get("motivo_categoria") or [])
-        if categorias == {"no_aplica"}:
+        categorias_sin_procedimiento = {"no_aplica", "camara_hiperbarica", "enfermeria", "tratamientos"}
+        categorias_con_procedimiento = {
+            _codigo_grupo_procedimiento(titulo)
+            for titulo, _opciones in PROCEDIMIENTOS_GENERALES_GRUPOS
+        }
+        if categorias and categorias.issubset(categorias_sin_procedimiento):
             cleaned_data["procedimientos_interes"] = []
             cleaned_data["procedimientos_interes_otros"] = ""
-        elif not cleaned_data.get("procedimientos_interes"):
+        elif categorias.intersection(categorias_con_procedimiento) and not cleaned_data.get("procedimientos_interes"):
             self.add_error("procedimientos_interes", "Seleccione al menos una opcion o marque No aplica en el motivo principal.")
 
         if cleaned_data.get("sexo") == "masculino":
