@@ -21,6 +21,7 @@
   .appointments{display:grid;gap:10px}.appointment{position:relative;display:grid;grid-template-columns:65px minmax(0,1fr) auto;gap:12px;align-items:center;padding:15px;border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:19px;background:#fff;box-shadow:0 9px 28px rgba(25,59,82,.06)}.appointment.color-dra-candy{border-left-color:var(--pink)}.appointment.color-doctor-luis{border-left-color:#347bd1}.appointment.color-terapias{border-left-color:#805ad5}.appointment.color-cirugias{border-left-color:#ce514c}.appointment.color-spa{border-left-color:#d8a824}.time{font-size:13px;font-weight:900}.time small{display:block;margin-top:3px;color:var(--muted);font-size:9px}.appointment-main{min-width:0}.appointment-main strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.appointment-main span{display:block;margin-top:4px;color:var(--muted);font-size:10px;line-height:1.4}.status{display:inline-flex;margin-top:7px;padding:5px 8px;border-radius:999px;background:#fff5d9;color:#8a6411;font-size:8px;font-weight:900;text-transform:uppercase}.status.confirmada{background:#e6f6ef;color:#277158}.status.realizada{background:#edf1f4;color:#536474}.status.cancelada{background:#fae9e8;color:#9b3e39}.status.paid{background:#e8f7ef;color:#16724f}.appointment.is-paid{overflow:hidden}.appointment.is-paid:before{content:"PAGADA";position:absolute;top:0;right:0;padding:3px 9px;border-bottom-left-radius:10px;background:linear-gradient(135deg,#0f9f8f,#2563eb);color:#fff;font-size:8px;font-weight:900;letter-spacing:.1em}.more{width:34px;height:34px;border:0;border-radius:11px;background:#eef4f7;color:var(--navy);font-weight:900;cursor:pointer}.empty{padding:32px 18px;border:1px dashed #bfd0da;border-radius:20px;background:#fff;text-align:center;color:var(--muted);font-size:12px}
   .sheet{position:fixed;z-index:100;inset:0;display:none;align-items:flex-end;justify-content:center;background:rgba(10,31,45,.48);backdrop-filter:blur(4px)}.sheet.open{display:flex}.sheet-card{width:min(760px,100%);max-height:92vh;overflow:auto;padding:20px 18px calc(24px + var(--safe-bottom));border-radius:28px 28px 0 0;background:#fff;box-shadow:0 -20px 60px rgba(0,0,0,.22)}.sheet-grip{width:48px;height:5px;margin:0 auto 18px;border-radius:99px;background:#d8e1e7}.sheet-head{display:flex;align-items:start;justify-content:space-between;gap:12px}.sheet-head small{color:var(--teal);font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.14em}.sheet-head h2{margin:5px 0 0}.close{width:38px;height:38px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font-size:20px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:18px}.field{display:grid;gap:6px}.field.wide{grid-column:1/-1}.field label{color:#53697a;font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.field input,.field select,.field textarea{width:100%;min-height:46px;border:1px solid #bfd0db;border-radius:13px;background:#fff;padding:10px 12px;color:var(--ink)}.field textarea{min-height:82px;resize:vertical}.field input[type=checkbox]{width:20px;min-height:20px;accent-color:var(--teal)}.datetime{display:grid;grid-template-columns:1fr 96px 72px;border:1px solid #bfd0db;border-radius:13px;overflow:hidden}.datetime input,.datetime select{border:0!important;border-radius:0!important}.datetime select{border-left:1px solid var(--line)!important}.errors{color:var(--danger);font-size:10px}.save{width:100%;min-height:50px;margin-top:18px;border:0;border-radius:15px;background:linear-gradient(135deg,var(--teal),#197ad0);color:#fff;font-weight:900;box-shadow:0 12px 28px rgba(31,151,178,.23)}.actions-menu{display:grid;gap:10px;margin-top:18px}.actions-menu form{display:grid;grid-template-columns:1fr auto;gap:8px}.actions-menu select,.actions-menu input{min-height:44px;border:1px solid var(--line);border-radius:12px;padding:0 11px}.actions-menu button,.action-link{min-height:44px;display:grid;place-items:center;border:0;border-radius:12px;background:var(--navy);color:#fff;padding:0 14px;text-decoration:none;font-size:11px;font-weight:900}.action-link.whatsapp{background:#168b65}.danger-block{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.danger-block button{background:var(--danger)}
   .bottom{position:fixed;z-index:70;left:50%;bottom:0;transform:translateX(-50%);width:min(760px,100%);display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;padding:10px 20px calc(10px + var(--safe-bottom));border-top:1px solid rgba(212,225,233,.8);background:rgba(255,255,255,.92);backdrop-filter:blur(20px)}.nav-item{display:grid;place-items:center;gap:4px;border:0;background:transparent;color:var(--muted);text-decoration:none;font-size:9px;font-weight:800}.nav-item b{font-size:20px;color:var(--navy)}.fab{width:58px;height:58px;margin:auto;border:0;border-radius:20px;background:linear-gradient(145deg,var(--pink),var(--teal));color:#fff;font-size:30px;box-shadow:0 12px 28px rgba(40,163,163,.35);transform:translateY(-15px)}.install-note{display:none;margin:12px 0 0;padding:12px;border-radius:14px;background:#eef6ff;color:#345b81;font-size:11px;line-height:1.5}.install-note.show{display:block}
+  .mobile-patient-picker{position:relative;display:grid;gap:8px}.mobile-patient-native{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden}.mobile-patient-search{position:relative}.mobile-patient-search input{padding-right:44px!important}.mobile-patient-search:after{content:"⌕";position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--teal);font-size:17px;font-weight:900}.mobile-patient-selected{display:none;align-items:flex-start;gap:9px;padding:11px 12px;border:1px solid #b8e8e2;border-radius:15px;background:linear-gradient(145deg,#f0fffc,#f7fbff);box-shadow:0 8px 20px rgba(34,184,173,.08)}.mobile-patient-selected.show{display:flex}.mobile-patient-selected b{display:block;font-size:12px}.mobile-patient-selected span{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.35}.mobile-patient-avatar{width:30px;height:30px;flex:0 0 auto;display:grid;place-items:center;border-radius:11px;background:linear-gradient(135deg,var(--teal),#2679d7);color:#fff;font-size:11px;font-weight:900}.mobile-patient-results{display:none;position:absolute;z-index:130;left:0;right:0;top:calc(100% + 6px);max-height:260px;overflow:auto;padding:6px;border:1px solid #bcd0dd;border-radius:16px;background:#fff;box-shadow:0 18px 45px rgba(18,50,74,.18)}.mobile-patient-results.show{display:grid;gap:6px}.mobile-patient-result{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:0;border-radius:13px;background:#f8fbfd;padding:11px 12px;text-align:left;color:var(--ink)}.mobile-patient-result:active{transform:scale(.99)}.mobile-patient-result strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.mobile-patient-result small{display:block;margin-top:3px;color:var(--muted);font-size:9px;line-height:1.3}.mobile-patient-badge{padding:5px 7px;border-radius:999px;background:#e8f7f4;color:#14766f;font-size:8px;font-weight:900;text-transform:uppercase}.mobile-patient-empty{padding:13px;border:1px dashed #cbd9e2;border-radius:13px;background:#fbfdff;color:var(--muted);font-size:11px;text-align:center}.mobile-patient-clear{display:none;position:absolute;right:43px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:0;border-radius:10px;background:#eef5f8;color:#526b7d;font-weight:900}.mobile-patient-picker.has-selection .mobile-patient-clear{display:grid;place-items:center}
   dialog{border:0}.patient-dialog{width:min(680px,94vw);max-height:88vh;padding:0;border-radius:24px}.patient-dialog::backdrop{background:rgba(10,31,45,.55)}.patient-body{padding:20px}.patient-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.secondary{min-height:44px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 14px}.new-patient{border:0;background:transparent;color:var(--teal);font-size:10px;font-weight:900;text-align:left;padding:0}
   .install-grid{display:grid;gap:12px;margin-top:18px}.install-choice{display:grid;grid-template-columns:54px minmax(0,1fr);gap:13px;align-items:center;padding:15px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,#fff,#f6fafc)}.install-choice.recommended{border-color:#72cfc7;box-shadow:0 10px 28px rgba(34,184,173,.12)}.platform-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;background:var(--navy);color:#fff;font-size:25px}.install-choice strong,.install-choice span{display:block}.install-choice span{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.45}.platform-install{grid-column:1/-1;min-height:48px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--teal),#197ad0);color:#fff;font-weight:900}.platform-install.ios{background:linear-gradient(135deg,#25394b,#111d28)}.install-steps{display:none;grid-column:1/-1;padding:12px 13px;border-radius:13px;background:#edf5fa;color:#39566d;font-size:11px;line-height:1.6}.install-steps.show{display:block}.install-status{display:none;margin-top:12px;padding:12px 14px;border-radius:14px;background:#eef7f5;color:#25665f;font-size:11px;line-height:1.5}.install-status.show{display:block}.platform-badge{display:none;width:max-content;margin-bottom:5px;padding:4px 7px;border-radius:999px;background:#dff8f3;color:#14776d;font-size:8px!important;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.recommended .platform-badge{display:block}
   @media(max-width:520px){.form-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.appointment{grid-template-columns:58px minmax(0,1fr) auto}.days{gap:5px}.day{border-radius:13px}.content{padding-inline:11px}.hero{padding-inline:16px}.datetime{grid-template-columns:1fr 82px 62px}}
@@ -79,6 +80,23 @@
       {% for field in form %}
         {% if field.name == "fecha_cita" %}
         <div class="field wide"><label>{{ field.label }}</label><div class="datetime">{{ field }}{{ form.hora_cita }}{{ form.periodo_cita }}</div><div class="errors">{{ field.errors }}{{ form.hora_cita.errors }}{{ form.periodo_cita.errors }}</div></div>
+        {% elif field.name == "paciente" or field.name == "cliente" %}
+        <div class="field wide">
+          <label for="mobilePatientSearch">{{ field.label }}</label>
+          <div class="mobile-patient-picker" id="mobilePatientPicker" data-search-url="{% if field.name == 'paciente' %}{% url 'agenda_buscar_pacientes' empresa.slug %}{% else %}{% url 'agenda_buscar_clientes' empresa.slug %}{% endif %}">
+            <div class="mobile-patient-native">{{ field }}</div>
+            <div class="mobile-patient-search">
+              <input id="mobilePatientSearch" type="search" autocomplete="off" placeholder="{% if field.name == 'paciente' %}Buscar por nombre, identidad, expediente, teléfono o correo{% else %}Buscar por nombre, RTN, teléfono, WhatsApp o correo{% endif %}">
+              <button class="mobile-patient-clear" type="button" id="mobilePatientClear" aria-label="Limpiar paciente">×</button>
+              <div class="mobile-patient-results" id="mobilePatientResults"></div>
+            </div>
+            <div class="mobile-patient-selected" id="mobilePatientSelected" aria-live="polite"></div>
+          </div>
+          {% if field.name == "paciente" %}
+          <button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>
+          {% endif %}
+          <div class="errors">{{ field.errors }}</div>
+        </div>
         {% elif field.name != "hora_cita" and field.name != "periodo_cita" %}
         <div class="field {% if field.name == 'observacion' %}wide{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.name == "paciente" %}<button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>{% endif %}<div class="errors">{{ field.errors }}</div></div>
         {% endif %}
@@ -128,6 +146,7 @@
 {% endif %}
 
 {{ proximas_app|json_script:"upcomingAppointments" }}
+{{ agenda_contactos_busqueda|json_script:"mobilePatientsData" }}
 <script>
 (() => {
   const editor=document.getElementById("editor");
@@ -190,7 +209,126 @@
   registerApp();
 
   const patientDialog=document.getElementById("patientDialog"),patientForm=document.getElementById("patientForm");
-  document.getElementById("newPatientButton")?.addEventListener("click",()=>patientDialog.showModal());
+  const patientPicker=document.getElementById("mobilePatientPicker");
+  const patientSelect=document.getElementById("id_paciente")||document.getElementById("id_cliente");
+  const patientInput=document.getElementById("mobilePatientSearch");
+  const patientResults=document.getElementById("mobilePatientResults");
+  const patientSelected=document.getElementById("mobilePatientSelected");
+  const patientClear=document.getElementById("mobilePatientClear");
+  const patientsDataNode=document.getElementById("mobilePatientsData");
+  let mobilePatients=[];
+  try{mobilePatients=JSON.parse(patientsDataNode?.textContent||"[]")}catch(error){mobilePatients=[]}
+  const normalize=value=>(value||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  const patientLabel=patient=>[patient.expediente,patient.documento,patient.telefono,patient.correo].filter(Boolean).join(" · ");
+  const ensurePatientOption=patient=>{
+    if(!patientSelect||!patient)return;
+    let option=Array.from(patientSelect.options).find(item=>item.value===String(patient.id));
+    if(!option){
+      option=new Option(patient.nombre||patient.label||"Paciente",patient.id);
+      patientSelect.add(option);
+    }
+    option.selected=true;
+    patientSelect.value=String(patient.id);
+  };
+  const renderSelected=patient=>{
+    if(!patientSelected||!patientPicker)return;
+    if(!patient){
+      patientSelected.classList.remove("show");
+      patientSelected.innerHTML="";
+      patientPicker.classList.remove("has-selection");
+      return;
+    }
+    const initial=(patient.nombre||patient.label||"P").trim().charAt(0).toUpperCase()||"P";
+    patientSelected.innerHTML=`<div class="mobile-patient-avatar">${initial}</div><div><b>${escapeHtml(patient.nombre||patient.label||"Paciente")}</b><span>${escapeHtml(patientLabel(patient)||"Paciente seleccionado")}</span></div>`;
+    patientSelected.classList.add("show");
+    patientPicker.classList.add("has-selection");
+  };
+  const choosePatient=patient=>{
+    if(!patient)return;
+    const exists=mobilePatients.some(item=>String(item.id)===String(patient.id));
+    if(!exists)mobilePatients.unshift(patient);
+    ensurePatientOption(patient);
+    if(patientInput)patientInput.value=patient.nombre||patient.label||"";
+    renderSelected(patient);
+    hidePatientResults();
+  };
+  const hidePatientResults=()=>{
+    if(!patientResults)return;
+    patientResults.classList.remove("show");
+    patientResults.innerHTML="";
+  };
+  const renderPatientResults=patients=>{
+    if(!patientResults)return;
+    patientResults.innerHTML="";
+    if(!patients.length){
+      patientResults.innerHTML='<div class="mobile-patient-empty">No encontramos pacientes con esos datos.</div>';
+      patientResults.classList.add("show");
+      return;
+    }
+    patients.slice(0,12).forEach(patient=>{
+      const button=document.createElement("button");
+      button.type="button";
+      button.className="mobile-patient-result";
+      button.innerHTML=`<span><strong>${escapeHtml(patient.nombre||patient.label||"Paciente")}</strong><small>${escapeHtml(patientLabel(patient)||"Sin datos adicionales")}</small></span><span class="mobile-patient-badge">Elegir</span>`;
+      button.addEventListener("click",()=>choosePatient(patient));
+      patientResults.appendChild(button);
+    });
+    patientResults.classList.add("show");
+  };
+  const localPatientSearch=term=>{
+    const needle=normalize(term);
+    if(!needle)return mobilePatients.slice(0,12);
+    return mobilePatients.filter(patient=>normalize([patient.nombre,patient.documento,patient.expediente,patient.telefono,patient.correo].join(" ")).includes(needle)).slice(0,12);
+  };
+  let patientSearchTimer=null;
+  const searchPatients=()=>{
+    const term=patientInput?.value||"";
+    renderPatientResults(localPatientSearch(term));
+    clearTimeout(patientSearchTimer);
+    if(normalize(term).length<2||!patientPicker?.dataset.searchUrl)return;
+    patientSearchTimer=setTimeout(async()=>{
+      try{
+        const url=new URL(patientPicker.dataset.searchUrl,window.location.origin);
+        url.searchParams.set("q",term);
+        const response=await fetch(url,{headers:{"Accept":"application/json","X-Requested-With":"XMLHttpRequest"}});
+        if(!response.ok)return;
+        const data=await response.json();
+        const remotePatients=data.results||[];
+        remotePatients.forEach(patient=>{
+          if(!mobilePatients.some(item=>String(item.id)===String(patient.id)))mobilePatients.push(patient);
+        });
+        renderPatientResults(remotePatients.length?remotePatients:localPatientSearch(term));
+      }catch(error){}
+    },220);
+  };
+  function escapeHtml(value){
+    return (value||"").toString().replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[char]));
+  }
+  if(patientInput&&patientSelect){
+    const currentId=patientSelect.value;
+    const currentPatient=mobilePatients.find(patient=>String(patient.id)===String(currentId));
+    if(currentPatient){
+      patientInput.value=currentPatient.nombre||"";
+      renderSelected(currentPatient);
+    }
+    patientInput.addEventListener("focus",searchPatients);
+    patientInput.addEventListener("input",()=>{
+      if(patientSelect.value)patientSelect.value="";
+      renderSelected(null);
+      searchPatients();
+    });
+    patientClear?.addEventListener("click",()=>{
+      patientSelect.value="";
+      patientInput.value="";
+      renderSelected(null);
+      searchPatients();
+      patientInput.focus();
+    });
+    document.addEventListener("click",event=>{
+      if(patientPicker&&!patientPicker.contains(event.target))hidePatientResults();
+    });
+  }
+  document.getElementById("newPatientButton")?.addEventListener("click",()=>patientDialog?.showModal());
   document.getElementById("closePatientDialog")?.addEventListener("click",()=>patientDialog.close());
   document.getElementById("cancelPatient")?.addEventListener("click",()=>patientDialog.close());
   patientForm?.addEventListener("submit",async event=>{
@@ -198,7 +336,7 @@
     const response=await fetch("{% url 'agenda_crear_paciente_rapido' empresa.slug %}",{method:"POST",body:new FormData(patientForm),headers:{"X-Requested-With":"XMLHttpRequest"}});
     const data=await response.json();
     if(!response.ok||!data.ok){Object.entries(data.errors||{}).forEach(([name,errors])=>{const target=patientForm.querySelector(`[data-error="${name}"]`);if(target)target.textContent=errors.join(" ")});return}
-    const select=document.querySelector('[name="paciente"]'),option=new Option(data.paciente.label,data.paciente.id,true,true);select.add(option);patientDialog.close();
+    const select=document.querySelector('[name="paciente"]'),option=new Option(data.paciente.label,data.paciente.id,true,true);select.add(option);choosePatient(data.paciente);patientDialog.close();
   });
 })();
 </script>

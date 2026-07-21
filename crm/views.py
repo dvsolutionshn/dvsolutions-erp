@@ -126,7 +126,10 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     ]
     paciente_busqueda_inicial = None
     pacientes_busqueda = []
+    cliente_busqueda_inicial = None
+    clientes_busqueda = []
     paciente_id_inicial = form["paciente"].value() if es_clinica and "paciente" in form.fields else None
+    cliente_id_inicial = form["cliente"].value() if not es_clinica and "cliente" in form.fields else None
     if es_clinica and "paciente" in form.fields:
         pacientes_busqueda = [
             {
@@ -139,6 +142,18 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
             }
             for paciente in form.fields["paciente"].queryset
         ]
+    if not es_clinica and "cliente" in form.fields:
+        clientes_busqueda = [
+            {
+                "id": cliente.id,
+                "nombre": cliente.nombre,
+                "documento": cliente.rtn or "",
+                "expediente": "",
+                "telefono": cliente.telefono_whatsapp or cliente.telefono or "",
+                "correo": cliente.correo or "",
+            }
+            for cliente in form.fields["cliente"].queryset
+        ]
     if paciente_id_inicial:
         try:
             paciente_busqueda_inicial = Paciente.objects.filter(
@@ -147,6 +162,14 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
             ).first()
         except (TypeError, ValueError):
             paciente_busqueda_inicial = None
+    if cliente_id_inicial:
+        try:
+            cliente_busqueda_inicial = Cliente.objects.filter(
+                empresa=empresa,
+                id=cliente_id_inicial,
+            ).first()
+        except (TypeError, ValueError):
+            cliente_busqueda_inicial = None
 
     return {
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
@@ -159,6 +182,9 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
         "paciente_busqueda_inicial": paciente_busqueda_inicial,
         "pacientes_busqueda": pacientes_busqueda,
+        "cliente_busqueda_inicial": cliente_busqueda_inicial,
+        "clientes_busqueda": clientes_busqueda,
+        "agenda_contactos_busqueda": pacientes_busqueda if es_clinica else clientes_busqueda,
     }
 
 
@@ -833,6 +859,40 @@ def buscar_pacientes_cita(request, empresa_slug):
                 "correo": paciente.correo or "",
             }
             for paciente in pacientes
+        ]
+    })
+
+
+@login_required
+def buscar_clientes_cita(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"results": [], "error": "Acceso no autorizado."}, status=403)
+    if not request.user.tiene_permiso_erp("puede_citas"):
+        return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
+
+    query = " ".join((request.GET.get("q") or "").split())
+    clientes = Cliente.objects.filter(empresa=empresa, activo=True)
+    for termino in query.split():
+        clientes = clientes.filter(
+            Q(nombre__icontains=termino)
+            | Q(rtn__icontains=termino)
+            | Q(telefono__icontains=termino)
+            | Q(telefono_whatsapp__icontains=termino)
+            | Q(correo__icontains=termino)
+        )
+    clientes = clientes.order_by("-id", "nombre")[:12]
+    return JsonResponse({
+        "results": [
+            {
+                "id": cliente.id,
+                "nombre": cliente.nombre,
+                "documento": cliente.rtn or "",
+                "expediente": "",
+                "telefono": cliente.telefono_whatsapp or cliente.telefono or "",
+                "correo": cliente.correo or "",
+            }
+            for cliente in clientes
         ]
     })
 
