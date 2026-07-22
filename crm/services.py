@@ -72,6 +72,13 @@ def _post_whatsapp(config, payload):
                 f"La plantilla '{template_name}' no existe aprobada en Meta para idioma '{language}'. "
                 "Creala en WhatsApp Manager o cambia el nombre/idioma en Configuracion CRM."
             ) from exc
+        if meta_error.get("code") == 131030:
+            raise WhatsAppAPIError(
+                "Meta rechazo el envio porque el numero destino no esta autorizado para recibir mensajes "
+                "desde este WhatsApp. Si la cuenta esta en modo prueba, agregue ese numero en la lista de "
+                "destinatarios permitidos de Meta; si ya es produccion, revise que el numero real de la "
+                "empresa este conectado y aprobado."
+            ) from exc
         raise WhatsAppAPIError(f"Meta respondio con error {exc.code}: {detail}") from exc
     except URLError as exc:
         raise WhatsAppAPIError(f"No se pudo conectar con WhatsApp Cloud API: {exc}") from exc
