@@ -194,6 +194,43 @@
 <script>
 (function(){
     const form=document.getElementById("preconsultaForm"),steps=[...document.querySelectorAll(".form-step")],bars=[...document.querySelectorAll(".progress span")];let current=0;
+    const draftKey="dv_preconsulta_draft:"+location.pathname;
+    const draftMaxAge=1000*60*60*48;
+    function serializableFields(){
+        return [...form.elements].filter(input=>input.name&&!["csrfmiddlewaretoken"].includes(input.name)&&input.type!=="file"&&input.type!=="submit"&&input.type!=="button");
+    }
+    function saveDraft(){
+        try{
+            const data={savedAt:Date.now(),fields:{}};
+            serializableFields().forEach(input=>{
+                if(input.type==="checkbox"||input.type==="radio"){
+                    if(!data.fields[input.name])data.fields[input.name]=[];
+                    if(input.checked)data.fields[input.name].push(input.value);
+                }else{
+                    data.fields[input.name]=input.value;
+                }
+            });
+            localStorage.setItem(draftKey,JSON.stringify(data));
+        }catch(error){}
+    }
+    function restoreDraft(){
+        try{
+            const raw=localStorage.getItem(draftKey);
+            if(!raw)return;
+            const data=JSON.parse(raw);
+            if(!data?.savedAt||Date.now()-data.savedAt>draftMaxAge){localStorage.removeItem(draftKey);return;}
+            serializableFields().forEach(input=>{
+                if(!(input.name in data.fields))return;
+                const value=data.fields[input.name];
+                if(input.type==="checkbox"||input.type==="radio"){
+                    input.checked=Array.isArray(value)&&value.includes(input.value);
+                }else if((input.value||"")===""||form.querySelector(".error-summary")){
+                    input.value=value||"";
+                }
+            });
+        }catch(error){}
+    }
+    const saveDraftSoon=(()=>{let timer=null;return()=>{clearTimeout(timer);timer=setTimeout(saveDraft,180);};})();
     function refreshChecks(){document.querySelectorAll(".check-grid label,.radio-row label").forEach(label=>{const input=label.querySelector("input");label.classList.toggle("is-selected",!!input&&input.checked);});}
     function toggleGineFields(){const sexo=form.querySelector('[name="sexo"]');const mostrar=sexo&&sexo.value==="femenino";document.querySelectorAll(".gine-field").forEach(field=>{field.hidden=!mostrar;field.querySelectorAll("input,select,textarea").forEach(input=>{input.disabled=!mostrar;if(!mostrar){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});refreshChecks();}
     function toggleReferral(){const field=form.querySelector('[name="referido_por"]');const show=field&&field.value==="referencia";document.querySelectorAll(".referral-detail").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
@@ -454,25 +491,92 @@
         goToMissing(records[0].element);
         return false;
     }
-    document.querySelectorAll(".next-step").forEach(button=>button.addEventListener("click",()=>{if(validScope(steps[current]))show(Math.min(current+1,steps.length-1));}));
-    document.querySelectorAll(".prev-step").forEach(button=>button.addEventListener("click",()=>show(Math.max(current-1,0))));
-    form.addEventListener("submit",event=>{if(!validScope(form,{showSummary:true})){event.preventDefault();event.stopPropagation();}});
-    document.addEventListener("input",event=>{if(event.target.closest("#preconsultaForm"))collectMissing(steps[current]);});
-    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"]'))toggleConditionalDetails();if(event.target.closest("#preconsultaForm"))collectMissing(steps[current]);});
+    document.querySelectorAll(".next-step").forEach(button=>button.addEventListener("click",()=>{saveDraft();if(validScope(steps[current]))show(Math.min(current+1,steps.length-1));}));
+    document.querySelectorAll(".prev-step").forEach(button=>button.addEventListener("click",()=>{saveDraft();show(Math.max(current-1,0));}));
+    form.addEventListener("submit",event=>{saveDraft();if(!validScope(form,{showSummary:true})){event.preventDefault();event.stopPropagation();}});
+    document.addEventListener("input",event=>{if(event.target.closest("#preconsultaForm")){saveDraftSoon();collectMissing(steps[current]);}});
+    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"]'))toggleConditionalDetails();if(event.target.closest("#preconsultaForm")){saveDraftSoon();collectMissing(steps[current]);}});
     document.getElementById("missingModalClose")?.addEventListener("click",closeMissingModal);
     document.getElementById("missingModal")?.addEventListener("click",event=>{if(event.target.id==="missingModal")closeMissingModal();});
     form.querySelectorAll(".field-error").forEach(error=>{const container=fieldContainer(error);if(container)container.classList.add("is-missing");});
     const firstError=form.querySelector(".field-error");if(firstError){const errorStep=firstError.closest(".form-step");if(errorStep)show(steps.indexOf(errorStep));}
-    installNoAplicaControls();refreshChecks();toggleGineFields();toggleReferral();toggleInformante();toggleProcedureGroups();toggleMamografiaFecha();toggleConditionalDetails();applyNoAplicaLocks(document);
+    installNoAplicaControls();restoreDraft();refreshChecks();toggleGineFields();toggleReferral();toggleInformante();toggleProcedureGroups();toggleMamografiaFecha();toggleConditionalDetails();applyNoAplicaLocks(document);
 
     const photoInput=document.getElementById("id_foto_perfil");
     if(photoInput){
         const openCamera=document.getElementById("openCamera"),choosePhoto=document.getElementById("choosePhoto"),capturePhoto=document.getElementById("capturePhoto"),closeCamera=document.getElementById("closeCamera"),cameraStage=document.getElementById("cameraStage"),video=document.getElementById("cameraVideo"),preview=document.getElementById("photoPreview"),status=document.getElementById("photoStatus");
         let stream=null;
+        const validPhotoTypes=["image/jpeg","image/png","image/webp"],maxPhotoSize=8*1024*1024;
         const stopCamera=()=>{if(stream){stream.getTracks().forEach(track=>track.stop());stream=null;}cameraStage.hidden=true;};
+        const assignPhotoFile=file=>{
+            const transfer=new DataTransfer();
+            transfer.items.add(file);
+            photoInput.files=transfer.files;
+            showPreview(file,true);
+        };
+        const compressPhoto=file=>new Promise((resolve,reject)=>{
+            const image=new Image(),url=URL.createObjectURL(file);
+            image.onload=()=>{
+                try{
+                    const maxSide=1600,scale=Math.min(1,maxSide/Math.max(image.width,image.height)),canvas=document.createElement("canvas");
+                    canvas.width=Math.max(1,Math.round(image.width*scale));
+                    canvas.height=Math.max(1,Math.round(image.height*scale));
+                    canvas.getContext("2d").drawImage(image,0,0,canvas.width,canvas.height);
+                    canvas.toBlob(blob=>{
+                        URL.revokeObjectURL(url);
+                        if(!blob)return reject(new Error("No se pudo optimizar la fotografia."));
+                        resolve(new File([blob],"foto-paciente.jpg",{type:"image/jpeg"}));
+                    },"image/jpeg",0.82);
+                }catch(error){URL.revokeObjectURL(url);reject(error);}
+            };
+            image.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("No se pudo leer la fotografia."));};
+            image.src=url;
+        });
+        const validatePhotoFile=file=>{
+            if(!file)return true;
+            if(!validPhotoTypes.includes(file.type)){
+                status.textContent="Formato no permitido. Use JPG, PNG o WebP. Si el telefono tomo una foto HEIC, conviertala o tome captura en JPG.";
+                return false;
+            }
+            if(file.size>maxPhotoSize){
+                status.textContent="La fotografia pesa demasiado. Debe ser menor de 8 MB; tome una nueva foto o seleccione una imagen mas liviana.";
+                return false;
+            }
+            return true;
+        };
         const showPreview=(file,previewOnly=true)=>{if(!file)return;preview.src=URL.createObjectURL(file);preview.hidden=false;cameraStage.hidden=false;cameraStage.classList.toggle("preview-only",previewOnly);status.textContent="Fotografía lista para enviar junto con el formulario.";};
         choosePhoto.addEventListener("click",()=>photoInput.click());
-        photoInput.addEventListener("change",()=>showPreview(photoInput.files[0]));
+        photoInput.addEventListener("change",async()=>{
+            let file=photoInput.files[0];
+            if(file&&validPhotoTypes.includes(file.type)&&file.size>maxPhotoSize){
+                status.textContent="Optimizando fotografia para que pueda enviarse sin perder sus respuestas...";
+                try{
+                    file=await compressPhoto(file);
+                    if(!validatePhotoFile(file))throw new Error("La fotografia optimizada todavia supera el limite.");
+                    assignPhotoFile(file);
+                    return;
+                }catch(error){
+                    status.textContent="No se pudo optimizar la fotografia. Intente tomar una nueva foto o subir una imagen mas liviana.";
+                }
+            }
+            if(!validatePhotoFile(file)){
+                photoInput.value="";
+                markMissing(photoInput,"Suba una fotografia JPG, PNG o WebP menor de 8 MB.");
+                show(0,{keepScroll:true});
+                goToMissing(photoInput);
+                return;
+            }
+            showPreview(file);
+        });
+        form.addEventListener("submit",event=>{
+            const file=photoInput.files[0];
+            if(file&&!validatePhotoFile(file)){
+                event.preventDefault();event.stopPropagation();
+                markMissing(photoInput,"Suba una fotografia JPG, PNG o WebP menor de 8 MB.");
+                showMissingDialog([{element:photoInput,label:"Fotografia del paciente",message:"Suba una fotografia JPG, PNG o WebP menor de 8 MB."}]);
+                goToMissing(photoInput);
+            }
+        });
         openCamera.addEventListener("click",async()=>{
             try{
                 stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});
@@ -486,8 +590,8 @@
             canvas.getContext("2d").drawImage(video,0,0,canvas.width,canvas.height);
             canvas.toBlob(blob=>{
                 if(!blob)return;
-                const file=new File([blob],"foto-paciente.jpg",{type:"image/jpeg"}),transfer=new DataTransfer();
-                transfer.items.add(file);photoInput.files=transfer.files;stopCamera();showPreview(file,true);
+                const file=new File([blob],"foto-paciente.jpg",{type:"image/jpeg"});
+                assignPhotoFile(file);stopCamera();
             },"image/jpeg",.88);
         });
         closeCamera.addEventListener("click",stopCamera);
