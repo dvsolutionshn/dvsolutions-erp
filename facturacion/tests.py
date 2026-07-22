@@ -21,7 +21,7 @@ from contabilidad.services import registrar_asiento_pago_cliente
 from crm.models import ConfiguracionCRM
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
 from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
-from .views import _registrar_entrada_nota_credito
+from .views import _registrar_entrada_nota_credito, _registrar_salida_factura
 
 
 class FacturacionTests(TestCase):
@@ -5194,6 +5194,97 @@ class FacturacionTests(TestCase):
         )
         self.assertContains(response, "No se puede editar esta factura emitida")
         self.assertContains(response, "pagos registrados")
+
+    def test_correccion_historica_permite_cambiar_producto_en_factura_pagada_y_reconstruye_inventario(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.permite_cai_historico = True
+        configuracion.save(update_fields=["permite_cai_historico"])
+        producto_correcto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto Correcto",
+            precio=Decimal("100.00"),
+        )
+        InventarioProducto.objects.create(
+            empresa=self.empresa,
+            producto=self.producto,
+            existencias=Decimal("10.00"),
+            stock_minimo=Decimal("0.00"),
+        )
+        InventarioProducto.objects.create(
+            empresa=self.empresa,
+            producto=producto_correcto,
+            existencias=Decimal("10.00"),
+            stock_minimo=Decimal("0.00"),
+        )
+        factura = self.crear_factura_con_linea(estado="emitida")
+        linea = factura.lineas.get()
+        _registrar_salida_factura(factura)
+        PagoFactura.objects.create(
+            factura=factura,
+            monto=factura.total,
+            metodo="efectivo",
+            fecha=date.today(),
+        )
+
+        response = self.client.post(
+            reverse("editar_factura", args=[self.empresa.slug, factura.id]),
+            {
+                "cliente": str(self.cliente.id),
+                "fecha_emision": str(factura.fecha_emision),
+                "fecha_vencimiento": "",
+                "vendedor": "",
+                "tipo_cambio": "1.0000",
+                "moneda": "HNL",
+                "numero_factura_sufijo": factura.numero_factura[-3:],
+                "estado": "emitida",
+                "orden_compra_exenta": "",
+                "registro_exonerado": "",
+                "registro_sag": "",
+                "motivo_auditoria": "Correccion historica por producto seleccionado incorrectamente",
+                "lineas-TOTAL_FORMS": "1",
+                "lineas-INITIAL_FORMS": "1",
+                "lineas-MIN_NUM_FORMS": "0",
+                "lineas-MAX_NUM_FORMS": "1000",
+                "lineas-0-id": str(linea.id),
+                "lineas-0-producto": str(producto_correcto.id),
+                "lineas-0-cantidad": "1.00",
+                "lineas-0-precio_unitario": "100.00",
+                "lineas-0-descuento_porcentaje": "0",
+                "lineas-0-comentario": "",
+                "lineas-0-impuesto": str(self.impuesto.id),
+            },
+        )
+
+        self.assertRedirects(response, reverse("facturas_dashboard", args=[self.empresa.slug]))
+        linea.refresh_from_db()
+        self.assertEqual(linea.producto, producto_correcto)
+        self.assertEqual(InventarioProducto.objects.get(producto=self.producto).existencias, Decimal("10.00"))
+        self.assertEqual(InventarioProducto.objects.get(producto=producto_correcto).existencias, Decimal("9.00"))
+        self.assertTrue(
+            MovimientoInventario.objects.filter(
+                factura=factura,
+                producto=self.producto,
+                tipo="reversion_factura",
+                cantidad=Decimal("1.00"),
+            ).exists()
+        )
+        self.assertTrue(
+            MovimientoInventario.objects.filter(
+                factura=factura,
+                producto=producto_correcto,
+                tipo="salida_factura",
+                cantidad=Decimal("1.00"),
+            ).exists()
+        )
+
+        response = self.client.post(
+            reverse("anular_factura", args=[self.empresa.slug, factura.id]),
+            {"motivo": "Anulacion posterior a correccion historica"},
+        )
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        self.assertEqual(InventarioProducto.objects.get(producto=self.producto).existencias, Decimal("10.00"))
+        self.assertEqual(InventarioProducto.objects.get(producto=producto_correcto).existencias, Decimal("10.00"))
 
     def test_permite_corregir_solo_numero_fiscal_en_factura_pagada(self):
         factura = self.crear_factura_con_linea(estado="emitida")

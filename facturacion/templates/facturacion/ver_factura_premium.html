@@ -730,6 +730,8 @@
             <div class="erp-document-actions-group">
                 {% if erp_access.editar_facturas and factura.puede_editar_emitida %}
                 <a class="erp-btn-secondary" href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
+                {% elif erp_access.editar_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" and not factura.tiene_notas_credito_activas %}
+                <a class="erp-btn-secondary" href="{% url 'editar_factura' empresa.slug factura.id %}">Correccion historica completa</a>
                 {% elif erp_access.editar_facturas %}
                 <span class="erp-btn-secondary disabled" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
                 {% endif %}

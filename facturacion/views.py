@@ -2063,14 +2063,15 @@ def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
     return faltantes
 
 
-def _registrar_salida_vitrina_factura(factura):
+def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None):
     config = ConfiguracionAvanzadaEmpresa.para_empresa(factura.empresa)
     if not config.ventas_solo_desde_vitrina:
         return
-    if MovimientoLoteBodega.objects.filter(factura=factura, tipo="salida_factura").exists():
+    if not forzar and MovimientoLoteBodega.objects.filter(factura=factura, tipo="salida_factura").exists():
         return
 
     bodega_venta = _obtener_bodega_venta(factura.empresa)
+    observacion = observacion or "Salida automatica desde Vitrina por factura emitida."
     for linea in factura.lineas.select_related("producto").all():
         if not linea.producto_id or not linea.producto:
             continue
@@ -2099,7 +2100,7 @@ def _registrar_salida_vitrina_factura(factura):
                 tipo="salida_factura",
                 cantidad=salida,
                 referencia=factura.numero_factura or f"Factura {factura.id}",
-                observacion="Salida automatica desde Vitrina por factura emitida.",
+                observacion=observacion,
                 factura=factura,
             )
             pendiente -= salida
@@ -2152,11 +2153,12 @@ def _registrar_movimiento_inventario(
     )
 
 
-def _registrar_salida_factura(factura):
-    if MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
+def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
+    if not forzar and MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
 
-    _registrar_salida_vitrina_factura(factura)
+    observacion = observacion or 'Salida generada automaticamente por emision de factura.'
+    _registrar_salida_vitrina_factura(factura, forzar=forzar, observacion=observacion)
 
     for linea in factura.lineas.select_related('producto').all():
         if not linea.producto_id or not linea.producto:
@@ -2169,42 +2171,66 @@ def _registrar_salida_factura(factura):
             tipo='salida_factura',
             cantidad=linea.cantidad,
             referencia=factura.numero_factura or f"Factura {factura.id}",
-            observacion='Salida generada automaticamente por emision de factura.',
+            observacion=observacion,
             factura=factura,
         )
 
 
-def _revertir_salida_factura(factura):
+def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
     if not MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
-    if MovimientoInventario.objects.filter(factura=factura, tipo='reversion_factura').exists():
-        return
 
-    movimientos_lote = MovimientoLoteBodega.objects.filter(factura=factura, tipo="salida_factura").select_related("bodega", "lote")
-    for movimiento in movimientos_lote:
+    observacion = observacion or 'Reversion automatica por anulacion de factura.'
+
+    movimientos_lote = (
+        MovimientoLoteBodega.objects
+        .filter(factura=factura, tipo__in=["salida_factura", "reversion"])
+        .values("bodega_id", "lote_id")
+        .annotate(
+            salida=Sum("cantidad", filter=Q(tipo="salida_factura")),
+            reversion=Sum("cantidad", filter=Q(tipo="reversion")),
+        )
+    )
+    for resumen in movimientos_lote:
+        cantidad_activa = Decimal(resumen.get("salida") or 0) - Decimal(resumen.get("reversion") or 0)
+        if cantidad_activa <= 0:
+            continue
+        bodega = BodegaInventario.objects.get(pk=resumen["bodega_id"])
+        lote = LoteInventario.objects.get(pk=resumen["lote_id"])
         _registrar_movimiento_lote_bodega(
             empresa=factura.empresa,
-            bodega=movimiento.bodega,
-            lote=movimiento.lote,
+            bodega=bodega,
+            lote=lote,
             tipo="reversion",
-            cantidad=movimiento.cantidad,
+            cantidad=cantidad_activa,
             referencia=factura.numero_factura or f"Factura {factura.id}",
-            observacion="Reversion automatica de lote por anulacion de factura.",
+            observacion=observacion,
             factura=factura,
         )
 
-    for linea in factura.lineas.select_related('producto').all():
-        if not linea.producto_id or not linea.producto:
+    movimientos_producto = (
+        MovimientoInventario.objects
+        .filter(factura=factura, tipo__in=["salida_factura", "reversion_factura"])
+        .values("producto_id")
+        .annotate(
+            salida=Sum("cantidad", filter=Q(tipo="salida_factura")),
+            reversion=Sum("cantidad", filter=Q(tipo="reversion_factura")),
+        )
+    )
+    for resumen in movimientos_producto:
+        cantidad_activa = Decimal(resumen.get("salida") or 0) - Decimal(resumen.get("reversion") or 0)
+        if cantidad_activa <= 0:
             continue
-        if not linea.producto.controla_inventario:
+        producto = Producto.objects.get(pk=resumen["producto_id"])
+        if not producto.controla_inventario:
             continue
         _registrar_movimiento_inventario(
             empresa=factura.empresa,
-            producto=linea.producto,
+            producto=producto,
             tipo='reversion_factura',
-            cantidad=linea.cantidad,
+            cantidad=cantidad_activa,
             referencia=factura.numero_factura or f"Factura {factura.id}",
-            observacion='Reversion automatica por anulacion de factura.',
+            observacion=observacion,
             factura=factura,
         )
 
@@ -2405,7 +2431,12 @@ def _validar_stock_disponible_para_lineas(lineas):
 
 
 def _factura_bloqueada_para_edicion(factura):
-    return factura.estado == 'emitida' and not factura.puede_editar_emitida
+    if factura.estado != 'emitida':
+        return False
+    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(factura.empresa)
+    if config_avanzada.permite_gestion_fiscal_historica and not factura.tiene_notas_credito_activas:
+        return False
+    return not factura.puede_editar_emitida
 
 
 @login_required
@@ -6143,6 +6174,14 @@ def editar_factura(request, empresa_slug, factura_id):
             try:
                 with transaction.atomic():
                     factura = form.save()
+                    reconstruir_factura_emitida = estado_original == 'emitida' and factura.estado == 'emitida'
+                    if reconstruir_factura_emitida:
+                        _revertir_salida_factura(
+                            factura,
+                            forzar=True,
+                            observacion='Reversion por correccion historica de factura emitida.',
+                        )
+
                     lineas_actualizadas = formset.save(commit=False)
                     for linea in formset.deleted_objects:
                         linea.delete()
@@ -6159,7 +6198,31 @@ def editar_factura(request, empresa_slug, factura_id):
 
                     _actualizar_totales_factura(factura)
 
-                    if estado_original != 'emitida' and factura.estado == 'emitida':
+                    if reconstruir_factura_emitida:
+                        total_pagado_actual = Decimal(factura.total_pagado or 0).quantize(Decimal("0.01"))
+                        total_documento_actual = Decimal(factura.total_documento_ajustado or 0).quantize(Decimal("0.01"))
+                        if total_pagado_actual > total_documento_actual:
+                            raise ValidationError(
+                                "El nuevo total de la factura no puede ser menor que los pagos ya registrados. "
+                                "Primero ajusta el pago o conserva el total cobrado."
+                            )
+                        _validar_stock_disponible_para_lineas(
+                            factura.lineas.select_related('producto').all()
+                        )
+                        _registrar_salida_factura(
+                            factura,
+                            forzar=True,
+                            observacion='Salida reconstruida por correccion historica de factura emitida.',
+                        )
+                        AsientoContable.objects.filter(
+                            empresa=factura.empresa,
+                            documento_tipo="factura",
+                            documento_id=factura.id,
+                            evento="emision",
+                        ).delete()
+                        registrar_asiento_factura_emitida(factura)
+                        _recalcular_y_recontabilizar_pagos_factura(factura)
+                    elif estado_original != 'emitida' and factura.estado == 'emitida':
                         _registrar_salida_factura(factura)
                         registrar_asiento_factura_emitida(factura)
                         _asegurar_pago_contado_factura(factura, request.user)
