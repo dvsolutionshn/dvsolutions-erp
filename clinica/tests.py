@@ -14,7 +14,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from crm.models import CitaCliente, ConfiguracionCRM
 from facturacion.models import Cliente, Producto
 from .forms import PreconsultaClinicaPublicaForm
-from .models import CitaClinica, ConsentimientoClinico, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, RecetaMedica, ServicioClinico
+from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, RecetaMedica, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -427,6 +427,66 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Receta medica")
         self.assertContains(response, "Antibiotico demo")
         self.assertContains(response, "Tomar 1 tableta")
+
+    def test_paciente_permite_documentos_clinicos_e_incapacidad_imprimible(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-DOC",
+            nombre="Paciente Documentos",
+            identidad="0801199900101",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dra. Demo",
+            especialidad="Medicina",
+            activo=True,
+        )
+        archivo = SimpleUploadedFile("resultado.pdf", b"%PDF-1.4 test", content_type="application/pdf")
+
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                reverse("clinica_subir_documento_categoria_paciente", args=[self.empresa.slug, paciente.id, "laboratorio"]),
+                {
+                    "titulo": "Quimica sanguinea",
+                    "fecha_documento": "2026-07-12",
+                    "entidad": "Lab Demo",
+                    "descripcion": "Resultado externo",
+                    "archivo": archivo,
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+            self.assertTrue(
+                DocumentoClinicoPaciente.objects.filter(
+                    paciente=paciente,
+                    categoria="laboratorio",
+                    titulo="Quimica sanguinea",
+                ).exists()
+            )
+            response = self.client.get(
+                reverse("clinica_documentos_categoria_paciente", args=[self.empresa.slug, paciente.id, "laboratorio"])
+            )
+            self.assertContains(response, "Trabajos de laboratorio")
+            self.assertContains(response, "Quimica sanguinea")
+
+        response = self.client.post(
+            reverse("clinica_subir_documento_categoria_paciente", args=[self.empresa.slug, paciente.id, "incapacidad"]),
+            {
+                "titulo": "Incapacidad medica",
+                "fecha_documento": "2026-07-12",
+                "fecha_inicio": "2026-07-12",
+                "fecha_fin": "2026-07-14",
+                "profesional": profesional.id,
+                "descripcion": "Reposo medico por procedimiento ambulatorio.",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        incapacidad = DocumentoClinicoPaciente.objects.get(paciente=paciente, categoria="incapacidad")
+        self.assertEqual(incapacidad.dias, 3)
+        response = self.client.get(
+            reverse("clinica_incapacidad_imprimir", args=[self.empresa.slug, paciente.id, incapacidad.id])
+        )
+        self.assertContains(response, "Certificado de incapacidad")
+        self.assertContains(response, "Reposo medico")
 
     def test_paciente_evolucion_muestra_fotos_y_videos_separados(self):
         paciente = Paciente.objects.create(

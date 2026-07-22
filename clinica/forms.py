@@ -9,6 +9,7 @@ from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normal
 from .models import (
     CitaClinica,
     ConsentimientoClinico,
+    DocumentoClinicoPaciente,
     ExamenPaciente,
     ExpedienteEvento,
     HistoriaClinicaEspecialidad,
@@ -463,6 +464,118 @@ class ExamenPacienteForm(BaseClinicaForm):
         if archivo and getattr(archivo, "content_type", "") not in permitidos:
             raise forms.ValidationError("Solo se permiten PDF o imagenes JPG, PNG o WebP.")
         return archivo
+
+
+class DocumentoClinicoPacienteForm(BaseClinicaForm):
+    MAX_ARCHIVO_MB = 50
+    LABELS_POR_CATEGORIA = {
+        "laboratorio": {
+            "titulo": "Nombre del resultado / solicitud",
+            "entidad": "Laboratorio / centro",
+            "archivo": "PDF o foto del resultado",
+        },
+        "radiologico": {
+            "titulo": "Nombre del estudio radiologico",
+            "entidad": "Centro de imagenologia",
+            "archivo": "PDF o foto del estudio",
+        },
+        "documento": {
+            "titulo": "Nombre del documento",
+            "entidad": "Origen / area",
+            "archivo": "Archivo del documento",
+        },
+        "remision": {
+            "titulo": "Remision o contraremision",
+            "entidad": "Centro o profesional externo",
+            "archivo": "Archivo de remision",
+        },
+        "detalle_remision": {
+            "titulo": "Detalle de remision",
+            "entidad": "Institucion / referencia",
+            "archivo": "Archivo de seguimiento",
+        },
+    }
+
+    class Meta:
+        model = DocumentoClinicoPaciente
+        fields = ["titulo", "fecha_documento", "entidad", "descripcion", "archivo"]
+        widgets = {
+            "fecha_documento": forms.DateInput(attrs={"type": "date"}),
+            "descripcion": forms.Textarea(attrs={"rows": 4}),
+            "archivo": forms.ClearableFileInput(
+                attrs={"accept": "application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"}
+            ),
+        }
+        labels = {
+            "titulo": "Nombre del documento",
+            "fecha_documento": "Fecha del documento",
+            "entidad": "Origen / centro",
+            "descripcion": "Descripcion o notas",
+            "archivo": "Archivo",
+        }
+
+    def __init__(self, *args, categoria=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        labels = self.LABELS_POR_CATEGORIA.get(categoria or "", {})
+        for campo, label in labels.items():
+            self.fields[campo].label = label
+        self.fields["archivo"].required = True
+        self.fields["archivo"].help_text = (
+            f"Puede subir PDF, imagen JPG/PNG/WebP o documento Word. Tamano maximo: {self.MAX_ARCHIVO_MB} MB."
+        )
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if archivo and archivo.size > self.MAX_ARCHIVO_MB * 1024 * 1024:
+            raise forms.ValidationError(f"El archivo no puede superar {self.MAX_ARCHIVO_MB} MB.")
+        if archivo:
+            nombre = (archivo.name or "").lower()
+            extensiones = (".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx")
+            if not nombre.endswith(extensiones):
+                raise forms.ValidationError("Solo se permiten PDF, imagenes JPG/PNG/WebP o documentos Word.")
+        return archivo
+
+
+class IncapacidadClinicaForm(BaseClinicaForm):
+    class Meta:
+        model = DocumentoClinicoPaciente
+        fields = ["titulo", "fecha_documento", "fecha_inicio", "fecha_fin", "dias", "profesional", "descripcion", "archivo"]
+        widgets = {
+            "fecha_documento": forms.DateInput(attrs={"type": "date"}),
+            "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
+            "fecha_fin": forms.DateInput(attrs={"type": "date"}),
+            "descripcion": forms.Textarea(attrs={"rows": 6, "placeholder": "Diagnostico, motivo clinico, reposo indicado e indicaciones generales."}),
+            "archivo": forms.ClearableFileInput(attrs={"accept": "application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp"}),
+        }
+        labels = {
+            "titulo": "Titulo del certificado",
+            "fecha_documento": "Fecha de emision",
+            "fecha_inicio": "Inicio de incapacidad",
+            "fecha_fin": "Fin de incapacidad",
+            "dias": "Dias indicados",
+            "profesional": "Profesional que emite",
+            "descripcion": "Motivo e indicaciones",
+            "archivo": "Adjunto firmado (opcional)",
+        }
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, empresa=empresa, **kwargs)
+        if empresa:
+            self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+        self.fields["archivo"].required = False
+        self.fields["titulo"].initial = self.fields["titulo"].initial or "Incapacidad medica"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        inicio = cleaned_data.get("fecha_inicio")
+        fin = cleaned_data.get("fecha_fin")
+        dias = cleaned_data.get("dias")
+        if inicio and fin:
+            if fin < inicio:
+                raise forms.ValidationError("La fecha final no puede ser anterior a la fecha inicial.")
+            if not dias:
+                cleaned_data["dias"] = (fin - inicio).days + 1
+        return cleaned_data
 
 
 class RecetaMedicaForm(BaseClinicaForm):

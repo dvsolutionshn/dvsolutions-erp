@@ -774,6 +774,55 @@ class ExamenPaciente(models.Model):
         return nombre.endswith((".jpg", ".jpeg", ".png", ".webp"))
 
 
+class DocumentoClinicoPaciente(models.Model):
+    CATEGORIA_CHOICES = [
+        ("laboratorio", "Trabajos de laboratorio"),
+        ("radiologico", "Solicitud estudio radiologico"),
+        ("documento", "Documentos"),
+        ("remision", "Remision y contraremision"),
+        ("detalle_remision", "Detalle remisiones"),
+        ("incapacidad", "Incapacidades"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="documentos_clinicos_pacientes")
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="documentos_clinicos")
+    categoria = models.CharField(max_length=40, choices=CATEGORIA_CHOICES)
+    titulo = models.CharField(max_length=180)
+    fecha_documento = models.DateField(default=timezone.localdate)
+    entidad = models.CharField(max_length=180, blank=True, null=True)
+    descripcion = models.TextField(blank=True, null=True)
+    archivo = models.FileField(upload_to="clinica/documentos/", blank=True, null=True)
+    profesional = models.ForeignKey(
+        ProfesionalSalud,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documentos_clinicos_emitidos",
+    )
+    fecha_inicio = models.DateField(blank=True, null=True)
+    fecha_fin = models.DateField(blank=True, null=True)
+    dias = models.PositiveIntegerField(blank=True, null=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_documento", "-fecha_creacion"]
+        verbose_name = "Documento clinico de paciente"
+        verbose_name_plural = "Documentos clinicos de pacientes"
+
+    def __str__(self):
+        return f"{self.get_categoria_display()} - {self.titulo} - {self.paciente.nombre}"
+
+    @property
+    def es_imagen(self):
+        nombre = (self.archivo.name or "").lower()
+        return nombre.endswith((".jpg", ".jpeg", ".png", ".webp"))
+
+    @property
+    def es_pdf(self):
+        return (self.archivo.name or "").lower().endswith(".pdf")
+
+
 class RecetaMedica(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="recetas_medicas")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="recetas")

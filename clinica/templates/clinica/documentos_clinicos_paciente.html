@@ -1,0 +1,129 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{{ config.titulo }} - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}{{ config.titulo }}{% endblock %}
+{% block header_description %}{{ config.descripcion }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+<a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}">{{ config.accion }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.doc-hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:24px;background:linear-gradient(135deg,#fff,#f6fbff 54%,#f5fff8);padding:22px;box-shadow:0 18px 46px rgba(15,42,68,.07);margin-bottom:16px}
+.doc-hero:before{content:"";position:absolute;right:-72px;top:-90px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(20,184,166,.16),transparent 70%)}
+.doc-head{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap}
+.doc-patient strong{display:block;color:#102338;font-size:24px}.doc-patient span{display:block;margin-top:6px;color:var(--muted)}
+.doc-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:#eaf8f6;color:#0f766e;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.doc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+.doc-kpi{padding:15px;border:1px solid #d7e5ee;border-radius:18px;background:rgba(255,255,255,.9);box-shadow:0 12px 30px rgba(15,42,68,.05)}
+.doc-kpi span{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.doc-kpi strong{display:block;margin-top:6px;color:#102338;font-size:25px}
+.doc-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.doc-list{display:grid;gap:12px}
+.doc-card{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:15px;align-items:center;padding:16px;border:1px solid #dbe7ef;border-radius:22px;background:#fff;box-shadow:0 16px 38px rgba(15,42,68,.06);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.doc-card:hover{transform:translateY(-2px);box-shadow:0 22px 48px rgba(15,42,68,.1);border-color:#a9dbe8}
+.doc-preview{width:96px;height:80px;border-radius:18px;background:linear-gradient(135deg,#edf8ff,#fff7fb);display:grid;place-items:center;overflow:hidden;color:#0f6f8a;font-size:12px;font-weight:900;text-align:center;text-decoration:none}
+.doc-preview img{width:100%;height:100%;object-fit:cover;transition:transform .2s ease}.doc-card:hover .doc-preview img{transform:scale(1.05)}
+.doc-info h3{margin:0;color:#102338;font-size:17px}.doc-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;color:var(--muted);font-size:11px}
+.doc-tag{display:inline-flex;padding:5px 8px;border-radius:999px;background:#eef4f8;color:#526477;font-size:9px;font-weight:900;text-transform:uppercase}.doc-tag.image{background:#e8f7ef;color:#16724f}.doc-tag.pdf{background:#edf2ff;color:#2453bd}.doc-tag.cert{background:#fff7df;color:#936b00}
+.doc-description{margin:10px 0 0;color:var(--muted);line-height:1.5;font-size:12px;white-space:pre-wrap}.doc-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.doc-empty{min-height:280px;display:grid;place-items:center;text-align:center;border:1px dashed #bcd0dd;border-radius:22px;background:#fff;color:var(--muted);padding:28px}
+.doc-empty-icon{width:70px;height:70px;margin:0 auto 12px;border-radius:22px;display:grid;place-items:center;background:linear-gradient(135deg,#e6fbf8,#edf4ff);color:#0f6f8a;font-weight:900}
+.doc-guide{position:sticky;top:92px;display:grid;gap:12px}
+.doc-guide-card{padding:18px;border:1px solid var(--line);border-radius:20px;background:#fff;box-shadow:0 14px 34px rgba(15,42,68,.05)}
+.doc-guide-card h3{margin:0 0 8px;color:#102338}.doc-guide-card p{margin:0;color:var(--muted);line-height:1.55}.doc-check{display:grid;gap:8px;margin-top:12px}.doc-check span{display:flex;gap:8px;align-items:flex-start;color:#30465a;font-size:12px}.doc-check i{width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:#e8f7ef;color:#10725f;font-style:normal;font-weight:900;font-size:10px;flex:0 0 auto}
+@media(max-width:1100px){.doc-layout{grid-template-columns:1fr}.doc-guide{position:static}.doc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.doc-card{grid-template-columns:78px minmax(0,1fr)}.doc-actions{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:620px){.doc-kpis{grid-template-columns:1fr}.doc-card{grid-template-columns:1fr}.doc-preview{width:100%;height:180px}}
+</style>
+
+<section class="doc-hero">
+    <div class="doc-head">
+        <div class="doc-patient">
+            <strong>{{ paciente.nombre }}</strong>
+            <span>{{ paciente.identidad|default:"Identidad no indicada" }} - {{ paciente.edad|default:"Edad no indicada" }} anos - Expediente {{ paciente.expediente_codigo }}</span>
+        </div>
+        <span class="doc-pill">{{ config.estado }}</span>
+    </div>
+    <div class="doc-kpis">
+        <div class="doc-kpi"><span>Total</span><strong>{{ resumen.total }}</strong></div>
+        <div class="doc-kpi"><span>PDF</span><strong>{{ resumen.pdf }}</strong></div>
+        <div class="doc-kpi"><span>Fotos</span><strong>{{ resumen.imagenes }}</strong></div>
+        <div class="doc-kpi"><span>Sin adjunto</span><strong>{{ resumen.sin_adjunto }}</strong></div>
+    </div>
+</section>
+
+<section class="doc-layout">
+    <div class="doc-list">
+        {% for documento in documentos %}
+        <article class="doc-card">
+            {% if documento.archivo %}
+            <a class="doc-preview" href="{{ documento.archivo.url }}" target="_blank" rel="noopener" title="Abrir archivo">
+                {% if documento.es_imagen %}
+                <img src="{{ documento.archivo.url }}" alt="{{ documento.titulo }}">
+                {% elif documento.es_pdf %}
+                PDF<br>Clinico
+                {% else %}
+                Archivo<br>Clinico
+                {% endif %}
+            </a>
+            {% else %}
+            <div class="doc-preview">Certificado<br>Imprimible</div>
+            {% endif %}
+            <div class="doc-info">
+                <h3>{{ documento.titulo }}</h3>
+                <div class="doc-meta">
+                    <span class="doc-tag {% if documento.es_imagen %}image{% elif documento.es_pdf %}pdf{% elif categoria == 'incapacidad' %}cert{% endif %}">{{ documento.get_categoria_display }}</span>
+                    <span>{{ documento.fecha_documento|date:"d/m/Y" }}</span>
+                    {% if documento.entidad %}<span>{{ documento.entidad }}</span>{% endif %}
+                    {% if documento.profesional %}<span>{{ documento.profesional.nombre }}</span>{% endif %}
+                    {% if documento.fecha_inicio or documento.fecha_fin %}<span>{{ documento.fecha_inicio|date:"d/m/Y" }} - {{ documento.fecha_fin|date:"d/m/Y" }}</span>{% endif %}
+                    {% if documento.dias %}<span>{{ documento.dias }} dia(s)</span>{% endif %}
+                    {% if documento.fecha_creacion %}<span>Cargado {{ documento.fecha_creacion|date:"d/m/Y h:i A" }}</span>{% endif %}
+                </div>
+                {% if documento.descripcion %}<p class="doc-description">{{ documento.descripcion }}</p>{% endif %}
+            </div>
+            <div class="doc-actions">
+                {% if documento.archivo %}<a class="erp-btn-secondary" href="{{ documento.archivo.url }}" target="_blank" rel="noopener">Abrir archivo</a>{% endif %}
+                {% if categoria == "incapacidad" %}<a class="erp-btn-secondary" href="{% url 'clinica_incapacidad_imprimir' empresa.slug paciente.id documento.id %}" target="_blank" rel="noopener">Imprimir</a>{% endif %}
+            </div>
+        </article>
+        {% empty %}
+        <div class="doc-empty">
+            <div>
+                <div class="doc-empty-icon">DOC</div>
+                <h3 style="margin:8px 0;color:#102338;">Aun no hay registros en {{ config.titulo|lower }}</h3>
+                <p style="margin:0 0 14px;">Agregue el primer documento para dejarlo integrado al expediente del paciente.</p>
+                <a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}">{{ config.accion }}</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <aside class="doc-guide">
+        <div class="doc-guide-card">
+            <h3>Uso clinico</h3>
+            <p>{{ config.descripcion }}</p>
+            <div class="doc-check">
+                <span><i>1</i>Registre fecha y nombre claro para encontrarlo rapidamente.</span>
+                <span><i>2</i>Use descripcion para anotar procedencia, motivo o resumen clinico.</span>
+                <span><i>3</i>Abra PDF, foto o certificado desde la misma ficha del paciente.</span>
+            </div>
+        </div>
+        <div class="doc-guide-card">
+            <h3>Nuevo registro</h3>
+            <p>Puede cargar documentos desde computadora o telefono. En incapacidades tambien se genera formato imprimible.</p>
+            <a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id categoria %}" style="width:100%;justify-content:center;margin-top:14px;">{{ config.accion }}</a>
+        </div>
+        <div class="doc-guide-card">
+            <h3>Expediente</h3>
+            <div class="doc-check">
+                <span><i>OK</i><a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Examenes</a></span>
+                <span><i>OK</i><a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas</a></span>
+                <span><i>OK</i><a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a></span>
+            </div>
+        </div>
+    </aside>
+</section>
+{% endblock %}

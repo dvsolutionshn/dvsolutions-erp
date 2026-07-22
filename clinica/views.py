@@ -39,9 +39,11 @@ from .forms import (
     PSICOLOGICA_CHOICES,
     SI_NO_CHOICES,
     CitaClinicaForm,
+    DocumentoClinicoPacienteForm,
     ExamenPacienteForm,
     ExpedienteEventoForm,
     HistoriaClinicaEspecialidadForm,
+    IncapacidadClinicaForm,
     PacienteForm,
     PacienteFotoEvolucionForm,
     PlanConsentimientoPDFForm,
@@ -54,6 +56,7 @@ from .forms import (
 from .models import (
     CitaClinica,
     ConsentimientoClinico,
+    DocumentoClinicoPaciente,
     ExamenPaciente,
     ConfiguracionClinica,
     ExpedienteEvento,
@@ -76,6 +79,45 @@ from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
 logger = logging.getLogger(__name__)
+
+DOCUMENTOS_CLINICOS_CONFIG = {
+    "laboratorio": {
+        "titulo": "Trabajos de laboratorio",
+        "descripcion": "Resultados, solicitudes y archivos de laboratorio organizados por fecha.",
+        "accion": "Subir trabajo de laboratorio",
+        "estado": "Biblioteca de laboratorio",
+    },
+    "radiologico": {
+        "titulo": "Estudios radiologicos",
+        "descripcion": "Ordenes, ultrasonidos, imagenologia y estudios recibidos del paciente.",
+        "accion": "Subir estudio radiologico",
+        "estado": "Imagenologia y estudios",
+    },
+    "documento": {
+        "titulo": "Documentos del paciente",
+        "descripcion": "Adjuntos generales, referencias, documentos personales y archivos clinicos de soporte.",
+        "accion": "Subir documento",
+        "estado": "Archivo documental",
+    },
+    "remision": {
+        "titulo": "Remision y contraremision",
+        "descripcion": "Control de referencias externas, remisiones recibidas y contrarremisiones emitidas.",
+        "accion": "Subir remision",
+        "estado": "Referencias externas",
+    },
+    "detalle_remision": {
+        "titulo": "Detalle de remisiones",
+        "descripcion": "Seguimiento puntual de remisiones, respuestas, hallazgos y continuidad medica.",
+        "accion": "Subir detalle",
+        "estado": "Seguimiento de remisiones",
+    },
+    "incapacidad": {
+        "titulo": "Incapacidades",
+        "descripcion": "Certificados e incapacidades emitidas con formato imprimible y control por fecha.",
+        "accion": "Crear incapacidad",
+        "estado": "Certificados medicos",
+    },
+}
 
 
 def _sincronizar_agenda_desde_cita_clinica(cita):
@@ -711,6 +753,12 @@ def paciente_detalle(request, empresa_slug, paciente_id):
     consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10]
     examenes = ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente)[:10]
     recetas = RecetaMedica.objects.filter(empresa=empresa, paciente=paciente).select_related("profesional")[:10]
+    documentos_clinicos_conteos = {
+        item["categoria"]: item["total"]
+        for item in DocumentoClinicoPaciente.objects.filter(empresa=empresa, paciente=paciente)
+        .values("categoria")
+        .annotate(total=Count("id"))
+    }
     historias_especialidad = paciente.historias_especialidad.select_related("profesional", "actualizado_por")[:20]
     return render(
         request,
@@ -728,6 +776,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "consentimientos": consentimientos,
             "examenes": examenes,
             "recetas": recetas,
+            "documentos_clinicos_conteos": documentos_clinicos_conteos,
             "historias_especialidad": historias_especialidad,
             "formularios_hospitalarios": empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS,
             "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
@@ -902,6 +951,99 @@ def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
         request,
         "clinica/receta_imprimir.html",
         {"empresa": empresa, "paciente": paciente, "receta": receta},
+    )
+
+
+def _config_documento_clinico(categoria):
+    config = DOCUMENTOS_CLINICOS_CONFIG.get(categoria)
+    if not config:
+        raise Http404("Modulo documental no valido.")
+    return config
+
+
+@login_required
+def documentos_clinicos_paciente(request, empresa_slug, paciente_id, categoria):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    config = _config_documento_clinico(categoria)
+    documentos = list(
+        DocumentoClinicoPaciente.objects.filter(empresa=empresa, paciente=paciente, categoria=categoria)
+        .select_related("profesional", "creado_por")
+        .order_by("-fecha_documento", "-fecha_creacion")
+    )
+    resumen = {
+        "total": len(documentos),
+        "pdf": sum(1 for item in documentos if item.archivo and item.es_pdf),
+        "imagenes": sum(1 for item in documentos if item.archivo and item.es_imagen),
+        "sin_adjunto": sum(1 for item in documentos if not item.archivo),
+    }
+    return render(
+        request,
+        "clinica/documentos_clinicos_paciente.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "categoria": categoria,
+            "config": config,
+            "documentos": documentos,
+            "resumen": resumen,
+        },
+    )
+
+
+@login_required
+def subir_documento_clinico_paciente(request, empresa_slug, paciente_id, categoria):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    config = _config_documento_clinico(categoria)
+    form_class = IncapacidadClinicaForm if categoria == "incapacidad" else DocumentoClinicoPacienteForm
+    form_kwargs = {"empresa": empresa}
+    if categoria != "incapacidad":
+        form_kwargs["categoria"] = categoria
+    form = form_class(request.POST or None, request.FILES or None, **form_kwargs)
+    if request.method == "POST" and form.is_valid():
+        documento = form.save(commit=False)
+        documento.empresa = empresa
+        documento.paciente = paciente
+        documento.categoria = categoria
+        documento.creado_por = request.user
+        if categoria == "incapacidad" and not documento.titulo:
+            documento.titulo = "Incapacidad medica"
+        documento.save()
+        messages.success(request, f"{config['titulo']} actualizado correctamente en el expediente.")
+        return redirect(
+            "clinica_documentos_categoria_paciente",
+            empresa_slug=empresa.slug,
+            paciente_id=paciente.id,
+            categoria=categoria,
+        )
+    return render(
+        request,
+        "clinica/form.html",
+        {
+            "empresa": empresa,
+            "form": form,
+            "titulo": f"{config['accion']}: {paciente.nombre}",
+            "cancel_url": reverse("clinica_documentos_categoria_paciente", args=[empresa.slug, paciente.id, categoria]),
+        },
+    )
+
+
+@login_required
+def imprimir_incapacidad_paciente(request, empresa_slug, paciente_id, documento_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    incapacidad = get_object_or_404(
+        DocumentoClinicoPaciente.objects.select_related("profesional", "creado_por"),
+        id=documento_id,
+        empresa=empresa,
+        paciente=paciente,
+        categoria="incapacidad",
+    )
+    return render(
+        request,
+        "clinica/incapacidad_imprimir.html",
+        {"empresa": empresa, "paciente": paciente, "incapacidad": incapacidad},
     )
 
 
