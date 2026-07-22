@@ -63,6 +63,16 @@
 .pos-cash-box.is-visible{display:grid}
 .pos-cash-total{display:flex;align-items:center;justify-content:space-between;gap:10px;grid-column:1/-1;color:#506984;font-size:13px}
 .pos-cash-total strong{font-size:19px;color:#102338}
+.pos-mixed-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #cfe0f2;border-radius:12px;background:linear-gradient(135deg,#f8fbff,#ffffff);color:#102338;font-weight:800}
+.pos-mixed-toggle span{display:block;color:#5b6f8e;font-size:12px;font-weight:600;margin-top:2px}
+.pos-mixed-box{display:none;gap:10px;padding:12px;border:1px solid #b8e7df;border-radius:14px;background:linear-gradient(135deg,#f0fdfa,#f8fbff)}
+.pos-mixed-box.is-visible{display:grid}
+.pos-mixed-row{display:grid;grid-template-columns:92px minmax(96px,.7fr) minmax(0,1fr);gap:8px;align-items:center}
+.pos-mixed-row strong{color:#102338;font-size:13px}
+.pos-mixed-ref{grid-column:2/-1}
+.pos-mixed-total{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:2px;padding:10px 12px;border:1px solid #cfe0f2;border-radius:10px;background:#fff;color:#5b6f8e;font-size:13px}
+.pos-mixed-total strong{color:#102338;font-size:18px}
+.pos-simple-payment.is-hidden{display:none}
 .pos-checkout-status{display:none;padding:11px 12px;border:1px solid #b9d9cf;border-radius:8px;background:#effcf8;color:#176252;font-size:13px;font-weight:700}
 .pos-checkout-status.is-visible{display:block}
 .pos-checkout-status.is-error{border-color:#efc0bd;background:#fff4f3;color:#9f2720}
@@ -90,7 +100,7 @@
 .pos-bodega-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .pos-empty{border:1px dashed #c9d8eb;border-radius:12px;padding:24px;text-align:center;color:#5b6f8e;background:#fbfdff}
 .pos-warning{border:1px solid #f1d3a6;background:#fff8ed;color:#724a10;border-radius:10px;padding:12px;margin-bottom:14px}
-@media (max-width:980px){.pos-shell{grid-template-columns:1fr}.pos-cart{position:static}.pos-toolbar,.pos-client-row,.pos-modal-grid,.pos-bodega-grid{grid-template-columns:1fr}.pos-modal-grid .span-2{grid-column:auto}}
+@media (max-width:980px){.pos-shell{grid-template-columns:1fr}.pos-cart{position:static}.pos-toolbar,.pos-client-row,.pos-modal-grid,.pos-bodega-grid,.pos-mixed-row{grid-template-columns:1fr}.pos-modal-grid .span-2,.pos-mixed-ref{grid-column:auto}}
 </style>
 {% endblock %}
 
@@ -149,12 +159,12 @@
             {% csrf_token %}
             <input type="hidden" name="payload" id="payloadInput">
             <input class="pos-input" type="date" id="saleDate" value="{{ fecha_hoy }}">
-            <select class="pos-select" id="paymentMethod">
+            <select class="pos-select pos-simple-payment" id="paymentMethod">
                 {% for valor, etiqueta in metodos_pago %}
                 <option value="{{ valor }}">{{ etiqueta }}</option>
                 {% endfor %}
             </select>
-            <select class="pos-select" id="financialAccount" required>
+            <select class="pos-select pos-simple-payment" id="financialAccount">
                 <option value="">Seleccione caja o banco</option>
                 {% for cuenta in cuentas_financieras %}
                 <option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}">{{ cuenta.nombre }} - {{ cuenta.get_tipo_display }}</option>
@@ -166,6 +176,46 @@
                 <div class="pos-cash-total"><span>Cambio para el cliente</span><strong id="changeLabel">L. 0.00</strong></div>
             </div>
             <input class="pos-input" id="referenceInput" type="text" placeholder="Referencia opcional">
+            <label class="pos-mixed-toggle">
+                <span><strong>Dividir pago</strong><span>Registra efectivo, tarjeta y transferencia en la misma factura.</span></span>
+                <input type="checkbox" id="mixedPaymentToggle">
+            </label>
+            <div class="pos-mixed-box" id="mixedPaymentBox">
+                <div class="pos-mixed-row">
+                    <strong>Efectivo</strong>
+                    <input class="pos-input" id="mixedCashAmount" type="number" min="0" step="0.01" placeholder="0.00">
+                    <select class="pos-select" id="mixedCashAccount">
+                        <option value="">Caja destino</option>
+                        {% for cuenta in cuentas_financieras %}
+                        <option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}">{{ cuenta.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <input class="pos-input pos-mixed-ref" id="mixedCashReference" type="text" placeholder="Referencia efectivo">
+                </div>
+                <div class="pos-mixed-row">
+                    <strong>Tarjeta</strong>
+                    <input class="pos-input" id="mixedCardAmount" type="number" min="0" step="0.01" placeholder="0.00">
+                    <select class="pos-select" id="mixedCardAccount">
+                        <option value="">POS / banco destino</option>
+                        {% for cuenta in cuentas_financieras %}
+                        <option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}">{{ cuenta.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <input class="pos-input pos-mixed-ref" id="mixedCardReference" type="text" placeholder="Referencia tarjeta">
+                </div>
+                <div class="pos-mixed-row">
+                    <strong>Transferencia</strong>
+                    <input class="pos-input" id="mixedTransferAmount" type="number" min="0" step="0.01" placeholder="0.00">
+                    <select class="pos-select" id="mixedTransferAccount">
+                        <option value="">Banco destino</option>
+                        {% for cuenta in cuentas_financieras %}
+                        <option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}">{{ cuenta.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <input class="pos-input pos-mixed-ref" id="mixedTransferReference" type="text" placeholder="Referencia transferencia">
+                </div>
+                <div class="pos-mixed-total"><span>Total dividido</span><strong id="mixedPaymentTotalLabel">L. 0.00</strong></div>
+            </div>
             <div class="pos-checkout-status" id="checkoutStatus" role="status" aria-live="polite"></div>
             <button class="erp-btn" type="submit" id="checkoutButton" disabled>Cobrar, facturar e imprimir</button>
         </form>
@@ -283,6 +333,9 @@
     const cashBox = document.getElementById("cashBox");
     const cashReceived = document.getElementById("cashReceived");
     const changeLabel = document.getElementById("changeLabel");
+    const mixedPaymentToggle = document.getElementById("mixedPaymentToggle");
+    const mixedPaymentBox = document.getElementById("mixedPaymentBox");
+    const mixedPaymentTotalLabel = document.getElementById("mixedPaymentTotalLabel");
     const checkoutStatus = document.getElementById("checkoutStatus");
     const changeDialog = document.getElementById("changeDialog");
     const finalChangeLabel = document.getElementById("finalChangeLabel");
@@ -310,6 +363,22 @@
     function money(value){return currency.format(value || 0).replace("HNL","L.");}
     function normalized(value){return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
     function normalizedCode(value){return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g,"");}
+    function isMixedPayment(){return Boolean(mixedPaymentToggle && mixedPaymentToggle.checked);}
+    function mixedRows(){
+        return [
+            {metodo:"efectivo", label:"Efectivo", amount:document.getElementById("mixedCashAmount"), account:document.getElementById("mixedCashAccount"), reference:document.getElementById("mixedCashReference")},
+            {metodo:"tarjeta", label:"Tarjeta", amount:document.getElementById("mixedCardAmount"), account:document.getElementById("mixedCardAccount"), reference:document.getElementById("mixedCardReference")},
+            {metodo:"transferencia", label:"Transferencia", amount:document.getElementById("mixedTransferAmount"), account:document.getElementById("mixedTransferAccount"), reference:document.getElementById("mixedTransferReference")}
+        ];
+    }
+    function mixedTotal(){
+        return mixedRows().reduce((total, row) => total + Number(row.amount.value || 0), 0);
+    }
+    function selectDefaultAccount(select, desiredType){
+        if(!select || select.value){return;}
+        const matching = Array.from(select.options).find(option => option.dataset.tipo === desiredType);
+        if(matching){select.value = matching.value;}
+    }
 
     function showScanFeedback(message, isError){
         window.clearTimeout(feedbackTimer);
@@ -530,9 +599,15 @@
         checkoutButton.disabled = !items.length || total.total <= 0;
         renderPromotion();
         updateChange();
+        updateMixedPaymentTotal();
     }
 
     function updateChange(){
+        if(isMixedPayment()){
+            cashBox.classList.remove("is-visible");
+            changeLabel.textContent = money(0);
+            return;
+        }
         const isCash = paymentMethod.value === "efectivo";
         cashBox.classList.toggle("is-visible", isCash);
         if(!isCash){
@@ -545,12 +620,46 @@
     }
 
     function selectAccountForPayment(){
+        updateMixedPaymentMode();
+        if(isMixedPayment()){return;}
         const desiredType = paymentMethod.value === "efectivo"
             ? "caja"
             : "banco";
         const matching = Array.from(financialAccount.options).find(option => option.dataset.tipo === desiredType);
         if(matching){financialAccount.value = matching.value;}
         updateChange();
+    }
+
+    function updateMixedPaymentTotal(){
+        if(mixedPaymentTotalLabel){
+            mixedPaymentTotalLabel.textContent = money(mixedTotal());
+        }
+    }
+
+    function updateMixedPaymentMode(){
+        const mixed = isMixedPayment();
+        mixedPaymentBox.classList.toggle("is-visible", mixed);
+        document.querySelectorAll(".pos-simple-payment").forEach(element => {
+            element.classList.toggle("is-hidden", mixed);
+        });
+        if(mixed){
+            selectDefaultAccount(document.getElementById("mixedCashAccount"), "caja");
+            selectDefaultAccount(document.getElementById("mixedCardAccount"), "banco");
+            selectDefaultAccount(document.getElementById("mixedTransferAccount"), "banco");
+        }
+        updateChange();
+        updateMixedPaymentTotal();
+    }
+
+    function selectedMixedPayments(){
+        return mixedRows()
+            .map(row => ({
+                metodo: row.metodo,
+                monto: row.amount.value || "",
+                cuenta_financiera: row.account.value || "",
+                referencia: row.reference.value || ""
+            }))
+            .filter(row => Number(row.monto || 0) > 0);
     }
 
     function showCheckoutStatus(message, isError){
@@ -594,6 +703,10 @@
         cart.clear();
         cashReceived.value = "";
         document.getElementById("referenceInput").value = "";
+        mixedRows().forEach(row => {
+            row.amount.value = "";
+            row.reference.value = "";
+        });
         selectedClient = null;
         if(selectedClientBox){selectedClientBox.classList.remove("is-visible"); selectedClientBox.innerHTML = "";}
         if(clientSearch){clientSearch.value = "";}
@@ -772,6 +885,13 @@
     document.getElementById("clearSearch").addEventListener("click", () => {search.value = ""; renderProducts(); search.focus();});
     paymentMethod.addEventListener("change", selectAccountForPayment);
     cashReceived.addEventListener("input", updateChange);
+    if(mixedPaymentToggle){
+        mixedPaymentToggle.addEventListener("change", updateMixedPaymentMode);
+        mixedRows().forEach(row => {
+            row.amount.addEventListener("input", updateMixedPaymentTotal);
+            row.account.addEventListener("change", updateMixedPaymentTotal);
+        });
+    }
     document.getElementById("exactCash").addEventListener("click", () => {
         cashReceived.value = totals().total.toFixed(2);
         updateChange();
@@ -804,13 +924,33 @@
             if(clientSearch){clientSearch.focus();}
             return;
         }
-        if(!financialAccount.value){
+        if(!isMixedPayment() && !financialAccount.value){
             showCheckoutStatus("Selecciona la caja o cuenta donde ingreso el pago.", true);
             financialAccount.focus();
             return;
         }
         const saleTotal = totals().total;
-        if(paymentMethod.value === "efectivo" && Number(cashReceived.value || 0) < saleTotal){
+        if(isMixedPayment()){
+            const pagosMixtos = selectedMixedPayments();
+            const totalMixto = mixedTotal();
+            if(!pagosMixtos.length){
+                showCheckoutStatus("Ingresa al menos un monto en el pago mixto.", true);
+                mixedRows()[0].amount.focus();
+                return;
+            }
+            const diferencia = Math.abs(totalMixto - saleTotal);
+            if(diferencia > 0.009){
+                showCheckoutStatus(`La suma del pago mixto debe dar exactamente ${money(saleTotal)}. Actualmente suma ${money(totalMixto)}.`, true);
+                mixedRows()[0].amount.focus();
+                return;
+            }
+            const sinCuenta = mixedRows().find(row => Number(row.amount.value || 0) > 0 && !row.account.value);
+            if(sinCuenta){
+                showCheckoutStatus(`Selecciona la cuenta para ${sinCuenta.label}.`, true);
+                sinCuenta.account.focus();
+                return;
+            }
+        }else if(paymentMethod.value === "efectivo" && Number(cashReceived.value || 0) < saleTotal){
             showCheckoutStatus("El efectivo recibido es menor que el total de la venta.", true);
             cashReceived.focus();
             return;
@@ -829,6 +969,8 @@
             fecha: document.getElementById("saleDate").value,
             metodo: paymentMethod.value,
             cuenta_financiera: financialAccount.value,
+            usa_pago_mixto: isMixedPayment(),
+            pagos_mixtos: selectedMixedPayments(),
             cliente_id: selectedClient ? selectedClient.id : "",
             referencia: document.getElementById("referenceInput").value,
             monto_recibido: paymentMethod.value === "efectivo" ? cashReceived.value : "",
@@ -870,7 +1012,9 @@
                     true
                 );
             }
-            const receivedAmount = paymentMethod.value === "efectivo"
+            const receivedAmount = isMixedPayment()
+                ? Number(result.total)
+                : paymentMethod.value === "efectivo"
                 ? Number(cashReceived.value || result.total)
                 : Number(result.total);
             showFinalChange(
@@ -894,6 +1038,7 @@
         }
     });
     selectAccountForPayment();
+    updateMixedPaymentMode();
     renderProducts();
     renderCart();
 })();

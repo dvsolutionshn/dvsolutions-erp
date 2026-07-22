@@ -188,6 +188,70 @@ def _cuenta_financiera_por_defecto(cuentas_financieras, metodo=None):
     return cuentas_financieras.filter(tipo="banco").first() or cuentas_financieras.first()
 
 
+def _parsear_decimal_pago(valor, etiqueta):
+    if valor in (None, ""):
+        return Decimal("0.00")
+    try:
+        return Decimal(str(valor)).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValidationError(f"El valor de {etiqueta} no es valido.") from exc
+
+
+def _pagos_mixtos_desde_payload(pagos_payload, cuentas_financieras):
+    pagos_validos = []
+    total_pago = Decimal("0.00")
+    etiquetas = {
+        "efectivo": "Efectivo",
+        "tarjeta": "Tarjeta",
+        "transferencia": "Transferencia",
+    }
+
+    for pago_payload in pagos_payload or []:
+        metodo_mixto = (pago_payload.get("metodo") or "").strip()
+        if metodo_mixto not in etiquetas:
+            continue
+
+        etiqueta = etiquetas[metodo_mixto]
+        monto_decimal = _parsear_decimal_pago(pago_payload.get("monto"), f"monto de {etiqueta}")
+        if monto_decimal <= 0:
+            continue
+
+        cuenta_id = pago_payload.get("cuenta_financiera")
+        cuenta_mixta = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo_mixto)
+        if not cuenta_mixta:
+            raise ValidationError(f"Selecciona la cuenta financiera para {etiqueta}.")
+
+        referencia_mixta = (pago_payload.get("referencia") or "").strip()
+        total_pago += monto_decimal
+        pagos_validos.append((metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta))
+
+    return pagos_validos, total_pago
+
+
+def _pagos_mixtos_desde_post(post_data, cuentas_financieras):
+    pagos_payload = [
+        {
+            "metodo": "efectivo",
+            "monto": post_data.get("monto_efectivo", "").strip(),
+            "cuenta_financiera": post_data.get("cuenta_efectivo"),
+            "referencia": post_data.get("referencia_efectivo", "").strip(),
+        },
+        {
+            "metodo": "tarjeta",
+            "monto": post_data.get("monto_tarjeta", "").strip(),
+            "cuenta_financiera": post_data.get("cuenta_tarjeta"),
+            "referencia": post_data.get("referencia_tarjeta", "").strip(),
+        },
+        {
+            "metodo": "transferencia",
+            "monto": post_data.get("monto_transferencia", "").strip(),
+            "cuenta_financiera": post_data.get("cuenta_transferencia"),
+            "referencia": post_data.get("referencia_transferencia", "").strip(),
+        },
+    ]
+    return _pagos_mixtos_desde_payload(pagos_payload, cuentas_financieras)
+
+
 def _empresa_factura_solo_contado(empresa):
     return bool(empresa and empresa.slug in EMPRESAS_FACTURACION_SOLO_CONTADO)
 
@@ -373,11 +437,13 @@ def punto_venta(request, empresa_slug):
         cuenta_id = payload.get("cuenta_financiera")
         referencia = (payload.get("referencia") or "").strip()
         monto_recibido_raw = payload.get("monto_recibido")
+        pagos_mixtos_payload = payload.get("pagos_mixtos") or []
+        usa_pago_mixto_pos = bool(payload.get("usa_pago_mixto") and pagos_mixtos_payload)
         cliente_id = payload.get("cliente_id")
         fecha_venta = _parsear_fecha_latam(payload.get("fecha")) or timezone.localdate()
 
         try:
-            if metodo not in dict(PagoFactura.METODOS):
+            if not usa_pago_mixto_pos and metodo not in dict(PagoFactura.METODOS):
                 raise ValidationError("Selecciona un metodo de pago valido.")
             if not impuesto_default and any(not p.impuesto_predeterminado_id for p in productos_qs):
                 raise ValidationError("Configura al menos un impuesto activo antes de usar el punto de venta.")
@@ -386,9 +452,17 @@ def punto_venta(request, empresa_slug):
             if cliente_obligatorio and not cliente_id:
                 raise ValidationError("Selecciona o crea el cliente antes de cobrar esta venta.")
 
-            cuenta_financiera = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
-            if not cuenta_financiera:
-                raise ValidationError("Configura una caja o cuenta bancaria activa para cobrar en punto de venta.")
+            pagos_mixtos_validos = []
+            total_pago_mixto = Decimal("0.00")
+            cuenta_financiera = None
+            if usa_pago_mixto_pos:
+                pagos_mixtos_validos, total_pago_mixto = _pagos_mixtos_desde_payload(pagos_mixtos_payload, cuentas_financieras)
+                if not pagos_mixtos_validos:
+                    raise ValidationError("Ingresa al menos un monto valido para el pago mixto.")
+            else:
+                cuenta_financiera = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
+                if not cuenta_financiera:
+                    raise ValidationError("Configura una caja o cuenta bancaria activa para cobrar en punto de venta.")
 
             producto_ids = []
             for item in items:
@@ -502,7 +576,12 @@ def punto_venta(request, empresa_slug):
 
                 monto_recibido = None
                 cambio = Decimal("0.00")
-                if metodo == "efectivo" and monto_recibido_raw not in (None, ""):
+                if usa_pago_mixto_pos:
+                    total_pago_mixto = total_pago_mixto.quantize(Decimal("0.01"))
+                    total_factura = Decimal(factura.total_documento_ajustado or factura.total or 0).quantize(Decimal("0.01"))
+                    if total_pago_mixto != total_factura:
+                        raise ValidationError("La suma de los pagos mixtos debe ser igual al total de la venta.")
+                elif metodo == "efectivo" and monto_recibido_raw not in (None, ""):
                     monto_recibido = Decimal(str(monto_recibido_raw)).quantize(Decimal("0.01"))
                     if monto_recibido < factura.total_documento_ajustado:
                         raise ValidationError("El efectivo recibido es menor que el total de la venta.")
@@ -514,18 +593,39 @@ def punto_venta(request, empresa_slug):
                         f"{referencia_pago} | Recibido L. {monto_recibido:.2f} | Cambio L. {cambio:.2f}"
                     )[:100]
 
-                pago = PagoFactura.objects.create(
-                    factura=factura,
-                    fecha=fecha_venta,
-                    monto=factura.total_documento_ajustado,
-                    metodo=metodo,
-                    referencia=referencia_pago,
-                    cuenta_financiera=cuenta_financiera,
-                    cajero=request.user,
-                )
-                registrar_asiento_pago_cliente(pago)
+                pagos_creados = []
+                if usa_pago_mixto_pos:
+                    for metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta in pagos_mixtos_validos:
+                        pago = PagoFactura.objects.create(
+                            factura=factura,
+                            fecha=fecha_venta,
+                            monto=monto_decimal,
+                            metodo=metodo_mixto,
+                            referencia=(referencia_mixta or referencia_pago)[:100],
+                            cuenta_financiera=cuenta_mixta,
+                            cajero=request.user,
+                        )
+                        registrar_asiento_pago_cliente(pago)
+                        pagos_creados.append(pago)
+                else:
+                    pago = PagoFactura.objects.create(
+                        factura=factura,
+                        fecha=fecha_venta,
+                        monto=factura.total_documento_ajustado,
+                        metodo=metodo,
+                        referencia=referencia_pago,
+                        cuenta_financiera=cuenta_financiera,
+                        cajero=request.user,
+                    )
+                    registrar_asiento_pago_cliente(pago)
+                    pagos_creados.append(pago)
 
-            recibo_numero = pago.recibo.numero_recibo if hasattr(pago, "recibo") else "sin numero"
+            recibos_numero = [
+                pago.recibo.numero_recibo
+                for pago in pagos_creados
+                if hasattr(pago, "recibo")
+            ]
+            recibo_numero = ", ".join(recibos_numero) or "sin numero"
             if solicitud_pos_ajax:
                 return JsonResponse({
                     "ok": True,
@@ -6159,7 +6259,7 @@ def registrar_pago(request, empresa_slug, factura_id):
             "cajas": cajas,
             "bancos": bancos,
             "cuentas_tarjeta": cuentas_tarjeta,
-            "usa_pagos_mixtos": config_avanzada.usa_pagos_mixtos,
+            "usa_pagos_mixtos": True,
             "subtotal_pendiente": factura.subtotal_pendiente_cobro,
             "impuesto_pendiente": factura.impuesto_pendiente_cobro,
             "today": timezone.now().date(),
@@ -6241,6 +6341,10 @@ def registrar_pago(request, empresa_slug, factura_id):
         separar_isv = request.POST.get("separar_isv") == "on"
         cuenta_financiera_impuesto_id = request.POST.get("cuenta_financiera_impuesto")
         error = None
+        usa_pago_mixto = any(
+            nombre in request.POST
+            for nombre in ("monto_efectivo", "monto_tarjeta", "monto_transferencia")
+        )
 
         def _parsear_decimal(valor, etiqueta):
             if not valor:
@@ -6250,7 +6354,7 @@ def registrar_pago(request, empresa_slug, factura_id):
             except InvalidOperation as exc:
                 raise ValidationError(f"El valor de {etiqueta} no es valido.") from exc
 
-        if config_avanzada.usa_pagos_mixtos:
+        if usa_pago_mixto:
             try:
                 fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
             except ValueError:
@@ -6503,9 +6607,13 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    cajas = cuentas_financieras.filter(tipo='caja')
+    bancos = cuentas_financieras.filter(tipo='banco')
+    tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
+    cuentas_tarjeta = tarjetas if tarjetas.exists() else cuentas_financieras
 
     def _form_data_base():
-        return {
+        data = {
             "fecha": pago.fecha.isoformat() if pago.fecha else timezone.now().date().isoformat(),
             "monto": f"{Decimal(pago.monto or 0):.2f}",
             "metodo": pago.metodo,
@@ -6515,18 +6623,31 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "retencion_isv": f"{Decimal(pago.retencion_isv or 0):.2f}",
             "separar_isv": pago.separar_isv,
             "cuenta_financiera_impuesto": str(pago.cuenta_financiera_impuesto_id or ""),
+            "monto_efectivo": "",
+            "cuenta_efectivo": "",
+            "referencia_efectivo": "",
+            "monto_tarjeta": "",
+            "cuenta_tarjeta": "",
+            "referencia_tarjeta": "",
+            "monto_transferencia": "",
+            "cuenta_transferencia": "",
+            "referencia_transferencia": "",
         }
+        metodo = pago.metodo if pago.metodo in {"efectivo", "tarjeta", "transferencia"} else "transferencia"
+        data[f"monto_{metodo}"] = f"{Decimal(pago.monto or 0):.2f}"
+        data[f"cuenta_{metodo}"] = str(pago.cuenta_financiera_id or "")
+        data[f"referencia_{metodo}"] = pago.referencia or ""
+        return data
 
     def _contexto_pago(form_data=None):
-        tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
         return {
             "factura": factura,
             "empresa": empresa,
             "cuentas_financieras": cuentas_financieras,
-            "cajas": cuentas_financieras.filter(tipo='caja'),
-            "bancos": cuentas_financieras.filter(tipo='banco'),
-            "cuentas_tarjeta": tarjetas if tarjetas.exists() else cuentas_financieras,
-            "usa_pagos_mixtos": False,
+            "cajas": cajas,
+            "bancos": bancos,
+            "cuentas_tarjeta": cuentas_tarjeta,
+            "usa_pagos_mixtos": True,
             "subtotal_pendiente": factura.subtotal_pendiente_cobro,
             "impuesto_pendiente": factura.impuesto_pendiente_cobro,
             "today": timezone.now().date(),
@@ -6612,7 +6733,70 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             except InvalidOperation as exc:
                 raise ValidationError(f"El valor de {etiqueta} no es valido.") from exc
 
+        usa_pago_mixto = any(
+            nombre in request.POST
+            for nombre in ("monto_efectivo", "monto_tarjeta", "monto_transferencia")
+        )
+
         try:
+            if usa_pago_mixto:
+                try:
+                    fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
+                except ValueError as exc:
+                    raise ValidationError("Ingrese una fecha valida.") from exc
+
+                retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
+                retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")
+                if retencion_isr < 0 or retencion_isv < 0:
+                    raise ValidationError("Las retenciones no pueden ser negativas.")
+
+                pagos_validos, total_pago = _pagos_mixtos_desde_post(request.POST, cuentas_financieras)
+                if not pagos_validos:
+                    raise ValidationError("Ingresa al menos un monto valido para dividir el cobro.")
+
+                saldo_editable = (Decimal(factura.saldo_pendiente or 0) + Decimal(pago.total_aplicado or 0)).quantize(Decimal("0.01"))
+                if (total_pago + retencion_isr + retencion_isv).quantize(Decimal("0.01")) > saldo_editable:
+                    raise ValidationError("La suma aplicada no puede ser mayor que el saldo disponible de la factura.")
+
+                cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
+                with transaction.atomic():
+                    metodo_principal, monto_principal, referencia_principal, cuenta_principal = pagos_validos[0]
+                    pago.fecha = fecha_convertida
+                    pago.monto = monto_principal
+                    pago.retencion_isr = retencion_isr
+                    pago.retencion_isv = retencion_isv
+                    pago.separar_isv = separar_isv
+                    pago.cuenta_financiera = cuenta_principal
+                    pago.cuenta_financiera_impuesto = cuenta_financiera_impuesto
+                    pago.metodo = metodo_principal
+                    pago.referencia = referencia_principal
+                    pago.save()
+
+                    for metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta in pagos_validos[1:]:
+                        PagoFactura.objects.create(
+                            factura=factura,
+                            monto=monto_decimal,
+                            retencion_isr=Decimal("0.00"),
+                            retencion_isv=Decimal("0.00"),
+                            separar_isv=separar_isv,
+                            cuenta_financiera_impuesto=cuenta_financiera_impuesto,
+                            metodo=metodo_mixto,
+                            referencia=referencia_mixta,
+                            cuenta_financiera=cuenta_mixta,
+                            cajero=request.user,
+                            fecha=fecha_convertida,
+                        )
+                    _recalcular_y_recontabilizar_pagos_factura(factura)
+
+                pago.refresh_from_db()
+                messages.success(request, f"Pago mixto actualizado correctamente. Cobro recibido: L. {total_pago:.2f}.")
+                respuesta_modal = _respuesta_modal_exito(
+                    f"Pago mixto actualizado. Cobro recibido: L. {total_pago:.2f}. Movimientos: {len(pagos_validos)}."
+                )
+                if respuesta_modal:
+                    return respuesta_modal
+                return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
             monto_decimal = _parsear_decimal(monto, "monto recibido")
             retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
             retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")

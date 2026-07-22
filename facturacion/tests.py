@@ -871,6 +871,82 @@ class FacturacionTests(TestCase):
         pago = PagoFactura.objects.get(factura_id=response.json()["factura_id"])
         self.assertEqual(pago.cuenta_financiera.tipo, "banco")
 
+    def test_punto_venta_ajax_permite_pago_mixto_tarjeta_y_transferencia(self):
+        self.empresa.slug = "hospital_mia"
+        self.empresa.save(update_fields=["slug"])
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110201",
+            nombre="Banco Moneda Nacional",
+            tipo="activo",
+            acepta_movimientos=True,
+        )
+        banco = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal HNL",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+            activa=True,
+        )
+        tarjeta = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="POS Tarjeta",
+            tipo="tarjeta_credito",
+            cuenta_contable=cuenta_banco,
+            activa=True,
+        )
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "usa_pago_mixto": True,
+                    "cliente_id": self.cliente.id,
+                    "pagos_mixtos": [
+                        {
+                            "metodo": "tarjeta",
+                            "monto": "40.00",
+                            "cuenta_financiera": tarjeta.id,
+                            "referencia": "POS-TAR-001",
+                        },
+                        {
+                            "metodo": "transferencia",
+                            "monto": "60.00",
+                            "cuenta_financiera": banco.id,
+                            "referencia": "DEP-TRF-001",
+                        },
+                    ],
+                    "items": [
+                        {
+                            "producto_id": self.producto.id,
+                            "cantidad": "1",
+                            "precio_unitario": "100.00",
+                        }
+                    ],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        factura = Factura.objects.get(pk=response.json()["factura_id"])
+        self.assertEqual(factura.total, Decimal("100.00"))
+        self.assertEqual(factura.estado_pago, "pagado")
+        pagos = list(PagoFactura.objects.filter(factura=factura).order_by("monto"))
+        self.assertEqual(len(pagos), 2)
+        self.assertEqual(pagos[0].metodo, "tarjeta")
+        self.assertEqual(pagos[0].monto, Decimal("40.00"))
+        self.assertEqual(pagos[0].referencia, "POS-TAR-001")
+        self.assertEqual(pagos[1].metodo, "transferencia")
+        self.assertEqual(pagos[1].monto, Decimal("60.00"))
+        self.assertEqual(pagos[1].referencia, "DEP-TRF-001")
+        self.assertEqual(ReciboPago.objects.filter(pago__factura=factura).count(), 2)
+
     def test_cierres_caja_respeta_permiso_del_rol(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
@@ -2143,6 +2219,88 @@ class FacturacionTests(TestCase):
         factura.cliente.refresh_from_db()
         self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, debe=Decimal("60.00")).exists())
         self.assertTrue(asiento.lineas.filter(cuenta=factura.cliente.cuenta_contable, haber=Decimal("60.00")).exists())
+
+    def test_editar_pago_factura_permita_dividir_cobro_en_dos_movimientos(self):
+        modulo_contabilidad, _ = Modulo.objects.get_or_create(
+            codigo="contabilidad",
+            defaults={"nombre": "Contabilidad"},
+        )
+        EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_contabilidad, defaults={"activo": True})
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110201",
+            nombre="Banco Moneda Nacional",
+            tipo="activo",
+            acepta_movimientos=True,
+        )
+        CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="2102",
+            nombre="Impuestos por Pagar",
+            tipo="pasivo",
+            acepta_movimientos=True,
+        )
+        banco = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco Principal HNL",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+            activa=True,
+        )
+        tarjeta = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="POS Tarjeta",
+            tipo="tarjeta_credito",
+            cuenta_contable=cuenta_banco,
+            activa=True,
+        )
+        factura = self.crear_factura_con_linea()
+        pago = PagoFactura.objects.create(
+            factura=factura,
+            fecha=date.today(),
+            monto=Decimal("115.00"),
+            metodo="transferencia",
+            referencia="DEP-ORIGINAL",
+            cuenta_financiera=banco,
+            cajero=self.user,
+        )
+        registrar_asiento_pago_cliente(pago)
+
+        response = self.client.post(
+            reverse("editar_pago_factura", args=[self.empresa.slug, factura.id, pago.id]) + "?modal=1",
+            {
+                "fecha": str(date.today()),
+                "monto_tarjeta": "40.00",
+                "cuenta_tarjeta": str(tarjeta.id),
+                "referencia_tarjeta": "POS-EDIT-001",
+                "monto_transferencia": "75.00",
+                "cuenta_transferencia": str(banco.id),
+                "referencia_transferencia": "DEP-EDIT-001",
+                "retencion_isr": "0.00",
+                "retencion_isv": "0.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "erp-pago-guardado")
+        pagos = list(PagoFactura.objects.filter(factura=factura).order_by("monto"))
+        self.assertEqual(len(pagos), 2)
+        self.assertEqual(pagos[0].metodo, "tarjeta")
+        self.assertEqual(pagos[0].monto, Decimal("40.00"))
+        self.assertEqual(pagos[0].referencia, "POS-EDIT-001")
+        self.assertEqual(pagos[1].metodo, "transferencia")
+        self.assertEqual(pagos[1].monto, Decimal("75.00"))
+        self.assertEqual(pagos[1].referencia, "DEP-EDIT-001")
+        self.assertEqual(ReciboPago.objects.filter(pago__factura=factura).count(), 2)
+        self.assertEqual(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="pago_factura",
+                documento_id__in=[p.id for p in pagos],
+                evento="cobro",
+            ).count(),
+            2,
+        )
 
     def test_editar_pago_anterior_recontabiliza_todos_los_pagos(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
