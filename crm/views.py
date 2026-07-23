@@ -105,7 +105,10 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     citas = list(
         CitaCliente.objects.filter(
             empresa=empresa, fecha_hora__date__gte=inicio, fecha_hora__date__lte=fin
-        ).select_related("cliente", "producto", "paciente", "servicio_clinico", "profesional_salud").order_by("fecha_hora")
+        )
+        .select_related("cliente", "producto", "paciente", "servicio_clinico", "profesional_salud")
+        .prefetch_related("fotos_cirugia")
+        .order_by("fecha_hora")
     )
     por_fecha = {}
     for cita in citas:

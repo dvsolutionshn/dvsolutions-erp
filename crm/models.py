@@ -319,6 +319,11 @@ class CitaCirugiaFoto(models.Model):
     def __str__(self):
         return f"{self.cita.display_cliente} - foto cirugia"
 
+    @property
+    def es_video(self):
+        nombre = (self.imagen.name or "").lower()
+        return nombre.endswith((".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"))
+
 
 class NotificacionCitaWhatsApp(models.Model):
     TIPO_CONFIRMACION = "confirmacion"
