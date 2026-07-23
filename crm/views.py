@@ -235,10 +235,11 @@ def _sincronizar_cita_clinica(cita):
 
 
 def _guardar_fotos_cirugia_cita(cita, archivos, usuario):
-    if cita.empresa.slug != "serviciosmedicos" or not archivos:
+    if cita.empresa.slug not in CitaClienteForm.EMPRESAS_CIRUGIA_EXTENDIDA or not archivos:
         return
     for archivo in archivos:
-        if not (getattr(archivo, "content_type", "") or "").startswith("image/"):
+        content_type = (getattr(archivo, "content_type", "") or "").lower()
+        if not (content_type.startswith("image/") or content_type.startswith("video/")):
             continue
         CitaCirugiaFoto.objects.create(
             cita=cita,

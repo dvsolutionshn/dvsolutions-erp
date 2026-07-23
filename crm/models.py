@@ -306,7 +306,7 @@ class CitaCliente(models.Model):
 class CitaCirugiaFoto(models.Model):
     cita = models.ForeignKey(CitaCliente, on_delete=models.CASCADE, related_name="fotos_cirugia")
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="fotos_cirugia_citas")
-    imagen = models.ImageField(upload_to="crm/citas/cirugias/")
+    imagen = models.FileField(upload_to="crm/citas/cirugias/")
     descripcion = models.CharField(max_length=180, blank=True, null=True)
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)

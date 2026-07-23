@@ -160,10 +160,10 @@ class CitaClienteForm(forms.ModelForm):
         choices=(("AM", "AM"), ("PM", "PM")),
     )
     fotos_cirugia = MultipleFileField(
-        label="Fotos para la cirugia",
+        label="Fotos o videos para la cirugia",
         required=False,
-        widget=MultipleFileInput(attrs={"accept": "image/*", "multiple": True}),
-        help_text="Adjunta fotos de referencia o del caso al momento de programar la cirugia.",
+        widget=MultipleFileInput(attrs={"accept": "image/*,video/*", "multiple": True}),
+        help_text="Adjunta fotos o videos de referencia al momento de programar la cirugia.",
     )
 
     class Meta:
