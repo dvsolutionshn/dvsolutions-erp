@@ -140,6 +140,7 @@ class CRMTests(TestCase):
         self.assertContains(response, "Instalar en Android")
         self.assertContains(response, "iPhone / iPad")
         self.assertContains(response, "mobile-view-switch")
+        self.assertContains(response, "data-day-strip-swipe")
         self.assertContains(response, "vista=semana")
         self.assertContains(response, "vista=mes")
         self.assertContains(response, "vista=anio")
