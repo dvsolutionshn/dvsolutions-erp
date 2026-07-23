@@ -184,6 +184,8 @@ class CitaCliente(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
     pagada = models.BooleanField(default=False)
     observacion = models.TextField(blank=True, null=True)
+    cirugia_detalle = models.TextField(blank=True, null=True)
+    cirugia_fin_estimada = models.DateTimeField(blank=True, null=True)
     enviar_confirmacion_whatsapp = models.BooleanField(default=False)
     recordatorio_semana_whatsapp = models.BooleanField(default=True)
     recordatorio_dia_whatsapp = models.BooleanField(default=True)
@@ -299,6 +301,23 @@ class CitaCliente(models.Model):
             f"para el {timezone.localtime(self.fecha_hora).strftime('%d/%m/%Y %I:%M %p')}."
         )
         return f"https://wa.me/{telefono}?text={quote(mensaje)}" if telefono else ""
+
+
+class CitaCirugiaFoto(models.Model):
+    cita = models.ForeignKey(CitaCliente, on_delete=models.CASCADE, related_name="fotos_cirugia")
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="fotos_cirugia_citas")
+    imagen = models.ImageField(upload_to="crm/citas/cirugias/")
+    descripcion = models.CharField(max_length=180, blank=True, null=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion", "-id"]
+        verbose_name = "Foto de cirugia agendada"
+        verbose_name_plural = "Fotos de cirugias agendadas"
+
+    def __str__(self):
+        return f"{self.cita.display_cliente} - foto cirugia"
 
 
 class NotificacionCitaWhatsApp(models.Model):

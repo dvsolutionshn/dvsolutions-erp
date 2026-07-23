@@ -74,14 +74,14 @@
   <div class="sheet-card">
     <div class="sheet-grip"></div>
     <div class="sheet-head"><div><small>{% if cita_editando %}Editar cita{% else %}Nueva cita{% endif %}</small><h2>{% if cita_editando %}{{ cita_editando.display_cliente }}{% else %}Programar atención{% endif %}</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}{% if cita_editando %}<input type="hidden" name="cita_id" value="{{ cita_editando.id }}">{% endif %}
       <div class="form-grid">
       {% for field in form %}
         {% if field.name == "fecha_cita" %}
-        <div class="field wide"><label>{{ field.label }}</label><div class="datetime">{{ field }}{{ form.hora_cita }}{{ form.periodo_cita }}</div><div class="errors">{{ field.errors }}{{ form.hora_cita.errors }}{{ form.periodo_cita.errors }}</div></div>
+        <div class="field wide" data-field-name="{{ field.name }}"><label>{{ field.label }}</label><div class="datetime">{{ field }}{{ form.hora_cita }}{{ form.periodo_cita }}</div><div class="errors">{{ field.errors }}{{ form.hora_cita.errors }}{{ form.periodo_cita.errors }}</div></div>
         {% elif field.name == "paciente" or field.name == "cliente" %}
-        <div class="field wide">
+        <div class="field wide" data-field-name="{{ field.name }}">
           <label for="mobilePatientSearch">{{ field.label }}</label>
           <div class="mobile-patient-picker" id="mobilePatientPicker" data-search-url="{% if field.name == 'paciente' %}{% url 'agenda_buscar_pacientes' empresa.slug %}{% else %}{% url 'agenda_buscar_clientes' empresa.slug %}{% endif %}">
             <div class="mobile-patient-native">{{ field }}</div>
@@ -98,7 +98,7 @@
           <div class="errors">{{ field.errors }}</div>
         </div>
         {% elif field.name != "hora_cita" and field.name != "periodo_cita" %}
-        <div class="field {% if field.name == 'observacion' %}wide{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.name == "paciente" %}<button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>{% endif %}<div class="errors">{{ field.errors }}</div></div>
+        <div class="field {% if field.name == 'observacion' or field.name == 'cirugia_detalle' or field.name == 'fotos_cirugia' %}wide{% endif %}" data-field-name="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.name == "paciente" %}<button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>{% endif %}<div class="errors">{{ field.errors }}</div></div>
         {% endif %}
       {% endfor %}
       </div>
@@ -106,6 +106,8 @@
     </form>
   </div>
 </section>
+
+{{ servicios_clinicos_meta|json_script:"mobileServicesMeta" }}
 
 {% for cita in citas %}
 <section class="sheet" id="actions-{{ cita.id }}">
@@ -340,5 +342,39 @@
   });
 })();
 </script>
+{% if agenda_cirugia_extendida %}
+<script>
+(function(){
+  const servicesNode = document.getElementById("mobileServicesMeta");
+  const serviceSelect = document.getElementById("id_servicio_clinico");
+  if(!servicesNode || !serviceSelect){ return; }
+  let services = [];
+  try{ services = JSON.parse(servicesNode.textContent || "[]"); }catch(error){ services = []; }
+  const serviceMap = new Map(services.map(item => [String(item.id), item]));
+  const surgeryFields = ["cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia"];
+  function isSurgerySelected(){
+    const item = serviceMap.get(String(serviceSelect.value));
+    if(!item){ return false; }
+    const category = String(item.categoria || "").toLowerCase();
+    const name = String(item.nombre || "").toLowerCase();
+    return category === "cirugia" || name.includes("cirug");
+  }
+  function toggleSurgeryFields(){
+    const show = isSurgerySelected();
+    surgeryFields.forEach(function(name){
+      const field = document.querySelector('[data-field-name="'+name+'"]');
+      if(!field){ return; }
+      field.style.display = show ? "" : "none";
+      field.querySelectorAll("input, textarea, select").forEach(function(input){
+        input.disabled = !show;
+        if(!show && input.type !== "file"){ input.value = ""; }
+      });
+    });
+  }
+  serviceSelect.addEventListener("change", toggleSurgeryFields);
+  toggleSurgeryFields();
+})();
+</script>
+{% endif %}
 </body>
 </html>

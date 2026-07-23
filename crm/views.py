@@ -20,7 +20,7 @@ from facturacion.models import Cliente, Producto
 from clinica.models import CitaClinica, Paciente, PreconsultaClinica
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCirugiaFoto, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
 from .appointment_notifications import procesar_notificacion, programar_notificaciones_cita
 from .models import NotificacionCitaWhatsApp
 from .services import (
@@ -170,6 +170,12 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
             ).first()
         except (TypeError, ValueError):
             cliente_busqueda_inicial = None
+    servicios_clinicos_meta = []
+    if es_clinica and "servicio_clinico" in form.fields:
+        servicios_clinicos_meta = [
+            {"id": servicio.id, "nombre": servicio.nombre, "categoria": servicio.categoria}
+            for servicio in form.fields["servicio_clinico"].queryset
+        ]
 
     return {
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
@@ -185,6 +191,8 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "cliente_busqueda_inicial": cliente_busqueda_inicial,
         "clientes_busqueda": clientes_busqueda,
         "agenda_contactos_busqueda": pacientes_busqueda if es_clinica else clientes_busqueda,
+        "agenda_cirugia_extendida": empresa.slug in CitaClienteForm.EMPRESAS_CIRUGIA_EXTENDIDA,
+        "servicios_clinicos_meta": servicios_clinicos_meta,
     }
 
 
@@ -195,6 +203,16 @@ def _sincronizar_cita_clinica(cita):
         "pendiente": "solicitada", "confirmada": "confirmada",
         "realizada": "completada", "cancelada": "cancelada",
     }
+    detalle_cirugia = ""
+    if cita.cirugia_detalle:
+        detalle_cirugia = f"Detalle de cirugia: {cita.cirugia_detalle}"
+        if cita.cirugia_fin_estimada:
+            detalle_cirugia = (
+                f"{detalle_cirugia}\nFin estimado: "
+                f"{timezone.localtime(cita.cirugia_fin_estimada):%d/%m/%Y %I:%M %p} "
+                "(incluye bloqueo de recuperacion de 1 hora)."
+            )
+    observaciones = "\n".join(parte for parte in [detalle_cirugia, cita.observacion or ""] if parte).strip()
     valores = {
         "empresa": cita.empresa,
         "paciente": cita.paciente,
@@ -204,8 +222,8 @@ def _sincronizar_cita_clinica(cita):
         "estado": estados.get(cita.estado, "solicitada"),
         "pagada": cita.pagada,
         "canal": "recepcion",
-        "motivo": cita.observacion or cita.titulo,
-        "observaciones": cita.observacion,
+        "motivo": cita.cirugia_detalle or cita.observacion or cita.titulo,
+        "observaciones": observaciones,
     }
     if cita.cita_clinica_id:
         for campo, valor in valores.items():
@@ -214,6 +232,20 @@ def _sincronizar_cita_clinica(cita):
     else:
         cita.cita_clinica = CitaClinica.objects.create(**valores)
         cita.save(update_fields=["cita_clinica"])
+
+
+def _guardar_fotos_cirugia_cita(cita, archivos, usuario):
+    if cita.empresa.slug != "serviciosmedicos" or not archivos:
+        return
+    for archivo in archivos:
+        if not (getattr(archivo, "content_type", "") or "").startswith("image/"):
+            continue
+        CitaCirugiaFoto.objects.create(
+            cita=cita,
+            empresa=cita.empresa,
+            imagen=archivo,
+            creado_por=usuario,
+        )
 
 
 def _programar_whatsapp_cita(request, cita):
@@ -628,7 +660,7 @@ def citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
@@ -637,6 +669,7 @@ def citas(request, empresa_slug):
             cita.recordatorio_semana_whatsapp = True
             cita.recordatorio_dia_whatsapp = True
         cita.save()
+        _guardar_fotos_cirugia_cita(cita, form.cleaned_data.get("fotos_cirugia"), request.user)
         _sincronizar_cita_clinica(cita)
         _programar_whatsapp_cita(request, cita)
         messages.success(request, "Cita guardada correctamente.")
@@ -650,7 +683,7 @@ def agenda_citas(request, empresa_slug):
     _asegurar_pacientes_hospital_mia(empresa)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
@@ -659,6 +692,7 @@ def agenda_citas(request, empresa_slug):
             cita.recordatorio_semana_whatsapp = True
             cita.recordatorio_dia_whatsapp = True
         cita.save()
+        _guardar_fotos_cirugia_cita(cita, form.cleaned_data.get("fotos_cirugia"), request.user)
         _sincronizar_cita_clinica(cita)
         _programar_whatsapp_cita(request, cita)
         messages.success(request, "Cita actualizada correctamente." if objeto else "Cita guardada correctamente.")
@@ -673,7 +707,7 @@ def agenda_mobile(request, empresa_slug):
         return acceso_denegado
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, empresa=empresa, instance=objeto)
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
@@ -682,6 +716,7 @@ def agenda_mobile(request, empresa_slug):
             cita.recordatorio_semana_whatsapp = True
             cita.recordatorio_dia_whatsapp = True
         cita.save()
+        _guardar_fotos_cirugia_cita(cita, form.cleaned_data.get("fotos_cirugia"), request.user)
         _sincronizar_cita_clinica(cita)
         _programar_whatsapp_cita(request, cita)
         messages.success(request, "Cita actualizada correctamente." if objeto else "Cita creada correctamente.")

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django import forms
 from django.utils import timezone
@@ -7,6 +7,23 @@ from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
 
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, PlantillaMensaje
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        if not isinstance(data, (list, tuple)):
+            data = [data]
+        return [super(MultipleFileField, self).clean(item, initial) for item in data if item]
 
 
 class ConfiguracionCRMForm(forms.ModelForm):
@@ -117,6 +134,7 @@ class CampaniaMarketingForm(forms.ModelForm):
 
 class CitaClienteForm(forms.ModelForm):
     EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
+    EMPRESAS_CIRUGIA_EXTENDIDA = {"serviciosmedicos"}
 
     HORAS_12 = [
         (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
@@ -135,12 +153,26 @@ class CitaClienteForm(forms.ModelForm):
         required=False,
         choices=(("AM", "AM"), ("PM", "PM")),
     )
+    cirugia_hora_fin = forms.ChoiceField(label="Hora final estimada", required=False, choices=HORAS_12)
+    cirugia_periodo_fin = forms.ChoiceField(
+        label="AM / PM final",
+        required=False,
+        choices=(("AM", "AM"), ("PM", "PM")),
+    )
+    fotos_cirugia = MultipleFileField(
+        label="Fotos para la cirugia",
+        required=False,
+        widget=MultipleFileInput(attrs={"accept": "image/*", "multiple": True}),
+        help_text="Adjunta fotos de referencia o del caso al momento de programar la cirugia.",
+    )
 
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+            "cirugia_detalle": forms.Textarea(attrs={"rows": 3, "placeholder": "Ejemplo: Abdominoplastia con liposuccion, zona a operar, preparacion especial o detalle clinico."}),
+            "cirugia_fin_estimada": forms.HiddenInput(),
             "observacion": forms.Textarea(attrs={"rows": 3}),
         }
 
@@ -150,6 +182,7 @@ class CitaClienteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
         self.notificaciones_cita_activas = bool(empresa and empresa.slug in self.EMPRESAS_WHATSAPP_CITAS)
+        self.cirugia_extendida_activa = bool(empresa and empresa.slug in self.EMPRESAS_CIRUGIA_EXTENDIDA)
         if empresa:
             asegurar_profesionales_agenda_base(empresa)
             self.fields["cliente"].queryset = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
@@ -166,6 +199,9 @@ class CitaClienteForm(forms.ModelForm):
         self.fields["producto"].required = False
         self.fields["duracion_minutos"].label = "Duración (minutos)"
         self.fields.pop("fecha_hora")
+        self.fields.pop("cirugia_fin_estimada")
+        self.fields["cirugia_detalle"].label = "Tipo / detalle de cirugia"
+        self.fields["cirugia_detalle"].required = False
         if self.instance and self.instance.pk and self.instance.fecha_hora:
             fecha_local = timezone.localtime(self.instance.fecha_hora)
             hora_12 = fecha_local.hour % 12 or 12
@@ -180,6 +216,22 @@ class CitaClienteForm(forms.ModelForm):
                 "hora_cita": valor_hora,
                 "periodo_cita": "PM" if fecha_local.hour >= 12 else "AM",
             })
+        if self.instance and self.instance.pk and self.instance.cirugia_fin_estimada:
+            fin_local = timezone.localtime(self.instance.cirugia_fin_estimada)
+            hora_fin_12 = fin_local.hour % 12 or 12
+            valor_hora_fin = f"{hora_fin_12:02d}:{fin_local.minute:02d}"
+            if valor_hora_fin not in dict(self.HORAS_12):
+                self.fields["cirugia_hora_fin"].choices = [
+                    *self.HORAS_12,
+                    (valor_hora_fin, valor_hora_fin),
+                ]
+            self.initial.update({
+                "cirugia_hora_fin": valor_hora_fin,
+                "cirugia_periodo_fin": "PM" if fin_local.hour >= 12 else "AM",
+            })
+        if not self.cirugia_extendida_activa:
+            for nombre in ["cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia"]:
+                self.fields.pop(nombre, None)
         if self.es_clinica:
             for nombre in ["cliente", "producto", "titulo", "responsable", "duracion_minutos"]:
                 self.fields.pop(nombre)
@@ -201,12 +253,55 @@ class CitaClienteForm(forms.ModelForm):
             if not self.notificaciones_cita_activas:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
         else:
-            for nombre in ["paciente", "servicio_clinico", "profesional_salud", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
-                self.fields.pop(nombre)
+            for nombre in ["paciente", "servicio_clinico", "profesional_salud", "cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
+                self.fields.pop(nombre, None)
             self.fields["pagada"].label = "Cita pagada"
             self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "duracion_minutos", "responsable", "estado", "pagada", "observacion"])
+
+    def _armar_fecha_hora(self, fecha, hora_texto, periodo):
+        hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
+        hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
+        fecha_hora = datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto)
+        return timezone.make_aware(fecha_hora)
+
+    def _servicio_es_cirugia(self, servicio):
+        if not servicio:
+            return False
+        categoria = (getattr(servicio, "categoria", "") or "").lower()
+        nombre = (getattr(servicio, "nombre", "") or "").lower()
+        return categoria == "cirugia" or "cirug" in nombre
+
+    def _rango_bloqueado_cita(self, cita):
+        inicio = cita.fecha_hora
+        if self.cirugia_extendida_activa and self._servicio_es_cirugia(cita.servicio_clinico) and cita.cirugia_fin_estimada:
+            return inicio, cita.cirugia_fin_estimada + timedelta(hours=1)
+        minutos = cita.duracion_minutos or getattr(cita.servicio_clinico, "duracion_minutos", None) or 30
+        return inicio, inicio + timedelta(minutes=minutos)
+
+    def _validar_traslapes_serviciosmedicos(self, inicio, fin_bloque):
+        if not self.cirugia_extendida_activa or not self.empresa:
+            return
+        citas = (
+            CitaCliente.objects.filter(
+                empresa=self.empresa,
+                fecha_hora__date=timezone.localtime(inicio).date(),
+            )
+            .exclude(estado="cancelada")
+            .select_related("servicio_clinico")
+        )
+        if self.instance and self.instance.pk:
+            citas = citas.exclude(pk=self.instance.pk)
+        for cita in citas:
+            cita_inicio, cita_fin = self._rango_bloqueado_cita(cita)
+            if inicio < cita_fin and fin_bloque > cita_inicio:
+                inicio_local = timezone.localtime(cita_inicio).strftime("%I:%M %p")
+                fin_local = timezone.localtime(cita_fin).strftime("%I:%M %p")
+                raise forms.ValidationError(
+                    f"Ese horario se cruza con {cita.display_servicio} de {cita.display_cliente}, "
+                    f"bloqueado de {inicio_local} a {fin_local}."
+                )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -219,7 +314,8 @@ class CitaClienteForm(forms.ModelForm):
         if not all((fecha, hora_texto, periodo)) and fecha_hora_anterior:
             try:
                 fecha_hora = datetime.strptime(fecha_hora_anterior, "%Y-%m-%dT%H:%M")
-                cleaned_data["fecha_hora_compuesta"] = timezone.make_aware(fecha_hora)
+                inicio = timezone.make_aware(fecha_hora)
+                cleaned_data["fecha_hora_compuesta"] = inicio
                 return cleaned_data
             except ValueError:
                 pass
@@ -233,15 +329,39 @@ class CitaClienteForm(forms.ModelForm):
         if not all((fecha, hora_texto, periodo)):
             return cleaned_data
 
-        hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
-        hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
-        fecha_hora = datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto)
-        cleaned_data["fecha_hora_compuesta"] = timezone.make_aware(fecha_hora)
+        inicio = self._armar_fecha_hora(fecha, hora_texto, periodo)
+        cleaned_data["fecha_hora_compuesta"] = inicio
+        servicio = cleaned_data.get("servicio_clinico")
+        fin_bloque = inicio + timedelta(minutes=(getattr(servicio, "duracion_minutos", None) or cleaned_data.get("duracion_minutos") or 30))
+
+        if self.cirugia_extendida_activa and self._servicio_es_cirugia(servicio):
+            if not (cleaned_data.get("cirugia_detalle") or "").strip():
+                self.add_error("cirugia_detalle", "Describe el tipo de cirugia o el procedimiento.")
+            hora_fin = cleaned_data.get("cirugia_hora_fin")
+            periodo_fin = cleaned_data.get("cirugia_periodo_fin")
+            if not hora_fin:
+                self.add_error("cirugia_hora_fin", "Selecciona la hora final estimada.")
+            if not periodo_fin:
+                self.add_error("cirugia_periodo_fin", "Selecciona AM o PM.")
+            if hora_fin and periodo_fin:
+                fin_estimada = self._armar_fecha_hora(fecha, hora_fin, periodo_fin)
+                if fin_estimada <= inicio:
+                    self.add_error("cirugia_hora_fin", "La hora final debe ser posterior a la hora de inicio.")
+                else:
+                    cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada
+                    fin_bloque = fin_estimada + timedelta(hours=1)
+        else:
+            cleaned_data["cirugia_detalle"] = ""
+            cleaned_data["cirugia_fin_estimada_compuesta"] = None
+
+        if not self.errors:
+            self._validar_traslapes_serviciosmedicos(inicio, fin_bloque)
         return cleaned_data
 
     def save(self, commit=True):
         cita = super().save(commit=False)
         cita.fecha_hora = self.cleaned_data["fecha_hora_compuesta"]
+        cita.cirugia_fin_estimada = self.cleaned_data.get("cirugia_fin_estimada_compuesta")
         if self.es_clinica:
             cita.titulo = cita.servicio_clinico.nombre
             cita.responsable = cita.profesional_salud.nombre
