@@ -15,6 +15,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from facturacion.models import Cliente
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
+from .forms import CitaClienteForm
 from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, PlantillaMensaje
 from .services import enviar_plantilla_cita_whatsapp, subir_media_whatsapp
 from .tokens import generar_token_respuesta_cita
@@ -799,6 +800,47 @@ class CRMTests(TestCase):
         self.assertTrue(CitaCliente.objects.filter(empresa=self.empresa, paciente=paciente).exists())
         cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
         self.assertIsNotNone(cita.cita_clinica_id)
+
+    def test_traslape_de_horario_solo_bloquea_mismo_profesional(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-DR", nombre="Paciente Agenda")
+        paciente_2 = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-DR2", nombre="Paciente Agenda Dos")
+        servicio = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta General", duracion_minutos=60)
+        dr_luis = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dr Luis Gonzales")
+        dra_candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra Candy Luque")
+        fecha_hora = timezone.make_aware(datetime(2026, 7, 22, 16, 0))
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=dr_luis,
+            titulo=servicio.nombre,
+            responsable=dr_luis.nombre,
+            fecha_hora=fecha_hora,
+            duracion_minutos=60,
+        )
+
+        base_data = {
+            "paciente": paciente_2.id,
+            "servicio_clinico": servicio.id,
+            "fecha_cita": "2026-07-22",
+            "hora_cita": "04:00",
+            "periodo_cita": "PM",
+            "estado": "pendiente",
+        }
+        distinta_doctora = CitaClienteForm(
+            {**base_data, "profesional_salud": dra_candy.id},
+            empresa=self.empresa,
+        )
+        mismo_doctor = CitaClienteForm(
+            {**base_data, "profesional_salud": dr_luis.id},
+            empresa=self.empresa,
+        )
+
+        self.assertTrue(distinta_doctora.is_valid(), distinta_doctora.errors.as_text())
+        self.assertFalse(mismo_doctor.is_valid())
+        self.assertIn("Ese horario se cruza", mismo_doctor.errors.as_text())
 
     @patch("crm.views.enviar_plantilla_cita_whatsapp")
     def test_modal_cita_permite_cancelar_y_reagendar_con_whatsapp(self, mock_whatsapp):

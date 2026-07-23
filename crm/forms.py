@@ -280,7 +280,7 @@ class CitaClienteForm(forms.ModelForm):
         minutos = cita.duracion_minutos or getattr(cita.servicio_clinico, "duracion_minutos", None) or 30
         return inicio, inicio + timedelta(minutes=minutos)
 
-    def _validar_traslapes_serviciosmedicos(self, inicio, fin_bloque):
+    def _validar_traslapes_serviciosmedicos(self, inicio, fin_bloque, profesional=None):
         if not self.cirugia_extendida_activa or not self.empresa:
             return
         citas = (
@@ -291,6 +291,8 @@ class CitaClienteForm(forms.ModelForm):
             .exclude(estado="cancelada")
             .select_related("servicio_clinico")
         )
+        if profesional:
+            citas = citas.filter(profesional_salud=profesional)
         if self.instance and self.instance.pk:
             citas = citas.exclude(pk=self.instance.pk)
         for cita in citas:
@@ -332,6 +334,7 @@ class CitaClienteForm(forms.ModelForm):
         inicio = self._armar_fecha_hora(fecha, hora_texto, periodo)
         cleaned_data["fecha_hora_compuesta"] = inicio
         servicio = cleaned_data.get("servicio_clinico")
+        profesional = cleaned_data.get("profesional_salud")
         fin_bloque = inicio + timedelta(minutes=(getattr(servicio, "duracion_minutos", None) or cleaned_data.get("duracion_minutos") or 30))
 
         if self.cirugia_extendida_activa and self._servicio_es_cirugia(servicio):
@@ -355,7 +358,7 @@ class CitaClienteForm(forms.ModelForm):
             cleaned_data["cirugia_fin_estimada_compuesta"] = None
 
         if not self.errors:
-            self._validar_traslapes_serviciosmedicos(inicio, fin_bloque)
+            self._validar_traslapes_serviciosmedicos(inicio, fin_bloque, profesional)
         return cleaned_data
 
     def save(self, commit=True):
