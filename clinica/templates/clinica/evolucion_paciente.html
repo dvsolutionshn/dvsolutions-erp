@@ -48,6 +48,45 @@
 
 <section class="evo-layout">
     <div>
+        {% if preoperatorios %}
+        <article class="evo-section">
+            <div class="evo-heading">
+                <div>
+                    <div class="erp-kpi-label">Antes de operacion</div>
+                    <h3>Fotos y videos preoperatorios</h3>
+                    <p>Archivos cargados desde la agenda al momento de programar una cirugia.</p>
+                </div>
+                <a class="erp-action-link" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Agregar archivo</a>
+            </div>
+            <div class="evo-grid">
+                {% for registro in preoperatorios %}
+                <article class="evo-card">
+                    {% if registro.video %}
+                    <button type="button" data-evo-open data-evo-kind="video" data-evo-src="{{ registro.video.url }}" data-evo-title="{{ registro.titulo }}" data-evo-meta="{{ registro.get_tipo_display }} · {{ registro.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ registro.descripcion|default:'' }}">
+                        <div class="evo-media">
+                            <span class="evo-chip">Antes de operacion</span>
+                            <video muted preload="metadata" src="{{ registro.video.url }}"></video>
+                            <span class="evo-play">▶</span>
+                        </div>
+                    {% else %}
+                    <button type="button" data-evo-open data-evo-kind="image" data-evo-src="{{ registro.imagen.url }}" data-evo-title="{{ registro.titulo }}" data-evo-meta="{{ registro.get_tipo_display }} · {{ registro.fecha|date:'d/m/Y H:i' }}" data-evo-description="{{ registro.descripcion|default:'' }}">
+                        <div class="evo-media">
+                            <span class="evo-chip">Antes de operacion</span>
+                            <img src="{{ registro.imagen.url }}" alt="{{ registro.titulo }}">
+                        </div>
+                    {% endif %}
+                        <div class="evo-card-body">
+                            <strong>{{ registro.titulo }}</strong>
+                            <span>{{ registro.fecha|date:"d/m/Y H:i" }}</span>
+                            {% if registro.descripcion %}<span>{{ registro.descripcion }}</span>{% endif %}
+                        </div>
+                    </button>
+                </article>
+                {% endfor %}
+            </div>
+        </article>
+        {% endif %}
+
         <article class="evo-section">
             <div class="evo-heading">
                 <div>

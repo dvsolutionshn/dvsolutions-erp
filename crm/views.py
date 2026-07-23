@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 
 from core.models import Empresa
 from facturacion.models import Cliente, Producto
-from clinica.models import CitaClinica, Paciente, PreconsultaClinica
+from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
 from .models import CampaniaMarketing, CitaCirugiaFoto, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
@@ -239,14 +239,38 @@ def _guardar_fotos_cirugia_cita(cita, archivos, usuario):
         return
     for archivo in archivos:
         content_type = (getattr(archivo, "content_type", "") or "").lower()
-        if not (content_type.startswith("image/") or content_type.startswith("video/")):
+        nombre_archivo = (getattr(archivo, "name", "") or "").lower()
+        es_video = content_type.startswith("video/") or nombre_archivo.endswith((".mp4", ".mov", ".webm", ".m4v"))
+        es_imagen = content_type.startswith("image/") or nombre_archivo.endswith((".jpg", ".jpeg", ".png", ".webp", ".heic"))
+        if not (es_imagen or es_video):
             continue
-        CitaCirugiaFoto.objects.create(
+        adjunto = CitaCirugiaFoto.objects.create(
             cita=cita,
             empresa=cita.empresa,
             imagen=archivo,
             creado_por=usuario,
         )
+        if cita.paciente_id:
+            descripcion = (
+                f"Archivo cargado al programar cirugia el "
+                f"{timezone.localtime(cita.fecha_hora):%d/%m/%Y %I:%M %p}."
+            )
+            if cita.cirugia_detalle:
+                descripcion = f"{descripcion}\nDetalle: {cita.cirugia_detalle}"
+            datos_evolucion = {
+                "empresa": cita.empresa,
+                "paciente": cita.paciente,
+                "tipo": "preoperatorio",
+                "titulo": f"{'Video' if es_video else 'Foto'} antes de operacion - {cita.display_servicio}",
+                "descripcion": descripcion,
+                "fecha": timezone.now(),
+                "creado_por": usuario,
+            }
+            if es_video:
+                datos_evolucion["video"] = adjunto.imagen.name
+            else:
+                datos_evolucion["imagen"] = adjunto.imagen.name
+            PacienteFotoEvolucion.objects.create(**datos_evolucion)
 
 
 def _programar_whatsapp_cita(request, cita):

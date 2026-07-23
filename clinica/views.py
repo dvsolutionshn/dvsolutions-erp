@@ -1058,6 +1058,7 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
     )
     fotos = [registro for registro in registros if registro.imagen]
     videos = [registro for registro in registros if registro.video]
+    preoperatorios = [registro for registro in registros if registro.tipo == "preoperatorio"]
     resumen = {
         "total": len(registros),
         "fotos": len(fotos),
@@ -1073,6 +1074,7 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
             "registros": registros,
             "fotos": fotos,
             "videos": videos,
+            "preoperatorios": preoperatorios,
             "resumen": resumen,
         },
     )

@@ -76,6 +76,16 @@
     <div class="sheet-head"><div><small>{% if cita_editando %}Editar cita{% else %}Nueva cita{% endif %}</small><h2>{% if cita_editando %}{{ cita_editando.display_cliente }}{% else %}Programar atención{% endif %}</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}{% if cita_editando %}<input type="hidden" name="cita_id" value="{{ cita_editando.id }}">{% endif %}
+      {% if form.errors %}
+      <div class="errors" style="padding:12px;border:1px solid #fecaca;border-radius:16px;background:#fff7f7;color:#991b1b">
+        <strong>No se pudo guardar la cita.</strong>
+        <div>Revise los campos marcados. Si adjuntó fotos o videos, seleccione los archivos nuevamente antes de guardar.</div>
+        <ul style="margin:8px 0 0;padding-left:18px">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+          {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
       <div class="form-grid">
       {% for field in form %}
         {% if field.name == "fecha_cita" %}

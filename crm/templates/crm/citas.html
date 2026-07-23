@@ -473,6 +473,16 @@
     <form method="post" enctype="multipart/form-data" class="erp-form-shell" style="margin-top:18px">
       {% csrf_token %}
       {% if cita_editando %}<input type="hidden" name="cita_id" value="{{ cita_editando.id }}">{% endif %}
+      {% if form.errors %}
+      <div class="erp-soft-panel" style="margin-bottom:14px;border-color:#fecaca;background:#fff7f7;color:#991b1b">
+        <strong>No se pudo guardar la cita.</strong>
+        <div class="erp-field-help" style="color:#991b1b;margin-top:4px">Revise los campos marcados abajo. Si adjuntó fotos o videos, seleccione los archivos nuevamente antes de guardar.</div>
+        <ul style="margin:8px 0 0;padding-left:18px">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+          {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
       <div class="erp-form-grid two">
         {% for field in form %}
           {% if field.name == "fecha_cita" %}
