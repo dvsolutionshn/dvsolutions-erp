@@ -62,6 +62,53 @@
   border-radius:18px;
   background:rgba(255,255,255,.62);
 }
+.calendar-filter-bar{
+  display:grid;
+  grid-template-columns:minmax(150px,.75fr) minmax(190px,1fr) minmax(190px,1fr) auto auto;
+  gap:10px;
+  align-items:end;
+  margin-top:14px;
+  padding:12px;
+  border:1px solid rgba(199,218,234,.86);
+  border-radius:20px;
+  background:linear-gradient(135deg,rgba(255,255,255,.86),rgba(242,249,255,.72));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 14px 34px rgba(18,42,64,.05);
+}
+.calendar-filter-bar label{display:grid;gap:6px;min-width:0}
+.calendar-filter-bar label span{
+  color:#617487;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.calendar-filter-bar input,.calendar-filter-bar select{
+  width:100%;
+  min-height:42px;
+  border:1px solid #bfd2e2;
+  border-radius:13px;
+  background:#fff;
+  padding:0 12px;
+  color:#20364b;
+  font-size:12px;
+  font-weight:800;
+}
+.calendar-filter-apply,.calendar-filter-clear{
+  min-height:42px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:0;
+  border-radius:13px;
+  padding:0 15px;
+  font-size:11px;
+  font-weight:900;
+  text-decoration:none;
+  white-space:nowrap;
+}
+.calendar-filter-apply{background:linear-gradient(135deg,#14b8a6,#2563eb);color:#fff;box-shadow:0 14px 28px rgba(37,99,235,.16)}
+.calendar-filter-clear{border:1px solid #c9d8e5;background:#fff;color:#526477}
+.calendar-swipe-hint{grid-column:1/-1;color:#6c8092;font-size:10px}
 .calendar-legend-item{
   min-height:30px;
   border-color:rgba(205,220,233,.8);
@@ -347,24 +394,58 @@
 @media(max-width:900px){
   .appointment-table td:last-child{min-width:250px}
   .appointment-manage{width:100%}
+  .calendar-filter-bar{grid-template-columns:1fr}
+  .calendar-filter-apply,.calendar-filter-clear{width:100%}
 }
 </style>
 
-<div class="calendar-shell">
+<div class="calendar-shell" data-calendar-swipe data-prev-url="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}" data-next-url="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}">
   <section class="erp-card">
     <div class="calendar-toolbar">
       <div class="calendar-nav">
-        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}">‹ Anterior</a>
-        <a class="calendar-chip" href="?vista={{ vista }}&fecha={% now 'Y-m-d' %}">Hoy</a>
-        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}">Siguiente ›</a>
+        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}">‹ Anterior</a>
+        <a class="calendar-chip" href="?vista={{ vista }}&fecha={% now 'Y-m-d' %}{{ filtros_query }}">Hoy</a>
+        <a class="calendar-chip" href="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}">Siguiente ›</a>
       </div>
       <div class="calendar-period"><h2>{{ titulo_periodo|title }}</h2></div>
       <div class="calendar-views">
-        <a class="calendar-chip {% if vista == 'mes' %}active{% endif %}" href="?vista=mes&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Mes</a>
-        <a class="calendar-chip {% if vista == 'semana' %}active{% endif %}" href="?vista=semana&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Semana</a>
-        <a class="calendar-chip {% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Día</a>
+        <a class="calendar-chip {% if vista == 'mes' %}active{% endif %}" href="?vista=mes&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Mes</a>
+        <a class="calendar-chip {% if vista == 'semana' %}active{% endif %}" href="?vista=semana&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Semana</a>
+        <a class="calendar-chip {% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Día</a>
       </div>
     </div>
+    {% if es_clinica %}
+    <form class="calendar-filter-bar" method="get">
+      <input type="hidden" name="vista" value="{{ vista }}">
+      <label>
+        <span>Día / fecha</span>
+        <input type="date" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+      </label>
+      <label>
+        <span>Tipo de consulta</span>
+        <select name="servicio">
+          <option value="">Todas las consultas</option>
+          {% for servicio in servicios_filtro %}
+          <option value="{{ servicio.id }}" {% if filtro_servicio == servicio.id|stringformat:"s" %}selected{% endif %}>{{ servicio.nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Doctor / profesional</span>
+        <select name="profesional">
+          <option value="">Todos los profesionales</option>
+          {% for profesional in profesionales_filtro %}
+          <option value="{{ profesional.id }}" {% if filtro_profesional == profesional.id|stringformat:"s" %}selected{% endif %}>{{ profesional.nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="calendar-filter-apply" type="submit">Filtrar agenda</button>
+      {% if filtros_activos %}
+      <a class="calendar-filter-clear" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Limpiar filtros</a>
+      {% endif %}
+      <div class="calendar-swipe-hint">Tip: desliza el calendario a la izquierda o derecha para cambiar de período.</div>
+    </form>
+    {% endif %}
     {% if es_clinica %}
     <div class="calendar-legend">
       <span class="calendar-legend-title">Color principal por tipo de consulta</span>
@@ -784,6 +865,31 @@
   document.addEventListener("keydown", function(event){
     if(event.key === "Escape" && modal.classList.contains("is-open")){ closeModal(); }
   });
+
+  const swipeArea = document.querySelector("[data-calendar-swipe]");
+  if(swipeArea){
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    const interactiveSelector = "a,button,input,select,textarea,summary,form,[role='button']";
+    swipeArea.addEventListener("touchstart", function(event){
+      if(event.target.closest(interactiveSelector) || !event.touches.length){ return; }
+      startX = event.touches[0].clientX;
+      startY = event.touches[0].clientY;
+      tracking = true;
+    }, {passive:true});
+    swipeArea.addEventListener("touchend", function(event){
+      if(!tracking || !event.changedTouches.length){ return; }
+      tracking = false;
+      const endX = event.changedTouches[0].clientX;
+      const endY = event.changedTouches[0].clientY;
+      const diffX = endX - startX;
+      const diffY = endY - startY;
+      if(Math.abs(diffX) < 70 || Math.abs(diffX) < Math.abs(diffY) * 1.25){ return; }
+      const url = diffX < 0 ? swipeArea.dataset.nextUrl : swipeArea.dataset.prevUrl;
+      if(url){ window.location.href = url; }
+    }, {passive:true});
+  }
 })();
 </script>
 {% if es_clinica %}

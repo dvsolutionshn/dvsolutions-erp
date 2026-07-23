@@ -85,6 +85,8 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     if vista not in {"mes", "semana", "dia"}:
         vista = "mes"
     seleccionada = _fecha_agenda(request.GET.get("fecha"))
+    filtro_servicio = (request.GET.get("servicio") or "").strip()
+    filtro_profesional = (request.GET.get("profesional") or "").strip()
     if vista == "mes":
         inicio = seleccionada.replace(day=1)
         fin = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
@@ -102,7 +104,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         anterior, siguiente = seleccionada - timedelta(days=1), seleccionada + timedelta(days=1)
         titulo_periodo = seleccionada.strftime("%d/%m/%Y")
 
-    citas = list(
+    citas_qs = (
         CitaCliente.objects.filter(
             empresa=empresa, fecha_hora__date__gte=inicio, fecha_hora__date__lte=fin
         )
@@ -110,6 +112,28 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         .prefetch_related("fotos_cirugia")
         .order_by("fecha_hora")
     )
+    if filtro_servicio:
+        try:
+            citas_qs = citas_qs.filter(servicio_clinico_id=int(filtro_servicio))
+        except (TypeError, ValueError):
+            filtro_servicio = ""
+    if filtro_profesional:
+        try:
+            citas_qs = citas_qs.filter(profesional_salud_id=int(filtro_profesional))
+        except (TypeError, ValueError):
+            filtro_profesional = ""
+    citas = list(citas_qs)
+
+    filtros_query = urlencode({
+        clave: valor
+        for clave, valor in {
+            "servicio": filtro_servicio,
+            "profesional": filtro_profesional,
+        }.items()
+        if valor
+    })
+    filtros_query = f"&{filtros_query}" if filtros_query else ""
+    filtros_activos = bool(filtro_servicio or filtro_profesional)
     por_fecha = {}
     for cita in citas:
         clave = timezone.localtime(cita.fecha_hora).date()
@@ -174,11 +198,16 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         except (TypeError, ValueError):
             cliente_busqueda_inicial = None
     servicios_clinicos_meta = []
+    servicios_filtro = []
+    profesionales_filtro = []
     if es_clinica and "servicio_clinico" in form.fields:
+        servicios_filtro = list(form.fields["servicio_clinico"].queryset)
         servicios_clinicos_meta = [
             {"id": servicio.id, "nombre": servicio.nombre, "categoria": servicio.categoria}
-            for servicio in form.fields["servicio_clinico"].queryset
+            for servicio in servicios_filtro
         ]
+    if es_clinica and "profesional_salud" in form.fields:
+        profesionales_filtro = list(form.fields["profesional_salud"].queryset)
 
     return {
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
@@ -196,6 +225,12 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "agenda_contactos_busqueda": pacientes_busqueda if es_clinica else clientes_busqueda,
         "agenda_cirugia_extendida": empresa.slug in CitaClienteForm.EMPRESAS_CIRUGIA_EXTENDIDA,
         "servicios_clinicos_meta": servicios_clinicos_meta,
+        "servicios_filtro": servicios_filtro,
+        "profesionales_filtro": profesionales_filtro,
+        "filtro_servicio": filtro_servicio,
+        "filtro_profesional": filtro_profesional,
+        "filtros_query": filtros_query,
+        "filtros_activos": filtros_activos,
     }
 
 
@@ -773,6 +808,10 @@ def agenda_mobile(request, empresa_slug):
         fecha_hora__date__gte=inicio_tira,
         fecha_hora__date__lte=fin_tira,
     )
+    if contexto.get("filtro_servicio"):
+        citas_tira = citas_tira.filter(servicio_clinico_id=contexto["filtro_servicio"])
+    if contexto.get("filtro_profesional"):
+        citas_tira = citas_tira.filter(profesional_salud_id=contexto["filtro_profesional"])
     conteos = {
         fila["fecha_hora__date"]: fila["total"]
         for fila in citas_tira.values("fecha_hora__date").annotate(total=Count("id"))

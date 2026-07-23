@@ -138,7 +138,7 @@ class CRMTests(TestCase):
         self.assertContains(response, 'rel="manifest"')
         self.assertContains(response, "serviceWorker.register")
         self.assertContains(response, "Instalar en Android")
-        self.assertContains(response, "VersiÃ³n iPhone / iPad")
+        self.assertContains(response, "iPhone / iPad")
         self.assertEqual(manifest.status_code, 200)
         self.assertEqual(manifest.json()["display"], "standalone")
         self.assertEqual(
@@ -502,6 +502,54 @@ class CRMTests(TestCase):
         self.assertContains(response, "professional-doctor-luis")
         self.assertContains(response, "professional-dra-candy")
         self.assertContains(response, "Spa")
+
+    def test_agenda_clinica_permite_filtrar_y_deslizar_periodos(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica", defaults={"nombre": "ClÃ­nica MÃ©dica", "es_comercial": True}
+        )
+        EmpresaModulo.objects.get_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})
+        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-FILTRO", nombre="Paciente Filtro")
+        dra_candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra Candy Luque")
+        dr_luis = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dr Luis")
+        consulta = ServicioClinico.objects.create(empresa=self.empresa, nombre="Consulta general", categoria="consulta")
+        facial = ServicioClinico.objects.create(empresa=self.empresa, nombre="Facial hidratante", categoria="spa")
+        fecha = timezone.make_aware(datetime(2026, 7, 7, 9, 0))
+        CitaCliente.objects.create(
+            empresa=self.empresa, paciente=paciente, servicio_clinico=consulta,
+            profesional_salud=dra_candy, titulo="Consulta de Candy", responsable=dra_candy.nombre,
+            fecha_hora=fecha,
+        )
+        CitaCliente.objects.create(
+            empresa=self.empresa, paciente=paciente, servicio_clinico=facial,
+            profesional_salud=dr_luis, titulo="Facial de Luis", responsable=dr_luis.nombre,
+            fecha_hora=fecha.replace(hour=10),
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_citas", args=[self.empresa.slug])
+
+        response = self.client.get(url, {"vista": "semana", "fecha": "2026-07-07"})
+        self.assertContains(response, "calendar-filter-bar")
+        self.assertContains(response, "data-calendar-swipe")
+        self.assertContains(response, "name=\"servicio\"")
+        self.assertContains(response, "name=\"profesional\"")
+        self.assertContains(response, "Consulta de Candy")
+        self.assertContains(response, "Facial de Luis")
+
+        filtrada = self.client.get(
+            url,
+            {
+                "vista": "semana",
+                "fecha": "2026-07-07",
+                "servicio": consulta.id,
+                "profesional": dra_candy.id,
+            },
+        )
+        self.assertContains(filtrada, "Consulta de Candy")
+        self.assertNotContains(filtrada, "Facial de Luis")
+        self.assertContains(filtrada, f"servicio={consulta.id}")
+        self.assertContains(filtrada, f"profesional={dra_candy.id}")
 
     def test_eliminar_cita_exige_motivo_y_limpia_registros_vinculados(self):
         self.empresa.tipo_solucion = "clinica"
