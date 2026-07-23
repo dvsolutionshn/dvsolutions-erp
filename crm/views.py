@@ -82,17 +82,23 @@ def _fecha_agenda(valor):
 def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_predeterminada="mes"):
     es_clinica = bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica"))
     vista = request.GET.get("vista", vista_predeterminada)
-    if vista not in {"mes", "semana", "dia"}:
+    if vista not in {"mes", "semana", "dia", "anio"}:
         vista = "mes"
     seleccionada = _fecha_agenda(request.GET.get("fecha"))
     filtro_servicio = (request.GET.get("servicio") or "").strip()
     filtro_profesional = (request.GET.get("profesional") or "").strip()
-    if vista == "mes":
+    meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    if vista == "anio":
+        inicio = date(seleccionada.year, 1, 1)
+        fin = date(seleccionada.year, 12, 31)
+        anterior = date(seleccionada.year - 1, seleccionada.month, min(seleccionada.day, 28))
+        siguiente = date(seleccionada.year + 1, seleccionada.month, min(seleccionada.day, 28))
+        titulo_periodo = str(seleccionada.year)
+    elif vista == "mes":
         inicio = seleccionada.replace(day=1)
         fin = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
         anterior = (inicio - timedelta(days=1)).replace(day=1)
         siguiente = fin + timedelta(days=1)
-        meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
         titulo_periodo = f"{meses[seleccionada.month]} {seleccionada.year}"
     elif vista == "semana":
         inicio = seleccionada - timedelta(days=seleccionada.weekday())
@@ -147,6 +153,20 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
                 {"fecha": dia, "es_mes": dia.month == seleccionada.month, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, [])}
                 for dia in semana
             ])
+    meses_agenda = []
+    if vista == "anio":
+        for numero_mes in range(1, 13):
+            primer_dia = date(seleccionada.year, numero_mes, 1)
+            citas_mes = [
+                cita for cita in citas
+                if timezone.localtime(cita.fecha_hora).date().month == numero_mes
+            ]
+            meses_agenda.append({
+                "fecha": primer_dia,
+                "nombre": meses[numero_mes],
+                "total": len(citas_mes),
+                "citas": citas_mes[:4],
+            })
     dias = [
         {"fecha": dia, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, [])}
         for dia in (inicio + timedelta(days=i) for i in range((fin - inicio).days + 1))
@@ -213,6 +233,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
         "vista": vista, "fecha_seleccionada": seleccionada, "titulo_periodo": titulo_periodo,
         "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
+        "meses_agenda": meses_agenda,
         "cita_editando": getattr(form, "instance", None) if getattr(form, "instance", None) and form.instance.pk else None,
         "estados_cita": CitaCliente.ESTADO_CHOICES,
         "es_clinica": es_clinica,
@@ -784,7 +805,10 @@ def agenda_mobile(request, empresa_slug):
         _programar_whatsapp_cita(request, cita)
         messages.success(request, "Cita actualizada correctamente." if objeto else "Cita creada correctamente.")
         fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
-        return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?fecha={fecha}")
+        vista_regreso = request.GET.get("vista") or request.POST.get("vista") or "dia"
+        if vista_regreso not in {"dia", "semana", "mes", "anio"}:
+            vista_regreso = "dia"
+        return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?vista={vista_regreso}&fecha={fecha}")
 
     contexto = _contexto_calendario(
         empresa,

@@ -139,6 +139,16 @@ class CRMTests(TestCase):
         self.assertContains(response, "serviceWorker.register")
         self.assertContains(response, "Instalar en Android")
         self.assertContains(response, "iPhone / iPad")
+        self.assertContains(response, "mobile-view-switch")
+        self.assertContains(response, "vista=semana")
+        self.assertContains(response, "vista=mes")
+        self.assertContains(response, "vista=anio")
+        vista_anual = self.client.get(
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            {"vista": "anio", "fecha": "2026-06-30"},
+        )
+        self.assertContains(vista_anual, "Resumen anual")
+        self.assertContains(vista_anual, "junio")
         self.assertEqual(manifest.status_code, 200)
         self.assertEqual(manifest.json()["display"], "standalone")
         self.assertEqual(
@@ -243,11 +253,15 @@ class CRMTests(TestCase):
         )
         self.client.login(username="crmuser", password="pass12345")
         url = reverse("agenda_citas", args=[self.empresa.slug])
-        for vista in ["mes", "semana", "dia"]:
+        for vista in ["mes", "semana", "dia", "anio"]:
             response = self.client.get(url, {"vista": vista, "fecha": "2026-06-22"})
             self.assertEqual(response.status_code, 200)
-            self.assertContains(response, "EvaluaciÃ³n mÃ©dica")
-            self.assertContains(response, "Paciente Calendario")
+            if vista != "anio":
+                self.assertContains(response, "EvaluaciÃ³n mÃ©dica")
+                self.assertContains(response, "Paciente Calendario")
+            else:
+                self.assertContains(response, "Paciente Calendario")
+                self.assertContains(response, "junio")
         response = self.client.get(url, {"vista": "mes", "fecha": "2026-06-22", "editar": cita.id})
         self.assertContains(response, "Editando cita")
         self.assertContains(response, "45")

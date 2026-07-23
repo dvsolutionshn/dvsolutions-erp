@@ -109,6 +109,16 @@
 .calendar-filter-apply{background:linear-gradient(135deg,#14b8a6,#2563eb);color:#fff;box-shadow:0 14px 28px rgba(37,99,235,.16)}
 .calendar-filter-clear{border:1px solid #c9d8e5;background:#fff;color:#526477}
 .calendar-swipe-hint{grid-column:1/-1;color:#6c8092;font-size:10px}
+.calendar-year-grid{display:grid;grid-template-columns:repeat(4,minmax(190px,1fr));gap:14px}
+.calendar-month-card{position:relative;min-height:180px;padding:16px;border:1px solid rgba(202,218,232,.9);border-radius:22px;background:linear-gradient(145deg,#fff,#f7fbff);box-shadow:0 14px 35px rgba(20,45,70,.07);text-decoration:none;color:#172b3e;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.calendar-month-card:hover{transform:translateY(-3px);border-color:rgba(20,184,166,.45);box-shadow:0 22px 50px rgba(20,45,70,.12)}
+.calendar-month-card::after{content:"";position:absolute;right:-44px;bottom:-54px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(34,184,173,.18),transparent 68%)}
+.calendar-month-card small{display:block;color:#718497;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.calendar-month-card strong{display:block;margin-top:6px;font-size:24px;text-transform:capitalize}
+.calendar-month-total{display:inline-flex;margin-top:12px;padding:7px 10px;border-radius:999px;background:#e8faf7;color:#0f766e;font-size:10px;font-weight:900}
+.calendar-month-preview{position:relative;z-index:1;display:grid;gap:5px;margin-top:13px}
+.calendar-month-preview span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 8px;border-radius:10px;background:#f1f6fa;color:#526477;font-size:10px;font-weight:800}
+.calendar-month-empty{color:#8a9aaa!important;background:#f7fafc!important}
 .calendar-legend-item{
   min-height:30px;
   border-color:rgba(205,220,233,.8);
@@ -396,6 +406,7 @@
   .appointment-manage{width:100%}
   .calendar-filter-bar{grid-template-columns:1fr}
   .calendar-filter-apply,.calendar-filter-clear{width:100%}
+  .calendar-year-grid{grid-template-columns:1fr}
 }
 </style>
 
@@ -412,6 +423,7 @@
         <a class="calendar-chip {% if vista == 'mes' %}active{% endif %}" href="?vista=mes&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Mes</a>
         <a class="calendar-chip {% if vista == 'semana' %}active{% endif %}" href="?vista=semana&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Semana</a>
         <a class="calendar-chip {% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Día</a>
+        <a class="calendar-chip {% if vista == 'anio' %}active{% endif %}" href="?vista=anio&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Año</a>
       </div>
     </div>
     {% if es_clinica %}
@@ -465,7 +477,24 @@
     {% endif %}
   </section>
 
-  {% if vista == "mes" %}
+  {% if vista == "anio" %}
+  <section class="calendar-year-grid">
+    {% for mes in meses_agenda %}
+    <a class="calendar-month-card" href="?vista=mes&fecha={{ mes.fecha|date:'Y-m-d' }}{{ filtros_query }}">
+      <small>{{ fecha_seleccionada.year }}</small>
+      <strong>{{ mes.nombre }}</strong>
+      <span class="calendar-month-total">{{ mes.total }} cita{{ mes.total|pluralize:"s" }}</span>
+      <div class="calendar-month-preview">
+        {% for cita in mes.citas %}
+        <span>{{ cita.fecha_hora|date:"d/m" }} · {{ cita.display_cliente }}</span>
+        {% empty %}
+        <span class="calendar-month-empty">Sin citas programadas</span>
+        {% endfor %}
+      </div>
+    </a>
+    {% endfor %}
+  </section>
+  {% elif vista == "mes" %}
   <section class="calendar-grid">
     <div class="calendar-weekday">Lunes</div>
     <div class="calendar-weekday">Martes</div>
