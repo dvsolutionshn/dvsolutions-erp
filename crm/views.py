@@ -1,6 +1,7 @@
 import calendar
 from datetime import date, datetime, timedelta
 import logging
+import unicodedata
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -17,7 +18,7 @@ from django.views.decorators.http import require_POST
 
 from core.models import Empresa
 from facturacion.models import Cliente, Producto
-from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica
+from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
 from .models import CampaniaMarketing, CitaCirugiaFoto, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
@@ -36,6 +37,38 @@ from .tokens import leer_token_respuesta_cita
 
 
 logger = logging.getLogger(__name__)
+
+AGENDA_ESPEJO_SERVICIOSMEDICOS = {
+    "origen": "hospital_mia",
+    "profesional_tokens": ("luis", "gonz"),
+}
+
+
+def _normalizar_texto_agenda(valor):
+    texto = unicodedata.normalize("NFKD", valor or "")
+    return "".join(caracter for caracter in texto if not unicodedata.combining(caracter)).lower()
+
+
+def _empresa_origen_agenda(empresa):
+    if empresa.slug == "serviciosmedicos":
+        origen = Empresa.objects.filter(slug=AGENDA_ESPEJO_SERVICIOSMEDICOS["origen"]).first()
+        if origen:
+            return origen
+    return empresa
+
+
+def _cita_pertenece_agenda_espejo(cita, empresa):
+    if empresa.slug != "serviciosmedicos":
+        return True
+    nombre = _normalizar_texto_agenda(getattr(cita.profesional_salud, "nombre", "") or cita.responsable)
+    return all(token in nombre for token in AGENDA_ESPEJO_SERVICIOSMEDICOS["profesional_tokens"])
+
+
+def _profesional_pertenece_agenda_espejo(profesional, empresa):
+    if empresa.slug != "serviciosmedicos":
+        return True
+    nombre = _normalizar_texto_agenda(getattr(profesional, "nombre", ""))
+    return all(token in nombre for token in AGENDA_ESPEJO_SERVICIOSMEDICOS["profesional_tokens"])
 
 
 def _empresa_desde_slug(empresa_slug):
@@ -81,6 +114,8 @@ def _fecha_agenda(valor):
 
 def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_predeterminada="mes"):
     es_clinica = bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica"))
+    empresa_agenda = _empresa_origen_agenda(empresa)
+    agenda_espejo = empresa_agenda.id != empresa.id
     vista = request.GET.get("vista", vista_predeterminada)
     if vista not in {"mes", "semana", "dia", "anio"}:
         vista = "mes"
@@ -112,12 +147,14 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
 
     citas_qs = (
         CitaCliente.objects.filter(
-            empresa=empresa, fecha_hora__date__gte=inicio, fecha_hora__date__lte=fin
+            empresa=empresa_agenda, fecha_hora__date__gte=inicio, fecha_hora__date__lte=fin
         )
         .select_related("cliente", "producto", "paciente", "servicio_clinico", "profesional_salud")
         .prefetch_related("fotos_cirugia")
         .order_by("fecha_hora")
     )
+    if agenda_espejo and empresa.slug == "serviciosmedicos":
+        citas_qs = citas_qs.filter(Q(profesional_salud__nombre__icontains="Luis") | Q(responsable__icontains="Luis"))
     if filtro_servicio:
         try:
             citas_qs = citas_qs.filter(servicio_clinico_id=int(filtro_servicio))
@@ -128,7 +165,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
             citas_qs = citas_qs.filter(profesional_salud_id=int(filtro_profesional))
         except (TypeError, ValueError):
             filtro_profesional = ""
-    citas = list(citas_qs)
+    citas = [cita for cita in citas_qs if _cita_pertenece_agenda_espejo(cita, empresa)]
 
     filtros_query = urlencode({
         clave: valor
@@ -220,17 +257,23 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     servicios_clinicos_meta = []
     servicios_filtro = []
     profesionales_filtro = []
-    if es_clinica and "servicio_clinico" in form.fields:
-        servicios_filtro = list(form.fields["servicio_clinico"].queryset)
+    if es_clinica:
+        servicios_filtro = list(ServicioClinico.objects.filter(empresa=empresa_agenda, activo=True).order_by("nombre"))
         servicios_clinicos_meta = [
             {"id": servicio.id, "nombre": servicio.nombre, "categoria": servicio.categoria}
             for servicio in servicios_filtro
         ]
-    if es_clinica and "profesional_salud" in form.fields:
-        profesionales_filtro = list(form.fields["profesional_salud"].queryset)
+        profesionales_filtro = list(ProfesionalSalud.objects.filter(empresa=empresa_agenda, activo=True).order_by("nombre"))
+        if agenda_espejo:
+            profesionales_filtro = [
+                profesional for profesional in profesionales_filtro
+                if _profesional_pertenece_agenda_espejo(profesional, empresa)
+            ]
 
     return {
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
+        "agenda_empresa": empresa_agenda,
+        "agenda_espejo": agenda_espejo,
         "vista": vista, "fecha_seleccionada": seleccionada, "titulo_periodo": titulo_periodo,
         "fecha_anterior": anterior, "fecha_siguiente": siguiente, "semanas": semanas, "dias": dias,
         "meses_agenda": meses_agenda,
@@ -827,19 +870,31 @@ def agenda_mobile(request, empresa_slug):
     )
     inicio_tira = seleccionada - timedelta(days=3)
     fin_tira = seleccionada + timedelta(days=3)
+    empresa_agenda = contexto["agenda_empresa"]
+    agenda_espejo = contexto["agenda_espejo"]
     citas_tira = CitaCliente.objects.filter(
-        empresa=empresa,
+        empresa=empresa_agenda,
         fecha_hora__date__gte=inicio_tira,
         fecha_hora__date__lte=fin_tira,
-    )
+    ).select_related("profesional_salud")
+    if agenda_espejo and empresa.slug == "serviciosmedicos":
+        citas_tira = citas_tira.filter(Q(profesional_salud__nombre__icontains="Luis") | Q(responsable__icontains="Luis"))
     if contexto.get("filtro_servicio"):
         citas_tira = citas_tira.filter(servicio_clinico_id=contexto["filtro_servicio"])
     if contexto.get("filtro_profesional"):
         citas_tira = citas_tira.filter(profesional_salud_id=contexto["filtro_profesional"])
-    conteos = {
-        fila["fecha_hora__date"]: fila["total"]
-        for fila in citas_tira.values("fecha_hora__date").annotate(total=Count("id"))
-    }
+    if agenda_espejo:
+        conteos = {}
+        for cita in citas_tira:
+            if not _cita_pertenece_agenda_espejo(cita, empresa):
+                continue
+            clave = timezone.localtime(cita.fecha_hora).date()
+            conteos[clave] = conteos.get(clave, 0) + 1
+    else:
+        conteos = {
+            fila["fecha_hora__date"]: fila["total"]
+            for fila in citas_tira.values("fecha_hora__date").annotate(total=Count("id"))
+        }
     contexto["dias_moviles"] = [
         {
             "fecha": inicio_tira + timedelta(days=indice),
@@ -849,34 +904,43 @@ def agenda_mobile(request, empresa_slug):
         for indice in range(7)
     ]
     ahora = timezone.now()
-    proximas = list(
+    proximas_qs = (
         CitaCliente.objects.filter(
-            empresa=empresa,
+            empresa=empresa_agenda,
             fecha_hora__gte=ahora,
             fecha_hora__lte=ahora + timedelta(hours=24),
         )
-        .select_related("paciente", "cliente", "servicio_clinico", "producto")
-        .order_by("fecha_hora")[:20]
+        .select_related("paciente", "cliente", "servicio_clinico", "producto", "profesional_salud")
+        .order_by("fecha_hora")
     )
+    if agenda_espejo and empresa.slug == "serviciosmedicos":
+        proximas_qs = proximas_qs.filter(Q(profesional_salud__nombre__icontains="Luis") | Q(responsable__icontains="Luis"))
+    proximas = [
+        cita for cita in proximas_qs[:50]
+        if _cita_pertenece_agenda_espejo(cita, empresa)
+    ][:20]
     contexto["proximas_app"] = [
         {
             "id": cita.id,
             "title": f"Cita: {cita.display_cliente}",
             "body": f"{cita.display_servicio} · {timezone.localtime(cita.fecha_hora).strftime('%I:%M %p')}",
             "at": int(cita.fecha_hora.timestamp() * 1000),
-            "url": f"{reverse('agenda_mobile', args=[empresa.slug])}?fecha={timezone.localtime(cita.fecha_hora).date().isoformat()}&editar={cita.id}#editor",
+            "url": f"{reverse('agenda_mobile', args=[empresa.slug])}?fecha={timezone.localtime(cita.fecha_hora).date().isoformat()}",
         }
         for cita in proximas
     ]
-    contexto["citas_hoy_total"] = CitaCliente.objects.filter(
-        empresa=empresa,
+    citas_hoy_qs = CitaCliente.objects.filter(
+        empresa=empresa_agenda,
         fecha_hora__date=timezone.localdate(),
-    ).count()
-    contexto["pendientes_hoy"] = CitaCliente.objects.filter(
-        empresa=empresa,
-        fecha_hora__date=timezone.localdate(),
-        estado__in=["pendiente", "confirmada"],
-    ).count()
+    ).select_related("profesional_salud")
+    if agenda_espejo and empresa.slug == "serviciosmedicos":
+        citas_hoy_qs = citas_hoy_qs.filter(Q(profesional_salud__nombre__icontains="Luis") | Q(responsable__icontains="Luis"))
+    citas_hoy = [
+        cita for cita in citas_hoy_qs
+        if _cita_pertenece_agenda_espejo(cita, empresa)
+    ]
+    contexto["citas_hoy_total"] = len(citas_hoy)
+    contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
     return render(request, "crm/agenda_mobile.html", contexto)
 
 

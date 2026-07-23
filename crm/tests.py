@@ -109,6 +109,84 @@ class CRMTests(TestCase):
         self.assertContains(response, "Calendario de Citas")
         self.assertContains(response, reverse("agenda_mobile", args=[self.empresa.slug]))
 
+    def test_serviciosmedicos_ve_agenda_espejo_de_hospital_mia_solo_dr_luis(self):
+        servicios = Empresa.objects.create(
+            nombre="Servicios Medicos Gonzalez",
+            slug="serviciosmedicos",
+            rtn="08011999111114",
+            tipo_solucion="clinica",
+            estado_licencia="activa",
+        )
+        EmpresaModulo.objects.create(empresa=servicios, modulo=self.modulo_citas, activo=True)
+        self.usuario.empresas_acceso.add(servicios)
+        consulta = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta General",
+            categoria="consulta",
+            duracion_minutos=60,
+        )
+        dr_luis = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dr. Luis González",
+            especialidad="Cirugía",
+        )
+        dra_candy = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dra. Candy Luque",
+            especialidad="Medicina estética",
+        )
+        paciente_luis = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-90001",
+            identidad="08011999000111",
+            nombre="Paciente de Luis",
+        )
+        paciente_candy = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-90002",
+            identidad="08011999000112",
+            nombre="Paciente de Candy",
+        )
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente_luis,
+            servicio_clinico=consulta,
+            profesional_salud=dr_luis,
+            titulo="Consulta General",
+            responsable=dr_luis.nombre,
+            fecha_hora=timezone.make_aware(datetime(2026, 7, 22, 10, 0)),
+            estado="confirmada",
+        )
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente_candy,
+            servicio_clinico=consulta,
+            profesional_salud=dra_candy,
+            titulo="Consulta General",
+            responsable=dra_candy.nombre,
+            fecha_hora=timezone.make_aware(datetime(2026, 7, 22, 10, 0)),
+            estado="confirmada",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(
+            reverse("agenda_citas", args=[servicios.slug]),
+            {"vista": "dia", "fecha": "2026-07-22"},
+        )
+        mobile = self.client.get(
+            reverse("agenda_mobile", args=[servicios.slug]),
+            {"vista": "dia", "fecha": "2026-07-22"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vista espejo")
+        self.assertContains(response, "Paciente de Luis")
+        self.assertNotContains(response, "Paciente de Candy")
+        self.assertContains(response, "Dr. Luis González")
+        self.assertEqual(mobile.status_code, 200)
+        self.assertContains(mobile, "Paciente de Luis")
+        self.assertNotContains(mobile, "Paciente de Candy")
+
     def test_app_movil_agenda_es_instalable_y_usa_los_mismos_datos(self):
         cliente = Cliente.objects.create(
             empresa=self.empresa,
