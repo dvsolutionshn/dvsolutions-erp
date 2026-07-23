@@ -15,10 +15,10 @@
 </head>
 <body>
 <main class="public-shell"><div class="public-wrap">
-    <header class="public-brand"><div class="brand-mark">{% if preconsulta.empresa.logo %}<div class="brand-symbol"><img src="{{ preconsulta.empresa.logo.url }}" alt="Logo {{ preconsulta.empresa.nombre }}"></div>{% else %}<div class="brand-symbol is-fallback">{{ preconsulta.empresa.nombre|slice:":3"|upper }}</div>{% endif %}<div><strong>{{ preconsulta.empresa.nombre }}</strong><span>Formulario general de entrada</span></div></div><div class="secure-note">Enlace privado - Uso medico</div></header>
+    <header class="public-brand"><div class="brand-mark">{% if preconsulta.empresa.logo %}<div class="brand-symbol"><img src="{{ preconsulta.empresa.logo.url }}" alt="Logo {{ preconsulta.empresa.nombre }}"></div>{% else %}<div class="brand-symbol is-fallback">{{ preconsulta.empresa.nombre|slice:":3"|upper }}</div>{% endif %}<div><strong>{{ preconsulta.empresa.nombre }}</strong><span>Formulario general de entrada</span></div></div><div class="secure-note">{% if registro_interno %}Registro interno - Sesion protegida{% else %}Enlace privado - Uso medico{% endif %}</div></header>
     <form method="post" enctype="multipart/form-data" class="public-card" id="preconsultaForm" novalidate>
         {% csrf_token %}
-        <div class="public-head"><h1>Formulario general del paciente</h1><p>Preparemos su consulta con una historia clínica ordenada y fácil de entender. Puede seleccionar una o varias respuestas por pregunta y agregar detalles cuando lo necesite.</p><p class="privacy">Este formulario es privado y confidencial. La información será revisada solamente por el doctor y el personal autorizado para su atención médica.</p></div>
+        <div class="public-head"><h1>Formulario general del paciente</h1><p>{% if registro_interno %}Complete el mismo formulario general que recibe el paciente por enlace. Al guardar se creara el expediente y quedara registrada la preconsulta general en su historial clinico.{% else %}Preparemos su consulta con una historia clínica ordenada y fácil de entender. Puede seleccionar una o varias respuestas por pregunta y agregar detalles cuando lo necesite.{% endif %}</p><p class="privacy">Este formulario es privado y confidencial. La información será revisada solamente por el doctor y el personal autorizado para su atención médica.</p></div>
         <div class="progress"><span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="missing-summary" id="missingSummary" hidden>
             <strong>Faltan datos por completar</strong>
@@ -171,7 +171,7 @@
                 <div class="field wide consent"><label>{{ form.consentimiento_datos }}<span>{{ form.consentimiento_datos.label }}</span></label>{% for error in form.consentimiento_datos.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <p class="privacy field wide">Su informacion se incorpora al expediente clinico de {{ preconsulta.empresa.nombre }} y sera accesible unicamente para personal autorizado. No comparta este enlace con otras personas.</p>
             </div>
-            <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary" type="submit">Enviar formulario general</button></div>
+            <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary" type="submit">{% if registro_interno %}Guardar paciente{% else %}Enviar formulario general{% endif %}</button></div>
         </section>
     </form>
     <div class="missing-modal" id="missingModal" hidden role="dialog" aria-modal="true" aria-labelledby="missingModalTitle">

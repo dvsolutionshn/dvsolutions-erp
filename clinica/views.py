@@ -411,6 +411,69 @@ def _actualizar_paciente_desde_preconsulta(paciente, form):
     _sincronizar_cliente_facturacion_paciente(paciente)
 
 
+def _crear_paciente_desde_formulario_general(
+    form,
+    empresa,
+    usuario=None,
+    ip_cliente="",
+    fecha_expiracion=None,
+    descripcion_foto="Fotografia registrada durante el formulario general del paciente.",
+):
+    paciente = Paciente(
+        empresa=empresa,
+        expediente_codigo=_proximo_codigo_expediente(empresa),
+        primer_nombre=form.cleaned_data.get("primer_nombre"),
+        segundo_nombre=form.cleaned_data.get("segundo_nombre"),
+        primer_apellido=form.cleaned_data.get("primer_apellido"),
+        segundo_apellido=form.cleaned_data.get("segundo_apellido"),
+        identidad=form.cleaned_data.get("identidad"),
+        fecha_nacimiento=form.cleaned_data.get("fecha_nacimiento"),
+        sexo=form.cleaned_data.get("sexo") or "no_indicado",
+        estado_civil=form.cleaned_data.get("estado_civil") or "no_indicado",
+        correo=form.cleaned_data.get("correo") or "",
+        telefono=form.cleaned_data.get("telefono") or "",
+        whatsapp=form.cleaned_data.get("telefono") or "",
+        prefijo_telefono=form.cleaned_data.get("telefono_codigo_area") or "504",
+        direccion=form.cleaned_data.get("direccion") or "",
+        lugar_nacimiento=form.cleaned_data.get("lugar_nacimiento") or "",
+        ocupacion=form.cleaned_data.get("ocupacion") or "",
+        contacto_emergencia=form.cleaned_data.get("contacto_emergencia") or "",
+        telefono_emergencia=form.cleaned_data.get("telefono_emergencia") or "",
+        foto_perfil=form.cleaned_data.get("foto_perfil"),
+        creado_por=usuario,
+    )
+    paciente.save()
+
+    _token_raw, preconsulta_token_hash, preconsulta_token_preview = generar_token_preconsulta()
+    preconsulta = form.save(commit=False)
+    preconsulta.empresa = empresa
+    preconsulta.paciente = paciente
+    preconsulta.tipo = "general"
+    preconsulta.token_hash = preconsulta_token_hash
+    preconsulta.token_preview = preconsulta_token_preview
+    preconsulta.fecha_expiracion = fecha_expiracion or (timezone.now() + timezone.timedelta(days=7))
+    preconsulta.datos_generales = form.datos_generales_limpios()
+    preconsulta.estado = "completada"
+    preconsulta.fecha_completada = timezone.now()
+    preconsulta.ip_completada = ip_cliente or ""
+    preconsulta.creada_por = usuario
+    preconsulta.save()
+
+    _actualizar_paciente_desde_preconsulta(paciente, form)
+
+    if paciente.foto_perfil:
+        PacienteFotoEvolucion.objects.create(
+            empresa=empresa,
+            paciente=paciente,
+            imagen=paciente.foto_perfil,
+            tipo="ingreso",
+            titulo="Foto de ingreso",
+            descripcion=descripcion_foto,
+            creado_por=usuario,
+        )
+    return paciente, preconsulta
+
+
 def _proximo_codigo_expediente(empresa):
     prefijo = "MIA" if "mia" in (empresa.slug or "").lower() or "mia" in (empresa.nombre or "").lower() else "EXP"
     patron = re.compile(rf"^{re.escape(prefijo)}-(\d+)$", re.IGNORECASE)
@@ -625,6 +688,64 @@ def pacientes_sugerencias(request, empresa_slug):
 @login_required
 def crear_paciente(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS:
+        preconsulta_base = PreconsultaClinica(
+            empresa=empresa,
+            tipo="general",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+        )
+        form = PreconsultaClinicaPublicaForm(
+            request.POST or None,
+            request.FILES or None,
+            instance=preconsulta_base,
+            empresa=empresa,
+        )
+        if request.method == "POST" and form.is_valid():
+            try:
+                with transaction.atomic():
+                    paciente, _preconsulta = _crear_paciente_desde_formulario_general(
+                        form,
+                        empresa,
+                        usuario=request.user,
+                        ip_cliente=_ip_cliente(request),
+                        fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+                        descripcion_foto="Fotografia registrada por el equipo al crear el expediente manualmente.",
+                    )
+            except ValidationError as exc:
+                logger.warning(
+                    "No se pudo crear paciente manual con formulario general en %s: %s",
+                    empresa.slug,
+                    exc,
+                )
+                if hasattr(exc, "message_dict"):
+                    for campo, errores in exc.message_dict.items():
+                        form.add_error(campo if campo in form.fields else None, errores)
+                else:
+                    form.add_error(None, exc)
+                messages.error(request, "Revisa los datos marcados. No se guardo el paciente para evitar un registro incompleto.")
+            except Exception:
+                logger.exception("Error inesperado al crear paciente manual con formulario general en %s", empresa.slug)
+                form.add_error(
+                    None,
+                    "No se pudo guardar el paciente por un error interno. Intenta nuevamente; si persiste, avisa a soporte.",
+                )
+                messages.error(request, "No se pudo crear el paciente. El formulario quedo listo para corregir o reintentar.")
+            else:
+                messages.success(request, "Paciente creado correctamente con formulario general.")
+                return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        return render(
+            request,
+            "clinica/preconsulta_publica.html",
+            {
+                "empresa": empresa,
+                "form": form,
+                "preconsulta": preconsulta_base,
+                "paciente": None,
+                "registro_nuevo": True,
+                "registro_interno": True,
+            },
+        )
+
     initial = {"expediente_codigo": _proximo_codigo_expediente(empresa)}
     form = PacienteForm(request.POST or None, request.FILES or None, empresa=empresa, initial=initial)
     if request.method == "POST" and form.is_valid():
@@ -1559,57 +1680,14 @@ def registro_paciente_publico(request, token):
     )
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
-            paciente = Paciente(
-                empresa=invitacion.empresa,
-                expediente_codigo=_proximo_codigo_expediente(invitacion.empresa),
-                primer_nombre=form.cleaned_data.get("primer_nombre"),
-                segundo_nombre=form.cleaned_data.get("segundo_nombre"),
-                primer_apellido=form.cleaned_data.get("primer_apellido"),
-                segundo_apellido=form.cleaned_data.get("segundo_apellido"),
-                identidad=form.cleaned_data.get("identidad"),
-                fecha_nacimiento=form.cleaned_data.get("fecha_nacimiento"),
-                sexo=form.cleaned_data.get("sexo") or "no_indicado",
-                estado_civil=form.cleaned_data.get("estado_civil") or "no_indicado",
-                correo=form.cleaned_data.get("correo") or "",
-                telefono=form.cleaned_data.get("telefono") or "",
-                whatsapp=form.cleaned_data.get("telefono") or "",
-                prefijo_telefono=form.cleaned_data.get("telefono_codigo_area") or "504",
-                direccion=form.cleaned_data.get("direccion") or "",
-                lugar_nacimiento=form.cleaned_data.get("lugar_nacimiento") or "",
-                ocupacion=form.cleaned_data.get("ocupacion") or "",
-                contacto_emergencia=form.cleaned_data.get("contacto_emergencia") or "",
-                telefono_emergencia=form.cleaned_data.get("telefono_emergencia") or "",
-                foto_perfil=form.cleaned_data.get("foto_perfil"),
-                creado_por=invitacion.creada_por,
+            paciente, _preconsulta = _crear_paciente_desde_formulario_general(
+                form,
+                invitacion.empresa,
+                usuario=invitacion.creada_por,
+                ip_cliente=_ip_cliente(request),
+                fecha_expiracion=invitacion.fecha_expiracion,
+                descripcion_foto="Fotografia adjuntada por el paciente durante su registro seguro.",
             )
-            paciente.save()
-
-            _preconsulta_token_raw, preconsulta_token_hash, preconsulta_token_preview = generar_token_preconsulta()
-            preconsulta = form.save(commit=False)
-            preconsulta.empresa = invitacion.empresa
-            preconsulta.paciente = paciente
-            preconsulta.tipo = "general"
-            preconsulta.token_hash = preconsulta_token_hash
-            preconsulta.token_preview = preconsulta_token_preview
-            preconsulta.fecha_expiracion = invitacion.fecha_expiracion
-            preconsulta.datos_generales = form.datos_generales_limpios()
-            preconsulta.estado = "completada"
-            preconsulta.fecha_completada = timezone.now()
-            preconsulta.ip_completada = _ip_cliente(request)
-            preconsulta.creada_por = invitacion.creada_por
-            preconsulta.save()
-            _actualizar_paciente_desde_preconsulta(paciente, form)
-
-            if paciente.foto_perfil:
-                PacienteFotoEvolucion.objects.create(
-                    empresa=invitacion.empresa,
-                    paciente=paciente,
-                    imagen=paciente.foto_perfil,
-                    tipo="ingreso",
-                    titulo="Foto de ingreso",
-                    descripcion="Fotografia adjuntada por el paciente durante su registro seguro.",
-                    creado_por=invitacion.creada_por,
-                )
 
             invitacion.fecha_completada = timezone.now()
             invitacion.ip_completada = _ip_cliente(request)

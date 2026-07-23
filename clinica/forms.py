@@ -1661,7 +1661,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             if campo in self.fields:
                 self.fields[campo].widget.attrs["class"] = "animated-check-list"
         for campo in [
-            "motivo_categoria", "procedimientos_interes", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
+            "motivo_categoria", "funciones_organicas", "antecedentes_personales", "medicamentos_habituales",
             "antecedentes_familiares", "alergias_seleccion", "medicamentos_actuales_seleccion",
             "antecedentes_hospitalarios", "quirurgicos_operado", "consumo_riesgo", "dieta", "ejercicio", "riesgo_tromboembolico",
             "evaluacion_psicologica", "expectativas_realistas", "busca_perfeccion", "multiples_cirugias_insatisfaccion",

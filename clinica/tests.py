@@ -41,6 +41,69 @@ class ClinicaPacienteTests(TestCase):
         )
         self.client.force_login(self.user)
 
+    def _foto_prueba(self, nombre="paciente.jpg"):
+        image_buffer = BytesIO()
+        Image.new("RGB", (32, 32), color=(24, 130, 160)).save(image_buffer, format="JPEG")
+        return SimpleUploadedFile(nombre, image_buffer.getvalue(), content_type="image/jpeg")
+
+    def _datos_formulario_general(self, **overrides):
+        identidad = overrides.pop("identidad", "0801199912345")
+        data = {
+            "nombres": "Ana",
+            "apellidos": "Mejia",
+            "identidad": identidad,
+            "fecha_nacimiento": "1999-08-12",
+            "sexo": "masculino",
+            "estado_civil": "soltero",
+            "correo": "ana@example.com",
+            "telefono_codigo_area": "504",
+            "telefono": "99998888",
+            "direccion": "",
+            "lugar_nacimiento": "Tegucigalpa",
+            "ocupacion": "Administradora",
+            "lugar_trabajo": "No aplica",
+            "informante": "yo_mismo",
+            "contacto_emergencia_completo": "Maria Perez - 9999-9999",
+            "referido_por": "facebook",
+            "motivo_categoria": ["no_aplica"],
+            "procedimientos_interes": [],
+            "procedimientos_interes_otros": "No aplica",
+            "funciones_organicas": "normal",
+            "funciones_detalle": "No aplica",
+            "antecedentes_personales": ["no_aplica"],
+            "antecedentes_personales_detalle": "No aplica",
+            "alergias_seleccion": ["ninguna"],
+            "alergias_otras": "No aplica",
+            "alergias": "No aplica",
+            "medicamentos_habituales": ["no_aplica"],
+            "medicamentos_habituales_detalle": "No aplica",
+            "medicamentos_actuales_seleccion": ["ninguno"],
+            "medicamentos_actuales_otros": "No aplica",
+            "antecedentes_infecciosos": "No aplica",
+            "antecedentes_hospitalarios": ["no"],
+            "antecedentes_hospitalarios_detalle": "No aplica",
+            "quirurgicos_operado": ["no"],
+            "quirurgicos_detalle": "No aplica",
+            "consumo_riesgo": ["ninguno"],
+            "consumo_riesgo_detalle": "No aplica",
+            "dieta": ["balanceada"],
+            "ejercicio": ["ocasional"],
+            "antecedentes_familiares": ["no_aplica"],
+            "antecedentes_familiares_detalle": "No aplica",
+            "riesgo_tromboembolico": ["ninguno"],
+            "riesgo_tromboembolico_otros": "No aplica",
+            "evaluacion_psicologica": ["ninguna"],
+            "evaluacion_psicologica_detalle": "No aplica",
+            "expectativas_realistas": ["si"],
+            "busca_perfeccion": ["no"],
+            "multiples_cirugias_insatisfaccion": ["no"],
+            "motivo_consulta": "Registro general",
+            "consentimiento_datos": "on",
+            "foto_perfil": self._foto_prueba(),
+        }
+        data.update(overrides)
+        return data
+
     def test_nueva_cita_clinica_usa_control_unificado_am_pm(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa, expediente_codigo="HM-CITA", nombre="Paciente Cita"
@@ -182,41 +245,25 @@ class ClinicaPacienteTests(TestCase):
     def test_crear_paciente_alergico_y_mostrar_alerta_en_lista(self):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Tomar foto")
-        self.assertContains(response, "O+")
+        self.assertContains(response, "Formulario general del paciente")
+        self.assertContains(response, "Guardar paciente")
+        self.assertContains(response, "Subir archivo")
 
         response = self.client.post(
             reverse("clinica_crear_paciente", args=[self.empresa.slug]),
-            {
-                "expediente_codigo": "HM-0001",
-                "tipo_id": "cc",
-                "identidad": "0801199912345",
-                "primer_nombre": "Ana",
-                "primer_apellido": "Mejia",
-                "rh": "O+",
-                "sexo": "femenino",
-                "genero": "femenino",
-                "estado_civil": "soltero",
-                "prefijo_telefono": "Honduras (+504)",
-                "zona_residencial": "urbana",
-                "pais": "Honduras",
-                "acompanante_relacion": "no_indicada",
-                "responsable_relacion": "no_indicada",
-                "escolaridad": "no_indicada",
-                "pertenencia_etnica": "no_indicada",
-                "nacionalidad": "Honduras",
-                "es_alergico": "on",
-                "alergias": "Penicilina",
-                "activo": "on",
-            },
+            self._datos_formulario_general(
+                alergias="Penicilina",
+                alergias_seleccion=["medicamentos"],
+            ),
         )
 
         self.assertEqual(response.status_code, 302)
-        paciente = Paciente.objects.get(empresa=self.empresa, expediente_codigo="HM-0001")
+        paciente = Paciente.objects.get(empresa=self.empresa, identidad="0801199912345")
         self.assertTrue(paciente.es_alergico)
         self.assertEqual(paciente.alergias, "Penicilina")
         self.assertIsNotNone(paciente.cliente)
         self.assertTrue(Cliente.objects.filter(empresa=self.empresa, rtn="0801199912345").exists())
+        self.assertEqual(PreconsultaClinica.objects.filter(paciente=paciente, estado="completada").count(), 1)
 
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
@@ -240,31 +287,12 @@ class ClinicaPacienteTests(TestCase):
 
         response = self.client.post(
             reverse("clinica_crear_paciente", args=[self.empresa.slug]),
-            {
-                "expediente_codigo": "HM-ERROR-SYNC",
-                "tipo_id": "cc",
-                "identidad": "0801199912350",
-                "primer_nombre": "Paciente",
-                "primer_apellido": "ConError",
-                "rh": "O+",
-                "sexo": "femenino",
-                "genero": "femenino",
-                "estado_civil": "soltero",
-                "prefijo_telefono": "Honduras (+504)",
-                "zona_residencial": "urbana",
-                "pais": "Honduras",
-                "acompanante_relacion": "no_indicada",
-                "responsable_relacion": "no_indicada",
-                "escolaridad": "no_indicada",
-                "pertenencia_etnica": "no_indicada",
-                "nacionalidad": "Honduras",
-                "activo": "on",
-            },
+            self._datos_formulario_general(identidad="0801199912350", nombres="Paciente", apellidos="ConError"),
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No se guardo el paciente")
-        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-ERROR-SYNC").exists())
+        self.assertContains(response, "Revise los campos marcados")
+        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, identidad="0801199912350").exists())
 
     def test_crear_paciente_rechaza_foto_inicial_mayor_a_5_mb(self):
         image_buffer = BytesIO()
@@ -274,32 +302,12 @@ class ClinicaPacienteTests(TestCase):
 
         response = self.client.post(
             reverse("clinica_crear_paciente", args=[self.empresa.slug]),
-            {
-                "expediente_codigo": "HM-FOTO-GRANDE",
-                "tipo_id": "cc",
-                "identidad": "0801199912351",
-                "primer_nombre": "Foto",
-                "primer_apellido": "Grande",
-                "rh": "O+",
-                "sexo": "femenino",
-                "genero": "femenino",
-                "estado_civil": "soltero",
-                "prefijo_telefono": "Honduras (+504)",
-                "zona_residencial": "urbana",
-                "pais": "Honduras",
-                "acompanante_relacion": "no_indicada",
-                "responsable_relacion": "no_indicada",
-                "escolaridad": "no_indicada",
-                "pertenencia_etnica": "no_indicada",
-                "nacionalidad": "Honduras",
-                "activo": "on",
-                "foto_perfil": foto_grande,
-            },
+            self._datos_formulario_general(identidad="0801199912351", nombres="Foto", apellidos="Grande", foto_perfil=foto_grande),
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "La foto inicial no puede superar 5 MB")
-        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-FOTO-GRANDE").exists())
+        self.assertContains(response, "La fotograf")
+        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, identidad="0801199912351").exists())
 
     def test_crear_paciente_refresca_expediente_si_el_codigo_ya_existe(self):
         Paciente.objects.create(
@@ -317,26 +325,7 @@ class ClinicaPacienteTests(TestCase):
 
         response = self.client.post(
             reverse("clinica_crear_paciente", args=[self.empresa.slug]),
-            {
-                "expediente_codigo": "MIA-00118",
-                "tipo_id": "cc",
-                "identidad": "0801199912352",
-                "primer_nombre": "Codigo",
-                "primer_apellido": "Nuevo",
-                "rh": "O+",
-                "sexo": "femenino",
-                "genero": "femenino",
-                "estado_civil": "soltero",
-                "prefijo_telefono": "Honduras (+504)",
-                "zona_residencial": "urbana",
-                "pais": "Honduras",
-                "acompanante_relacion": "no_indicada",
-                "responsable_relacion": "no_indicada",
-                "escolaridad": "no_indicada",
-                "pertenencia_etnica": "no_indicada",
-                "nacionalidad": "Honduras",
-                "activo": "on",
-            },
+            self._datos_formulario_general(identidad="0801199912352", nombres="Codigo", apellidos="Nuevo"),
         )
 
         self.assertEqual(response.status_code, 302)
@@ -542,30 +531,12 @@ class ClinicaPacienteTests(TestCase):
     def test_no_permite_identidad_con_guiones_o_espacios(self):
         response = self.client.post(
             reverse("clinica_crear_paciente", args=[self.empresa.slug]),
-            {
-                "expediente_codigo": "HM-0002",
-                "tipo_id": "cc",
-                "identidad": "0801-1994-13996",
-                "primer_nombre": "Luis",
-                "primer_apellido": "Lopez",
-                "sexo": "masculino",
-                "genero": "masculino",
-                "estado_civil": "soltero",
-                "prefijo_telefono": "Honduras (+504)",
-                "zona_residencial": "urbana",
-                "pais": "Honduras",
-                "acompanante_relacion": "no_indicada",
-                "responsable_relacion": "no_indicada",
-                "escolaridad": "no_indicada",
-                "pertenencia_etnica": "no_indicada",
-                "nacionalidad": "Honduras",
-                "activo": "on",
-            },
+            self._datos_formulario_general(identidad="0801-1994-13996", nombres="Luis", apellidos="Lopez"),
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "solo debe contener numeros")
-        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, expediente_codigo="HM-0002").exists())
+        self.assertContains(response, "Utilice solamente numeros")
+        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, identidad="0801-1994-13996").exists())
 
     def test_lista_pacientes_prioriza_cumpleaneros_del_mes(self):
         hoy = timezone.localdate()
@@ -926,6 +897,7 @@ class ClinicaPacienteTests(TestCase):
                 "procedimientos_interes_otros": "No aplica",
                 "funciones_organicas": "normal",
                 "funciones_detalle": "No aplica",
+                "antecedentes_hospitalarios": ["no"],
                 "antecedentes_personales": ["no_aplica"],
                 "antecedentes_personales_detalle": "No aplica",
                 "alergias_seleccion": ["ninguna"],
@@ -1054,7 +1026,7 @@ class ClinicaPacienteTests(TestCase):
                 "funciones_detalle": "No aplica",
                 "revision_sistemas": "normal",
                 "revision_sistemas_detalle": "",
-                "antecedentes_hospitalarios": "on",
+                "antecedentes_hospitalarios": ["si"],
                 "antecedentes_hospitalarios_detalle": "Apendicectomia en 2018",
                 "antecedentes_personales": ["asma", "hipertension"],
                 "antecedentes_personales_detalle": "Asma controlada",
@@ -1261,7 +1233,8 @@ class ClinicaPacienteTests(TestCase):
                     "telefono_codigo_area": "504",
                     "telefono": "99998888",
                     "informante": "yo_mismo",
-                    "motivo_categoria": "medicina_estetica",
+                    "referido_por": "facebook",
+                    "motivo_categoria": ["medicina_estetica"],
                     "procedimientos_interes": ["rejuvenecimiento_facial"],
                     "procedimientos_interes_otros": "No aplica",
                     "funciones_organicas": "normal",
@@ -1276,6 +1249,7 @@ class ClinicaPacienteTests(TestCase):
                     "medicamentos_actuales_seleccion": ["ninguno"],
                     "medicamentos_actuales_otros": "No aplica",
                     "antecedentes_infecciosos": "No aplica",
+                    "antecedentes_hospitalarios": ["no"],
                     "antecedentes_hospitalarios_detalle": "No aplica",
                     "quirurgicos_operado": ["no"],
                     "quirurgicos_detalle": "No aplica",
@@ -1328,7 +1302,8 @@ class ClinicaPacienteTests(TestCase):
                 "telefono_codigo_area": "504",
                 "telefono": "99997777",
                 "informante": "yo_mismo",
-                "motivo_categoria": "capilar",
+                "referido_por": "facebook",
+                "motivo_categoria": ["capilar"],
                 "procedimientos_interes": ["evaluacion_alopecia"],
                 "procedimientos_interes_otros": "No aplica",
                 "funciones_organicas": "normal",
@@ -1343,6 +1318,7 @@ class ClinicaPacienteTests(TestCase):
                 "medicamentos_actuales_seleccion": ["ninguno"],
                 "medicamentos_actuales_otros": "No aplica",
                 "antecedentes_infecciosos": "No aplica",
+                "antecedentes_hospitalarios": ["no"],
                 "antecedentes_hospitalarios_detalle": "No aplica",
                 "quirurgicos_operado": ["no"],
                 "quirurgicos_detalle": "No aplica",
@@ -1361,6 +1337,7 @@ class ClinicaPacienteTests(TestCase):
                 "multiples_cirugias_insatisfaccion": ["no"],
                 "motivo_consulta": "Registro nuevo desde el mismo enlace",
                 "consentimiento_datos": "on",
+                "foto_perfil": self._foto_prueba("segundo.jpg"),
             },
         )
         self.assertEqual(response.status_code, 200)
