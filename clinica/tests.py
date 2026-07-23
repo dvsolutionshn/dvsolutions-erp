@@ -1132,14 +1132,16 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Información recibida")
 
     def test_solo_admin_empresa_puede_eliminar_paciente(self):
-        paciente = Paciente.objects.create(
+        cliente = Cliente.objects.create(
             empresa=self.empresa,
-            expediente_codigo="HM-DEL",
-            primer_nombre="Paciente",
-            primer_apellido="Prueba",
             nombre="Paciente Prueba",
-            identidad="0801199900001",
+            rtn="0801199900001",
         )
+        paciente = Paciente.objects.get(cliente=cliente)
+        paciente.expediente_codigo = "HM-DEL"
+        paciente.primer_nombre = "Paciente"
+        paciente.primer_apellido = "Prueba"
+        paciente.save(update_fields=["expediente_codigo", "primer_nombre", "primer_apellido", "fecha_actualizacion"])
         url = reverse("clinica_eliminar_paciente", args=[self.empresa.slug, paciente.id])
 
         response = self.client.post(url)
@@ -1152,7 +1154,26 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.post(url)
 
         self.assertRedirects(response, reverse("clinica_pacientes", args=[self.empresa.slug]))
-        self.assertFalse(Paciente.objects.filter(id=paciente.id).exists())
+        paciente.refresh_from_db()
+        cliente.refresh_from_db()
+        self.assertFalse(paciente.activo)
+        self.assertFalse(cliente.activo)
+
+    def test_cliente_inactivo_no_recrea_paciente_compartido_eliminado(self):
+        from .services_pacientes import asegurar_paciente_desde_cliente
+
+        cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Paciente Inactivo",
+            rtn="0801199900010",
+            activo=False,
+        )
+
+        paciente, creado = asegurar_paciente_desde_cliente(cliente)
+
+        self.assertIsNone(paciente)
+        self.assertFalse(creado)
+        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, identidad="0801199900010").exists())
 
     @patch("clinica.views.enviar_plantilla_preconsulta_whatsapp")
     def test_preconsulta_se_envia_directo_por_whatsapp_api(self, enviar_mock):

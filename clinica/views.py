@@ -559,7 +559,7 @@ def pacientes(request, empresa_slug):
     hoy = timezone.localdate()
     q = (request.GET.get("q") or "").strip()
     pacientes_qs = (
-        Paciente.objects.filter(empresa=empresa)
+        Paciente.objects.filter(empresa=empresa, activo=True)
         .annotate(
             cumple_mes=Case(
                 When(fecha_nacimiento__month=hoy.month, then=Value(0)),
@@ -594,7 +594,7 @@ def pacientes_sugerencias(request, empresa_slug):
         return JsonResponse({"results": []})
 
     pacientes_qs = (
-        Paciente.objects.filter(empresa=empresa)
+        Paciente.objects.filter(empresa=empresa, activo=True)
         .filter(
             Q(identidad__icontains=q)
             | Q(nombre__icontains=q)
@@ -729,8 +729,52 @@ def eliminar_paciente(request, empresa_slug, paciente_id):
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
 
     nombre = paciente.nombre
-    paciente.delete()
-    messages.success(request, f"Paciente {nombre} eliminado correctamente.")
+    from clinica.services_pacientes import EMPRESAS_PACIENTES_COMPARTIDOS
+
+    if empresa.slug in EMPRESAS_PACIENTES_COMPARTIDOS:
+        identidad = (paciente.identidad or "").strip()
+        perfil_ids = set()
+        if paciente.cliente_id and paciente.cliente.perfil_compartido_id:
+            perfil_ids.add(paciente.cliente.perfil_compartido_id)
+        if identidad:
+            perfil_ids.update(
+                Cliente.objects.filter(
+                    empresa__slug__in=EMPRESAS_PACIENTES_COMPARTIDOS,
+                    rtn__iexact=identidad,
+                ).values_list("perfil_compartido_id", flat=True)
+            )
+
+        filtro_clientes = Q()
+        filtro_pacientes = Q()
+        if perfil_ids:
+            filtro_clientes |= Q(perfil_compartido_id__in=perfil_ids)
+            filtro_pacientes |= Q(cliente__perfil_compartido_id__in=perfil_ids)
+        if identidad:
+            filtro_clientes |= Q(rtn__iexact=identidad)
+            filtro_pacientes |= Q(identidad__iexact=identidad)
+        if not filtro_clientes and nombre:
+            filtro_clientes |= Q(nombre__iexact=nombre.strip())
+            filtro_pacientes |= Q(nombre__iexact=nombre.strip())
+
+        with transaction.atomic():
+            pacientes_baja = Paciente.objects.filter(
+                filtro_pacientes,
+                empresa__slug__in=EMPRESAS_PACIENTES_COMPARTIDOS,
+                activo=True,
+            ).update(activo=False)
+            clientes_baja = Cliente.objects.filter(
+                filtro_clientes,
+                empresa__slug__in=EMPRESAS_PACIENTES_COMPARTIDOS,
+                activo=True,
+            ).update(activo=False)
+        messages.success(
+            request,
+            f"Paciente {nombre} dado de baja en la base compartida. "
+            f"Se ocultaron {pacientes_baja} expediente(s) y {clientes_baja} cliente(s) relacionado(s).",
+        )
+    else:
+        paciente.delete()
+        messages.success(request, f"Paciente {nombre} eliminado correctamente.")
     return redirect("clinica_pacientes", empresa_slug=empresa.slug)
 
 

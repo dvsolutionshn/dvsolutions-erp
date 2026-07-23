@@ -52,6 +52,16 @@ def asegurar_paciente_desde_cliente(cliente):
                 nombre__iexact=cliente.nombre.strip(),
             ).first()
 
+        if not cliente.activo:
+            if paciente and paciente.activo:
+                paciente.activo = False
+                if not paciente.cliente_id:
+                    paciente.cliente = cliente
+                    paciente.save(update_fields=["activo", "cliente", "fecha_actualizacion"])
+                else:
+                    paciente.save(update_fields=["activo", "fecha_actualizacion"])
+            return paciente, False
+
         datos = {
             "cliente": cliente,
             "identidad": identidad,
