@@ -134,7 +134,7 @@ class CampaniaMarketingForm(forms.ModelForm):
 
 class CitaClienteForm(forms.ModelForm):
     EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
-    EMPRESAS_CIRUGIA_EXTENDIDA = {"serviciosmedicos"}
+    EMPRESAS_CIRUGIA_EXTENDIDA = {"hospital_mia", "serviciosmedicos"}
 
     HORAS_12 = [
         (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
