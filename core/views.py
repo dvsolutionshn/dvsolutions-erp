@@ -16,6 +16,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.crypto import get_random_string
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
@@ -1570,6 +1571,36 @@ def superadmin_usuario_edit(request, usuario_id):
         "form": form,
         "titulo": f"Editar Usuario: {usuario.username}",
     })
+
+
+@superadmin_required
+@require_POST
+def superadmin_usuario_reset_password_temporal(request, usuario_id):
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if usuario.pk == request.user.pk:
+        messages.error(
+            request,
+            "Por seguridad no puedes generar una contrasena temporal para tu propia sesion desde aqui.",
+        )
+        return redirect("superadmin_usuario_edit", usuario_id=usuario.id)
+
+    password_temporal = f"DVS-{timezone.now():%y%m}-{get_random_string(8, allowed_chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789')}"
+    usuario.set_password(password_temporal)
+    usuario.is_active = True
+    usuario.save(update_fields=["password", "is_active"])
+    TokenAccesoUsuario.objects.filter(
+        usuario=usuario,
+        fecha_uso__isnull=True,
+        revocado=False,
+    ).update(revocado=True, fecha_revocacion=timezone.now())
+    messages.success(
+        request,
+        (
+            f"Contrasena temporal generada para {usuario.email or usuario.username}: "
+            f"{password_temporal} | Copiala ahora; por seguridad no se volvera a mostrar."
+        ),
+    )
+    return redirect("superadmin_usuario_edit", usuario_id=usuario.id)
 
 
 @superadmin_required

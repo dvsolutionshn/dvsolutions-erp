@@ -541,6 +541,32 @@ class SuperAdminControlTests(TestCase):
         self.assertTrue(usuario.check_password("ClaveNuevaSegura2026"))
         self.assertFalse(usuario.check_password("ClaveAnteriorSegura2026"))
 
+    def test_superadmin_puede_generar_password_temporal_sin_ver_password_actual(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Password Temporal",
+            slug="empresa-password-temporal",
+            rtn="08011999000062",
+        )
+        usuario = Usuario.objects.create_user(
+            username="usuario-password-temporal",
+            email="temporal@empresa.com",
+            password="ClaveAnteriorSegura2026",
+            empresa=empresa,
+            rol_sistema=self.rol_facturador,
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_reset_password_temporal", args=[usuario.id]),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Contrasena temporal generada")
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.is_active)
+        self.assertFalse(usuario.check_password("ClaveAnteriorSegura2026"))
+
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_invitacion_permite_crear_password_y_entrar_con_correo(self):
         import re
