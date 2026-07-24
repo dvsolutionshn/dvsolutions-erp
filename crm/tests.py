@@ -442,7 +442,7 @@ class CRMTests(TestCase):
         agenda = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
         self.assertContains(agenda, "+ Nuevo paciente")
         self.assertContains(agenda, "patientQuickModal")
-        self.assertContains(agenda, "Buscar por nombre, identidad, expediente, telÃ©fono o correo")
+        self.assertContains(agenda, "Buscar por nombre, identidad, expediente, teléfono o correo")
         self.assertContains(agenda, reverse("agenda_buscar_pacientes", args=[self.empresa.slug]))
 
         response = self.client.post(
@@ -919,6 +919,121 @@ class CRMTests(TestCase):
         self.assertTrue(distinta_doctora.is_valid(), distinta_doctora.errors.as_text())
         self.assertFalse(mismo_doctor.is_valid())
         self.assertIn("Ese horario se cruza", mismo_doctor.errors.as_text())
+
+    def test_agenda_respeta_capacidad_de_cubiculos_por_tipo_de_servicio(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra Candy Luque")
+        tratamiento = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Tratamientos",
+            categoria="tratamiento",
+            duracion_minutos=60,
+        )
+        fecha_hora = timezone.make_aware(datetime(2026, 7, 22, 10, 0))
+        for indice in range(7):
+            paciente = Paciente.objects.create(
+                empresa=self.empresa,
+                expediente_codigo=f"EXP-TRAT-{indice}",
+                nombre=f"Paciente Tratamiento {indice}",
+            )
+            CitaCliente.objects.create(
+                empresa=self.empresa,
+                paciente=paciente,
+                servicio_clinico=tratamiento,
+                profesional_salud=doctor,
+                titulo=tratamiento.nombre,
+                responsable=doctor.nombre,
+                fecha_hora=fecha_hora,
+                duracion_minutos=60,
+            )
+
+        paciente_extra = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="EXP-TRAT-EXTRA",
+            nombre="Paciente Extra",
+        )
+        form_lleno = CitaClienteForm({
+            "paciente": paciente_extra.id,
+            "servicio_clinico": tratamiento.id,
+            "profesional_salud": doctor.id,
+            "fecha_cita": "2026-07-22",
+            "hora_cita": "10:00",
+            "periodo_cita": "AM",
+            "estado": "pendiente",
+        }, empresa=self.empresa)
+        form_con_espacio = CitaClienteForm({
+            "paciente": paciente_extra.id,
+            "servicio_clinico": tratamiento.id,
+            "profesional_salud": doctor.id,
+            "fecha_cita": "2026-07-22",
+            "hora_cita": "11:00",
+            "periodo_cita": "AM",
+            "estado": "pendiente",
+        }, empresa=self.empresa)
+        form_legacy_lleno = CitaClienteForm({
+            "paciente": paciente_extra.id,
+            "servicio_clinico": tratamiento.id,
+            "profesional_salud": doctor.id,
+            "fecha_hora": "2026-07-22T10:00",
+            "estado": "pendiente",
+        }, empresa=self.empresa)
+
+        self.assertFalse(form_lleno.is_valid())
+        self.assertIn("Capacidad: 7; ocupados: 7", form_lleno.errors.as_text())
+        self.assertTrue(form_con_espacio.is_valid(), form_con_espacio.errors.as_text())
+        self.assertFalse(form_legacy_lleno.is_valid())
+        self.assertIn("Capacidad: 7; ocupados: 7", form_legacy_lleno.errors.as_text())
+
+    def test_agenda_respeta_capacidad_de_terapias_y_camara(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        doctor = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Enfermera Agenda")
+        servicios = [
+            ("Terapias", "tratamiento", 3),
+            ("Camara hiperbarica", "tratamiento", 3),
+        ]
+        for nombre, categoria, capacidad in servicios:
+            servicio = ServicioClinico.objects.create(
+                empresa=self.empresa,
+                nombre=nombre,
+                categoria=categoria,
+                duracion_minutos=60,
+            )
+            fecha_hora = timezone.make_aware(datetime(2026, 7, 23, 9, 0))
+            for indice in range(capacidad):
+                paciente = Paciente.objects.create(
+                    empresa=self.empresa,
+                    expediente_codigo=f"EXP-{nombre[:3]}-{indice}",
+                    nombre=f"Paciente {nombre} {indice}",
+                )
+                CitaCliente.objects.create(
+                    empresa=self.empresa,
+                    paciente=paciente,
+                    servicio_clinico=servicio,
+                    profesional_salud=doctor,
+                    titulo=servicio.nombre,
+                    responsable=doctor.nombre,
+                    fecha_hora=fecha_hora,
+                    duracion_minutos=60,
+                )
+            paciente_extra = Paciente.objects.create(
+                empresa=self.empresa,
+                expediente_codigo=f"EXP-{nombre[:3]}-EXTRA",
+                nombre=f"Paciente Extra {nombre}",
+            )
+            form = CitaClienteForm({
+                "paciente": paciente_extra.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": doctor.id,
+                "fecha_cita": "2026-07-23",
+                "hora_cita": "09:00",
+                "periodo_cita": "AM",
+                "estado": "pendiente",
+            }, empresa=self.empresa)
+
+            self.assertFalse(form.is_valid())
+            self.assertIn("Capacidad: 3; ocupados: 3", form.errors.as_text())
 
     @patch("crm.views.enviar_plantilla_cita_whatsapp")
     def test_modal_cita_permite_cancelar_y_reagendar_con_whatsapp(self, mock_whatsapp):

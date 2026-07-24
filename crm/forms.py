@@ -135,6 +135,11 @@ class CampaniaMarketingForm(forms.ModelForm):
 class CitaClienteForm(forms.ModelForm):
     EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
     EMPRESAS_CIRUGIA_EXTENDIDA = {"hospital_mia", "serviciosmedicos"}
+    CAPACIDAD_RECURSOS_AGENDA = {
+        "tratamientos": {"nombre": "Tratamientos", "capacidad": 7},
+        "camara_hiperbarica": {"nombre": "Camaras hiperbaricas", "capacidad": 3},
+        "terapias": {"nombre": "Terapias", "capacidad": 3},
+    }
 
     HORAS_12 = [
         (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
@@ -273,6 +278,61 @@ class CitaClienteForm(forms.ModelForm):
         nombre = (getattr(servicio, "nombre", "") or "").lower()
         return categoria == "cirugia" or "cirug" in nombre
 
+    def _recurso_capacidad_servicio(self, servicio):
+        if not servicio:
+            return ""
+        categoria = (getattr(servicio, "categoria", "") or "").lower()
+        nombre = (getattr(servicio, "nombre", "") or "").lower()
+        texto = f"{categoria} {nombre}"
+        if "camara" in texto or "cámara" in texto or "hiperbar" in texto:
+            return "camara_hiperbarica"
+        if "terapia" in texto:
+            return "terapias"
+        if (
+            categoria in {"tratamiento", "procedimiento"}
+            or "tratamiento" in texto
+            or "botox" in texto
+            or "relleno" in texto
+        ):
+            return "tratamientos"
+        return ""
+
+    def _validar_capacidad_recurso(self, inicio, fin_bloque, servicio):
+        recurso = self._recurso_capacidad_servicio(servicio)
+        if not recurso or not self.empresa:
+            return False
+
+        config = self.CAPACIDAD_RECURSOS_AGENDA[recurso]
+        citas = (
+            CitaCliente.objects.filter(
+                empresa=self.empresa,
+                fecha_hora__date=timezone.localtime(inicio).date(),
+            )
+            .exclude(estado="cancelada")
+            .select_related("servicio_clinico", "paciente", "cliente")
+        )
+        if self.instance and self.instance.pk:
+            citas = citas.exclude(pk=self.instance.pk)
+
+        ocupadas = 0
+        ejemplos = []
+        for cita in citas:
+            if self._recurso_capacidad_servicio(cita.servicio_clinico) != recurso:
+                continue
+            cita_inicio, cita_fin = self._rango_bloqueado_cita(cita)
+            if inicio < cita_fin and fin_bloque > cita_inicio:
+                ocupadas += 1
+                if len(ejemplos) < 3:
+                    ejemplos.append(cita.display_cliente)
+
+        if ocupadas >= config["capacidad"]:
+            detalle = f" Pacientes en ese horario: {', '.join(ejemplos)}." if ejemplos else ""
+            raise forms.ValidationError(
+                f"No hay cubiculos disponibles para {config['nombre']} a esa hora. "
+                f"Capacidad: {config['capacidad']}; ocupados: {ocupadas}.{detalle}"
+            )
+        return True
+
     def _rango_bloqueado_cita(self, cita):
         inicio = cita.fecha_hora
         if self.cirugia_extendida_activa and self._servicio_es_cirugia(cita.servicio_clinico) and cita.cirugia_fin_estimada:
@@ -313,26 +373,28 @@ class CitaClienteForm(forms.ModelForm):
 
         # Compatibilidad con integraciones y formularios anteriores al selector AM/PM.
         fecha_hora_anterior = (self.data.get("fecha_hora") or "").strip()
+        inicio = None
         if not all((fecha, hora_texto, periodo)) and fecha_hora_anterior:
             try:
                 fecha_hora = datetime.strptime(fecha_hora_anterior, "%Y-%m-%dT%H:%M")
                 inicio = timezone.make_aware(fecha_hora)
+                fecha = timezone.localtime(inicio).date()
                 cleaned_data["fecha_hora_compuesta"] = inicio
-                return cleaned_data
             except ValueError:
                 pass
 
-        if not fecha:
-            self.add_error("fecha_cita", "Selecciona la fecha de la cita.")
-        if not hora_texto:
-            self.add_error("hora_cita", "Selecciona la hora de la cita.")
-        if not periodo:
-            self.add_error("periodo_cita", "Selecciona AM o PM.")
-        if not all((fecha, hora_texto, periodo)):
-            return cleaned_data
+        if inicio is None:
+            if not fecha:
+                self.add_error("fecha_cita", "Selecciona la fecha de la cita.")
+            if not hora_texto:
+                self.add_error("hora_cita", "Selecciona la hora de la cita.")
+            if not periodo:
+                self.add_error("periodo_cita", "Selecciona AM o PM.")
+            if not all((fecha, hora_texto, periodo)):
+                return cleaned_data
 
-        inicio = self._armar_fecha_hora(fecha, hora_texto, periodo)
-        cleaned_data["fecha_hora_compuesta"] = inicio
+            inicio = self._armar_fecha_hora(fecha, hora_texto, periodo)
+            cleaned_data["fecha_hora_compuesta"] = inicio
         servicio = cleaned_data.get("servicio_clinico")
         profesional = cleaned_data.get("profesional_salud")
         fin_bloque = inicio + timedelta(minutes=(getattr(servicio, "duracion_minutos", None) or cleaned_data.get("duracion_minutos") or 30))
@@ -358,7 +420,12 @@ class CitaClienteForm(forms.ModelForm):
             cleaned_data["cirugia_fin_estimada_compuesta"] = None
 
         if not self.errors:
-            self._validar_traslapes_serviciosmedicos(inicio, fin_bloque, profesional)
+            try:
+                usa_capacidad = self._validar_capacidad_recurso(inicio, fin_bloque, servicio)
+                if not usa_capacidad:
+                    self._validar_traslapes_serviciosmedicos(inicio, fin_bloque, profesional)
+            except forms.ValidationError as exc:
+                self.add_error("fecha_cita", exc)
         return cleaned_data
 
     def save(self, commit=True):
