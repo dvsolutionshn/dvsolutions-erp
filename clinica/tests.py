@@ -972,6 +972,8 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Preparemos su consulta")
+        self.assertContains(response, "Lea esto antes de empezar")
+        self.assertContains(response, "contacte al admin DV Solutions")
         self.assertContains(response, "Laura")
         self.assertContains(response, "Paso 8 de 8")
         self.assertContains(response, "No aplica / no estoy seguro todavia")
@@ -1103,6 +1105,46 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Información recibida")
 
+    @patch("clinica.views._actualizar_paciente_desde_preconsulta")
+    def test_preconsulta_publica_muestra_soporte_si_ocurre_error_tecnico(self, actualizar_mock):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-ERR",
+            primer_nombre="Paciente",
+            primer_apellido="Error",
+            nombre="Paciente Error",
+            identidad="0801199600100",
+            whatsapp="99990010",
+        )
+        token_raw = "token-error-tecnico-preconsulta"
+        preconsulta = PreconsultaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="general",
+            token_hash=hash_token_preconsulta(token_raw),
+            token_preview="token...",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+            creada_por=self.user,
+        )
+        actualizar_mock.side_effect = RuntimeError("fallo controlado")
+
+        self.client.logout()
+        response = self.client.post(
+            reverse("clinica_preconsulta_publica", args=[token_raw]),
+            self._datos_formulario_general(
+                nombres="Paciente",
+                apellidos="Error",
+                identidad="0801199600100",
+                telefono="99990010",
+            ),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No pudimos enviar todavía")
+        self.assertContains(response, "contacte al admin DV Solutions")
+        preconsulta.refresh_from_db()
+        self.assertEqual(preconsulta.estado, "pendiente")
+
     def test_solo_admin_empresa_puede_eliminar_paciente(self):
         cliente = Cliente.objects.create(
             empresa=self.empresa,
@@ -1212,6 +1254,8 @@ class ClinicaPacienteTests(TestCase):
         publica_url = reverse("clinica_registro_paciente_publico", args=[token_raw])
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lea esto antes de empezar")
+        self.assertContains(response, "contacte al admin DV Solutions")
         self.assertContains(response, "Abrir cámara")
         self.assertContains(response, "Subir archivo")
         self.assertContains(response, 'enctype="multipart/form-data"', html=False)

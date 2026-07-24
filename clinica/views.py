@@ -1632,15 +1632,30 @@ def preconsulta_publica(request, token):
         empresa=preconsulta.empresa,
     )
     if request.method == "POST" and form.is_valid():
-        with transaction.atomic():
-            preconsulta = form.save(commit=False)
-            preconsulta.datos_generales = form.datos_generales_limpios()
-            preconsulta.estado = "completada"
-            preconsulta.fecha_completada = timezone.now()
-            preconsulta.ip_completada = _ip_cliente(request)
-            preconsulta.save()
-            _actualizar_paciente_desde_preconsulta(preconsulta.paciente, form)
-        return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
+        try:
+            with transaction.atomic():
+                preconsulta = form.save(commit=False)
+                preconsulta.datos_generales = form.datos_generales_limpios()
+                preconsulta.estado = "completada"
+                preconsulta.fecha_completada = timezone.now()
+                preconsulta.ip_completada = _ip_cliente(request)
+                preconsulta.save()
+                _actualizar_paciente_desde_preconsulta(preconsulta.paciente, form)
+        except ValidationError as exc:
+            logger.warning("Validacion al completar preconsulta publica %s: %s", preconsulta.id, exc)
+            if hasattr(exc, "message_dict"):
+                for campo, errores in exc.message_dict.items():
+                    form.add_error(campo if campo in form.fields else None, errores)
+            else:
+                form.add_error(None, exc)
+        except Exception:
+            logger.exception("Error tecnico al completar preconsulta publica %s", preconsulta.id)
+            form.add_error(
+                None,
+                "Ocurrio un problema tecnico al enviar el formulario. Sus respuestas siguen en pantalla; revise lo marcado e intente nuevamente. Si continua, contacte al admin DV Solutions.",
+            )
+        else:
+            return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
 
     return render(
         request,
@@ -1679,29 +1694,44 @@ def registro_paciente_publico(request, token):
         empresa=invitacion.empresa,
     )
     if request.method == "POST" and form.is_valid():
-        with transaction.atomic():
-            paciente, _preconsulta = _crear_paciente_desde_formulario_general(
-                form,
-                invitacion.empresa,
-                usuario=invitacion.creada_por,
-                ip_cliente=_ip_cliente(request),
-                fecha_expiracion=invitacion.fecha_expiracion,
-                descripcion_foto="Fotografia adjuntada por el paciente durante su registro seguro.",
-            )
+        try:
+            with transaction.atomic():
+                paciente, _preconsulta = _crear_paciente_desde_formulario_general(
+                    form,
+                    invitacion.empresa,
+                    usuario=invitacion.creada_por,
+                    ip_cliente=_ip_cliente(request),
+                    fecha_expiracion=invitacion.fecha_expiracion,
+                    descripcion_foto="Fotografia adjuntada por el paciente durante su registro seguro.",
+                )
 
-            invitacion.fecha_completada = timezone.now()
-            invitacion.ip_completada = _ip_cliente(request)
-            invitacion.paciente = paciente
-            invitacion.save(update_fields=[
-                "fecha_completada",
-                "ip_completada",
-                "paciente",
-            ])
-        return render(
-            request,
-            "clinica/preconsulta_publica_finalizada.html",
-            {"completada": True, "registro_nuevo": True},
-        )
+                invitacion.fecha_completada = timezone.now()
+                invitacion.ip_completada = _ip_cliente(request)
+                invitacion.paciente = paciente
+                invitacion.save(update_fields=[
+                    "fecha_completada",
+                    "ip_completada",
+                    "paciente",
+                ])
+        except ValidationError as exc:
+            logger.warning("Validacion al completar registro publico %s: %s", invitacion.id, exc)
+            if hasattr(exc, "message_dict"):
+                for campo, errores in exc.message_dict.items():
+                    form.add_error(campo if campo in form.fields else None, errores)
+            else:
+                form.add_error(None, exc)
+        except Exception:
+            logger.exception("Error tecnico al completar registro publico de paciente %s", invitacion.id)
+            form.add_error(
+                None,
+                "Ocurrio un problema tecnico al crear el expediente. Sus respuestas siguen en pantalla; revise lo marcado e intente nuevamente. Si continua, contacte al admin DV Solutions.",
+            )
+        else:
+            return render(
+                request,
+                "clinica/preconsulta_publica_finalizada.html",
+                {"completada": True, "registro_nuevo": True},
+            )
 
     return render(
         request,
