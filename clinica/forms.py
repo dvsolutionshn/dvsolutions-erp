@@ -1347,7 +1347,7 @@ class LenientMultipleChoiceField(forms.MultipleChoiceField):
 
 
 class PreconsultaClinicaPublicaForm(forms.ModelForm):
-    foto_perfil = forms.ImageField(
+    foto_perfil = forms.FileField(
         required=False,
         label="Fotografía del paciente",
         help_text="Puede tomarla con la cámara o seleccionar una imagen del dispositivo.",
@@ -1544,6 +1544,40 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         required=True,
         label="Confirmo que la informacion es correcta y autorizo su uso para mi atencion medica.",
     )
+    CHECKBOX_DEFAULTS = {
+        "motivo_categoria": ["no_aplica"],
+        "antecedentes_personales": ["no_aplica"],
+        "medicamentos_habituales": ["no_aplica"],
+        "antecedentes_familiares": ["no_aplica"],
+        "alergias_seleccion": ["ninguna"],
+        "medicamentos_actuales_seleccion": ["ninguno"],
+        "antecedentes_hospitalarios": ["no"],
+        "quirurgicos_operado": ["no"],
+        "consumo_riesgo": ["ninguno"],
+        "dieta": ["no_aplica"],
+        "ejercicio": ["no_aplica"],
+        "riesgo_tromboembolico": ["ninguno"],
+        "evaluacion_psicologica": ["ninguna"],
+        "expectativas_realistas": ["si"],
+        "busca_perfeccion": ["no"],
+        "multiples_cirugias_insatisfaccion": ["no"],
+    }
+    TEXT_DEFAULTS = {
+        "procedimientos_interes_otros": "No aplica",
+        "funciones_detalle": "No aplica",
+        "antecedentes_personales_detalle": "No aplica",
+        "alergias_otras": "No aplica",
+        "alergias": "No aplica",
+        "medicamentos_habituales_detalle": "No aplica",
+        "medicamentos_actuales_otros": "No aplica",
+        "antecedentes_infecciosos": "No aplica",
+        "antecedentes_hospitalarios_detalle": "No aplica",
+        "quirurgicos_detalle": "No aplica",
+        "consumo_riesgo_detalle": "No aplica",
+        "antecedentes_familiares_detalle": "No aplica",
+        "riesgo_tromboembolico_otros": "No aplica",
+        "evaluacion_psicologica_detalle": "No aplica",
+    }
 
     class Meta:
         model = PreconsultaClinica
@@ -1611,8 +1645,10 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         self.empresa = empresa or getattr(paciente, "empresa", None)
         super().__init__(*args, **kwargs)
         if paciente is None:
-            self.fields["foto_perfil"].required = True
-            self.fields["foto_perfil"].widget.attrs["data-required-photo"] = "1"
+            self.fields["foto_perfil"].required = False
+            self.fields["foto_perfil"].help_text = (
+                "Opcional. Si la camara o la foto falla, puede enviar el formulario y la fotografia se completa en recepcion."
+            )
         if paciente and not self.is_bound:
             for campo in [
                 "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
@@ -1667,7 +1703,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "evaluacion_psicologica", "expectativas_realistas", "busca_perfeccion", "multiples_cirugias_insatisfaccion",
         ]:
             if campo in self.fields:
-                self.fields[campo].required = True
+                self.fields[campo].required = False
         for campo in [
             "funciones_organicas", "funciones_detalle", "procedimientos_interes_otros",
             "antecedentes_personales_detalle", "alergias_otras", "alergias",
@@ -1694,13 +1730,21 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     def clean_foto_perfil(self):
         foto = self.cleaned_data.get("foto_perfil")
         if foto and foto.size > 8 * 1024 * 1024:
-            raise forms.ValidationError("La fotografía no puede superar 8 MB.")
+            return None
         if foto and getattr(foto, "content_type", "") not in {"image/jpeg", "image/png", "image/webp"}:
-            raise forms.ValidationError("Utilice una fotografía JPG, PNG o WebP.")
+            return None
         return foto
 
     def clean(self):
         cleaned_data = super().clean()
+        for campo, valor in self.CHECKBOX_DEFAULTS.items():
+            if campo in self.fields and not cleaned_data.get(campo):
+                cleaned_data[campo] = list(valor)
+        if not cleaned_data.get("funciones_organicas"):
+            cleaned_data["funciones_organicas"] = ["no_aplica"]
+        for campo, valor in self.TEXT_DEFAULTS.items():
+            if campo in self.fields and not (cleaned_data.get(campo) or "").strip():
+                cleaned_data[campo] = valor
         nombres = (cleaned_data.get("nombres") or "").strip()
         apellidos = (cleaned_data.get("apellidos") or "").strip()
         partes_nombre = nombres.split()
@@ -1774,7 +1818,11 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             cleaned_data["procedimientos_interes"] = []
             cleaned_data["procedimientos_interes_otros"] = ""
         elif categorias.intersection(categorias_con_procedimiento) and not cleaned_data.get("procedimientos_interes"):
-            self.add_error("procedimientos_interes", "Seleccione al menos una opcion o marque No aplica en el motivo principal.")
+            cleaned_data["procedimientos_interes"] = [
+                f"no_aplica_{categoria}"
+                for categoria in categorias
+                if categoria in categorias_con_procedimiento
+            ]
 
         if cleaned_data.get("sexo") == "masculino":
             for campo in [
@@ -1800,8 +1848,6 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         if categorias.isdisjoint(categorias_cirugia):
             cleaned_data["decision_cirugia"] = []
             cleaned_data["decision_cirugia_otros"] = ""
-        elif not cleaned_data.get("decision_cirugia"):
-            self.add_error("decision_cirugia", "Indique quien tomo la decision de operarse.")
         return cleaned_data
 
     @property

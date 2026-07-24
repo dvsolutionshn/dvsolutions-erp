@@ -294,7 +294,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Revise los campos marcados")
         self.assertFalse(Paciente.objects.filter(empresa=self.empresa, identidad="0801199912350").exists())
 
-    def test_crear_paciente_rechaza_foto_inicial_mayor_a_5_mb(self):
+    def test_crear_paciente_no_se_bloquea_por_foto_inicial_mayor(self):
         image_buffer = BytesIO()
         Image.effect_noise((3200, 3200), 100).convert("RGB").save(image_buffer, format="JPEG", quality=95)
         self.assertGreater(len(image_buffer.getvalue()), 5 * 1024 * 1024)
@@ -305,9 +305,9 @@ class ClinicaPacienteTests(TestCase):
             self._datos_formulario_general(identidad="0801199912351", nombres="Foto", apellidos="Grande", foto_perfil=foto_grande),
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "La fotograf")
-        self.assertFalse(Paciente.objects.filter(empresa=self.empresa, identidad="0801199912351").exists())
+        self.assertEqual(response.status_code, 302)
+        paciente = Paciente.objects.get(empresa=self.empresa, identidad="0801199912351")
+        self.assertFalse(bool(paciente.foto_perfil))
 
     def test_crear_paciente_refresca_expediente_si_el_codigo_ya_existe(self):
         Paciente.objects.create(
@@ -1390,3 +1390,37 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(segundo_paciente.nombre, "Elvin Francisco Romero")
         self.assertIsNotNone(segundo_paciente.cliente)
         self.assertEqual(PreconsultaClinica.objects.filter(paciente=segundo_paciente, estado="completada").count(), 1)
+
+    def test_enlace_paciente_nuevo_crea_expediente_sin_foto_y_con_secciones_clinicas_omitidas(self):
+        response = self.client.post(
+            reverse("clinica_generar_enlace_registro_paciente", args=[self.empresa.slug])
+        )
+        enlace = response.context["enlace_publico"]
+        token_raw = enlace.rstrip("/").rsplit("/", 1)[-1]
+
+        self.client.logout()
+        response = self.client.post(
+            reverse("clinica_registro_paciente_publico", args=[token_raw]),
+            {
+                "nombres": "Paciente",
+                "apellidos": "Sin Foto",
+                "identidad": "0801199900199",
+                "fecha_nacimiento": "1995-05-20",
+                "sexo": "masculino",
+                "estado_civil": "soltero",
+                "telefono_codigo_area": "504",
+                "telefono": "99996666",
+                "informante": "yo_mismo",
+                "referido_por": "no_aplica",
+                "consentimiento_datos": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Expediente creado")
+        paciente = Paciente.objects.get(identidad="0801199900199")
+        self.assertFalse(bool(paciente.foto_perfil))
+        preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
+        self.assertEqual(preconsulta.datos_generales["formulario_general"]["motivo_categoria"], ["no_aplica"])
+        self.assertIn("No aplica", paciente.antecedentes_medicos)
+        self.assertEqual(paciente.alergias, "No aplica")

@@ -63,7 +63,7 @@
                             </div>
                         </div>
                     </div>
-                    <p class="camera-note" id="photoStatus">Formatos permitidos: JPG, PNG o WebP. Tamaño máximo: 8 MB. Si una foto no carga, pruebe tomar una nueva foto o subir una imagen más liviana.</p>
+                    <p class="camera-note" id="photoStatus">La fotografía es opcional. Formatos permitidos: JPG, PNG o WebP. Si una foto no carga, puede continuar y el equipo la completará en recepción.</p>
                     {% for error in form.foto_perfil.errors %}<div class="photo-error">{{ error }}</div>{% endfor %}
                 </div>
                 {% endif %}
@@ -365,6 +365,7 @@
     }
     function groupMissingRecord(group){
         const inputs=[...group.querySelectorAll('input[type="checkbox"],input[type="radio"]')].filter(input=>!input.disabled);
+        if(!inputs.some(input=>input.required))return null;
         if(!inputs.length||inputs.some(input=>input.checked))return null;
         return {element:inputs[0],label:fieldLabel(inputs[0]),message:"Seleccione al menos una opcion."};
     }
@@ -592,9 +593,7 @@
             }
             if(!validatePhotoFile(file)){
                 photoInput.value="";
-                markMissing(photoInput,"Suba una fotografia JPG, PNG o WebP menor de 8 MB.");
-                show(0,{keepScroll:true});
-                goToMissing(photoInput);
+                status.textContent="La foto no se pudo adjuntar, pero puede continuar. El equipo la completara en recepcion.";
                 return;
             }
             showPreview(file);
@@ -602,10 +601,8 @@
         form.addEventListener("submit",event=>{
             const file=photoInput.files[0];
             if(file&&!validatePhotoFile(file)){
-                event.preventDefault();event.stopPropagation();
-                markMissing(photoInput,"Suba una fotografia JPG, PNG o WebP menor de 8 MB.");
-                showMissingDialog([{element:photoInput,label:"Fotografia del paciente",message:"Suba una fotografia JPG, PNG o WebP menor de 8 MB."}]);
-                goToMissing(photoInput);
+                photoInput.value="";
+                status.textContent="La foto no se adjunto por formato o tamano, pero el formulario puede enviarse. El equipo la completara en recepcion.";
             }
         });
         openCamera.addEventListener("click",async()=>{
