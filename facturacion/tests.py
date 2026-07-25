@@ -5779,6 +5779,15 @@ class FacturacionTests(TestCase):
         self.assertContains(response, self.cliente.nombre)
         self.assertContains(response, self.producto.nombre)
 
+    def test_reportes_permite_abrir_factura_filtrada(self):
+        factura = self.crear_factura_con_linea(estado="emitida")
+
+        response = self.client.get(reverse("reportes_facturacion", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        self.assertContains(response, "Ver factura")
+
     def test_dashboard_bi_facturacion_renderiza_panel_ejecutivo(self):
         self.crear_factura_con_linea(estado="emitida")
 

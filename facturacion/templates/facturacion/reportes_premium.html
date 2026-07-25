@@ -708,6 +708,7 @@
                         <th>Total</th>
                         <th>Saldo</th>
                         <th>Estado</th>
+                        <th>Accion</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -760,10 +761,13 @@
                             <span class="erp-badge danger">Pendiente</span>
                             {% endif %}
                         </td>
+                        <td>
+                            <a class="erp-link" href="{% url 'ver_factura' empresa.slug f.id %}">Ver factura</a>
+                        </td>
                     </tr>
                 {% endwith %}
                 {% empty %}
-                    <tr><td colspan="10" class="erp-empty">Sin resultados para los filtros seleccionados.</td></tr>
+                    <tr><td colspan="11" class="erp-empty">Sin resultados para los filtros seleccionados.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

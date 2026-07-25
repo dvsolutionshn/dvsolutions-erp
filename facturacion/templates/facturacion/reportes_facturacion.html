@@ -181,6 +181,7 @@ Limpiar
 <th>Total</th>
 <th>Saldo</th>
 <th>Estado</th>
+<th>AcciÃ³n</th>
 </tr>
 </thead>
 
@@ -223,11 +224,14 @@ L {{ r.descuento_total|floatformat:2|intcomma }}
 <span class="pendiente">Pendiente</span>
 {% endif %}
 </td>
+<td>
+<a href="{% url 'ver_factura' empresa.slug f.id %}">Ver factura</a>
+</td>
 
 </tr>
 {% endwith %}
 {% empty %}
-<tr><td colspan="14">Sin resultados</td></tr>
+<tr><td colspan="15">Sin resultados</td></tr>
 {% endfor %}
 
 </tbody>
