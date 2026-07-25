@@ -43,6 +43,7 @@ class FacturacionTests(TestCase):
             puede_configuracion_facturacion=True,
             puede_cierres_caja=True,
             puede_facturas=True,
+            puede_ver_facturas=True,
             puede_clientes=True,
             puede_productos=True,
             puede_proveedores=True,
