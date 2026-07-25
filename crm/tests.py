@@ -920,6 +920,72 @@ class CRMTests(TestCase):
         self.assertFalse(mismo_doctor.is_valid())
         self.assertIn("Ese horario se cruza", mismo_doctor.errors.as_text())
 
+    def test_hospital_mia_cirugia_usa_hora_inicio_y_finalizacion(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-CIR-HM", nombre="Paciente Cirugia")
+        paciente_2 = Paciente.objects.create(empresa=self.empresa, expediente_codigo="EXP-CIR-HM2", nombre="Paciente Cirugia Dos")
+        cirugia = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Cirugia plastica",
+            categoria="cirugia",
+            duracion_minutos=60,
+        )
+        consulta = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta General",
+            categoria="consulta",
+            duracion_minutos=30,
+        )
+        dra_candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra Candy Luque")
+        dr_luis = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dr Luis Gonzales")
+
+        form = CitaClienteForm({
+            "paciente": paciente.id,
+            "servicio_clinico": cirugia.id,
+            "profesional_salud": dra_candy.id,
+            "fecha_cita": "2026-08-10",
+            "hora_cita": "01:00",
+            "periodo_cita": "PM",
+            "cirugia_hora_fin": "06:00",
+            "cirugia_periodo_fin": "PM",
+            "cirugia_detalle": "Rinoplastia con control postoperatorio",
+            "estado": "pendiente",
+        }, empresa=self.empresa)
+
+        self.assertIn("cirugia_hora_fin", form.fields)
+        self.assertIn("cirugia_periodo_fin", form.fields)
+        self.assertIn("cirugia_detalle", form.fields)
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        cita = form.save(commit=False)
+        self.assertEqual(timezone.localtime(cita.fecha_hora).strftime("%Y-%m-%d %I:%M %p"), "2026-08-10 01:00 PM")
+        self.assertEqual(timezone.localtime(cita.cirugia_fin_estimada).strftime("%Y-%m-%d %I:%M %p"), "2026-08-10 06:00 PM")
+        cita.empresa = self.empresa
+        cita.save()
+
+        mismo_profesional = CitaClienteForm({
+            "paciente": paciente_2.id,
+            "servicio_clinico": consulta.id,
+            "profesional_salud": dra_candy.id,
+            "fecha_cita": "2026-08-10",
+            "hora_cita": "06:30",
+            "periodo_cita": "PM",
+            "estado": "pendiente",
+        }, empresa=self.empresa)
+        otro_profesional = CitaClienteForm({
+            "paciente": paciente_2.id,
+            "servicio_clinico": consulta.id,
+            "profesional_salud": dr_luis.id,
+            "fecha_cita": "2026-08-10",
+            "hora_cita": "06:30",
+            "periodo_cita": "PM",
+            "estado": "pendiente",
+        }, empresa=self.empresa)
+
+        self.assertFalse(mismo_profesional.is_valid())
+        self.assertIn("bloqueado de 01:00 PM a 07:00 PM", mismo_profesional.errors.as_text())
+        self.assertTrue(otro_profesional.is_valid(), otro_profesional.errors.as_text())
+
     def test_agenda_respeta_capacidad_de_cubiculos_por_tipo_de_servicio(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])

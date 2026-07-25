@@ -340,7 +340,7 @@ class CitaClienteForm(forms.ModelForm):
         minutos = cita.duracion_minutos or getattr(cita.servicio_clinico, "duracion_minutos", None) or 30
         return inicio, inicio + timedelta(minutes=minutos)
 
-    def _validar_traslapes_serviciosmedicos(self, inicio, fin_bloque, profesional=None):
+    def _validar_traslapes_agenda_extendida(self, inicio, fin_bloque, profesional=None):
         if not self.cirugia_extendida_activa or not self.empresa:
             return
         citas = (
@@ -423,7 +423,7 @@ class CitaClienteForm(forms.ModelForm):
             try:
                 usa_capacidad = self._validar_capacidad_recurso(inicio, fin_bloque, servicio)
                 if not usa_capacidad:
-                    self._validar_traslapes_serviciosmedicos(inicio, fin_bloque, profesional)
+                    self._validar_traslapes_agenda_extendida(inicio, fin_bloque, profesional)
             except forms.ValidationError as exc:
                 self.add_error("fecha_cita", exc)
         return cleaned_data
