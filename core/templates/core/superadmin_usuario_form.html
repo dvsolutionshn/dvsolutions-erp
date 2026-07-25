@@ -33,10 +33,7 @@
                 <p>Las contrasenas actuales estan protegidas con hash irreversible. Para administrar accesos, genera una contrasena temporal, copiala en ese momento y entregala al usuario.</p>
             </div>
             {% if form.instance.id != request.user.id %}
-            <form method="post" action="{% url 'superadmin_usuario_reset_password_temporal' form.instance.id %}" data-temp-password-form>
-                {% csrf_token %}
-                <button type="submit" class="erp-btn-secondary">Generar contrasena temporal</button>
-            </form>
+            <button type="submit" class="erp-btn-secondary" form="tempPasswordForm">Generar contrasena temporal</button>
             {% else %}
             <span class="erp-badge neutral">Tu propia sesion</span>
             {% endif %}
@@ -151,6 +148,11 @@
         <button type="submit" class="erp-btn" id="usuarioSubmitButton">{% if form.instance.pk %}Guardar Usuario{% else %}Crear y enviar invitacion{% endif %}</button>
     </div>
 </form>
+{% if form.instance.pk and form.instance.id != request.user.id %}
+<form id="tempPasswordForm" method="post" action="{% url 'superadmin_usuario_reset_password_temporal' form.instance.id %}" data-temp-password-form style="display:none;">
+    {% csrf_token %}
+</form>
+{% endif %}
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {

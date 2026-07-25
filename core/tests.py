@@ -542,6 +542,30 @@ class SuperAdminControlTests(TestCase):
         self.assertTrue(usuario.check_password("ClaveNuevaSegura2026"))
         self.assertFalse(usuario.check_password("ClaveAnteriorSegura2026"))
 
+    def test_edicion_usuario_no_anida_formulario_de_password_temporal(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa HTML Clave",
+            slug="empresa-html-clave",
+            rtn="08011999000064",
+        )
+        usuario = Usuario.objects.create_user(
+            username="usuario-html-clave",
+            email="htmlclave@empresa.com",
+            password="ClaveAnteriorSegura2026",
+            empresa=empresa,
+            rol_sistema=self.rol_facturador,
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.get(reverse("superadmin_usuario_edit", args=[usuario.id]))
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        main_form_end = html.index("</form>")
+        temp_form_start = html.index('id="tempPasswordForm"')
+        self.assertGreater(temp_form_start, main_form_end)
+        self.assertContains(response, 'form="tempPasswordForm"')
+
     def test_superadmin_puede_generar_password_temporal_sin_ver_password_actual(self):
         empresa = Empresa.objects.create(
             nombre="Empresa Password Temporal",
