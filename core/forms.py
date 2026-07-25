@@ -588,6 +588,7 @@ class RolSistemaForm(forms.ModelForm):
             "puede_configuracion_facturacion": ("Puede configurar Facturacion", "Autoriza plantillas, identidad documental y reglas comerciales."),
             "puede_cierres_caja": ("Puede gestionar Cierres de Caja", "Autoriza cierres por cajero, detalle y resumen diario."),
             "puede_facturas": ("Puede entrar a facturas", ""),
+            "puede_ver_facturas": ("Puede ver historial de facturas", "Autoriza listado, busqueda y consulta de facturas anteriores. Desactivalo para personal que solo debe crear facturas."),
             "puede_clientes": ("Puede entrar a clientes", ""),
             "puede_productos": ("Puede entrar a productos", ""),
             "puede_proveedores": ("Puede entrar a proveedores", ""),

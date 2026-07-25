@@ -32,6 +32,7 @@ class RolSistema(models.Model):
     puede_configuracion_facturacion = models.BooleanField(default=False)
     puede_cierres_caja = models.BooleanField(default=False)
     puede_facturas = models.BooleanField(default=False)
+    puede_ver_facturas = models.BooleanField(default=False)
     puede_clientes = models.BooleanField(default=False)
     puede_productos = models.BooleanField(default=False)
     puede_proveedores = models.BooleanField(default=False)
@@ -109,6 +110,7 @@ class RolSistema(models.Model):
                 "puede_configuracion_facturacion",
                 "puede_cierres_caja",
                 "puede_facturas",
+                "puede_ver_facturas",
                 "puede_clientes",
                 "puede_productos",
                 "puede_proveedores",
@@ -122,6 +124,12 @@ class RolSistema(models.Model):
                 "puede_reportes",
                 "puede_cxc",
                 "puede_cxp",
+                "puede_crear_facturas",
+                "puede_editar_facturas",
+                "puede_anular_facturas",
+                "puede_registrar_pagos_clientes",
+                "puede_crear_clientes",
+                "puede_crear_productos",
             ]
         )
 
@@ -416,50 +424,106 @@ class Usuario(AbstractUser):
             activa=True,
         ).order_by("nombre")
 
-    def tiene_permiso_erp(self, permiso):
+    def rol_para_empresa(self, empresa=None):
+        if not empresa or not self.pk:
+            return self.rol_sistema
+        empresa_id = getattr(empresa, "id", empresa)
+        permiso_empresa = (
+            self.permisos_por_empresa
+            .filter(empresa_id=empresa_id, activo=True)
+            .select_related("rol_sistema")
+            .first()
+        )
+        if permiso_empresa:
+            return permiso_empresa.rol_sistema
+        return self.rol_sistema
+
+    def tiene_permiso_erp(self, permiso, empresa=None):
         if self.is_superuser or self.es_administrador_empresa:
             return True
+        rol = self.rol_para_empresa(empresa)
         return bool(
-            self.rol_sistema_id
-            and self.rol_sistema.activo
-            and getattr(self.rol_sistema, permiso, False)
+            rol
+            and rol.activo
+            and getattr(rol, permiso, False)
         )
+
+    def tiene_alguna_permision_facturacion_empresa(self, empresa=None):
+        if self.is_superuser or self.es_administrador_empresa:
+            return True
+        rol = self.rol_para_empresa(empresa)
+        return bool(rol and rol.activo and rol.tiene_algun_acceso_facturacion)
 
     @property
     def tiene_alguna_permision_facturacion(self):
+        return self.tiene_alguna_permision_facturacion_empresa()
+
+    def tiene_alguna_permision_contabilidad_empresa(self, empresa=None):
         if self.is_superuser or self.es_administrador_empresa:
             return True
-        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_facturacion)
+        rol = self.rol_para_empresa(empresa)
+        return bool(rol and rol.activo and rol.tiene_algun_acceso_contabilidad)
 
     @property
     def tiene_alguna_permision_contabilidad(self):
+        return self.tiene_alguna_permision_contabilidad_empresa()
+
+    def tiene_alguna_permision_rrhh_empresa(self, empresa=None):
         if self.is_superuser or self.es_administrador_empresa:
             return True
-        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_contabilidad)
+        rol = self.rol_para_empresa(empresa)
+        return bool(rol and rol.activo and rol.tiene_algun_acceso_rrhh)
 
     @property
     def tiene_alguna_permision_rrhh(self):
+        return self.tiene_alguna_permision_rrhh_empresa()
+
+    def tiene_alguna_permision_crm_empresa(self, empresa=None):
         if self.is_superuser or self.es_administrador_empresa:
             return True
-        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_rrhh)
+        rol = self.rol_para_empresa(empresa)
+        return bool(rol and rol.activo and rol.tiene_algun_acceso_crm)
 
     @property
     def tiene_alguna_permision_crm(self):
+        return self.tiene_alguna_permision_crm_empresa()
+
+    def tiene_alguna_permision_clinica_empresa(self, empresa=None):
         if self.is_superuser or self.es_administrador_empresa:
             return True
-        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_crm)
+        rol = self.rol_para_empresa(empresa)
+        return bool(rol and rol.activo and rol.tiene_algun_acceso_clinica)
 
     @property
     def tiene_alguna_permision_clinica(self):
+        return self.tiene_alguna_permision_clinica_empresa()
+
+    def tiene_alguna_permision_tecnicentro_empresa(self, empresa=None):
         if self.is_superuser or self.es_administrador_empresa:
             return True
-        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_clinica)
+        rol = self.rol_para_empresa(empresa)
+        return bool(rol and rol.activo and rol.tiene_algun_acceso_tecnicentro)
 
     @property
     def tiene_alguna_permision_tecnicentro(self):
-        if self.is_superuser or self.es_administrador_empresa:
-            return True
-        return bool(self.rol_sistema_id and self.rol_sistema.activo and self.rol_sistema.tiene_algun_acceso_tecnicentro)
+        return self.tiene_alguna_permision_tecnicentro_empresa()
+
+
+class UsuarioEmpresaPermiso(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="permisos_por_empresa")
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="permisos_usuarios")
+    rol_sistema = models.ForeignKey(RolSistema, on_delete=models.PROTECT, related_name="permisos_empresa_usuario")
+    activo = models.BooleanField(default=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("usuario", "empresa")
+        ordering = ["empresa__nombre"]
+        verbose_name = "Permiso de usuario por empresa"
+        verbose_name_plural = "Permisos de usuarios por empresa"
+
+    def __str__(self):
+        return f"{self.usuario.email or self.usuario.username} - {self.empresa.nombre}: {self.rol_sistema.nombre}"
 
 
 class RegistroAuditoria(models.Model):

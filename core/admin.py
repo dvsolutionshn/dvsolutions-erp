@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConfiguracionAvanzadaEmpresa, Empresa, PlanComercial, PlanModulo, RolSistema, Usuario
+from .models import ConfiguracionAvanzadaEmpresa, Empresa, PlanComercial, PlanModulo, RolSistema, Usuario, UsuarioEmpresaPermiso
 
 
 @admin.register(Empresa)
@@ -58,4 +58,11 @@ class PlanModuloAdmin(admin.ModelAdmin):
 
 @admin.register(RolSistema)
 class RolSistemaAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'codigo', 'activo', 'puede_punto_venta', 'puede_cierres_caja', 'puede_facturas', 'puede_inventario', 'puede_reportes')
+    list_display = ('nombre', 'codigo', 'activo', 'puede_punto_venta', 'puede_cierres_caja', 'puede_facturas', 'puede_ver_facturas', 'puede_inventario', 'puede_reportes')
+
+
+@admin.register(UsuarioEmpresaPermiso)
+class UsuarioEmpresaPermisoAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "empresa", "rol_sistema", "activo", "fecha_actualizacion")
+    list_filter = ("activo", "empresa", "rol_sistema")
+    search_fields = ("usuario__username", "usuario__email", "empresa__nombre", "rol_sistema__nombre")

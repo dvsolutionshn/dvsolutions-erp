@@ -22,8 +22,8 @@ FACTURACION_PERMISSION_MAP = [
     ("cxc/", "puede_cxc"),
     ("cxp/", "puede_cxp"),
     ("cotizaciones/", "puede_facturas"),
-    ("facturas/", "puede_facturas"),
-    ("crear/", "puede_facturas"),
+    ("facturas/", "puede_ver_facturas"),
+    ("crear/", "puede_crear_facturas"),
 ]
 
 CONTABILIDAD_PERMISSION_MAP = [
@@ -75,7 +75,7 @@ def permiso_facturacion_desde_ruta(path_suffix):
         return None
     normalized = path_suffix if path_suffix.endswith("/") else f"{path_suffix}/"
     if normalized.startswith(tuple(str(i) for i in range(10))):
-        return "puede_facturas"
+        return "puede_ver_facturas"
     for prefix, permiso in FACTURACION_PERMISSION_MAP:
         if normalized.startswith(prefix):
             return permiso

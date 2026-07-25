@@ -50,6 +50,7 @@ from .models import (
     TokenRespaldoEmpresa,
     TokenAccesoUsuario,
     Usuario,
+    UsuarioEmpresaPermiso,
 )
 
 
@@ -63,6 +64,63 @@ SESSION_EXPIRED_MESSAGE_KEY = "dvsolutions_session_expired_message"
 SESSION_EXPIRED_MESSAGE = "Vuelve a iniciar sesion para continuar."
 BACKUP_TOKEN_MAX_ATTEMPTS = 5
 BACKUP_TOKEN_WINDOW_SECONDS = 15 * 60
+
+
+def _usuario_empresas_config(form, request):
+    empresas = list(Empresa.objects.filter(activa=True).order_by("nombre"))
+    roles = list(RolSistema.objects.filter(activo=True).order_by("nombre"))
+    seleccionadas = set()
+    if request.method == "POST":
+        seleccionadas.update(int(valor) for valor in request.POST.getlist("empresas_acceso") if valor.isdigit())
+        empresa_principal = request.POST.get("empresa")
+        if empresa_principal and empresa_principal.isdigit():
+            seleccionadas.add(int(empresa_principal))
+    else:
+        usuario = getattr(form, "instance", None)
+        if usuario and usuario.pk:
+            seleccionadas.update(usuario.empresas_acceso.values_list("id", flat=True))
+            if usuario.empresa_id:
+                seleccionadas.add(usuario.empresa_id)
+        else:
+            inicial = form.fields.get("empresas_acceso").initial if "empresas_acceso" in form.fields else None
+            if inicial:
+                seleccionadas.update(getattr(item, "id", item) for item in inicial)
+
+    permisos_actuales = {}
+    usuario = getattr(form, "instance", None)
+    if usuario and usuario.pk:
+        permisos_actuales = {
+            permiso.empresa_id: permiso.rol_sistema_id
+            for permiso in usuario.permisos_por_empresa.filter(activo=True)
+        }
+
+    config = []
+    for empresa in empresas:
+        posted_role = request.POST.get(f"empresa_rol_{empresa.id}") if request.method == "POST" else None
+        config.append({
+            "empresa": empresa,
+            "seleccionada": empresa.id in seleccionadas,
+            "rol_id": int(posted_role) if posted_role and posted_role.isdigit() else permisos_actuales.get(empresa.id),
+        })
+    return {"empresas_config": config, "roles_empresa": roles}
+
+
+def _guardar_roles_por_empresa(usuario, post_data):
+    empresas_ids = {int(valor) for valor in post_data.getlist("empresas_acceso") if valor.isdigit()}
+    if usuario.empresa_id:
+        empresas_ids.add(usuario.empresa_id)
+
+    UsuarioEmpresaPermiso.objects.filter(usuario=usuario).exclude(empresa_id__in=empresas_ids).delete()
+    for empresa_id in empresas_ids:
+        rol_id = post_data.get(f"empresa_rol_{empresa_id}")
+        if rol_id and str(rol_id).isdigit():
+            UsuarioEmpresaPermiso.objects.update_or_create(
+                usuario=usuario,
+                empresa_id=empresa_id,
+                defaults={"rol_sistema_id": int(rol_id), "activo": True},
+            )
+        else:
+            UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa_id=empresa_id).delete()
 
 
 def _public_demo_catalog():
@@ -426,12 +484,12 @@ def empresa_login(request, slug=None):
                 if es_perfil_clinico:
                     if (
                         empresa.tiene_modulo_activo("clinica_medica")
-                        and user.tiene_alguna_permision_clinica
+                        and user.tiene_alguna_permision_clinica_empresa(empresa)
                     ):
                         return redirect("clinica_dashboard", empresa_slug=empresa.slug)
                     if (
                         empresa.tiene_modulo_activo("agenda_citas")
-                        and user.tiene_permiso_erp("puede_citas")
+                        and user.tiene_permiso_erp("puede_citas", empresa)
                     ):
                         return redirect("agenda_citas", empresa_slug=empresa.slug)
                 return _redirect_dashboard_empresa(request, empresa)
@@ -1504,6 +1562,7 @@ def superadmin_usuario_create(request):
     form = UsuarioControlCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         usuario = form.save()
+        _guardar_roles_por_empresa(usuario, request.POST)
         if form.cleaned_data["modo_creacion"] == UsuarioControlCreateForm.MODO_RAPIDO:
             messages.success(
                 request,
@@ -1543,6 +1602,7 @@ def superadmin_usuario_create(request):
         **_superadmin_base_context(),
         "form": form,
         "titulo": "Nuevo Usuario",
+        **_usuario_empresas_config(form, request),
     })
 
 
@@ -1553,6 +1613,7 @@ def superadmin_usuario_edit(request, usuario_id):
     form = UsuarioControlUpdateForm(request.POST or None, instance=usuario)
     if request.method == "POST" and form.is_valid():
         usuario = form.save()
+        _guardar_roles_por_empresa(usuario, request.POST)
         if not usuario.is_active and email_anterior.lower() != usuario.email.lower():
             TokenAccesoUsuario.objects.filter(
                 usuario=usuario,
@@ -1570,6 +1631,7 @@ def superadmin_usuario_edit(request, usuario_id):
         **_superadmin_base_context(),
         "form": form,
         "titulo": f"Editar Usuario: {usuario.username}",
+        **_usuario_empresas_config(form, request),
     })
 
 

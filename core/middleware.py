@@ -59,13 +59,13 @@ class EmpresaAccessMiddleware:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_facturacion_desde_ruta(suffix)
                     permiso_accion = permiso_facturacion_accion(suffix)
-                    if permiso and not request.user.tiene_permiso_erp(permiso):
+                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if permiso_accion and not request.user.tiene_permiso_erp(permiso_accion):
+                    if permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa):
                         messages.error(request, "Tu rol no tiene permiso para ejecutar esta accion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if not suffix and not request.user.tiene_alguna_permision_facturacion:
+                    if not suffix and not request.user.tiene_alguna_permision_facturacion_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de facturacion.")
                         return redirect("dashboard", slug=empresa.slug)
 
@@ -89,13 +89,13 @@ class EmpresaAccessMiddleware:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_contabilidad_desde_ruta(suffix)
                     permiso_accion = permiso_contabilidad_accion(suffix)
-                    if permiso and not request.user.tiene_permiso_erp(permiso):
+                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if permiso_accion and not request.user.tiene_permiso_erp(permiso_accion):
+                    if permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa):
                         messages.error(request, "Tu rol no tiene permiso para ejecutar esta accion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if not suffix and not request.user.tiene_alguna_permision_contabilidad:
+                    if not suffix and not request.user.tiene_alguna_permision_contabilidad_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de contabilidad.")
                         return redirect("dashboard", slug=empresa.slug)
 
@@ -118,10 +118,10 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_rrhh_desde_ruta(suffix)
-                    if permiso and not request.user.tiene_permiso_erp(permiso):
+                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if not suffix and not request.user.tiene_alguna_permision_rrhh:
+                    if not suffix and not request.user.tiene_alguna_permision_rrhh_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de recursos humanos.")
                         return redirect("dashboard", slug=empresa.slug)
 
@@ -144,10 +144,10 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_crm_desde_ruta(suffix)
-                    if permiso and not request.user.tiene_permiso_erp(permiso):
+                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if not suffix and not request.user.tiene_alguna_permision_crm:
+                    if not suffix and not request.user.tiene_alguna_permision_crm_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo CRM.")
                         return redirect("dashboard", slug=empresa.slug)
 
@@ -168,7 +168,7 @@ class EmpresaAccessMiddleware:
                     return redirect("dashboard", slug=empresa.slug)
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    if not request.user.tiene_permiso_erp("puede_citas"):
+                    if not request.user.tiene_permiso_erp("puede_citas", empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a citas.")
                         return redirect("dashboard", slug=empresa.slug)
 
@@ -191,10 +191,10 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_clinica_desde_ruta(suffix)
-                    if permiso and not request.user.tiene_permiso_erp(permiso):
+                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion clinica.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if not suffix and not request.user.tiene_alguna_permision_clinica:
+                    if not suffix and not request.user.tiene_alguna_permision_clinica_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo clinico.")
                         return redirect("dashboard", slug=empresa.slug)
 
@@ -216,10 +216,10 @@ class EmpresaAccessMiddleware:
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_tecnicentro_desde_ruta(suffix)
-                    if permiso and not request.user.tiene_permiso_erp(permiso):
+                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para esta operacion del taller.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if not suffix and not request.user.tiene_alguna_permision_tecnicentro:
+                    if not suffix and not request.user.tiene_alguna_permision_tecnicentro_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso al modulo Tecnicentro.")
                         return redirect("dashboard", slug=empresa.slug)
 

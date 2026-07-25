@@ -14,7 +14,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario
+from core.models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario, UsuarioEmpresaPermiso
 from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 from core.backup_tokens import hash_token_respaldo
 from core.forms import EmpresaControlForm, RolSistemaForm
@@ -44,6 +44,7 @@ class SuperAdminControlTests(TestCase):
             nombre="Facturador",
             codigo="facturador",
             puede_facturas=True,
+            puede_ver_facturas=True,
             puede_recibos=True,
         )
 
@@ -771,6 +772,73 @@ class SuperAdminControlTests(TestCase):
             response,
             reverse("facturacion_dashboard", args=[empresa_secundaria.slug]),
         )
+
+    def test_usuario_puede_tener_rol_diferente_por_empresa(self):
+        empresa_principal = Empresa.objects.create(
+            nombre="Empresa Principal Permisos",
+            slug="principal-permisos",
+            rtn="08011999000180",
+        )
+        empresa_secundaria = Empresa.objects.create(
+            nombre="Empresa Secundaria Permisos",
+            slug="secundaria-permisos",
+            rtn="08011999000181",
+        )
+        EmpresaModulo.objects.create(empresa=empresa_principal, modulo=self.modulo, activo=True)
+        EmpresaModulo.objects.create(empresa=empresa_secundaria, modulo=self.modulo, activo=True)
+        rol_crear = RolSistema.objects.create(
+            nombre="Solo crear facturas",
+            codigo="solo-crear-facturas",
+            puede_crear_facturas=True,
+        )
+        usuario = Usuario.objects.create_user(
+            username="multi-rol",
+            email="multi-rol@ejemplo.com",
+            password="ClaveSegura2026",
+            empresa=empresa_principal,
+            rol_sistema=self.rol_facturador,
+        )
+        usuario.empresas_acceso.set([empresa_principal, empresa_secundaria])
+        UsuarioEmpresaPermiso.objects.create(
+            usuario=usuario,
+            empresa=empresa_secundaria,
+            rol_sistema=rol_crear,
+        )
+
+        self.assertTrue(usuario.tiene_permiso_erp("puede_ver_facturas", empresa_principal))
+        self.assertTrue(usuario.tiene_permiso_erp("puede_crear_facturas", empresa_secundaria))
+        self.assertFalse(usuario.tiene_permiso_erp("puede_ver_facturas", empresa_secundaria))
+
+    def test_usuario_solo_crear_facturas_no_ve_historial(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Enfermeria Factura",
+            slug="empresa-enfermeria-factura",
+            rtn="08011999000182",
+        )
+        EmpresaModulo.objects.create(empresa=empresa, modulo=self.modulo, activo=True)
+        rol_crear = RolSistema.objects.create(
+            nombre="Enfermeria factura",
+            codigo="enfermeria-factura",
+            puede_crear_facturas=True,
+        )
+        usuario = Usuario.objects.create_user(
+            username="enfermeria-factura",
+            email="enfermeria-factura@ejemplo.com",
+            password="ClaveSegura2026",
+            empresa=empresa,
+            rol_sistema=rol_crear,
+        )
+        self.client.force_login(usuario)
+
+        response_modulo = self.client.get(reverse("facturacion_dashboard", args=[empresa.slug]))
+        response_crear = self.client.get(reverse("crear_factura", args=[empresa.slug]))
+        response_historial = self.client.get(reverse("facturas_dashboard", args=[empresa.slug]))
+
+        self.assertEqual(response_modulo.status_code, 200)
+        self.assertContains(response_modulo, "Crear Factura")
+        self.assertNotContains(response_modulo, "Crear, emitir, revisar y administrar facturas")
+        self.assertEqual(response_crear.status_code, 200)
+        self.assertRedirects(response_historial, reverse("dashboard", args=[empresa.slug]))
 
     def test_mismo_correo_puede_tener_accesos_separados_por_empresa(self):
         empresa_hospital = Empresa.objects.create(
