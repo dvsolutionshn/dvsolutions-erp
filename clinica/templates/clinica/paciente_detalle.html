@@ -7,6 +7,7 @@
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
+<a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>
 {% if puede_eliminar_pacientes %}
 <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" class="erp-inline-form" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
@@ -189,6 +190,7 @@
                 </div>
                 <div class="clinical-focus-actions">
                     <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
+                    <a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
                     <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota</a>
                 </div>
             </div>

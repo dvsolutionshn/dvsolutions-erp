@@ -188,7 +188,7 @@
 .erp-doctor-welcome > *{position:relative;z-index:1}.erp-doctor-welcome h3{margin:10px 0 12px;color:#102338;font-size:clamp(30px,2.3vw,46px);line-height:1.04;letter-spacing:-.04em;max-width:760px}
 .erp-doctor-welcome p{margin:0;color:#5d7185;line-height:1.65;max-width:760px;font-size:15px}
 .erp-doctor-eyebrow{display:inline-flex;align-items:center;gap:9px;padding:8px 12px;border:1px solid rgba(31,182,170,.24);border-radius:999px;background:rgba(255,255,255,.72);color:#08766f;font-size:11px;font-weight:950;letter-spacing:.14em;text-transform:uppercase}.erp-doctor-eyebrow::before{content:"";width:9px;height:9px;border-radius:999px;background:#1fb6aa;box-shadow:0 0 0 5px rgba(31,182,170,.12)}
-.erp-doctor-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin-top:24px}
+.erp-doctor-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:15px;margin-top:24px}
 .erp-doctor-action{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;min-height:122px;padding:18px;border:1px solid #d8e7f1;border-radius:24px;background:rgba(255,255,255,.82);color:#102338;text-decoration:none;box-shadow:0 18px 42px rgba(16,40,62,.08);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease;overflow:hidden}
 .erp-doctor-action::after{content:"";position:absolute;inset:auto 16px 14px auto;width:52px;height:52px;border-radius:18px;background:rgba(31,182,170,.08);transform:rotate(12deg)}
 .erp-doctor-action:hover{transform:translateY(-4px);border-color:#8fc5dd;background:#fff;box-shadow:0 24px 54px rgba(16,40,62,.14)}
@@ -436,9 +436,10 @@
     <div>
         <div class="erp-doctor-eyebrow">Bienvenida doctora</div>
         <h3>Su espacio de trabajo, simple y listo para atender.</h3>
-        <p>Una entrada directa a lo que realmente usa en consulta: pacientes, expediente clinico y facturacion. Menos ruido, mas velocidad y una experiencia pensada para atender sin perderse.</p>
+        <p>Una entrada directa a lo que realmente usa en consulta: pacientes, calendario, expediente clinico y facturacion. Menos ruido, mas velocidad y una experiencia pensada para atender sin perderse.</p>
         <div class="erp-doctor-actions">
             <a class="erp-doctor-action" href="{% url 'clinica_pacientes' empresa.slug %}"><i>👤</i><span><strong>Pacientes</strong><span>Buscar, abrir expediente o crear un nuevo paciente.</span></span></a>
+            {% if erp_access.modulo_citas %}<a class="erp-doctor-action" href="{% url 'agenda_citas' empresa.slug %}"><i>📅</i><span><strong>Calendario de citas</strong><span>Ver agenda, crear atenciones y revisar el dia de consulta.</span></span></a>{% endif %}
             <a class="erp-doctor-action" href="{% url 'clinica_dashboard' empresa.slug %}"><i>🩺</i><span><strong>Clinica</strong><span>Expedientes, formularios, citas, tratamientos y seguimiento.</span></span></a>
             <a class="erp-doctor-action" href="{% url 'crear_factura' empresa.slug %}"><i>🧾</i><span><strong>Crear factura</strong><span>Facturar de forma directa cuando termine la atencion.</span></span></a>
             <a class="erp-doctor-action" href="{% url 'facturacion_dashboard' empresa.slug %}"><i>💳</i><span><strong>Facturacion</strong><span>Operaciones de cobro y documentos permitidos.</span></span></a>
@@ -450,6 +451,7 @@
         <p>Solo aparece lo que necesita usar en el dia a dia clinico.</p>
         <ul>
             <li>Clinica y pacientes</li>
+            {% if erp_access.modulo_citas %}<li>Calendario de citas</li>{% endif %}
             <li>Facturacion</li>
             <li>Opciones internas del expediente</li>
         </ul>

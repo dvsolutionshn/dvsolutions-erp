@@ -806,6 +806,7 @@ class SuperAdminControlTests(TestCase):
         modulos = [
             self.modulo,
             Modulo.objects.create(nombre="Clinica Medica", codigo="clinica_medica"),
+            Modulo.objects.create(nombre="Agenda de Citas", codigo="agenda_citas"),
             Modulo.objects.create(nombre="Contabilidad", codigo="contabilidad"),
             Modulo.objects.create(nombre="Recursos Humanos", codigo="rrhh"),
             Modulo.objects.create(nombre="CRM y Marketing", codigo="crm_marketing"),
@@ -827,6 +828,7 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Bienvenida doctora")
         self.assertContains(response, "Pacientes")
+        self.assertContains(response, "Calendario de citas")
         self.assertContains(response, "Crear factura")
         self.assertNotContains(response, "CRM y Marketing")
         self.assertNotContains(response, "Contabilidad")

@@ -137,7 +137,6 @@ def erp_access(request):
             "modulo_contabilidad": False,
             "modulo_rrhh": False,
             "modulo_crm": False,
-            "modulo_citas": False,
             "modulo_tecnicentro": False,
         })
     return {"erp_access": base}
