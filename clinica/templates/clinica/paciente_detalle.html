@@ -51,6 +51,13 @@
 .clinical-side-link{display:flex;align-items:center;gap:10px;min-height:42px;padding:10px 12px;border:1px solid transparent;border-radius:14px;color:#17314a;text-decoration:none;font-weight:900;font-size:12px;transition:background .16s ease,border-color .16s ease,transform .16s ease}
 .clinical-side-link:hover{transform:translateX(2px);border-color:#c8d9e8;background:#fff}
 .clinical-side-link i{display:grid;place-items:center;width:24px;height:24px;border-radius:9px;background:linear-gradient(135deg,#1fb6aa,#2563eb);color:#fff;font-style:normal;font-size:10px;font-weight:950}
+.clinical-side-group{padding:0 12px 8px}
+.clinical-side-group summary{display:flex;align-items:center;gap:10px;min-height:42px;padding:10px 12px;border:1px solid #d8e6f1;border-radius:14px;color:#17314a;background:#fff;cursor:pointer;font-weight:900;font-size:12px;list-style:none}
+.clinical-side-group summary::-webkit-details-marker{display:none}
+.clinical-side-group summary i{display:grid;place-items:center;width:24px;height:24px;border-radius:9px;background:linear-gradient(135deg,#f59e0b,#1fb6aa);color:#fff;font-style:normal;font-size:10px;font-weight:950}
+.clinical-submenu{display:grid;gap:6px;margin:8px 0 0 34px}
+.clinical-submenu a{padding:9px 10px;border:1px solid #dbe7f0;border-radius:12px;background:#f8fcff;color:#24445e;text-decoration:none;font-size:11px;font-weight:850}
+.clinical-submenu a:hover{background:#fff;border-color:#a9c8df;color:#0f766e}
 .clinical-side-actions{display:grid;gap:8px;padding:0 12px 14px}
 .clinical-side-actions a{justify-content:center;text-align:center}
 .clinical-workspace-main{display:grid;gap:18px;min-width:0}
@@ -63,6 +70,10 @@
 .clinical-focus-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:16px}
 .clinical-focus-kpi{padding:13px;border:1px solid #d9e5f0;border-radius:16px;background:rgba(255,255,255,.82)}
 .clinical-focus-kpi span{display:block;color:#6b7f91;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}.clinical-focus-kpi strong{display:block;margin-top:6px;color:#102338;font-size:17px}
+.clinical-quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:16px}
+.clinical-quick-card{display:block;min-height:94px;padding:16px;border:1px solid #d9e7f1;border-radius:18px;background:linear-gradient(135deg,#ffffff,#f8fcff);text-decoration:none;color:#102338;box-shadow:0 14px 35px rgba(18,42,66,.06);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.clinical-quick-card:hover{transform:translateY(-2px);border-color:#8fc5dd;box-shadow:0 18px 42px rgba(18,42,66,.1)}
+.clinical-quick-card strong{display:block;font-size:15px;margin-bottom:7px}.clinical-quick-card span{display:block;color:#667b8c;font-size:12px;line-height:1.45}
 .clinical-panel-title{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .clinical-panel-title h3{margin:5px 0 0;color:#102338}.clinical-panel-title p{margin:6px 0 0;color:#6a7d8f;line-height:1.55}
 .clinical-soft-note{padding:12px 14px;border:1px dashed #b9ccdd;border-radius:14px;background:#fbfdff;color:#5f7184;font-size:12px;line-height:1.55}
@@ -137,17 +148,32 @@
             <small>{{ paciente.expediente_codigo }} · {{ paciente.identidad|default:"Sin documento" }}</small>
         </div>
         <nav class="clinical-side-nav">
-            <a class="clinical-side-link" href="#resumen-clinico"><i>01</i>Resumen</a>
-            <a class="clinical-side-link" href="#historial-clinico"><i>02</i>Historial Clinico</a>
+            <a class="clinical-side-link" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><i>01</i>Clinica completa</a>
+            <a class="clinical-side-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}"><i>02</i>Nueva nota</a>
             {% if formularios_hospitalarios %}<a class="clinical-side-link" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><i>03</i>Formularios</a>{% endif %}
-            <a class="clinical-side-link" href="#recordatorios-tratamiento"><i>04</i>Seguimientos</a>
-            <a class="clinical-side-link" href="#plan-tratamiento"><i>05</i>Tratamientos</a>
-            <a class="clinical-side-link" href="#anexos"><i>06</i>Anexos</a>
-            <a class="clinical-side-link" href="#consentimientos"><i>07</i>Consentimientos</a>
-            <a class="clinical-side-link" href="#evolucion"><i>08</i>Evolucion</a>
-            <a class="clinical-side-link" href="#citas"><i>09</i>Citas</a>
+            <a class="clinical-side-link" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}"><i>04</i>Evolucion</a>
+            <a class="clinical-side-link" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><i>05</i>Consentimientos</a>
+            <a class="clinical-side-link" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}"><i>06</i>Recetas</a>
+            <a class="clinical-side-link" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><i>07</i>Examenes</a>
+            <a class="clinical-side-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}"><i>08</i>Tratamientos</a>
+            <a class="clinical-side-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}"><i>09</i>Agendar cita</a>
+            <a class="clinical-side-link" href="#recordatorios-tratamiento"><i>10</i>Seguimientos</a>
         </nav>
+        <details class="clinical-side-group" open>
+            <summary><i>11</i>Anexos completos</summary>
+            <div class="clinical-submenu">
+                <a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Examenes</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'laboratorio' %}">Trabajos de laboratorio</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'radiologico' %}">Solicitud estudio radiologico</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'documento' %}">Documentos</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'remision' %}">Remision y contraremision</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'detalle_remision' %}">Detalle remisiones</a>
+                <a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Prescripciones / recetas</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'incapacidad' %}">Incapacidades</a>
+            </div>
+        </details>
         <div class="clinical-side-actions">
+            <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
             <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota clínica</a>
             <a class="erp-btn-secondary" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Crear receta</a>
             <a class="erp-btn-secondary" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Subir examen</a>
@@ -157,23 +183,23 @@
         <section class="erp-card clinical-focus-panel patient-anchor-offset" id="resumen-clinico">
             <div class="clinical-focus-head">
                 <div>
-                    <div class="erp-kpi-label">Centro de atención del paciente</div>
-                    <h3>Todo el expediente en una sola pantalla</h3>
-                    <p>Esta vista concentra lo que la doctora necesita durante la consulta: historia, formularios, diagnósticos, plan, anexos, consentimientos, evolución, recetas y citas sin cambiar de contexto.</p>
+                    <div class="erp-kpi-label">Accesos de consulta</div>
+                    <h3>Seleccione que necesita hacer con este paciente</h3>
+                    <p>Un punto de entrada simple para trabajar: abrir la historia completa, escribir la consulta, revisar formularios, subir documentos o agendar sin perderse entre pantallas.</p>
                 </div>
                 <div class="clinical-focus-actions">
-                    <a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Guardar nota de consulta</a>
-                    <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Ver formularios</a>
-                    <a class="erp-btn-secondary" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Fotos / videos</a>
+                    <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
+                    <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota</a>
                 </div>
             </div>
-            <div class="clinical-focus-kpis">
-                <div class="clinical-focus-kpi"><span>Historias</span><strong>{{ eventos|length }}</strong></div>
-                <div class="clinical-focus-kpi"><span>Formularios</span><strong>{{ historias_especialidad|length }}</strong></div>
-                <div class="clinical-focus-kpi"><span>Exámenes</span><strong>{{ examenes|length }}</strong></div>
-                <div class="clinical-focus-kpi"><span>Recetas</span><strong>{{ recetas|length }}</strong></div>
-                <div class="clinical-focus-kpi"><span>Consentimientos</span><strong>{{ consentimientos|length }}</strong></div>
-                <div class="clinical-focus-kpi"><span>Citas</span><strong>{{ citas|length }}</strong></div>
+            <div class="clinical-quick-grid">
+                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><strong>Clinica completa</strong><span>Ver todo el Historial Clinico del paciente en una lectura ordenada.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}"><strong>Escribir consulta</strong><span>Registrar diagnostico, plan y nota medica del dia.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><strong>Formularios</strong><span>Preconsultas, formularios por area y notas especializadas.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}"><strong>Fotos y videos</strong><span>Seguimiento visual de evolucion por fecha.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}"><strong>Tratamiento</strong><span>Crear o registrar una ruta de tratamiento para el paciente.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><strong>Consentimientos</strong><span>PDF firmados y control documental del paciente.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}"><strong>Agendar cita</strong><span>Enviar este paciente al calendario de atenciones.</span></a>
             </div>
         </section>
 
@@ -441,7 +467,7 @@
 <section id="plan-tratamiento" class="erp-card patient-anchor-offset">
     <div class="erp-section-heading">
         <div><div class="erp-kpi-label">Plan de tratamiento</div><h3>Tratamientos del paciente</h3></div>
-        <a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>
+        <a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}">Crear tratamiento</a>
     </div>
     {% for tratamiento in tratamientos %}
     <div class="patient-timeline-item">
@@ -487,7 +513,7 @@
 <section id="citas" class="erp-card patient-anchor-offset">
     <div class="erp-section-heading">
         <div><div class="erp-kpi-label">Citas</div><h3>Agenda del paciente</h3></div>
-        <a class="erp-action-link" href="{% url 'clinica_crear_cita' empresa.slug %}">Programar cita</a>
+        <a class="erp-action-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Programar cita</a>
     </div>
     {% for cita in citas %}
     <div class="patient-timeline-item">

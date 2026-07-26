@@ -1755,7 +1755,14 @@ def citas(request, empresa_slug):
 @login_required
 def crear_cita(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    form = CitaClinicaForm(request.POST or None, empresa=empresa)
+    paciente_inicial = None
+    if request.method == "GET" and request.GET.get("paciente"):
+        paciente_inicial = get_object_or_404(Paciente, id=request.GET.get("paciente"), empresa=empresa)
+    form = CitaClinicaForm(
+        request.POST or None,
+        empresa=empresa,
+        initial={"paciente": paciente_inicial} if paciente_inicial else None,
+    )
     if request.method == "POST" and form.is_valid():
         cita = form.save(commit=False)
         cita.empresa = empresa
@@ -1894,7 +1901,14 @@ def tratamientos(request, empresa_slug):
 @login_required
 def crear_tratamiento(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    form = TratamientoPacienteForm(request.POST or None, empresa=empresa)
+    paciente_inicial = None
+    if request.method == "GET" and request.GET.get("paciente"):
+        paciente_inicial = get_object_or_404(Paciente, id=request.GET.get("paciente"), empresa=empresa)
+    form = TratamientoPacienteForm(
+        request.POST or None,
+        empresa=empresa,
+        initial={"paciente": paciente_inicial} if paciente_inicial else None,
+    )
     if request.method == "POST" and form.is_valid():
         tratamiento = form.save(commit=False)
         tratamiento.empresa = empresa
