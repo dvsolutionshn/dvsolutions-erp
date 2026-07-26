@@ -41,6 +41,31 @@
 .patient-consent-list{display:grid;gap:12px;margin-top:14px}.patient-consent-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#fff,#f8fbff)}.patient-consent-card strong{display:block;color:#102338}.patient-consent-card span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.patient-consent-actions{display:flex;gap:8px;flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:14px;padding:12px 14px;font-weight:800}
 .patient-anchor-offset{scroll-margin-top:100px}
+.clinical-workspace{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.clinical-side-panel{position:sticky;top:18px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(180deg,#ffffff,#f6fbff);box-shadow:0 18px 45px rgba(18,42,66,.07);overflow:hidden}
+.clinical-side-head{padding:18px;border-bottom:1px solid var(--line);background:radial-gradient(circle at top right,rgba(20,184,166,.12),transparent 34%),#fff}
+.clinical-side-head span{display:block;color:#6a7d91;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.14em}
+.clinical-side-head strong{display:block;margin-top:6px;color:#102338;font-size:17px;line-height:1.25}
+.clinical-side-head small{display:block;margin-top:6px;color:#6b7d8d;font-size:11px;line-height:1.45}
+.clinical-side-nav{display:grid;gap:6px;padding:12px}
+.clinical-side-link{display:flex;align-items:center;gap:10px;min-height:42px;padding:10px 12px;border:1px solid transparent;border-radius:14px;color:#17314a;text-decoration:none;font-weight:900;font-size:12px;transition:background .16s ease,border-color .16s ease,transform .16s ease}
+.clinical-side-link:hover{transform:translateX(2px);border-color:#c8d9e8;background:#fff}
+.clinical-side-link i{display:grid;place-items:center;width:24px;height:24px;border-radius:9px;background:linear-gradient(135deg,#1fb6aa,#2563eb);color:#fff;font-style:normal;font-size:10px;font-weight:950}
+.clinical-side-actions{display:grid;gap:8px;padding:0 12px 14px}
+.clinical-side-actions a{justify-content:center;text-align:center}
+.clinical-workspace-main{display:grid;gap:18px;min-width:0}
+.clinical-focus-panel{position:relative;overflow:hidden;border:1px solid rgba(31,182,170,.22);background:radial-gradient(circle at top right,rgba(37,99,235,.12),transparent 28%),linear-gradient(135deg,#ffffff,#f7fcff)}
+.clinical-focus-panel:before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:linear-gradient(180deg,#1fb6aa,#2563eb,#f59e0b)}
+.clinical-focus-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.clinical-focus-head h3{margin:6px 0 0;color:#102338;font-size:22px}
+.clinical-focus-head p{margin:8px 0 0;color:#5d7185;line-height:1.6;max-width:760px}
+.clinical-focus-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.clinical-focus-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:16px}
+.clinical-focus-kpi{padding:13px;border:1px solid #d9e5f0;border-radius:16px;background:rgba(255,255,255,.82)}
+.clinical-focus-kpi span{display:block;color:#6b7f91;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}.clinical-focus-kpi strong{display:block;margin-top:6px;color:#102338;font-size:17px}
+.clinical-panel-title{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.clinical-panel-title h3{margin:5px 0 0;color:#102338}.clinical-panel-title p{margin:6px 0 0;color:#6a7d8f;line-height:1.55}
+.clinical-soft-note{padding:12px 14px;border:1px dashed #b9ccdd;border-radius:14px;background:#fbfdff;color:#5f7184;font-size:12px;line-height:1.55}
 .patient-reminder-card{position:relative;overflow:hidden;border:1px solid rgba(137,92,246,.22);background:radial-gradient(circle at top right,rgba(168,85,247,.13),transparent 30%),linear-gradient(135deg,#fff,#f8fbff)}
 .patient-reminder-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#7c3aed,#06b6d4,#14b8a6)}
 .patient-reminder-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
@@ -67,6 +92,7 @@
 @media (max-width:1180px){
     .patient-entry-grid,.patient-quick-grid,.patient-section-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     .patient-reminder-row{grid-template-columns:1fr 1fr}
+    .clinical-workspace{grid-template-columns:1fr}.clinical-side-panel{position:relative;top:auto}.clinical-side-nav{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 }
 @media (max-width:760px){
     .patient-hero,.patient-entry-grid,.patient-quick-grid,.patient-section-grid{grid-template-columns:1fr}
@@ -103,15 +129,53 @@
     </div>
 </section>
 
-<section class="patient-entry-grid">
-    <a class="erp-card patient-entry-card" href="{% if formularios_hospitalarios %}{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}{% else %}#historial-clinico{% endif %}"><div class="erp-kpi-label">Expediente</div><h3>Historial Clinico</h3><p>{% if formularios_hospitalarios %}Formularios de Capilar, Cirugia, Tratamiento Estetico / Piel, Enfermeria, Terapias y Camara hiperbarica.{% else %}Antecedentes, funciones, examen fisico, diagnosticos y plan.{% endif %}</p></a>
-    <a class="erp-card patient-entry-card" href="#plan-tratamiento"><div class="erp-kpi-label">Ruta medica</div><h3>Plan de tratamiento</h3><p>Tratamientos activos, objetivos, plan clinico, costos y seguimiento profesional.</p></a>
-    <a class="erp-card patient-entry-card" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Bitacora visual</div><h3>Evolucion</h3><p>Pantalla propia para fotos, videos, fechas, procedimiento aplicado y registro cronologico del avance.</p></a>
-    <a class="erp-card patient-entry-card" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Documentos firmados</div><h3>Plan de consentimiento</h3><p>Pantalla propia para PDF firmados, fecha, tipo de plan y control documental del paciente.</p></a>
-    <a class="erp-card patient-entry-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Resultados</div><h3>Examenes</h3><p>Subida y consulta de examenes en PDF o fotografia, organizados por fecha y tipo.</p></a>
-    <a class="erp-card patient-entry-card" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}"><div class="erp-kpi-label">Prescripcion</div><h3>Recetas</h3><p>Crea recetas medicas profesionales con productos, indicaciones e impresion con logo.</p></a>
-    <a class="erp-card patient-entry-card" href="#citas"><div class="erp-kpi-label">Agenda</div><h3>Citas</h3><p>Citas pasadas, programadas y acceso rapido para agendar nuevas atenciones.</p></a>
-</section>
+<section class="clinical-workspace">
+    <aside class="clinical-side-panel" aria-label="Navegacion del expediente">
+        <div class="clinical-side-head">
+            <span>Historia clinica</span>
+            <strong>{{ paciente.nombre }}</strong>
+            <small>{{ paciente.expediente_codigo }} · {{ paciente.identidad|default:"Sin documento" }}</small>
+        </div>
+        <nav class="clinical-side-nav">
+            <a class="clinical-side-link" href="#resumen-clinico"><i>01</i>Resumen</a>
+            <a class="clinical-side-link" href="#historial-clinico"><i>02</i>Historial Clinico</a>
+            {% if formularios_hospitalarios %}<a class="clinical-side-link" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><i>03</i>Formularios</a>{% endif %}
+            <a class="clinical-side-link" href="#recordatorios-tratamiento"><i>04</i>Seguimientos</a>
+            <a class="clinical-side-link" href="#plan-tratamiento"><i>05</i>Tratamientos</a>
+            <a class="clinical-side-link" href="#anexos"><i>06</i>Anexos</a>
+            <a class="clinical-side-link" href="#consentimientos"><i>07</i>Consentimientos</a>
+            <a class="clinical-side-link" href="#evolucion"><i>08</i>Evolucion</a>
+            <a class="clinical-side-link" href="#citas"><i>09</i>Citas</a>
+        </nav>
+        <div class="clinical-side-actions">
+            <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota clínica</a>
+            <a class="erp-btn-secondary" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Crear receta</a>
+            <a class="erp-btn-secondary" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Subir examen</a>
+        </div>
+    </aside>
+    <div class="clinical-workspace-main">
+        <section class="erp-card clinical-focus-panel patient-anchor-offset" id="resumen-clinico">
+            <div class="clinical-focus-head">
+                <div>
+                    <div class="erp-kpi-label">Centro de atención del paciente</div>
+                    <h3>Todo el expediente en una sola pantalla</h3>
+                    <p>Esta vista concentra lo que la doctora necesita durante la consulta: historia, formularios, diagnósticos, plan, anexos, consentimientos, evolución, recetas y citas sin cambiar de contexto.</p>
+                </div>
+                <div class="clinical-focus-actions">
+                    <a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Guardar nota de consulta</a>
+                    <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Ver formularios</a>
+                    <a class="erp-btn-secondary" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Fotos / videos</a>
+                </div>
+            </div>
+            <div class="clinical-focus-kpis">
+                <div class="clinical-focus-kpi"><span>Historias</span><strong>{{ eventos|length }}</strong></div>
+                <div class="clinical-focus-kpi"><span>Formularios</span><strong>{{ historias_especialidad|length }}</strong></div>
+                <div class="clinical-focus-kpi"><span>Exámenes</span><strong>{{ examenes|length }}</strong></div>
+                <div class="clinical-focus-kpi"><span>Recetas</span><strong>{{ recetas|length }}</strong></div>
+                <div class="clinical-focus-kpi"><span>Consentimientos</span><strong>{{ consentimientos|length }}</strong></div>
+                <div class="clinical-focus-kpi"><span>Citas</span><strong>{{ citas|length }}</strong></div>
+            </div>
+        </section>
 
 <section class="erp-card patient-reminder-card patient-anchor-offset" id="recordatorios-tratamiento">
     <div class="patient-reminder-head">
@@ -434,6 +498,9 @@
     {% empty %}
     <div class="erp-empty">Sin citas registradas para este paciente.</div>
     {% endfor %}
+</section>
+
+</div>
 </section>
 
 <div class="patient-photo-modal" id="patientPhotoModal" aria-hidden="true">
