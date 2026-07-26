@@ -149,7 +149,6 @@ class CitaClienteForm(forms.ModelForm):
         "serviciosmedicos": True,
     }
     SERVICIOS_AGENDA_PREDEFINIDOS = [
-        ("Cita con nosotros", "consulta", 30),
         ("Tratamientos", "tratamiento", 60),
         ("Camara hiperbarica", "tratamiento", 60),
         ("Terapias", "tratamiento", 60),
@@ -209,6 +208,8 @@ class CitaClienteForm(forms.ModelForm):
                 for servicio in ServicioClinico.objects.filter(empresa=empresa, activo=True):
                     nombre_normalizado = unicodedata.normalize("NFKD", servicio.nombre or "").encode("ascii", "ignore").decode("ascii").lower()
                     if "terapia" in nombre_normalizado and ("camara" in nombre_normalizado or "hiperbar" in nombre_normalizado):
+                        ServicioClinico.objects.filter(pk=servicio.pk).update(activo=False)
+                    if nombre_normalizado.strip() == "cita con nosotros":
                         ServicioClinico.objects.filter(pk=servicio.pk).update(activo=False)
                 for nombre, categoria, duracion in self.SERVICIOS_AGENDA_PREDEFINIDOS:
                     servicio = (
