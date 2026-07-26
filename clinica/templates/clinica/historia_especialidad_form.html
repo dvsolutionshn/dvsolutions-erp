@@ -1,12 +1,12 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}{{ titulo }} - {{ paciente.nombre }}{% endblock %}
-{% block header_kicker %}{{ tipo_nombre }} · {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_kicker %}{{ tipo_nombre }} Â· {{ paciente.expediente_codigo }}{% endblock %}
 {% block header_title %}{{ titulo }}{% endblock %}
 {% block header_description %}Registro clinico de {{ paciente.nombre }}. Los cambios quedan asociados al usuario y fecha de actualizacion.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Vista clínica completa</a>
+<a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Vista clÃ­nica completa</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>
 {% endblock %}
 
@@ -33,35 +33,35 @@
 {% block content %}
 <section class="erp-card clinical-form-shell">
     <div class="clinical-banner">
-        <div><div class="erp-kpi-label">Formulario hospitalario</div><h3>{{ tipo_nombre }}</h3><p>{{ paciente.nombre }} · Documento {{ paciente.identidad|default:"No indicado" }}</p></div>
+        <div><div class="erp-kpi-label">Formulario hospitalario</div><h3>{{ tipo_nombre }}</h3><p>{{ paciente.nombre }} Â· Documento {{ paciente.identidad|default:"No indicado" }}</p></div>
         {% if paciente.es_alergico %}<div class="patient-alert">Alergico: {{ paciente.alergias|default:"Sin detalle" }}</div>{% endif %}
     </div>
     {% if bloqueada %}
-    <div class="locked-note">Esta nota de enfermería fue finalizada y está bloqueada permanentemente. Su contenido es únicamente de lectura.</div>
+    <div class="locked-note">Esta nota de enfermerÃ­a fue finalizada y estÃ¡ bloqueada permanentemente. Su contenido es Ãºnicamente de lectura.</div>
     {% endif %}
     <div class="preconsult-panel">
         <div class="preconsult-head">
-            <div><div class="erp-kpi-label">Preconsulta de {{ tipo_nombre }}</div><h3>Formulario previo e historial</h3><span class="erp-card-muted">Cada envío se conserva en el expediente del paciente.</span></div>
+            <div><div class="erp-kpi-label">Historia clinica de {{ tipo_nombre }}</div><h3>Formulario previo e historial</h3><span class="erp-card-muted">Cada envÃ­o se conserva en el expediente del paciente.</span></div>
             <form method="post" action="{% url 'clinica_generar_enlace_preconsulta_tipo' empresa.slug paciente.id tipo %}">
                 {% csrf_token %}
-                <button class="erp-btn-secondary" type="submit">Generar preconsulta</button>
+                <button class="erp-btn-secondary" type="submit">Generar formulario</button>
             </form>
         </div>
         <div class="preconsult-history">
             {% for item in preconsultas_tipo %}
             <div class="preconsult-row">
-                <span>{{ item.fecha_creacion|date:"d/m/Y H:i" }} · {{ item.get_estado_display }}</span>
+                <span>{{ item.fecha_creacion|date:"d/m/Y H:i" }} Â· {{ item.get_estado_display }}</span>
                 <a href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id item.id %}">Ver</a>
             </div>
             {% empty %}
-            <span class="erp-card-muted">Aún no hay preconsultas registradas para esta área.</span>
+            <span class="erp-card-muted">Aun no hay formularios de historia clinica registrados para esta area.</span>
             {% endfor %}
         </div>
     </div>
     {% if ultima_preconsulta and resumen_preconsulta %}
     <div class="general-summary">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-            <div><div class="erp-kpi-label">Formulario general de entrada</div><h3>Información base del paciente</h3></div>
+            <div><div class="erp-kpi-label">Formulario general de entrada</div><h3>InformaciÃ³n base del paciente</h3></div>
             <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id ultima_preconsulta.id %}">Ver completo</a>
         </div>
         <div class="general-summary-grid">
@@ -69,28 +69,28 @@
             <div class="general-summary-item"><span>Quiere mejorar</span>{{ resumen_preconsulta.general.historia_mejorar|default:"No indicado"|linebreaksbr }}</div>
             <div class="general-summary-item"><span>Alergias</span>{% for valor in resumen_preconsulta.alergias_generales %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}{{ ultima_preconsulta.alergias|default:"No declaradas" }}{% endfor %}</div>
             <div class="general-summary-item"><span>Medicamentos actuales</span>{% for valor in resumen_preconsulta.medicamentos_actuales %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}No indicado{% endfor %}</div>
-            <div class="general-summary-item"><span>Riesgo tromboembólico</span>{% for valor in resumen_preconsulta.riesgo_tromboembolico %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}No indicado{% endfor %}</div>
-            <div class="general-summary-item"><span>Examen físico</span>Peso {{ resumen_preconsulta.general.examen_peso|default:"-" }} kg · Talla {{ resumen_preconsulta.general.examen_talla|default:"-" }} cm · PA {{ resumen_preconsulta.general.examen_pa|default:"-" }}</div>
+            <div class="general-summary-item"><span>Riesgo tromboembÃ³lico</span>{% for valor in resumen_preconsulta.riesgo_tromboembolico %}{{ valor }}{% if not forloop.last %}, {% endif %}{% empty %}No indicado{% endfor %}</div>
+            <div class="general-summary-item"><span>Examen fÃ­sico</span>Peso {{ resumen_preconsulta.general.examen_peso|default:"-" }} kg Â· Talla {{ resumen_preconsulta.general.examen_talla|default:"-" }} cm Â· PA {{ resumen_preconsulta.general.examen_pa|default:"-" }}</div>
         </div>
     </div>
     {% endif %}
     {% if tipo != "enfermeria" and tipo != "terapias" and tipo != "camara_hiperbarica" %}
     <div class="doctor-workflow">
-        <div class="erp-kpi-label">Atención médica interna</div>
+        <div class="erp-kpi-label">AtenciÃ³n mÃ©dica interna</div>
         <h3>Formulario privado para la doctora durante la consulta</h3>
-        <p>La preconsulta es lo que llenó el paciente. Esta sección es privada de la doctora/equipo: primero marque las opciones clínicas del área y al final escriba en un solo cuadro la historia de enfermedad actual, diagnóstico, plan, indicaciones y seguimiento.</p>
+        <p>El formulario de historia clinica es lo que lleno el paciente. Esta seccion es privada de la doctora/equipo: primero marque las opciones clinicas del area y al final escriba en un solo cuadro la historia de enfermedad actual, diagnostico, plan, indicaciones y seguimiento.</p>
         <div class="doctor-workflow-grid">
             <div class="doctor-step"><strong>1. Confirmar datos</strong><span>Revisar motivo, antecedentes, medicamentos, alergias y riesgos reportados.</span></div>
-            <div class="doctor-step"><strong>2. Marcar opciones</strong><span>Completar las preguntas de selección del área clínica.</span></div>
-            <div class="doctor-step"><strong>3. Historia, diagnóstico y plan</strong><span>Documentar en un solo cuadro lo ocurrido en la cita y la conducta a seguir.</span></div>
+            <div class="doctor-step"><strong>2. Marcar opciones</strong><span>Completar las preguntas de selecciÃ³n del Ã¡rea clÃ­nica.</span></div>
+            <div class="doctor-step"><strong>3. Historia, diagnÃ³stico y plan</strong><span>Documentar en un solo cuadro lo ocurrido en la cita y la conducta a seguir.</span></div>
         </div>
     </div>
     {% endif %}
     {% if historias_previas %}
     <div class="clinical-timeline">
-        <div class="erp-kpi-label">Lectura rápida del historial</div>
-        <h3>Historia de enfermedad actual, diagnóstico y plan guardados</h3>
-        <p>Notas anteriores de esta misma área, ordenadas por fecha para leer el seguimiento sin abrir entrada por entrada.</p>
+        <div class="erp-kpi-label">Lectura rÃ¡pida del historial</div>
+        <h3>Historia de enfermedad actual, diagnÃ³stico y plan guardados</h3>
+        <p>Notas anteriores de esta misma Ã¡rea, ordenadas por fecha para leer el seguimiento sin abrir entrada por entrada.</p>
         <div class="clinical-timeline-grid">
             {% for item in historias_previas %}
             <article class="clinical-timeline-card">

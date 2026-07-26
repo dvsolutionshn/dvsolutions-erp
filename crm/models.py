@@ -217,7 +217,9 @@ class CitaCliente(models.Model):
         categoria = _normalizar_texto(
             self.servicio_clinico.categoria if self.servicio_clinico_id else ""
         )
-        if "terapia" in servicio or "camara" in servicio or "hiperbar" in servicio:
+        if "camara" in servicio or "hiperbar" in servicio:
+            return "camara_hiperbarica"
+        if "terapia" in servicio:
             return "terapias"
         if categoria == "consulta" or "consulta" in servicio or "evaluacion" in servicio or "valoracion" in servicio:
             return "consulta"
@@ -242,7 +244,8 @@ class CitaCliente(models.Model):
     def agenda_color_label(self):
         etiquetas = {
             "consulta": "Consulta",
-            "terapias": "Terapias / camaras hiperbaricas",
+            "terapias": "Terapias",
+            "camara_hiperbarica": "Camara hiperbarica",
             "tratamientos": "Tratamientos",
             "cirugias": "Cirugias",
             "spa": "Spa",

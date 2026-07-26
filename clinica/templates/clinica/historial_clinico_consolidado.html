@@ -1,9 +1,9 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Vista clínica completa - {{ paciente.nombre }}{% endblock %}
+{% block title %}Vista clÃ­nica completa - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
-{% block header_title %}Vista clínica completa{% endblock %}
-{% block header_description %}Toda la información clínica del paciente en una sola pantalla: preconsultas, formularios por área, notas, diagnóstico y plan.{% endblock %}
+{% block header_title %}Vista clÃ­nica completa{% endblock %}
+{% block header_description %}Toda la informaciÃ³n clÃ­nica del paciente en una sola pantalla: preconsultas, formularios por Ã¡rea, notas, diagnÃ³stico y plan.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver a formularios</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
@@ -26,18 +26,18 @@
         <div class="cover-main">
             <div class="erp-kpi-label">Paciente</div>
             <h3>{{ paciente.nombre }}</h3>
-            <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · RH {{ paciente.rh|default:"No indicado" }}</p>
+            <p>{{ paciente.identidad|default:"Sin documento" }} Â· {{ paciente.edad|default:"-" }} aÃ±os Â· RH {{ paciente.rh|default:"No indicado" }}</p>
             {% if paciente.es_alergico %}<span class="allergy-alert">Alerta de alergia: {{ paciente.alergias|default:"Sin detalle" }}</span>{% endif %}
         </div>
         <div class="cover-stat"><strong>{{ preconsultas|length }}</strong><span>preconsulta(s) completada(s)</span></div>
-        <div class="cover-stat"><strong>{{ historias|length }}</strong><span>nota(s) clínica(s)</span></div>
-        <div class="cover-stat"><strong>{{ tipos|length }}</strong><span>áreas clínicas</span></div>
+        <div class="cover-stat"><strong>{{ historias|length }}</strong><span>nota(s) clÃ­nica(s)</span></div>
+        <div class="cover-stat"><strong>{{ tipos|length }}</strong><span>Ã¡reas clÃ­nicas</span></div>
     </div>
 
     <div class="timeline-layout">
         <aside class="area-nav">
-            <h3>Áreas</h3>
-            <a href="#preconsultas">Preconsultas <em>{{ preconsultas|length }}</em></a>
+            <h3>Ãreas</h3>
+            <a href="#preconsultas">Historia clinicas <em>{{ preconsultas|length }}</em></a>
             {% for tipo in tipos %}
             <a href="#area-{{ tipo.codigo }}">{{ tipo.nombre }} <em>{{ tipo.historias|length }}</em></a>
             {% endfor %}
@@ -46,12 +46,12 @@
         <div>
             <section class="clinical-block" id="preconsultas">
                 <div class="block-head">
-                    <div><h3>Formularios completados por el paciente</h3><p>Lectura rápida de todas las preconsultas finalizadas.</p></div>
+                    <div><h3>Formularios completados por el paciente</h3><p>Lectura rÃ¡pida de todas las preconsultas finalizadas.</p></div>
                 </div>
                 <div class="block-body">
                     {% for bloque in bloques_preconsulta %}
                     <details class="read-section-mini" {% if forloop.first %}open{% endif %}>
-                        <summary>{{ bloque.preconsulta.get_tipo_display }} · {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i" }}</summary>
+                        <summary>{{ bloque.preconsulta.get_tipo_display }} Â· {{ bloque.preconsulta.fecha_completada|date:"d/m/Y H:i" }}</summary>
                         {% for seccion in bloque.secciones %}
                         <div class="mini-grid">
                             {% for campo in seccion.campos %}
@@ -71,7 +71,7 @@
                         <div style="padding:0 12px 12px;"><a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id bloque.preconsulta.id %}">Ver formulario completo</a></div>
                     </details>
                     {% empty %}
-                    <div class="empty-zone">Todavía no hay preconsultas completadas.</div>
+                    <div class="empty-zone">TodavÃ­a no hay preconsultas completadas.</div>
                     {% endfor %}
                 </div>
             </section>
@@ -79,14 +79,14 @@
             {% for tipo in tipos %}
             <section class="clinical-block" id="area-{{ tipo.codigo }}">
                 <div class="block-head">
-                    <div><h3>{{ tipo.nombre }}</h3><p>{{ tipo.historias|length }} historia(s) · {{ tipo.preconsultas|length }} preconsulta(s)</p></div>
+                    <div><h3>{{ tipo.nombre }}</h3><p>{{ tipo.historias|length }} historia(s) Â· {{ tipo.preconsultas|length }} preconsulta(s)</p></div>
                     <a class="erp-btn-secondary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id tipo.codigo %}">Nueva entrada</a>
                 </div>
                 <div class="block-body">
                     {% for historia in tipo.historias %}
                     <article class="note-card">
-                        <h4>{{ historia.fecha_atencion|date:"d/m/Y H:i" }} · {{ historia.get_estado_display }}</h4>
-                        <div class="note-meta">{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} · Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
+                        <h4>{{ historia.fecha_atencion|date:"d/m/Y H:i" }} Â· {{ historia.get_estado_display }}</h4>
+                        <div class="note-meta">{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} Â· Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
                         {% if historia.datos_especialidad %}
                         <div class="mini-chips" style="margin-bottom:10px;">
                             {% for clave, valor in historia.datos_especialidad.items|slice:":8" %}
@@ -100,13 +100,13 @@
                             {% elif historia.observaciones %}
                             {{ historia.observaciones|linebreaksbr }}
                             {% else %}
-                            <span class="erp-card-muted">Sin diagnóstico/plan registrado.</span>
+                            <span class="erp-card-muted">Sin diagnÃ³stico/plan registrado.</span>
                             {% endif %}
                         </div>
                         <div style="margin-top:10px;"><a class="erp-btn-secondary" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver nota bloqueada{% else %}Ver detalle{% endif %}</a></div>
                     </article>
                     {% empty %}
-                    <div class="empty-zone">Sin historias registradas en esta área.</div>
+                    <div class="empty-zone">Sin historias registradas en esta Ã¡rea.</div>
                     {% endfor %}
                 </div>
             </section>

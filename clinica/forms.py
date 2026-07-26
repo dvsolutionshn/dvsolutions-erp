@@ -1640,9 +1640,10 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "antecedentes_infecciosos": "Enfermedades infecciosas previas, incluido COVID-19",
         }
 
-    def __init__(self, *args, paciente=None, empresa=None, **kwargs):
+    def __init__(self, *args, paciente=None, empresa=None, modo_basico_paciente_nuevo=False, **kwargs):
         self.paciente = paciente
         self.empresa = empresa or getattr(paciente, "empresa", None)
+        self.modo_basico_paciente_nuevo = modo_basico_paciente_nuevo
         super().__init__(*args, **kwargs)
         if paciente is None:
             self.fields["foto_perfil"].required = False
@@ -1715,6 +1716,20 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         ]:
             if campo in self.fields:
                 self.fields[campo].required = False
+        if self.modo_basico_paciente_nuevo:
+            campos_paciente_nuevo = {
+                "foto_perfil",
+                "nombres", "apellidos", "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+                "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "telefono_codigo_area", "telefono",
+                "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo",
+                "informante", "informante_detalle", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
+                "referido_por", "referido_por_detalle", "consentimiento_datos",
+            }
+            for campo, field in self.fields.items():
+                if campo not in campos_paciente_nuevo:
+                    field.required = False
+            self.fields["foto_perfil"].required = False
+            self.fields["consentimiento_datos"].required = False
 
     def clean_identidad(self):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
@@ -1737,6 +1752,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        if self.modo_basico_paciente_nuevo:
+            cleaned_data["consentimiento_datos"] = True
         for campo, valor in self.CHECKBOX_DEFAULTS.items():
             if campo in self.fields and not cleaned_data.get(campo):
                 cleaned_data[campo] = list(valor)
@@ -1898,6 +1915,10 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         datos = {campo: self.cleaned_data.get(campo) for campo in campos}
         if datos.get("fecha_nacimiento"):
             datos["fecha_nacimiento"] = datos["fecha_nacimiento"].isoformat()
+        if self.modo_basico_paciente_nuevo:
+            datos["formulario_general_pendiente_doctor"] = True
+            datos["formulario_general"] = {"pendiente_doctor_desde_paso": 3}
+            return datos
         campos_generales = [
             "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros", "historia_mejorar",
             "historia_tiempo_preocupacion", "historia_tratamientos_previos", "historia_expectativas",

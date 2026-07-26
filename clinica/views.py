@@ -925,6 +925,12 @@ def paciente_detalle(request, empresa_slug, paciente_id):
         .annotate(total=Count("id"))
     }
     historias_especialidad = paciente.historias_especialidad.select_related("profesional", "actualizado_por")[:20]
+    ultima_historia_general = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
+    historia_clinica_pendiente_doctor = bool(
+        ultima_historia_general
+        and isinstance(ultima_historia_general.datos_generales, dict)
+        and ultima_historia_general.datos_generales.get("formulario_general_pendiente_doctor")
+    )
     return render(
         request,
         "clinica/paciente_detalle.html",
@@ -945,6 +951,58 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "historias_especialidad": historias_especialidad,
             "formularios_hospitalarios": empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS,
             "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
+            "historia_clinica_pendiente_doctor": historia_clinica_pendiente_doctor,
+        },
+    )
+
+
+@login_required
+def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    preconsulta = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
+    if preconsulta is None:
+        token_raw, token_hash, token_preview = generar_token_preconsulta()
+        preconsulta = PreconsultaClinica.objects.create(
+            empresa=empresa,
+            paciente=paciente,
+            tipo="general",
+            token_hash=token_hash,
+            token_preview=token_preview,
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=30),
+            creada_por=request.user,
+            datos_generales={"formulario_general_pendiente_doctor": True},
+        )
+    form = PreconsultaClinicaPublicaForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=preconsulta,
+        paciente=paciente,
+        empresa=empresa,
+    )
+    if request.method == "POST" and form.is_valid():
+        preconsulta = form.save(commit=False)
+        datos = form.datos_generales_limpios()
+        datos.pop("formulario_general_pendiente_doctor", None)
+        preconsulta.datos_generales = datos
+        preconsulta.estado = "completada"
+        preconsulta.fecha_completada = timezone.now()
+        preconsulta.ip_completada = _ip_cliente(request)
+        preconsulta.creada_por = preconsulta.creada_por or request.user
+        preconsulta.save()
+        _actualizar_paciente_desde_preconsulta(paciente, form)
+        messages.success(request, "Historia clinica completada correctamente.")
+        return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    return render(
+        request,
+        "clinica/preconsulta_publica.html",
+        {
+            "form": form,
+            "preconsulta": preconsulta,
+            "paciente": paciente,
+            "registro_interno": True,
+            "modo_doctor_completar_historia": True,
+            "inicio_paso": 2,
         },
     )
 
@@ -1465,7 +1523,7 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
     if tipo not in tipos_validos:
-        raise Http404("Tipo de preconsulta no valido.")
+        raise Http404("Tipo de formulario de historia clinica no valido.")
     paciente.preconsultas.filter(estado="pendiente", tipo=tipo).update(estado="revocada")
     token_raw, token_hash, token_preview = generar_token_preconsulta()
     preconsulta = PreconsultaClinica.objects.create(
@@ -1484,7 +1542,7 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
     if len(telefono) == 8:
         telefono = "504" + telefono
     mensaje = quote(
-        f"Hola {paciente.primer_nombre or paciente.nombre}. {empresa.nombre} le comparte su formulario de preconsulta "
+        f"Hola {paciente.primer_nombre or paciente.nombre}. {empresa.nombre} le comparte su formulario de historia clinica "
         f"de {tipos_validos[tipo]}. "
         f"Complete la informacion antes de su cita en este enlace seguro: {enlace_publico}"
     )
@@ -1532,7 +1590,7 @@ def enviar_preconsulta_whatsapp(request, empresa_slug, paciente_id, preconsulta_
     enlace_publico = (request.POST.get("enlace_publico") or "").strip()
     telefono = paciente.whatsapp or paciente.telefono or ""
     mensaje = quote(
-        f"Hola {paciente.primer_nombre or paciente.nombre}. {empresa.nombre} le comparte su formulario de preconsulta "
+        f"Hola {paciente.primer_nombre or paciente.nombre}. {empresa.nombre} le comparte su formulario de historia clinica "
         f"de {tipo_nombre}. "
         f"Complete la informacion antes de su cita en este enlace seguro: {enlace_publico}"
     )
@@ -1543,7 +1601,7 @@ def enviar_preconsulta_whatsapp(request, empresa_slug, paciente_id, preconsulta_
 
     try:
         if not enlace_publico:
-            raise WhatsAppAPIError("No se encontro el enlace seguro de preconsulta para enviar.")
+            raise WhatsAppAPIError("No se encontro el enlace seguro del formulario para enviar.")
         config = ConfiguracionCRM.objects.filter(empresa=empresa).first()
         if not config or not config.whatsapp_activo:
             raise WhatsAppAPIError("WhatsApp API no esta activo en CRM para esta empresa.")
@@ -1554,7 +1612,7 @@ def enviar_preconsulta_whatsapp(request, empresa_slug, paciente_id, preconsulta_
             tipo_preconsulta=tipo_nombre,
             enlace=enlace_publico,
         )
-        messages.success(request, f"Preconsulta enviada por WhatsApp a {paciente.nombre}.")
+        messages.success(request, f"Formulario de historia clinica enviado por WhatsApp a {paciente.nombre}.")
     except WhatsAppAPIError as exc:
         messages.error(request, f"No se pudo enviar directo por WhatsApp: {exc}")
 
@@ -1706,6 +1764,7 @@ def registro_paciente_publico(request, token):
         request.FILES or None,
         instance=preconsulta_base,
         empresa=invitacion.empresa,
+        modo_basico_paciente_nuevo=True,
     )
     if request.method == "POST" and form.is_valid():
         try:
@@ -1755,6 +1814,7 @@ def registro_paciente_publico(request, token):
             "preconsulta": preconsulta_base,
             "paciente": None,
             "registro_nuevo": True,
+            "flujo_paciente_nuevo_corto": True,
         },
     )
 

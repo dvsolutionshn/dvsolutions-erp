@@ -1,3 +1,4 @@
+import unicodedata
 from datetime import datetime, timedelta
 
 from django import forms
@@ -139,7 +140,21 @@ class CitaClienteForm(forms.ModelForm):
         "tratamientos": {"nombre": "Tratamientos", "capacidad": 7},
         "camara_hiperbarica": {"nombre": "Camaras hiperbaricas", "capacidad": 3},
         "terapias": {"nombre": "Terapias", "capacidad": 3},
+        "spa": {"nombre": "Spa", "capacidad": 6},
     }
+    SERVICIOS_AGENDA_BASE = {
+        "hospital_mia": True,
+        "medical_spa": True,
+        "luque_aestetic": True,
+        "serviciosmedicos": True,
+    }
+    SERVICIOS_AGENDA_PREDEFINIDOS = [
+        ("Cita con nosotros", "consulta", 30),
+        ("Tratamientos", "tratamiento", 60),
+        ("Camara hiperbarica", "tratamiento", 60),
+        ("Terapias", "tratamiento", 60),
+        ("Spa", "spa", 60),
+    ]
 
     HORAS_12 = [
         (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
@@ -190,6 +205,37 @@ class CitaClienteForm(forms.ModelForm):
         self.cirugia_extendida_activa = bool(empresa and empresa.slug in self.EMPRESAS_CIRUGIA_EXTENDIDA)
         if empresa:
             asegurar_profesionales_agenda_base(empresa)
+            if empresa.slug in self.SERVICIOS_AGENDA_BASE:
+                for servicio in ServicioClinico.objects.filter(empresa=empresa, activo=True):
+                    nombre_normalizado = unicodedata.normalize("NFKD", servicio.nombre or "").encode("ascii", "ignore").decode("ascii").lower()
+                    if "terapia" in nombre_normalizado and ("camara" in nombre_normalizado or "hiperbar" in nombre_normalizado):
+                        ServicioClinico.objects.filter(pk=servicio.pk).update(activo=False)
+                for nombre, categoria, duracion in self.SERVICIOS_AGENDA_PREDEFINIDOS:
+                    servicio = (
+                        ServicioClinico.objects.filter(empresa=empresa, nombre=nombre, activo=True).first()
+                        or ServicioClinico.objects.filter(empresa=empresa, nombre=nombre).first()
+                    )
+                    if servicio:
+                        cambios = []
+                        if not servicio.activo:
+                            servicio.activo = True
+                            cambios.append("activo")
+                        if servicio.categoria != categoria:
+                            servicio.categoria = categoria
+                            cambios.append("categoria")
+                        if servicio.duracion_minutos != duracion:
+                            servicio.duracion_minutos = duracion
+                            cambios.append("duracion_minutos")
+                        if cambios:
+                            servicio.save(update_fields=cambios)
+                    else:
+                        ServicioClinico.objects.create(
+                            empresa=empresa,
+                            nombre=nombre,
+                            categoria=categoria,
+                            duracion_minutos=duracion,
+                            activo=True,
+                        )
             self.fields["cliente"].queryset = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["producto"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["paciente"].queryset = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
@@ -288,6 +334,8 @@ class CitaClienteForm(forms.ModelForm):
             return "camara_hiperbarica"
         if "terapia" in texto:
             return "terapias"
+        if categoria == "spa" or "spa" in texto:
+            return "spa"
         if (
             categoria in {"tratamiento", "procedimiento"}
             or "tratamiento" in texto

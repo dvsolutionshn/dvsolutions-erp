@@ -8,6 +8,15 @@
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
 <a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
+{% if formularios_hospitalarios %}
+<form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}" class="erp-inline-form">
+    {% csrf_token %}
+    <button class="erp-btn-secondary" type="submit">Enviar historia clinica</button>
+</form>
+{% if historia_clinica_pendiente_doctor %}
+<a class="erp-btn" href="{% url 'clinica_completar_historia_clinica_paciente' empresa.slug paciente.id %}">Terminar expediente</a>
+{% endif %}
+{% endif %}
 <a class="erp-btn-secondary" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar paciente</a>
 {% if puede_eliminar_pacientes %}
 <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" class="erp-inline-form" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
@@ -175,6 +184,13 @@
         </details>
         <div class="clinical-side-actions">
             <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
+            {% if formularios_hospitalarios %}
+            {% if historia_clinica_pendiente_doctor %}<a class="erp-btn-secondary" href="{% url 'clinica_completar_historia_clinica_paciente' empresa.slug paciente.id %}">Terminar expediente</a>{% endif %}
+            <form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}" class="erp-inline-form">
+                {% csrf_token %}
+                <button class="erp-btn-secondary" type="submit" style="width:100%;">Enviar historia clinica</button>
+            </form>
+            {% endif %}
             <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota clínica</a>
             <a class="erp-btn-secondary" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Crear receta</a>
             <a class="erp-btn-secondary" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Subir examen</a>

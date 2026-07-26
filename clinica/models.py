@@ -52,6 +52,8 @@ class ProfesionalSalud(models.Model):
         return self.nombre
 
 
+EMPRESAS_AGENDA_CLINICA_BASE = {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"}
+
 PROFESIONALES_AGENDA_BASE = [
     ("Licenciada en enfermeria", "Enfermeria"),
     ("Enfermera", "Enfermeria"),
@@ -59,7 +61,7 @@ PROFESIONALES_AGENDA_BASE = [
 
 
 def asegurar_profesionales_agenda_base(empresa):
-    if not empresa or empresa.slug not in {"hospital_mia", "medical_spa", "luque_aestetic"}:
+    if not empresa or empresa.slug not in EMPRESAS_AGENDA_CLINICA_BASE:
         return
     for nombre, especialidad in PROFESIONALES_AGENDA_BASE:
         ProfesionalSalud.objects.get_or_create(
@@ -346,7 +348,9 @@ class CitaClinica(models.Model):
             return "recordatorio"
         servicio = _normalizar_texto(self.servicio.nombre if self.servicio_id else self.motivo)
         categoria = _normalizar_texto(self.servicio.categoria if self.servicio_id else "")
-        if "terapia" in servicio or "camara" in servicio or "hiperbar" in servicio:
+        if "camara" in servicio or "hiperbar" in servicio:
+            return "camara_hiperbarica"
+        if "terapia" in servicio:
             return "terapias"
         if categoria == "consulta" or "consulta" in servicio or "evaluacion" in servicio or "valoracion" in servicio:
             return "consulta"
@@ -371,7 +375,8 @@ class CitaClinica(models.Model):
     def agenda_color_label(self):
         etiquetas = {
             "consulta": "Consulta",
-            "terapias": "Terapias / camaras hiperbaricas",
+            "terapias": "Terapias",
+            "camara_hiperbarica": "Camara hiperbarica",
             "tratamientos": "Tratamientos",
             "cirugias": "Cirugias",
             "spa": "Spa",

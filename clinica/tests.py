@@ -245,8 +245,8 @@ class ClinicaPacienteTests(TestCase):
     def test_crear_paciente_alergico_y_mostrar_alerta_en_lista(self):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Formulario general del paciente")
-        self.assertContains(response, "Guardar paciente")
+        self.assertContains(response, "Formulario de historia clinica")
+        self.assertContains(response, "Guardar historia clinica")
         self.assertContains(response, "Subir archivo")
 
         response = self.client.post(
@@ -829,7 +829,7 @@ class ClinicaPacienteTests(TestCase):
             "Camara hiperbarica",
         ]:
             self.assertContains(selector, nombre)
-        self.assertContains(selector, "Nueva preconsulta", count=6)
+        self.assertContains(selector, "Nuevo formulario", count=6)
 
     def test_historias_especialidad_no_estan_disponibles_para_otra_empresa(self):
         otra_empresa = Empresa.objects.create(
@@ -1332,7 +1332,7 @@ class ClinicaPacienteTests(TestCase):
             self.assertIsNone(invitacion.preconsulta)
 
         response = self.client.get(publica_url)
-        self.assertContains(response, "Formulario general del paciente")
+        self.assertContains(response, "Formulario de historia clinica")
 
         response = self.client.post(
             publica_url,
@@ -1421,6 +1421,8 @@ class ClinicaPacienteTests(TestCase):
         paciente = Paciente.objects.get(identidad="0801199900199")
         self.assertFalse(bool(paciente.foto_perfil))
         preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
-        self.assertEqual(preconsulta.datos_generales["formulario_general"]["motivo_categoria"], ["no_aplica"])
+        self.assertTrue(preconsulta.datos_generales["formulario_general_pendiente_doctor"])
+        self.assertEqual(preconsulta.datos_generales["formulario_general"]["pendiente_doctor_desde_paso"], 3)
+        self.assertNotIn("motivo_categoria", preconsulta.datos_generales["formulario_general"])
         self.assertIn("No aplica", paciente.antecedentes_medicos)
         self.assertEqual(paciente.alergias, "No aplica")

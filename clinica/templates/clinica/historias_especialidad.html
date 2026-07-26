@@ -1,12 +1,12 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Historias clínicas - {{ paciente.nombre }}{% endblock %}
+{% block title %}Historias clÃ­nicas - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
-{% block header_title %}Historial clínico especializado{% endblock %}
-{% block header_description %}Selecciona el área médica para registrar una atención, generar su preconsulta o consultar el historial.{% endblock %}
+{% block header_title %}Historial clÃ­nico especializado{% endblock %}
+{% block header_description %}Selecciona el area medica para registrar una atencion, generar formulario de historia clinica o consultar el historial.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Vista clínica completa</a>
+<a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Vista clÃ­nica completa</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
 {% endblock %}
 
@@ -34,7 +34,7 @@
 {% block content %}
 <section class="erp-card">
     <div class="specialty-patient">
-        <div><div class="erp-kpi-label">Paciente</div><h3>{{ paciente.nombre }}</h3><p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · RH {{ paciente.rh|default:"No indicado" }}</p></div>
+        <div><div class="erp-kpi-label">Paciente</div><h3>{{ paciente.nombre }}</h3><p>{{ paciente.identidad|default:"Sin documento" }} Â· {{ paciente.edad|default:"-" }} aÃ±os Â· RH {{ paciente.rh|default:"No indicado" }}</p></div>
         {% if paciente.es_alergico %}<div class="patient-alert">Alerta de alergia: {{ paciente.alergias|default:"Sin detalle" }}</div>{% endif %}
     </div>
     <div class="specialty-grid">
@@ -42,13 +42,13 @@
         <article class="specialty-option">
             <span class="specialty-icon">{{ forloop.counter|stringformat:"02d" }}</span>
             <h3>{{ tipo.nombre }}</h3>
-            <p>Nueva evaluación, preconsulta e historial independiente para esta área.</p>
-            <span class="specialty-count">{{ tipo.total }} historia(s) · {{ tipo.preconsultas }} preconsulta(s)</span>
+            <p>Nueva evaluacion, formulario e historial independiente para esta area.</p>
+            <span class="specialty-count">{{ tipo.total }} historia(s) · {{ tipo.preconsultas }} formulario(s)</span>
             <div class="specialty-actions">
                 <a class="specialty-mini-btn primary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id tipo.codigo %}">Nueva entrada</a>
                 <form method="post" action="{% url 'clinica_generar_enlace_preconsulta_tipo' empresa.slug paciente.id tipo.codigo %}">
                     {% csrf_token %}
-                    <button class="specialty-mini-btn" type="submit">Nueva preconsulta</button>
+                    <button class="specialty-mini-btn" type="submit">Nuevo formulario</button>
                 </form>
                 {% if tipo.ultima_preconsulta %}
                 <a class="specialty-mini-btn" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id tipo.ultima_preconsulta.id %}">Ver formulario</a>
@@ -61,7 +61,7 @@
         {% endfor %}
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px;padding:16px;border:1px solid #bcd0e8;border-radius:8px;background:#f6faff;flex-wrap:wrap;">
-        <div><strong style="display:block;color:#102338;">Preconsulta general del paciente</strong><span class="erp-card-muted">Conserva el formulario general de entrada adicional a las preconsultas de cada área.</span></div>
+        <div><strong style="display:block;color:#102338;">Historia clinica general del paciente</strong><span class="erp-card-muted">Conserva el formulario general de entrada adicional a los formularios de cada area.</span></div>
         <form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}">
             {% csrf_token %}
             <button class="erp-btn" type="submit">Generar enlace general</button>
@@ -71,11 +71,11 @@
 
 {% if preconsultas %}
 <section class="erp-card history-list">
-    <div class="erp-section-heading"><div><div class="erp-kpi-label">Formularios enviados</div><h3>Historial de preconsultas</h3></div></div>
+    <div class="erp-section-heading"><div><div class="erp-kpi-label">Formularios enviados</div><h3>Historial de formularios de historia clinica</h3></div></div>
     {% for preconsulta in preconsultas %}
     <div class="history-row">
         <div><div class="history-date">{{ preconsulta.fecha_creacion|date:"d/m/Y" }}</div><div class="history-meta">{{ preconsulta.fecha_creacion|date:"H:i" }}</div></div>
-        <div><h4>Preconsulta · {{ preconsulta.get_tipo_display }}</h4><div class="history-meta">{% if preconsulta.fecha_completada %}Completada {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% else %}Vence {{ preconsulta.fecha_expiracion|date:"d/m/Y H:i" }}{% endif %}</div><span class="status-pill {% if preconsulta.estado == 'pendiente' %}is-draft{% endif %}">{{ preconsulta.get_estado_display }}</span></div>
+        <div><h4>Historia clinica Â· {{ preconsulta.get_tipo_display }}</h4><div class="history-meta">{% if preconsulta.fecha_completada %}Completada {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% else %}Vence {{ preconsulta.fecha_expiracion|date:"d/m/Y H:i" }}{% endif %}</div><span class="status-pill {% if preconsulta.estado == 'pendiente' %}is-draft{% endif %}">{{ preconsulta.get_estado_display }}</span></div>
         <a class="erp-btn-secondary" href="{% url 'clinica_preconsulta_detalle' empresa.slug paciente.id preconsulta.id %}">Ver resumen</a>
     </div>
     {% endfor %}
@@ -83,19 +83,19 @@
 {% endif %}
 
 <section class="erp-card history-list">
-    <div class="erp-section-heading"><div><div class="erp-kpi-label">Registro cronológico</div><h3>Historias anteriores</h3></div></div>
+    <div class="erp-section-heading"><div><div class="erp-kpi-label">Registro cronolÃ³gico</div><h3>Historias anteriores</h3></div></div>
     {% for historia in historias %}
     <div class="history-row" id="historial-{{ historia.tipo }}">
         <div><div class="history-date">{{ historia.fecha_atencion|date:"d/m/Y" }}</div><div class="history-meta">{{ historia.fecha_atencion|date:"H:i" }}</div></div>
         <div>
             <h4>{{ historia.get_tipo_display }}</h4>
-            <div class="history-meta">{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} · Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
+            <div class="history-meta">{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} Â· Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
             <span class="status-pill {% if historia.estado == 'borrador' %}is-draft{% endif %}">{{ historia.get_estado_display }}</span>
         </div>
         <a class="erp-btn-secondary" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver nota bloqueada{% else %}Ver y editar{% endif %}</a>
     </div>
     {% empty %}
-    <div class="erp-empty">Todavía no hay historias especializadas para este paciente.</div>
+    <div class="erp-empty">TodavÃ­a no hay historias especializadas para este paciente.</div>
     {% endfor %}
 </section>
 {% endblock %}
