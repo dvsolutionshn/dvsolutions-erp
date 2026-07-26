@@ -183,6 +183,16 @@
     padding-bottom:6px;
     font-size:clamp(9px, .62vw, 11px);
 }
+.erp-doctor-welcome{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px;align-items:stretch;background:radial-gradient(circle at top right,rgba(31,182,170,.17),transparent 34%),linear-gradient(135deg,#ffffff,#f7fcff)}
+.erp-doctor-welcome h3{margin:8px 0 10px;color:#102338;font-size:32px;line-height:1.15}
+.erp-doctor-welcome p{margin:0;color:#5d7185;line-height:1.7;max-width:760px}
+.erp-doctor-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px}
+.erp-doctor-action{display:block;min-height:138px;padding:18px;border:1px solid #d8e7f1;border-radius:22px;background:linear-gradient(135deg,#fff,#f7fbff);color:#102338;text-decoration:none;box-shadow:0 16px 38px rgba(16,40,62,.07);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.erp-doctor-action:hover{transform:translateY(-3px);border-color:#8fc5dd;box-shadow:0 20px 48px rgba(16,40,62,.12)}
+.erp-doctor-action i{display:grid;place-items:center;width:42px;height:42px;border-radius:16px;margin-bottom:14px;background:linear-gradient(135deg,#1fb6aa,#2563eb);color:#fff;font-style:normal;font-weight:950}
+.erp-doctor-action strong{display:block;font-size:18px;margin-bottom:7px}.erp-doctor-action span{display:block;color:#65798b;font-size:13px;line-height:1.5}
+.erp-doctor-side{border:1px solid rgba(31,182,170,.2);border-radius:24px;padding:22px;background:rgba(255,255,255,.74)}
+.erp-doctor-side h4{margin:0 0 12px;color:#102338;font-size:18px}.erp-doctor-side ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}.erp-doctor-side li{padding:12px 13px;border:1px solid #dce9f2;border-radius:15px;background:#fff;color:#445b70;font-weight:800}
 .erp-module-status.upgrade{
     background:rgba(23,166,161,.1);
     color:#0f6f6a;
@@ -403,6 +413,8 @@
     .erp-dashboard-hero{
         grid-template-columns:1fr;
     }
+    .erp-doctor-welcome{grid-template-columns:1fr}
+    .erp-doctor-actions{grid-template-columns:1fr}
 }
 @media (min-width: 761px) and (max-width: 1440px){
     .erp-dashboard-hero{
@@ -416,6 +428,29 @@
 {% endblock %}
 
 {% block content %}
+{% if erp_access.modo_clinico_simple %}
+<section class="erp-card erp-doctor-welcome">
+    <div>
+        <div class="erp-kpi-label">Bienvenida doctora</div>
+        <h3>Su espacio de trabajo, simple y listo para atender.</h3>
+        <p>Desde aqui puede entrar directo a pacientes, expediente clinico, agenda clinica y facturacion sin ver modulos que no necesita durante la consulta.</p>
+        <div class="erp-doctor-actions">
+            <a class="erp-doctor-action" href="{% url 'clinica_pacientes' empresa.slug %}"><i>01</i><strong>Pacientes</strong><span>Buscar, abrir expediente o crear un nuevo paciente.</span></a>
+            <a class="erp-doctor-action" href="{% url 'clinica_dashboard' empresa.slug %}"><i>02</i><strong>Clinica</strong><span>Entrar al modulo clinico, citas, tratamientos y seguimiento.</span></a>
+            <a class="erp-doctor-action" href="{% url 'crear_factura' empresa.slug %}"><i>03</i><strong>Crear factura</strong><span>Facturar de forma directa cuando termine la atencion.</span></a>
+            <a class="erp-doctor-action" href="{% url 'facturacion_dashboard' empresa.slug %}"><i>04</i><strong>Facturacion</strong><span>Ver el modulo de facturacion y sus operaciones permitidas.</span></a>
+        </div>
+    </div>
+    <aside class="erp-doctor-side">
+        <h4>Lo que vera en su menu</h4>
+        <ul>
+            <li>Clinica y pacientes</li>
+            <li>Facturacion</li>
+            <li>Opciones internas del expediente</li>
+        </ul>
+    </aside>
+</section>
+{% else %}
 <section class="erp-card erp-dashboard-hero">
     <div class="erp-dashboard-hero-copy">
         <div class="erp-kpi-label">Operacion empresarial</div>
@@ -638,7 +673,8 @@
         {% endif %}
     </div>
 </section>
-
+{% endif %}
+{% if not erp_access.modo_clinico_simple %}
 <div class="erp-plans-modal" id="erpPlansModal" aria-hidden="true">
     <div class="erp-plans-backdrop" data-plans-close></div>
     <div class="erp-plans-dialog" role="dialog" aria-modal="true" aria-labelledby="erpPlansTitle">
@@ -716,6 +752,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

@@ -168,15 +168,17 @@
                     <span>Tecnicentro</span>
                 </a>
                 {% endif %}
-                {% if request.user.is_superuser or request.user.es_administrador_empresa %}
-                <a class="erp-nav-link {% if '/dashboard/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_empresa_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Bitacora ERP</span>
-                </a>
-                <a class="erp-nav-link {% if '/dashboard/respaldo/' in request.path %}is-active{% endif %}" href="{{ empresa_respaldo_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Mi respaldo</span>
-                </a>
+                {% if not erp_access.modo_clinico_simple %}
+                    {% if request.user.is_superuser or request.user.es_administrador_empresa %}
+                    <a class="erp-nav-link {% if '/dashboard/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_empresa_url }}">
+                        <span class="erp-nav-bullet"></span>
+                        <span>Bitacora ERP</span>
+                    </a>
+                    <a class="erp-nav-link {% if '/dashboard/respaldo/' in request.path %}is-active{% endif %}" href="{{ empresa_respaldo_url }}">
+                        <span class="erp-nav-bullet"></span>
+                        <span>Mi respaldo</span>
+                    </a>
+                    {% endif %}
                 {% endif %}
             </nav>
         </div>

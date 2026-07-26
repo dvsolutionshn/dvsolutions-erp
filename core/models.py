@@ -386,6 +386,10 @@ class Usuario(AbstractUser):
         help_text="Empresas adicionales a las que este usuario puede ingresar con la misma cuenta.",
     )
     es_administrador_empresa = models.BooleanField(default=False)
+    modo_clinico_simple = models.BooleanField(
+        default=False,
+        help_text="Muestra una experiencia simplificada para doctores: solo Clinica y Facturacion.",
+    )
     rol_sistema = models.ForeignKey(
         RolSistema,
         on_delete=models.SET_NULL,

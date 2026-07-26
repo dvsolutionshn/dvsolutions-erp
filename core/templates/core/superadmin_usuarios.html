@@ -56,6 +56,7 @@
                     <td>
                         {% if usuario.is_superuser %}<span class="erp-badge info">Superadmin</span>{% endif %}
                         {% if usuario.es_administrador_empresa %}<span class="erp-badge warning">Admin Empresa</span>{% endif %}
+                        {% if usuario.modo_clinico_simple %}<span class="erp-badge info">Vista Clinica Simple</span>{% endif %}
                         {% if usuario.rol_sistema %}<span class="erp-badge success">{{ usuario.rol_sistema.nombre }}</span>{% endif %}
                         {% for grupo in usuario.groups.all %}
                             <span class="erp-badge neutral">{{ grupo.name }}</span>

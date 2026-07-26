@@ -797,6 +797,43 @@ class SuperAdminControlTests(TestCase):
             reverse("facturacion_dashboard", args=[empresa_secundaria.slug]),
         )
 
+    def test_modo_clinico_simple_solo_muestra_clinica_y_facturacion(self):
+        empresa = Empresa.objects.create(
+            nombre="Hospital Mia Simple",
+            slug="hospital-mia-simple",
+            rtn="08011999000173",
+        )
+        modulos = [
+            self.modulo,
+            Modulo.objects.create(nombre="Clinica Medica", codigo="clinica_medica"),
+            Modulo.objects.create(nombre="Contabilidad", codigo="contabilidad"),
+            Modulo.objects.create(nombre="Recursos Humanos", codigo="rrhh"),
+            Modulo.objects.create(nombre="CRM y Marketing", codigo="crm_marketing"),
+        ]
+        for modulo in modulos:
+            EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
+        usuario = Usuario.objects.create_user(
+            username="candy-simple",
+            email="candy.simple@ejemplo.com",
+            password="ClaveCandySegura2026",
+            empresa=empresa,
+            es_administrador_empresa=True,
+            modo_clinico_simple=True,
+        )
+        self.client.force_login(usuario)
+
+        response = self.client.get(reverse("dashboard", args=[empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bienvenida doctora")
+        self.assertContains(response, "Pacientes")
+        self.assertContains(response, "Crear factura")
+        self.assertNotContains(response, "CRM y Marketing")
+        self.assertNotContains(response, "Contabilidad")
+        self.assertNotContains(response, "Recursos Humanos")
+        self.assertNotContains(response, "Bitacora ERP")
+        self.assertNotContains(response, "Mi respaldo")
+
     def test_usuario_puede_tener_rol_diferente_por_empresa(self):
         empresa_principal = Empresa.objects.create(
             nombre="Empresa Principal Permisos",

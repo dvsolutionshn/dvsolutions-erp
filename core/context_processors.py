@@ -45,6 +45,7 @@ def erp_access(request):
         return False
 
     base = {
+        "modo_clinico_simple": bool(user and user.is_authenticated and getattr(user, "modo_clinico_simple", False)),
         "modulo_facturacion": facturacion_activa and algun("facturacion"),
         "modulo_contabilidad": contabilidad_activa and algun("contabilidad"),
         "modulo_pos": facturacion_activa and pos_activa and permiso("puede_punto_venta"),
@@ -131,4 +132,12 @@ def erp_access(request):
         "usa_bodegas_internas": bool(config_avanzada and config_avanzada.usa_bodegas_internas),
         "ventas_solo_desde_vitrina": bool(config_avanzada and config_avanzada.ventas_solo_desde_vitrina),
     }
+    if base["modo_clinico_simple"]:
+        base.update({
+            "modulo_contabilidad": False,
+            "modulo_rrhh": False,
+            "modulo_crm": False,
+            "modulo_citas": False,
+            "modulo_tecnicentro": False,
+        })
     return {"erp_access": base}

@@ -748,6 +748,8 @@ def dashboard(request, slug=None):
         return _redirect_login_empresa(request, empresa)
 
     modulos_activos = empresa.modulos_habilitados()
+    if getattr(request.user, "modo_clinico_simple", False):
+        modulos_activos = modulos_activos.filter(codigo__in=["clinica_medica", "facturacion"])
 
     return render(request, 'core/dashboard_premium.html', {
         'empresa': empresa,
