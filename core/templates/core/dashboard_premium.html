@@ -183,16 +183,19 @@
     padding-bottom:6px;
     font-size:clamp(9px, .62vw, 11px);
 }
-.erp-doctor-welcome{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px;align-items:stretch;background:radial-gradient(circle at top right,rgba(31,182,170,.17),transparent 34%),linear-gradient(135deg,#ffffff,#f7fcff)}
-.erp-doctor-welcome h3{margin:8px 0 10px;color:#102338;font-size:32px;line-height:1.15}
-.erp-doctor-welcome p{margin:0;color:#5d7185;line-height:1.7;max-width:760px}
-.erp-doctor-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px}
-.erp-doctor-action{display:block;min-height:138px;padding:18px;border:1px solid #d8e7f1;border-radius:22px;background:linear-gradient(135deg,#fff,#f7fbff);color:#102338;text-decoration:none;box-shadow:0 16px 38px rgba(16,40,62,.07);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
-.erp-doctor-action:hover{transform:translateY(-3px);border-color:#8fc5dd;box-shadow:0 20px 48px rgba(16,40,62,.12)}
-.erp-doctor-action i{display:grid;place-items:center;width:42px;height:42px;border-radius:16px;margin-bottom:14px;background:linear-gradient(135deg,#1fb6aa,#2563eb);color:#fff;font-style:normal;font-weight:950}
-.erp-doctor-action strong{display:block;font-size:18px;margin-bottom:7px}.erp-doctor-action span{display:block;color:#65798b;font-size:13px;line-height:1.5}
-.erp-doctor-side{border:1px solid rgba(31,182,170,.2);border-radius:24px;padding:22px;background:rgba(255,255,255,.74)}
-.erp-doctor-side h4{margin:0 0 12px;color:#102338;font-size:18px}.erp-doctor-side ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}.erp-doctor-side li{padding:12px 13px;border:1px solid #dce9f2;border-radius:15px;background:#fff;color:#445b70;font-weight:800}
+.erp-doctor-welcome{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:22px;align-items:stretch;padding:28px;background:radial-gradient(circle at 8% 8%,rgba(31,182,170,.2),transparent 28%),radial-gradient(circle at 90% 18%,rgba(37,99,235,.18),transparent 32%),linear-gradient(135deg,#ffffff 0%,#f8fcff 50%,#eefafa 100%);border-color:rgba(31,182,170,.22)}
+.erp-doctor-welcome::after{content:"";position:absolute;right:-80px;bottom:-120px;width:320px;height:320px;border-radius:999px;background:linear-gradient(135deg,rgba(31,182,170,.16),rgba(37,99,235,.12));filter:blur(2px)}
+.erp-doctor-welcome > *{position:relative;z-index:1}.erp-doctor-welcome h3{margin:10px 0 12px;color:#102338;font-size:clamp(30px,2.3vw,46px);line-height:1.04;letter-spacing:-.04em;max-width:760px}
+.erp-doctor-welcome p{margin:0;color:#5d7185;line-height:1.65;max-width:760px;font-size:15px}
+.erp-doctor-eyebrow{display:inline-flex;align-items:center;gap:9px;padding:8px 12px;border:1px solid rgba(31,182,170,.24);border-radius:999px;background:rgba(255,255,255,.72);color:#08766f;font-size:11px;font-weight:950;letter-spacing:.14em;text-transform:uppercase}.erp-doctor-eyebrow::before{content:"";width:9px;height:9px;border-radius:999px;background:#1fb6aa;box-shadow:0 0 0 5px rgba(31,182,170,.12)}
+.erp-doctor-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin-top:24px}
+.erp-doctor-action{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;min-height:122px;padding:18px;border:1px solid #d8e7f1;border-radius:24px;background:rgba(255,255,255,.82);color:#102338;text-decoration:none;box-shadow:0 18px 42px rgba(16,40,62,.08);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease;overflow:hidden}
+.erp-doctor-action::after{content:"";position:absolute;inset:auto 16px 14px auto;width:52px;height:52px;border-radius:18px;background:rgba(31,182,170,.08);transform:rotate(12deg)}
+.erp-doctor-action:hover{transform:translateY(-4px);border-color:#8fc5dd;background:#fff;box-shadow:0 24px 54px rgba(16,40,62,.14)}
+.erp-doctor-action i{display:grid;place-items:center;width:58px;height:58px;border-radius:20px;background:linear-gradient(135deg,#1fb6aa,#2563eb);color:#fff;font-style:normal;font-size:25px;box-shadow:0 14px 28px rgba(37,99,235,.18)}
+.erp-doctor-action strong{display:block;font-size:18px;margin-bottom:6px}.erp-doctor-action span{display:block;color:#65798b;font-size:13px;line-height:1.45}
+.erp-doctor-side{display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(31,182,170,.2);border-radius:28px;padding:24px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+.erp-doctor-side h4{margin:0 0 12px;color:#102338;font-size:20px}.erp-doctor-side p{font-size:13px}.erp-doctor-side ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:10px}.erp-doctor-side li{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dce9f2;border-radius:16px;background:#fff;color:#445b70;font-weight:850}.erp-doctor-side li::before{content:"✓";display:grid;place-items:center;width:23px;height:23px;border-radius:9px;background:#e9faf6;color:#08766f;font-weight:950}.erp-doctor-mini{margin-top:18px;padding:15px;border-radius:18px;background:linear-gradient(135deg,#102338,#18496e);color:#fff}.erp-doctor-mini strong{display:block;font-size:18px}.erp-doctor-mini span{display:block;margin-top:4px;color:rgba(255,255,255,.72);font-size:12px}
 .erp-module-status.upgrade{
     background:rgba(23,166,161,.1);
     color:#0f6f6a;
@@ -431,23 +434,27 @@
 {% if erp_access.modo_clinico_simple %}
 <section class="erp-card erp-doctor-welcome">
     <div>
-        <div class="erp-kpi-label">Bienvenida doctora</div>
+        <div class="erp-doctor-eyebrow">Bienvenida doctora</div>
         <h3>Su espacio de trabajo, simple y listo para atender.</h3>
-        <p>Desde aqui puede entrar directo a pacientes, expediente clinico, agenda clinica y facturacion sin ver modulos que no necesita durante la consulta.</p>
+        <p>Una entrada directa a lo que realmente usa en consulta: pacientes, expediente clinico y facturacion. Menos ruido, mas velocidad y una experiencia pensada para atender sin perderse.</p>
         <div class="erp-doctor-actions">
-            <a class="erp-doctor-action" href="{% url 'clinica_pacientes' empresa.slug %}"><i>01</i><strong>Pacientes</strong><span>Buscar, abrir expediente o crear un nuevo paciente.</span></a>
-            <a class="erp-doctor-action" href="{% url 'clinica_dashboard' empresa.slug %}"><i>02</i><strong>Clinica</strong><span>Entrar al modulo clinico, citas, tratamientos y seguimiento.</span></a>
-            <a class="erp-doctor-action" href="{% url 'crear_factura' empresa.slug %}"><i>03</i><strong>Crear factura</strong><span>Facturar de forma directa cuando termine la atencion.</span></a>
-            <a class="erp-doctor-action" href="{% url 'facturacion_dashboard' empresa.slug %}"><i>04</i><strong>Facturacion</strong><span>Ver el modulo de facturacion y sus operaciones permitidas.</span></a>
+            <a class="erp-doctor-action" href="{% url 'clinica_pacientes' empresa.slug %}"><i>👤</i><span><strong>Pacientes</strong><span>Buscar, abrir expediente o crear un nuevo paciente.</span></span></a>
+            <a class="erp-doctor-action" href="{% url 'clinica_dashboard' empresa.slug %}"><i>🩺</i><span><strong>Clinica</strong><span>Expedientes, formularios, citas, tratamientos y seguimiento.</span></span></a>
+            <a class="erp-doctor-action" href="{% url 'crear_factura' empresa.slug %}"><i>🧾</i><span><strong>Crear factura</strong><span>Facturar de forma directa cuando termine la atencion.</span></span></a>
+            <a class="erp-doctor-action" href="{% url 'facturacion_dashboard' empresa.slug %}"><i>💳</i><span><strong>Facturacion</strong><span>Operaciones de cobro y documentos permitidos.</span></span></a>
         </div>
     </div>
     <aside class="erp-doctor-side">
-        <h4>Lo que vera en su menu</h4>
+        <div>
+        <h4>Vista limpia para consulta</h4>
+        <p>Solo aparece lo que necesita usar en el dia a dia clinico.</p>
         <ul>
             <li>Clinica y pacientes</li>
             <li>Facturacion</li>
             <li>Opciones internas del expediente</li>
         </ul>
+        </div>
+        <div class="erp-doctor-mini"><strong>Acceso rapido</strong><span>Diseñado para llegar al expediente en menos clics.</span></div>
     </aside>
 </section>
 {% else %}

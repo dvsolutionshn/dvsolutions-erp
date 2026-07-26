@@ -902,10 +902,10 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             for campo in campos_texto_a_ocultar:
                 self.fields.pop(campo, None)
             if "plan_tratamiento" in self.fields:
-                self.fields["plan_tratamiento"].label = "Diagnóstico y plan"
+                self.fields["plan_tratamiento"].label = "Historia de la enfermedad actual, diagnóstico y plan"
                 self.fields["plan_tratamiento"].widget.attrs.update({
                     "rows": 8,
-                    "placeholder": "Escriba aquí el diagnóstico, hallazgos relevantes, conducta médica, plan de tratamiento, indicaciones y seguimiento.",
+                    "placeholder": "Escriba aquí la historia de la enfermedad actual, hallazgos relevantes, diagnóstico, conducta médica, plan de tratamiento, indicaciones y seguimiento.",
                 })
             orden = ["profesional", "fecha_atencion"]
             for nombre, *_resto in self.campos_estructurados:

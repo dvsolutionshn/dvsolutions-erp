@@ -12,18 +12,20 @@
 
 {% block extra_head %}
 <style>
-.clinical-form-shell{max-width:1180px;margin:0 auto}.clinical-banner{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding-bottom:18px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.clinical-form-shell{max-width:1380px;margin:0 auto}.clinical-banner{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding-bottom:18px;margin-bottom:20px;border-bottom:1px solid var(--line)}
 .clinical-banner h3{margin:4px 0;color:#102338}.clinical-banner p{margin:0;color:var(--muted)}
-.clinical-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.clinical-field{display:flex;flex-direction:column;gap:7px}.clinical-field.is-wide{grid-column:1/-1}
+.clinical-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.clinical-field{display:flex;flex-direction:column;gap:7px;padding:14px;border:1px solid #dce8f4;border-radius:16px;background:linear-gradient(180deg,#fff,#fbfdff)}.clinical-field.is-wide{grid-column:1/-1}.clinical-field.is-compact{min-height:100%}.clinical-field.is-detail{padding:0;border:0;background:transparent}
 .clinical-field label{font-size:11px;font-weight:900;text-transform:uppercase;color:#4e6480}.clinical-field input,.clinical-field select,.clinical-field textarea{width:100%;box-sizing:border-box;border:1px solid #bed0e6;border-radius:8px;padding:12px 13px;background:#fff;color:#102338;font:inherit;outline:none;transition:border-color .2s ease,box-shadow .2s ease}
 .clinical-field input:focus,.clinical-field select:focus,.clinical-field textarea:focus{border-color:#2367df;box-shadow:0 0 0 3px rgba(35,103,223,.12)}.clinical-field textarea{min-height:105px;resize:vertical}
-.clinical-field ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.clinical-field li label{display:flex;align-items:center;gap:9px;border:1px solid #d7e4f2;border-radius:12px;padding:10px 12px;background:#fff;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease}.clinical-field li label:hover{transform:translateY(-2px);border-color:#9fc2ef;box-shadow:0 10px 22px rgba(19,37,58,.08)}.clinical-field li label:has(input:checked){background:linear-gradient(135deg,#edf7ff,#f1fffb);border-color:#36a8df;box-shadow:0 0 0 3px rgba(11,159,145,.11)}.clinical-field li input{width:18px!important;height:18px!important;accent-color:#0b9f91;flex:0 0 auto}
+.clinical-field ul,.clinical-field .clinical-check-list,.clinical-field .clinical-check-list div{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.clinical-field .clinical-check-list{grid-template-columns:1fr}.clinical-field .clinical-check-list div{display:contents}.clinical-field li label,.clinical-field .clinical-check-list label{display:flex;align-items:center;gap:9px;min-height:42px;border:1px solid #d7e4f2;border-radius:13px;padding:9px 11px;background:#fff;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease;font-size:11px;line-height:1.25}.clinical-field li label:hover,.clinical-field .clinical-check-list label:hover{transform:translateY(-2px);border-color:#9fc2ef;box-shadow:0 10px 22px rgba(19,37,58,.08)}.clinical-field li label:has(input:checked),.clinical-field .clinical-check-list label:has(input:checked){background:linear-gradient(135deg,#edf7ff,#f1fffb);border-color:#36a8df;box-shadow:0 0 0 3px rgba(11,159,145,.11)}.clinical-field li input,.clinical-field .clinical-check-list input{width:18px!important;height:18px!important;accent-color:#0b9f91;flex:0 0 auto}
+.clinical-detail{border:1px solid #cddfec;border-radius:15px;background:#fbfdff;overflow:hidden}.clinical-detail summary{cursor:pointer;padding:12px 14px;color:#12645e;font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:.06em}.clinical-detail[open] summary{border-bottom:1px solid #dbe8f4;background:#f3fbfa}.clinical-detail-body{padding:13px}
+.clinical-timeline{margin:0 0 18px;border:1px solid #c8d9ed;border-radius:18px;background:linear-gradient(135deg,#ffffff,#f7fcff);padding:16px}.clinical-timeline h3{margin:0;color:#102338}.clinical-timeline p{margin:4px 0 0;color:#60748d}.clinical-timeline-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}.clinical-timeline-card{border:1px solid #dce8f4;border-radius:15px;background:#fff;padding:13px}.clinical-timeline-date{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#102338;font-weight:900}.clinical-timeline-date span{font-size:11px;color:#60748d}.clinical-timeline-note{margin-top:9px;padding:11px;border-radius:12px;background:#f8fbff;color:#20364f;line-height:1.55;max-height:170px;overflow:auto}
 .clinical-error{color:#b42318;font-size:12px}.clinical-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:8px;padding:10px 12px;font-weight:800}
 .general-summary{margin-bottom:18px;border:1px solid #c8d9ed;background:linear-gradient(135deg,#f8fbff,#f4fffc);border-radius:14px;padding:16px}.general-summary h3{margin:0 0 8px;color:#102338}.general-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.general-summary-item{padding:10px;border:1px solid #d9e7f4;border-radius:10px;background:#fff}.general-summary-item span{display:block;font-size:10px;text-transform:uppercase;font-weight:900;color:#60748d;margin-bottom:4px}.general-tags{display:flex;gap:6px;flex-wrap:wrap}.general-tag{padding:5px 8px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:11px;font-weight:800;font-style:normal}
 .preconsult-panel{margin-bottom:18px;padding:16px;border:1px solid #bcd0e8;border-radius:12px;background:#f7fbff}.preconsult-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.preconsult-head h3{margin:3px 0;color:#102338}.preconsult-history{display:grid;gap:7px;margin-top:12px}.preconsult-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;border:1px solid #d8e5f2;border-radius:8px;background:#fff;font-size:12px}.locked-note{margin-bottom:16px;padding:13px;border:1px solid #f0c4c4;border-radius:10px;background:#fff5f5;color:#9f1239;font-weight:800}
 .doctor-workflow{margin-bottom:18px;border:1px solid #c6d8ec;border-radius:16px;background:linear-gradient(135deg,#ffffff,#f5fbff);padding:17px}.doctor-workflow h3{margin:0 0 7px;color:#102338}.doctor-workflow p{margin:0;color:#60748d;line-height:1.55}.doctor-workflow-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:13px}.doctor-step{padding:12px;border:1px solid #dbe7f3;border-radius:12px;background:#fff}.doctor-step strong{display:block;color:#17365c;font-size:13px}.doctor-step span{display:block;margin-top:5px;color:#6d7f92;font-size:11px;line-height:1.45}
-@media(max-width:760px){.clinical-banner,.clinical-form-grid,.clinical-field ul{grid-template-columns:1fr}.clinical-field.is-wide{grid-column:auto}}
+@media(max-width:760px){.clinical-banner,.clinical-form-grid,.clinical-field ul,.clinical-field .clinical-check-list{grid-template-columns:1fr}.clinical-field.is-wide{grid-column:auto}}
 @media(max-width:900px){.general-summary-grid,.doctor-workflow-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
@@ -76,11 +78,26 @@
     <div class="doctor-workflow">
         <div class="erp-kpi-label">Atención médica interna</div>
         <h3>Formulario privado para la doctora durante la consulta</h3>
-        <p>La preconsulta es lo que llenó el paciente. Esta sección es privada de la doctora/equipo: primero marque las opciones clínicas del área y al final escriba en un solo cuadro el diagnóstico, plan, indicaciones y seguimiento.</p>
+        <p>La preconsulta es lo que llenó el paciente. Esta sección es privada de la doctora/equipo: primero marque las opciones clínicas del área y al final escriba en un solo cuadro la historia de enfermedad actual, diagnóstico, plan, indicaciones y seguimiento.</p>
         <div class="doctor-workflow-grid">
             <div class="doctor-step"><strong>1. Confirmar datos</strong><span>Revisar motivo, antecedentes, medicamentos, alergias y riesgos reportados.</span></div>
             <div class="doctor-step"><strong>2. Marcar opciones</strong><span>Completar las preguntas de selección del área clínica.</span></div>
-            <div class="doctor-step"><strong>3. Diagnóstico y plan</strong><span>Documentar en un solo cuadro lo ocurrido en la cita y la conducta a seguir.</span></div>
+            <div class="doctor-step"><strong>3. Historia, diagnóstico y plan</strong><span>Documentar en un solo cuadro lo ocurrido en la cita y la conducta a seguir.</span></div>
+        </div>
+    </div>
+    {% endif %}
+    {% if historias_previas %}
+    <div class="clinical-timeline">
+        <div class="erp-kpi-label">Lectura rápida del historial</div>
+        <h3>Historia de enfermedad actual, diagnóstico y plan guardados</h3>
+        <p>Notas anteriores de esta misma área, ordenadas por fecha para leer el seguimiento sin abrir entrada por entrada.</p>
+        <div class="clinical-timeline-grid">
+            {% for item in historias_previas %}
+            <article class="clinical-timeline-card">
+                <div class="clinical-timeline-date">{{ item.fecha_atencion|date:"d/m/Y H:i" }} <span>{{ item.profesional.nombre|default:"Profesional no indicado" }}</span></div>
+                <div class="clinical-timeline-note">{{ item.plan_tratamiento|linebreaksbr }}</div>
+            </article>
+            {% endfor %}
         </div>
     </div>
     {% endif %}
@@ -88,10 +105,21 @@
         {% csrf_token %}
         <div class="clinical-form-grid">
         {% for field in form %}
-            <div class="clinical-field {% if field.name != 'profesional' and field.name != 'fecha_atencion' and field.name != 'estado' %}is-wide{% endif %}">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+            <div class="clinical-field {% if field.name == 'plan_tratamiento' %}is-wide{% elif field.name|slice:'-6:' == '_otros' %}is-wide is-detail{% elif field.name != 'profesional' and field.name != 'fecha_atencion' and field.name != 'estado' %}is-compact{% endif %}">
+                {% if field.name|slice:'-6:' == '_otros' %}
+                <details class="clinical-detail" {% if field.value %}open{% endif %}>
+                    <summary>Agregar otros / detalle</summary>
+                    <div class="clinical-detail-body">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+                    </div>
+                </details>
+                {% else %}
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<span class="clinical-error">{{ error }}</span>{% endfor %}
+                {% endif %}
             </div>
         {% endfor %}
         </div>

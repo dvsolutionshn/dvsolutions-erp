@@ -1367,6 +1367,12 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         historia.save()
         messages.success(request, f"Historia de {historia.get_tipo_display()} guardada correctamente.")
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    historias_previas = (
+        paciente.historias_especialidad.filter(tipo=tipo)
+        .exclude(plan_tratamiento="")
+        .select_related("profesional", "actualizado_por")
+        .order_by("-fecha_atencion", "-id")[:12]
+    )
     return render(
         request,
         "clinica/historia_especialidad_form.html",
@@ -1380,6 +1386,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             "resumen_preconsulta": _resumen_preconsulta(ultima_preconsulta) if ultima_preconsulta else None,
             "tipo": tipo,
             "preconsultas_tipo": preconsultas_tipo,
+            "historias_previas": historias_previas,
         },
     )
 
@@ -1420,6 +1427,12 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         historia.save()
         messages.success(request, "Historia clinica actualizada correctamente.")
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    historias_previas = (
+        paciente.historias_especialidad.filter(tipo=historia.tipo)
+        .exclude(plan_tratamiento="")
+        .select_related("profesional", "actualizado_por")
+        .order_by("-fecha_atencion", "-id")[:12]
+    )
     return render(
         request,
         "clinica/historia_especialidad_form.html",
@@ -1439,6 +1452,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
             "tipo": historia.tipo,
             "preconsultas_tipo": preconsultas_tipo,
             "bloqueada": bloqueada,
+            "historias_previas": historias_previas,
         },
     )
 
