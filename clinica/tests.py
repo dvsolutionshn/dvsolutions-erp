@@ -1412,6 +1412,7 @@ class ClinicaPacienteTests(TestCase):
                 "telefono": "99996666",
                 "informante": "yo_mismo",
                 "referido_por": "no_aplica",
+                "motivo_categoria": ["no_aplica"],
                 "consentimiento_datos": "on",
             },
         )
@@ -1422,7 +1423,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertFalse(bool(paciente.foto_perfil))
         preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
         self.assertTrue(preconsulta.datos_generales["formulario_general_pendiente_doctor"])
-        self.assertEqual(preconsulta.datos_generales["formulario_general"]["pendiente_doctor_desde_paso"], 3)
-        self.assertNotIn("motivo_categoria", preconsulta.datos_generales["formulario_general"])
+        self.assertEqual(preconsulta.datos_generales["formulario_general"]["pendiente_doctor_desde_paso"], 4)
+        self.assertEqual(preconsulta.datos_generales["formulario_general"]["motivo_categoria"], ["no_aplica"])
         self.assertIn("No aplica", paciente.antecedentes_medicos)
         self.assertEqual(paciente.alergias, "No aplica")

@@ -1002,7 +1002,7 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
             "paciente": paciente,
             "registro_interno": True,
             "modo_doctor_completar_historia": True,
-            "inicio_paso": 2,
+            "inicio_paso": 3,
         },
     )
 

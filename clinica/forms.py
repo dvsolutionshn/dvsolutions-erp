@@ -1724,12 +1724,14 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo",
                 "informante", "informante_detalle", "contacto_emergencia_completo", "contacto_emergencia", "telefono_emergencia",
                 "referido_por", "referido_por_detalle", "consentimiento_datos",
+                "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros",
             }
             for campo, field in self.fields.items():
                 if campo not in campos_paciente_nuevo:
                     field.required = False
             self.fields["foto_perfil"].required = False
             self.fields["consentimiento_datos"].required = False
+            self.fields["motivo_categoria"].required = True
 
     def clean_identidad(self):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
@@ -1916,8 +1918,17 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         if datos.get("fecha_nacimiento"):
             datos["fecha_nacimiento"] = datos["fecha_nacimiento"].isoformat()
         if self.modo_basico_paciente_nuevo:
+            for campo in ["motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros"]:
+                valor = self.cleaned_data.get(campo)
+                if valor not in (None, "", []):
+                    datos[campo] = valor
             datos["formulario_general_pendiente_doctor"] = True
-            datos["formulario_general"] = {"pendiente_doctor_desde_paso": 3}
+            datos["formulario_general"] = {
+                "pendiente_doctor_desde_paso": 4,
+                "motivo_categoria": self.cleaned_data.get("motivo_categoria") or [],
+                "procedimientos_interes": self.cleaned_data.get("procedimientos_interes") or [],
+                "procedimientos_interes_otros": self.cleaned_data.get("procedimientos_interes_otros") or "",
+            }
             return datos
         campos_generales = [
             "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros", "historia_mejorar",

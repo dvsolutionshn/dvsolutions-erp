@@ -29,7 +29,7 @@
             </ol>
             <div class="support-note"><strong>Ayuda rápida:</strong> si corrige lo marcado y aun así no puede enviar, contacte al admin DV Solutions para revisar el caso.</div>
         </div>
-        <div class="progress" style="grid-template-columns:repeat({% if flujo_paciente_nuevo_corto %}2{% else %}8{% endif %},1fr);"><span class="active"></span><span></span>{% if not flujo_paciente_nuevo_corto %}<span></span><span></span><span></span><span></span><span></span><span></span>{% endif %}</div>
+        <div class="progress" style="grid-template-columns:repeat({% if flujo_paciente_nuevo_corto %}3{% else %}8{% endif %},1fr);"><span class="active"></span><span></span><span></span>{% if not flujo_paciente_nuevo_corto %}<span></span><span></span><span></span><span></span><span></span>{% endif %}</div>
         <div class="missing-summary" id="missingSummary" hidden>
             <strong>Faltan datos por completar</strong>
             <p>Marcamos en rojo las preguntas pendientes. Puede tocar una de la lista para ir directo a completarla.</p>
@@ -38,7 +38,7 @@
         {% if form.errors %}<div class="error-summary"><strong>No pudimos enviar todavía.</strong><p>Revise los campos marcados en rojo. La información que ya escribió se mantiene en pantalla para que no tenga que comenzar desde cero.</p>{% if form.non_field_errors %}<ul>{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}<p>Si el error parece técnico o continúa después de corregir lo marcado, contacte al admin DV Solutions.</p></div>{% endif %}
 
         <section class="form-step active" data-step="0">
-            <div class="step-kicker">Paso 1 de {% if flujo_paciente_nuevo_corto %}2{% else %}8{% endif %}</div><h2>Datos generales</h2><p class="step-copy">Iniciemos con su identificación y datos personales básicos. Esto ayuda a abrir correctamente su expediente clínico.</p>
+            <div class="step-kicker">Paso 1 de {% if flujo_paciente_nuevo_corto %}3{% else %}8{% endif %}</div><h2>Datos generales</h2><p class="step-copy">Iniciemos con su identificación y datos personales básicos. Esto ayuda a abrir correctamente su expediente clínico.</p>
             <div class="field-grid">
                 <div class="step-tip">Escriba sus nombres y apellidos como aparecen en su identidad. Seleccione sexo y estado civil para que el sistema muestre solo las preguntas que correspondan.</div>
                 {% for field in form %}{% if field.name == 'nombres' or field.name == 'apellidos' or field.name == 'identidad' or field.name == 'fecha_nacimiento' or field.name == 'sexo' or field.name == 'estado_civil' %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
@@ -72,18 +72,17 @@
         </section>
 
         <section class="form-step" data-step="1">
-            <div class="step-kicker">Paso 2 de {% if flujo_paciente_nuevo_corto %}2{% else %}8{% endif %}</div><h2>Datos generales de contacto</h2><p class="step-copy">Seguimos con sus medios de contacto, residencia opcional, ocupacion y la forma en que conocio {{ preconsulta.empresa.nombre }}.</p>
+            <div class="step-kicker">Paso 2 de {% if flujo_paciente_nuevo_corto %}3{% else %}8{% endif %}</div><h2>Datos generales de contacto</h2><p class="step-copy">Seguimos con sus medios de contacto, residencia opcional, ocupacion y la forma en que conocio {{ preconsulta.empresa.nombre }}.</p>
             <div class="field-grid">
                 <div class="step-tip">El correo y la dirección son opcionales. El teléfono o WhatsApp sí es importante para poder contactarle. Si el contacto de emergencia no aplica, puede escribir "No aplica".</div>
                 {% for field in form %}{% if field.name == 'correo' or field.name == 'telefono_codigo_area' or field.name == 'telefono' or field.name == 'direccion' or field.name == 'lugar_nacimiento' or field.name == 'ocupacion' or field.name == 'lugar_trabajo' or field.name == 'informante' or field.name == 'informante_detalle' or field.name == 'contacto_emergencia_completo' or field.name == 'referido_por' or field.name == 'referido_por_detalle' %}<div class="field {% if field.name == 'direccion' or field.name == 'referido_por_detalle' or field.name == 'informante_detalle' %}wide{% endif %} {% if field.name == 'referido_por_detalle' %}referral-detail{% endif %} {% if field.name == 'informante_detalle' %}informante-detail{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
                 {{ form.contacto_emergencia }}{{ form.telefono_emergencia }}
             </div>
-            <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button>{% if flujo_paciente_nuevo_corto %}<button class="btn-primary" type="submit">Crear expediente</button>{% else %}<button class="btn-primary next-step" type="button">Continuar</button>{% endif %}</div>
+            <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
         </section>
 
-        {% if not flujo_paciente_nuevo_corto %}
         <section class="form-step" data-step="2">
-            <div class="step-kicker">Paso 3 de 8</div><h2>Motivo y procedimiento de interés</h2><p class="step-copy">Puede hacer selección múltiple. Solo se desplegarán las opciones de las áreas seleccionadas.</p>
+            <div class="step-kicker">Paso 3 de {% if flujo_paciente_nuevo_corto %}3{% else %}8{% endif %}</div><h2>Motivo y procedimiento de interés</h2><p class="step-copy">Puede hacer selección múltiple. Solo se desplegarán las opciones de las áreas seleccionadas.</p>
             <div class="field-grid">
                 <div class="step-tip">Primero marque el área que le interesa. Ejemplo: Botox, limpieza facial o manchas van en Tratamiento Estético / Piel; temas de cabello van en Capilar. Si no está seguro, marque No aplica / no estoy seguro todavía.</div>
                 <div class="field wide check-grid"><span class="group-label">{{ form.motivo_categoria.label }}</span>{{ form.motivo_categoria }}<div class="field-help">{{ form.motivo_categoria.help_text }}</div>{% for error in form.motivo_categoria.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
@@ -109,9 +108,10 @@
                 </div>
                 <div class="field wide"><label for="{{ form.procedimientos_interes_otros.id_for_label }}">Otros:</label>{{ form.procedimientos_interes_otros }}<div class="field-instruction">Use este espacio solo si no encontró su procedimiento en la lista. Si no tiene otro detalle, marque No aplica.</div></div>
             </div>
-            <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
+            <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button>{% if flujo_paciente_nuevo_corto %}<button class="btn-primary" type="submit">Crear expediente</button>{% else %}<button class="btn-primary next-step" type="button">Continuar</button>{% endif %}</div>
         </section>
 
+        {% if not flujo_paciente_nuevo_corto %}
         <section class="form-step" data-step="3">
             <div class="step-kicker">Paso 4 de 8</div><h2>Funciones orgánicas generales</h2><p class="step-copy">Marque si estas funciones están normales o alteradas. La revisión por sistemas la completará el doctor durante la consulta.</p>
             <div class="field-grid">
@@ -235,6 +235,7 @@
     }
     function restoreDraft(){
         try{
+            if(form.querySelector(".error-summary"))return;
             const raw=localStorage.getItem(draftKey);
             if(!raw)return;
             const data=JSON.parse(raw);

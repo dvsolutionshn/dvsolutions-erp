@@ -433,7 +433,7 @@
     {% endif %}
     {% if es_clinica %}
     <form class="calendar-filter-bar" method="get">
-      <input type="hidden" name="vista" value="{{ vista }}">
+      <input type="hidden" name="vista" value="dia">
       <label>
         <span>Día / fecha</span>
         <input type="date" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
