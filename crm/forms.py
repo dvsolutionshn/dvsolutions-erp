@@ -253,6 +253,8 @@ class CitaClienteForm(forms.ModelForm):
         self.fields.pop("fecha_hora")
         self.fields.pop("cirugia_fin_estimada")
         self.fields["cirugia_detalle"].label = "Tipo / detalle de cirugia"
+        self.fields["cirugia_hora_fin"].label = "Hora final estimada"
+        self.fields["cirugia_periodo_fin"].label = "AM / PM final"
         self.fields["cirugia_detalle"].required = False
         if self.instance and self.instance.pk and self.instance.fecha_hora:
             fecha_local = timezone.localtime(self.instance.fecha_hora)
@@ -384,8 +386,10 @@ class CitaClienteForm(forms.ModelForm):
 
     def _rango_bloqueado_cita(self, cita):
         inicio = cita.fecha_hora
-        if self.cirugia_extendida_activa and self._servicio_es_cirugia(cita.servicio_clinico) and cita.cirugia_fin_estimada:
-            return inicio, cita.cirugia_fin_estimada + timedelta(hours=1)
+        if self.cirugia_extendida_activa and cita.cirugia_fin_estimada:
+            if self._servicio_es_cirugia(cita.servicio_clinico):
+                return inicio, cita.cirugia_fin_estimada + timedelta(hours=1)
+            return inicio, cita.cirugia_fin_estimada
         minutos = cita.duracion_minutos or getattr(cita.servicio_clinico, "duracion_minutos", None) or 30
         return inicio, inicio + timedelta(minutes=minutos)
 
@@ -447,26 +451,33 @@ class CitaClienteForm(forms.ModelForm):
         servicio = cleaned_data.get("servicio_clinico")
         profesional = cleaned_data.get("profesional_salud")
         fin_bloque = inicio + timedelta(minutes=(getattr(servicio, "duracion_minutos", None) or cleaned_data.get("duracion_minutos") or 30))
+        hora_fin = cleaned_data.get("cirugia_hora_fin")
+        periodo_fin = cleaned_data.get("cirugia_periodo_fin")
+        fin_estimada = None
 
-        if self.cirugia_extendida_activa and self._servicio_es_cirugia(servicio):
-            if not (cleaned_data.get("cirugia_detalle") or "").strip():
-                self.add_error("cirugia_detalle", "Describe el tipo de cirugia o el procedimiento.")
-            hora_fin = cleaned_data.get("cirugia_hora_fin")
-            periodo_fin = cleaned_data.get("cirugia_periodo_fin")
-            if not hora_fin:
-                self.add_error("cirugia_hora_fin", "Selecciona la hora final estimada.")
+        if self.cirugia_extendida_activa and hora_fin:
             if not periodo_fin:
                 self.add_error("cirugia_periodo_fin", "Selecciona AM o PM.")
-            if hora_fin and periodo_fin:
+            if periodo_fin:
                 fin_estimada = self._armar_fecha_hora(fecha, hora_fin, periodo_fin)
                 if fin_estimada <= inicio:
                     self.add_error("cirugia_hora_fin", "La hora final debe ser posterior a la hora de inicio.")
                 else:
                     cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada
-                    fin_bloque = fin_estimada + timedelta(hours=1)
+                    fin_bloque = fin_estimada
+
+        if self.cirugia_extendida_activa and self._servicio_es_cirugia(servicio):
+            if not (cleaned_data.get("cirugia_detalle") or "").strip():
+                self.add_error("cirugia_detalle", "Describe el tipo de cirugia o el procedimiento.")
+            if not hora_fin:
+                self.add_error("cirugia_hora_fin", "Selecciona la hora final estimada.")
+            if not periodo_fin:
+                self.add_error("cirugia_periodo_fin", "Selecciona AM o PM.")
+            if fin_estimada and fin_estimada > inicio:
+                fin_bloque = fin_estimada + timedelta(hours=1)
         else:
             cleaned_data["cirugia_detalle"] = ""
-            cleaned_data["cirugia_fin_estimada_compuesta"] = None
+            cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada
 
         if not self.errors:
             try:

@@ -506,7 +506,8 @@
   let services = [];
   try{ services = JSON.parse(servicesNode.textContent || "[]"); }catch(error){ services = []; }
   const serviceMap = new Map(services.map(item => [String(item.id), item]));
-  const surgeryFields = ["cirugia_hora_fin", "cirugia_detalle", "fotos_cirugia"];
+  const extendedTimeFields = ["cirugia_hora_fin"];
+  const surgeryOnlyFields = ["cirugia_detalle", "fotos_cirugia"];
   function isSurgerySelected(){
     const item = serviceMap.get(String(serviceSelect.value));
     if(!item){ return false; }
@@ -516,7 +517,15 @@
   }
   function toggleSurgeryFields(){
     const show = isSurgerySelected();
-    surgeryFields.forEach(function(name){
+    extendedTimeFields.forEach(function(name){
+      const field = document.querySelector('[data-field-name="'+name+'"]');
+      if(!field){ return; }
+      field.style.display = "";
+      field.querySelectorAll("input, textarea, select").forEach(function(input){
+        input.disabled = false;
+      });
+    });
+    surgeryOnlyFields.forEach(function(name){
       const field = document.querySelector('[data-field-name="'+name+'"]');
       if(!field){ return; }
       field.style.display = show ? "" : "none";
