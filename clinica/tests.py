@@ -118,11 +118,13 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Vista clínica completa")
-        self.assertContains(response, "información clínica")
-        self.assertContains(response, "áreas clínicas")
+        self.assertContains(response, "Historia clínica completa")
+        self.assertContains(response, "Una sola hoja de trabajo")
+        self.assertContains(response, "hoja única de lectura")
         self.assertContains(response, "años")
         self.assertContains(response, "· RH")
+        self.assertNotContains(response, "area-nav")
+        self.assertNotContains(response, 'id="area-')
         self.assertNotContains(response, "Ã")
         self.assertNotContains(response, "Â")
 
