@@ -2810,6 +2810,7 @@ def editar_proveedor(request, empresa_slug, proveedor_id):
 def inventario_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     mostrar_costo_real = _empresa_muestra_costo_real_inventario(empresa)
+    q = (request.GET.get("q") or "").strip()
     if request.method == "POST" and request.POST.get("accion") == "actualizar_costo_real":
         if not mostrar_costo_real:
             messages.error(request, "El costo real de inventario no esta habilitado para esta empresa.")
@@ -2843,6 +2844,12 @@ def inventario_facturacion(request, empresa_slug):
         controla_inventario=True,
         eliminado=False,
     ).select_related('impuesto_predeterminado').order_by('nombre')
+    if q:
+        productos = productos.filter(
+            Q(nombre__icontains=q) |
+            Q(codigo__icontains=q) |
+            Q(descripcion__icontains=q)
+        )
 
     for producto in productos:
         _obtener_inventario_producto(producto)
@@ -2858,6 +2865,12 @@ def inventario_facturacion(request, empresa_slug):
             to_attr='historial_costos_recientes',
         )
     ).order_by('nombre')
+    if q:
+        productos = productos.filter(
+            Q(nombre__icontains=q) |
+            Q(codigo__icontains=q) |
+            Q(descripcion__icontains=q)
+        )
 
     producto_id = request.GET.get('producto')
     producto_seleccionado = None
@@ -2900,6 +2913,12 @@ def inventario_facturacion(request, empresa_slug):
         "movimientos": movimientos,
         "productos_alerta": productos_alerta,
         "mostrar_costo_real_inventario": mostrar_costo_real,
+        "q": q,
+        "productos_sugeridos": Producto.objects.filter(
+            empresa=empresa,
+            controla_inventario=True,
+            eliminado=False,
+        ).order_by('nombre').values_list('nombre', flat=True).distinct(),
     })
 
 

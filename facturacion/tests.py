@@ -3759,6 +3759,29 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Nuevo Producto")
         self.assertContains(response, f'href="{producto_url}?next={inventario_url}"', html=False)
 
+    def test_inventario_dashboard_filtra_productos_con_buscador_en_vivo(self):
+        otro_producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto Inventario Alterno",
+            codigo="INV-ALT",
+            tipo_item="producto",
+            precio=Decimal("175.00"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=True,
+        )
+
+        response = self.client.get(
+            reverse("inventario_facturacion", args=[self.empresa.slug]),
+            {"q": "Alterno"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="inventario-sugerencias"', html=False)
+        productos_visibles = list(response.context["productos"])
+        self.assertIn(otro_producto, productos_visibles)
+        self.assertNotIn(self.producto, productos_visibles)
+        self.assertEqual(response.context["q"], "Alterno")
+
     def test_costo_real_inventario_solo_hospital_mia_y_medical_spa(self):
         inventario_url = reverse("inventario_facturacion", args=[self.empresa.slug])
         response = self.client.post(
