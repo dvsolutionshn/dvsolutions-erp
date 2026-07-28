@@ -104,6 +104,28 @@ class ClinicaPacienteTests(TestCase):
         data.update(overrides)
         return data
 
+    def test_vista_clinica_completa_renderiza_textos_sin_mojibake(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-TEST",
+            nombre="Paciente Consolidado",
+            identidad="1101200800619",
+            fecha_nacimiento="2000-01-01",
+            rh="O+",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vista clínica completa")
+        self.assertContains(response, "información clínica")
+        self.assertContains(response, "áreas clínicas")
+        self.assertContains(response, "años")
+        self.assertContains(response, "· RH")
+        self.assertNotContains(response, "Ã")
+        self.assertNotContains(response, "Â")
+
     def test_nueva_cita_clinica_usa_control_unificado_am_pm(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa, expediente_codigo="HM-CITA", nombre="Paciente Cita"
