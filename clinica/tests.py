@@ -150,6 +150,44 @@ class ClinicaPacienteTests(TestCase):
         self.assertNotContains(response, "Ã")
         self.assertNotContains(response, "Â")
 
+    def test_editar_paciente_usa_formulario_general_moderno(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-EDIT",
+            primer_nombre="Paciente",
+            primer_apellido="Viejo",
+            nombre="Paciente Viejo",
+            identidad="0801199912345",
+            fecha_nacimiento="1999-08-12",
+            sexo="femenino",
+            estado_civil="soltero",
+            whatsapp="99990000",
+            telefono="99990000",
+        )
+        url = reverse("clinica_editar_paciente", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Actualice los datos generales del paciente")
+        self.assertContains(response, "Actualizar paciente")
+        self.assertNotContains(response, "Foto inicial del paciente")
+
+        data = self._datos_formulario_general(
+            nombres="Paciente Actualizado",
+            apellidos="Desde Formulario",
+            identidad=paciente.identidad,
+            telefono="98887777",
+            correo="nuevo@example.com",
+        )
+        response = self.client.post(url, data)
+
+        self.assertRedirects(response, reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]))
+        paciente.refresh_from_db()
+        self.assertEqual(paciente.nombre, "Paciente Actualizado Desde Formulario")
+        self.assertEqual(paciente.whatsapp, "50498887777")
+        self.assertEqual(paciente.correo, "nuevo@example.com")
+
     def test_nueva_cita_clinica_usa_control_unificado_am_pm(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa, expediente_codigo="HM-CITA", nombre="Paciente Cita"
@@ -292,7 +330,7 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Formulario de historia clinica")
-        self.assertContains(response, "Guardar historia clinica")
+        self.assertContains(response, "Crear expediente")
         self.assertContains(response, "Subir archivo")
 
         response = self.client.post(

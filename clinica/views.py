@@ -411,6 +411,21 @@ def _actualizar_paciente_desde_preconsulta(paciente, form):
     _sincronizar_cliente_facturacion_paciente(paciente)
 
 
+def _actualizar_paciente_basico_desde_preconsulta(paciente, form):
+    campos_directos = [
+        "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+        "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "direccion",
+        "lugar_nacimiento", "ocupacion", "contacto_emergencia", "telefono_emergencia",
+    ]
+    for campo in campos_directos:
+        setattr(paciente, campo, form.cleaned_data.get(campo))
+    paciente.telefono = form.cleaned_data.get("telefono")
+    paciente.whatsapp = form.cleaned_data.get("telefono")
+    paciente.prefijo_telefono = form.cleaned_data.get("telefono_codigo_area") or paciente.prefijo_telefono or "504"
+    paciente.save()
+    _sincronizar_cliente_facturacion_paciente(paciente)
+
+
 def _crear_paciente_desde_formulario_general(
     form,
     empresa,
@@ -699,6 +714,7 @@ def crear_paciente(request, empresa_slug):
             request.FILES or None,
             instance=preconsulta_base,
             empresa=empresa,
+            modo_basico_paciente_nuevo=True,
         )
         if request.method == "POST" and form.is_valid():
             try:
@@ -743,6 +759,7 @@ def crear_paciente(request, empresa_slug):
                 "paciente": None,
                 "registro_nuevo": True,
                 "registro_interno": True,
+                "flujo_paciente_nuevo_corto": True,
             },
         )
 
@@ -803,6 +820,107 @@ def crear_paciente(request, empresa_slug):
 def editar_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    if empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS:
+        preconsulta = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
+        if preconsulta is None:
+            token_raw, token_hash, token_preview = generar_token_preconsulta()
+            preconsulta = PreconsultaClinica(
+                empresa=empresa,
+                paciente=paciente,
+                tipo="general",
+                token_hash=token_hash,
+                token_preview=token_preview,
+                fecha_expiracion=timezone.now() + timezone.timedelta(days=30),
+                creada_por=request.user,
+                datos_generales={"formulario_general_pendiente_doctor": True},
+            )
+        form = PreconsultaClinicaPublicaForm(
+            request.POST or None,
+            request.FILES or None,
+            instance=preconsulta,
+            paciente=paciente,
+            empresa=empresa,
+            modo_basico_paciente_nuevo=True,
+        )
+        foto_anterior = paciente.foto_perfil.name if paciente.foto_perfil else ""
+        if request.method == "POST" and form.is_valid():
+            try:
+                with transaction.atomic():
+                    if not preconsulta.pk:
+                        preconsulta.empresa = empresa
+                        preconsulta.paciente = paciente
+                        preconsulta.tipo = "general"
+                    datos_previos = preconsulta.datos_generales if isinstance(preconsulta.datos_generales, dict) else {}
+                    datos_actualizados = dict(datos_previos)
+                    datos_formulario = form.datos_generales_limpios()
+                    formulario_general_previo = datos_actualizados.get("formulario_general", {})
+                    if not isinstance(formulario_general_previo, dict):
+                        formulario_general_previo = {}
+                    formulario_general_nuevo = datos_formulario.pop("formulario_general", {}) or {}
+                    datos_actualizados.update(datos_formulario)
+                    formulario_general_previo.update(formulario_general_nuevo)
+                    datos_actualizados["formulario_general"] = formulario_general_previo
+                    datos_actualizados["formulario_general_pendiente_doctor"] = True
+
+                    preconsulta = form.save(commit=False)
+                    preconsulta.empresa = empresa
+                    preconsulta.paciente = paciente
+                    preconsulta.tipo = "general"
+                    preconsulta.datos_generales = datos_actualizados
+                    preconsulta.estado = preconsulta.estado or "pendiente"
+                    preconsulta.fecha_expiracion = preconsulta.fecha_expiracion or (timezone.now() + timezone.timedelta(days=30))
+                    preconsulta.creada_por = preconsulta.creada_por or request.user
+                    preconsulta.save()
+
+                    _actualizar_paciente_basico_desde_preconsulta(paciente, form)
+                    foto_nueva = paciente.foto_perfil.name if paciente.foto_perfil else ""
+                    if form.cleaned_data.get("foto_perfil"):
+                        paciente.foto_perfil = form.cleaned_data.get("foto_perfil")
+                        paciente.save(update_fields=["foto_perfil"])
+                        foto_nueva = paciente.foto_perfil.name if paciente.foto_perfil else ""
+                    if foto_nueva and foto_nueva != foto_anterior:
+                        PacienteFotoEvolucion.objects.create(
+                            empresa=empresa,
+                            paciente=paciente,
+                            imagen=paciente.foto_perfil,
+                            tipo="evolucion",
+                            titulo="Actualizacion de foto de perfil",
+                            descripcion="Foto registrada desde la edicion del paciente.",
+                            creado_por=request.user,
+                        )
+            except ValidationError as exc:
+                logger.warning("No se pudo editar paciente con formulario general en %s: %s", empresa.slug, exc)
+                if hasattr(exc, "message_dict"):
+                    for campo, errores in exc.message_dict.items():
+                        form.add_error(campo if campo in form.fields else None, errores)
+                else:
+                    form.add_error(None, exc)
+                messages.error(request, "Revisa los datos marcados. No se actualizo el paciente.")
+            except Exception:
+                logger.exception("Error inesperado al editar paciente con formulario general en %s", empresa.slug)
+                form.add_error(
+                    None,
+                    "No se pudo actualizar el paciente por un error interno. Intenta nuevamente; si persiste, avisa a soporte.",
+                )
+                messages.error(request, "No se pudo actualizar el paciente. El formulario quedo listo para corregir o reintentar.")
+            else:
+                messages.success(request, "Paciente actualizado correctamente con el formulario general.")
+                return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        return render(
+            request,
+            "clinica/preconsulta_publica.html",
+            {
+                "empresa": empresa,
+                "form": form,
+                "preconsulta": preconsulta,
+                "paciente": paciente,
+                "registro_nuevo": True,
+                "registro_interno": True,
+                "flujo_paciente_nuevo_corto": True,
+                "modo_edicion_paciente": True,
+            },
+        )
+
     foto_anterior = paciente.foto_perfil.name if paciente.foto_perfil else ""
     form = PacienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=paciente)
     if request.method == "POST" and form.is_valid():
