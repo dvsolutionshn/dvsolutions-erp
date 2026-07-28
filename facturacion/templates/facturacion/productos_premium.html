@@ -100,6 +100,50 @@
     gap:10px;
     margin-top:18px;
 }
+.erp-catalog-panel-header{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) auto;
+    gap:18px;
+    align-items:start;
+}
+.erp-catalog-panel-title{
+    max-width:760px;
+}
+.erp-catalog-actions{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    gap:10px;
+}
+.erp-catalog-action{
+    display:inline-flex;
+    align-items:center;
+    gap:9px;
+    min-height:42px;
+    padding:10px 14px;
+    border:1px solid rgba(17,95,122,.16);
+    border-radius:16px;
+    background:linear-gradient(135deg, rgba(255,255,255,.96), rgba(238,247,251,.84));
+    color:#0b6d75;
+    text-decoration:none;
+    font-size:12px;
+    font-weight:950;
+    box-shadow:0 14px 32px rgba(16,35,56,.08);
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.erp-catalog-action::before{
+    content:"";
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    background:linear-gradient(135deg, #20c5b8, #2f7cf6);
+    box-shadow:0 0 0 5px rgba(32,197,184,.10);
+}
+.erp-catalog-action:hover{
+    transform:translateY(-2px);
+    border-color:rgba(32,197,184,.42);
+    box-shadow:0 20px 42px rgba(16,35,56,.13);
+}
 .erp-catalog-tab{
     display:inline-flex;
     align-items:center;
@@ -158,6 +202,29 @@
     border-radius:999px;
     background:currentColor;
     box-shadow:0 0 0 4px rgba(255,255,255,.78);
+}
+.erp-catalog-filter-grid{
+    margin-top:22px;
+    grid-template-columns:minmax(260px, 420px) minmax(220px, 300px) auto;
+    align-items:end;
+}
+.erp-catalog-filter-grid .erp-list-filter-actions{
+    grid-column:auto !important;
+    justify-content:flex-start;
+}
+@media(max-width:980px){
+    .erp-catalog-panel-header{
+        grid-template-columns:1fr;
+    }
+    .erp-catalog-actions{
+        justify-content:flex-start;
+    }
+    .erp-catalog-filter-grid{
+        grid-template-columns:1fr;
+    }
+    .erp-catalog-filter-grid .erp-list-filter-actions{
+        grid-column:1 / -1 !important;
+    }
 }
 </style>
 {% endblock %}
@@ -218,8 +285,8 @@
     </section>
 
     <section class="erp-card erp-list-filter-card">
-        <div class="erp-list-toolbar">
-            <div>
+        <div class="erp-catalog-panel-header">
+            <div class="erp-catalog-panel-title">
                 <h3 class="erp-panel-title" style="margin:0;">Catalogo separado</h3>
                 <p>Alterna entre productos fisicos, servicios o todo el catalogo sin mezclar la operacion.</p>
                 <div class="erp-catalog-tabs" aria-label="Filtro por tipo de item">
@@ -234,12 +301,14 @@
                     </a>
                 </div>
             </div>
+            <div class="erp-catalog-actions" aria-label="Acciones del catalogo">
             {% if erp_access.usa_inventario_farmaceutico %}
-            <a class="erp-btn-secondary" href="{% url 'categorias_farmaceuticas' empresa.slug %}">Categorias</a>
+                <a class="erp-catalog-action" href="{% url 'categorias_farmaceuticas' empresa.slug %}">Categorias</a>
             {% endif %}
-            <a class="erp-btn-secondary" href="{% url 'codigos_barras_productos' empresa.slug %}">Asignar codigos de barras</a>
+                <a class="erp-catalog-action" href="{% url 'codigos_barras_productos' empresa.slug %}">Codigos de barras</a>
+            </div>
         </div>
-        <form method="get" class="erp-list-filter-grid">
+        <form method="get" class="erp-list-filter-grid erp-catalog-filter-grid">
             <input type="hidden" name="tipo" value="{{ tipo_item }}">
             <div class="erp-filter-field">
                 <label for="q">Buscar producto o servicio</label>
