@@ -3,11 +3,11 @@
 
 {% block title %}Productos - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Catalogo Comercial{% endblock %}
-{% block header_title %}Productos{% endblock %}
-{% block header_description %}Organiza el catalogo comercial, fiscal y operativo desde una vista mas limpia, consistente y preparada para crecer con inventario.{% endblock %}
+{% block header_title %}Productos y Servicios{% endblock %}
+{% block header_description %}Organiza por separado los productos fisicos y los servicios del catalogo comercial, fiscal y operativo.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'codigos_barras_productos' empresa.slug %}">Asignar codigos</a>
-<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto</a>
+<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}">Nuevo Producto / Servicio</a>
 {% endblock %}
 
 {% block extra_head %}
@@ -94,6 +94,71 @@
     font-weight:900;
     letter-spacing:.08em;
 }
+.erp-catalog-tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:18px;
+}
+.erp-catalog-tab{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 16px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    color:var(--primary);
+    background:rgba(255,255,255,.86);
+    text-decoration:none;
+    font-weight:900;
+    box-shadow:0 12px 28px rgba(16,35,56,.08);
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+.erp-catalog-tab:hover{
+    transform:translateY(-2px);
+    box-shadow:0 18px 42px rgba(16,35,56,.13);
+}
+.erp-catalog-tab.is-active{
+    border-color:rgba(28,181,172,.75);
+    background:linear-gradient(135deg, rgba(28,181,172,.16), rgba(37,99,235,.12));
+    color:#0c5260;
+}
+.erp-catalog-tab-count{
+    min-width:30px;
+    height:30px;
+    padding:0 10px;
+    display:inline-grid;
+    place-items:center;
+    border-radius:999px;
+    background:#eef7fb;
+    color:#0c5260;
+    font-size:12px;
+}
+.erp-type-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:7px 11px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.02em;
+}
+.erp-type-chip.producto{
+    background:#eaf7f4;
+    color:#087268;
+}
+.erp-type-chip.servicio{
+    background:#eef2ff;
+    color:#2655c8;
+}
+.erp-type-dot{
+    width:8px;
+    height:8px;
+    border-radius:999px;
+    background:currentColor;
+    box-shadow:0 0 0 4px rgba(255,255,255,.78);
+}
 </style>
 {% endblock %}
 
@@ -101,9 +166,14 @@
 <section class="erp-list-shell">
     <section class="erp-list-kpis">
         <article class="erp-card erp-list-kpi-card">
-            <div class="erp-kpi-label">Productos</div>
+            <div class="erp-kpi-label">Vista actual</div>
             <div class="erp-stat-value">{{ resumen.total }}</div>
-            <p class="erp-card-muted">Catalogo total disponible para facturacion y operacion.</p>
+            <p class="erp-card-muted">Items mostrados segun el filtro seleccionado.</p>
+        </article>
+        <article class="erp-card erp-list-kpi-card">
+            <div class="erp-kpi-label">Productos fisicos</div>
+            <div class="erp-stat-value">{{ resumen.productos }}</div>
+            <p class="erp-card-muted">Articulos que pueden manejar inventario, bodegas y existencias.</p>
         </article>
         <article class="erp-card erp-list-kpi-card">
             <div class="erp-kpi-label">Activos</div>
@@ -150,8 +220,19 @@
     <section class="erp-card erp-list-filter-card">
         <div class="erp-list-toolbar">
             <div>
-                <h3 class="erp-panel-title" style="margin:0;">Catalogo de Productos</h3>
-                <p>Concentra nombre, clasificacion, impuesto base y estado operativo desde una misma vista administrativa.</p>
+                <h3 class="erp-panel-title" style="margin:0;">Catalogo separado</h3>
+                <p>Alterna entre productos fisicos, servicios o todo el catalogo sin mezclar la operacion.</p>
+                <div class="erp-catalog-tabs" aria-label="Filtro por tipo de item">
+                    <a class="erp-catalog-tab {% if tipo_item == 'todos' %}is-active{% endif %}" href="{% url 'productos_facturacion' empresa.slug %}?tipo=todos{% if q %}&q={{ q|urlencode }}{% endif %}{% if categoria_id %}&categoria={{ categoria_id }}{% endif %}">
+                        Todo el catalogo <span class="erp-catalog-tab-count">{{ resumen.total_catalogo }}</span>
+                    </a>
+                    <a class="erp-catalog-tab {% if tipo_item == 'producto' %}is-active{% endif %}" href="{% url 'productos_facturacion' empresa.slug %}?tipo=producto{% if q %}&q={{ q|urlencode }}{% endif %}{% if categoria_id %}&categoria={{ categoria_id }}{% endif %}">
+                        Productos <span class="erp-catalog-tab-count">{{ resumen.productos }}</span>
+                    </a>
+                    <a class="erp-catalog-tab {% if tipo_item == 'servicio' %}is-active{% endif %}" href="{% url 'productos_facturacion' empresa.slug %}?tipo=servicio{% if q %}&q={{ q|urlencode }}{% endif %}{% if categoria_id %}&categoria={{ categoria_id }}{% endif %}">
+                        Servicios <span class="erp-catalog-tab-count">{{ resumen.servicios }}</span>
+                    </a>
+                </div>
             </div>
             {% if erp_access.usa_inventario_farmaceutico %}
             <a class="erp-btn-secondary" href="{% url 'categorias_farmaceuticas' empresa.slug %}">Categorias</a>
@@ -159,8 +240,9 @@
             <a class="erp-btn-secondary" href="{% url 'codigos_barras_productos' empresa.slug %}">Asignar codigos de barras</a>
         </div>
         <form method="get" class="erp-list-filter-grid">
+            <input type="hidden" name="tipo" value="{{ tipo_item }}">
             <div class="erp-filter-field">
-                <label for="q">Buscar producto</label>
+                <label for="q">Buscar producto o servicio</label>
                 <div class="erp-autocomplete">
                     <input id="q" type="text" name="q" value="{{ q|default:'' }}" placeholder="Escribe nombre, codigo o descripcion" autocomplete="off">
                     <div id="productos-sugerencias" class="erp-suggestion-list"></div>
@@ -219,7 +301,7 @@
                         <td>
                             <div class="erp-doc-cell">
                                 <div class="erp-doc-title">{{ producto.codigo|default:"-" }}</div>
-                                <div class="erp-doc-subtext">{{ producto.get_tipo_item_display }}</div>
+                                <span class="erp-type-chip {{ producto.tipo_item }}"><span class="erp-type-dot"></span>{{ producto.get_tipo_item_display }}</span>
                             </div>
                         </td>
                         <td>
@@ -265,7 +347,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="9" class="erp-empty">No hay productos registrados.</td></tr>
+                    <tr><td colspan="9" class="erp-empty">No hay productos o servicios registrados para este filtro.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

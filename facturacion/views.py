@@ -2572,6 +2572,9 @@ def productos_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     q = request.GET.get("q", "").strip()
     categoria_id = request.GET.get("categoria", "").strip()
+    tipo_item = request.GET.get("tipo", "todos").strip().lower()
+    if tipo_item not in {"todos", "producto", "servicio"}:
+        tipo_item = "todos"
     productos = Producto.objects.filter(empresa=empresa, eliminado=False).select_related(
         'impuesto_predeterminado',
         'perfil_farmaceutico__categoria',
@@ -2587,24 +2590,30 @@ def productos_facturacion(request, empresa_slug):
         )
     if categoria_id:
         productos = productos.filter(perfil_farmaceutico__categoria_id=categoria_id)
+    productos_filtrados = productos
+    if tipo_item != "todos":
+        productos_filtrados = productos_filtrados.filter(tipo_item=tipo_item)
     resumen = {
-        "total": productos.count(),
-        "activos": productos.filter(activo=True).count(),
-        "inactivos": productos.filter(activo=False).count(),
-        "valor_catalogo": sum((producto.precio for producto in productos), Decimal('0.00')),
+        "total": productos_filtrados.count(),
+        "total_catalogo": productos.count(),
+        "productos": productos.filter(tipo_item='producto').count(),
         "servicios": productos.filter(tipo_item='servicio').count(),
-        "con_foto": productos.exclude(foto__isnull=True).exclude(foto__exact="").count(),
-        "con_inventario": productos.filter(controla_inventario=True).count(),
-        "controlados": productos.filter(perfil_farmaceutico__producto_controlado=True).count(),
-        "refrigerados": productos.filter(perfil_farmaceutico__requiere_refrigeracion=True).count(),
+        "activos": productos_filtrados.filter(activo=True).count(),
+        "inactivos": productos_filtrados.filter(activo=False).count(),
+        "valor_catalogo": sum((producto.precio for producto in productos_filtrados), Decimal('0.00')),
+        "con_foto": productos_filtrados.exclude(foto__isnull=True).exclude(foto__exact="").count(),
+        "con_inventario": productos_filtrados.filter(controla_inventario=True).count(),
+        "controlados": productos_filtrados.filter(perfil_farmaceutico__producto_controlado=True).count(),
+        "refrigerados": productos_filtrados.filter(perfil_farmaceutico__requiere_refrigeracion=True).count(),
     }
 
     return render(request, "facturacion/productos_premium.html", {
         "empresa": empresa,
-        "productos": productos,
+        "productos": productos_filtrados,
         "resumen": resumen,
         "q": q,
         "categoria_id": categoria_id,
+        "tipo_item": tipo_item,
         "categorias_farmaceuticas": CategoriaProductoFarmaceutico.objects.filter(empresa=empresa, activa=True).order_by('nombre'),
         "productos_sugeridos": Producto.objects.filter(empresa=empresa, eliminado=False).order_by('nombre').values_list('nombre', flat=True).distinct(),
         "ultimas_bajas": BitacoraProductoEliminado.objects.filter(empresa=empresa).select_related('usuario', 'producto')[:8],

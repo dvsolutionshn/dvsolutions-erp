@@ -3713,6 +3713,41 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="productos-sugerencias"', html=False)
 
+    def test_listado_productos_permite_separar_productos_y_servicios(self):
+        servicio = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta profesional",
+            codigo="SRV-TEST",
+            tipo_item="servicio",
+            unidad_medida="servicio",
+            precio=Decimal("850.00"),
+            impuesto_predeterminado=self.impuesto,
+            controla_inventario=False,
+        )
+
+        response_productos = self.client.get(
+            reverse("productos_facturacion", args=[self.empresa.slug]),
+            {"tipo": "producto"},
+        )
+        response_servicios = self.client.get(
+            reverse("productos_facturacion", args=[self.empresa.slug]),
+            {"tipo": "servicio"},
+        )
+
+        self.assertEqual(response_productos.status_code, 200)
+        productos_visibles = list(response_productos.context["productos"])
+        self.assertIn(self.producto, productos_visibles)
+        self.assertNotIn(servicio, productos_visibles)
+        self.assertEqual(response_productos.context["tipo_item"], "producto")
+        self.assertEqual(response_productos.context["resumen"]["productos"], 1)
+
+        self.assertEqual(response_servicios.status_code, 200)
+        servicios_visibles = list(response_servicios.context["productos"])
+        self.assertIn(servicio, servicios_visibles)
+        self.assertNotIn(self.producto, servicios_visibles)
+        self.assertEqual(response_servicios.context["tipo_item"], "servicio")
+        self.assertEqual(response_servicios.context["resumen"]["servicios"], 1)
+
     def test_inventario_dashboard_muestra_producto(self):
         response = self.client.get(reverse("inventario_facturacion", args=[self.empresa.slug]))
 
