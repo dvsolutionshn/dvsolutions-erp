@@ -1457,6 +1457,28 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_hospital_mia(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
+    tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
+    if request.method == "POST" and tipo_post in tipos_validos:
+        form_inline = HistoriaClinicaEspecialidadForm(
+            request.POST,
+            empresa=empresa,
+            tipo=tipo_post,
+            prefix=f"historia_{tipo_post}",
+        )
+        if form_inline.is_valid():
+            historia = form_inline.save(commit=False)
+            historia.empresa = empresa
+            historia.paciente = paciente
+            historia.tipo = tipo_post
+            historia.creado_por = request.user
+            historia.actualizado_por = request.user
+            historia.save()
+            messages.success(request, f"Nota de {historia.get_tipo_display()} guardada en la historia clinica completa.")
+            return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        messages.error(request, f"Revise los campos marcados en {tipos_validos[tipo_post]}.")
+    else:
+        form_inline = None
     preconsultas = list(
         paciente.preconsultas.filter(estado="completada")
         .select_related("creada_por")
@@ -1473,15 +1495,27 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         }
         for preconsulta in preconsultas
     ]
-    tipos = [
-        {
+    tipos = []
+    ahora = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
+    for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES:
+        historias_tipo = [historia for historia in historias if historia.tipo == codigo]
+        formulario = (
+            form_inline
+            if form_inline is not None and tipo_post == codigo
+            else HistoriaClinicaEspecialidadForm(
+                empresa=empresa,
+                tipo=codigo,
+                prefix=f"historia_{codigo}",
+                initial={"fecha_atencion": ahora},
+            )
+        )
+        tipos.append({
             "codigo": codigo,
             "nombre": nombre,
-            "historias": [historia for historia in historias if historia.tipo == codigo],
+            "historias": historias_tipo,
             "preconsultas": [preconsulta for preconsulta in preconsultas if preconsulta.tipo == codigo],
-        }
-        for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
-    ]
+            "form": formulario,
+        })
     return render(
         request,
         "clinica/historial_clinico_consolidado.html",

@@ -119,8 +119,8 @@ class ClinicaPacienteTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Historia clínica completa")
-        self.assertContains(response, "Una sola hoja de trabajo")
-        self.assertContains(response, "hoja única de lectura")
+        self.assertContains(response, "Cuadros clínicos para escribir sin salir de esta pantalla")
+        self.assertContains(response, "Guardar nota de Capilar")
         self.assertContains(response, "años")
         self.assertContains(response, "· RH")
         self.assertNotContains(response, "area-nav")
@@ -150,6 +150,27 @@ class ClinicaPacienteTests(TestCase):
         self.assertNotContains(response, "Ã")
         self.assertNotContains(response, "Â")
 
+    def test_vista_clinica_completa_guarda_nota_inline_por_area(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-INLINE",
+            nombre="Paciente Nota Inline",
+            identidad="1101200800633",
+            fecha_nacimiento="1990-01-01",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url, {
+            "tipo_historia": "capilar",
+            "historia_capilar-fecha_atencion": "2026-07-28T09:30",
+            "historia_capilar-plan_tratamiento": "Historia actual, diagnostico y plan desde clinica completa.",
+            "historia_capilar-estado": "borrador",
+        })
+
+        self.assertRedirects(response, url)
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="capilar")
+        self.assertEqual(historia.plan_tratamiento, "Historia actual, diagnostico y plan desde clinica completa.")
+        self.assertEqual(historia.creado_por, self.user)
     def test_editar_paciente_usa_formulario_general_moderno(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,

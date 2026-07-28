@@ -3,35 +3,34 @@
 {% block title %}Historia clínica completa - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
 {% block header_title %}Historia clínica completa{% endblock %}
-{% block header_description %}Una sola hoja de trabajo con la información del paciente, formularios completados, evolución médica, diagnóstico y plan.{% endblock %}
+{% block header_description %}Lectura y trabajo clínico en una sola hoja: datos generales, formularios completados y cuadros médicos por área sin salir del expediente.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
-<a class="erp-btn-primary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Agregar nota clínica</a>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-.clinical-sheet{max-width:1180px;margin:0 auto 32px}
-.sheet-cover{position:relative;overflow:hidden;border:1px solid #cfe0f3;border-radius:26px;background:linear-gradient(135deg,#ffffff 0%,#f8fcff 45%,#eefaf8 100%);box-shadow:0 24px 55px rgba(16,35,56,.08);padding:24px;margin-bottom:18px}
-.sheet-cover:before{content:"";position:absolute;right:-90px;top:-120px;width:310px;height:310px;border-radius:999px;background:radial-gradient(circle,rgba(35,193,184,.18),rgba(42,112,232,.06),transparent 70%)}
-.cover-grid{position:relative;display:grid;grid-template-columns:minmax(0,1fr) repeat(3,150px);gap:14px;align-items:stretch}
+.clinical-sheet{max-width:1240px;margin:0 auto 36px}
+.sheet-cover{position:relative;overflow:hidden;border:1px solid #cfe0f3;border-radius:26px;background:linear-gradient(135deg,#fff 0%,#f8fcff 48%,#eefaf8 100%);box-shadow:0 24px 60px rgba(16,35,56,.08);padding:24px;margin-bottom:18px}
+.sheet-cover:before{content:"";position:absolute;right:-90px;top:-120px;width:330px;height:330px;border-radius:999px;background:radial-gradient(circle,rgba(35,193,184,.18),rgba(42,112,232,.07),transparent 70%)}
+.cover-grid{position:relative;display:grid;grid-template-columns:minmax(0,1fr) repeat(3,155px);gap:14px;align-items:stretch}
 .patient-summary{display:flex;gap:16px;align-items:center}
-.patient-photo{width:76px;height:76px;border-radius:22px;object-fit:cover;border:1px solid #cfe0f3;background:#f6fbff}
-.patient-fallback{width:76px;height:76px;border-radius:22px;display:grid;place-items:center;background:linear-gradient(135deg,#22b8b0,#2a70e8);color:#fff;font-size:28px;font-weight:900}
-.patient-summary h3{margin:3px 0 6px;color:#102338;font-size:27px;line-height:1.15}
-.patient-summary p{margin:0;color:#5d7288;font-weight:700}
-.cover-stat{border:1px solid #d8e7f5;border-radius:19px;background:rgba(255,255,255,.78);padding:15px;backdrop-filter:blur(10px)}
+.patient-photo{width:82px;height:82px;border-radius:24px;object-fit:cover;border:1px solid #cfe0f3;background:#f6fbff}
+.patient-fallback{width:82px;height:82px;border-radius:24px;display:grid;place-items:center;background:linear-gradient(135deg,#22b8b0,#2a70e8);color:#fff;font-size:30px;font-weight:900}
+.patient-summary h3{margin:3px 0 6px;color:#102338;font-size:28px;line-height:1.15}
+.patient-summary p{margin:0;color:#5d7288;font-weight:800}
+.cover-stat{border:1px solid #d8e7f5;border-radius:19px;background:rgba(255,255,255,.82);padding:15px;backdrop-filter:blur(10px)}
 .cover-stat strong{display:block;color:#102338;font-size:25px;margin-bottom:4px}
 .cover-stat span{color:#5d7288;font-weight:800;font-size:13px}
 .sheet-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;padding-top:18px;border-top:1px solid #dbe8f5}
 .sheet-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:#eef7ff;color:#174f9f;font-weight:900;font-size:12px}
 .allergy-alert{background:#fff5f5;color:#9f1239;border:1px solid rgba(220,38,38,.22)}
 .sheet-panel{border:1px solid #cfe0f3;border-radius:24px;background:#fff;box-shadow:0 18px 42px rgba(16,35,56,.055);margin-bottom:18px;overflow:hidden}
-.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:19px 21px;border-bottom:1px solid #e1ebf6;background:linear-gradient(135deg,#fbfdff,#f5fbfa)}
-.panel-head h3{margin:0;color:#102338;font-size:20px}
-.panel-head p{margin:6px 0 0;color:#5d7288}
-.panel-body{padding:20px 21px}
-.single-note{border:1px solid #dbe8f5;border-radius:20px;background:linear-gradient(135deg,#ffffff,#fbfdff);padding:17px;margin-bottom:14px}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid #e1ebf6;background:linear-gradient(135deg,#fbfdff,#f5fbfa)}
+.panel-head h3{margin:0;color:#102338;font-size:21px}
+.panel-head p{margin:6px 0 0;color:#5d7288;line-height:1.5}
+.panel-body{padding:20px 22px}
+.single-note{border:1px solid #dbe8f5;border-radius:20px;background:linear-gradient(135deg,#fff,#fbfdff);padding:17px;margin-bottom:14px}
 .single-note:last-child{margin-bottom:0}
 .note-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
 .note-title h4{margin:0;color:#102338;font-size:16px}
@@ -45,19 +44,46 @@
 .area-chip{background:#ecfdf5;color:#087466}
 .status-chip{background:#fff6dc;color:#926300}
 .status-chip.done{background:#e8f6f2;color:#087466}
-.doctor-stream{display:grid;gap:13px}
-.doctor-note{position:relative;border:1px solid #dbe8f5;border-radius:20px;background:#fbfdff;padding:16px 16px 16px 20px}
-.doctor-note:before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:4px;border-radius:999px;background:linear-gradient(180deg,#22b8b0,#2a70e8)}
-.doctor-note-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}
-.doctor-note h4{margin:0;color:#102338}
-.doctor-note-meta{color:#6b7f95;font-size:12px;font-weight:800;margin-top:4px}
-.doctor-note-text{border:1px solid #e0ebf6;border-radius:15px;background:#fff;padding:13px;color:#14253a;line-height:1.65}
-.empty-sheet{padding:28px;text-align:center;color:#60748d;border:1px dashed #cbd9e8;border-radius:18px;background:#fbfdff}
-.quick-actions{display:flex;gap:10px;flex-wrap:wrap}
+.work-intro{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.work-intro-card{border:1px solid #dce9f6;border-radius:18px;background:linear-gradient(135deg,#f8fcff,#fff);padding:14px;color:#516b84;line-height:1.55}
+.work-intro-card strong{display:block;color:#102338;margin-bottom:4px}
+.clinical-area{border:1px solid #d5e5f5;border-radius:22px;background:#fff;margin-bottom:14px;overflow:hidden}
+.clinical-area[open]{box-shadow:0 18px 42px rgba(16,35,56,.06)}
+.clinical-area summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;background:linear-gradient(135deg,#fbfdff,#f6fbfa);border-bottom:1px solid transparent}
+.clinical-area[open] summary{border-bottom-color:#e1ebf6}
+.clinical-area summary::-webkit-details-marker{display:none}
+.area-title{display:flex;gap:12px;align-items:center}
+.area-number{width:38px;height:38px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#22b8b0,#2a70e8);color:#fff;font-weight:900}
+.area-title h4{margin:0;color:#102338;font-size:18px}
+.area-title span{display:block;margin-top:3px;color:#6b7f95;font-size:12px;font-weight:800}
+.area-toggle{color:#087466;font-weight:900;font-size:12px}
+.area-body{padding:18px 20px 20px}
+.inline-form{display:grid;gap:14px}
+.inline-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.inline-field{display:flex;flex-direction:column;gap:7px;border:1px solid #e0ebf6;border-radius:16px;background:#fbfdff;padding:12px}
+.inline-field.is-wide{grid-column:1/-1}
+.inline-field label,.inline-field .field-label-form{color:#344d68;font-size:12px;font-weight:900}
+.inline-field input,.inline-field select,.inline-field textarea{width:100%;border:1px solid #bfd0e1;border-radius:13px;padding:11px 12px;background:#fff;color:#102338;font:inherit;outline:none}
+.inline-field textarea{min-height:118px}
+.inline-field input:focus,.inline-field select:focus,.inline-field textarea:focus{border-color:#1769d2;box-shadow:0 0 0 3px rgba(23,105,210,.11)}
+.inline-field ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.inline-field li label{display:flex;align-items:center;gap:9px;border:1px solid #d8e3ef;border-radius:13px;background:#fff;padding:10px 11px;cursor:pointer;transition:.18s ease}
+.inline-field li label:hover{transform:translateY(-1px);border-color:#9fc2ef;box-shadow:0 10px 20px rgba(16,35,56,.06)}
+.inline-field input[type=checkbox],.inline-field input[type=radio]{width:17px;height:17px;padding:0;accent-color:#0b9f91}
+.inline-error{color:#b42318;font-size:12px;font-weight:800}
+.form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:4px}
+.history-strip{margin-top:16px;border-top:1px solid #e6eef7;padding-top:14px}
+.history-strip h5{margin:0 0 10px;color:#102338;font-size:14px}
+.doctor-note{position:relative;border:1px solid #dbe8f5;border-radius:18px;background:#fbfdff;padding:14px 14px 14px 18px;margin-bottom:10px}
+.doctor-note:before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:999px;background:linear-gradient(180deg,#22b8b0,#2a70e8)}
+.doctor-note-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
+.doctor-note h5{margin:0;color:#102338;font-size:14px}
+.doctor-note-meta{color:#6b7f95;font-size:12px;font-weight:800;margin-top:3px}
+.doctor-note-text{border:1px solid #e0ebf6;border-radius:14px;background:#fff;padding:12px;color:#14253a;line-height:1.6}
+.empty-sheet{padding:24px;text-align:center;color:#60748d;border:1px dashed #cbd9e8;border-radius:18px;background:#fbfdff}
 @media(max-width:1050px){
-    .cover-grid{grid-template-columns:1fr}
-    .sheet-grid{grid-template-columns:1fr}
-    .panel-head,.note-title,.doctor-note-head{flex-direction:column}
+    .cover-grid,.work-intro,.sheet-grid,.inline-fields,.inline-field ul{grid-template-columns:1fr}
+    .panel-head,.note-title,.doctor-note-head,.clinical-area summary{flex-direction:column;align-items:flex-start}
 }
 </style>
 {% endblock %}
@@ -67,7 +93,9 @@
     <div class="sheet-cover">
         <div class="cover-grid">
             <div class="patient-summary">
-                {% if paciente.foto %}
+                {% if paciente.foto_perfil %}
+                <img class="patient-photo" src="{{ paciente.foto_perfil.url }}" alt="Foto de {{ paciente.nombre }}">
+                {% elif paciente.foto %}
                 <img class="patient-photo" src="{{ paciente.foto.url }}" alt="Foto de {{ paciente.nombre }}">
                 {% else %}
                 <div class="patient-fallback">{{ paciente.nombre|first|upper }}</div>
@@ -78,9 +106,9 @@
                     <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · RH {{ paciente.rh|default:"No indicado" }}</p>
                 </div>
             </div>
-            <div class="cover-stat"><strong>{{ preconsultas|length }}</strong><span>formularios completados</span></div>
+            <div class="cover-stat"><strong>{{ preconsultas|length }}</strong><span>formularios recibidos</span></div>
             <div class="cover-stat"><strong>{{ historias|length }}</strong><span>notas clínicas</span></div>
-            <div class="cover-stat"><strong>1</strong><span>hoja única de lectura</span></div>
+            <div class="cover-stat"><strong>{{ tipos|length }}</strong><span>cuadros de trabajo</span></div>
         </div>
         <div class="sheet-toolbar">
             {% if paciente.es_alergico %}
@@ -89,19 +117,16 @@
             <span class="sheet-pill">Sin alerta de alergia registrada</span>
             {% endif %}
             <span class="sheet-pill">Documento: {{ paciente.identidad|default:"No indicado" }}</span>
-            <span class="sheet-pill">Teléfono: {{ paciente.telefono|default:"No indicado" }}</span>
+            <span class="sheet-pill">Teléfono: {{ paciente.telefono|default:paciente.whatsapp|default:"No indicado" }}</span>
         </div>
     </div>
 
     <section class="sheet-panel">
         <div class="panel-head">
             <div>
-                <div class="erp-kpi-label">Lectura del paciente</div>
-                <h3>Historia clínica completa del paciente</h3>
-                <p>Todo lo que el paciente completó aparece aquí, en una sola hoja continua, sin entrar por áreas.</p>
-            </div>
-            <div class="quick-actions">
-                <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Terminar expediente</a>
+                <div class="erp-kpi-label">Información recibida</div>
+                <h3>Formulario completo llenado por el paciente</h3>
+                <p>Datos generales, motivo, antecedentes y respuestas del formulario en una sola lectura.</p>
             </div>
         </div>
         <div class="panel-body">
@@ -146,48 +171,85 @@
     <section class="sheet-panel">
         <div class="panel-head">
             <div>
-                <div class="erp-kpi-label">Trabajo médico</div>
-                <h3>Historia de la enfermedad actual, diagnóstico y plan</h3>
-                <p>Notas médicas ordenadas por fecha para continuar la atención sin buscar entrada por entrada.</p>
-            </div>
-            <div class="quick-actions">
-                <a class="erp-btn-primary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Agregar nueva nota</a>
+                <div class="erp-kpi-label">Trabajo de la doctora</div>
+                <h3>Cuadros clínicos para escribir sin salir de esta pantalla</h3>
+                <p>Abra el área que necesita, marque las opciones del formulario y escriba la historia de enfermedad actual, diagnóstico y plan.</p>
             </div>
         </div>
         <div class="panel-body">
-            <div class="doctor-stream">
-                {% for historia in historias %}
-                <article class="doctor-note">
-                    <div class="doctor-note-head">
-                        <div>
-                            <h4>{{ historia.fecha_atencion|date:"d/m/Y H:i" }}</h4>
-                            <div class="doctor-note-meta">
-                                {% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %}
-                                · Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}
-                            </div>
-                        </div>
-                        <div class="chip-wrap">
-                            <span class="sheet-chip area-chip">{{ historia.get_tipo_display }}</span>
-                            <span class="sheet-chip status-chip {% if historia.bloqueada %}done{% endif %}">{{ historia.get_estado_display }}</span>
-                        </div>
-                    </div>
-                    <div class="doctor-note-text">
-                        {% if historia.plan_tratamiento %}
-                        {{ historia.plan_tratamiento|linebreaksbr }}
-                        {% elif historia.observaciones %}
-                        {{ historia.observaciones|linebreaksbr }}
-                        {% else %}
-                        <span class="erp-card-muted">Sin historia, diagnóstico o plan registrado.</span>
-                        {% endif %}
-                    </div>
-                    <div style="margin-top:12px;">
-                        <a class="erp-btn-secondary" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver nota bloqueada{% else %}Editar / continuar nota{% endif %}</a>
-                    </div>
-                </article>
-                {% empty %}
-                <div class="empty-sheet">Todavía no hay notas clínicas. Use “Agregar nueva nota” para iniciar la atención de la doctora.</div>
-                {% endfor %}
+            <div class="work-intro">
+                <div class="work-intro-card"><strong>Todo en un solo lugar</strong>La doctora puede leer el formulario recibido y registrar cada nota clínica desde esta misma hoja.</div>
+                <div class="work-intro-card"><strong>Historial visible</strong>Debajo de cada cuadro aparece lo guardado anteriormente con fecha, profesional y estado.</div>
             </div>
+
+            {% for tipo in tipos %}
+            <details class="clinical-area" {% if forloop.first or tipo.form.errors %}open{% endif %} id="trabajo-{{ tipo.codigo }}">
+                <summary>
+                    <div class="area-title">
+                        <span class="area-number">{{ forloop.counter|stringformat:"02d" }}</span>
+                        <div>
+                            <h4>{{ tipo.nombre }}</h4>
+                            <span>{{ tipo.historias|length }} nota(s) guardada(s). Escriba aquí sin cambiar de pantalla.</span>
+                        </div>
+                    </div>
+                    <span class="area-toggle">Abrir / trabajar aquí</span>
+                </summary>
+                <div class="area-body">
+                    <form class="inline-form" method="post" action="#trabajo-{{ tipo.codigo }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="tipo_historia" value="{{ tipo.codigo }}">
+                        {% if tipo.form.non_field_errors %}
+                        <div class="inline-error">{{ tipo.form.non_field_errors }}</div>
+                        {% endif %}
+                        <div class="inline-fields">
+                            {% for field in tipo.form %}
+                            <div class="inline-field {% if field.name == 'plan_tratamiento' or field.name == 'observaciones' or field.name|slice:'-6:' == '_otros' %}is-wide{% endif %}">
+                                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<span class="erp-card-muted">{{ field.help_text }}</span>{% endif %}
+                                {% for error in field.errors %}<span class="inline-error">{{ error }}</span>{% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-actions">
+                            <button class="erp-btn-primary" type="submit">Guardar nota de {{ tipo.nombre }}</button>
+                        </div>
+                    </form>
+
+                    <div class="history-strip">
+                        <h5>Historial guardado en {{ tipo.nombre }}</h5>
+                        {% for historia in tipo.historias %}
+                        <article class="doctor-note">
+                            <div class="doctor-note-head">
+                                <div>
+                                    <h5>{{ historia.fecha_atencion|date:"d/m/Y H:i" }}</h5>
+                                    <div class="doctor-note-meta">
+                                        {% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %}
+                                        · Actualizado {{ historia.fecha_actualizacion|date:"d/m/Y H:i" }}
+                                    </div>
+                                </div>
+                                <div class="chip-wrap">
+                                    <span class="sheet-chip status-chip {% if historia.bloqueada %}done{% endif %}">{{ historia.get_estado_display }}</span>
+                                    <a class="erp-action-link" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver bloqueada{% else %}Editar detalle{% endif %}</a>
+                                </div>
+                            </div>
+                            <div class="doctor-note-text">
+                                {% if historia.plan_tratamiento %}
+                                {{ historia.plan_tratamiento|linebreaksbr }}
+                                {% elif historia.observaciones %}
+                                {{ historia.observaciones|linebreaksbr }}
+                                {% else %}
+                                <span class="erp-card-muted">Sin historia, diagnóstico o plan registrado.</span>
+                                {% endif %}
+                            </div>
+                        </article>
+                        {% empty %}
+                        <div class="empty-sheet">Aún no hay notas guardadas para esta área.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </details>
+            {% endfor %}
         </div>
     </section>
 </section>
