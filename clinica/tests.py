@@ -126,6 +126,28 @@ class ClinicaPacienteTests(TestCase):
         self.assertNotContains(response, "Ã")
         self.assertNotContains(response, "Â")
 
+    def test_historia_clinica_paciente_es_hoja_continua_sin_mojibake(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-HOJA",
+            nombre="Paciente Hoja Clinica",
+            identidad="1101200800620",
+            fecha_nacimiento="1995-05-10",
+            rh="A+",
+        )
+        url = reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Historia clínica del paciente")
+        self.assertContains(response, "Hoja clínica continua")
+        self.assertContains(response, "Cuadro de trabajo")
+        self.assertContains(response, "Escribir en esta área")
+        self.assertContains(response, "años")
+        self.assertNotContains(response, "Ã")
+        self.assertNotContains(response, "Â")
+
     def test_nueva_cita_clinica_usa_control_unificado_am_pm(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa, expediente_codigo="HM-CITA", nombre="Paciente Cita"

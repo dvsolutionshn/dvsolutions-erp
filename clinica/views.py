@@ -1314,6 +1314,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
         {
             "codigo": codigo,
             "nombre": nombre,
+            "historias": historias.filter(tipo=codigo),
             "total": historias.filter(tipo=codigo).count(),
             "preconsultas": paciente.preconsultas.filter(tipo=codigo, estado="completada").count(),
             "ultima_preconsulta": paciente.preconsultas.filter(tipo=codigo, estado="completada").order_by("-fecha_completada", "-fecha_creacion").first(),
