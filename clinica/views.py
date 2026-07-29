@@ -1,5 +1,6 @@
 import logging
 import re
+import unicodedata
 from datetime import datetime
 from urllib.parse import quote
 
@@ -79,6 +80,39 @@ from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
 logger = logging.getLogger(__name__)
+
+
+def _texto_busqueda_profesional(valor):
+    return unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii").lower().strip()
+
+
+def _profesional_predeterminado_usuario(empresa, usuario):
+    if not empresa or not getattr(usuario, "is_authenticated", False):
+        return None
+    profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True)
+    vinculado = profesionales.filter(usuario=usuario).first()
+    if vinculado:
+        return vinculado
+    texto_usuario = _texto_busqueda_profesional(
+        f"{getattr(usuario, 'first_name', '')} {getattr(usuario, 'last_name', '')} "
+        f"{getattr(usuario, 'username', '')} {getattr(usuario, 'email', '')}"
+    )
+    reglas = []
+    if "candy" in texto_usuario or "luque" in texto_usuario:
+        reglas.append(("candy", "luque"))
+    if "luis" in texto_usuario or "gonzal" in texto_usuario:
+        reglas.append(("luis", "gonzal"))
+    for principal, apellido in reglas:
+        fallback_principal = None
+        for profesional in profesionales:
+            texto_profesional = _texto_busqueda_profesional(f"{profesional.nombre} {profesional.especialidad}")
+            if principal in texto_profesional and apellido in texto_profesional:
+                return profesional
+            if principal in texto_profesional and fallback_principal is None:
+                fallback_principal = profesional
+        if fallback_principal:
+            return fallback_principal
+    return None
 
 DOCUMENTOS_CLINICOS_CONFIG = {
     "laboratorio": {
@@ -1459,6 +1493,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
+    profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
     if request.method == "POST" and request.POST.get("accion") == "editar_texto_historia":
         historia = get_object_or_404(
             HistoriaClinicaEspecialidad,
@@ -1494,6 +1529,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             historia.empresa = empresa
             historia.paciente = paciente
             historia.tipo = tipo_post
+            if profesional_usuario and not historia.profesional_id:
+                historia.profesional = profesional_usuario
             historia.creado_por = request.user
             historia.actualizado_por = request.user
             historia.save()
@@ -1522,6 +1559,9 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     ahora = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
     for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES:
         historias_tipo = [historia for historia in historias if historia.tipo == codigo]
+        initial_formulario = {"fecha_atencion": ahora}
+        if profesional_usuario:
+            initial_formulario["profesional"] = profesional_usuario
         formulario = (
             form_inline
             if form_inline is not None and tipo_post == codigo
@@ -1529,7 +1569,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
                 empresa=empresa,
                 tipo=codigo,
                 prefix=f"historia_{codigo}",
-                initial={"fecha_atencion": ahora},
+                initial=initial_formulario,
             )
         )
         tipos.append({
@@ -1562,6 +1602,9 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
+    profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
+    if profesional_usuario:
+        initial["profesional"] = profesional_usuario
     preconsultas_tipo = paciente.preconsultas.filter(tipo=tipo).select_related("creada_por")[:10]
     ultima_preconsulta = (
         paciente.preconsultas.filter(estado="completada", tipo__in=[tipo, "general"])
@@ -1596,6 +1639,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         historia.empresa = empresa
         historia.paciente = paciente
         historia.tipo = tipo
+        if profesional_usuario and not historia.profesional_id:
+            historia.profesional = profesional_usuario
         historia.creado_por = request.user
         historia.actualizado_por = request.user
         historia.save()

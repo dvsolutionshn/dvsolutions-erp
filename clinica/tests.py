@@ -201,6 +201,66 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.plan_tratamiento, "Texto actualizado desde la vista completa.")
         self.assertEqual(historia.actualizado_por, self.user)
 
+    def test_vista_clinica_completa_toma_profesional_del_usuario_vinculado(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-PRO-AUTO",
+            nombre="Paciente Profesional Automatico",
+            identidad="1101200800655",
+            fecha_nacimiento="1990-01-01",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            usuario=self.user,
+            nombre="Dra. Candy Luque",
+            especialidad="Cirugia plastica",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url, {
+            "tipo_historia": "capilar",
+            "historia_capilar-fecha_atencion": "2026-07-29T09:30",
+            "historia_capilar-plan_tratamiento": "Plan con profesional automatico.",
+            "historia_capilar-estado": "borrador",
+        })
+
+        self.assertRedirects(response, url)
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="capilar")
+        self.assertEqual(historia.profesional, profesional)
+
+    def test_vista_clinica_completa_detecta_profesional_luis_por_usuario(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-LUIS-AUTO",
+            nombre="Paciente Luis Automatico",
+            identidad="1101200800666",
+            fecha_nacimiento="1990-01-01",
+        )
+        usuario_luis = get_user_model().objects.create_user(
+            username="luis.gonzales",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=self.user.rol_sistema,
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dr. Luis Gonzales",
+            especialidad="Cirugia",
+        )
+        self.client.force_login(usuario_luis)
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url, {
+            "tipo_historia": "cirugia_plastica",
+            "historia_cirugia_plastica-fecha_atencion": "2026-07-29T10:30",
+            "historia_cirugia_plastica-plan_tratamiento": "Plan asignado a Luis.",
+            "historia_cirugia_plastica-estado": "borrador",
+        })
+
+        self.assertRedirects(response, url)
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="cirugia_plastica")
+        self.assertEqual(historia.profesional, profesional)
+
     def test_editar_paciente_usa_formulario_general_moderno(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
