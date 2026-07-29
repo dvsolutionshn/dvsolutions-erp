@@ -941,6 +941,11 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["citas_hoy_total"] = len(citas_hoy)
     contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
+    contexto["pacientes_app_total"] = Paciente.objects.filter(empresa=empresa, activo=True).count()
+    contexto["pacientes_recientes_app"] = Paciente.objects.filter(
+        empresa=empresa,
+        activo=True,
+    ).order_by("-fecha_actualizacion", "-id")[:4]
     return render(request, "crm/agenda_mobile.html", contexto)
 
 
