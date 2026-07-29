@@ -1684,17 +1684,20 @@ document.addEventListener("DOMContentLoaded", function () {
             if(event.key !== "Enter"){
                 return;
             }
-            if(event.target.matches("textarea, button, [type='submit']")){
+            if(event.target.matches("textarea, button, [type='submit'], .erp-select-search")){
                 return;
             }
             const fila = event.target.closest(".tabla-row");
             if(!fila){
                 return;
             }
+            if(!event.target.matches(".cantidad, .precio, .descuento, .impuesto, .subtotal, .impuesto_monto, select")){
+                return;
+            }
             event.preventDefault();
             avanzarLineaConEnter(fila);
         });
-    });
+    }
 
     document.addEventListener("click", function(e){
         if(e.target.classList.contains("btn-eliminar")){
