@@ -177,11 +177,6 @@
             </div>
         </div>
         <div class="panel-body">
-            <div class="work-intro">
-                <div class="work-intro-card"><strong>Todo en un solo lugar</strong>La doctora puede leer el formulario recibido y registrar cada nota clínica desde esta misma hoja.</div>
-                <div class="work-intro-card"><strong>Historial visible</strong>Debajo de cada cuadro aparece lo guardado anteriormente con fecha, profesional y estado.</div>
-            </div>
-
             {% for tipo in tipos %}
             <details class="clinical-area" {% if forloop.first or tipo.form.errors %}open{% endif %} id="trabajo-{{ tipo.codigo }}">
                 <summary>
