@@ -59,17 +59,21 @@
 .area-toggle{color:#087466;font-weight:900;font-size:12px}
 .area-body{padding:18px 20px 20px}
 .inline-form{display:grid;gap:14px}
-.inline-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.inline-field{display:flex;flex-direction:column;gap:7px;border:1px solid #e0ebf6;border-radius:16px;background:#fbfdff;padding:12px}
+.inline-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.inline-field{display:flex;flex-direction:column;gap:8px;border:1px solid #dbe8f5;border-radius:18px;background:linear-gradient(135deg,#fff,#fbfdff);padding:14px;box-shadow:0 12px 26px rgba(16,35,56,.035)}
 .inline-field.is-wide{grid-column:1/-1}
-.inline-field label,.inline-field .field-label-form{color:#344d68;font-size:12px;font-weight:900}
+.inline-field.is-conditional-detail{display:none}
+.inline-field.is-conditional-detail.is-visible{display:flex}
+.inline-field label,.inline-field .field-label-form{color:#253f5c;font-size:12px;font-weight:900;line-height:1.35}
 .inline-field input,.inline-field select,.inline-field textarea{width:100%;border:1px solid #bfd0e1;border-radius:13px;padding:11px 12px;background:#fff;color:#102338;font:inherit;outline:none}
 .inline-field textarea{min-height:118px}
 .inline-field input:focus,.inline-field select:focus,.inline-field textarea:focus{border-color:#1769d2;box-shadow:0 0 0 3px rgba(23,105,210,.11)}
 .inline-field ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.inline-field li label{display:flex;align-items:center;gap:9px;border:1px solid #d8e3ef;border-radius:13px;background:#fff;padding:10px 11px;cursor:pointer;transition:.18s ease}
+.inline-field li label{display:flex;align-items:center;gap:9px;min-height:38px;border:1px solid #d8e3ef;border-radius:13px;background:#fff;padding:9px 10px;cursor:pointer;transition:.18s ease;color:#17304b}
 .inline-field li label:hover{transform:translateY(-1px);border-color:#9fc2ef;box-shadow:0 10px 20px rgba(16,35,56,.06)}
+.inline-field li:has(input:checked) label{border-color:#16b8ad;background:#effdfb;box-shadow:0 10px 20px rgba(11,159,145,.08)}
 .inline-field input[type=checkbox],.inline-field input[type=radio]{width:17px;height:17px;padding:0;accent-color:#0b9f91}
+.inline-detail-hint{display:inline-flex;align-items:center;align-self:flex-start;border-radius:999px;background:#eef7ff;color:#174f9f;padding:5px 9px;font-size:11px;font-weight:900}
 .inline-error{color:#b42318;font-size:12px;font-weight:800}
 .form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:4px}
 .history-strip{margin-top:16px;border-top:1px solid #e6eef7;padding-top:14px}
@@ -198,8 +202,11 @@
                         {% endif %}
                         <div class="inline-fields">
                             {% for field in tipo.form %}
-                            <div class="inline-field {% if field.name == 'plan_tratamiento' or field.name == 'observaciones' or field.name|slice:'-6:' == '_otros' %}is-wide{% endif %}">
+                            <div class="inline-field {% if field.name == 'plan_tratamiento' or field.name == 'observaciones' or field.name|slice:'-6:' == '_otros' %}is-wide{% endif %}{% if field.name|slice:'-6:' == '_otros' %} is-conditional-detail{% endif %}" data-field-name="{{ field.html_name }}">
                                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {% if field.name|slice:'-6:' == '_otros' %}
+                                <span class="inline-detail-hint">Se abre al seleccionar Otros o Detalle</span>
+                                {% endif %}
                                 {{ field }}
                                 {% if field.help_text %}<span class="erp-card-muted">{{ field.help_text }}</span>{% endif %}
                                 {% for error in field.errors %}<span class="inline-error">{{ error }}</span>{% endfor %}
@@ -248,4 +255,64 @@
         </div>
     </section>
 </section>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    function normalizeText(value) {
+        return (value || "")
+            .toString()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+    }
+
+    function optionRequiresDetail(input) {
+        const label = input.closest("label") || input.parentElement;
+        const text = normalizeText(`${input.value} ${label ? label.textContent : ""}`);
+        return text.includes("otro") || text.includes("otra") || text.includes("detalle") || text.includes("especifique");
+    }
+
+    function clearControl(control) {
+        if (!control) return;
+        if (control.type === "checkbox" || control.type === "radio") {
+            control.checked = false;
+        } else {
+            control.value = "";
+        }
+    }
+
+    document.querySelectorAll(".inline-form").forEach(function (form) {
+        const detailFields = Array.from(form.querySelectorAll(".is-conditional-detail"));
+        const refreshDetail = function (detailField, shouldClear) {
+            const detailControl = detailField.querySelector("textarea, input, select");
+            if (!detailControl) return;
+
+            const detailName = detailControl.name || detailField.dataset.fieldName || "";
+            const baseName = detailName.replace(/_otros$/, "");
+            const relatedOptions = Array.from(form.querySelectorAll("input, select")).filter(function (input) {
+                return input.name === baseName;
+            });
+            const hasValue = (detailControl.value || "").trim().length > 0;
+            const shouldShow = hasValue || relatedOptions.some(function (input) {
+                return input.checked && optionRequiresDetail(input);
+            });
+
+            detailField.classList.toggle("is-visible", shouldShow);
+            if (!shouldShow && shouldClear) {
+                clearControl(detailControl);
+            }
+        };
+
+        const refreshAll = function (shouldClear) {
+            detailFields.forEach(function (detailField) {
+                refreshDetail(detailField, shouldClear);
+            });
+        };
+
+        refreshAll(false);
+        form.addEventListener("change", function () {
+            refreshAll(true);
+        });
+    });
+});
+</script>
 {% endblock %}
