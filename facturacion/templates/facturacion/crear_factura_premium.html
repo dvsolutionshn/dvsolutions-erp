@@ -1524,6 +1524,54 @@ document.addEventListener("DOMContentLoaded", function () {
         return nueva;
     }
 
+    function obtenerLineasActivas(){
+        return Array.from(document.querySelectorAll(".tabla-row:not([data-deleted='1'])"))
+            .filter(linea => linea.style.display !== "none");
+    }
+
+    function enfocarCapturaLinea(linea){
+        if(!linea){
+            return;
+        }
+        const campoProducto = linea.querySelector(".erp-select-search, .producto, input:not([type='hidden']), select, textarea");
+        if(campoProducto){
+            campoProducto.focus();
+            if(typeof campoProducto.select === "function"){
+                campoProducto.select();
+            }
+        }
+    }
+
+    function lineaTieneContenido(linea){
+        if(!linea){
+            return false;
+        }
+        const producto = (linea.querySelector(".producto")?.value || "").trim();
+        const descripcion = (linea.querySelector(".descripcion-manual")?.value || "").trim();
+        const busqueda = (linea.querySelector(".erp-select-search")?.value || "").trim();
+        const cantidad = parseFloat(linea.querySelector(".cantidad")?.value || 0) || 0;
+        const precio = parseFloat(linea.querySelector(".precio")?.value || 0) || 0;
+        return Boolean(producto || descripcion || busqueda || cantidad || precio);
+    }
+
+    function avanzarLineaConEnter(linea){
+        if(!linea){
+            return;
+        }
+        const lineas = obtenerLineasActivas();
+        const indiceActual = lineas.indexOf(linea);
+        const siguiente = lineas[indiceActual + 1];
+
+        if(siguiente){
+            enfocarCapturaLinea(siguiente);
+            return;
+        }
+
+        if(lineaTieneContenido(linea)){
+            enfocarCapturaLinea(agregarLineaFactura());
+        }
+    }
+
     function guardarBorradorFactura(){
         if(!formShell){
             return;
@@ -1628,7 +1676,24 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     document.getElementById("agregar-linea").addEventListener("click", function(){
-        agregarLineaFactura();
+        enfocarCapturaLinea(agregarLineaFactura());
+    });
+
+    if(container){
+        container.addEventListener("keydown", function(event){
+            if(event.key !== "Enter"){
+                return;
+            }
+            if(event.target.matches("textarea, button, [type='submit']")){
+                return;
+            }
+            const fila = event.target.closest(".tabla-row");
+            if(!fila){
+                return;
+            }
+            event.preventDefault();
+            avanzarLineaConEnter(fila);
+        });
     });
 
     document.addEventListener("click", function(e){
