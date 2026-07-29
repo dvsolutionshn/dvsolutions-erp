@@ -120,7 +120,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Historia clínica completa")
         self.assertContains(response, "Cuadros clínicos para escribir sin salir de esta pantalla")
-        self.assertContains(response, "Guardar nota de Capilar")
+        self.assertContains(response, "Guardar historia clínica de Capilar")
         self.assertContains(response, "años")
         self.assertContains(response, "· RH")
         self.assertNotContains(response, "area-nav")
@@ -337,6 +337,10 @@ class ClinicaPacienteTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Consulta completada")
+        self.assertContains(response, "Formulario completado · General")
+        self.assertContains(response, "Información privada y confidencial")
+        self.assertNotContains(response, "Ã")
+        self.assertNotContains(response, "Â")
 
     def test_servicios_clinicos_incluyen_categoria_spa_estetica_no_medica(self):
         response = self.client.get(reverse("clinica_servicios", args=[self.empresa.slug]))

@@ -1,9 +1,9 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Historia clinica {{ preconsulta.get_tipo_display }} - {{ paciente.nombre }}{% endblock %}
+{% block title %}Historia clínica {{ preconsulta.get_tipo_display }} - {{ paciente.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
-{% block header_title %}Formulario completado Â· {{ preconsulta.get_tipo_display }}{% endblock %}
-{% block header_description %}Lectura mÃ©dica del formulario llenado por el paciente. Revise y confirme la informaciÃ³n durante la consulta.{% endblock %}
+{% block header_title %}Formulario completado · {{ preconsulta.get_tipo_display }}{% endblock %}
+{% block header_description %}Lectura médica del formulario llenado por el paciente. Revise y confirme la información durante la consulta.{% endblock %}
 {% block topbar_actions %}
 {% if preconsulta.tipo != "general" %}
 <a class="erp-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id preconsulta.tipo %}">Escribir nota de consulta</a>
@@ -31,14 +31,14 @@
         <div>
             <div class="erp-kpi-label">Formulario recibido</div>
             <h3>{{ paciente.nombre }}</h3>
-            <p>{{ paciente.identidad|default:"Sin documento" }} Â· {{ paciente.edad|default:"-" }} aÃ±os Â· {{ preconsulta.get_tipo_display }}{% if preconsulta.fecha_completada %} Â· Completado {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% endif %}</p>
+            <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · {{ preconsulta.get_tipo_display }}{% if preconsulta.fecha_completada %} · Completado {{ preconsulta.fecha_completada|date:"d/m/Y H:i" }}{% endif %}</p>
             {% if preconsulta.estado == "completada" %}<p><strong>Consulta completada</strong></p>{% endif %}
         </div>
         <span class="read-badge">{{ preconsulta.get_estado_display }}</span>
     </div>
 
     <div class="read-confidential">
-        InformaciÃ³n privada y confidencial. Este formulario fue completado por el paciente y debe ser confirmado por la doctora o personal autorizado durante la atenciÃ³n.
+        Información privada y confidencial. Este formulario fue completado por el paciente y debe ser confirmado por la doctora o personal autorizado durante la atención.
     </div>
 
     {% if preconsulta.estado == "completada" %}
@@ -74,16 +74,16 @@
         <div class="doctor-cta">
             <div>
                 <h3>Nota profesional de la consulta</h3>
-                <p>DespuÃ©s de leer el formulario, la doctora puede documentar aquÃ­ lo ocurrido en la cita: evaluaciÃ³n, diagnÃ³stico, plan, indicaciones y seguimiento.</p>
+                <p>Después de leer el formulario, la doctora puede documentar aquí lo ocurrido en la cita: evaluación, diagnóstico, plan, indicaciones y seguimiento.</p>
             </div>
             {% if preconsulta.tipo != "general" %}
             <a class="erp-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id preconsulta.tipo %}">Escribir nota de consulta</a>
             {% else %}
-            <a class="erp-btn" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Elegir Ã¡rea y escribir nota</a>
+            <a class="erp-btn" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Elegir área y escribir nota</a>
             {% endif %}
         </div>
     {% else %}
-        <div class="read-empty erp-card">El paciente todavÃ­a no ha completado este formulario.</div>
+        <div class="read-empty erp-card">El paciente todavía no ha completado este formulario.</div>
     {% endif %}
 </section>
 {% endblock %}

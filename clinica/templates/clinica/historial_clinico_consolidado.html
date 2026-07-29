@@ -41,12 +41,8 @@
 .field-value{color:#14253a;line-height:1.55}
 .chip-wrap{display:flex;gap:7px;flex-wrap:wrap}
 .sheet-chip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#edf4ff;color:#174f9f;font-size:11px;font-weight:900}
-.area-chip{background:#ecfdf5;color:#087466}
 .status-chip{background:#fff6dc;color:#926300}
 .status-chip.done{background:#e8f6f2;color:#087466}
-.work-intro{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
-.work-intro-card{border:1px solid #dce9f6;border-radius:18px;background:linear-gradient(135deg,#f8fcff,#fff);padding:14px;color:#516b84;line-height:1.55}
-.work-intro-card strong{display:block;color:#102338;margin-bottom:4px}
 .clinical-area{border:1px solid #d5e5f5;border-radius:22px;background:#fff;margin-bottom:14px;overflow:hidden}
 .clinical-area[open]{box-shadow:0 18px 42px rgba(16,35,56,.06)}
 .clinical-area summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;background:linear-gradient(135deg,#fbfdff,#f6fbfa);border-bottom:1px solid transparent}
@@ -74,8 +70,12 @@
 .inline-field li:has(input:checked) label{border-color:#16b8ad;background:#effdfb;box-shadow:0 10px 20px rgba(11,159,145,.08)}
 .inline-field input[type=checkbox],.inline-field input[type=radio]{width:17px;height:17px;padding:0;accent-color:#0b9f91}
 .inline-detail-hint{display:inline-flex;align-items:center;align-self:flex-start;border-radius:999px;background:#eef7ff;color:#174f9f;padding:5px 9px;font-size:11px;font-weight:900}
+.inline-detail-toggle{align-self:flex-start;border:1px solid #c9deef;border-radius:999px;background:#fff;color:#087466;padding:7px 11px;font-size:11px;font-weight:900;cursor:pointer;transition:.18s ease}
+.inline-detail-toggle:hover,.inline-detail-toggle.is-active{border-color:#14b8a6;background:#ecfdf5;box-shadow:0 10px 20px rgba(11,159,145,.08)}
 .inline-error{color:#b42318;font-size:12px;font-weight:800}
 .form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:4px}
+.save-clinical-btn{border:0;border-radius:16px;background:linear-gradient(135deg,#14b8a6,#2563eb);color:#fff;padding:13px 20px;font-weight:900;box-shadow:0 16px 32px rgba(37,99,235,.18);cursor:pointer;transition:.18s ease}
+.save-clinical-btn:hover{transform:translateY(-1px);box-shadow:0 20px 38px rgba(37,99,235,.24)}
 .history-strip{margin-top:16px;border-top:1px solid #e6eef7;padding-top:14px}
 .history-strip h5{margin:0 0 10px;color:#102338;font-size:14px}
 .doctor-note{position:relative;border:1px solid #dbe8f5;border-radius:18px;background:#fbfdff;padding:14px 14px 14px 18px;margin-bottom:10px}
@@ -86,7 +86,7 @@
 .doctor-note-text{border:1px solid #e0ebf6;border-radius:14px;background:#fff;padding:12px;color:#14253a;line-height:1.6}
 .empty-sheet{padding:24px;text-align:center;color:#60748d;border:1px dashed #cbd9e8;border-radius:18px;background:#fbfdff}
 @media(max-width:1050px){
-    .cover-grid,.work-intro,.sheet-grid,.inline-fields,.inline-field ul{grid-template-columns:1fr}
+    .cover-grid,.sheet-grid,.inline-fields,.inline-field ul{grid-template-columns:1fr}
     .panel-head,.note-title,.doctor-note-head,.clinical-area summary{flex-direction:column;align-items:flex-start}
 }
 </style>
@@ -182,7 +182,7 @@
         </div>
         <div class="panel-body">
             {% for tipo in tipos %}
-            <details class="clinical-area" {% if forloop.first or tipo.form.errors %}open{% endif %} id="trabajo-{{ tipo.codigo }}">
+            <details class="clinical-area" {% if tipo.form.errors %}open{% endif %} id="trabajo-{{ tipo.codigo }}">
                 <summary>
                     <div class="area-title">
                         <span class="area-number">{{ forloop.counter|stringformat:"02d" }}</span>
@@ -202,10 +202,10 @@
                         {% endif %}
                         <div class="inline-fields">
                             {% for field in tipo.form %}
-                            <div class="inline-field {% if field.name == 'plan_tratamiento' or field.name == 'observaciones' or field.name|slice:'-6:' == '_otros' %}is-wide{% endif %}{% if field.name|slice:'-6:' == '_otros' %} is-conditional-detail{% endif %}" data-field-name="{{ field.html_name }}">
+                            <div class="inline-field {% if field.name == 'plan_tratamiento' or field.name == 'observaciones' or field.name|slice:'-6:' == '_otros' %}is-wide{% endif %}{% if field.name|slice:'-6:' == '_otros' %} is-conditional-detail{% endif %}" data-field-name="{{ field.html_name }}" data-base-name="{% if field.name|slice:'-6:' == '_otros' %}{{ field.html_name|slice:':-6' }}{% else %}{{ field.html_name }}{% endif %}">
                                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                                 {% if field.name|slice:'-6:' == '_otros' %}
-                                <span class="inline-detail-hint">Se abre al seleccionar Otros o Detalle</span>
+                                <span class="inline-detail-hint">Detalle opcional de la pregunta</span>
                                 {% endif %}
                                 {{ field }}
                                 {% if field.help_text %}<span class="erp-card-muted">{{ field.help_text }}</span>{% endif %}
@@ -214,7 +214,7 @@
                             {% endfor %}
                         </div>
                         <div class="form-actions">
-                            <button class="erp-btn-primary" type="submit">Guardar nota de {{ tipo.nombre }}</button>
+                            <button class="save-clinical-btn" type="submit">Guardar historia clínica de {{ tipo.nombre }}</button>
                         </div>
                     </form>
 
@@ -282,21 +282,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.querySelectorAll(".inline-form").forEach(function (form) {
         const detailFields = Array.from(form.querySelectorAll(".is-conditional-detail"));
+        detailFields.forEach(function (detailField) {
+            const baseName = detailField.dataset.baseName || "";
+            const relatedField = Array.from(form.querySelectorAll(".inline-field")).find(function (field) {
+                return field !== detailField && field.dataset.fieldName === baseName;
+            });
+            if (!relatedField || relatedField.querySelector(".inline-detail-toggle")) return;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "inline-detail-toggle";
+            button.textContent = "Agregar detalle";
+            button.dataset.detailTarget = detailField.dataset.fieldName || "";
+            relatedField.appendChild(button);
+        });
+
         const refreshDetail = function (detailField, shouldClear) {
             const detailControl = detailField.querySelector("textarea, input, select");
             if (!detailControl) return;
 
             const detailName = detailControl.name || detailField.dataset.fieldName || "";
             const baseName = detailName.replace(/_otros$/, "");
+            const detailButton = form.querySelector(`.inline-detail-toggle[data-detail-target="${detailName}"]`);
             const relatedOptions = Array.from(form.querySelectorAll("input, select")).filter(function (input) {
                 return input.name === baseName;
             });
             const hasValue = (detailControl.value || "").trim().length > 0;
-            const shouldShow = hasValue || relatedOptions.some(function (input) {
+            const requestedByButton = detailButton && detailButton.classList.contains("is-active");
+            const shouldShow = requestedByButton || hasValue || relatedOptions.some(function (input) {
                 return input.checked && optionRequiresDetail(input);
             });
 
             detailField.classList.toggle("is-visible", shouldShow);
+            if (detailButton) {
+                detailButton.classList.toggle("is-active", shouldShow);
+                detailButton.textContent = shouldShow ? "Ocultar detalle" : "Agregar detalle";
+            }
             if (!shouldShow && shouldClear) {
                 clearControl(detailControl);
             }
@@ -311,6 +331,23 @@ document.addEventListener("DOMContentLoaded", function () {
         refreshAll(false);
         form.addEventListener("change", function () {
             refreshAll(true);
+        });
+        form.addEventListener("click", function (event) {
+            const button = event.target.closest(".inline-detail-toggle");
+            if (!button) return;
+            const detailField = form.querySelector(`.is-conditional-detail[data-field-name="${button.dataset.detailTarget}"]`);
+            const detailControl = detailField ? detailField.querySelector("textarea, input, select") : null;
+            const willOpen = !button.classList.contains("is-active");
+            button.classList.toggle("is-active", willOpen);
+            if (detailField) {
+                detailField.classList.toggle("is-visible", willOpen);
+            }
+            button.textContent = willOpen ? "Ocultar detalle" : "Agregar detalle";
+            if (!willOpen) {
+                clearControl(detailControl);
+            } else if (detailControl) {
+                detailControl.focus();
+            }
         });
     });
 });
