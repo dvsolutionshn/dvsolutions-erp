@@ -1459,6 +1459,29 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
+    if request.method == "POST" and request.POST.get("accion") == "editar_texto_historia":
+        historia = get_object_or_404(
+            HistoriaClinicaEspecialidad,
+            id=request.POST.get("historia_id"),
+            empresa=empresa,
+            paciente=paciente,
+        )
+        if historia.bloqueada:
+            messages.error(request, "Esta nota finalizada está bloqueada y no puede modificarse.")
+            return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        texto = (request.POST.get("texto_historia") or "").strip()
+        if historia.tipo in {"enfermeria", "terapias", "camara_hiperbarica"}:
+            historia.observaciones = texto
+        else:
+            historia.plan_tratamiento = texto
+        historia.actualizado_por = request.user
+        try:
+            historia.save()
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc))
+        else:
+            messages.success(request, f"Texto de {historia.get_tipo_display()} actualizado correctamente.")
+        return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
     if request.method == "POST" and tipo_post in tipos_validos:
         form_inline = HistoriaClinicaEspecialidadForm(
             request.POST,

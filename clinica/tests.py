@@ -171,6 +171,36 @@ class ClinicaPacienteTests(TestCase):
         historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="capilar")
         self.assertEqual(historia.plan_tratamiento, "Historia actual, diagnostico y plan desde clinica completa.")
         self.assertEqual(historia.creado_por, self.user)
+
+    def test_vista_clinica_completa_edita_texto_inline(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-EDIT-INLINE",
+            nombre="Paciente Editar Texto",
+            identidad="1101200800644",
+            fecha_nacimiento="1990-01-01",
+        )
+        historia = HistoriaClinicaEspecialidad.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="capilar",
+            plan_tratamiento="Texto anterior",
+            creado_por=self.user,
+            actualizado_por=self.user,
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url, {
+            "accion": "editar_texto_historia",
+            "historia_id": historia.id,
+            "texto_historia": "Texto actualizado desde la vista completa.",
+        })
+
+        self.assertRedirects(response, url)
+        historia.refresh_from_db()
+        self.assertEqual(historia.plan_tratamiento, "Texto actualizado desde la vista completa.")
+        self.assertEqual(historia.actualizado_por, self.user)
+
     def test_editar_paciente_usa_formulario_general_moderno(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
