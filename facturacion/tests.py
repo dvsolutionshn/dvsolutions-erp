@@ -4081,6 +4081,14 @@ class FacturacionTests(TestCase):
         self.assertEqual(compra.total_documento, Decimal("400.00"))
         self.assertEqual(inventario.existencias, Decimal("5.00"))
         self.assertTrue(MovimientoInventario.objects.filter(compra_documento=compra, tipo="entrada_compra").exists())
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="compra",
+                documento_id=compra.id,
+                evento="aplicacion",
+            ).exists()
+        )
 
     def test_compra_borrador_no_mueve_inventario(self):
         response = self.client.post(
@@ -4196,6 +4204,14 @@ class FacturacionTests(TestCase):
         self.assertEqual(compra.estado, "aplicada")
         self.assertEqual(inventario.existencias, Decimal("4.00"))
         self.assertTrue(MovimientoInventario.objects.filter(compra_documento=compra, tipo="entrada_compra").exists())
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="compra",
+                documento_id=compra.id,
+                evento="aplicacion",
+            ).exists()
+        )
 
     def test_aplicar_compra_ya_aplicada_no_duplica_movimiento(self):
         compra = CompraInventario.objects.create(
@@ -5665,6 +5681,15 @@ class FacturacionTests(TestCase):
         self.assertEqual(compra.saldo_pendiente, compra.total_documento - Decimal("60.00"))
         self.assertContains(response, "Pago de compra registrado correctamente")
         self.assertTrue(ComprobanteEgresoCompra.objects.filter(pago__compra=compra).exists())
+        pago = PagoCompra.objects.get(compra=compra)
+        self.assertTrue(
+            AsientoContable.objects.filter(
+                empresa=self.empresa,
+                documento_tipo="pago_compra",
+                documento_id=pago.id,
+                evento="egreso",
+            ).exists()
+        )
 
     def test_reporte_cxp_muestra_proveedor_y_compras_pendientes(self):
         compra = self.crear_compra_con_linea()

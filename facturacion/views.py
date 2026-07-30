@@ -4026,6 +4026,7 @@ def crear_compra(request, empresa_slug):
                     _aplicar_compra_documento(compra)
                     compra.estado = 'aplicada'
                     compra.save(update_fields=['estado'])
+                    registrar_asiento_compra_aplicada(compra)
 
             messages.success(request, "Compra guardada correctamente.")
             return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
