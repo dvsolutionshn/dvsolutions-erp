@@ -4002,6 +4002,46 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="proveedores-sugerencias"', html=False)
         self.assertNotContains(response, "Proveedor nombre")
+        self.assertContains(response, "Crear proveedor")
+        self.assertContains(response, "Crear producto")
+        self.assertContains(response, "Tipo de impuesto")
+
+    def test_compra_crea_proveedor_rapido_desde_modal(self):
+        response = self.client.post(
+            reverse("compra_crear_proveedor_rapido", args=[self.empresa.slug]),
+            data=json.dumps({
+                "nombre": "Proveedor Nuevo",
+                "rtn": "0801199900001",
+                "condicion_pago": "credito",
+                "dias_credito": 15,
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        proveedor = Proveedor.objects.get(nombre="Proveedor Nuevo")
+        self.assertEqual(proveedor.empresa, self.empresa)
+        self.assertEqual(proveedor.dias_credito, 15)
+
+    def test_compra_crea_producto_rapido_con_impuesto(self):
+        response = self.client.post(
+            reverse("compra_crear_producto_rapido", args=[self.empresa.slug]),
+            data=json.dumps({
+                "nombre": "Producto Compra Rapida",
+                "codigo": "PCR-1",
+                "precio": "125.00",
+                "impuesto_id": self.impuesto.id,
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        producto = Producto.objects.get(nombre="Producto Compra Rapida")
+        self.assertEqual(producto.empresa, self.empresa)
+        self.assertEqual(producto.impuesto_predeterminado, self.impuesto)
+        self.assertTrue(producto.controla_inventario)
 
     def test_crear_compra_muestra_metodos_de_pago(self):
         response = self.client.get(reverse("crear_compra", args=[self.empresa.slug]))

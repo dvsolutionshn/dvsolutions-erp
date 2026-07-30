@@ -925,6 +925,97 @@ def pos_crear_producto_rapido(request, empresa_slug):
     return JsonResponse({"ok": True, "producto": _pos_producto_payload(producto, impuesto_default)})
 
 
+def _compra_proveedor_payload(proveedor):
+    return {
+        "id": proveedor.id,
+        "nombre": proveedor.nombre,
+        "condicion_pago": proveedor.condicion_pago,
+        "dias_credito": proveedor.dias_credito,
+    }
+
+
+@login_required
+@require_POST
+def compra_crear_proveedor_rapido(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    nombre = (payload.get("nombre") or "").strip()
+    if not nombre:
+        return JsonResponse({"ok": False, "error": "Ingresa el nombre del proveedor."}, status=400)
+
+    try:
+        dias_credito = int(payload.get("dias_credito") or 0)
+    except (TypeError, ValueError):
+        dias_credito = 0
+
+    proveedor = Proveedor.objects.create(
+        empresa=empresa,
+        nombre=nombre,
+        rtn=(payload.get("rtn") or "").strip() or None,
+        contacto=(payload.get("contacto") or "").strip(),
+        telefono=(payload.get("telefono") or "").strip(),
+        correo=(payload.get("correo") or "").strip().lower(),
+        ciudad=(payload.get("ciudad") or "").strip(),
+        condicion_pago=payload.get("condicion_pago") or "contado",
+        dias_credito=dias_credito if dias_credito > 0 else 0,
+        activo=True,
+    )
+    return JsonResponse({"ok": True, "proveedor": _compra_proveedor_payload(proveedor)})
+
+
+@login_required
+@require_POST
+def compra_crear_producto_rapido(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    nombre = (payload.get("nombre") or "").strip()
+    codigo = (payload.get("codigo") or "").strip()
+    try:
+        precio = Decimal(str(payload.get("precio") or "0")).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return JsonResponse({"ok": False, "error": "El precio de venta no es valido."}, status=400)
+    if not nombre:
+        return JsonResponse({"ok": False, "error": "Ingresa el nombre del producto."}, status=400)
+    if precio < 0:
+        return JsonResponse({"ok": False, "error": "El precio no puede ser negativo."}, status=400)
+
+    impuesto_default = TipoImpuesto.objects.filter(activo=True).order_by("nombre").first()
+    impuesto = impuesto_default
+    impuesto_id = payload.get("impuesto_id")
+    if impuesto_id:
+        impuesto = TipoImpuesto.objects.filter(id=impuesto_id, activo=True).first() or impuesto_default
+    if not impuesto:
+        return JsonResponse({"ok": False, "error": "Configura al menos un impuesto activo antes de crear productos."}, status=400)
+
+    try:
+        producto = Producto.objects.create(
+            empresa=empresa,
+            nombre=nombre,
+            codigo=codigo or None,
+            tipo_item="producto",
+            unidad_medida=payload.get("unidad_medida") or "unidad",
+            precio=precio,
+            impuesto_predeterminado=impuesto,
+            controla_inventario=True,
+            activo=True,
+        )
+        _obtener_inventario_producto(producto)
+    except ValidationError as exc:
+        return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+    except IntegrityError:
+        return JsonResponse({"ok": False, "error": "Ya existe un producto con esos datos. Revisa el codigo o nombre."}, status=409)
+
+    return JsonResponse({"ok": True, "producto": _pos_producto_payload(producto, impuesto_default)})
+
+
 @login_required
 def prefijo_factura_manual(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
@@ -3882,6 +3973,7 @@ def crear_compra(request, empresa_slug):
         activo=True,
         controla_inventario=True
     ).order_by('nombre')
+    impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by('nombre')
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -3954,6 +4046,7 @@ def crear_compra(request, empresa_slug):
         "form": form,
         "formset": formset,
         "productos": productos_qs,
+        "impuestos": impuestos_qs,
         "proveedores": proveedores_qs,
         "proveedores_sugeridos": proveedores_qs.values_list('nombre', flat=True).distinct(),
         "proveedores_config": {
@@ -4010,6 +4103,7 @@ def editar_compra(request, empresa_slug, compra_id):
         activo=True,
         controla_inventario=True
     ).order_by('nombre')
+    impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by('nombre')
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -4067,6 +4161,7 @@ def editar_compra(request, empresa_slug, compra_id):
         "form": form,
         "formset": formset,
         "productos": productos_qs,
+        "impuestos": impuestos_qs,
         "proveedores": proveedores_qs,
         "proveedores_sugeridos": proveedores_qs.values_list('nombre', flat=True).distinct(),
         "proveedores_config": {

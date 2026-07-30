@@ -227,6 +227,99 @@
     color:#102338;
     font-weight:800;
 }
+.erp-inline-create-hint{
+    border-top:1px solid #edf3f9;
+    margin-top:6px;
+    padding-top:8px;
+}
+.erp-inline-create-btn{
+    width:100%;
+    border:1px dashed #21b8c6;
+    background:#f0fffe;
+    color:#087d84;
+    border-radius:12px;
+    padding:10px 12px;
+    font-weight:900;
+    cursor:pointer;
+    text-align:left;
+}
+.erp-inline-create-btn:hover{
+    background:#e4fbff;
+    box-shadow:0 12px 26px rgba(15,181,168,.12);
+}
+.erp-quick-dialog{
+    width:min(640px, calc(100vw - 32px));
+    border:none;
+    border-radius:24px;
+    padding:0;
+    box-shadow:0 28px 80px rgba(8,28,54,.28);
+}
+.erp-quick-dialog::backdrop{
+    background:rgba(10,25,40,.48);
+    backdrop-filter:blur(4px);
+}
+.erp-quick-modal{
+    background:#fff;
+    border:1px solid #d7e6f5;
+    border-radius:24px;
+    overflow:hidden;
+}
+.erp-quick-modal-head{
+    padding:22px 24px;
+    background:linear-gradient(135deg,#f4fffd,#eef5ff);
+    border-bottom:1px solid #dbe7f2;
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-start;
+}
+.erp-quick-modal-head h3{
+    margin:0 0 6px;
+    color:#102338;
+}
+.erp-quick-modal-head p{
+    margin:0;
+    color:#5e7185;
+}
+.erp-quick-modal-close{
+    border:1px solid #cdddeb;
+    background:#fff;
+    color:#173b68;
+    border-radius:999px;
+    width:38px;
+    height:38px;
+    font-weight:900;
+    cursor:pointer;
+}
+.erp-quick-modal-body{
+    padding:22px 24px;
+}
+.erp-quick-modal-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:14px;
+}
+.erp-quick-modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:20px;
+    padding-top:16px;
+    border-top:1px solid #edf3f9;
+}
+.erp-quick-error{
+    display:none;
+    margin-top:14px;
+    padding:12px 14px;
+    border-radius:14px;
+    border:1px solid #fecaca;
+    background:#fff1f2;
+    color:#b91c1c;
+    font-weight:800;
+}
+.erp-quick-error.is-visible{
+    display:block;
+}
 #id_observacion{
     min-height:86px;
 }
@@ -236,6 +329,11 @@
     }
     .erp-purchase-side{
         position:static;
+    }
+}
+@media (max-width: 700px){
+    .erp-quick-modal-grid{
+        grid-template-columns:1fr;
     }
 }
 </style>
@@ -412,6 +510,81 @@
         </aside>
     </div>
 </form>
+
+<dialog class="erp-quick-dialog" id="proveedor-quick-dialog">
+    <div class="erp-quick-modal">
+        <div class="erp-quick-modal-head">
+            <div>
+                <h3>Crear proveedor</h3>
+                <p>Registra el proveedor sin salir de esta compra.</p>
+            </div>
+            <button type="button" class="erp-quick-modal-close" data-close-dialog="proveedor-quick-dialog">X</button>
+        </div>
+        <div class="erp-quick-modal-body">
+            <div class="erp-quick-modal-grid">
+                <div class="erp-field"><label>Proveedor</label><input class="erp-select-search" name="nombre" id="quick-proveedor-nombre" required></div>
+                <div class="erp-field"><label>RTN</label><input class="erp-select-search" name="rtn"></div>
+                <div class="erp-field"><label>Contacto</label><input class="erp-select-search" name="contacto"></div>
+                <div class="erp-field"><label>Telefono</label><input class="erp-select-search" name="telefono"></div>
+                <div class="erp-field"><label>Correo</label><input class="erp-select-search" name="correo" type="email"></div>
+                <div class="erp-field"><label>Condicion de pago</label>
+                    <select class="erp-select-search" name="condicion_pago">
+                        <option value="contado">Contado</option>
+                        <option value="credito">Credito</option>
+                    </select>
+                </div>
+                <div class="erp-field"><label>Dias credito</label><input class="erp-select-search" name="dias_credito" type="number" min="0" value="0"></div>
+                <div class="erp-field"><label>Ciudad</label><input class="erp-select-search" name="ciudad"></div>
+            </div>
+            <div class="erp-quick-error" id="proveedor-quick-error"></div>
+            <div class="erp-quick-modal-actions">
+                <button type="button" class="erp-btn-secondary" data-close-dialog="proveedor-quick-dialog">Cancelar</button>
+                <button type="button" class="erp-btn" id="guardar-proveedor-rapido">Guardar proveedor</button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<dialog class="erp-quick-dialog" id="producto-quick-dialog">
+    <div class="erp-quick-modal">
+        <div class="erp-quick-modal-head">
+            <div>
+                <h3>Crear producto</h3>
+                <p>Agrega el producto al catalogo y seleccionalo en la linea actual.</p>
+            </div>
+            <button type="button" class="erp-quick-modal-close" data-close-dialog="producto-quick-dialog">X</button>
+        </div>
+        <div class="erp-quick-modal-body">
+            <div class="erp-quick-modal-grid">
+                <div class="erp-field"><label>Producto</label><input class="erp-select-search" name="nombre" id="quick-producto-nombre" required></div>
+                <div class="erp-field"><label>Codigo</label><input class="erp-select-search" name="codigo"></div>
+                <div class="erp-field"><label>Precio de venta</label><input class="erp-select-search" name="precio" type="number" min="0" step="0.01" value="0.00"></div>
+                <div class="erp-field"><label>Tipo de impuesto</label>
+                    <select class="erp-select-search" name="impuesto_id" required>
+                        {% for impuesto in impuestos %}
+                        <option value="{{ impuesto.id }}">{{ impuesto.nombre }} ({{ impuesto.porcentaje|floatformat:2 }}%)</option>
+                        {% empty %}
+                        <option value="">Configura un impuesto activo</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="erp-field"><label>Unidad</label>
+                    <select class="erp-select-search" name="unidad_medida">
+                        <option value="unidad">Unidad</option>
+                        <option value="caja">Caja</option>
+                        <option value="paquete">Paquete</option>
+                        <option value="servicio">Servicio</option>
+                    </select>
+                </div>
+            </div>
+            <div class="erp-quick-error" id="producto-quick-error"></div>
+            <div class="erp-quick-modal-actions">
+                <button type="button" class="erp-btn-secondary" data-close-dialog="producto-quick-dialog">Cancelar</button>
+                <button type="button" class="erp-btn" id="guardar-producto-rapido">Guardar producto</button>
+            </div>
+        </div>
+    </div>
+</dialog>
 {% endblock %}
 
 {% block extra_js %}
@@ -443,6 +616,16 @@ document.addEventListener("DOMContentLoaded", function () {
     const observacionInput = document.getElementById("id_observacion");
     const observacionToggle = document.getElementById("toggle-observacion");
     const observacionPanel = document.getElementById("observacion-panel");
+    const proveedorDialog = document.getElementById("proveedor-quick-dialog");
+    const productoDialog = document.getElementById("producto-quick-dialog");
+    const proveedorQuickError = document.getElementById("proveedor-quick-error");
+    const productoQuickError = document.getElementById("producto-quick-error");
+    const proveedorQuickNombre = document.getElementById("quick-proveedor-nombre");
+    const productoQuickNombre = document.getElementById("quick-producto-nombre");
+    const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "";
+    const crearProveedorUrl = "{% url 'compra_crear_proveedor_rapido' empresa.slug %}";
+    const crearProductoUrl = "{% url 'compra_crear_producto_rapido' empresa.slug %}";
+    let productoSelectObjetivo = null;
 
     if(referenciaInput){
         referenciaInput.placeholder = "Ejemplo: 000-001-01-00001234";
@@ -455,6 +638,65 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function normalizarTexto(value){
         return (value || "").toString().trim().toLowerCase();
+    }
+
+    function mostrarErrorRapido(elemento, mensaje){
+        if(!elemento){ return; }
+        elemento.textContent = mensaje || "No se pudo completar la accion.";
+        elemento.classList.add("is-visible");
+    }
+
+    function limpiarErrorRapido(elemento){
+        if(!elemento){ return; }
+        elemento.textContent = "";
+        elemento.classList.remove("is-visible");
+    }
+
+    function abrirDialogo(dialogo){
+        if(!dialogo){ return; }
+        if(typeof dialogo.showModal === "function"){
+            dialogo.showModal();
+        } else {
+            dialogo.setAttribute("open", "open");
+        }
+    }
+
+    function cerrarDialogo(dialogo){
+        if(!dialogo){ return; }
+        if(typeof dialogo.close === "function"){
+            dialogo.close();
+        } else {
+            dialogo.removeAttribute("open");
+        }
+    }
+
+    async function postJson(url, payload){
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if(!response.ok || data.ok === false){
+            throw new Error(data.error || "No se pudo guardar la informacion.");
+        }
+        return data;
+    }
+
+    function valoresDeCampos(scope){
+        const data = {};
+        scope.querySelectorAll("input[name], select[name], textarea[name]").forEach(field => {
+            if(field.type === "checkbox"){
+                data[field.name] = field.checked;
+            } else {
+                data[field.name] = field.value;
+            }
+        });
+        return data;
     }
 
     function sincronizarProveedor(){
@@ -504,6 +746,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
         proveedorSuggestionsPanel.innerHTML = "";
         if(!options.length){
+            if(term){
+                const wrap = document.createElement("div");
+                wrap.className = "erp-inline-create-hint";
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "erp-inline-create-btn";
+                button.textContent = `+ Crear proveedor "${proveedorSearchInput.value.trim()}"`;
+                button.addEventListener("click", function(){
+                    if(proveedorQuickNombre){ proveedorQuickNombre.value = proveedorSearchInput.value.trim(); }
+                    limpiarErrorRapido(proveedorQuickError);
+                    abrirDialogo(proveedorDialog);
+                    proveedorSuggestionsPanel.style.display = "none";
+                });
+                wrap.appendChild(button);
+                proveedorSuggestionsPanel.appendChild(wrap);
+                proveedorSuggestionsPanel.style.display = "block";
+                return;
+            }
             proveedorSuggestionsPanel.style.display = "none";
             return;
         }
@@ -521,6 +781,22 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             proveedorSuggestionsPanel.appendChild(button);
         });
+        if(term && !options.some(option => normalizarTexto(option.text) === term)){
+            const wrap = document.createElement("div");
+            wrap.className = "erp-inline-create-hint";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "erp-inline-create-btn";
+            button.textContent = `+ Crear proveedor "${proveedorSearchInput.value.trim()}"`;
+            button.addEventListener("click", function(){
+                if(proveedorQuickNombre){ proveedorQuickNombre.value = proveedorSearchInput.value.trim(); }
+                limpiarErrorRapido(proveedorQuickError);
+                abrirDialogo(proveedorDialog);
+                proveedorSuggestionsPanel.style.display = "none";
+            });
+            wrap.appendChild(button);
+            proveedorSuggestionsPanel.appendChild(wrap);
+        }
         proveedorSuggestionsPanel.style.display = "block";
     }
 
@@ -631,6 +907,22 @@ document.addEventListener("DOMContentLoaded", function () {
                 .slice(0, 10);
             panel.innerHTML = "";
             if(!options.length){
+                if(term){
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "erp-inline-create-btn";
+                    button.textContent = `+ Crear producto "${input.value.trim()}"`;
+                    button.addEventListener("click", function(){
+                        productoSelectObjetivo = select;
+                        if(productoQuickNombre){ productoQuickNombre.value = input.value.trim(); }
+                        limpiarErrorRapido(productoQuickError);
+                        abrirDialogo(productoDialog);
+                        panel.style.display = "none";
+                    });
+                    panel.appendChild(button);
+                    panel.style.display = "block";
+                    return;
+                }
                 panel.style.display = "none";
                 return;
             }
@@ -648,6 +940,23 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
                 panel.appendChild(button);
             });
+            if(term && !options.some(option => normalizarTexto(option.text) === term)){
+                const wrap = document.createElement("div");
+                wrap.className = "erp-inline-create-hint";
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "erp-inline-create-btn";
+                button.textContent = `+ Crear producto "${input.value.trim()}"`;
+                button.addEventListener("click", function(){
+                    productoSelectObjetivo = select;
+                    if(productoQuickNombre){ productoQuickNombre.value = input.value.trim(); }
+                    limpiarErrorRapido(productoQuickError);
+                    abrirDialogo(productoDialog);
+                    panel.style.display = "none";
+                });
+                wrap.appendChild(button);
+                panel.appendChild(wrap);
+            }
             panel.style.display = "block";
         }
 
@@ -738,6 +1047,52 @@ document.addEventListener("DOMContentLoaded", function () {
             abrirObservacion();
         });
     }
+    document.querySelectorAll("[data-close-dialog]").forEach(button => {
+        button.addEventListener("click", function(){
+            cerrarDialogo(document.getElementById(button.dataset.closeDialog));
+        });
+    });
+    document.getElementById("guardar-proveedor-rapido")?.addEventListener("click", async function(){
+        limpiarErrorRapido(proveedorQuickError);
+        const payload = valoresDeCampos(proveedorDialog);
+        try{
+            const data = await postJson(crearProveedorUrl, payload);
+            const proveedor = data.proveedor;
+            const option = new Option(proveedor.nombre, proveedor.id, true, true);
+            proveedorSelect.appendChild(option);
+            proveedoresConfig[String(proveedor.id)] = {
+                condicion_pago: proveedor.condicion_pago || "contado",
+                dias_credito: proveedor.dias_credito || 0,
+            };
+            proveedorSearchInput.value = proveedor.nombre;
+            proveedorNombreInput.value = proveedor.nombre;
+            sincronizarProveedor();
+            cerrarDialogo(proveedorDialog);
+        } catch(error){
+            mostrarErrorRapido(proveedorQuickError, error.message);
+        }
+    });
+    document.getElementById("guardar-producto-rapido")?.addEventListener("click", async function(){
+        limpiarErrorRapido(productoQuickError);
+        const payload = valoresDeCampos(productoDialog);
+        try{
+            const data = await postJson(crearProductoUrl, payload);
+            const producto = data.producto;
+            const texto = producto.codigo ? `${producto.nombre} (${producto.codigo})` : producto.nombre;
+            document.querySelectorAll("select.producto").forEach(select => {
+                if(!Array.from(select.options).some(option => option.value === String(producto.id))){
+                    select.appendChild(new Option(texto, producto.id));
+                }
+            });
+            if(productoSelectObjetivo){
+                productoSelectObjetivo.value = String(producto.id);
+                productoSelectObjetivo.dispatchEvent(new Event("change", {bubbles:true}));
+            }
+            cerrarDialogo(productoDialog);
+        } catch(error){
+            mostrarErrorRapido(productoQuickError, error.message);
+        }
+    });
     if(observacionInput && observacionInput.value.trim()){
         abrirObservacion(true);
     }
