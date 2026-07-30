@@ -2482,6 +2482,18 @@ def _revertir_compra_documento(compra):
         )
 
 
+def _registrar_asiento_compra_aplicada_seguro(compra):
+    try:
+        return registrar_asiento_compra_aplicada(compra)
+    except Exception as exc:
+        logger.exception(
+            "No se pudo registrar el asiento contable automatico de la compra %s en empresa %s.",
+            compra.id,
+            compra.empresa_id,
+        )
+        return exc
+
+
 def _validar_stock_disponible_para_lineas(lineas):
     cantidades_por_producto = {}
 
@@ -4015,6 +4027,7 @@ def crear_compra(request, empresa_slug):
                 form.add_error('proveedor', 'Seleccione o escriba el proveedor de la compra.')
 
         if form.is_valid() and lineas_validas:
+            error_asiento = None
             with transaction.atomic():
                 estado_destino = form.cleaned_data['estado']
                 compra = form.save(commit=False)
@@ -4037,9 +4050,11 @@ def crear_compra(request, empresa_slug):
                     _aplicar_compra_documento(compra)
                     compra.estado = 'aplicada'
                     compra.save(update_fields=['estado'])
-                    registrar_asiento_compra_aplicada(compra)
+                    error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
 
             messages.success(request, "Compra guardada correctamente.")
+            if error_asiento:
+                messages.warning(request, "La compra se guardo y el inventario fue actualizado, pero no se pudo crear el asiento contable automatico. Revise la configuracion contable de la empresa.")
             return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
         elif form.is_valid():
             messages.error(request, "Debe agregar al menos una linea valida en la compra.")
@@ -4217,13 +4232,16 @@ def aplicar_compra(request, empresa_slug, compra_id):
         messages.error(request, "No se puede aplicar una compra sin lineas.")
         return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
 
+    error_asiento = None
     with transaction.atomic():
         _aplicar_compra_documento(compra)
         compra.estado = 'aplicada'
         compra.save(update_fields=['estado'])
-        registrar_asiento_compra_aplicada(compra)
+        error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
 
     messages.success(request, "Compra aplicada correctamente e inventario actualizado.")
+    if error_asiento:
+        messages.warning(request, "La compra fue aplicada, pero no se pudo crear el asiento contable automatico. Revise la configuracion contable de la empresa.")
     return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
 
 

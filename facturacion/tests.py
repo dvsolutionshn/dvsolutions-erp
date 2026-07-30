@@ -4164,6 +4164,36 @@ class FacturacionTests(TestCase):
             ).exists()
         )
 
+    def test_crear_compra_aplicada_no_falla_si_asiento_contable_tiene_error(self):
+        with patch("facturacion.views.registrar_asiento_compra_aplicada", side_effect=ValidationError("Cuenta contable invalida")):
+            response = self.client.post(
+                reverse("crear_compra", args=[self.empresa.slug]),
+                {
+                    "proveedor_nombre": "Distribuidora Sin Asiento",
+                    "referencia_documento": "FAC-PROV-SIN-ASIENTO",
+                    "fecha_documento": str(date.today()),
+                    "observacion": "Compra con error contable simulado",
+                    "estado": "aplicada",
+                    "lineas_compra-TOTAL_FORMS": "1",
+                    "lineas_compra-INITIAL_FORMS": "0",
+                    "lineas_compra-MIN_NUM_FORMS": "0",
+                    "lineas_compra-MAX_NUM_FORMS": "1000",
+                    "lineas_compra-0-producto": str(self.producto.id),
+                    "lineas_compra-0-cantidad": "5.00",
+                    "lineas_compra-0-costo_unitario": "80.00",
+                    "lineas_compra-0-comentario": "Lote abril",
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        compra = CompraInventario.objects.get(proveedor_nombre="Distribuidora Sin Asiento")
+        inventario = InventarioProducto.objects.get(producto=self.producto)
+        self.assertEqual(compra.estado, "aplicada")
+        self.assertEqual(inventario.existencias, Decimal("5.00"))
+        self.assertTrue(MovimientoInventario.objects.filter(compra_documento=compra, tipo="entrada_compra").exists())
+        self.assertContains(response, "no se pudo crear el asiento contable automatico")
+
     def test_compra_borrador_no_mueve_inventario(self):
         response = self.client.post(
             reverse("crear_compra", args=[self.empresa.slug]),
