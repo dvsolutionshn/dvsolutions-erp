@@ -2494,6 +2494,21 @@ def _registrar_asiento_compra_aplicada_seguro(compra):
         return exc
 
 
+def _configurar_fechas_compra_form(form):
+    for campo in ("fecha_documento", "fecha_vencimiento"):
+        if campo not in form.fields:
+            continue
+        form.fields[campo].input_formats = DATE_INPUT_FORMATS_LATAM
+        form.fields[campo].widget = forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={
+                "type": "date",
+                "class": "erp-select-search",
+            },
+        )
+    return form
+
+
 def _validar_stock_disponible_para_lineas(lineas):
     cantidades_por_producto = {}
 
@@ -3994,6 +4009,7 @@ def crear_compra(request, empresa_slug):
         post_data.setdefault('dias_credito', '0')
         proveedor_busqueda = (post_data.get('proveedor_busqueda') or '').strip()
         form = CompraForm(post_data)
+        _configurar_fechas_compra_form(form)
         form.fields['estado'].choices = estados_disponibles
         form.fields['proveedor'].queryset = proveedores_qs
         form.fields['proveedor_nombre'].required = False
@@ -4060,6 +4076,7 @@ def crear_compra(request, empresa_slug):
             messages.error(request, "Debe agregar al menos una linea valida en la compra.")
     else:
         form = CompraForm()
+        _configurar_fechas_compra_form(form)
         form.fields['estado'].choices = estados_disponibles
         form.fields['proveedor'].queryset = proveedores_qs
         form.fields['proveedor_nombre'].required = False
@@ -4139,6 +4156,7 @@ def editar_compra(request, empresa_slug, compra_id):
         post_data.setdefault('dias_credito', str(compra.dias_credito or 0))
         proveedor_busqueda = (post_data.get('proveedor_busqueda') or '').strip()
         form = CompraForm(post_data, instance=compra)
+        _configurar_fechas_compra_form(form)
         form.fields['estado'].choices = estados_disponibles
         form.fields['proveedor'].queryset = proveedores_qs
         form.fields['proveedor_nombre'].required = False
@@ -4186,6 +4204,7 @@ def editar_compra(request, empresa_slug, compra_id):
             messages.error(request, "Debe agregar al menos una linea valida en la compra.")
     else:
         form = CompraForm(instance=compra)
+        _configurar_fechas_compra_form(form)
         form.fields['estado'].choices = estados_disponibles
         form.fields['proveedor'].queryset = proveedores_qs
         form.fields['proveedor_nombre'].required = False

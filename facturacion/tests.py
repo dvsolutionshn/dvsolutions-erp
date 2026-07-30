@@ -4006,6 +4006,8 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Crear producto")
         self.assertContains(response, "Tipo de impuesto")
         self.assertContains(response, 'name="proveedor_busqueda"', html=False)
+        self.assertContains(response, 'name="fecha_documento"', html=False)
+        self.assertContains(response, 'type="date"', html=False)
 
     def test_crear_compra_con_proveedor_existente_completa_nombre(self):
         proveedor = Proveedor.objects.create(empresa=self.empresa, nombre="Proveedor Seleccionado")
