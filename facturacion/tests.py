@@ -1315,6 +1315,16 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "scannerLastKeyAt > 160")
         self.assertContains(response, "productCode.replace(/^0+/,")
 
+    def test_punto_venta_producto_rapido_muestra_selector_de_impuesto(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+
+        response = self.client.get(reverse("punto_venta", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Tipo de impuesto")
+        self.assertContains(response, self.impuesto.nombre)
+
     def test_formulario_producto_prepara_campo_para_codigo_de_barras(self):
         form = ProductoForm(empresa=self.empresa)
 
@@ -3991,6 +4001,7 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="proveedores-sugerencias"', html=False)
+        self.assertNotContains(response, "Proveedor nombre")
 
     def test_crear_compra_muestra_metodos_de_pago(self):
         response = self.client.get(reverse("crear_compra", args=[self.empresa.slug]))

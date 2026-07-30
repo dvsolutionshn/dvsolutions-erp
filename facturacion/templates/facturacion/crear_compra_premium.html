@@ -258,15 +258,9 @@
                             <input type="text" id="proveedor-search" class="erp-select-search" placeholder="Buscar proveedor por nombre" autocomplete="off">
                             <div id="proveedores-sugerencias" class="erp-suggestion-list"></div>
                         </div>
-                        <div style="display:none;">{{ form.proveedor }}</div>
+                        <div style="display:none;">{{ form.proveedor }}{{ form.proveedor_nombre }}</div>
                         <p class="erp-field-help">Escribe y selecciona el proveedor sugerido para autocompletar su configuración.</p>
                         {% if form.proveedor.errors %}<ul class="erp-field-errors">{% for error in form.proveedor.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
-                    </div>
-
-                    <div class="erp-field">
-                        {{ form.proveedor_nombre.label_tag }}
-                        {{ form.proveedor_nombre }}
-                        {% if form.proveedor_nombre.errors %}<ul class="erp-field-errors">{% for error in form.proveedor_nombre.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
                     </div>
 
                     <div class="erp-field">
@@ -494,6 +488,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if(!matched && !buscado){
             proveedorSelect.value = "";
             proveedorNombreInput.value = "";
+        } else if(!matched && proveedorNombreInput) {
+            proveedorNombreInput.value = proveedorSearchInput.value.trim();
         }
         sincronizarProveedor();
     }

@@ -664,6 +664,14 @@ def punto_venta(request, empresa_slug):
             messages.error(request, f"No se pudo registrar la venta POS: {exc}")
 
     productos_payload = [_pos_producto_payload(producto, impuesto_default) for producto in productos_qs]
+    impuestos_payload = [
+        {
+            "id": impuesto.id,
+            "nombre": impuesto.nombre,
+            "porcentaje": float(impuesto.porcentaje or Decimal("0.00")),
+        }
+        for impuesto in impuestos_qs
+    ]
     clientes_payload = [
         _pos_cliente_payload(cliente)
         for cliente in Cliente.objects.filter(empresa=empresa, activo=True)
@@ -675,6 +683,7 @@ def punto_venta(request, empresa_slug):
     return render(request, "facturacion/punto_venta.html", {
         "empresa": empresa,
         "productos_payload": productos_payload,
+        "impuestos_payload": impuestos_payload,
         "clientes_payload": clientes_payload,
         "bodegas_payload": [_pos_bodega_payload(bodega) for bodega in bodegas_pos],
         "promocion_pos_payload": promocion_pos_payload,

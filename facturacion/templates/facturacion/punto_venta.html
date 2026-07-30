@@ -106,6 +106,7 @@
 
 {% block content %}
 {{ productos_payload|json_script:"pos-products" }}
+{{ impuestos_payload|json_script:"pos-taxes" }}
 {{ clientes_payload|json_script:"pos-clients" }}
 {{ bodegas_payload|json_script:"pos-warehouses" }}
 {{ promocion_pos_payload|json_script:"pos-promotion" }}
@@ -279,6 +280,16 @@
             <div class="pos-field span-2"><label>Nombre producto</label><input class="pos-input" name="nombre" required></div>
             <div class="pos-field"><label>Codigo / barra</label><input class="pos-input" name="codigo" autocomplete="off"></div>
             <div class="pos-field"><label>{% if precios_incluyen_impuesto %}Precio final (impuesto incluido){% else %}Precio venta{% endif %}</label><input class="pos-input" name="precio" type="number" min="0" step="0.01" required></div>
+            <div class="pos-field">
+                <label>Tipo de impuesto</label>
+                <select class="pos-select" name="impuesto_id" required>
+                    {% for impuesto in impuestos_payload %}
+                    <option value="{{ impuesto.id }}">{{ impuesto.nombre }} ({{ impuesto.porcentaje|floatformat:2 }}%)</option>
+                    {% empty %}
+                    <option value="">Configura un impuesto activo</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="pos-field"><label>Lote inicial</label><input class="pos-input" name="lote_inicial" placeholder="Opcional"></div>
             <div class="pos-field"><label>Vencimiento lote</label><input class="pos-input" name="vencimiento_lote" type="date"></div>
             <label class="pos-check span-2"><input type="checkbox" name="controla_inventario" checked> Controla inventario</label>
@@ -305,6 +316,7 @@
 <script>
 (function(){
     let products = JSON.parse(document.getElementById("pos-products").textContent);
+    const taxes = JSON.parse(document.getElementById("pos-taxes").textContent);
     let clients = JSON.parse(document.getElementById("pos-clients").textContent);
     const warehouses = JSON.parse(document.getElementById("pos-warehouses").textContent);
     const promotion = JSON.parse(document.getElementById("pos-promotion").textContent);
