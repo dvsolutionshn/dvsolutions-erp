@@ -11,6 +11,8 @@
 {% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <style>
 .erp-purchase-shell{
     display:grid;
@@ -590,6 +592,17 @@
 {% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    if (window.flatpickr) {
+        flatpickr("#id_fecha_documento", {
+            dateFormat: "d/m/Y",
+            allowInput: true
+        });
+        flatpickr("#id_fecha_vencimiento", {
+            dateFormat: "d/m/Y",
+            allowInput: true
+        });
+    }
+
     const proveedoresConfig = {{ proveedores_config|safe }};
     const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
     const container = document.getElementById("lineas-container");
@@ -801,12 +814,21 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function sumarDias(fechaBase, dias){
-        const fecha = new Date(fechaBase + "T00:00:00");
+        let fecha;
+        if(/^\d{2}\/\d{2}\/\d{4}$/.test(fechaBase)){
+            const [day, month, year] = fechaBase.split("/");
+            fecha = new Date(`${year}-${month}-${day}T00:00:00`);
+        } else {
+            fecha = new Date(fechaBase + "T00:00:00");
+        }
+        if(Number.isNaN(fecha.getTime())){
+            return fechaBase;
+        }
         fecha.setDate(fecha.getDate() + dias);
         const year = fecha.getFullYear();
         const month = String(fecha.getMonth() + 1).padStart(2, "0");
         const day = String(fecha.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
+        return `${day}/${month}/${year}`;
     }
 
     function calcularFechaVencimiento(){

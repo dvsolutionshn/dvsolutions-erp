@@ -2500,10 +2500,12 @@ def _configurar_fechas_compra_form(form):
             continue
         form.fields[campo].input_formats = DATE_INPUT_FORMATS_LATAM
         form.fields[campo].widget = forms.DateInput(
-            format="%Y-%m-%d",
+            format="%d/%m/%Y",
             attrs={
-                "type": "date",
+                "type": "text",
                 "class": "erp-select-search",
+                "placeholder": "dd/mm/aaaa",
+                "autocomplete": "off",
             },
         )
     return form

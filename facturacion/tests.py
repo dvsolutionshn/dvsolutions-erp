@@ -4007,7 +4007,8 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Tipo de impuesto")
         self.assertContains(response, 'name="proveedor_busqueda"', html=False)
         self.assertContains(response, 'name="fecha_documento"', html=False)
-        self.assertContains(response, 'type="date"', html=False)
+        self.assertContains(response, 'flatpickr("#id_fecha_documento"', html=False)
+        self.assertNotContains(response, 'name="fecha_documento" type="date"', html=False)
 
     def test_crear_compra_con_proveedor_existente_completa_nombre(self):
         proveedor = Proveedor.objects.create(empresa=self.empresa, nombre="Proveedor Seleccionado")
@@ -4059,6 +4060,32 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         compra = CompraInventario.objects.get(referencia_documento="FAC-PROV-MANUAL")
         self.assertEqual(compra.proveedor_nombre, "Proveedor Manual Visible")
+
+    def test_crear_compra_acepta_fecha_latam_desde_calendario(self):
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_busqueda": "Proveedor Fecha Latam",
+                "proveedor_nombre": "",
+                "referencia_documento": "FAC-FECHA-LATAM",
+                "fecha_documento": "30/06/2026",
+                "fecha_vencimiento": "30/06/2026",
+                "estado": "borrador",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "2.00",
+                "lineas_compra-0-costo_unitario": "50.00",
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-FECHA-LATAM")
+        self.assertEqual(compra.fecha_documento, date(2026, 6, 30))
+        self.assertEqual(compra.fecha_vencimiento, date(2026, 6, 30))
 
     def test_crear_compra_sin_proveedor_no_lanza_error_500(self):
         response = self.client.post(
