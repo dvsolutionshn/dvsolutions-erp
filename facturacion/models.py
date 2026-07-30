@@ -770,6 +770,12 @@ class LineaEntradaInventario(models.Model):
 
 class CompraInventario(models.Model):
     CONDICIONES_PAGO = Proveedor.CONDICIONES_PAGO
+    METODOS_PAGO = (
+        ('efectivo', 'Efectivo'),
+        ('tarjeta', 'Tarjeta'),
+        ('transferencia', 'Transferencia'),
+        ('cheque', 'Cheque'),
+    )
 
     ESTADOS = (
         ('borrador', 'Borrador'),
@@ -784,6 +790,7 @@ class CompraInventario(models.Model):
     referencia_documento = models.CharField(max_length=120, blank=True, null=True)
     fecha_documento = models.DateField(default=timezone.now)
     condicion_pago = models.CharField(max_length=20, choices=CONDICIONES_PAGO, default='contado')
+    metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
     dias_credito = models.PositiveIntegerField(default=0)
     fecha_vencimiento = models.DateField(blank=True, null=True)
     observacion = models.TextField(blank=True, null=True)
@@ -972,8 +979,9 @@ class LineaCompraInventario(models.Model):
 class PagoCompra(models.Model):
     METODOS = (
         ('efectivo', 'Efectivo'),
-        ('transferencia', 'Transferencia'),
         ('tarjeta', 'Tarjeta'),
+        ('transferencia', 'Transferencia'),
+        ('cheque', 'Cheque'),
     )
 
     compra = models.ForeignKey(

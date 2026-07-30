@@ -289,6 +289,13 @@
                     </div>
 
                     <div class="erp-field">
+                        <label for="{{ form.metodo_pago.id_for_label }}">Cómo se realizó el pago</label>
+                        {{ form.metodo_pago }}
+                        <p class="erp-field-help">Método usado para pagar esta compra.</p>
+                        {% if form.metodo_pago.errors %}<ul class="erp-field-errors">{% for error in form.metodo_pago.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                    </div>
+
+                    <div class="erp-field">
                         {{ form.dias_credito.label_tag }}
                         {{ form.dias_credito }}
                         {% if form.dias_credito.errors %}<ul class="erp-field-errors">{% for error in form.dias_credito.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
@@ -391,7 +398,7 @@
                     <div class="erp-purchase-doc-item"><span class="label">Líneas</span><div class="value" id="resumen-lineas">0</div></div>
                     <div class="erp-purchase-doc-item"><span class="label">Unidades</span><div class="value" id="resumen-unidades">0.00</div></div>
                     <div class="erp-purchase-doc-item"><span class="label">Condición</span><div class="value" id="resumen-condicion">-</div></div>
-                    <div class="erp-purchase-doc-item"><span class="label">Días crédito</span><div class="value" id="resumen-dias">0</div></div>
+                    <div class="erp-purchase-doc-item"><span class="label">Método</span><div class="value" id="resumen-metodo">-</div></div>
                 </div>
             </section>
 
@@ -402,6 +409,7 @@
                     <div class="erp-purchase-doc-item"><span class="label">Factura</span><div class="value" id="resumen-factura">-</div></div>
                     <div class="erp-purchase-doc-item"><span class="label">Fecha</span><div class="value" id="resumen-fecha">-</div></div>
                     <div class="erp-purchase-doc-item"><span class="label">Vence</span><div class="value" id="resumen-vencimiento">-</div></div>
+                    <div class="erp-purchase-doc-item"><span class="label">Días crédito</span><div class="value" id="resumen-dias">0</div></div>
                 </div>
                 <div class="erp-purchase-side-note" style="margin-top:14px;">
                     Al guardar como <strong>aplicada</strong>, el inventario sube y el kardex registra la entrada de compra.
@@ -424,12 +432,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const proveedorNombreInput = document.getElementById("id_proveedor_nombre");
     const referenciaInput = document.getElementById("id_referencia_documento");
     const condicionPagoInput = document.getElementById("id_condicion_pago");
+    const metodoPagoInput = document.getElementById("id_metodo_pago");
     const diasCreditoInput = document.getElementById("id_dias_credito");
     const fechaDocumentoInput = document.getElementById("id_fecha_documento");
     const fechaVencimientoInput = document.getElementById("id_fecha_vencimiento");
     const resumenProveedor = document.getElementById("resumen-proveedor");
     const resumenFactura = document.getElementById("resumen-factura");
     const resumenCondicion = document.getElementById("resumen-condicion");
+    const resumenMetodo = document.getElementById("resumen-metodo");
     const resumenDias = document.getElementById("resumen-dias");
     const resumenFecha = document.getElementById("resumen-fecha");
     const resumenVencimiento = document.getElementById("resumen-vencimiento");
@@ -551,6 +561,10 @@ document.addEventListener("DOMContentLoaded", function () {
         if(resumenCondicion && condicionPagoInput){
             const option = condicionPagoInput.options[condicionPagoInput.selectedIndex];
             resumenCondicion.textContent = option ? option.text.trim() : "-";
+        }
+        if(resumenMetodo && metodoPagoInput){
+            const option = metodoPagoInput.options[metodoPagoInput.selectedIndex];
+            resumenMetodo.textContent = option ? option.text.trim() : "-";
         }
         if(resumenDias && diasCreditoInput){
             resumenDias.textContent = diasCreditoInput.value || "0";
@@ -704,6 +718,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     if(condicionPagoInput){
         condicionPagoInput.addEventListener("change", function(){ calcularFechaVencimiento(); actualizarResumenCompra(); });
+    }
+    if(metodoPagoInput){
+        metodoPagoInput.addEventListener("change", actualizarResumenCompra);
     }
     if(diasCreditoInput){
         diasCreditoInput.addEventListener("input", function(){ calcularFechaVencimiento(); actualizarResumenCompra(); });

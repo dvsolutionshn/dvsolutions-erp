@@ -3992,6 +3992,16 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="proveedores-sugerencias"', html=False)
 
+    def test_crear_compra_muestra_metodos_de_pago(self):
+        response = self.client.get(reverse("crear_compra", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cómo se realizó el pago")
+        self.assertContains(response, "Efectivo")
+        self.assertContains(response, "Tarjeta")
+        self.assertContains(response, "Transferencia")
+        self.assertContains(response, "Cheque")
+
     def test_crear_compra_aplicada_ingresa_inventario(self):
         response = self.client.post(
             reverse("crear_compra", args=[self.empresa.slug]),

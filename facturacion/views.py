@@ -2752,6 +2752,7 @@ def crear_proveedor(request, empresa_slug):
     if request.method == "POST":
         post_data = request.POST.copy()
         post_data.setdefault('condicion_pago', 'contado')
+        post_data.setdefault('metodo_pago', 'efectivo')
         post_data.setdefault('dias_credito', '0')
         form = ProveedorForm(post_data)
         if form.is_valid():
@@ -3852,6 +3853,7 @@ def crear_compra(request, empresa_slug):
             'referencia_documento',
             'fecha_documento',
             'condicion_pago',
+            'metodo_pago',
             'dias_credito',
             'fecha_vencimiento',
             'observacion',
@@ -3875,6 +3877,7 @@ def crear_compra(request, empresa_slug):
     if request.method == "POST":
         post_data = request.POST.copy()
         post_data.setdefault('condicion_pago', 'contado')
+        post_data.setdefault('metodo_pago', 'efectivo')
         post_data.setdefault('dias_credito', '0')
         form = CompraForm(post_data)
         form.fields['estado'].choices = estados_disponibles
@@ -3978,6 +3981,7 @@ def editar_compra(request, empresa_slug, compra_id):
             'referencia_documento',
             'fecha_documento',
             'condicion_pago',
+            'metodo_pago',
             'dias_credito',
             'fecha_vencimiento',
             'observacion',
@@ -4001,6 +4005,7 @@ def editar_compra(request, empresa_slug, compra_id):
     if request.method == "POST":
         post_data = request.POST.copy()
         post_data.setdefault('condicion_pago', compra.condicion_pago or 'contado')
+        post_data.setdefault('metodo_pago', compra.metodo_pago or 'efectivo')
         post_data.setdefault('dias_credito', str(compra.dias_credito or 0))
         form = CompraForm(post_data, instance=compra)
         form.fields['estado'].choices = estados_disponibles
