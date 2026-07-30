@@ -145,6 +145,88 @@
 .erp-purchase-line-row{
     align-items:start;
 }
+.erp-purchase-line-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    margin-top:16px;
+    flex-wrap:wrap;
+    padding-top:16px;
+    border-top:1px solid #dbe7f2;
+}
+.erp-observation-toggle{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 16px;
+    border:1px dashed #bcd5eb;
+    border-radius:14px;
+    background:#f8fbff;
+    color:#173b68;
+    font-weight:800;
+    cursor:pointer;
+}
+.erp-observation-toggle:hover{
+    background:#eef8ff;
+}
+.erp-observation-panel{
+    display:none;
+    margin-top:12px;
+}
+.erp-observation-panel.is-open{
+    display:block;
+}
+.erp-line-note-toggle{
+    width:42px;
+    height:42px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--primary-2);
+    font-weight:900;
+    cursor:pointer;
+}
+.erp-line-note-toggle.is-open{
+    background:linear-gradient(135deg,#0fb5a8,#2468f2);
+    color:#fff;
+    border-color:transparent;
+    box-shadow:0 10px 22px rgba(36,104,242,.16);
+}
+.erp-line-comment-panel{
+    grid-column:1/-1;
+    display:none;
+    margin-top:-2px;
+}
+.erp-line-comment-panel.is-open{
+    display:block;
+}
+.erp-line-comment-panel label{
+    display:block;
+    margin-bottom:6px;
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#6b7b8f;
+}
+.erp-line-comment-panel textarea{
+    min-height:62px;
+    resize:vertical;
+}
+.erp-purchase-amount-box{
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    padding:0 14px;
+    border:1px solid #cdddeb;
+    border-radius:10px;
+    background:#fbfdff;
+    color:#102338;
+    font-weight:800;
+}
 #id_observacion{
     min-height:86px;
 }
@@ -225,9 +307,15 @@
                     </div>
 
                     <div class="erp-field erp-field-span-full">
-                        {{ form.observacion.label_tag }}
-                        {{ form.observacion }}
-                        {% if form.observacion.errors %}<ul class="erp-field-errors">{% for error in form.observacion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                        <button type="button" class="erp-observation-toggle" id="toggle-observacion">
+                            <span>Agregar observaciones de la compra</span>
+                            <span>+</span>
+                        </button>
+                        <div class="erp-observation-panel" id="observacion-panel">
+                            {{ form.observacion.label_tag }}
+                            {{ form.observacion }}
+                            {% if form.observacion.errors %}<ul class="erp-field-errors">{% for error in form.observacion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                        </div>
                     </div>
                 </div>
             </section>
@@ -243,24 +331,32 @@
                 {{ formset.management_form }}
 
                 <div class="erp-line-layout">
-                    <div class="erp-line-header" style="grid-template-columns:2fr 1fr 1fr 1.6fr auto;">
+                    <div class="erp-line-header" style="grid-template-columns:2fr .8fr .9fr 56px 1fr 1fr auto;">
                         <div>Producto</div>
                         <div>Cantidad</div>
-                        <div>Costo unitario</div>
-                        <div>Comentario</div>
+                        <div>Costo</div>
+                        <div>Nota</div>
+                        <div>Subtotal</div>
+                        <div>Monto</div>
                         <div></div>
                     </div>
 
                     <div id="lineas-container" class="erp-line-layout">
                     {% for form_linea in formset %}
-                        <div class="tabla-row erp-line-row erp-purchase-line-row" style="grid-template-columns:2fr 1fr 1fr 1.6fr auto;">
+                        <div class="tabla-row erp-line-row erp-purchase-line-row" style="grid-template-columns:2fr .8fr .9fr 56px 1fr 1fr auto;">
                             {{ form_linea.id }}
                             <div style="display:none;">{{ form_linea.DELETE }}</div>
                             <div>{{ form_linea.producto|add_class:"producto" }}</div>
                             <div>{{ form_linea.cantidad|add_class:"cantidad" }}</div>
                             <div>{{ form_linea.costo_unitario|add_class:"costo" }}</div>
-                            <div>{{ form_linea.comentario|add_class:"comentario" }}</div>
+                            <div><button type="button" class="erp-line-note-toggle" title="Agregar nota">+</button></div>
+                            <div class="erp-purchase-amount-box erp-line-subtotal-value">L. 0.00</div>
+                            <div class="erp-purchase-amount-box erp-line-monto-value">L. 0.00</div>
                             <div class="erp-delete-cell"><button type="button" class="delete-btn erp-btn-danger btn-eliminar">X</button></div>
+                            <div class="erp-line-comment-panel">
+                                <label>Nota / comentario de esta línea</label>
+                                {{ form_linea.comentario|add_class:"comentario" }}
+                            </div>
                         </div>
                     {% endfor %}
                     </div>
@@ -340,6 +436,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const resumenLineas = document.getElementById("resumen-lineas");
     const resumenUnidades = document.getElementById("resumen-unidades");
     const resumenTotal = document.getElementById("resumen-total");
+    const observacionInput = document.getElementById("id_observacion");
+    const observacionToggle = document.getElementById("toggle-observacion");
+    const observacionPanel = document.getElementById("observacion-panel");
 
     if(referenciaInput){
         referenciaInput.placeholder = "Ejemplo: 000-001-01-00001234";
@@ -471,13 +570,18 @@ document.addEventListener("DOMContentLoaded", function () {
             const producto = row.querySelector("select.producto");
             const cantidadInput = row.querySelector(".cantidad");
             const costoInput = row.querySelector(".costo");
+            const subtotalBox = row.querySelector(".erp-line-subtotal-value");
+            const montoBox = row.querySelector(".erp-line-monto-value");
             const cantidad = parseFloat(cantidadInput?.value || "0") || 0;
             const costo = parseFloat(costoInput?.value || "0") || 0;
+            const subtotal = cantidad * costo;
             const tieneProducto = producto && producto.value;
+            if(subtotalBox){ subtotalBox.textContent = formatMoney(subtotal); }
+            if(montoBox){ montoBox.textContent = formatMoney(subtotal); }
             if(tieneProducto || cantidad || costo){
                 lineas += 1;
                 unidades += cantidad;
-                total += cantidad * costo;
+                total += subtotal;
             }
         });
         if(resumenLineas){ resumenLineas.textContent = lineas; }
@@ -559,6 +663,26 @@ document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll("select.producto").forEach(enhanceProductSelect);
     }
 
+    function abrirObservacion(forzar){
+        if(!observacionPanel || !observacionToggle){ return; }
+        const abierto = typeof forzar === "boolean" ? forzar : !observacionPanel.classList.contains("is-open");
+        observacionPanel.classList.toggle("is-open", abierto);
+        observacionToggle.classList.toggle("is-open", abierto);
+        const icono = observacionToggle.querySelector("span:last-child");
+        if(icono){ icono.textContent = abierto ? "−" : "+"; }
+    }
+
+    function inicializarNotas(){
+        document.querySelectorAll(".tabla-row").forEach(row => {
+            const comentario = row.querySelector(".comentario");
+            const panel = row.querySelector(".erp-line-comment-panel");
+            const boton = row.querySelector(".erp-line-note-toggle");
+            const tieneTexto = Boolean((comentario?.value || "").trim());
+            if(panel){ panel.classList.toggle("is-open", tieneTexto); }
+            if(boton){ boton.classList.toggle("is-open", tieneTexto); }
+        });
+    }
+
     if(proveedorSelect){
         proveedorSelect.addEventListener("change", sincronizarProveedor);
     }
@@ -595,6 +719,14 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     if(referenciaInput){
         referenciaInput.addEventListener("input", actualizarResumenCompra);
+    }
+    if(observacionToggle){
+        observacionToggle.addEventListener("click", function(){
+            abrirObservacion();
+        });
+    }
+    if(observacionInput && observacionInput.value.trim()){
+        abrirObservacion(true);
     }
     document.addEventListener("input", function(e){
         if(e.target.classList.contains("cantidad") || e.target.classList.contains("costo")){
@@ -639,6 +771,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if(idField){ idField.remove(); }
         let deleteField = nueva.querySelector("input[name$='-DELETE']");
         if(deleteField){ deleteField.checked = false; }
+        nueva.querySelectorAll(".erp-line-comment-panel").forEach(panel => panel.classList.remove("is-open"));
+        nueva.querySelectorAll(".erp-line-note-toggle").forEach(button => button.classList.remove("is-open"));
+        nueva.querySelectorAll(".erp-line-subtotal-value, .erp-line-monto-value").forEach(box => {
+            box.textContent = formatMoney(0);
+        });
 
         container.appendChild(nueva);
         totalFormsInput.value = document.querySelectorAll(".tabla-row").length;
@@ -649,6 +786,18 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     document.addEventListener("click", function(e){
+        if(e.target.classList.contains("erp-line-note-toggle")){
+            const fila = e.target.closest(".tabla-row");
+            const panel = fila?.querySelector(".erp-line-comment-panel");
+            const abrir = !panel?.classList.contains("is-open");
+            if(panel){ panel.classList.toggle("is-open", abrir); }
+            e.target.classList.toggle("is-open", abrir);
+            if(abrir){
+                const comentario = fila.querySelector(".comentario");
+                if(comentario){ comentario.focus(); }
+            }
+            return;
+        }
         if(e.target.classList.contains("btn-eliminar")){
             const fila = e.target.closest(".tabla-row");
             const deleteField = fila.querySelector("input[name$='-DELETE']");
@@ -675,6 +824,7 @@ document.addEventListener("DOMContentLoaded", function () {
     calcularFechaVencimiento();
     sincronizarProveedor();
     enhanceAllProductSelects();
+    inicializarNotas();
     actualizarResumenCompra();
 });
 </script>
