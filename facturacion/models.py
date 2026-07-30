@@ -811,9 +811,14 @@ class CompraInventario(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero_compra:
-            ultima = CompraInventario.objects.filter(empresa=self.empresa).order_by('-id').first()
+            ultima = CompraInventario.objects.order_by('-id').first()
             siguiente = 1 if not ultima else ultima.id + 1
-            self.numero_compra = f"COM-{str(siguiente).zfill(8)}"
+            while True:
+                numero = f"COM-{str(siguiente).zfill(8)}"
+                if not CompraInventario.objects.filter(numero_compra=numero).exists():
+                    self.numero_compra = numero
+                    break
+                siguiente += 1
         self.full_clean()
         super().save(*args, **kwargs)
 

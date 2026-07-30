@@ -4087,6 +4087,42 @@ class FacturacionTests(TestCase):
         self.assertEqual(compra.fecha_documento, date(2026, 6, 30))
         self.assertEqual(compra.fecha_vencimiento, date(2026, 6, 30))
 
+    def test_primera_compra_de_empresa_no_repite_numero_global(self):
+        otra_empresa = Empresa.objects.create(
+            nombre="Otra Empresa",
+            slug="otra_empresa",
+            rtn="08011999000002",
+        )
+        CompraInventario.objects.create(
+            empresa=otra_empresa,
+            proveedor_nombre="Proveedor Inicial",
+            fecha_documento=date.today(),
+        )
+
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_busqueda": "Proveedor Empresa Actual",
+                "proveedor_nombre": "",
+                "referencia_documento": "FAC-NUM-GLOBAL",
+                "fecha_documento": "30/06/2026",
+                "fecha_vencimiento": "30/06/2026",
+                "estado": "borrador",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "2.00",
+                "lineas_compra-0-costo_unitario": "50.00",
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-NUM-GLOBAL")
+        self.assertNotEqual(compra.numero_compra, "COM-00000001")
+
     def test_crear_compra_sin_proveedor_no_lanza_error_500(self):
         response = self.client.post(
             reverse("crear_compra", args=[self.empresa.slug]),
