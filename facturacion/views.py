@@ -3980,6 +3980,7 @@ def crear_compra(request, empresa_slug):
         post_data.setdefault('condicion_pago', 'contado')
         post_data.setdefault('metodo_pago', 'efectivo')
         post_data.setdefault('dias_credito', '0')
+        proveedor_busqueda = (post_data.get('proveedor_busqueda') or '').strip()
         form = CompraForm(post_data)
         form.fields['estado'].choices = estados_disponibles
         form.fields['proveedor'].queryset = proveedores_qs
@@ -4005,6 +4006,14 @@ def crear_compra(request, empresa_slug):
             if f.is_valid():
                 lineas_validas.append(f)
 
+        if form.is_valid():
+            proveedor = form.cleaned_data.get('proveedor')
+            proveedor_nombre = (form.cleaned_data.get('proveedor_nombre') or proveedor_busqueda or '').strip()
+            if proveedor:
+                proveedor_nombre = proveedor.nombre
+            if not proveedor_nombre:
+                form.add_error('proveedor', 'Seleccione o escriba el proveedor de la compra.')
+
         if form.is_valid() and lineas_validas:
             with transaction.atomic():
                 estado_destino = form.cleaned_data['estado']
@@ -4014,6 +4023,8 @@ def crear_compra(request, empresa_slug):
                     compra.proveedor_nombre = compra.proveedor.nombre
                     if not compra.pk:
                         compra.condicion_pago = compra.condicion_pago or compra.proveedor.condicion_pago
+                else:
+                    compra.proveedor_nombre = proveedor_nombre
                 compra.estado = 'borrador'
                 compra.save()
 
@@ -4111,6 +4122,7 @@ def editar_compra(request, empresa_slug, compra_id):
         post_data.setdefault('condicion_pago', compra.condicion_pago or 'contado')
         post_data.setdefault('metodo_pago', compra.metodo_pago or 'efectivo')
         post_data.setdefault('dias_credito', str(compra.dias_credito or 0))
+        proveedor_busqueda = (post_data.get('proveedor_busqueda') or '').strip()
         form = CompraForm(post_data, instance=compra)
         form.fields['estado'].choices = estados_disponibles
         form.fields['proveedor'].queryset = proveedores_qs
@@ -4135,11 +4147,21 @@ def editar_compra(request, empresa_slug, compra_id):
             if f.is_valid():
                 lineas_validas.append(f)
 
+        if form.is_valid():
+            proveedor = form.cleaned_data.get('proveedor')
+            proveedor_nombre = (form.cleaned_data.get('proveedor_nombre') or proveedor_busqueda or '').strip()
+            if proveedor:
+                proveedor_nombre = proveedor.nombre
+            if not proveedor_nombre:
+                form.add_error('proveedor', 'Seleccione o escriba el proveedor de la compra.')
+
         if form.is_valid() and formset.is_valid() and lineas_validas:
             with transaction.atomic():
                 compra = form.save(commit=False)
                 if compra.proveedor:
                     compra.proveedor_nombre = compra.proveedor.nombre
+                else:
+                    compra.proveedor_nombre = proveedor_nombre
                 compra.estado = 'borrador'
                 compra.save()
                 formset.save()

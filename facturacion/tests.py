@@ -4005,6 +4005,80 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Crear proveedor")
         self.assertContains(response, "Crear producto")
         self.assertContains(response, "Tipo de impuesto")
+        self.assertContains(response, 'name="proveedor_busqueda"', html=False)
+
+    def test_crear_compra_con_proveedor_existente_completa_nombre(self):
+        proveedor = Proveedor.objects.create(empresa=self.empresa, nombre="Proveedor Seleccionado")
+
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor": str(proveedor.id),
+                "proveedor_nombre": "",
+                "referencia_documento": "FAC-PROV-SEL",
+                "fecha_documento": str(date.today()),
+                "estado": "aplicada",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "2.00",
+                "lineas_compra-0-costo_unitario": "50.00",
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-PROV-SEL")
+        self.assertEqual(compra.proveedor, proveedor)
+        self.assertEqual(compra.proveedor_nombre, "Proveedor Seleccionado")
+
+    def test_crear_compra_usa_proveedor_escrito_en_buscador(self):
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_busqueda": "Proveedor Manual Visible",
+                "proveedor_nombre": "",
+                "referencia_documento": "FAC-PROV-MANUAL",
+                "fecha_documento": str(date.today()),
+                "estado": "aplicada",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "2.00",
+                "lineas_compra-0-costo_unitario": "50.00",
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-PROV-MANUAL")
+        self.assertEqual(compra.proveedor_nombre, "Proveedor Manual Visible")
+
+    def test_crear_compra_sin_proveedor_no_lanza_error_500(self):
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_nombre": "",
+                "referencia_documento": "FAC-SIN-PROV",
+                "fecha_documento": str(date.today()),
+                "estado": "aplicada",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "2.00",
+                "lineas_compra-0-costo_unitario": "50.00",
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Seleccione o escriba el proveedor de la compra.")
 
     def test_compra_crea_proveedor_rapido_desde_modal(self):
         response = self.client.post(
