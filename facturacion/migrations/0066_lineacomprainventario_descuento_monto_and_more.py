@@ -23,6 +23,7 @@ def backfill_totales_lineas_compra(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ('facturacion', '0065_comprainventario_metodo_pago_and_more'),
