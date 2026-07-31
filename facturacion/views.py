@@ -4646,6 +4646,55 @@ def ver_compra(request, empresa_slug, compra_id):
 
 
 @login_required
+def descargar_compra_pdf(request, empresa_slug, compra_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    compra = get_object_or_404(
+        CompraInventario.objects.select_related('proveedor').prefetch_related(
+            'lineas__producto',
+            'lineas__impuesto',
+            'pagos_compra',
+        ),
+        id=compra_id,
+        empresa=empresa,
+    )
+
+    lineas = compra.lineas.select_related('producto', 'impuesto').all()
+    pagos = compra.pagos_compra.all()
+    resumen_impuestos = []
+    impuestos_por_nombre = {}
+    for linea in lineas:
+        nombre = linea.impuesto.nombre if linea.impuesto_id else "Exento"
+        impuestos_por_nombre.setdefault(nombre, Decimal("0.00"))
+        impuestos_por_nombre[nombre] += Decimal(linea.impuesto_monto or 0)
+    for nombre, monto in impuestos_por_nombre.items():
+        resumen_impuestos.append({"nombre": nombre, "monto": monto.quantize(Decimal("0.01"))})
+
+    logo_url = _obtener_logo_url(empresa)
+    html_string = render_to_string(
+        "facturacion/compra_pdf.html",
+        {
+            "empresa": empresa,
+            "compra": compra,
+            "lineas": lineas,
+            "pagos": pagos,
+            "resumen_impuestos": resumen_impuestos,
+            "logo_url": logo_url,
+        },
+    )
+
+    pdf_file = HTML(string=html_string, base_url=str(settings.BASE_DIR)).write_pdf()
+    nombre_archivo = _nombre_archivo_pdf(
+        "Compra",
+        compra.numero_compra or f"compra_{compra.id}",
+        compra.proveedor_nombre,
+    )
+
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{nombre_archivo}"'
+    return response
+
+
+@login_required
 def kardex_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     producto_id = request.GET.get("producto")

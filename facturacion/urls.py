@@ -54,6 +54,7 @@ urlpatterns = [
     path('inventario/compras/<int:compra_id>/eliminar-anulada/', views.eliminar_compra_anulada, name='eliminar_compra_anulada'),
     path('inventario/compras/<int:compra_id>/pago/', views.registrar_pago_compra, name='registrar_pago_compra'),
     path('inventario/compras/<int:compra_id>/pago/<int:pago_id>/revertir/', views.revertir_pago_compra, name='revertir_pago_compra'),
+    path('inventario/compras/<int:compra_id>/pdf/', views.descargar_compra_pdf, name='descargar_compra_pdf'),
     path('inventario/compras/<int:compra_id>/', views.ver_compra, name='ver_compra'),
     path('libro-compras/', views.libro_compras_fiscal, name='libro_compras_fiscal'),
     path('libro-compras/importar/', views.importar_libro_compras_fiscal, name='importar_libro_compras_fiscal'),

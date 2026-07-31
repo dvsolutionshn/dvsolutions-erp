@@ -7,6 +7,7 @@
 {% block header_description %}Lectura simplificada del documento de compra, sus pagos y su impacto en inventario en una sola vista documental.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Volver a Compras</a>
+<a class="erp-action-link" href="{% url 'descargar_compra_pdf' empresa.slug compra.id %}" target="_blank" rel="noopener">Ver PDF</a>
 {% if compra.estado == "borrador" %}
 <a class="erp-action-link" href="{% url 'editar_compra' empresa.slug compra.id %}">Editar Compra</a>
 <form method="post" action="{% url 'aplicar_compra' empresa.slug compra.id %}" style="display:inline;">{% csrf_token %}<button class="erp-action-link" type="submit" onclick="return confirm('Seguro que deseas aplicar esta compra al inventario?');">Aplicar Compra</button></form>

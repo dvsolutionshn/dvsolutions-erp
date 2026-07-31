@@ -6291,6 +6291,25 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Registrar Pago")
 
+    def test_ver_compra_muestra_boton_pdf(self):
+        compra = self.crear_compra_con_linea()
+
+        response = self.client.get(reverse("ver_compra", args=[self.empresa.slug, compra.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ver PDF")
+        self.assertContains(response, reverse("descargar_compra_pdf", args=[self.empresa.slug, compra.id]))
+
+    def test_descargar_compra_pdf(self):
+        compra = self.crear_compra_con_linea()
+
+        response = self.client.get(reverse("descargar_compra_pdf", args=[self.empresa.slug, compra.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("inline", response["Content-Disposition"])
+        self.assertGreater(len(response.content), 1000)
+
     def test_revertir_pago_compra_elimina_comprobante_y_restaurar_saldo(self):
         compra = self.crear_compra_con_linea()
         pago = PagoCompra.objects.create(
