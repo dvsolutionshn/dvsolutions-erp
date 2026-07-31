@@ -4307,6 +4307,37 @@ class FacturacionTests(TestCase):
         self.assertEqual(pago.metodo, "efectivo")
         self.assertEqual(pago.cuenta_financiera, cuenta)
 
+    def test_crear_compra_credito_aplicada_no_exige_pago_automatico(self):
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_nombre": "Proveedor Credito",
+                "referencia_documento": "FAC-CREDITO-001",
+                "fecha_documento": str(date.today()),
+                "condicion_pago": "credito",
+                "dias_credito": "30",
+                "observacion": "Compra al credito",
+                "estado": "aplicada",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "1.00",
+                "lineas_compra-0-costo_unitario": "250.00",
+                "lineas_compra-0-descuento_porcentaje": "0",
+                "lineas_compra-0-impuesto": "",
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-CREDITO-001")
+        self.assertEqual(compra.estado, "aplicada")
+        self.assertEqual(compra.estado_pago, "pendiente")
+        self.assertEqual(compra.saldo_pendiente, Decimal("250.00"))
+        self.assertFalse(PagoCompra.objects.filter(compra=compra).exists())
+
     def test_crear_compra_aplicada_no_falla_si_asiento_contable_tiene_error(self):
         with patch("facturacion.views.registrar_asiento_compra_aplicada", side_effect=ValidationError("Cuenta contable invalida")):
             response = self.client.post(

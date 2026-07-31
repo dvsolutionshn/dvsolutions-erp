@@ -2530,9 +2530,9 @@ def _configurar_compra_form(form, empresa, estados_disponibles, proveedores_qs, 
 
 def _registrar_pago_contado_compra_si_aplica(compra, usuario=None):
     if compra.condicion_pago != 'contado' or compra.estado != 'aplicada':
-        return None
+        return None, None
     if compra.total_documento <= 0 or compra.saldo_pendiente <= 0:
-        return None
+        return None, None
     if not compra.cuenta_financiera_pago_id:
         raise ValidationError({'cuenta_financiera_pago': 'Seleccione la cuenta financiera para cancelar la compra de contado.'})
 
@@ -2545,8 +2545,16 @@ def _registrar_pago_contado_compra_si_aplica(compra, usuario=None):
         referencia=compra.referencia_documento or compra.numero_compra or f"Compra {compra.id}",
         observacion="Pago automático por compra de contado.",
     )
-    registrar_asiento_pago_proveedor(pago)
-    return pago
+    try:
+        registrar_asiento_pago_proveedor(pago)
+    except Exception as exc:
+        logger.exception(
+            "No se pudo registrar el asiento contable automatico del pago de compra %s en empresa %s.",
+            pago.id,
+            compra.empresa_id,
+        )
+        return pago, exc
+    return pago, None
 
 
 def _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs):
@@ -4121,6 +4129,7 @@ def crear_compra(request, empresa_slug):
 
         if form.is_valid() and lineas_validas:
             error_asiento = None
+            error_pago = None
             try:
                 with transaction.atomic():
                     estado_destino = form.cleaned_data['estado']
@@ -4148,7 +4157,7 @@ def crear_compra(request, empresa_slug):
                         compra.save(update_fields=['estado'])
                         error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
                         if compra.condicion_pago == 'contado':
-                            _registrar_pago_contado_compra_si_aplica(compra, request.user)
+                            _pago_contado, error_pago = _registrar_pago_contado_compra_si_aplica(compra, request.user)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
                     for campo, errores in exc.message_dict.items():
@@ -4156,10 +4165,18 @@ def crear_compra(request, empresa_slug):
                             form.add_error(campo if campo in form.fields else None, error)
                 else:
                     form.add_error(None, exc.messages[0] if exc.messages else "No se pudo guardar la compra.")
+            except Exception as exc:
+                logger.exception(
+                    "No se pudo guardar la compra de inventario en empresa %s.",
+                    empresa.id,
+                )
+                form.add_error(None, "No se pudo guardar la compra. Revise proveedor, productos, impuestos y cuenta financiera; si persiste, contacte al administrador DV Solutions.")
             else:
                 messages.success(request, "Compra guardada correctamente.")
                 if error_asiento:
                     messages.warning(request, "La compra se guardo y el inventario fue actualizado, pero no se pudo crear el asiento contable automatico. Revise la configuracion contable de la empresa.")
+                if error_pago:
+                    messages.warning(request, "La compra de contado quedo pagada, pero no se pudo crear el asiento contable del pago. Revise la cuenta financiera y la configuracion contable.")
                 return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
         elif form.is_valid():
             messages.error(request, "Debe agregar al menos una linea valida en la compra.")
@@ -4367,17 +4384,32 @@ def aplicar_compra(request, empresa_slug, compra_id):
         return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
 
     error_asiento = None
-    with transaction.atomic():
-        _aplicar_compra_documento(compra)
-        compra.estado = 'aplicada'
-        compra.save(update_fields=['estado'])
-        error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
-        if compra.condicion_pago == 'contado' and compra.cuenta_financiera_pago_id:
-            _registrar_pago_contado_compra_si_aplica(compra, request.user)
+    error_pago = None
+    try:
+        with transaction.atomic():
+            _aplicar_compra_documento(compra)
+            compra.estado = 'aplicada'
+            compra.save(update_fields=['estado'])
+            error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
+            if compra.condicion_pago == 'contado':
+                if not compra.cuenta_financiera_pago_id:
+                    messages.error(request, "Seleccione una cuenta financiera antes de aplicar una compra de contado.")
+                    return redirect("editar_compra", empresa_slug=empresa.slug, compra_id=compra.id)
+                _pago_contado, error_pago = _registrar_pago_contado_compra_si_aplica(compra, request.user)
+    except Exception:
+        logger.exception(
+            "No se pudo aplicar la compra %s en empresa %s.",
+            compra.id,
+            empresa.id,
+        )
+        messages.error(request, "No se pudo aplicar la compra. Revise productos, impuestos y cuenta financiera; si persiste, contacte al administrador DV Solutions.")
+        return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
 
     messages.success(request, "Compra aplicada correctamente e inventario actualizado.")
     if error_asiento:
         messages.warning(request, "La compra fue aplicada, pero no se pudo crear el asiento contable automatico. Revise la configuracion contable de la empresa.")
+    if error_pago:
+        messages.warning(request, "La compra de contado quedo pagada, pero no se pudo crear el asiento contable del pago. Revise la cuenta financiera y la configuracion contable.")
     return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
 
 

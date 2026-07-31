@@ -181,6 +181,26 @@
 .erp-observation-panel.is-open{
     display:block;
 }
+.erp-payment-account{
+    grid-column:1 / -1;
+    padding:14px 16px;
+    border:1px solid #b7d7f0;
+    border-radius:16px;
+    background:linear-gradient(135deg,#f8fcff 0%,#eefdfa 100%);
+}
+.erp-payment-account label{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.erp-payment-account label::before{
+    content:"";
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    background:linear-gradient(135deg,#10b8ad,#2576e8);
+    box-shadow:0 0 0 5px rgba(16,184,173,.12);
+}
 .erp-line-note-toggle{
     width:42px;
     height:42px;
@@ -382,7 +402,7 @@
                         {% if form.condicion_pago.errors %}<ul class="erp-field-errors">{% for error in form.condicion_pago.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
                     </div>
 
-                    <div class="erp-field" data-payment-when="contado">
+                    <div class="erp-field erp-payment-account" data-payment-when="contado">
                         <label for="{{ form.metodo_pago.id_for_label }}">Cómo se realizó el pago</label>
                         {{ form.metodo_pago }}
                         <p class="erp-field-help">Método usado para pagar esta compra.</p>
