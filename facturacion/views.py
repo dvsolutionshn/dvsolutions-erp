@@ -2512,6 +2512,43 @@ def _configurar_fechas_compra_form(form):
     return form
 
 
+def _configurar_compra_form(form, empresa, estados_disponibles, proveedores_qs, cuentas_financieras):
+    form.instance.empresa = empresa
+    _configurar_fechas_compra_form(form)
+    form.fields['estado'].choices = estados_disponibles
+    form.fields['proveedor'].queryset = proveedores_qs
+    form.fields['proveedor_nombre'].required = False
+    form.fields['fecha_vencimiento'].required = False
+    if 'cuenta_financiera_pago' in form.fields:
+        form.fields['cuenta_financiera_pago'].queryset = cuentas_financieras
+        form.fields['cuenta_financiera_pago'].required = False
+        form.fields['cuenta_financiera_pago'].label = "Cuenta financiera"
+        form.fields['cuenta_financiera_pago'].empty_label = "Seleccione caja, banco o tarjeta"
+        form.fields['cuenta_financiera_pago'].widget.attrs.update({"class": "erp-select-search"})
+    return form
+
+
+def _registrar_pago_contado_compra_si_aplica(compra, usuario=None):
+    if compra.condicion_pago != 'contado' or compra.estado != 'aplicada':
+        return None
+    if compra.total_documento <= 0 or compra.saldo_pendiente <= 0:
+        return None
+    if not compra.cuenta_financiera_pago_id:
+        raise ValidationError({'cuenta_financiera_pago': 'Seleccione la cuenta financiera para cancelar la compra de contado.'})
+
+    pago = PagoCompra.objects.create(
+        compra=compra,
+        fecha=compra.fecha_documento or timezone.now().date(),
+        monto=compra.saldo_pendiente,
+        metodo=compra.metodo_pago or 'efectivo',
+        cuenta_financiera=compra.cuenta_financiera_pago,
+        referencia=compra.referencia_documento or compra.numero_compra or f"Compra {compra.id}",
+        observacion="Pago automático por compra de contado.",
+    )
+    registrar_asiento_pago_proveedor(pago)
+    return pago
+
+
 def _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs):
     for f in formset.forms:
         f.fields['producto'].queryset = productos_qs
@@ -4000,6 +4037,7 @@ def crear_compra(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     estados_disponibles = [estado for estado in CompraInventario.ESTADOS if estado[0] != 'anulada']
     proveedores_qs = Proveedor.objects.filter(empresa=empresa, activo=True).order_by('nombre')
+    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
 
     CompraForm = modelform_factory(
         CompraInventario,
@@ -4010,6 +4048,7 @@ def crear_compra(request, empresa_slug):
             'fecha_documento',
             'condicion_pago',
             'metodo_pago',
+            'cuenta_financiera_pago',
             'dias_credito',
             'fecha_vencimiento',
             'observacion',
@@ -4036,13 +4075,16 @@ def crear_compra(request, empresa_slug):
         post_data.setdefault('condicion_pago', 'contado')
         post_data.setdefault('metodo_pago', 'efectivo')
         post_data.setdefault('dias_credito', '0')
+        if post_data.get('condicion_pago') == 'contado' and not post_data.get('cuenta_financiera_pago'):
+            cuenta_defecto = _cuenta_financiera_por_defecto(
+                cuentas_financieras,
+                post_data.get('metodo_pago') or "efectivo",
+            )
+            if cuenta_defecto:
+                post_data['cuenta_financiera_pago'] = str(cuenta_defecto.id)
         proveedor_busqueda = (post_data.get('proveedor_busqueda') or '').strip()
         form = CompraForm(post_data)
-        _configurar_fechas_compra_form(form)
-        form.fields['estado'].choices = estados_disponibles
-        form.fields['proveedor'].queryset = proveedores_qs
-        form.fields['proveedor_nombre'].required = False
-        form.fields['fecha_vencimiento'].required = False
+        _configurar_compra_form(form, empresa, estados_disponibles, proveedores_qs, cuentas_financieras)
         compra_temp = CompraInventario(empresa=empresa)
         formset = LineaFormSet(post_data, instance=compra_temp, prefix='lineas_compra')
         _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
@@ -4070,48 +4112,63 @@ def crear_compra(request, empresa_slug):
                 proveedor_nombre = proveedor.nombre
             if not proveedor_nombre:
                 form.add_error('proveedor', 'Seleccione o escriba el proveedor de la compra.')
+            if (
+                form.cleaned_data.get('condicion_pago') == 'contado'
+                and form.cleaned_data.get('estado') == 'aplicada'
+                and not form.cleaned_data.get('cuenta_financiera_pago')
+            ):
+                form.add_error('cuenta_financiera_pago', 'Seleccione la cuenta financiera para cancelar esta compra de contado.')
 
         if form.is_valid() and lineas_validas:
             error_asiento = None
-            with transaction.atomic():
-                estado_destino = form.cleaned_data['estado']
-                compra = form.save(commit=False)
-                compra.empresa = empresa
-                if compra.proveedor:
-                    compra.proveedor_nombre = compra.proveedor.nombre
-                    if not compra.pk:
-                        compra.condicion_pago = compra.condicion_pago or compra.proveedor.condicion_pago
+            try:
+                with transaction.atomic():
+                    estado_destino = form.cleaned_data['estado']
+                    compra = form.save(commit=False)
+                    compra.empresa = empresa
+                    if compra.proveedor:
+                        compra.proveedor_nombre = compra.proveedor.nombre
+                        if not compra.pk:
+                            compra.condicion_pago = compra.condicion_pago or compra.proveedor.condicion_pago
+                    else:
+                        compra.proveedor_nombre = proveedor_nombre
+                    compra.estado = 'borrador'
+                    compra.save()
+
+                    for f in lineas_validas:
+                        linea = f.save(commit=False)
+                        linea.compra = compra
+                        if not linea.impuesto_id and linea.producto_id and linea.producto.impuesto_predeterminado_id:
+                            linea.impuesto = linea.producto.impuesto_predeterminado
+                        linea.save()
+
+                    if estado_destino == 'aplicada':
+                        _aplicar_compra_documento(compra)
+                        compra.estado = 'aplicada'
+                        compra.save(update_fields=['estado'])
+                        error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
+                        if compra.condicion_pago == 'contado':
+                            _registrar_pago_contado_compra_si_aplica(compra, request.user)
+            except ValidationError as exc:
+                if hasattr(exc, "message_dict"):
+                    for campo, errores in exc.message_dict.items():
+                        for error in errores:
+                            form.add_error(campo if campo in form.fields else None, error)
                 else:
-                    compra.proveedor_nombre = proveedor_nombre
-                compra.estado = 'borrador'
-                compra.save()
-
-                for f in lineas_validas:
-                    linea = f.save(commit=False)
-                    linea.compra = compra
-                    if not linea.impuesto_id and linea.producto_id and linea.producto.impuesto_predeterminado_id:
-                        linea.impuesto = linea.producto.impuesto_predeterminado
-                    linea.save()
-
-                if estado_destino == 'aplicada':
-                    _aplicar_compra_documento(compra)
-                    compra.estado = 'aplicada'
-                    compra.save(update_fields=['estado'])
-                    error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
-
-            messages.success(request, "Compra guardada correctamente.")
-            if error_asiento:
-                messages.warning(request, "La compra se guardo y el inventario fue actualizado, pero no se pudo crear el asiento contable automatico. Revise la configuracion contable de la empresa.")
-            return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
+                    form.add_error(None, exc.messages[0] if exc.messages else "No se pudo guardar la compra.")
+            else:
+                messages.success(request, "Compra guardada correctamente.")
+                if error_asiento:
+                    messages.warning(request, "La compra se guardo y el inventario fue actualizado, pero no se pudo crear el asiento contable automatico. Revise la configuracion contable de la empresa.")
+                return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
         elif form.is_valid():
             messages.error(request, "Debe agregar al menos una linea valida en la compra.")
     else:
         form = CompraForm()
-        _configurar_fechas_compra_form(form)
-        form.fields['estado'].choices = estados_disponibles
-        form.fields['proveedor'].queryset = proveedores_qs
-        form.fields['proveedor_nombre'].required = False
-        form.fields['fecha_vencimiento'].required = False
+        _configurar_compra_form(form, empresa, estados_disponibles, proveedores_qs, cuentas_financieras)
+        cuenta_defecto = _cuenta_financiera_por_defecto(cuentas_financieras, "efectivo")
+        if cuenta_defecto:
+            form.fields['cuenta_financiera_pago'].initial = cuenta_defecto.id
         formset = LineaFormSet(prefix='lineas_compra')
         _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
@@ -4122,6 +4179,7 @@ def crear_compra(request, empresa_slug):
         "productos": productos_qs,
         "impuestos": impuestos_qs,
         "proveedores": proveedores_qs,
+        "cuentas_financieras": cuentas_financieras,
         "proveedores_sugeridos": proveedores_qs.values_list('nombre', flat=True).distinct(),
         "proveedores_config": {
             str(proveedor.id): {
@@ -4151,6 +4209,7 @@ def editar_compra(request, empresa_slug, compra_id):
     compra = get_object_or_404(CompraInventario, id=compra_id, empresa=empresa)
     estados_disponibles = [estado for estado in CompraInventario.ESTADOS if estado[0] != 'anulada']
     proveedores_qs = Proveedor.objects.filter(empresa=empresa, activo=True).order_by('nombre')
+    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
 
     if compra.estado == 'anulada':
         messages.error(request, "No se puede editar una compra anulada.")
@@ -4169,6 +4228,7 @@ def editar_compra(request, empresa_slug, compra_id):
             'fecha_documento',
             'condicion_pago',
             'metodo_pago',
+            'cuenta_financiera_pago',
             'dias_credito',
             'fecha_vencimiento',
             'observacion',
@@ -4195,13 +4255,16 @@ def editar_compra(request, empresa_slug, compra_id):
         post_data.setdefault('condicion_pago', compra.condicion_pago or 'contado')
         post_data.setdefault('metodo_pago', compra.metodo_pago or 'efectivo')
         post_data.setdefault('dias_credito', str(compra.dias_credito or 0))
+        if post_data.get('condicion_pago') == 'contado' and not post_data.get('cuenta_financiera_pago'):
+            cuenta_defecto = _cuenta_financiera_por_defecto(
+                cuentas_financieras,
+                post_data.get('metodo_pago') or "efectivo",
+            )
+            if cuenta_defecto:
+                post_data['cuenta_financiera_pago'] = str(cuenta_defecto.id)
         proveedor_busqueda = (post_data.get('proveedor_busqueda') or '').strip()
         form = CompraForm(post_data, instance=compra)
-        _configurar_fechas_compra_form(form)
-        form.fields['estado'].choices = estados_disponibles
-        form.fields['proveedor'].queryset = proveedores_qs
-        form.fields['proveedor_nombre'].required = False
-        form.fields['fecha_vencimiento'].required = False
+        _configurar_compra_form(form, empresa, estados_disponibles, proveedores_qs, cuentas_financieras)
         formset = LineaFormSet(post_data, instance=compra, prefix='lineas_compra')
         _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
@@ -4249,11 +4312,7 @@ def editar_compra(request, empresa_slug, compra_id):
             messages.error(request, "Debe agregar al menos una linea valida en la compra.")
     else:
         form = CompraForm(instance=compra)
-        _configurar_fechas_compra_form(form)
-        form.fields['estado'].choices = estados_disponibles
-        form.fields['proveedor'].queryset = proveedores_qs
-        form.fields['proveedor_nombre'].required = False
-        form.fields['fecha_vencimiento'].required = False
+        _configurar_compra_form(form, empresa, estados_disponibles, proveedores_qs, cuentas_financieras)
         formset = LineaFormSet(instance=compra, prefix='lineas_compra')
         _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
@@ -4264,6 +4323,7 @@ def editar_compra(request, empresa_slug, compra_id):
         "productos": productos_qs,
         "impuestos": impuestos_qs,
         "proveedores": proveedores_qs,
+        "cuentas_financieras": cuentas_financieras,
         "proveedores_sugeridos": proveedores_qs.values_list('nombre', flat=True).distinct(),
         "proveedores_config": {
             str(proveedor.id): {
@@ -4312,6 +4372,8 @@ def aplicar_compra(request, empresa_slug, compra_id):
         compra.estado = 'aplicada'
         compra.save(update_fields=['estado'])
         error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
+        if compra.condicion_pago == 'contado' and compra.cuenta_financiera_pago_id:
+            _registrar_pago_contado_compra_si_aplica(compra, request.user)
 
     messages.success(request, "Compra aplicada correctamente e inventario actualizado.")
     if error_asiento:

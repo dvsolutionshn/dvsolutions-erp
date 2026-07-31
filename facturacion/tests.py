@@ -4260,6 +4260,53 @@ class FacturacionTests(TestCase):
             ).exists()
         )
 
+    def test_crear_compra_contado_aplicada_registra_pago_automatico(self):
+        cuenta = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Caja Compras",
+            tipo="caja",
+            cuenta_contable=CuentaContable.objects.create(
+                empresa=self.empresa,
+                codigo="110101",
+                nombre="Caja Compras",
+                tipo="activo",
+            ),
+        )
+
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_nombre": "Proveedor Contado",
+                "referencia_documento": "FAC-CONTADO-001",
+                "fecha_documento": str(date.today()),
+                "condicion_pago": "contado",
+                "metodo_pago": "efectivo",
+                "cuenta_financiera_pago": str(cuenta.id),
+                "observacion": "Compra pagada al momento",
+                "estado": "aplicada",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "2.00",
+                "lineas_compra-0-costo_unitario": "100.00",
+                "lineas_compra-0-descuento_porcentaje": "0",
+                "lineas_compra-0-impuesto": str(self.impuesto.id),
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-CONTADO-001")
+        pago = PagoCompra.objects.get(compra=compra)
+        self.assertEqual(compra.estado, "aplicada")
+        self.assertEqual(compra.estado_pago, "pagado")
+        self.assertEqual(compra.saldo_pendiente, Decimal("0.00"))
+        self.assertEqual(pago.monto, compra.total_documento)
+        self.assertEqual(pago.metodo, "efectivo")
+        self.assertEqual(pago.cuenta_financiera, cuenta)
+
     def test_crear_compra_aplicada_no_falla_si_asiento_contable_tiene_error(self):
         with patch("facturacion.views.registrar_asiento_compra_aplicada", side_effect=ValidationError("Cuenta contable invalida")):
             response = self.client.post(

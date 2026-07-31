@@ -791,6 +791,13 @@ class CompraInventario(models.Model):
     fecha_documento = models.DateField(default=timezone.now)
     condicion_pago = models.CharField(max_length=20, choices=CONDICIONES_PAGO, default='contado')
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
+    cuenta_financiera_pago = models.ForeignKey(
+        'contabilidad.CuentaFinanciera',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='compras_contado',
+    )
     dias_credito = models.PositiveIntegerField(default=0)
     fecha_vencimiento = models.DateField(blank=True, null=True)
     observacion = models.TextField(blank=True, null=True)
@@ -808,6 +815,10 @@ class CompraInventario(models.Model):
                 self.fecha_vencimiento = self.fecha_documento
         elif self.fecha_documento and self.fecha_vencimiento is None:
             self.fecha_vencimiento = self.fecha_documento + timedelta(days=self.dias_credito or 0)
+        if self.cuenta_financiera_pago_id and self.cuenta_financiera_pago.empresa_id != self.empresa_id:
+            raise ValidationError({
+                'cuenta_financiera_pago': 'La cuenta financiera debe pertenecer a la misma empresa de la compra.'
+            })
 
     def save(self, *args, **kwargs):
         if not self.numero_compra:

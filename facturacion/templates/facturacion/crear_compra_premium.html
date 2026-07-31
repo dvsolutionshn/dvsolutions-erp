@@ -382,11 +382,18 @@
                         {% if form.condicion_pago.errors %}<ul class="erp-field-errors">{% for error in form.condicion_pago.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
                     </div>
 
-                    <div class="erp-field">
+                    <div class="erp-field" data-payment-when="contado">
                         <label for="{{ form.metodo_pago.id_for_label }}">Cómo se realizó el pago</label>
                         {{ form.metodo_pago }}
                         <p class="erp-field-help">Método usado para pagar esta compra.</p>
                         {% if form.metodo_pago.errors %}<ul class="erp-field-errors">{% for error in form.metodo_pago.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                    </div>
+
+                    <div class="erp-field" data-payment-when="contado">
+                        {{ form.cuenta_financiera_pago.label_tag }}
+                        {{ form.cuenta_financiera_pago }}
+                        <p class="erp-field-help">Caja, banco o tarjeta desde donde salió el pago.</p>
+                        {% if form.cuenta_financiera_pago.errors %}<ul class="erp-field-errors">{% for error in form.cuenta_financiera_pago.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
                     </div>
 
                     <div class="erp-field">
@@ -623,6 +630,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const referenciaInput = document.getElementById("id_referencia_documento");
     const condicionPagoInput = document.getElementById("id_condicion_pago");
     const metodoPagoInput = document.getElementById("id_metodo_pago");
+    const cuentaPagoInput = document.getElementById("id_cuenta_financiera_pago");
     const diasCreditoInput = document.getElementById("id_dias_credito");
     const fechaDocumentoInput = document.getElementById("id_fecha_documento");
     const fechaVencimientoInput = document.getElementById("id_fecha_vencimiento");
@@ -855,6 +863,20 @@ document.addEventListener("DOMContentLoaded", function () {
         fechaVencimientoInput.value = sumarDias(fechaDocumentoInput.value, isNaN(dias) ? 0 : dias);
     }
 
+    function actualizarCamposPago(){
+        const esContado = !condicionPagoInput || condicionPagoInput.value === "contado";
+        document.querySelectorAll("[data-payment-when='contado']").forEach(field => {
+            field.style.display = esContado ? "" : "none";
+        });
+        if(cuentaPagoInput){
+            cuentaPagoInput.required = esContado;
+            cuentaPagoInput.disabled = !esContado;
+        }
+        if(metodoPagoInput){
+            metodoPagoInput.disabled = !esContado;
+        }
+    }
+
     function actualizarResumenCompra(){
         if(resumenProveedor){
             resumenProveedor.textContent = proveedorNombreInput.value || "Sin seleccionar";
@@ -1068,7 +1090,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
     if(condicionPagoInput){
-        condicionPagoInput.addEventListener("change", function(){ calcularFechaVencimiento(); actualizarResumenCompra(); });
+        condicionPagoInput.addEventListener("change", function(){ calcularFechaVencimiento(); actualizarCamposPago(); actualizarResumenCompra(); });
     }
     if(metodoPagoInput){
         metodoPagoInput.addEventListener("change", actualizarResumenCompra);
@@ -1245,6 +1267,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     calcularFechaVencimiento();
+    actualizarCamposPago();
     sincronizarProveedor();
     enhanceAllProductSelects();
     inicializarNotas();
