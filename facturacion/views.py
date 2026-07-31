@@ -1670,6 +1670,7 @@ def _pos_producto_payload(producto, impuesto_default=None):
         "codigo": producto.codigo or "",
         "foto_url": producto.foto.url if producto.foto else "",
         "precio": float(producto.precio or Decimal("0.00")),
+        "impuesto_id": impuesto.id if impuesto else "",
         "impuesto": float(impuesto.porcentaje if impuesto else Decimal("0.00")),
         "stock": float(producto.stock_actual),
         "unidad": producto.get_unidad_medida_display(),
@@ -2509,6 +2510,32 @@ def _configurar_fechas_compra_form(form):
             },
         )
     return form
+
+
+def _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs):
+    for f in formset.forms:
+        f.fields['producto'].queryset = productos_qs
+        f.fields['impuesto'].queryset = impuestos_qs
+        f.fields['impuesto'].required = False
+        f.fields['descuento_porcentaje'].required = False
+        f.fields['descuento_porcentaje'].initial = 0
+        f.fields['cantidad'].widget.attrs.update({
+            "step": "0.01",
+            "min": "0",
+            "inputmode": "decimal",
+        })
+        f.fields['costo_unitario'].widget.attrs.update({
+            "step": "0.0001",
+            "min": "0",
+            "inputmode": "decimal",
+        })
+        f.fields['descuento_porcentaje'].widget.attrs.update({
+            "step": "0.01",
+            "min": "0",
+            "max": "100",
+            "inputmode": "decimal",
+        })
+    return formset
 
 
 def _validar_stock_disponible_para_lineas(lineas):
@@ -3992,7 +4019,7 @@ def crear_compra(request, empresa_slug):
     LineaFormSet = inlineformset_factory(
         CompraInventario,
         LineaCompraInventario,
-        fields=['producto', 'cantidad', 'costo_unitario', 'comentario'],
+        fields=['producto', 'cantidad', 'costo_unitario', 'descuento_porcentaje', 'comentario', 'impuesto'],
         extra=1,
         can_delete=True
     )
@@ -4018,9 +4045,7 @@ def crear_compra(request, empresa_slug):
         form.fields['fecha_vencimiento'].required = False
         compra_temp = CompraInventario(empresa=empresa)
         formset = LineaFormSet(post_data, instance=compra_temp, prefix='lineas_compra')
-
-        for f in formset.forms:
-            f.fields['producto'].queryset = productos_qs
+        _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
         lineas_validas = []
         for f in formset.forms:
@@ -4028,9 +4053,11 @@ def crear_compra(request, empresa_slug):
             producto_raw = (request.POST.get(f"{prefix}-producto") or "").strip()
             cantidad_raw = (request.POST.get(f"{prefix}-cantidad") or "").strip()
             costo_raw = (request.POST.get(f"{prefix}-costo_unitario") or "").strip()
+            descuento_raw = (request.POST.get(f"{prefix}-descuento_porcentaje") or "").strip()
+            impuesto_raw = (request.POST.get(f"{prefix}-impuesto") or "").strip()
             comentario_raw = (request.POST.get(f"{prefix}-comentario") or "").strip()
             delete_raw = request.POST.get(f"{prefix}-DELETE")
-            fila_vacia = not producto_raw and not cantidad_raw and not costo_raw and not comentario_raw
+            fila_vacia = not producto_raw and not cantidad_raw and not costo_raw and not descuento_raw and not impuesto_raw and not comentario_raw
             if delete_raw or fila_vacia:
                 continue
             if f.is_valid():
@@ -4062,6 +4089,8 @@ def crear_compra(request, empresa_slug):
                 for f in lineas_validas:
                     linea = f.save(commit=False)
                     linea.compra = compra
+                    if not linea.impuesto_id and linea.producto_id and linea.producto.impuesto_predeterminado_id:
+                        linea.impuesto = linea.producto.impuesto_predeterminado
                     linea.save()
 
                 if estado_destino == 'aplicada':
@@ -4084,8 +4113,7 @@ def crear_compra(request, empresa_slug):
         form.fields['proveedor_nombre'].required = False
         form.fields['fecha_vencimiento'].required = False
         formset = LineaFormSet(prefix='lineas_compra')
-        for f in formset:
-            f.fields['producto'].queryset = productos_qs
+        _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
     return render(request, "facturacion/crear_compra_premium.html", {
         "empresa": empresa,
@@ -4102,6 +4130,17 @@ def crear_compra(request, empresa_slug):
             }
             for proveedor in proveedores_qs
         },
+        "impuestos_payload": [
+            {"id": impuesto.id, "porcentaje": str(impuesto.porcentaje)}
+            for impuesto in impuestos_qs
+        ],
+        "productos_payload": [
+            {
+                "id": producto.id,
+                "impuesto_id": producto.impuesto_predeterminado_id or "",
+            }
+            for producto in productos_qs
+        ],
         "modo_edicion": False,
     })
 
@@ -4139,7 +4178,7 @@ def editar_compra(request, empresa_slug, compra_id):
     LineaFormSet = inlineformset_factory(
         CompraInventario,
         LineaCompraInventario,
-        fields=['producto', 'cantidad', 'costo_unitario', 'comentario'],
+        fields=['producto', 'cantidad', 'costo_unitario', 'descuento_porcentaje', 'comentario', 'impuesto'],
         extra=0,
         can_delete=True
     )
@@ -4164,9 +4203,7 @@ def editar_compra(request, empresa_slug, compra_id):
         form.fields['proveedor_nombre'].required = False
         form.fields['fecha_vencimiento'].required = False
         formset = LineaFormSet(post_data, instance=compra, prefix='lineas_compra')
-
-        for f in formset.forms:
-            f.fields['producto'].queryset = productos_qs
+        _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
         lineas_validas = []
         for f in formset.forms:
@@ -4174,9 +4211,11 @@ def editar_compra(request, empresa_slug, compra_id):
             producto_raw = (request.POST.get(f"{prefix}-producto") or "").strip()
             cantidad_raw = (request.POST.get(f"{prefix}-cantidad") or "").strip()
             costo_raw = (request.POST.get(f"{prefix}-costo_unitario") or "").strip()
+            descuento_raw = (request.POST.get(f"{prefix}-descuento_porcentaje") or "").strip()
+            impuesto_raw = (request.POST.get(f"{prefix}-impuesto") or "").strip()
             comentario_raw = (request.POST.get(f"{prefix}-comentario") or "").strip()
             delete_raw = request.POST.get(f"{prefix}-DELETE")
-            fila_vacia = not producto_raw and not cantidad_raw and not costo_raw and not comentario_raw
+            fila_vacia = not producto_raw and not cantidad_raw and not costo_raw and not descuento_raw and not impuesto_raw and not comentario_raw
             if delete_raw or fila_vacia:
                 continue
             if f.is_valid():
@@ -4200,6 +4239,10 @@ def editar_compra(request, empresa_slug, compra_id):
                 compra.estado = 'borrador'
                 compra.save()
                 formset.save()
+                for linea in compra.lineas.select_related('producto').filter(impuesto__isnull=True):
+                    if linea.producto_id and linea.producto.impuesto_predeterminado_id:
+                        linea.impuesto = linea.producto.impuesto_predeterminado
+                        linea.save(update_fields=["impuesto", "descuento_monto", "subtotal", "impuesto_monto"])
             messages.success(request, "Compra actualizada correctamente.")
             return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
         elif form.is_valid() and formset.is_valid():
@@ -4212,8 +4255,7 @@ def editar_compra(request, empresa_slug, compra_id):
         form.fields['proveedor_nombre'].required = False
         form.fields['fecha_vencimiento'].required = False
         formset = LineaFormSet(instance=compra, prefix='lineas_compra')
-        for f in formset:
-            f.fields['producto'].queryset = productos_qs
+        _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs)
 
     return render(request, "facturacion/crear_compra_premium.html", {
         "empresa": empresa,
@@ -4230,6 +4272,17 @@ def editar_compra(request, empresa_slug, compra_id):
             }
             for proveedor in proveedores_qs
         },
+        "impuestos_payload": [
+            {"id": impuesto.id, "porcentaje": str(impuesto.porcentaje)}
+            for impuesto in impuestos_qs
+        ],
+        "productos_payload": [
+            {
+                "id": producto.id,
+                "impuesto_id": producto.impuesto_predeterminado_id or "",
+            }
+            for producto in productos_qs
+        ],
         "modo_edicion": True,
         "compra": compra,
     })

@@ -970,12 +970,35 @@ class LineaCompraInventario(models.Model):
     )
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
-    costo_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+    costo_unitario = models.DecimalField(max_digits=12, decimal_places=4)
+    descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    descuento_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    impuesto = models.ForeignKey(TipoImpuesto, on_delete=models.PROTECT, null=True, blank=True)
+    impuesto_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     comentario = models.CharField(max_length=150, blank=True, null=True)
+
+    def calcular_totales(self):
+        cantidad = Decimal(self.cantidad or 0)
+        costo = Decimal(self.costo_unitario or 0)
+        descuento = Decimal(self.descuento_porcentaje or 0)
+        subtotal_base = cantidad * costo
+        self.descuento_monto = (subtotal_base * (descuento / Decimal("100"))).quantize(DOS_DECIMALES)
+        self.subtotal = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
+        porcentaje = Decimal(self.impuesto.porcentaje or 0) if self.impuesto_id else Decimal("0.00")
+        self.impuesto_monto = (self.subtotal * (porcentaje / Decimal("100"))).quantize(DOS_DECIMALES)
+
+    def save(self, *args, **kwargs):
+        self.calcular_totales()
+        super().save(*args, **kwargs)
 
     @property
     def total_linea(self):
-        return self.cantidad * self.costo_unitario
+        subtotal = Decimal(self.subtotal or 0)
+        impuesto = Decimal(self.impuesto_monto or 0)
+        if subtotal == 0 and impuesto == 0 and self.cantidad and self.costo_unitario:
+            return (Decimal(self.cantidad) * Decimal(self.costo_unitario)).quantize(DOS_DECIMALES)
+        return (subtotal + impuesto).quantize(DOS_DECIMALES)
 
     def __str__(self):
         return f"{self.producto.nombre} - {self.cantidad}"

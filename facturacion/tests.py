@@ -4087,6 +4087,37 @@ class FacturacionTests(TestCase):
         self.assertEqual(compra.fecha_documento, date(2026, 6, 30))
         self.assertEqual(compra.fecha_vencimiento, date(2026, 6, 30))
 
+    def test_crear_compra_acepta_costo_con_4_decimales_e_impuesto(self):
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_busqueda": "Proveedor Decimal",
+                "proveedor_nombre": "",
+                "referencia_documento": "FAC-4DEC-IMP",
+                "fecha_documento": "30/06/2026",
+                "fecha_vencimiento": "30/06/2026",
+                "estado": "borrador",
+                "lineas_compra-TOTAL_FORMS": "1",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "3.00",
+                "lineas_compra-0-costo_unitario": "3212.3333",
+                "lineas_compra-0-descuento_porcentaje": "0",
+                "lineas_compra-0-impuesto": str(self.impuesto.id),
+                "lineas_compra-0-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-4DEC-IMP")
+        linea = compra.lineas.get()
+        self.assertEqual(linea.costo_unitario, Decimal("3212.3333"))
+        self.assertEqual(linea.subtotal, Decimal("9637.00"))
+        self.assertEqual(linea.impuesto_monto, Decimal("1445.55"))
+        self.assertEqual(compra.total_documento, Decimal("11082.55"))
+
     def test_primera_compra_de_empresa_no_repite_numero_global(self):
         otra_empresa = Empresa.objects.create(
             nombre="Otra Empresa",

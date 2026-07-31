@@ -432,26 +432,30 @@
                 {{ formset.management_form }}
 
                 <div class="erp-line-layout">
-                    <div class="erp-line-header" style="grid-template-columns:2fr .8fr .9fr 56px 1fr 1fr auto;">
+                    <div class="erp-line-header" style="grid-template-columns:2fr .75fr .9fr .7fr 56px 1fr .95fr 1fr auto;">
                         <div>Producto</div>
                         <div>Cantidad</div>
                         <div>Costo</div>
+                        <div>% Desc.</div>
                         <div>Nota</div>
                         <div>Subtotal</div>
+                        <div>Impuesto</div>
                         <div>Monto</div>
                         <div></div>
                     </div>
 
                     <div id="lineas-container" class="erp-line-layout">
                     {% for form_linea in formset %}
-                        <div class="tabla-row erp-line-row erp-purchase-line-row" style="grid-template-columns:2fr .8fr .9fr 56px 1fr 1fr auto;">
+                        <div class="tabla-row erp-line-row erp-purchase-line-row" style="grid-template-columns:2fr .75fr .9fr .7fr 56px 1fr .95fr 1fr auto;">
                             {{ form_linea.id }}
                             <div style="display:none;">{{ form_linea.DELETE }}</div>
                             <div>{{ form_linea.producto|add_class:"producto" }}</div>
                             <div>{{ form_linea.cantidad|add_class:"cantidad" }}</div>
                             <div>{{ form_linea.costo_unitario|add_class:"costo" }}</div>
+                            <div>{{ form_linea.descuento_porcentaje|add_class:"descuento" }}</div>
                             <div><button type="button" class="erp-line-note-toggle" title="Agregar nota">+</button></div>
                             <div class="erp-purchase-amount-box erp-line-subtotal-value">L. 0.00</div>
+                            <div>{{ form_linea.impuesto|add_class:"impuesto" }}</div>
                             <div class="erp-purchase-amount-box erp-line-monto-value">L. 0.00</div>
                             <div class="erp-delete-cell"><button type="button" class="delete-btn erp-btn-danger btn-eliminar">X</button></div>
                             <div class="erp-line-comment-panel">
@@ -587,6 +591,8 @@
         </div>
     </div>
 </dialog>
+{{ impuestos_payload|json_script:"purchase-tax-data" }}
+{{ productos_payload|json_script:"purchase-product-data" }}
 {% endblock %}
 
 {% block extra_js %}
@@ -604,6 +610,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const proveedoresConfig = {{ proveedores_config|safe }};
+    const impuestosData = JSON.parse(document.getElementById("purchase-tax-data")?.textContent || "[]");
+    const impuestosPorId = new Map(impuestosData.map(item => [String(item.id), Number(item.porcentaje || 0)]));
+    const productosData = JSON.parse(document.getElementById("purchase-product-data")?.textContent || "[]");
+    const productosPorId = new Map(productosData.map(item => [String(item.id), item]));
     const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
     const container = document.getElementById("lineas-container");
     const proveedorSelect = document.getElementById("id_proveedor");
@@ -878,18 +888,26 @@ document.addEventListener("DOMContentLoaded", function () {
             const producto = row.querySelector("select.producto");
             const cantidadInput = row.querySelector(".cantidad");
             const costoInput = row.querySelector(".costo");
+            const descuentoInput = row.querySelector(".descuento");
+            const impuestoInput = row.querySelector("select.impuesto");
             const subtotalBox = row.querySelector(".erp-line-subtotal-value");
             const montoBox = row.querySelector(".erp-line-monto-value");
             const cantidad = parseFloat(cantidadInput?.value || "0") || 0;
             const costo = parseFloat(costoInput?.value || "0") || 0;
-            const subtotal = cantidad * costo;
+            const descuento = parseFloat(descuentoInput?.value || "0") || 0;
+            const subtotalBruto = cantidad * costo;
+            const descuentoMonto = subtotalBruto * (descuento / 100);
+            const subtotal = Math.max(subtotalBruto - descuentoMonto, 0);
+            const porcentajeImpuesto = impuestosPorId.get(String(impuestoInput?.value || "")) || 0;
+            const impuestoMonto = subtotal * (porcentajeImpuesto / 100);
+            const monto = subtotal + impuestoMonto;
             const tieneProducto = producto && producto.value;
             if(subtotalBox){ subtotalBox.textContent = formatMoney(subtotal); }
-            if(montoBox){ montoBox.textContent = formatMoney(subtotal); }
-            if(tieneProducto || cantidad || costo){
+            if(montoBox){ montoBox.textContent = formatMoney(monto); }
+            if(tieneProducto || cantidad || costo || descuento || impuestoInput?.value){
                 lineas += 1;
                 unidades += cantidad;
-                total += subtotal;
+                total += monto;
             }
         });
         if(resumenLineas){ resumenLineas.textContent = lineas; }
@@ -996,6 +1014,12 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         select.addEventListener("change", function(){
             input.value = selectedText();
+            const row = select.closest(".tabla-row");
+            const impuesto = row?.querySelector("select.impuesto");
+            const producto = productosPorId.get(String(select.value || ""));
+            if(impuesto && producto?.impuesto_id && !impuesto.value){
+                impuesto.value = String(producto.impuesto_id);
+            }
             actualizarResumenCompra();
         });
     }
@@ -1106,6 +1130,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     select.appendChild(new Option(texto, producto.id));
                 }
             });
+            productosPorId.set(String(producto.id), {
+                id: producto.id,
+                impuesto_id: producto.impuesto_id || "",
+            });
             if(productoSelectObjetivo){
                 productoSelectObjetivo.value = String(producto.id);
                 productoSelectObjetivo.dispatchEvent(new Event("change", {bubbles:true}));
@@ -1119,7 +1147,12 @@ document.addEventListener("DOMContentLoaded", function () {
         abrirObservacion(true);
     }
     document.addEventListener("input", function(e){
-        if(e.target.classList.contains("cantidad") || e.target.classList.contains("costo")){
+        if(e.target.classList.contains("cantidad") || e.target.classList.contains("costo") || e.target.classList.contains("descuento") || e.target.classList.contains("impuesto")){
+            actualizarResumenCompra();
+        }
+    });
+    document.addEventListener("change", function(e){
+        if(e.target.classList.contains("impuesto")){
             actualizarResumenCompra();
         }
     });
