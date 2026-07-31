@@ -4,66 +4,61 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { size: letter; margin: 18mm 14mm; }
+        @page { size: letter; margin: 8mm 8mm 9mm; }
+        *{box-sizing:border-box;}
         body{
-            font-family: Arial, sans-serif;
-            color:#132238;
-            font-size:11px;
-            line-height:1.45;
+            font-family: Arial, Helvetica, sans-serif;
+            color:#112236;
+            font-size:8.7px;
+            line-height:1.22;
+            margin:0;
         }
-        .top{
-            display:flex;
-            justify-content:space-between;
-            gap:24px;
-            align-items:flex-start;
-            padding-bottom:18px;
-            border-bottom:3px solid #16b8ae;
-            margin-bottom:18px;
+        .header{
+            display:grid;
+            grid-template-columns:1fr 210px;
+            gap:10px;
+            align-items:center;
+            border-bottom:2px solid #15b8ae;
+            padding-bottom:7px;
+            margin-bottom:7px;
         }
-        .brand{
-            display:flex;
-            gap:14px;
-            align-items:flex-start;
-        }
+        .brand{display:flex;gap:8px;align-items:center;}
         .logo{
-            width:72px;
-            height:72px;
+            width:42px;
+            height:42px;
             border:1px solid #dbe7f2;
-            border-radius:16px;
+            border-radius:12px;
             display:flex;
             align-items:center;
             justify-content:center;
             overflow:hidden;
+            background:#fff;
+            font-weight:900;
         }
-        .logo img{max-width:68px;max-height:68px;}
-        .company-name{font-size:18px;font-weight:800;color:#0d2035;margin-bottom:4px;}
+        .logo img{max-width:39px;max-height:39px;}
+        .company-name{font-size:14px;font-weight:900;color:#0c1f36;margin-bottom:2px;}
         .muted{color:#607086;}
         .doc-box{
-            border:1px solid #dbe7f2;
-            border-radius:16px;
-            padding:14px 16px;
-            min-width:220px;
+            border:1px solid #d5e3f0;
+            border-radius:12px;
+            padding:8px 10px;
             background:#f8fbff;
+            text-align:right;
         }
         .kicker{
             text-transform:uppercase;
-            letter-spacing:.15em;
-            font-size:9px;
+            letter-spacing:.12em;
+            font-size:7px;
             color:#5f7085;
-            font-weight:800;
-            margin-bottom:5px;
+            font-weight:900;
         }
-        h1{
-            margin:0;
-            font-size:24px;
-            color:#0c1f36;
-        }
+        h1{margin:1px 0 5px;font-size:18px;color:#0c1f36;}
         .status{
             display:inline-block;
-            padding:5px 10px;
+            padding:3px 8px;
             border-radius:999px;
-            font-weight:800;
-            font-size:10px;
+            font-weight:900;
+            font-size:7px;
             text-transform:uppercase;
             letter-spacing:.08em;
             background:#def7ec;
@@ -71,141 +66,175 @@
         }
         .status.warning{background:#fff7d6;color:#a16207;}
         .status.danger{background:#ffe4e6;color:#be123c;}
-        .grid{
+        .summary-grid{
             display:grid;
-            grid-template-columns:1fr 1fr 1fr;
-            gap:12px;
-            margin-bottom:16px;
+            grid-template-columns:1.25fr 1fr 1fr;
+            gap:6px;
+            margin-bottom:7px;
         }
         .card{
             border:1px solid #dbe7f2;
-            border-radius:14px;
-            padding:13px 14px;
+            border-radius:10px;
+            padding:7px 8px;
             background:#fff;
         }
         .card h3{
-            margin:0 0 10px;
-            font-size:12px;
+            margin:0 0 5px;
+            font-size:8px;
             text-transform:uppercase;
-            letter-spacing:.12em;
+            letter-spacing:.11em;
             color:#31445d;
         }
-        .label{
-            font-size:9px;
-            text-transform:uppercase;
-            letter-spacing:.12em;
-            color:#6b7f94;
-            font-weight:800;
-            margin-bottom:3px;
+        .facts{
+            display:grid;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+            gap:4px 8px;
         }
-        .value{font-weight:800;color:#102338;margin-bottom:9px;}
+        .label{
+            font-size:6.8px;
+            text-transform:uppercase;
+            letter-spacing:.10em;
+            color:#6b7f94;
+            font-weight:900;
+            margin-bottom:1px;
+        }
+        .value{font-weight:900;color:#102338;}
         table{
             width:100%;
             border-collapse:collapse;
-            margin-top:8px;
+            margin-top:4px;
+            table-layout:fixed;
         }
         th{
             background:#eff5fb;
             color:#3b4f66;
             text-transform:uppercase;
-            letter-spacing:.10em;
-            font-size:9px;
-            padding:9px 8px;
+            letter-spacing:.07em;
+            font-size:6.9px;
+            padding:5px 5px;
             text-align:left;
             border-bottom:1px solid #d5e3f0;
         }
         td{
-            padding:9px 8px;
+            padding:4.5px 5px;
             border-bottom:1px solid #edf2f7;
             vertical-align:top;
+            overflow-wrap:break-word;
         }
+        tbody tr{break-inside:avoid;}
         .right{text-align:right;}
-        .totals{
+        .product-col{width:31%;}
+        .qty-col{width:9%;}
+        .money-col{width:12%;}
+        .tax-col{width:15%;}
+        .compact-note{
+            margin-top:7px;
+            padding:6px 8px;
+            border:1px solid #c7f0e9;
+            border-radius:9px;
+            background:#f5fffd;
+            color:#245c5b;
+        }
+        .bottom{
             display:grid;
-            grid-template-columns:1fr 260px;
-            gap:18px;
-            margin-top:18px;
+            grid-template-columns:1fr 250px;
+            gap:7px;
+            margin-top:7px;
             align-items:start;
         }
         .total-row{
             display:flex;
             justify-content:space-between;
-            gap:16px;
-            padding:7px 0;
+            gap:10px;
+            padding:3.5px 0;
             border-bottom:1px solid #edf2f7;
         }
         .total-row.strong{
             border-top:2px solid #dbe7f2;
-            margin-top:6px;
-            padding-top:10px;
-            font-size:14px;
+            border-bottom:0;
+            margin-top:2px;
+            padding-top:6px;
+            font-size:10.5px;
             font-weight:900;
         }
-        .note{
-            background:#f5fffd;
-            border:1px solid #c7f0e9;
-            border-radius:14px;
-            padding:12px 14px;
-            color:#245c5b;
-        }
+        .payments table th,
+        .payments table td{padding:4px 5px;font-size:8px;}
         .footer{
-            margin-top:24px;
-            padding-top:12px;
+            position:fixed;
+            bottom:-4mm;
+            left:0;
+            right:0;
+            padding-top:4px;
             border-top:1px solid #dbe7f2;
             color:#7a8797;
-            font-size:10px;
+            font-size:7px;
             text-align:center;
         }
     </style>
 </head>
 <body>
-    <div class="top">
+    <div class="header">
         <div class="brand">
             <div class="logo">
                 {% if logo_url %}<img src="{{ logo_url }}" alt="Logo">{% else %}<strong>{{ empresa.nombre|slice:":1" }}</strong>{% endif %}
             </div>
             <div>
                 <div class="company-name">{{ empresa.nombre }}</div>
-                <div class="muted">RTN {{ empresa.rtn|default:"-" }}</div>
-                <div class="muted">{{ empresa.direccion|default:"" }}</div>
+                <div class="muted">RTN {{ empresa.rtn|default:"-" }}{% if empresa.direccion %} · {{ empresa.direccion }}{% endif %}</div>
             </div>
         </div>
         <div class="doc-box">
             <div class="kicker">Documento de compra</div>
             <h1>{{ compra.numero_compra }}</h1>
-            <div style="margin-top:10px;">
-                {% if compra.estado == "aplicada" %}
-                    <span class="status">Aplicada</span>
-                {% elif compra.estado == "anulada" %}
-                    <span class="status danger">Anulada</span>
-                {% else %}
-                    <span class="status warning">Borrador</span>
-                {% endif %}
-            </div>
+            {% if compra.estado == "aplicada" %}
+                <span class="status">Aplicada</span>
+            {% elif compra.estado == "anulada" %}
+                <span class="status danger">Anulada</span>
+            {% else %}
+                <span class="status warning">Borrador</span>
+            {% endif %}
         </div>
     </div>
 
-    <div class="grid">
+    <div class="summary-grid">
         <div class="card">
             <h3>Proveedor</h3>
-            <div class="label">Nombre</div>
-            <div class="value">{{ compra.proveedor_nombre }}</div>
-            <div class="label">RTN</div>
-            <div class="value">{% if compra.proveedor %}{{ compra.proveedor.rtn|default:"-" }}{% else %}-{% endif %}</div>
+            <div class="facts">
+                <div>
+                    <div class="label">Nombre</div>
+                    <div class="value">{{ compra.proveedor_nombre }}</div>
+                </div>
+                <div>
+                    <div class="label">RTN</div>
+                    <div class="value">{% if compra.proveedor %}{{ compra.proveedor.rtn|default:"-" }}{% else %}-{% endif %}</div>
+                </div>
+            </div>
         </div>
         <div class="card">
             <h3>Documento</h3>
-            <div class="label">Factura proveedor</div>
-            <div class="value">{{ compra.referencia_documento|default:"-" }}</div>
-            <div class="label">Fecha documento</div>
-            <div class="value">{{ compra.fecha_documento|date:"d/m/Y" }}</div>
+            <div class="facts">
+                <div>
+                    <div class="label">Factura proveedor</div>
+                    <div class="value">{{ compra.referencia_documento|default:"-" }}</div>
+                </div>
+                <div>
+                    <div class="label">Fecha</div>
+                    <div class="value">{{ compra.fecha_documento|date:"d/m/Y" }}</div>
+                </div>
+            </div>
         </div>
         <div class="card">
             <h3>Pago</h3>
-            <div class="label">Condición</div>
-            <div class="value">{{ compra.get_condicion_pago_display }} / {{ compra.dias_credito }} días</div>
-            <div class="label">Estado pago</div>
-            <div class="value">{{ compra.estado_pago|title }}</div>
+            <div class="facts">
+                <div>
+                    <div class="label">Condición</div>
+                    <div class="value">{{ compra.get_condicion_pago_display }} / {{ compra.dias_credito }} días</div>
+                </div>
+                <div>
+                    <div class="label">Estado</div>
+                    <div class="value">{{ compra.estado_pago|title }}</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -214,13 +243,13 @@
         <table>
             <thead>
                 <tr>
-                    <th>Producto</th>
-                    <th class="right">Cantidad</th>
-                    <th class="right">Costo</th>
-                    <th class="right">% Desc.</th>
-                    <th class="right">Subtotal</th>
-                    <th>Impuesto</th>
-                    <th class="right">Total</th>
+                    <th class="product-col">Producto</th>
+                    <th class="right qty-col">Cant.</th>
+                    <th class="right money-col">Costo</th>
+                    <th class="right qty-col">% Desc.</th>
+                    <th class="right money-col">Subtotal</th>
+                    <th class="tax-col">Impuesto</th>
+                    <th class="right money-col">Total</th>
                 </tr>
             </thead>
             <tbody>
@@ -244,37 +273,35 @@
         </table>
     </div>
 
-    <div class="totals">
-        <div>
-            <div class="note">
-                <strong>Observación:</strong>
-                {{ compra.observacion|default:"Sin observación adicional registrada para este documento." }}
-            </div>
-            {% if pagos %}
-            <div class="card" style="margin-top:14px;">
-                <h3>Pagos registrados</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Método</th>
-                            <th>Referencia</th>
-                            <th class="right">Monto</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for pago in pagos %}
-                        <tr>
-                            <td>{{ pago.fecha|date:"d/m/Y" }}</td>
-                            <td>{{ pago.get_metodo_display }}</td>
-                            <td>{{ pago.referencia|default:"-" }}</td>
-                            <td class="right">L. {{ pago.monto|floatformat:2|intcomma }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endif %}
+    {% if compra.observacion %}
+    <div class="compact-note"><strong>Observación:</strong> {{ compra.observacion }}</div>
+    {% endif %}
+
+    <div class="bottom">
+        <div class="card payments">
+            <h3>Pagos registrados</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Método</th>
+                        <th>Referencia</th>
+                        <th class="right">Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pago in pagos %}
+                    <tr>
+                        <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ pago.get_metodo_display }}</td>
+                        <td>{{ pago.referencia|default:"-" }}</td>
+                        <td class="right">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">Sin pagos registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         <div class="card">
             <h3>Resumen financiero</h3>
