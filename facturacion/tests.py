@@ -4609,6 +4609,77 @@ class FacturacionTests(TestCase):
         self.assertEqual(inventario.existencias, Decimal("0.00"))
         self.assertEqual(MovimientoInventario.objects.filter(compra_documento=compra, tipo="reversion_compra").count(), 1)
 
+    def test_solo_dueno_puede_eliminar_compra_anulada(self):
+        compra = CompraInventario.objects.create(
+            empresa=self.empresa,
+            proveedor_nombre="Proveedor Pruebas",
+            referencia_documento="REF-DEL-001",
+            fecha_documento=date.today(),
+            estado="anulada",
+        )
+        LineaCompraInventario.objects.create(
+            compra=compra,
+            producto=self.producto,
+            cantidad=Decimal("1.00"),
+            costo_unitario=Decimal("10.00"),
+        )
+
+        response = self.client.post(
+            reverse("eliminar_compra_anulada", args=[self.empresa.slug, compra.id]),
+            follow=True,
+        )
+
+        self.assertContains(response, "Solo el propietario autorizado del ERP")
+        self.assertTrue(CompraInventario.objects.filter(id=compra.id).exists())
+
+        dueno = get_user_model().objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=self.rol_total,
+        )
+        self.client.force_login(dueno)
+
+        response = self.client.post(
+            reverse("eliminar_compra_anulada", args=[self.empresa.slug, compra.id]),
+            follow=True,
+        )
+
+        self.assertContains(response, "fue eliminada del historial de compras anuladas")
+        self.assertFalse(CompraInventario.objects.filter(id=compra.id).exists())
+
+    def test_dueno_no_puede_eliminar_compra_no_anulada(self):
+        compra = CompraInventario.objects.create(
+            empresa=self.empresa,
+            proveedor_nombre="Proveedor Aplicada",
+            referencia_documento="REF-DEL-002",
+            fecha_documento=date.today(),
+            estado="aplicada",
+        )
+        LineaCompraInventario.objects.create(
+            compra=compra,
+            producto=self.producto,
+            cantidad=Decimal("1.00"),
+            costo_unitario=Decimal("10.00"),
+        )
+        dueno = get_user_model().objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=self.rol_total,
+        )
+        self.client.force_login(dueno)
+
+        response = self.client.post(
+            reverse("eliminar_compra_anulada", args=[self.empresa.slug, compra.id]),
+            follow=True,
+        )
+
+        self.assertContains(response, "Solo se pueden eliminar compras que ya estan anuladas")
+        self.assertTrue(CompraInventario.objects.filter(id=compra.id).exists())
+
     def test_inventario_dashboard_muestra_alerta_stock_minimo(self):
         InventarioProducto.objects.create(
             empresa=self.empresa,

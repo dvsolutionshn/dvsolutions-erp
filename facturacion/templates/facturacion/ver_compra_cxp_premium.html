@@ -16,6 +16,11 @@
 <a class="erp-action-link" href="{% url 'registrar_pago_compra' empresa.slug compra.id %}">Registrar Pago</a>
 {% endif %}
 <form method="post" action="{% url 'anular_compra' empresa.slug compra.id %}" style="display:inline;">{% csrf_token %}<button class="erp-action-link" type="submit" onclick="return confirm('Seguro que deseas anular esta compra? Esto revertira el inventario.');">Anular Compra</button></form>
+{% elif compra.estado == "anulada" and puede_eliminar_compra_anulada %}
+<form method="post" action="{% url 'eliminar_compra_anulada' empresa.slug compra.id %}" style="display:inline;">
+    {% csrf_token %}
+    <button class="erp-action-link" style="border-color:#fecaca;color:#b91c1c;" type="submit" onclick="return confirm('Seguro que deseas eliminar definitivamente esta compra anulada? Esta accion no se puede deshacer.');">Eliminar Compra Anulada</button>
+</form>
 {% endif %}
 {% endblock %}
 

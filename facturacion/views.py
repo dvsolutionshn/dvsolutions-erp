@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
@@ -74,6 +75,20 @@ def _registrar_cambio_costo_real(producto, costo_anterior, usuario):
 
 POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
 CAJA_EXCLUYE_FACTURAS_ANULADAS_SLUGS = {"hospital_mia", "medical_spa"}
+USUARIOS_DUENOS_ELIMINAN_COMPRAS_ANULADAS = {"dannyvarela25"}
+CORREOS_DUENOS_ELIMINAN_COMPRAS_ANULADAS = {"dannyvarela25@gmail.com"}
+
+
+def _usuario_puede_eliminar_compra_anulada(usuario):
+    username = (getattr(usuario, "username", "") or "").strip().lower()
+    email = (getattr(usuario, "email", "") or "").strip().lower()
+    return bool(
+        getattr(usuario, "is_authenticated", False)
+        and (
+            username in USUARIOS_DUENOS_ELIMINAN_COMPRAS_ANULADAS
+            or email in CORREOS_DUENOS_ELIMINAN_COMPRAS_ANULADAS
+        )
+    )
 
 
 def _precios_incluyen_impuesto(empresa):
@@ -4445,6 +4460,55 @@ def anular_compra(request, empresa_slug, compra_id):
 
 
 @login_required
+@require_POST
+def eliminar_compra_anulada(request, empresa_slug, compra_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    compra = get_object_or_404(CompraInventario, id=compra_id, empresa=empresa)
+
+    if not _usuario_puede_eliminar_compra_anulada(request.user):
+        messages.error(request, "Solo el propietario autorizado del ERP puede eliminar compras anuladas.")
+        return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
+
+    if compra.estado != "anulada":
+        messages.error(request, "Solo se pueden eliminar compras que ya estan anuladas.")
+        return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
+
+    numero_compra = compra.numero_compra or compra.referencia_documento or f"Compra {compra.id}"
+    pago_ids = list(compra.pagos_compra.values_list("id", flat=True))
+
+    try:
+        with transaction.atomic():
+            MovimientoInventario.objects.filter(compra_documento=compra).delete()
+            compra.comprobantes_egreso.all().delete()
+            compra.pagos_compra.all().delete()
+            AsientoContable.objects.filter(
+                empresa=empresa,
+                documento_tipo="compra",
+                documento_id=compra.id,
+            ).delete()
+            if pago_ids:
+                AsientoContable.objects.filter(
+                    empresa=empresa,
+                    documento_tipo="pago_compra",
+                    documento_id__in=pago_ids,
+                ).delete()
+            compra.delete()
+    except ProtectedError:
+        logger.exception(
+            "No se pudo eliminar la compra anulada %s por relaciones protegidas.",
+            compra.id,
+        )
+        messages.error(
+            request,
+            "No se pudo eliminar esta compra anulada porque tiene documentos protegidos relacionados.",
+        )
+        return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
+
+    messages.success(request, f"{numero_compra} fue eliminada del historial de compras anuladas.")
+    return redirect("compras_dashboard", empresa_slug=empresa.slug)
+
+
+@login_required
 def registrar_pago_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
@@ -4553,6 +4617,7 @@ def ver_compra(request, empresa_slug, compra_id):
         "compra": compra,
         "movimientos": movimientos,
         "pagos": pagos,
+        "puede_eliminar_compra_anulada": _usuario_puede_eliminar_compra_anulada(request.user),
     })
 
 
