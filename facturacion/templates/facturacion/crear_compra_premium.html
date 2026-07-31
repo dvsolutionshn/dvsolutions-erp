@@ -1230,6 +1230,10 @@ document.addEventListener("DOMContentLoaded", function () {
             } else if(el.type !== "hidden"){
                 el.value = "";
             }
+
+            if(el.classList.contains("descuento")){
+                el.value = "0";
+            }
         });
 
         let idField = nueva.querySelector("input[name$='-id']");
@@ -1284,6 +1288,15 @@ document.addEventListener("DOMContentLoaded", function () {
         if(target.tagName === "TEXTAREA"){ return; }
         e.preventDefault();
         document.getElementById("agregar-linea").click();
+    });
+
+    document.querySelector(".erp-form-shell")?.addEventListener("submit", function(){
+        document.querySelectorAll(".tabla-row").forEach(row => {
+            const descuento = row.querySelector(".descuento");
+            if(descuento && !descuento.value.trim()){
+                descuento.value = "0";
+            }
+        });
     });
 
     calcularFechaVencimiento();

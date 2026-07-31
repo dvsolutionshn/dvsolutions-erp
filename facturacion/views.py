@@ -2598,6 +2598,28 @@ def _configurar_lineas_compra_formset(formset, productos_qs, impuestos_qs):
     return formset
 
 
+def _normalizar_lineas_compra_post(post_data):
+    try:
+        total_formularios = int(post_data.get("lineas_compra-TOTAL_FORMS") or 0)
+    except (TypeError, ValueError):
+        total_formularios = 0
+
+    for indice in range(total_formularios):
+        prefijo = f"lineas_compra-{indice}"
+        campos_linea = [
+            f"{prefijo}-producto",
+            f"{prefijo}-cantidad",
+            f"{prefijo}-costo_unitario",
+            f"{prefijo}-descuento_porcentaje",
+            f"{prefijo}-impuesto",
+            f"{prefijo}-comentario",
+        ]
+        tiene_datos = any((post_data.get(campo) or "").strip() for campo in campos_linea)
+        if tiene_datos and not (post_data.get(f"{prefijo}-descuento_porcentaje") or "").strip():
+            post_data[f"{prefijo}-descuento_porcentaje"] = "0"
+    return post_data
+
+
 def _validar_stock_disponible_para_lineas(lineas):
     cantidades_por_producto = {}
 
@@ -4095,6 +4117,7 @@ def crear_compra(request, empresa_slug):
 
     if request.method == "POST":
         post_data = request.POST.copy()
+        _normalizar_lineas_compra_post(post_data)
         post_data.setdefault('condicion_pago', 'contado')
         post_data.setdefault('metodo_pago', 'efectivo')
         post_data.setdefault('dias_credito', '0')
@@ -4115,13 +4138,13 @@ def crear_compra(request, empresa_slug):
         lineas_validas = []
         for f in formset.forms:
             prefix = f.prefix
-            producto_raw = (request.POST.get(f"{prefix}-producto") or "").strip()
-            cantidad_raw = (request.POST.get(f"{prefix}-cantidad") or "").strip()
-            costo_raw = (request.POST.get(f"{prefix}-costo_unitario") or "").strip()
-            descuento_raw = (request.POST.get(f"{prefix}-descuento_porcentaje") or "").strip()
-            impuesto_raw = (request.POST.get(f"{prefix}-impuesto") or "").strip()
-            comentario_raw = (request.POST.get(f"{prefix}-comentario") or "").strip()
-            delete_raw = request.POST.get(f"{prefix}-DELETE")
+            producto_raw = (post_data.get(f"{prefix}-producto") or "").strip()
+            cantidad_raw = (post_data.get(f"{prefix}-cantidad") or "").strip()
+            costo_raw = (post_data.get(f"{prefix}-costo_unitario") or "").strip()
+            descuento_raw = (post_data.get(f"{prefix}-descuento_porcentaje") or "").strip()
+            impuesto_raw = (post_data.get(f"{prefix}-impuesto") or "").strip()
+            comentario_raw = (post_data.get(f"{prefix}-comentario") or "").strip()
+            delete_raw = post_data.get(f"{prefix}-DELETE")
             fila_vacia = not producto_raw and not cantidad_raw and not costo_raw and not descuento_raw and not impuesto_raw and not comentario_raw
             if delete_raw or fila_vacia:
                 continue
@@ -4284,6 +4307,7 @@ def editar_compra(request, empresa_slug, compra_id):
 
     if request.method == "POST":
         post_data = request.POST.copy()
+        _normalizar_lineas_compra_post(post_data)
         post_data.setdefault('condicion_pago', compra.condicion_pago or 'contado')
         post_data.setdefault('metodo_pago', compra.metodo_pago or 'efectivo')
         post_data.setdefault('dias_credito', str(compra.dias_credito or 0))
@@ -4303,13 +4327,13 @@ def editar_compra(request, empresa_slug, compra_id):
         lineas_validas = []
         for f in formset.forms:
             prefix = f.prefix
-            producto_raw = (request.POST.get(f"{prefix}-producto") or "").strip()
-            cantidad_raw = (request.POST.get(f"{prefix}-cantidad") or "").strip()
-            costo_raw = (request.POST.get(f"{prefix}-costo_unitario") or "").strip()
-            descuento_raw = (request.POST.get(f"{prefix}-descuento_porcentaje") or "").strip()
-            impuesto_raw = (request.POST.get(f"{prefix}-impuesto") or "").strip()
-            comentario_raw = (request.POST.get(f"{prefix}-comentario") or "").strip()
-            delete_raw = request.POST.get(f"{prefix}-DELETE")
+            producto_raw = (post_data.get(f"{prefix}-producto") or "").strip()
+            cantidad_raw = (post_data.get(f"{prefix}-cantidad") or "").strip()
+            costo_raw = (post_data.get(f"{prefix}-costo_unitario") or "").strip()
+            descuento_raw = (post_data.get(f"{prefix}-descuento_porcentaje") or "").strip()
+            impuesto_raw = (post_data.get(f"{prefix}-impuesto") or "").strip()
+            comentario_raw = (post_data.get(f"{prefix}-comentario") or "").strip()
+            delete_raw = post_data.get(f"{prefix}-DELETE")
             fila_vacia = not producto_raw and not cantidad_raw and not costo_raw and not descuento_raw and not impuesto_raw and not comentario_raw
             if delete_raw or fila_vacia:
                 continue

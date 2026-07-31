@@ -4118,6 +4118,51 @@ class FacturacionTests(TestCase):
         self.assertEqual(linea.impuesto_monto, Decimal("1445.55"))
         self.assertEqual(compra.total_documento, Decimal("11082.55"))
 
+    def test_crear_compra_con_varias_lineas_y_descuento_vacio(self):
+        producto_dos = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto Demo 2",
+            precio=Decimal("50.00"),
+        )
+        response = self.client.post(
+            reverse("crear_compra", args=[self.empresa.slug]),
+            {
+                "proveedor_busqueda": "Proveedor Varias Lineas",
+                "proveedor_nombre": "",
+                "referencia_documento": "FAC-VARIAS-LINEAS",
+                "fecha_documento": "30/06/2026",
+                "fecha_vencimiento": "30/06/2026",
+                "estado": "borrador",
+                "lineas_compra-TOTAL_FORMS": "3",
+                "lineas_compra-INITIAL_FORMS": "0",
+                "lineas_compra-MIN_NUM_FORMS": "0",
+                "lineas_compra-MAX_NUM_FORMS": "1000",
+                "lineas_compra-0-producto": str(self.producto.id),
+                "lineas_compra-0-cantidad": "40",
+                "lineas_compra-0-costo_unitario": "75",
+                "lineas_compra-0-descuento_porcentaje": "0",
+                "lineas_compra-0-impuesto": "",
+                "lineas_compra-0-comentario": "",
+                "lineas_compra-1-producto": str(producto_dos.id),
+                "lineas_compra-1-cantidad": "100",
+                "lineas_compra-1-costo_unitario": "4",
+                "lineas_compra-1-descuento_porcentaje": "",
+                "lineas_compra-1-impuesto": "",
+                "lineas_compra-1-comentario": "",
+                "lineas_compra-2-producto": str(self.producto.id),
+                "lineas_compra-2-cantidad": "200",
+                "lineas_compra-2-costo_unitario": "2.5",
+                "lineas_compra-2-descuento_porcentaje": "",
+                "lineas_compra-2-impuesto": "",
+                "lineas_compra-2-comentario": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        compra = CompraInventario.objects.get(referencia_documento="FAC-VARIAS-LINEAS")
+        self.assertEqual(compra.lineas.count(), 3)
+        self.assertEqual(compra.total_documento, Decimal("3900.00"))
+
     def test_primera_compra_de_empresa_no_repite_numero_global(self):
         otra_empresa = Empresa.objects.create(
             nombre="Otra Empresa",
