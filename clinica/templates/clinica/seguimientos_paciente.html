@@ -1,0 +1,234 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Seguimientos - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Seguimiento estético / clínico{% endblock %}
+{% block header_description %}Recordatorios de retoques, controles y próximas aplicaciones conectados al calendario del paciente.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+<a class="erp-btn-secondary" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.follow-page{max-width:1380px;margin:0 auto 36px}
+.follow-hero{position:relative;overflow:hidden;border:1px solid #d5e2f1;border-radius:26px;background:radial-gradient(circle at top right,rgba(124,58,237,.14),transparent 32%),linear-gradient(135deg,#fff,#f7fcff);box-shadow:0 24px 60px rgba(16,35,56,.08);padding:24px;margin-bottom:18px}
+.follow-hero:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#7c3aed,#06b6d4,#14b8a6)}
+.follow-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,170px);gap:14px;align-items:stretch}
+.follow-patient h3{margin:3px 0 6px;color:#102338;font-size:28px}
+.follow-patient p{margin:0;color:#5d7288;font-weight:800}
+.follow-stat{border:1px solid #dce9f6;border-radius:19px;background:rgba(255,255,255,.82);padding:15px}
+.follow-stat strong{display:block;color:#102338;font-size:24px}.follow-stat span{color:#5d7288;font-weight:800;font-size:12px}
+.follow-card{border:1px solid #d5e2f1;border-radius:24px;background:#fff;box-shadow:0 18px 42px rgba(16,35,56,.055);margin-bottom:18px;overflow:hidden}
+.follow-card-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:20px 22px;border-bottom:1px solid #e4edf7;background:linear-gradient(135deg,#fbfdff,#f7fbfa)}
+.follow-card-head h3{margin:0;color:#102338}.follow-card-head p{margin:6px 0 0;color:#5d7288;line-height:1.5}
+.follow-badge{display:inline-flex;align-items:center;padding:8px 11px;border-radius:999px;background:#f2eafe;color:#6d28d9;font-size:10px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}
+.follow-body{padding:20px 22px}
+.preset-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;padding:12px;border:1px solid rgba(124,58,237,.16);border-radius:18px;background:rgba(248,250,255,.8)}
+.preset{display:flex;align-items:center;gap:10px;min-height:58px;padding:11px 12px;border:1px solid #d9e4f2;border-radius:15px;background:#fff;cursor:pointer;transition:.16s ease}
+.preset:hover{transform:translateY(-2px);border-color:rgba(124,58,237,.38);box-shadow:0 14px 30px rgba(91,65,180,.09)}
+.preset:has(input:checked){border-color:#7c3aed;background:linear-gradient(135deg,#fbf7ff,#f1fcff)}
+.preset input{width:18px;height:18px;accent-color:#7c3aed}.preset strong{display:block;color:#102338;font-size:13px}.preset span span{display:block;margin-top:3px;color:#6b7d90;font-size:11px;font-weight:800}
+.preset-actions,.follow-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;color:#64758a;font-size:12px}
+.reminder-list{display:grid;gap:10px;margin-top:18px}
+.reminder-row{display:grid;grid-template-columns:minmax(220px,1.35fr) 150px 110px 82px minmax(200px,1fr) 42px;gap:10px;align-items:end;padding:12px;border:1px solid #dfe8f2;border-radius:16px;background:#fff;box-shadow:0 10px 24px rgba(17,35,54,.04)}
+.follow-field label{display:block;margin-bottom:6px;color:#60768b;font-size:9px;font-weight:950;letter-spacing:.1em;text-transform:uppercase}
+.follow-field input,.follow-field select,.follow-field textarea{width:100%;min-height:42px;border:1px solid #bfd2e5;border-radius:12px;background:#fff;padding:0 11px;color:#102338;font:inherit}
+.follow-field textarea{padding:10px 11px;min-height:70px;resize:vertical}
+.follow-field input:focus,.follow-field select:focus,.follow-field textarea:focus{outline:0;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.11)}
+.remove-row,.delete-follow{min-height:42px;border:1px solid #ffc7c2;border-radius:12px;background:#fff5f4;color:#b42318;font-weight:900;cursor:pointer}
+.follow-table{display:grid;gap:12px}
+.saved-follow{border:1px solid #dbe8f5;border-radius:18px;background:linear-gradient(135deg,#fff,#fbfdff);padding:14px}
+.saved-follow-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}
+.saved-follow h4{margin:0;color:#102338}.saved-follow small{display:block;margin-top:4px;color:#64758a;font-weight:800}
+.saved-follow-form{display:grid;grid-template-columns:minmax(220px,1.2fr) 150px 110px 82px minmax(200px,1fr);gap:10px;align-items:end}
+.saved-follow-note{grid-column:1/-1}
+.saved-follow-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.empty-follow{padding:28px;border:1px dashed #cbd9e8;border-radius:18px;text-align:center;color:#60748d;background:#fbfdff}
+@media(max-width:1050px){.follow-hero-grid,.reminder-row,.saved-follow-form{grid-template-columns:1fr}.saved-follow-note,.saved-follow-actions{grid-column:auto}}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="follow-page">
+    <div class="follow-hero">
+        <div class="follow-hero-grid">
+            <div class="follow-patient">
+                <div class="erp-kpi-label">Paciente</div>
+                <h3>{{ paciente.nombre }}</h3>
+                <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · {{ paciente.whatsapp|default:paciente.telefono|default:"Sin teléfono" }}</p>
+            </div>
+            <div class="follow-stat"><strong>{{ recordatorios_tratamiento|length }}</strong><span>seguimiento(s)</span></div>
+            <div class="follow-stat"><strong>Calendario</strong><span>citas destacadas</span></div>
+            <div class="follow-stat"><strong>Control</strong><span>retoques y revisiones</span></div>
+        </div>
+    </div>
+
+    <section class="follow-card">
+        <div class="follow-card-head">
+            <div>
+                <div class="erp-kpi-label">Agregar seguimiento</div>
+                <h3>Programar próximos controles</h3>
+                <p>Seleccione uno o varios tratamientos sugeridos, ajuste la fecha si lo necesita y envíelos al calendario.</p>
+            </div>
+            <span class="follow-badge">Calendario + seguimiento</span>
+        </div>
+        <div class="follow-body">
+            <div class="preset-grid" aria-label="Retoques sugeridos">
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Retoque de Botox" data-months="4"><span><strong>Botox</strong><span>4 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Retoque de Fillers" data-months="10"><span><strong>Fillers</strong><span>10 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Control de Hilos tensores" data-months="10"><span><strong>Hilos tensores</strong><span>10 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Control de Bioestimuladores Colageno" data-months="10"><span><strong>Bioestimuladores Colágeno</strong><span>10 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Seguimiento de Manchas" data-months="1"><span><strong>Manchas</strong><span>1 mes</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Seguimiento de Alopecia" data-months="1"><span><strong>Alopecia</strong><span>1 mes</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Control de Sueroterapia" data-months="2"><span><strong>Sueroterapias</strong><span>2 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Revision post trasplante" data-months="3"><span><strong>Revisión post trasplante</strong><span>3 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Seguimiento de Acne" data-months="1"><span><strong>Acné</strong><span>1 mes</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Control de Skinbooster" data-months="3"><span><strong>Skinbooster</strong><span>3 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Control de PDRN salmon" data-months="1"><span><strong>PDRN salmón</strong><span>1 mes</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="PRP facial" data-months="3"><span><strong>PRP facial</strong><span>3 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Exosomas" data-months="3"><span><strong>Exosomas</strong><span>3 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Rejuvenecimiento facial" data-months="10"><span><strong>Rejuvenecimiento facial</strong><span>10 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Fototerapia LED" data-months="1"><span><strong>Fototerapia LED</strong><span>1 mes</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Radiofrecuencia facial Exilis" data-weeks="1"><span><strong>Radiofrecuencia facial</strong><span>semanal</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Radiofrecuencia fraccionada con microagujas Matrix Pro" data-months="3"><span><strong>Matrix Pro</strong><span>3 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="IPL para manchas" data-months="2"><span><strong>IPL para manchas</strong><span>2 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Laser CO2 fraccionado" data-months="3"><span><strong>Láser CO₂</strong><span>3 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Hollywood Peel" data-months="1"><span><strong>Hollywood Peel</strong><span>1 mes</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Spectra laser" data-months="2"><span><strong>Spectra laser</strong><span>2 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Depilacion laser" data-months="1"><span><strong>Depilación láser</strong><span>1 mes</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Reposicion linea cremas piel/cabello" data-months="3"><span><strong>Reposición cremas</strong><span>3 meses</span></span></label>
+                <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Paciente que no ha venido" data-months="7"><span><strong>Paciente que no ha venido</strong><span>7 meses</span></span></label>
+            </div>
+            <div class="preset-actions">
+                <span>El sistema calcula la fecha sugerida desde hoy. Puede modificarla antes de guardar.</span>
+                <button type="button" class="erp-btn-secondary" id="addReminderPresets">Agregar seleccionados</button>
+            </div>
+            <form method="post" action="{% url 'clinica_crear_recordatorios_tratamiento' empresa.slug paciente.id %}" id="treatmentReminderForm">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="seguimientos">
+                <div class="reminder-list" id="treatmentReminderRows">
+                    <div class="reminder-row">
+                        <div class="follow-field"><label>Tratamiento / seguimiento</label><input type="text" name="tratamiento[]" placeholder="Ej. Relleno de botox, revisión de botox"></div>
+                        <div class="follow-field"><label>Fecha</label><input type="date" name="fecha[]"></div>
+                        <div class="follow-field"><label>Hora</label><select name="hora[]"><option value="">Hora</option>{% include "clinica/partials/opciones_hora_12.html" %}</select></div>
+                        <div class="follow-field"><label>AM/PM</label><select name="periodo[]"><option value="AM">AM</option><option value="PM" selected>PM</option></select></div>
+                        <div class="follow-field"><label>Doctor / profesional</label><select name="profesional[]"><option value="">Sin asignar</option>{% for profesional in profesionales %}<option value="{{ profesional.id }}">{{ profesional.nombre }}{% if profesional.especialidad %} · {{ profesional.especialidad }}{% endif %}</option>{% endfor %}</select><input type="hidden" name="nota[]" value=""></div>
+                        <button type="button" class="remove-row" data-remove-reminder>×</button>
+                    </div>
+                </div>
+                <div class="follow-actions">
+                    <button type="button" class="erp-btn-secondary" id="addTreatmentReminder">+ Agregar otro seguimiento</button>
+                    <button type="submit" class="erp-btn">Enviar al calendario</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="follow-card">
+        <div class="follow-card-head">
+            <div>
+                <div class="erp-kpi-label">Seguimientos existentes</div>
+                <h3>Recordatorios del paciente</h3>
+                <p>Edite tratamiento, fecha, hora y profesional sin salir de esta pantalla.</p>
+            </div>
+        </div>
+        <div class="follow-body">
+            <div class="follow-table">
+                {% for recordatorio in recordatorios_tratamiento %}
+                <article class="saved-follow">
+                    <div class="saved-follow-head">
+                        <div>
+                            <h4>{{ recordatorio.tratamiento_recordatorio|default:recordatorio.motivo }}</h4>
+                            <small>{{ recordatorio.fecha_hora|date:"d/m/Y h:i A" }}{% if recordatorio.profesional %} · {{ recordatorio.profesional.nombre }}{% endif %}</small>
+                        </div>
+                        <span class="follow-badge">Recordatorio</span>
+                    </div>
+                    <form class="saved-follow-form" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="recordatorio_id" value="{{ recordatorio.id }}">
+                        <div class="follow-field"><label>Tratamiento</label><input type="text" name="tratamiento" value="{{ recordatorio.tratamiento_recordatorio|default:recordatorio.motivo }}"></div>
+                        <div class="follow-field"><label>Fecha</label><input type="date" name="fecha" value="{{ recordatorio.fecha_hora|date:'Y-m-d' }}"></div>
+                        <div class="follow-field"><label>Hora</label><select name="hora">{% include "clinica/partials/opciones_hora_12.html" with selected_hora=recordatorio.fecha_hora|date:"h:i" %}</select></div>
+                        <div class="follow-field"><label>AM/PM</label><select name="periodo"><option value="AM" {% if recordatorio.fecha_hora|date:"A" == "AM" %}selected{% endif %}>AM</option><option value="PM" {% if recordatorio.fecha_hora|date:"A" == "PM" %}selected{% endif %}>PM</option></select></div>
+                        <div class="follow-field"><label>Profesional</label><select name="profesional"><option value="">Sin asignar</option>{% for profesional in profesionales %}<option value="{{ profesional.id }}" {% if recordatorio.profesional_id == profesional.id %}selected{% endif %}>{{ profesional.nombre }}{% if profesional.especialidad %} · {{ profesional.especialidad }}{% endif %}</option>{% endfor %}</select></div>
+                        <div class="follow-field saved-follow-note"><label>Nota interna</label><textarea name="nota">{{ recordatorio.observaciones|default:"" }}</textarea></div>
+                        <div class="saved-follow-actions">
+                            <button class="erp-btn" type="submit" name="accion" value="editar_recordatorio">Guardar cambios</button>
+                            <button class="delete-follow" type="submit" name="accion" value="eliminar_recordatorio" formnovalidate onclick="return confirm('¿Eliminar este seguimiento?');">Eliminar</button>
+                        </div>
+                    </form>
+                </article>
+                {% empty %}
+                <div class="empty-follow">Todavía no hay seguimientos programados para este paciente.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+</section>
+
+<script>
+(function(){
+    const rows = document.getElementById("treatmentReminderRows");
+    const addButton = document.getElementById("addTreatmentReminder");
+    const presetButton = document.getElementById("addReminderPresets");
+    if(!rows || !addButton){ return; }
+    function calculatePresetDate(preset){
+        const date = new Date();
+        const months = parseInt(preset.dataset.months || "0", 10);
+        const weeks = parseInt(preset.dataset.weeks || "0", 10);
+        if(months){ date.setMonth(date.getMonth() + months); }
+        if(weeks){ date.setDate(date.getDate() + weeks * 7); }
+        return date;
+    }
+    function toDateInputValue(date){
+        return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+    }
+    function resetRow(row){
+        row.querySelectorAll("input").forEach(input => input.value = "");
+        row.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
+        const periodo = row.querySelector('select[name="periodo[]"]');
+        if(periodo){ periodo.value = "PM"; }
+        const hora = row.querySelector('select[name="hora[]"]');
+        if(hora){ hora.value = "09:00"; }
+    }
+    function wireRow(row){
+        const remove = row.querySelector("[data-remove-reminder]");
+        if(remove){
+            remove.onclick = function(){
+                const allRows = rows.querySelectorAll(".reminder-row");
+                if(allRows.length <= 1){ resetRow(row); return; }
+                row.remove();
+            };
+        }
+    }
+    function createRow(){
+        const base = rows.querySelector(".reminder-row");
+        if(!base){ return null; }
+        const firstEmpty = rows.querySelectorAll(".reminder-row").length === 1 && !base.querySelector('input[name="tratamiento[]"]')?.value && !base.querySelector('input[name="fecha[]"]')?.value;
+        const row = firstEmpty ? base : base.cloneNode(true);
+        resetRow(row);
+        if(!firstEmpty){ rows.appendChild(row); wireRow(row); }
+        return row;
+    }
+    rows.querySelectorAll(".reminder-row").forEach(wireRow);
+    addButton.addEventListener("click", function(){
+        const row = createRow();
+        row?.querySelector('input[name="tratamiento[]"]')?.focus();
+    });
+    presetButton?.addEventListener("click", function(){
+        const selected = Array.from(document.querySelectorAll("[data-reminder-preset]:checked"));
+        selected.forEach(function(preset){
+            const row = createRow();
+            if(!row){ return; }
+            row.querySelector('input[name="tratamiento[]"]').value = preset.dataset.treatment || "";
+            row.querySelector('input[name="fecha[]"]').value = toDateInputValue(calculatePresetDate(preset));
+            const note = row.querySelector('input[name="nota[]"]');
+            if(note){ note.value = "Seguimiento sugerido automaticamente desde expediente."; }
+            preset.checked = false;
+        });
+        rows.querySelector(".reminder-row:last-child")?.scrollIntoView({behavior:"smooth", block:"center"});
+    });
+})();
+</script>
+{% endblock %}

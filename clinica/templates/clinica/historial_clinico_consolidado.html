@@ -87,6 +87,9 @@
 .doctor-note-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .inline-edit-btn{border:1px solid #c9deef;border-radius:999px;background:#fff;color:#087466;padding:9px 13px;font-size:12px;font-weight:900;text-decoration:none;cursor:pointer;transition:.18s ease}
 .inline-edit-btn:hover,.inline-edit-btn.is-active{border-color:#14b8a6;background:#ecfdf5;box-shadow:0 12px 24px rgba(11,159,145,.08)}
+.inline-delete-form{display:inline}
+.inline-delete-btn{border:1px solid #fecaca;border-radius:999px;background:#fff5f5;color:#b42318;padding:9px 13px;font-size:12px;font-weight:900;cursor:pointer;transition:.18s ease}
+.inline-delete-btn:hover{border-color:#ef4444;background:#fee2e2;box-shadow:0 12px 24px rgba(180,35,24,.08)}
 .doctor-note-edit{display:none;margin-top:10px;border:1px solid #dbe8f5;border-radius:16px;background:#f8fcff;padding:12px}
 .doctor-note-edit.is-visible{display:block}
 .doctor-note-edit textarea{width:100%;min-height:135px;border:1px solid #bfd0e1;border-radius:13px;padding:12px;background:#fff;color:#102338;font:inherit;outline:none;resize:vertical}
@@ -244,6 +247,14 @@
                                     <button class="inline-edit-btn" type="button" data-edit-target="historia-edit-{{ historia.id }}">Editar texto</button>
                                     {% endif %}
                                     <a class="inline-edit-btn" href="{% url 'clinica_editar_historia_especialidad' empresa.slug paciente.id historia.id %}">{% if historia.bloqueada %}Ver bloqueada{% else %}Detalle completo{% endif %}</a>
+                                    {% if puede_eliminar_notas_clinicas %}
+                                    <form class="inline-delete-form" method="post" action="#trabajo-{{ tipo.codigo }}" onsubmit="return confirm('¿Eliminar esta nota clínica? Esta acción no se puede deshacer.');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="accion" value="eliminar_historia">
+                                        <input type="hidden" name="historia_id" value="{{ historia.id }}">
+                                        <button class="inline-delete-btn" type="submit">Eliminar nota</button>
+                                    </form>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="doctor-note-text">

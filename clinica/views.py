@@ -114,6 +114,19 @@ def _profesional_predeterminado_usuario(empresa, usuario):
             return fallback_principal
     return None
 
+
+def _es_dueno_erp(usuario):
+    if not getattr(usuario, "is_authenticated", False):
+        return False
+    email = (getattr(usuario, "email", "") or "").strip().lower()
+    username = (getattr(usuario, "username", "") or "").strip().lower()
+    nombre = f"{getattr(usuario, 'first_name', '') or ''} {getattr(usuario, 'last_name', '') or ''}".strip().lower()
+    return (
+        email == "dannyvarela25@gmail.com"
+        or username in {"dannyvarela25", "danielvarela", "daniel_varela"}
+        or nombre == "daniel varela"
+    )
+
 DOCUMENTOS_CLINICOS_CONFIG = {
     "laboratorio": {
         "titulo": "Trabajos de laboratorio",
@@ -1159,6 +1172,98 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
     )
 
 
+def _fecha_hora_recordatorio_desde_post(fecha_texto, hora_texto, periodo):
+    fecha_texto = (fecha_texto or "").strip()
+    hora_texto = (hora_texto or "").strip()
+    periodo = (periodo or "").strip().upper()
+    if not fecha_texto:
+        raise ValueError("seleccione la fecha")
+    if not hora_texto or periodo not in {"AM", "PM"}:
+        raise ValueError("seleccione hora y AM/PM")
+    fecha = datetime.strptime(fecha_texto, "%Y-%m-%d").date()
+    hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
+    if hora_12 < 1 or hora_12 > 12 or minuto not in {0, 15, 30, 45}:
+        raise ValueError("fecha u hora invalida")
+    hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
+    zona = timezone.get_current_timezone()
+    return timezone.make_aware(
+        datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto),
+        zona,
+    )
+
+
+@login_required
+def seguimientos_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    asegurar_profesionales_agenda_base(empresa)
+    profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        recordatorio = get_object_or_404(
+            CitaClinica,
+            id=request.POST.get("recordatorio_id"),
+            empresa=empresa,
+            paciente=paciente,
+            es_recordatorio_tratamiento=True,
+        )
+        if accion == "eliminar_recordatorio":
+            recordatorio.delete()
+            messages.success(request, "Seguimiento eliminado correctamente.")
+            return redirect("clinica_seguimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        if accion == "editar_recordatorio":
+            tratamiento = (request.POST.get("tratamiento") or "").strip()
+            if not tratamiento:
+                messages.error(request, "Indique el tratamiento o seguimiento.")
+                return redirect("clinica_seguimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
+            profesional_id = (request.POST.get("profesional") or "").strip()
+            profesional = None
+            if profesional_id:
+                profesional = ProfesionalSalud.objects.filter(id=profesional_id, empresa=empresa, activo=True).first()
+                if profesional is None:
+                    messages.error(request, "El profesional seleccionado no esta disponible.")
+                    return redirect("clinica_seguimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
+            try:
+                recordatorio.fecha_hora = _fecha_hora_recordatorio_desde_post(
+                    request.POST.get("fecha"),
+                    request.POST.get("hora"),
+                    request.POST.get("periodo"),
+                )
+            except ValueError as exc:
+                messages.error(request, f"Revise la fecha del seguimiento: {exc}.")
+                return redirect("clinica_seguimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
+            recordatorio.profesional = profesional
+            recordatorio.tratamiento_recordatorio = tratamiento
+            recordatorio.motivo = f"Recordatorio: {tratamiento}"
+            recordatorio.observaciones = (request.POST.get("nota") or "").strip() or "Seguimiento programado desde expediente clinico."
+            recordatorio.save()
+            try:
+                _sincronizar_agenda_desde_cita_clinica(recordatorio)
+            except Exception:
+                logger.exception("No se pudo sincronizar recordatorio clinico %s", recordatorio.id)
+                messages.warning(request, "El seguimiento se actualizo, pero no se pudo sincronizar con WhatsApp/agenda externa.")
+            else:
+                messages.success(request, "Seguimiento actualizado correctamente.")
+            return redirect("clinica_seguimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
+
+    recordatorios = (
+        paciente.citas.filter(es_recordatorio_tratamiento=True)
+        .select_related("profesional", "servicio")
+        .order_by("fecha_hora", "id")
+    )
+    return render(
+        request,
+        "clinica/seguimientos_paciente.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "profesionales": profesionales,
+            "recordatorios_tratamiento": recordatorios,
+        },
+    )
+
+
 @login_required
 @require_POST
 def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
@@ -1207,12 +1312,7 @@ def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
                 continue
 
         try:
-            fecha = datetime.strptime(fecha_texto, "%Y-%m-%d").date()
-            hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
-            if hora_12 < 1 or hora_12 > 12 or minuto not in {0, 15, 30, 45}:
-                raise ValueError
-            hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
-            fecha_hora = timezone.make_aware(datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto), zona)
+            fecha_hora = _fecha_hora_recordatorio_desde_post(fecha_texto, hora_texto, periodo)
         except ValueError:
             errores.append(f"Fila {fila}: fecha u hora invalida.")
             continue
@@ -1243,6 +1343,8 @@ def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
     elif not errores:
         messages.info(request, "No se agregaron recordatorios porque no habia filas completas.")
 
+    if request.POST.get("next") == "seguimientos":
+        return redirect("clinica_seguimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
     return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
 
 
@@ -1494,6 +1596,21 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
+    puede_eliminar_notas_clinicas = _es_dueno_erp(request.user)
+    if request.method == "POST" and request.POST.get("accion") == "eliminar_historia":
+        if not puede_eliminar_notas_clinicas:
+            messages.error(request, "Solo el dueño del ERP puede eliminar notas clínicas guardadas.")
+            return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        historia = get_object_or_404(
+            HistoriaClinicaEspecialidad,
+            id=request.POST.get("historia_id"),
+            empresa=empresa,
+            paciente=paciente,
+        )
+        tipo_nombre = historia.get_tipo_display()
+        historia.delete()
+        messages.success(request, f"Nota clínica de {tipo_nombre} eliminada correctamente.")
+        return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
     if request.method == "POST" and request.POST.get("accion") == "editar_texto_historia":
         historia = get_object_or_404(
             HistoriaClinicaEspecialidad,
@@ -1589,6 +1706,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "historias": historias,
             "preconsultas": preconsultas,
             "bloques_preconsulta": bloques_preconsulta,
+            "puede_eliminar_notas_clinicas": puede_eliminar_notas_clinicas,
         },
     )
 

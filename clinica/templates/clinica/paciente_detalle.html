@@ -167,7 +167,7 @@
             <a class="clinical-side-link" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><i>07</i>Examenes</a>
             <a class="clinical-side-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}"><i>08</i>Tratamientos</a>
             <a class="clinical-side-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}"><i>09</i>Agendar cita</a>
-            <a class="clinical-side-link" href="#recordatorios-tratamiento"><i>10</i>Seguimientos</a>
+            <a class="clinical-side-link" href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}"><i>10</i>Seguimientos</a>
         </nav>
         <details class="clinical-side-group" open>
             <summary><i>11</i>Anexos completos</summary>
@@ -218,6 +218,7 @@
                 <a class="clinical-quick-card" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}"><strong>Tratamiento</strong><span>Crear o registrar una ruta de tratamiento para el paciente.</span></a>
                 <a class="clinical-quick-card" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><strong>Consentimientos</strong><span>PDF firmados y control documental del paciente.</span></a>
                 <a class="clinical-quick-card" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}"><strong>Agendar cita</strong><span>Enviar este paciente al calendario de atenciones.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}"><strong>Seguimientos</strong><span>Programar y editar recordatorios de tratamiento.</span></a>
             </div>
         </section>
 

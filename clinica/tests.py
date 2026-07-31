@@ -1,5 +1,6 @@
 from io import BytesIO
 from tempfile import TemporaryDirectory
+from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -200,6 +201,124 @@ class ClinicaPacienteTests(TestCase):
         historia.refresh_from_db()
         self.assertEqual(historia.plan_tratamiento, "Texto actualizado desde la vista completa.")
         self.assertEqual(historia.actualizado_por, self.user)
+
+    def test_boton_eliminar_nota_solo_aparece_para_dueno_erp(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-DEL-VIS",
+            nombre="Paciente Delete Visible",
+            identidad="1101200800670",
+            fecha_nacimiento="1990-01-01",
+        )
+        HistoriaClinicaEspecialidad.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="capilar",
+            plan_tratamiento="Nota privada",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.get(url)
+        self.assertNotContains(response, "Eliminar nota")
+
+        dueno = get_user_model().objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=self.user.rol_sistema,
+        )
+        self.client.force_login(dueno)
+        response = self.client.get(url)
+
+        self.assertContains(response, "Eliminar nota")
+
+    def test_solo_dueno_erp_puede_eliminar_nota_clinica(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-DEL-NOTA",
+            nombre="Paciente Delete Nota",
+            identidad="1101200800671",
+            fecha_nacimiento="1990-01-01",
+        )
+        historia = HistoriaClinicaEspecialidad.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="capilar",
+            plan_tratamiento="Nota a eliminar",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url, {
+            "accion": "eliminar_historia",
+            "historia_id": historia.id,
+        })
+        self.assertRedirects(response, url)
+        self.assertTrue(HistoriaClinicaEspecialidad.objects.filter(id=historia.id).exists())
+
+        dueno = get_user_model().objects.create_user(
+            username="daniel.varela",
+            email="dannyvarela25@gmail.com",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=self.user.rol_sistema,
+        )
+        self.client.force_login(dueno)
+        response = self.client.post(url, {
+            "accion": "eliminar_historia",
+            "historia_id": historia.id,
+        })
+
+        self.assertRedirects(response, url)
+        self.assertFalse(HistoriaClinicaEspecialidad.objects.filter(id=historia.id).exists())
+
+    def test_seguimientos_paciente_tiene_pantalla_propia_y_edicion(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-SEG",
+            nombre="Paciente Seguimiento",
+            identidad="1101200800672",
+            fecha_nacimiento="1990-01-01",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dra. Candy Luque",
+            especialidad="Cirugia plastica",
+        )
+        cita = CitaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            profesional=profesional,
+            fecha_hora=timezone.make_aware(datetime(2026, 8, 1, 14, 0)),
+            estado="confirmada",
+            canal="recepcion",
+            motivo="Recordatorio: Botox",
+            es_recordatorio_tratamiento=True,
+            tratamiento_recordatorio="Botox",
+        )
+        url = reverse("clinica_seguimientos_paciente", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Seguimiento estético / clínico")
+        self.assertContains(response, "Recordatorios del paciente")
+
+        response = self.client.post(url, {
+            "accion": "editar_recordatorio",
+            "recordatorio_id": cita.id,
+            "tratamiento": "Retoque de Botox actualizado",
+            "fecha": "2026-08-15",
+            "hora": "03:30",
+            "periodo": "PM",
+            "profesional": str(profesional.id),
+            "nota": "Ajustado desde modulo de seguimientos.",
+        })
+
+        self.assertRedirects(response, url)
+        cita.refresh_from_db()
+        self.assertEqual(cita.tratamiento_recordatorio, "Retoque de Botox actualizado")
+        self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
+        self.assertEqual(timezone.localtime(cita.fecha_hora).minute, 30)
 
     def test_vista_clinica_completa_toma_profesional_del_usuario_vinculado(self):
         paciente = Paciente.objects.create(
