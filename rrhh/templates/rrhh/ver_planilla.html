@@ -4,7 +4,7 @@
 {% block title %}{{ periodo.nombre }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Planilla{% endblock %}
 {% block header_title %}{{ periodo.nombre }}{% endblock %}
-{% block header_description %}Lectura integral de devengados, deducciones, netos y envio de voucher por colaborador.{% endblock %}
+{% block header_description %}Lectura integral de devengados, deducciones, netos y envío de voucher por colaborador.{% endblock %}
 
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'planillas_rrhh' empresa.slug %}">Volver</a>
@@ -15,13 +15,15 @@
     <section class="erp-card erp-document-shell">
         <div class="erp-document-header">
             <div>
-                <div class="erp-kpi-label">Resumen de nomina</div>
+                <div class="erp-kpi-label">Resumen de nómina</div>
                 <h3 style="margin:8px 0 6px;">{{ periodo.nombre }}</h3>
-                <p class="erp-card-muted">Periodo {{ periodo.fecha_inicio|date:"d/m/Y" }} al {{ periodo.fecha_fin|date:"d/m/Y" }} · Pago {{ periodo.fecha_pago|date:"d/m/Y" }}</p>
+                <p class="erp-card-muted">Período {{ periodo.fecha_inicio|date:"d/m/Y" }} al {{ periodo.fecha_fin|date:"d/m/Y" }} · Pago {{ periodo.fecha_pago|date:"d/m/Y" }}</p>
                 <div class="erp-actions-cluster" style="margin-top:14px;">
                     <span class="erp-badge {% if periodo.estado == 'pagada' %}success{% elif periodo.estado == 'cerrada' %}info{% else %}warning{% endif %}">
                         {{ periodo.get_estado_display }}
                     </span>
+                    {% if periodo.incluir_13avo %}<span class="erp-badge info">Incluye 13avo</span>{% endif %}
+                    {% if periodo.incluir_14avo %}<span class="erp-badge info">Incluye 14avo</span>{% endif %}
                     {% if config_crm.whatsapp_activo %}
                     <span class="erp-badge info">WhatsApp API activo</span>
                     {% else %}
@@ -30,6 +32,10 @@
                 </div>
             </div>
             <div class="erp-document-kpis">
+                <article class="erp-document-kpi">
+                    <div class="erp-kpi-label">Colaboradores</div>
+                    <strong>{{ detalles|length }}</strong>
+                </article>
                 <article class="erp-document-kpi">
                     <div class="erp-kpi-label">Devengado</div>
                     <strong>L. {{ periodo.total_devengado|floatformat:2|intcomma }}</strong>
@@ -44,11 +50,21 @@
                 </article>
             </div>
         </div>
+
+        <div class="erp-soft-panel" style="margin-top:14px;">
+            <div class="erp-actions-cluster">
+                <span class="erp-badge {% if periodo.estado == 'borrador' %}info{% else %}success{% endif %}">1. Crear período</span>
+                <span class="erp-badge {% if periodo.estado == 'calculada' %}info{% elif periodo.estado == 'cerrada' or periodo.estado == 'pagada' %}success{% else %}warning{% endif %}">2. Generar y revisar</span>
+                <span class="erp-badge {% if periodo.estado == 'cerrada' %}info{% elif periodo.estado == 'pagada' %}success{% else %}warning{% endif %}">3. Cerrar y contabilizar</span>
+                <span class="erp-badge {% if periodo.estado == 'pagada' %}success{% else %}warning{% endif %}">4. Pagar</span>
+            </div>
+        </div>
+
         <div class="erp-document-actions">
             {% if periodo.estado == "borrador" or periodo.estado == "calculada" %}
             <form method="post" action="{% url 'generar_planilla' empresa.slug periodo.id %}">
                 {% csrf_token %}
-                <button class="erp-btn" type="submit">Generar / Recalcular</button>
+                <button class="erp-btn" type="submit">Generar / recalcular</button>
             </form>
             {% endif %}
             {% if periodo.estado == "calculada" %}
@@ -70,19 +86,20 @@
             <a class="erp-btn-secondary" href="{% url 'movimientos_planilla' empresa.slug %}">Bonos y deducciones</a>
             <a class="erp-btn-secondary" href="{% url 'vacaciones_rrhh' empresa.slug %}">Vacaciones</a>
         </div>
-        {% if asiento_cierre or asiento_pago %}<div class="erp-soft-panel" style="margin-top:14px;">
+
+        {% if asiento_cierre or asiento_pago %}
+        <div class="erp-soft-panel" style="margin-top:14px;">
             {% if asiento_cierre %}<span class="erp-badge success">Devengo {{ asiento_cierre.numero }}</span>{% endif %}
             {% if asiento_pago %}<span class="erp-badge success">Pago {{ asiento_pago.numero }}</span>{% endif %}
-        </div>{% endif %}
+        </div>
+        {% endif %}
     </section>
 
     <section class="erp-card">
         <div class="erp-card-header">
             <div>
-                <h3>Canales de entrega del voucher</h3>
-                <p>
-                    Desde aqui puedes operar PDF, correo, enlace manual y WhatsApp API. El envio API manda el resumen del pago en texto desde la configuracion CRM de la empresa.
-                </p>
+                <h3>Entrega del voucher</h3>
+                <p>Genera PDF, envía por correo, abre WhatsApp manual o utiliza WhatsApp API cuando CRM esté configurado.</p>
             </div>
         </div>
     </section>
@@ -97,7 +114,7 @@
                         <th>Devengado</th>
                         <th>Deducciones</th>
                         <th>Neto</th>
-                        <th>Extras / bonos</th>
+                        <th>Extras y beneficios</th>
                         <th>Deducciones clave</th>
                         <th>Acciones</th>
                     </tr>
@@ -107,7 +124,7 @@
                     <tr>
                         <td class="erp-doc-cell">
                             <div class="erp-doc-title">{{ detalle.empleado.nombre_completo }}</div>
-                            <div class="erp-doc-subtext">{{ detalle.empleado.puesto|default:"Sin puesto" }} · {{ detalle.empleado.departamento|default:"Sin area" }}</div>
+                            <div class="erp-doc-subtext">{{ detalle.empleado.puesto|default:"Sin puesto" }} · {{ detalle.empleado.departamento|default:"Sin área" }}</div>
                         </td>
                         <td class="erp-doc-cell">
                             <div class="erp-doc-title">{{ detalle.empleado.banco|default:"No definido" }}</div>
@@ -120,18 +137,19 @@
                             <div class="erp-doc-subtext">Extras: L. {{ detalle.monto_horas_extra|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">Bonos: L. {{ detalle.bonos|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">Comisiones: L. {{ detalle.comisiones|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">13avo: L. {{ detalle.decimo_tercero|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">14avo: L. {{ detalle.decimo_cuarto|floatformat:2|intcomma }}</div>
                         </td>
                         <td class="erp-doc-cell">
                             <div class="erp-doc-subtext">IHSS: L. {{ detalle.ihss|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">RAP: L. {{ detalle.rap|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">ISR: L. {{ detalle.isr|floatformat:2|intcomma }}</div>
-                            <div class="erp-doc-subtext">Prestamos: L. {{ detalle.prestamos|floatformat:2|intcomma }}</div>
+                            <div class="erp-doc-subtext">Préstamos: L. {{ detalle.prestamos|floatformat:2|intcomma }}</div>
                         </td>
                         <td>
                             <div class="erp-actions-cluster">
                                 {% if periodo.estado == "cerrada" or periodo.estado == "pagada" %}
-                                <span class="erp-pill-link disabled">Edicion bloqueada</span>
+                                <span class="erp-pill-link disabled">Edición bloqueada</span>
                                 {% else %}
                                 <a class="erp-pill-link" href="{% url 'editar_detalle_planilla' empresa.slug detalle.id %}">Editar</a>
                                 {% endif %}

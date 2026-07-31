@@ -140,6 +140,7 @@ class PeriodoPlanilla(models.Model):
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField()
     fecha_pago = models.DateField(default=timezone.localdate)
+    incluir_13avo = models.BooleanField(default=False)
     incluir_14avo = models.BooleanField(default=False)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="borrador")
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
@@ -186,6 +187,7 @@ class DetallePlanilla(models.Model):
     monto_horas_extra = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     bonos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     comisiones = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    decimo_tercero = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     decimo_cuarto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_devengado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     ihss = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -225,6 +227,7 @@ class DetallePlanilla(models.Model):
             f"- Horas extra: L. {self.monto_horas_extra}\n"
             f"- Bonos: L. {self.bonos}\n"
             f"- Comisiones: L. {self.comisiones}\n"
+            f"- 13avo: L. {self.decimo_tercero}\n"
             f"- 14avo: L. {self.decimo_cuarto}\n"
             f"- Total devengado: L. {self.total_devengado}\n\n"
             f"Deducciones:\n"

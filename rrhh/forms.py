@@ -66,11 +66,20 @@ class EmpleadoForm(forms.ModelForm):
 class PeriodoPlanillaForm(forms.ModelForm):
     class Meta:
         model = PeriodoPlanilla
-        fields = ["nombre", "frecuencia", "fecha_inicio", "fecha_fin", "fecha_pago", "incluir_14avo"]
+        fields = ["nombre", "frecuencia", "fecha_inicio", "fecha_fin", "fecha_pago", "incluir_13avo", "incluir_14avo"]
         widgets = {
             "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
             "fecha_fin": forms.DateInput(attrs={"type": "date"}),
             "fecha_pago": forms.DateInput(attrs={"type": "date"}),
+        }
+        labels = {
+            "nombre": "Nombre de la planilla",
+            "frecuencia": "Frecuencia de pago",
+            "fecha_inicio": "Fecha inicial",
+            "fecha_fin": "Fecha final",
+            "fecha_pago": "Fecha de pago",
+            "incluir_13avo": "Incluir 13avo proporcional",
+            "incluir_14avo": "Incluir 14avo proporcional",
         }
 
 
@@ -101,6 +110,7 @@ class DetallePlanillaForm(forms.ModelForm):
             "monto_horas_extra",
             "bonos",
             "comisiones",
+            "decimo_tercero",
             "decimo_cuarto",
             "ihss",
             "rap",
@@ -121,13 +131,14 @@ class DetallePlanillaForm(forms.ModelForm):
             "monto_horas_extra": "Monto horas extra",
             "bonos": "Bonos",
             "comisiones": "Comisiones",
+            "decimo_tercero": "13avo",
             "decimo_cuarto": "14avo",
             "ihss": "IHSS",
             "rap": "RAP",
             "isr": "ISR",
-            "prestamos": "Prestamos",
+            "prestamos": "Préstamos",
             "otras_deducciones": "Otras deducciones",
-            "observacion": "Observacion",
+            "observacion": "Observación",
         }
 
     def __init__(self, *args, **kwargs):
@@ -136,7 +147,7 @@ class DetallePlanillaForm(forms.ModelForm):
             if field_name != "observacion":
                 field.widget.attrs.update({"step": "0.01", "min": "0"})
         self.fields["monto_horas_extra"].widget.attrs.update({"readonly": "readonly"})
-        self.fields["monto_horas_extra"].help_text = "Se recalcula al guardar segun las horas indicadas y los factores configurados."
+        self.fields["monto_horas_extra"].help_text = "Se recalcula al guardar según las horas indicadas y los factores configurados."
 
 
 class VacacionEmpleadoForm(forms.ModelForm):

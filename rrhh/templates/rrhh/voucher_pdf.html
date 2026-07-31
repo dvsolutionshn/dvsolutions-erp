@@ -42,7 +42,7 @@ th{background:#0f2742;color:white}
 <div><div class="label">Empleado</div><div class="value">{{ detalle.empleado.nombre_completo }}</div></div>
 <div><div class="label">Puesto / Departamento</div><div class="value">{{ detalle.empleado.puesto|default:"-" }} {{ detalle.empleado.departamento|default:"" }}</div></div>
 <div><div class="label">Cuenta acreditada</div><div class="value">{{ detalle.empleado.banco|default:"No definido" }}</div></div>
-<div><div class="label">Numero de cuenta</div><div class="value">{{ detalle.empleado.cuenta_bancaria|default:"No definido" }}</div></div>
+<div><div class="label">Número de cuenta</div><div class="value">{{ detalle.empleado.cuenta_bancaria|default:"No definido" }}</div></div>
 </div>
 </div>
 <table>
@@ -51,16 +51,17 @@ th{background:#0f2742;color:white}
 <tr><td>Horas extra</td><td class="right">L. {{ detalle.monto_horas_extra|floatformat:2|intcomma }}</td></tr>
 <tr><td>Bonos</td><td class="right">L. {{ detalle.bonos|floatformat:2|intcomma }}</td></tr>
 <tr><td>Comisiones</td><td class="right">L. {{ detalle.comisiones|floatformat:2|intcomma }}</td></tr>
+<tr><td>13avo proporcional</td><td class="right">L. {{ detalle.decimo_tercero|floatformat:2|intcomma }}</td></tr>
 <tr><td>14avo proporcional</td><td class="right">L. {{ detalle.decimo_cuarto|floatformat:2|intcomma }}</td></tr>
 <tr><th>Total devengado</th><th class="right">L. {{ detalle.total_devengado|floatformat:2|intcomma }}</th></tr>
 <tr><td>IHSS</td><td class="right">L. {{ detalle.ihss|floatformat:2|intcomma }}</td></tr>
 <tr><td>RAP</td><td class="right">L. {{ detalle.rap|floatformat:2|intcomma }}</td></tr>
 <tr><td>ISR</td><td class="right">L. {{ detalle.isr|floatformat:2|intcomma }}</td></tr>
-<tr><td>Prestamos</td><td class="right">L. {{ detalle.prestamos|floatformat:2|intcomma }}</td></tr>
+<tr><td>Préstamos</td><td class="right">L. {{ detalle.prestamos|floatformat:2|intcomma }}</td></tr>
 <tr><td>Otras deducciones</td><td class="right">L. {{ detalle.otras_deducciones|floatformat:2|intcomma }}</td></tr>
 <tr><th>Total deducciones</th><th class="right">L. {{ detalle.total_deducciones|floatformat:2|intcomma }}</th></tr>
 <tr><td class="total">Neto a pagar</td><td class="right total">L. {{ detalle.neto_pagar|floatformat:2|intcomma }}</td></tr>
 </table>
-<p class="muted">Documento generado automaticamente por DV Solutions ERP.</p>
+<p class="muted">Documento generado automáticamente por DV Solutions ERP.</p>
 </body>
 </html>

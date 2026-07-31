@@ -188,6 +188,7 @@ class RRHHTests(TestCase):
                 "monto_horas_extra": "0.00",
                 "bonos": "500.00",
                 "comisiones": "250.00",
+                "decimo_tercero": "0.00",
                 "decimo_cuarto": "0.00",
                 "ihss": "297.58",
                 "rap": "180.00",

@@ -3,7 +3,7 @@
 {% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Planilla{% endblock %}
 {% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Define el periodo de pago, frecuencia y si deseas incluir el calculo del 14avo proporcional.{% endblock %}
+{% block header_description %}Crea el período de pago con fechas, frecuencia y beneficios hondureños opcionales para calcular la nómina sin complicaciones.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'planillas_rrhh' empresa.slug %}" class="erp-action-link">Volver a Planillas</a>
@@ -14,6 +14,13 @@
     <form method="post" class="erp-form-shell" autocomplete="off">
         {% csrf_token %}
         {% if form.non_field_errors %}<div class="erp-message">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="erp-card-header">
+            <div>
+                <div class="erp-kpi-label">Paso 1</div>
+                <h3>Datos del período</h3>
+                <p>La planilla se crea en borrador. Después podrás generar el cálculo, revisar empleado por empleado, cerrar y pagar.</p>
+            </div>
+        </div>
         <div class="erp-form-grid two">
             <div class="erp-field">
                 <label for="{{ form.nombre.id_for_label }}">Nombre de la planilla</label>
@@ -41,19 +48,19 @@
                 {% for error in form.fecha_pago.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
             </div>
             <div class="erp-field rrhh-check-field">
-                <label>Opciones</label>
-                <label class="rrhh-inline-check">{{ form.incluir_14avo }} Incluir 14avo proporcional</label>
-                <div class="erp-field-help">Activalo solo cuando esta planilla pague decimo cuarto proporcional.</div>
+                <label>Beneficios hondureños</label>
+                <label class="rrhh-inline-check">{{ form.incluir_13avo }} {{ form.incluir_13avo.label }}</label>
+                <label class="rrhh-inline-check">{{ form.incluir_14avo }} {{ form.incluir_14avo.label }}</label>
+                <div class="erp-field-help">Actívalos solo cuando este período pague décimo tercero o décimo cuarto proporcional.</div>
             </div>
-            <div class="erp-field">
-                <label for="{{ form.estado.id_for_label }}">Estado</label>
-                {{ form.estado }}
-                {% for error in form.estado.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
-            </div>
+        </div>
+        <div class="erp-soft-panel">
+            <strong>Parámetros de Honduras configurables.</strong>
+            IHSS, RAP, ISR, días base y factores de horas extra se toman desde Configuración de RRHH por empresa, para que puedas ajustarlos cuando cambien las reglas o políticas internas.
         </div>
         <div class="erp-form-actions">
             <a class="erp-btn-secondary" href="{% url 'planillas_rrhh' empresa.slug %}">Cancelar</a>
-            <button class="erp-btn" type="submit">Guardar Planilla</button>
+            <button class="erp-btn" type="submit">Crear planilla</button>
         </div>
     </form>
 </section>

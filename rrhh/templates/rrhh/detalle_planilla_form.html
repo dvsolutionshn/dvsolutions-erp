@@ -4,7 +4,7 @@
 {% block title %}Editar detalle de planilla - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Planilla{% endblock %}
 {% block header_title %}Editar {{ detalle.empleado.nombre_completo }}{% endblock %}
-{% block header_description %}Ajusta valores por empleado: prestamos, deducciones, bonos, comisiones, horas extras y observaciones.{% endblock %}
+{% block header_description %}Ajusta valores por empleado: préstamos, deducciones, bonos, comisiones, horas extras y observaciones.{% endblock %}
 
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'ver_planilla' empresa.slug periodo.id %}">Volver a Planilla</a>
@@ -40,12 +40,12 @@
         <div class="erp-card-header">
             <div>
                 <h3>Devengados</h3>
-                <p>El monto de horas extras se recalcula automaticamente al guardar.</p>
+                <p>El monto de horas extras se recalcula automáticamente al guardar.</p>
             </div>
         </div>
         <div class="erp-form-grid three">
             {% for field in form %}
-                {% if field.name == "dias_pagados" or field.name == "salario_base" or field.name == "horas_extra_diurnas" or field.name == "horas_extra_nocturnas" or field.name == "horas_extra_feriado" or field.name == "monto_horas_extra" or field.name == "bonos" or field.name == "comisiones" or field.name == "decimo_cuarto" %}
+                {% if field.name == "dias_pagados" or field.name == "salario_base" or field.name == "horas_extra_diurnas" or field.name == "horas_extra_nocturnas" or field.name == "horas_extra_feriado" or field.name == "monto_horas_extra" or field.name == "bonos" or field.name == "comisiones" or field.name == "decimo_tercero" or field.name == "decimo_cuarto" %}
                 <div class="erp-field">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
@@ -59,7 +59,7 @@
         <div class="erp-card-header">
             <div>
                 <h3>Deducciones</h3>
-                <p>Aqui puedes ajustar prestamos, otras deducciones y deducciones legales si aplica.</p>
+                <p>Aquí puedes ajustar préstamos, otras deducciones y deducciones legales si aplica.</p>
             </div>
         </div>
         <div class="erp-form-grid three">

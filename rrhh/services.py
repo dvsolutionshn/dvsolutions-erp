@@ -48,6 +48,19 @@ def calcular_decimo_cuarto_proporcional(empleado, periodo):
     return q2((empleado.salario_mensual / Decimal("360.00")) * dias)
 
 
+def calcular_decimo_tercero_proporcional(empleado, periodo):
+    if not getattr(periodo, "incluir_13avo", False):
+        return Decimal("0.00")
+    corte_inicio = periodo.fecha_fin.replace(month=1, day=1)
+    corte_fin = periodo.fecha_fin.replace(month=12, day=31)
+    inicio = max(empleado.fecha_ingreso, corte_inicio)
+    fin = min(empleado.fecha_salida or corte_fin, corte_fin)
+    if fin < inicio:
+        return Decimal("0.00")
+    dias = Decimal((fin - inicio).days + 1)
+    return q2((empleado.salario_mensual / Decimal("360.00")) * dias)
+
+
 def movimientos_periodo(empleado, periodo):
     qs = MovimientoPlanilla.objects.filter(empleado=empleado, aplicado=False).filter(
         periodo__isnull=True
@@ -80,8 +93,9 @@ def calcular_detalle_planilla(empleado, periodo, *, horas_extra_diurnas=0, horas
         elif movimiento.tipo == "deduccion":
             otras_deducciones += movimiento.monto
 
+    decimo_tercero = calcular_decimo_tercero_proporcional(empleado, periodo)
     decimo_cuarto = calcular_decimo_cuarto_proporcional(empleado, periodo)
-    total_devengado = q2(salario_base + monto_horas_extra + bonos + comisiones + decimo_cuarto)
+    total_devengado = q2(salario_base + monto_horas_extra + bonos + comisiones + decimo_tercero + decimo_cuarto)
     ihss_base = min(salario_base, config.ihss_techo_mensual)
     ihss = q2(ihss_base * config.ihss_trabajador_porcentaje) if empleado.aplica_ihss else Decimal("0.00")
     rap = q2(salario_base * config.rap_trabajador_porcentaje) if empleado.aplica_rap and config.aplicar_rap else Decimal("0.00")
@@ -97,6 +111,7 @@ def calcular_detalle_planilla(empleado, periodo, *, horas_extra_diurnas=0, horas
         "monto_horas_extra": monto_horas_extra,
         "bonos": q2(bonos),
         "comisiones": q2(comisiones),
+        "decimo_tercero": decimo_tercero,
         "decimo_cuarto": decimo_cuarto,
         "total_devengado": total_devengado,
         "ihss": ihss,
@@ -120,6 +135,7 @@ def recalcular_detalle_planilla(detalle):
     detalle.salario_base = q2(detalle.salario_base)
     detalle.bonos = q2(detalle.bonos)
     detalle.comisiones = q2(detalle.comisiones)
+    detalle.decimo_tercero = q2(detalle.decimo_tercero)
     detalle.decimo_cuarto = q2(detalle.decimo_cuarto)
     detalle.ihss = q2(detalle.ihss)
     detalle.rap = q2(detalle.rap)
@@ -131,6 +147,7 @@ def recalcular_detalle_planilla(detalle):
         + detalle.monto_horas_extra
         + detalle.bonos
         + detalle.comisiones
+        + detalle.decimo_tercero
         + detalle.decimo_cuarto
     )
     detalle.total_deducciones = q2(
