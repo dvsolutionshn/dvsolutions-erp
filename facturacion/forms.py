@@ -187,6 +187,12 @@ class PagoCompraForm(forms.ModelForm):
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
         self.fields['observacion'].required = False
+        self.fields['fecha'].label = 'Fecha'
+        self.fields['monto'].label = 'Monto'
+        self.fields['metodo'].label = 'Metodo'
+        self.fields['cuenta_financiera'].label = 'Cuenta financiera'
+        self.fields['referencia'].label = 'Referencia'
+        self.fields['observacion'].label = 'Observacion'
         if empresa:
             from contabilidad.models import CuentaFinanciera
 

@@ -87,6 +87,12 @@
             {% if form.metodo.errors %}<div class="erp-field-error">{{ form.metodo.errors|join:", " }}</div>{% endif %}
         </div>
         <div class="erp-field">
+            <label for="{{ form.cuenta_financiera.id_for_label }}">Cuenta financiera</label>
+            {{ form.cuenta_financiera }}
+            {% if form.cuenta_financiera.help_text %}<small>{{ form.cuenta_financiera.help_text }}</small>{% endif %}
+            {% if form.cuenta_financiera.errors %}<div class="erp-field-error">{{ form.cuenta_financiera.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div class="erp-field">
             <label for="{{ form.referencia.id_for_label }}">Referencia</label>
             {{ form.referencia }}
             {% if form.referencia.help_text %}<small>{{ form.referencia.help_text }}</small>{% endif %}

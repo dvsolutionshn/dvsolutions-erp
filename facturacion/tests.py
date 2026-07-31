@@ -5860,6 +5860,58 @@ class FacturacionTests(TestCase):
             ).exists()
         )
 
+    def test_registrar_pago_compra_muestra_cuenta_financiera(self):
+        compra = self.crear_compra_con_linea()
+        cuenta_caja = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110101",
+            nombre="Caja General",
+            tipo="activo",
+        )
+        CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Caja General HNL",
+            tipo="caja",
+            cuenta_contable=cuenta_caja,
+        )
+
+        response = self.client.get(reverse("registrar_pago_compra", args=[self.empresa.slug, compra.id]))
+
+        self.assertContains(response, 'name="cuenta_financiera"', html=False)
+        self.assertContains(response, "Caja General HNL")
+
+    def test_pago_compra_efectivo_usa_caja_por_defecto_si_no_envian_cuenta(self):
+        compra = self.crear_compra_con_linea()
+        cuenta_caja = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110101",
+            nombre="Caja General",
+            tipo="activo",
+        )
+        caja = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Caja General HNL",
+            tipo="caja",
+            cuenta_contable=cuenta_caja,
+        )
+
+        response = self.client.post(
+            reverse("registrar_pago_compra", args=[self.empresa.slug, compra.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "60.00",
+                "metodo": "efectivo",
+                "referencia": "EF-001",
+                "observacion": "Pago en efectivo",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pago de compra registrado correctamente")
+        pago = PagoCompra.objects.get(compra=compra, referencia="EF-001")
+        self.assertEqual(pago.cuenta_financiera, caja)
+
     def test_reporte_cxp_muestra_proveedor_y_compras_pendientes(self):
         compra = self.crear_compra_con_linea()
 

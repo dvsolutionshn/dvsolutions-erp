@@ -4300,7 +4300,7 @@ def anular_compra(request, empresa_slug, compra_id):
 @login_required
 def registrar_pago_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    _cuentas_financieras_activas_para_pago(empresa)
+    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related('pagos_compra'),
         id=compra_id,
@@ -4312,7 +4312,16 @@ def registrar_pago_compra(request, empresa_slug, compra_id):
         return redirect("ver_compra", empresa_slug=empresa.slug, compra_id=compra.id)
 
     if request.method == "POST":
-        form = PagoCompraForm(request.POST, empresa=empresa)
+        post_data = request.POST.copy()
+        if not post_data.get("cuenta_financiera"):
+            cuenta_defecto = _cuenta_financiera_por_defecto(
+                cuentas_financieras,
+                post_data.get("metodo") or "efectivo",
+            )
+            if cuenta_defecto:
+                post_data["cuenta_financiera"] = str(cuenta_defecto.id)
+
+        form = PagoCompraForm(post_data, empresa=empresa)
         form.instance.compra = compra
         if form.is_valid():
             try:
@@ -4337,7 +4346,14 @@ def registrar_pago_compra(request, empresa_slug, compra_id):
         if not form.errors:
             messages.error(request, "Revisa la informacion del pago antes de continuar.")
     else:
-        form = PagoCompraForm(initial={"fecha": timezone.now().date()}, empresa=empresa)
+        cuenta_defecto = _cuenta_financiera_por_defecto(cuentas_financieras, "efectivo")
+        form = PagoCompraForm(
+            initial={
+                "fecha": timezone.now().date(),
+                "cuenta_financiera": cuenta_defecto.id if cuenta_defecto else None,
+            },
+            empresa=empresa,
+        )
 
     historial = compra.pagos_compra.all()
     return render(request, "facturacion/registrar_pago_compra.html", {
@@ -4345,6 +4361,7 @@ def registrar_pago_compra(request, empresa_slug, compra_id):
         "compra": compra,
         "form": form,
         "historial": historial,
+        "cuentas_financieras": cuentas_financieras,
     })
 
 
