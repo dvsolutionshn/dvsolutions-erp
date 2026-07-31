@@ -78,7 +78,7 @@
             {{ form.monto }}
             {% if form.monto.help_text %}<small>{{ form.monto.help_text }}</small>{% endif %}
             {% if form.monto.errors %}<div class="erp-field-error">{{ form.monto.errors|join:", " }}</div>{% endif %}
-            <button class="erp-btn-secondary" type="button" onclick="document.getElementById('{{ form.monto.id_for_label }}').value='{{ compra.saldo_pendiente }}';">Usar saldo pendiente</button>
+            <button class="erp-btn-secondary" type="button" onclick="document.getElementById('{{ form.monto.id_for_label }}').value='{{ compra.saldo_pendiente|floatformat:2 }}';">Usar saldo pendiente</button>
         </div>
         <div class="erp-field">
             <label for="{{ form.metodo.id_for_label }}">Metodo</label>

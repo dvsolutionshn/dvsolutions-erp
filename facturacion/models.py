@@ -831,15 +831,15 @@ class CompraInventario(models.Model):
 
     @property
     def total_documento(self):
-        return sum((linea.total_linea for linea in self.lineas.all()), Decimal('0.00'))
+        return sum((linea.total_linea for linea in self.lineas.all()), Decimal('0.00')).quantize(Decimal("0.01"))
 
     @property
     def total_pagado(self):
-        return sum((pago.monto for pago in self.pagos_compra.all()), Decimal('0.00'))
+        return sum((pago.monto for pago in self.pagos_compra.all()), Decimal('0.00')).quantize(Decimal("0.01"))
 
     @property
     def saldo_pendiente(self):
-        saldo = self.total_documento - self.total_pagado
+        saldo = (self.total_documento - self.total_pagado).quantize(Decimal("0.01"))
         return saldo if saldo > 0 else Decimal('0.00')
 
     @property
@@ -1075,9 +1075,14 @@ class ComprobanteEgresoCompra(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero_comprobante:
-            ultimo = ComprobanteEgresoCompra.objects.filter(empresa=self.empresa).order_by('-id').first()
+            ultimo = ComprobanteEgresoCompra.objects.order_by('-id').first()
             siguiente = 1 if not ultimo else ultimo.id + 1
-            self.numero_comprobante = f"EGR-{str(siguiente).zfill(8)}"
+            while True:
+                numero = f"EGR-{str(siguiente).zfill(8)}"
+                if not ComprobanteEgresoCompra.objects.filter(numero_comprobante=numero).exists():
+                    self.numero_comprobante = numero
+                    break
+                siguiente += 1
         super().save(*args, **kwargs)
 
     def __str__(self):

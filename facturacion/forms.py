@@ -175,6 +175,15 @@ class PagoCompraForm(forms.ModelForm):
             'referencia': forms.TextInput(),
             'observacion': forms.Textarea(attrs={'rows': 3}),
         }
+        error_messages = {
+            'monto': {
+                'max_decimal_places': 'Use solamente 2 decimales.',
+                'invalid': 'Ingrese un monto valido.',
+            },
+            'cuenta_financiera': {
+                'required': 'Seleccione la cuenta financiera de donde salio el pago.',
+            },
+        }
         help_texts = {
             'fecha': 'Fecha efectiva del pago registrado al proveedor.',
             'monto': 'No puede superar el saldo pendiente de la compra.',

@@ -5879,6 +5879,7 @@ class FacturacionTests(TestCase):
 
         self.assertContains(response, 'name="cuenta_financiera"', html=False)
         self.assertContains(response, "Caja General HNL")
+        self.assertContains(response, f"value='{compra.saldo_pendiente:.2f}'", html=False)
 
     def test_pago_compra_efectivo_usa_caja_por_defecto_si_no_envian_cuenta(self):
         compra = self.crear_compra_con_linea()
@@ -5911,6 +5912,53 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Pago de compra registrado correctamente")
         pago = PagoCompra.objects.get(compra=compra, referencia="EF-001")
         self.assertEqual(pago.cuenta_financiera, caja)
+
+    def test_comprobante_pago_compra_evita_numero_duplicado_global_entre_empresas(self):
+        compra = self.crear_compra_con_linea()
+        pago = PagoCompra.objects.create(
+            compra=compra,
+            fecha=date.today(),
+            monto=Decimal("25.00"),
+            metodo="efectivo",
+            referencia="EGR-DEMO",
+        )
+        numero_existente = pago.comprobante.numero_comprobante
+
+        otra_empresa = Empresa.objects.create(
+            nombre="Hospital Mia",
+            slug="hospital_mia",
+            rtn="08011999000001",
+        )
+        proveedor = Proveedor.objects.create(empresa=otra_empresa, nombre="Proveedor Hospital")
+        producto = Producto.objects.create(
+            empresa=otra_empresa,
+            nombre="Producto Hospital",
+            precio=Decimal("100.00"),
+            impuesto_predeterminado=self.impuesto,
+        )
+        compra_hospital = CompraInventario.objects.create(
+            empresa=otra_empresa,
+            proveedor=proveedor,
+            proveedor_nombre=proveedor.nombre,
+            fecha_documento=date.today(),
+            estado="aplicada",
+        )
+        LineaCompraInventario.objects.create(
+            compra=compra_hospital,
+            producto=producto,
+            cantidad=Decimal("1.00"),
+            costo_unitario=Decimal("30.00"),
+        )
+
+        pago_hospital = PagoCompra.objects.create(
+            compra=compra_hospital,
+            fecha=date.today(),
+            monto=Decimal("30.00"),
+            metodo="efectivo",
+            referencia="EGR-HOSP",
+        )
+
+        self.assertNotEqual(pago_hospital.comprobante.numero_comprobante, numero_existente)
 
     def test_reporte_cxp_muestra_proveedor_y_compras_pendientes(self):
         compra = self.crear_compra_con_linea()
