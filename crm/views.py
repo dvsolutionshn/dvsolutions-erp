@@ -17,7 +17,9 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 
 from core.models import Empresa
-from facturacion.models import Cliente, Producto
+from contabilidad.models import CuentaFinanciera
+from contabilidad.services import asegurar_cuentas_financieras_base_honduras
+from facturacion.models import Cliente, PagoFactura, Producto, TipoImpuesto
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
@@ -946,6 +948,51 @@ def agenda_mobile(request, empresa_slug):
         empresa=empresa,
         activo=True,
     ).order_by("-fecha_actualizacion", "-id")[:4]
+    pacientes_app_qs = Paciente.objects.filter(empresa=empresa, activo=True).order_by("-fecha_actualizacion", "nombre")[:120]
+    contexto["pacientes_app_payload"] = [
+        {
+            "id": paciente.id,
+            "nombre": paciente.nombre,
+            "documento": paciente.identidad or "",
+            "expediente": paciente.expediente_codigo,
+            "telefono": paciente.whatsapp or paciente.telefono or "",
+            "correo": paciente.correo or "",
+            "edad": paciente.edad,
+            "alergico": paciente.es_alergico,
+            "url": reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id]),
+        }
+        for paciente in pacientes_app_qs
+    ]
+    impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")
+    impuesto_default = impuestos_qs.first()
+    productos_app_qs = (
+        Producto.objects.filter(empresa=empresa, activo=True, eliminado=False)
+        .select_related("impuesto_predeterminado")
+        .order_by("nombre")[:180]
+    )
+    contexto["productos_app_payload"] = [
+        {
+            "id": producto.id,
+            "nombre": producto.nombre,
+            "codigo": producto.codigo or "",
+            "precio": float(producto.precio or 0),
+            "impuesto": float((producto.impuesto_predeterminado or impuesto_default).porcentaje if (producto.impuesto_predeterminado or impuesto_default) else 0),
+            "tipo_item": producto.tipo_item,
+            "stock": float(producto.stock_actual),
+        }
+        for producto in productos_app_qs
+    ]
+    try:
+        asegurar_cuentas_financieras_base_honduras(empresa)
+    except Exception:
+        logger.exception("No se pudieron asegurar cuentas financieras para app movil de %s", empresa.id)
+    cuentas_app_qs = CuentaFinanciera.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre")
+    contexto["cuentas_app_payload"] = [
+        {"id": cuenta.id, "nombre": cuenta.nombre, "tipo": cuenta.tipo}
+        for cuenta in cuentas_app_qs
+    ]
+    contexto["metodos_pago_app"] = PagoFactura.METODOS
+    contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
     return render(request, "crm/agenda_mobile.html", contexto)
 
 
