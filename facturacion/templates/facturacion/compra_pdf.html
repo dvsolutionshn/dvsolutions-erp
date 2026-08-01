@@ -67,9 +67,11 @@
         .status.warning{background:#fff7d6;color:#a16207;}
         .status.danger{background:#ffe4e6;color:#be123c;}
         .summary-strip{
-            display:grid;
-            grid-template-columns:1.35fr 1fr .95fr;
-            gap:0;
+            display:table;
+            width:100%;
+            table-layout:fixed;
+            border-collapse:separate;
+            border-spacing:0;
             margin-bottom:7px;
             border:1px solid #dbe7f2;
             border-radius:10px;
@@ -83,10 +85,17 @@
             background:#fff;
         }
         .summary-cell{
+            display:table-cell;
             padding:7px 9px;
             border-right:1px solid #e4edf6;
             min-height:45px;
+            vertical-align:top;
+            overflow-wrap:break-word;
+            word-break:normal;
         }
+        .summary-provider{width:40%;}
+        .summary-document{width:30%;}
+        .summary-payment{width:30%;}
         .summary-cell:last-child{border-right:0;}
         .summary-cell h3{
             margin:0 0 4px;
@@ -103,19 +112,20 @@
             color:#31445d;
         }
         .facts{
-            display:grid;
-            grid-template-columns:repeat(2, minmax(0, 1fr));
-            gap:4px 8px;
+            display:block;
         }
         .label{
+            display:inline;
             font-size:6.8px;
             text-transform:uppercase;
             letter-spacing:.10em;
             color:#6b7f94;
             font-weight:900;
-            margin-bottom:1px;
+            margin-right:4px;
         }
-        .value{font-weight:900;color:#102338;}
+        .value{display:inline;font-weight:900;color:#102338;}
+        .facts > div{margin-bottom:2px;}
+        .facts > div:last-child{margin-bottom:0;}
         table{
             width:100%;
             border-collapse:collapse;
@@ -214,7 +224,7 @@
     </div>
 
     <div class="summary-strip">
-        <div class="summary-cell">
+        <div class="summary-cell summary-provider">
             <h3>Proveedor</h3>
             <div class="facts">
                 <div>
@@ -227,7 +237,7 @@
                 </div>
             </div>
         </div>
-        <div class="summary-cell">
+        <div class="summary-cell summary-document">
             <h3>Documento</h3>
             <div class="facts">
                 <div>
@@ -240,7 +250,7 @@
                 </div>
             </div>
         </div>
-        <div class="summary-cell">
+        <div class="summary-cell summary-payment">
             <h3>Pago</h3>
             <div class="facts">
                 <div>
