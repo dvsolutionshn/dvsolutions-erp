@@ -66,17 +66,34 @@
         }
         .status.warning{background:#fff7d6;color:#a16207;}
         .status.danger{background:#ffe4e6;color:#be123c;}
-        .summary-grid{
+        .summary-strip{
             display:grid;
-            grid-template-columns:1.25fr 1fr 1fr;
-            gap:6px;
+            grid-template-columns:1.35fr 1fr .95fr;
+            gap:0;
             margin-bottom:7px;
+            border:1px solid #dbe7f2;
+            border-radius:10px;
+            background:#fff;
+            overflow:hidden;
         }
         .card{
             border:1px solid #dbe7f2;
             border-radius:10px;
             padding:7px 8px;
             background:#fff;
+        }
+        .summary-cell{
+            padding:7px 9px;
+            border-right:1px solid #e4edf6;
+            min-height:45px;
+        }
+        .summary-cell:last-child{border-right:0;}
+        .summary-cell h3{
+            margin:0 0 4px;
+            font-size:7.8px;
+            text-transform:uppercase;
+            letter-spacing:.11em;
+            color:#31445d;
         }
         .card h3{
             margin:0 0 5px;
@@ -196,8 +213,8 @@
         </div>
     </div>
 
-    <div class="summary-grid">
-        <div class="card">
+    <div class="summary-strip">
+        <div class="summary-cell">
             <h3>Proveedor</h3>
             <div class="facts">
                 <div>
@@ -210,7 +227,7 @@
                 </div>
             </div>
         </div>
-        <div class="card">
+        <div class="summary-cell">
             <h3>Documento</h3>
             <div class="facts">
                 <div>
@@ -223,7 +240,7 @@
                 </div>
             </div>
         </div>
-        <div class="card">
+        <div class="summary-cell">
             <h3>Pago</h3>
             <div class="facts">
                 <div>
