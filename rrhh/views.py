@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from decimal import Decimal, InvalidOperation
 from django.core.mail import EmailMessage
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -25,7 +26,7 @@ from .forms import (
     VacacionEmpleadoForm,
 )
 from .models import DetallePlanilla, Empleado, MovimientoPlanilla, PeriodoPlanilla, VacacionEmpleado
-from .services import configuracion_rrhh, generar_planilla, recalcular_detalle_planilla
+from .services import configuracion_rrhh, generar_planilla, recalcular_detalle_planilla, dias_pagables_empleado
 
 
 def _empresa_desde_slug(empresa_slug):
@@ -159,12 +160,32 @@ def ver_planilla(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
     periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
     config_crm = _configuracion_crm(empresa)
+    detalles = periodo.detalles.select_related("empleado")
+    detalles_por_empleado = {detalle.empleado_id: detalle for detalle in detalles}
+    empleados = Empleado.objects.filter(
+        empresa=empresa,
+        estado="activo",
+        fecha_ingreso__lte=periodo.fecha_fin,
+    ).order_by("nombres", "apellidos")
+    if periodo.fecha_inicio:
+        empleados = empleados.filter(fecha_salida__isnull=True) | empleados.filter(fecha_salida__gte=periodo.fecha_inicio)
+    empleados_planilla = []
+    for empleado in empleados.distinct().order_by("nombres", "apellidos"):
+        detalle = detalles_por_empleado.get(empleado.id)
+        empleados_planilla.append({
+            "empleado": empleado,
+            "detalle": detalle,
+            "dias_sugeridos": detalle.dias_pagados if detalle else dias_pagables_empleado(empleado, periodo),
+            "dias_input": f"{(detalle.dias_pagados if detalle else dias_pagables_empleado(empleado, periodo)):.2f}",
+        })
     return render(request, "rrhh/ver_planilla.html", {
         "empresa": empresa,
         "periodo": periodo,
-        "detalles": periodo.detalles.select_related("empleado"),
+        "detalles": detalles,
+        "empleados_planilla": empleados_planilla,
         "config_crm": config_crm,
         "cuentas_financieras": CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related("cuenta_contable"),
+        "metodos_pago_planilla": PeriodoPlanilla.METODO_PAGO_CHOICES,
         "asiento_cierre": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="cierre").first(),
         "asiento_pago": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="pago").first(),
     })
@@ -178,7 +199,24 @@ def generar_planilla_view(request, empresa_slug, periodo_id):
     if periodo.estado in {"cerrada", "pagada"}:
         messages.error(request, "Una planilla cerrada o pagada no puede recalcularse.")
         return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
-    creados = generar_planilla(periodo)
+    dias_por_empleado = {}
+    errores = []
+    for key, value in request.POST.items():
+        if not key.startswith("dias_empleado_"):
+            continue
+        empleado_id = key.replace("dias_empleado_", "", 1)
+        try:
+            dias = Decimal(value or "0")
+            if dias < 0:
+                raise InvalidOperation
+            dias_por_empleado[int(empleado_id)] = dias
+        except (InvalidOperation, ValueError):
+            errores.append("Revisa los días trabajados; deben ser números positivos.")
+            break
+    if errores:
+        messages.error(request, errores[0])
+        return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
+    creados = generar_planilla(periodo, dias_por_empleado=dias_por_empleado)
     messages.success(request, f"Planilla calculada correctamente para {creados} empleado(s).")
     return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
 
@@ -215,18 +253,23 @@ def pagar_planilla(request, empresa_slug, periodo_id):
     cuenta = CuentaFinanciera.objects.filter(
         empresa=empresa, activa=True, id=request.POST.get("cuenta_financiera")
     ).select_related("cuenta_contable").first()
+    metodo_pago = request.POST.get("metodo_pago") or "transferencia"
+    metodos_validos = {codigo for codigo, _ in PeriodoPlanilla.METODO_PAGO_CHOICES}
     if periodo.estado == "pagada":
         messages.info(request, "La planilla ya estaba pagada.")
     elif periodo.estado != "cerrada":
         messages.error(request, "La planilla debe estar cerrada antes de pagarla.")
     elif not cuenta:
         messages.error(request, "Selecciona la caja o cuenta bancaria desde la que se pago la planilla.")
+    elif metodo_pago not in metodos_validos:
+        messages.error(request, "Selecciona un metodo de pago valido para la planilla.")
     else:
         try:
             with transaction.atomic():
                 periodo.cuenta_financiera_pago = cuenta
+                periodo.metodo_pago = metodo_pago
                 periodo.estado = "pagada"
-                periodo.save(update_fields=["cuenta_financiera_pago", "estado"])
+                periodo.save(update_fields=["cuenta_financiera_pago", "metodo_pago", "estado"])
                 registrar_asiento_planilla_pagada(periodo, request.user)
         except ValidationError as exc:
             messages.error(request, "; ".join(exc.messages))

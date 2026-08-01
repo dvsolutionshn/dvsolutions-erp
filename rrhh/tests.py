@@ -75,6 +75,36 @@ class RRHHTests(TestCase):
         self.assertGreater(detalle.rap, Decimal("0.00"))
         self.assertGreater(detalle.neto_pagar, Decimal("0.00"))
 
+    def test_generar_planilla_permita_dias_trabajados_por_empleado(self):
+        empleado = Empleado.objects.create(
+            empresa=self.empresa,
+            codigo="EMP-DIAS-001",
+            nombres="Rosa",
+            apellidos="Sanchez",
+            identidad="0801199900123",
+            fecha_ingreso=date(2026, 1, 1),
+            salario_mensual=Decimal("30000.00"),
+        )
+        periodo = PeriodoPlanilla.objects.create(
+            empresa=self.empresa,
+            nombre="Planilla con ausencias",
+            frecuencia="mensual",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 7, 30),
+            fecha_pago=date(2026, 7, 30),
+        )
+        self.client.login(username="rrhh", password="pass12345")
+
+        response = self.client.post(
+            reverse("generar_planilla", args=[self.empresa.slug, periodo.id]),
+            {f"dias_empleado_{empleado.id}": "28.00"},
+        )
+
+        self.assertRedirects(response, reverse("ver_planilla", args=[self.empresa.slug, periodo.id]))
+        detalle = DetallePlanilla.objects.get(periodo=periodo, empleado=empleado)
+        self.assertEqual(detalle.dias_pagados, Decimal("28.00"))
+        self.assertEqual(detalle.salario_base, Decimal("28000.00"))
+
     def test_cerrar_y_pagar_planilla_genera_asientos_balanceados(self):
         empleado = Empleado.objects.create(
             empresa=self.empresa,
@@ -133,6 +163,7 @@ class RRHHTests(TestCase):
         periodo.refresh_from_db()
         self.assertEqual(periodo.estado, "pagada")
         self.assertEqual(periodo.cuenta_financiera_pago, cuenta_financiera)
+        self.assertEqual(periodo.metodo_pago, "transferencia")
         pago = AsientoContable.objects.get(documento_tipo="planilla", documento_id=periodo.id, evento="pago")
         self.assertEqual(pago.total_debe, Decimal("850.00"))
         self.assertEqual(pago.total_haber, Decimal("850.00"))
@@ -146,6 +177,50 @@ class RRHHTests(TestCase):
             AsientoContable.objects.filter(documento_tipo="planilla", documento_id=periodo.id, evento="pago").count(),
             1,
         )
+
+    def test_pagar_planilla_registra_metodo_efectivo(self):
+        empleado = Empleado.objects.create(
+            empresa=self.empresa,
+            codigo="EMP-EFE-001",
+            nombres="Luis",
+            apellidos="Caja",
+            identidad="0801199900199",
+            fecha_ingreso=date(2026, 1, 1),
+            salario_mensual=Decimal("1000.00"),
+        )
+        periodo = PeriodoPlanilla.objects.create(
+            empresa=self.empresa,
+            nombre="Planilla efectivo",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 7, 30),
+            fecha_pago=date(2026, 7, 30),
+            estado="cerrada",
+            creado_por=self.usuario,
+        )
+        DetallePlanilla.objects.create(
+            periodo=periodo,
+            empleado=empleado,
+            salario_base=Decimal("1000.00"),
+            total_devengado=Decimal("1000.00"),
+            neto_pagar=Decimal("1000.00"),
+        )
+        caja_contable = CuentaContable.objects.create(
+            empresa=self.empresa, codigo="110101", nombre="Caja general", tipo="activo"
+        )
+        caja = CuentaFinanciera.objects.create(
+            empresa=self.empresa, nombre="Caja General", tipo="caja", cuenta_contable=caja_contable
+        )
+        self.client.login(username="rrhh", password="pass12345")
+
+        response = self.client.post(
+            reverse("pagar_planilla", args=[self.empresa.slug, periodo.id]),
+            {"cuenta_financiera": caja.id, "metodo_pago": "efectivo"},
+        )
+
+        self.assertRedirects(response, reverse("ver_planilla", args=[self.empresa.slug, periodo.id]))
+        periodo.refresh_from_db()
+        self.assertEqual(periodo.estado, "pagada")
+        self.assertEqual(periodo.metodo_pago, "efectivo")
 
     def test_dashboard_rrhh_responde_con_permiso(self):
         self.client.login(username="rrhh", password="pass12345")

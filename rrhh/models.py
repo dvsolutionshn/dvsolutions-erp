@@ -133,6 +133,12 @@ class PeriodoPlanilla(models.Model):
         ("semanal", "Semanal"),
         ("especial", "Especial"),
     ]
+    METODO_PAGO_CHOICES = [
+        ("efectivo", "Efectivo"),
+        ("transferencia", "Transferencia"),
+        ("cheque", "Cheque"),
+        ("tarjeta", "Tarjeta"),
+    ]
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="periodos_planilla")
     nombre = models.CharField(max_length=160)
@@ -143,6 +149,7 @@ class PeriodoPlanilla(models.Model):
     incluir_13avo = models.BooleanField(default=False)
     incluir_14avo = models.BooleanField(default=False)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="borrador")
+    metodo_pago = models.CharField(max_length=20, choices=METODO_PAGO_CHOICES, default="transferencia")
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     cuenta_financiera_pago = models.ForeignKey(
         'contabilidad.CuentaFinanciera',

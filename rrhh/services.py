@@ -68,9 +68,19 @@ def movimientos_periodo(empleado, periodo):
     return qs
 
 
-def calcular_detalle_planilla(empleado, periodo, *, horas_extra_diurnas=0, horas_extra_nocturnas=0, horas_extra_feriado=0):
+def calcular_detalle_planilla(
+    empleado,
+    periodo,
+    *,
+    dias_pagados=None,
+    horas_extra_diurnas=0,
+    horas_extra_nocturnas=0,
+    horas_extra_feriado=0,
+):
     config = configuracion_rrhh(periodo.empresa)
-    dias = dias_pagables_empleado(empleado, periodo)
+    dias = Decimal(dias_pagados) if dias_pagados is not None else dias_pagables_empleado(empleado, periodo)
+    if dias < 0:
+        dias = Decimal("0.00")
     salario_base = q2((empleado.salario_mensual / Decimal(str(config.dias_base_mes))) * dias)
     monto_horas_extra = q2(
         (Decimal(horas_extra_diurnas or 0) * empleado.salario_hora * config.hora_extra_diurna_factor)
@@ -132,7 +142,10 @@ def recalcular_detalle_planilla(detalle):
         + (Decimal(detalle.horas_extra_nocturnas or 0) * detalle.empleado.salario_hora * config.hora_extra_nocturna_factor)
         + (Decimal(detalle.horas_extra_feriado or 0) * detalle.empleado.salario_hora * config.hora_extra_feriado_factor)
     )
-    detalle.salario_base = q2(detalle.salario_base)
+    detalle.dias_pagados = Decimal(detalle.dias_pagados or 0)
+    if detalle.dias_pagados < 0:
+        detalle.dias_pagados = Decimal("0.00")
+    detalle.salario_base = q2((detalle.empleado.salario_mensual / Decimal(str(config.dias_base_mes))) * detalle.dias_pagados)
     detalle.bonos = q2(detalle.bonos)
     detalle.comisiones = q2(detalle.comisiones)
     detalle.decimo_tercero = q2(detalle.decimo_tercero)
@@ -162,13 +175,18 @@ def recalcular_detalle_planilla(detalle):
 
 
 @transaction.atomic
-def generar_planilla(periodo):
+def generar_planilla(periodo, dias_por_empleado=None):
+    dias_por_empleado = dias_por_empleado or {}
     empleados = Empleado.objects.filter(empresa=periodo.empresa, estado="activo", fecha_ingreso__lte=periodo.fecha_fin)
     if periodo.fecha_inicio:
         empleados = empleados.filter(fecha_salida__isnull=True) | empleados.filter(fecha_salida__gte=periodo.fecha_inicio)
     creados = 0
     for empleado in empleados.distinct():
-        data = calcular_detalle_planilla(empleado, periodo)
+        data = calcular_detalle_planilla(
+            empleado,
+            periodo,
+            dias_pagados=dias_por_empleado.get(empleado.id),
+        )
         movimientos = data.pop("movimientos")
         DetallePlanilla.objects.update_or_create(
             periodo=periodo,
