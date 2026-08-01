@@ -1410,6 +1410,7 @@ class ContabilidadTests(TestCase):
             "exportar_balance_comprobacion_excel",
             "exportar_estado_resultados_excel",
             "exportar_balance_general_excel",
+            "exportar_libro_mayor_general_excel",
         ]
         for url_name in urls:
             response = self.client.get(reverse(url_name, args=[self.empresa.slug]))
@@ -1418,6 +1419,87 @@ class ContabilidadTests(TestCase):
                 response["Content-Type"],
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
+    def test_libro_mayor_general_y_exportacion(self):
+        cuenta_caja = CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja General", tipo="activo")
+        cuenta_ventas = CuentaContable.objects.create(empresa=self.empresa, codigo="4101", nombre="Ventas", tipo="ingreso")
+        asiento = AsientoContable.objects.create(
+            empresa=self.empresa,
+            numero="ASI-00000001",
+            fecha=date(2026, 4, 10),
+            descripcion="Venta contado",
+            referencia="MAY-001",
+            estado="contabilizado",
+        )
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_caja, debe=Decimal("250.00"))
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_ventas, haber=Decimal("250.00"))
+        self.client.login(username="contador", password="pass12345")
+
+        response = self.client.get(reverse("libro_mayor_general", args=[self.empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Libro Mayor General")
+        self.assertContains(response, "Caja General")
+        self.assertContains(response, "Ventas")
+
+        response_excel = self.client.get(reverse("exportar_libro_mayor_general_excel", args=[self.empresa.slug]))
+        self.assertEqual(response_excel.status_code, 200)
+        self.assertEqual(
+            response_excel["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def test_mayor_por_cuenta_exporta_excel(self):
+        cuenta_caja = CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja General", tipo="activo")
+        cuenta_ventas = CuentaContable.objects.create(empresa=self.empresa, codigo="4101", nombre="Ventas", tipo="ingreso")
+        asiento = AsientoContable.objects.create(
+            empresa=self.empresa,
+            numero="ASI-00000001",
+            fecha=date(2026, 4, 10),
+            descripcion="Venta contado",
+            estado="contabilizado",
+        )
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_caja, debe=Decimal("125.00"))
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_ventas, haber=Decimal("125.00"))
+        self.client.login(username="contador", password="pass12345")
+        response = self.client.get(reverse("exportar_mayor_cuenta_excel", args=[self.empresa.slug]), {"cuenta": cuenta_caja.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def test_estado_flujo_efectivo_y_resumen_ejecutivo(self):
+        cuenta_caja = CuentaContable.objects.create(empresa=self.empresa, codigo="1101", nombre="Caja General", tipo="activo")
+        cuenta_ventas = CuentaContable.objects.create(empresa=self.empresa, codigo="4101", nombre="Ventas", tipo="ingreso")
+        ConfiguracionContableEmpresa.objects.create(empresa=self.empresa, cuenta_caja=cuenta_caja)
+        asiento = AsientoContable.objects.create(
+            empresa=self.empresa,
+            numero="ASI-00000001",
+            fecha=date(2026, 4, 10),
+            descripcion="Cobro de venta",
+            estado="contabilizado",
+        )
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_caja, debe=Decimal("300.00"))
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=cuenta_ventas, haber=Decimal("300.00"))
+        self.client.login(username="contador", password="pass12345")
+
+        response = self.client.get(reverse("estado_flujo_efectivo", args=[self.empresa.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Estado de Flujo de Efectivo")
+        self.assertContains(response, "Caja General")
+        self.assertContains(response, "L. 300.00")
+
+        response_excel = self.client.get(reverse("exportar_estado_flujo_efectivo_excel", args=[self.empresa.slug]))
+        self.assertEqual(response_excel.status_code, 200)
+        self.assertEqual(
+            response_excel["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        response_resumen = self.client.get(reverse("resumen_ejecutivo_contable", args=[self.empresa.slug]))
+        self.assertEqual(response_resumen.status_code, 200)
+        self.assertContains(response_resumen, "Resumen Ejecutivo Contable")
+        self.assertContains(response_resumen, "Resultado neto")
 
     def test_dashboard_bi_financiero_renderiza_lectura_ejecutiva(self):
         cuenta_banco = CuentaContable.objects.create(

@@ -1,0 +1,126 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Resumen Ejecutivo Contable - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Resumen Ejecutivo Contable{% endblock %}
+{% block header_description %}Lectura gerencial de resultados, posicion financiera, flujo de efectivo y salud del registro contable.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Perdidas y Ganancias</a>
+<a href="{% url 'balance_general' empresa.slug %}" class="erp-action-link">Balance de Situacion</a>
+<a href="{% url 'estado_flujo_efectivo' empresa.slug %}" class="erp-action-link">Flujo de Efectivo</a>
+<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Periodo ejecutivo</h3>
+            <p class="erp-card-muted">Resume los estados principales del rango seleccionado. Si no eliges fechas, usa toda la informacion contabilizada.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a href="{% url 'resumen_ejecutivo_contable' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card">
+        <div class="erp-kpi-label">Resultado neto</div>
+        <p class="erp-stat-value">L. {{ resumen.utilidad }}</p>
+        <p class="erp-card-muted">Margen neto estimado: {{ resumen.margen_neto|floatformat:2 }}%.</p>
+    </article>
+    <article class="erp-card"><div class="erp-kpi-label">Ingresos</div><p class="erp-stat-value">L. {{ resumen.total_ingresos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Costos + gastos</div><p class="erp-stat-value">L. {{ resumen.total_egresos_resultado }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Flujo neto de efectivo</div><p class="erp-stat-value">L. {{ resumen.flujo_neto }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Activos</div><p class="erp-stat-value">L. {{ resumen.total_activos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Pasivos</div><p class="erp-stat-value">L. {{ resumen.total_pasivos }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Patrimonio</div><p class="erp-stat-value">L. {{ resumen.total_patrimonio }}</p></article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Balance</div>
+        <p class="erp-stat-value">{% if resumen.diferencia_balance == 0 %}Cuadrado{% else %}Revisar{% endif %}</p>
+        <p class="erp-card-muted">Diferencia: L. {{ resumen.diferencia_balance }}</p>
+    </article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Control operativo</div>
+        <h3>Estado del registro contable</h3>
+        <p>Asientos contabilizados en el periodo: <strong>{{ resumen.asientos_contabilizados }}</strong>.</p>
+        <p>Asientos en borrador pendientes de revisar: <strong>{{ resumen.asientos_pendientes }}</strong>.</p>
+        <p>Cuentas de efectivo detectadas: <strong>{{ resumen.cuentas_efectivo }}</strong>.</p>
+    </article>
+    <article class="erp-card erp-module-card">
+        <div class="erp-kpi-label">Caja y bancos</div>
+        <h3>Lectura de efectivo</h3>
+        <p>Operacion: <strong>L. {{ resumen.flujo_operacion }}</strong>.</p>
+        <p>Variacion neta de efectivo: <strong>L. {{ resumen.flujo_neto }}</strong>.</p>
+        <a class="erp-btn-secondary" href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}">Abrir detalle</a>
+    </article>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Cuentas principales de resultados</h3>
+                <p class="erp-card-muted">Mayores impactos en ingresos, costos y gastos.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead><tr><th>Cuenta</th><th>Tipo</th><th>Saldo</th></tr></thead>
+                <tbody>
+                    {% for fila in top_resultados %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td>{{ fila.cuenta.get_tipo_display }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="erp-empty">No hay cuentas de resultado con movimiento.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="erp-card erp-table-card">
+        <div class="erp-toolbar">
+            <div>
+                <h3 class="erp-panel-title">Cuentas principales del balance</h3>
+                <p class="erp-card-muted">Mayores saldos en activos, pasivos y patrimonio.</p>
+            </div>
+        </div>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead><tr><th>Cuenta</th><th>Tipo</th><th>Saldo</th></tr></thead>
+                <tbody>
+                    {% for fila in top_balance %}
+                    <tr>
+                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
+                        <td>{{ fila.cuenta.get_tipo_display }}</td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="erp-empty">No hay cuentas de balance con movimiento.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

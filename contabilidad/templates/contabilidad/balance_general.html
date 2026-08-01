@@ -1,14 +1,15 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Balance General - {{ empresa.nombre }}{% endblock %}
+{% block title %}Balance de Situacion Financiera - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Reportes Contables{% endblock %}
-{% block header_title %}Balance General{% endblock %}
+{% block header_title %}Balance de Situacion Financiera{% endblock %}
 {% block header_description %}Consulta activos, pasivos y patrimonio a una fecha de corte para validar la posicion financiera de la empresa.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
 <a href="{% url 'balance_comprobacion' empresa.slug %}" class="erp-action-link">Balance de Comprobacion</a>
-<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Estado de Resultados</a>
+<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Perdidas y Ganancias</a>
+<a href="{% url 'estado_flujo_efectivo' empresa.slug %}" class="erp-action-link">Flujo de Efectivo</a>
 <a href="{% url 'exportar_balance_general_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
 <button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
 {% endblock %}

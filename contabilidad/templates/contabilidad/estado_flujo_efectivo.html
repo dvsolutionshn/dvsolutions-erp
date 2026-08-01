@@ -1,0 +1,111 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Estado de Flujo de Efectivo - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Reportes Contables{% endblock %}
+{% block header_title %}Estado de Flujo de Efectivo{% endblock %}
+{% block header_description %}Analiza entradas y salidas de caja y bancos clasificadas en operacion, inversion y financiamiento.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'balance_general' empresa.slug %}" class="erp-action-link">Balance de Situacion</a>
+<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Perdidas y Ganancias</a>
+<a href="{% url 'exportar_estado_flujo_efectivo_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
+<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card erp-report-filter-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Periodo</h3>
+            <p class="erp-card-muted">El reporte toma las cuentas de caja y bancos configuradas para la empresa.</p>
+        </div>
+    </div>
+    <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+        </div>
+        <div class="erp-filter-actions">
+            <button type="submit" class="erp-btn">Filtrar</button>
+            <a href="{% url 'estado_flujo_efectivo' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Flujo neto</div><p class="erp-stat-value">L. {{ resumen.total_neto }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Operacion</div><p class="erp-stat-value">L. {{ resumen.operacion }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Inversion</div><p class="erp-stat-value">L. {{ resumen.inversion }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Financiamiento</div><p class="erp-stat-value">L. {{ resumen.financiamiento }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Movimientos</div><p class="erp-stat-value">{{ resumen.movimientos }}</p></article>
+</section>
+
+<section class="erp-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title">Cuentas de efectivo incluidas</h3>
+            <p class="erp-card-muted">Caja, bancos y cuentas financieras enlazadas a contabilidad.</p>
+        </div>
+    </div>
+    <div class="erp-chip-row">
+        {% for cuenta in cuentas_efectivo %}
+        <span class="erp-chip">{{ cuenta.codigo }} - {{ cuenta.nombre }}</span>
+        {% empty %}
+        <span class="erp-empty">Configura una cuenta de caja o banco para alimentar este estado.</span>
+        {% endfor %}
+    </div>
+</section>
+
+{% for clave, grupo in flujo.items %}
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <div class="erp-kpi-label">Actividades de {{ clave }}</div>
+            <h3 class="erp-panel-title">
+                {% if clave == "operacion" %}Operacion{% elif clave == "inversion" %}Inversion{% else %}Financiamiento{% endif %}
+            </h3>
+        </div>
+        <div class="erp-inline-kpis">
+            <span class="erp-badge success">Entradas L. {{ grupo.entradas }}</span>
+            <span class="erp-badge danger">Salidas L. {{ grupo.salidas }}</span>
+            <span class="erp-badge">Neto L. {{ grupo.neto }}</span>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Asiento</th>
+                    <th>Cuenta</th>
+                    <th>Detalle</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Neto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movimiento in grupo.movimientos %}
+                <tr>
+                    <td>{{ movimiento.asiento.fecha|date:"d/m/Y" }}</td>
+                    <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.asiento.id %}">{{ movimiento.asiento.numero|default:"Sin numero" }}</a></td>
+                    <td>{{ movimiento.cuenta.codigo }} - {{ movimiento.cuenta.nombre }}</td>
+                    <td>{{ movimiento.detalle }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.entrada }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.salida }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.neto }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="erp-empty">No hay movimientos de efectivo para esta actividad.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endfor %}
+{% endblock %}

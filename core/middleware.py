@@ -59,7 +59,7 @@ class EmpresaAccessMiddleware:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_facturacion_desde_ruta(suffix)
                     permiso_accion = permiso_facturacion_accion(suffix)
-                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
+                    if permiso and not permiso_accion and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
                     if permiso_accion and not request.user.tiene_permiso_erp(permiso_accion, empresa):
