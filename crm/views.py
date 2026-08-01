@@ -83,8 +83,13 @@ def _proteger_agenda_mobile(request, empresa):
         return redirect(f"{login_url}?{urlencode({'next': request.get_full_path()})}")
     if not request.user.puede_acceder_empresa(empresa):
         return HttpResponse("Acceso no autorizado.", status=403)
-    if not request.user.tiene_permiso_erp("puede_citas"):
-        return HttpResponse("Tu usuario no tiene permiso para gestionar citas.", status=403)
+    tiene_acceso_app = (
+        request.user.tiene_permiso_erp("puede_citas", empresa)
+        or request.user.tiene_alguna_permision_facturacion_empresa(empresa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa)
+    )
+    if not tiene_acceso_app:
+        return HttpResponse("Tu usuario no tiene permiso para usar la app movil de esta empresa.", status=403)
     return None
 
 
@@ -862,6 +867,17 @@ def agenda_mobile(request, empresa_slug):
         modo_agenda=True,
         vista_predeterminada="dia",
     )
+    contexto["empresas_app_switch"] = [
+        {
+            "id": empresa_disponible.id,
+            "nombre": empresa_disponible.nombre,
+            "slug": empresa_disponible.slug,
+            "actual": empresa_disponible.id == empresa.id,
+            "url": reverse("agenda_mobile", args=[empresa_disponible.slug]),
+            "puede_facturar": request.user.tiene_alguna_permision_facturacion_empresa(empresa_disponible),
+        }
+        for empresa_disponible in request.user.empresas_operativas()
+    ]
     seleccionada = contexto["fecha_seleccionada"]
     dias_semana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
     dias_semana_largos = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]

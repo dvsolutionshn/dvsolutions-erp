@@ -188,6 +188,14 @@ class CRMTests(TestCase):
         self.assertNotContains(mobile, "Paciente de Candy")
 
     def test_app_movil_agenda_es_instalable_y_usa_los_mismos_datos(self):
+        medical_spa = Empresa.objects.create(
+            nombre="Mia Medical spa",
+            slug="medical_spa",
+            rtn="08011999111115",
+            estado_licencia="activa",
+        )
+        EmpresaModulo.objects.create(empresa=medical_spa, modulo=self.modulo_citas, activo=True)
+        self.usuario.empresas_acceso.add(medical_spa)
         cliente = Cliente.objects.create(
             empresa=self.empresa,
             nombre="Paciente App",
@@ -226,6 +234,8 @@ class CRMTests(TestCase):
         self.assertContains(response, "vista=semana")
         self.assertContains(response, "vista=mes")
         self.assertContains(response, "vista=anio")
+        self.assertContains(response, "Cambiar empresa para operar y facturar")
+        self.assertContains(response, reverse("agenda_mobile", args=[medical_spa.slug]))
         vista_anual = self.client.get(
             reverse("agenda_mobile", args=[self.empresa.slug]),
             {"vista": "anio", "fecha": "2026-06-30"},
