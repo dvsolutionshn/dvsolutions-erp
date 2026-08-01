@@ -222,6 +222,78 @@ class RRHHTests(TestCase):
         self.assertEqual(periodo.estado, "pagada")
         self.assertEqual(periodo.metodo_pago, "efectivo")
 
+    def test_solo_dueno_puede_eliminar_planillas_y_empleados_rrhh(self):
+        empleado = Empleado.objects.create(
+            empresa=self.empresa,
+            codigo="EMP-DEL-001",
+            nombres="Prueba",
+            apellidos="Borrar",
+            identidad="0801199900299",
+            fecha_ingreso=date(2026, 1, 1),
+            salario_mensual=Decimal("1000.00"),
+        )
+        periodo = PeriodoPlanilla.objects.create(
+            empresa=self.empresa,
+            nombre="Planilla prueba borrar",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 7, 30),
+            fecha_pago=date(2026, 7, 30),
+        )
+        self.client.login(username="rrhh", password="pass12345")
+
+        response = self.client.post(reverse("eliminar_planilla_rrhh", args=[self.empresa.slug, periodo.id]))
+
+        self.assertRedirects(response, reverse("planillas_rrhh", args=[self.empresa.slug]))
+        self.assertTrue(PeriodoPlanilla.objects.filter(id=periodo.id).exists())
+
+        dueno = Usuario.objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass12345",
+            empresa=self.empresa,
+            rol_sistema=self.rol,
+        )
+        self.client.force_login(dueno)
+        response = self.client.post(reverse("eliminar_planilla_rrhh", args=[self.empresa.slug, periodo.id]))
+        self.assertRedirects(response, reverse("planillas_rrhh", args=[self.empresa.slug]))
+        self.assertFalse(PeriodoPlanilla.objects.filter(id=periodo.id).exists())
+
+        response = self.client.post(reverse("eliminar_empleado_rrhh", args=[self.empresa.slug, empleado.id]))
+        self.assertRedirects(response, reverse("empleados_rrhh", args=[self.empresa.slug]))
+        self.assertFalse(Empleado.objects.filter(id=empleado.id).exists())
+
+    def test_no_borra_empleado_con_planillas_asociadas(self):
+        empleado = Empleado.objects.create(
+            empresa=self.empresa,
+            codigo="EMP-PROT-001",
+            nombres="Empleado",
+            apellidos="Protegido",
+            identidad="0801199900399",
+            fecha_ingreso=date(2026, 1, 1),
+            salario_mensual=Decimal("1000.00"),
+        )
+        periodo = PeriodoPlanilla.objects.create(
+            empresa=self.empresa,
+            nombre="Planilla asociada",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 7, 30),
+            fecha_pago=date(2026, 7, 30),
+        )
+        DetallePlanilla.objects.create(periodo=periodo, empleado=empleado, salario_base=Decimal("1000.00"))
+        dueno = Usuario.objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass12345",
+            empresa=self.empresa,
+            rol_sistema=self.rol,
+        )
+        self.client.force_login(dueno)
+
+        response = self.client.post(reverse("eliminar_empleado_rrhh", args=[self.empresa.slug, empleado.id]))
+
+        self.assertRedirects(response, reverse("ver_empleado", args=[self.empresa.slug, empleado.id]))
+        self.assertTrue(Empleado.objects.filter(id=empleado.id).exists())
+
     def test_dashboard_rrhh_responde_con_permiso(self):
         self.client.login(username="rrhh", password="pass12345")
         response = self.client.get(reverse("rrhh_dashboard", args=[self.empresa.slug]))

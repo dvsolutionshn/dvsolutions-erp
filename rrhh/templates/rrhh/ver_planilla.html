@@ -7,6 +7,9 @@
 {% block header_description %}Lectura integral de devengados, deducciones, netos y envío de voucher por colaborador.{% endblock %}
 
 {% block topbar_actions %}
+{% if puede_borrar_rrhh %}
+<a class="erp-action-link" style="color:#b42318;border-color:#fecdd3;background:#fff5f5;" href="{% url 'eliminar_planilla_rrhh' empresa.slug periodo.id %}">Eliminar planilla</a>
+{% endif %}
 <a class="erp-action-link" href="{% url 'planillas_rrhh' empresa.slug %}">Volver</a>
 {% endblock %}
 

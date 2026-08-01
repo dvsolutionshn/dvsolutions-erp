@@ -60,6 +60,9 @@
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'ver_empleado' empresa.slug empleado.id %}">Ver</a>
                                 <a class="erp-pill-link" href="{% url 'editar_empleado_rrhh' empresa.slug empleado.id %}">Editar</a>
+                                {% if puede_borrar_rrhh %}
+                                <a class="erp-pill-link" style="color:#b42318;border-color:#fecdd3;background:#fff5f5;" href="{% url 'eliminar_empleado_rrhh' empresa.slug empleado.id %}">Eliminar</a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

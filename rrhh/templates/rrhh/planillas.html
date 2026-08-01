@@ -61,6 +61,9 @@
                         <td>
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'ver_planilla' empresa.slug periodo.id %}">Abrir planilla</a>
+                                {% if puede_borrar_rrhh %}
+                                <a class="erp-pill-link" style="color:#b42318;border-color:#fecdd3;background:#fff5f5;" href="{% url 'eliminar_planilla_rrhh' empresa.slug periodo.id %}">Eliminar</a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

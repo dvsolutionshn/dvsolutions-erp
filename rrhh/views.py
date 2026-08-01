@@ -8,6 +8,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from weasyprint import HTML
 
@@ -35,6 +36,19 @@ def _empresa_desde_slug(empresa_slug):
 
 def _configuracion_crm(empresa):
     return ConfiguracionCRM.objects.get_or_create(empresa=empresa)[0]
+
+
+def _puede_borrar_rrhh(request):
+    email = (getattr(request.user, "email", "") or "").strip().lower()
+    username = (getattr(request.user, "username", "") or "").strip().lower()
+    return email == "dannyvarela25@gmail.com" or username == "dannyvarela25"
+
+
+def _bloquear_si_no_es_dueno_rrhh(request, empresa):
+    if _puede_borrar_rrhh(request):
+        return False
+    messages.error(request, "Esta acción está restringida al dueño del sistema.")
+    return True
 
 
 @login_required
@@ -81,7 +95,12 @@ def empleados_rrhh(request, empresa_slug):
     empleados = Empleado.objects.filter(empresa=empresa).order_by("nombres", "apellidos")
     if q:
         empleados = empleados.filter(nombres__icontains=q) | empleados.filter(apellidos__icontains=q) | empleados.filter(identidad__icontains=q)
-    return render(request, "rrhh/empleados.html", {"empresa": empresa, "empleados": empleados, "q": q})
+    return render(request, "rrhh/empleados.html", {
+        "empresa": empresa,
+        "empleados": empleados,
+        "q": q,
+        "puede_borrar_rrhh": _puede_borrar_rrhh(request),
+    })
 
 
 @login_required
@@ -124,7 +143,37 @@ def editar_empleado(request, empresa_slug, empleado_id):
 def ver_empleado(request, empresa_slug, empleado_id):
     empresa = _empresa_desde_slug(empresa_slug)
     empleado = get_object_or_404(Empleado, id=empleado_id, empresa=empresa)
-    return render(request, "rrhh/ver_empleado.html", {"empresa": empresa, "empleado": empleado})
+    return render(request, "rrhh/ver_empleado.html", {
+        "empresa": empresa,
+        "empleado": empleado,
+        "puede_borrar_rrhh": _puede_borrar_rrhh(request),
+    })
+
+
+@login_required
+def eliminar_empleado_rrhh(request, empresa_slug, empleado_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if _bloquear_si_no_es_dueno_rrhh(request, empresa):
+        return redirect("empleados_rrhh", empresa_slug=empresa.slug)
+    empleado = get_object_or_404(Empleado, id=empleado_id, empresa=empresa)
+    if request.method == "POST":
+        if empleado.detalles_planilla.exists():
+            messages.error(
+                request,
+                "No se puede borrar este empleado porque tiene planillas asociadas. Borra primero las planillas de prueba donde aparece.",
+            )
+            return redirect("ver_empleado", empresa_slug=empresa.slug, empleado_id=empleado.id)
+        nombre = empleado.nombre_completo
+        empleado.delete()
+        messages.success(request, f"Empleado {nombre} eliminado correctamente.")
+        return redirect("empleados_rrhh", empresa_slug=empresa.slug)
+    return render(request, "rrhh/confirm_delete_rrhh.html", {
+        "empresa": empresa,
+        "titulo": "Eliminar empleado",
+        "objeto": empleado.nombre_completo,
+        "descripcion": "Se eliminará el expediente de RRHH del empleado. Esta acción solo está habilitada para Daniel Varela.",
+        "cancelar_href": reverse("ver_empleado", args=[empresa.slug, empleado.id]),
+    })
 
 
 @login_required
@@ -134,6 +183,7 @@ def planillas_rrhh(request, empresa_slug):
     return render(request, "rrhh/planillas.html", {
         "empresa": empresa,
         "periodos": periodos,
+        "puede_borrar_rrhh": _puede_borrar_rrhh(request),
         "resumen_planillas": {
             "total": periodos.count(),
             "abiertas": periodos.exclude(estado__in=["cerrada", "pagada"]).count(),
@@ -186,8 +236,29 @@ def ver_planilla(request, empresa_slug, periodo_id):
         "config_crm": config_crm,
         "cuentas_financieras": CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related("cuenta_contable"),
         "metodos_pago_planilla": PeriodoPlanilla.METODO_PAGO_CHOICES,
+        "puede_borrar_rrhh": _puede_borrar_rrhh(request),
         "asiento_cierre": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="cierre").first(),
         "asiento_pago": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="pago").first(),
+    })
+
+
+@login_required
+def eliminar_planilla_rrhh(request, empresa_slug, periodo_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if _bloquear_si_no_es_dueno_rrhh(request, empresa):
+        return redirect("planillas_rrhh", empresa_slug=empresa.slug)
+    periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
+    if request.method == "POST":
+        nombre = periodo.nombre
+        periodo.delete()
+        messages.success(request, f"Planilla {nombre} eliminada correctamente.")
+        return redirect("planillas_rrhh", empresa_slug=empresa.slug)
+    return render(request, "rrhh/confirm_delete_rrhh.html", {
+        "empresa": empresa,
+        "titulo": "Eliminar planilla",
+        "objeto": periodo.nombre,
+        "descripcion": "Se eliminará la planilla y sus detalles de cálculo. Esta acción solo está habilitada para Daniel Varela.",
+        "cancelar_href": reverse("ver_planilla", args=[empresa.slug, periodo.id]),
     })
 
 

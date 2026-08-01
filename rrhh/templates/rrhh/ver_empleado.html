@@ -7,6 +7,9 @@
 {% block header_description %}Ficha integral del colaborador para planilla, vacaciones, banco y comunicacion operativa.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'editar_empleado_rrhh' empresa.slug empleado.id %}">Editar</a>
+{% if puede_borrar_rrhh %}
+<a class="erp-action-link" style="color:#b42318;border-color:#fecdd3;background:#fff5f5;" href="{% url 'eliminar_empleado_rrhh' empresa.slug empleado.id %}">Eliminar empleado</a>
+{% endif %}
 <a class="erp-action-link" href="{% url 'empleados_rrhh' empresa.slug %}">Volver</a>
 {% endblock %}
 
