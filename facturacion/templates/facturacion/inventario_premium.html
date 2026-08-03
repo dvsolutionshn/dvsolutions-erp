@@ -100,6 +100,11 @@
 .erp-cost-history th{position:sticky;top:0;background:#f4f8fc;color:#49627d}
 .erp-cost-history td.amount{text-align:right}
 .erp-inventory-note{margin-top:8px;padding:10px 12px;border:1px solid #c8d9ed;border-radius:12px;background:#f6faff;color:#49627d;font-size:12px}
+.erp-stock-locations{display:flex;flex-direction:column;gap:6px;margin-top:8px;min-width:180px}
+.erp-stock-location{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid rgba(17,95,122,.12);border-radius:12px;background:linear-gradient(135deg,rgba(238,247,251,.9),rgba(255,255,255,.94));color:#17324d;font-size:12px;font-weight:850}
+.erp-stock-location strong{color:#087268;white-space:nowrap}
+.erp-stock-location.vitrina strong{color:#0b82d8}
+.erp-stock-empty{display:block;margin-top:8px;color:#71869b;font-size:12px;text-align:right}
 .erp-inventory-search-panel{margin-top:18px;padding:16px;border:1px solid rgba(17,95,122,.14);border-radius:18px;background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(238,247,251,.72));box-shadow:0 16px 36px rgba(16,35,56,.08)}
 .erp-inventory-search-form{display:grid;grid-template-columns:minmax(260px,520px) auto auto;gap:12px;align-items:end}
 .erp-inventory-search-form label{display:block;margin-bottom:7px;color:#4d667e;font-size:12px;font-weight:900;letter-spacing:.11em;text-transform:uppercase}
@@ -225,6 +230,7 @@
                     <th>Código</th>
                     <th>Unidad</th>
                     <th>Stock Actual</th>
+                    <th>Ubicación por bodega</th>
                     {% if mostrar_costo_real_inventario %}
                     <th>Costo real</th>
                     <th>Precio venta</th>
@@ -250,6 +256,20 @@
                             <span class="erp-stock-critical">{{ producto.stock_actual|floatformat:2|intcomma }}</span>
                         {% else %}
                             <span class="erp-stock-ok">{{ producto.stock_actual|floatformat:2|intcomma }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if producto.existencias_por_bodega %}
+                        <div class="erp-stock-locations" aria-label="Existencia por bodega">
+                            {% for item in producto.existencias_por_bodega %}
+                            <div class="erp-stock-location {{ item.tipo }}">
+                                <span>{{ item.nombre }}</span>
+                                <strong>{{ item.cantidad|floatformat:2|intcomma }}</strong>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <span class="erp-stock-empty">Sin unidades por bodega</span>
                         {% endif %}
                     </td>
                     {% if mostrar_costo_real_inventario %}
@@ -316,7 +336,7 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="{% if mostrar_costo_real_inventario %}11{% else %}7{% endif %}" class="erp-empty">Aún no hay productos con control de inventario.</td></tr>
+                <tr><td colspan="{% if mostrar_costo_real_inventario %}12{% else %}8{% endif %}" class="erp-empty">Aún no hay productos con control de inventario.</td></tr>
             {% endfor %}
             </tbody>
         </table>

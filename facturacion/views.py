@@ -1905,6 +1905,15 @@ def _obtener_bodega_venta(empresa):
     return bodegas.get("vitrina")
 
 
+def _obtener_bodega_destino_compra(empresa):
+    if not _empresa_usa_perfil_farmaceutico(empresa):
+        return None
+    bodegas = _asegurar_bodegas_farmaceuticas(empresa)
+    if empresa.slug == "hospital_mia":
+        return bodegas.get("vitrina") or bodegas.get("principal")
+    return bodegas.get("principal") or bodegas.get("vitrina")
+
+
 def _obtener_lote_generico(producto):
     lote, _ = LoteInventario.objects.get_or_create(
         empresa=producto.empresa,
@@ -1946,10 +1955,10 @@ def _registrar_movimiento_lote_bodega(*, empresa, bodega, lote, tipo, cantidad, 
     )
 
 
-def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", observacion=""):
+def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", observacion="", bodega_destino=None):
     if not _empresa_usa_perfil_farmaceutico(empresa) or not producto.controla_inventario:
         return
-    bodega = _asegurar_bodegas_farmaceuticas(empresa)["principal"]
+    bodega = bodega_destino or _asegurar_bodegas_farmaceuticas(empresa)["principal"]
     lote = _obtener_lote_generico(producto)
     _registrar_movimiento_lote_bodega(
         empresa=empresa,
@@ -1958,8 +1967,36 @@ def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", o
         tipo="entrada",
         cantidad=cantidad,
         referencia=referencia,
-        observacion=observacion or "Entrada automatica a bodega principal.",
+        observacion=observacion or f"Entrada automatica a {bodega.nombre}.",
     )
+
+
+def _anotar_existencias_por_bodega(productos, empresa):
+    productos_lista = list(productos)
+    producto_ids = [producto.id for producto in productos_lista if producto.controla_inventario]
+    mapa = {producto.id: [] for producto in productos_lista}
+    if producto_ids:
+        existencias = (
+            ExistenciaLoteBodega.objects.filter(
+                empresa=empresa,
+                lote__producto_id__in=producto_ids,
+            )
+            .values("lote__producto_id", "bodega__nombre", "bodega__tipo")
+            .annotate(total=Sum("cantidad"))
+            .order_by("bodega__tipo", "bodega__nombre")
+        )
+        for item in existencias:
+            total = item["total"] or Decimal("0.00")
+            if total <= 0:
+                continue
+            mapa.setdefault(item["lote__producto_id"], []).append({
+                "nombre": item["bodega__nombre"],
+                "tipo": item["bodega__tipo"],
+                "cantidad": total,
+            })
+    for producto in productos_lista:
+        producto.existencias_por_bodega = mapa.get(producto.id, [])
+    return productos_lista
 
 
 def _registrar_entrada_inicial_producto(producto, *, bodega, cantidad, numero_lote="", fecha_vencimiento=None):
@@ -2433,6 +2470,7 @@ def _aplicar_compra_documento(compra):
     if MovimientoInventario.objects.filter(compra_documento=compra).exists():
         return
 
+    bodega_destino = _obtener_bodega_destino_compra(compra.empresa)
     for linea in compra.lineas.select_related('producto').all():
         if not linea.producto.controla_inventario:
             continue
@@ -2455,6 +2493,7 @@ def _aplicar_compra_documento(compra):
             referencia=compra.numero_compra or compra.referencia_documento or f"Compra {compra.id}",
             observacion=linea.comentario or compra.observacion or f'Ingreso por compra a {compra.proveedor_nombre}.',
             compra_documento=compra,
+            bodega=bodega_destino,
         )
         _entrada_farmaceutica_generica(
             empresa=compra.empresa,
@@ -2462,6 +2501,7 @@ def _aplicar_compra_documento(compra):
             cantidad=linea.cantidad,
             referencia=compra.numero_compra or compra.referencia_documento or f"Compra {compra.id}",
             observacion=linea.comentario or compra.observacion,
+            bodega_destino=bodega_destino,
         )
 
 
@@ -2845,6 +2885,8 @@ def productos_facturacion(request, empresa_slug):
         "refrigerados": productos_filtrados.filter(perfil_farmaceutico__requiere_refrigeracion=True).count(),
     }
 
+    productos_filtrados = _anotar_existencias_por_bodega(productos_filtrados, empresa)
+
     return render(request, "facturacion/productos_premium.html", {
         "empresa": empresa,
         "productos": productos_filtrados,
@@ -3143,6 +3185,7 @@ def inventario_facturacion(request, empresa_slug):
         p for p in productos
         if hasattr(p, 'inventario') and p.inventario.existencias <= p.inventario.stock_minimo
     ][:8]
+    productos = _anotar_existencias_por_bodega(productos, empresa)
 
     return render(request, "facturacion/inventario_premium.html", {
         "empresa": empresa,

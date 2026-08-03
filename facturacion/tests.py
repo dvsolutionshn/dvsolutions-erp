@@ -21,7 +21,7 @@ from contabilidad.services import registrar_asiento_pago_cliente
 from crm.models import ConfiguracionCRM
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
 from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
-from .views import _registrar_entrada_nota_credito, _registrar_salida_factura
+from .views import _aplicar_compra_documento, _registrar_entrada_nota_credito, _registrar_salida_factura
 
 
 class FacturacionTests(TestCase):
@@ -4303,6 +4303,56 @@ class FacturacionTests(TestCase):
                 documento_id=compra.id,
                 evento="aplicacion",
             ).exists()
+        )
+
+    def test_compra_hospital_mia_ingresa_existencia_a_vitrina(self):
+        hospital = Empresa.objects.create(
+            nombre="Hospital Mia",
+            slug="hospital_mia",
+            rtn="08019016840771",
+        )
+        EmpresaModulo.objects.create(empresa=hospital, modulo=self.modulo_facturacion, activo=True)
+        modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
+        EmpresaModulo.objects.create(empresa=hospital, modulo=modulo_clinica, activo=True)
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(hospital)
+        configuracion.usa_inventario_farmaceutico = True
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_inventario_farmaceutico", "usa_bodegas_internas"])
+        producto = Producto.objects.create(
+            empresa=hospital,
+            nombre="Suero Hospital",
+            codigo="SU-HM",
+            precio=Decimal("120.00"),
+            controla_inventario=True,
+        )
+
+        compra = CompraInventario.objects.create(
+            empresa=hospital,
+            proveedor_nombre="Proveedor Hospital",
+            referencia_documento="FAC-HM-VITRINA",
+            fecha_documento=date.today(),
+            condicion_pago="credito",
+            dias_credito=0,
+            observacion="Compra para facturacion inmediata",
+            estado="aplicada",
+        )
+        LineaCompraInventario.objects.create(
+            compra=compra,
+            producto=producto,
+            cantidad=Decimal("7.00"),
+            costo_unitario=Decimal("80.0000"),
+        )
+
+        _aplicar_compra_documento(compra)
+
+        vitrina = BodegaInventario.objects.get(empresa=hospital, tipo="vitrina")
+        self.assertEqual(
+            ExistenciaLoteBodega.objects.get(empresa=hospital, bodega=vitrina, lote__producto=producto).cantidad,
+            Decimal("7.00"),
+        )
+        self.assertEqual(
+            MovimientoInventario.objects.get(compra_documento=compra, producto=producto, tipo="entrada_compra").bodega,
+            vitrina,
         )
 
     def test_crear_compra_contado_aplicada_registra_pago_automatico(self):

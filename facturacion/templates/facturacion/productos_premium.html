@@ -203,6 +203,39 @@
     background:currentColor;
     box-shadow:0 0 0 4px rgba(255,255,255,.78);
 }
+.erp-stock-locations{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:8px;
+    min-width:170px;
+}
+.erp-stock-location{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:7px 10px;
+    border:1px solid rgba(17,95,122,.12);
+    border-radius:12px;
+    background:linear-gradient(135deg, rgba(238,247,251,.9), rgba(255,255,255,.94));
+    color:#17324d;
+    font-size:12px;
+    font-weight:850;
+}
+.erp-stock-location strong{
+    color:#087268;
+    white-space:nowrap;
+}
+.erp-stock-location.vitrina strong{
+    color:#0b82d8;
+}
+.erp-stock-empty{
+    display:block;
+    margin-top:8px;
+    color:#71869b;
+    font-size:12px;
+}
 .erp-catalog-filter-grid{
     margin-top:22px;
     grid-template-columns:minmax(260px, 420px) minmax(220px, 300px) auto;
@@ -393,6 +426,18 @@
                         <td>
                             {% if producto.controla_inventario %}
                             <span class="erp-badge info">Controlado</span>
+                            {% if producto.existencias_por_bodega %}
+                            <div class="erp-stock-locations" aria-label="Existencia por bodega">
+                                {% for item in producto.existencias_por_bodega %}
+                                <div class="erp-stock-location {{ item.tipo }}">
+                                    <span>{{ item.nombre }}</span>
+                                    <strong>{{ item.cantidad|floatformat:2|intcomma }}</strong>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="erp-stock-empty">Sin unidades por bodega</span>
+                            {% endif %}
                             {% else %}
                             <span class="erp-badge neutral">No aplica</span>
                             {% endif %}
