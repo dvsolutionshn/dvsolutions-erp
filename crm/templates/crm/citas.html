@@ -685,7 +685,7 @@
   </section>
   {% endif %}
 
-  <details id="editor" class="erp-form-card editor" {% if cita_editando %}open{% endif %}>
+  <details id="editor" class="erp-form-card editor" {% if cita_editando or form.errors %}open{% endif %}>
     <summary class="editor-title">
       <div>
         <div class="erp-kpi-label">{% if cita_editando %}Editando cita{% else %}Nueva cita{% endif %}</div>
@@ -700,7 +700,7 @@
       {% if form.errors %}
       <div class="erp-soft-panel" style="margin-bottom:14px;border-color:#fecaca;background:#fff7f7;color:#991b1b">
         <strong>No se pudo guardar la cita.</strong>
-        <div class="erp-field-help" style="color:#991b1b;margin-top:4px">Revise los campos marcados abajo. Si adjuntó fotos o videos, seleccione los archivos nuevamente antes de guardar.</div>
+        <div class="erp-field-help" style="color:#991b1b;margin-top:4px">Revise los campos marcados abajo. Si escribió el paciente en el buscador, toque la opción correcta de la lista antes de guardar. Si adjuntó fotos o videos, seleccione los archivos nuevamente antes de guardar.</div>
         <ul style="margin:8px 0 0;padding-left:18px">
           {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
           {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
@@ -1070,6 +1070,7 @@
   const input = document.getElementById("patientSearchInput");
   const patientField = document.getElementById("id_paciente");
   const results = document.getElementById("patientSearchResults");
+  const appointmentForm = input ? input.closest("form") : null;
   if(!input || !patientField || !results){ return; }
 
   let timer = null;
@@ -1337,6 +1338,18 @@ window.appointmentPatientPicker = {choosePatient};
     activeIndex = -1;
   }
 
+  function showSelectionRequired(patients){
+    results.innerHTML = '<div class="appointment-patient-empty">Seleccione el paciente correcto de la lista antes de guardar la cita.</div>';
+    results.classList.add("is-open");
+    if(patients && patients.length){
+      renderPatients(patients);
+      const warning = document.createElement("div");
+      warning.className = "appointment-patient-empty";
+      warning.textContent = "Toque una opcion para confirmar el paciente.";
+      results.prepend(warning);
+    }
+  }
+
   input.addEventListener("input", function(){
     hidden.value = "";
     renderPatients(filterPatients(input.value));
@@ -1362,6 +1375,29 @@ window.appointmentPatientPicker = {choosePatient};
     renderPatients(matches);
     input.focus();
   });
+  if(appointmentForm){
+    appointmentForm.addEventListener("submit", function(event){
+      if(patientField.value){ return; }
+      const query = input.value.trim();
+      if(!query){ return; }
+      const matches = filterLocalPatients(query);
+      const exactMatches = matches.filter(function(patient){
+        return normalize(patient.nombre) === normalize(query);
+      });
+      if(exactMatches.length === 1){
+        choosePatient(exactMatches[0]);
+        return;
+      }
+      if(matches.length === 1){
+        choosePatient(matches[0]);
+        return;
+      }
+      event.preventDefault();
+      showSelectionRequired(matches);
+      input.focus();
+      input.scrollIntoView({behavior:"smooth", block:"center"});
+    });
+  }
   document.addEventListener("click", function(event){
     if(!shell.contains(event.target)){ closeResults(); }
   });

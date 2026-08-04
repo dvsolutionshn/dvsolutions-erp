@@ -291,10 +291,13 @@ class CitaClienteForm(forms.ModelForm):
                 self.fields.pop(nombre)
             self.fields["paciente"].label = "Paciente"
             self.fields["paciente"].required = True
+            self.fields["paciente"].error_messages["required"] = "Selecciona el paciente de la lista antes de guardar la cita."
             self.fields["servicio_clinico"].label = "Tipo de consulta"
             self.fields["servicio_clinico"].required = True
+            self.fields["servicio_clinico"].error_messages["required"] = "Selecciona el tipo de consulta."
             self.fields["profesional_salud"].label = "Doctor / profesional"
             self.fields["profesional_salud"].required = True
+            self.fields["profesional_salud"].error_messages["required"] = "Selecciona el doctor o profesional que atendera la cita."
             self.fields["observacion"].label = "Motivo o notas de la cita"
             self.fields["pagada"].label = "Cita pagada"
             self.fields["enviar_confirmacion_whatsapp"].label = "Enviar confirmación por WhatsApp al guardar"
@@ -461,7 +464,11 @@ class CitaClienteForm(forms.ModelForm):
             if periodo_fin:
                 fin_estimada = self._armar_fecha_hora(fecha, hora_fin, periodo_fin)
                 if fin_estimada <= inicio:
-                    self.add_error("cirugia_hora_fin", "La hora final debe ser posterior a la hora de inicio.")
+                    self.add_error(
+                        "cirugia_hora_fin",
+                        "La hora de finalizacion no puede ser igual ni menor que la hora de inicio. "
+                        "Seleccione una hora final posterior para poder guardar la cita.",
+                    )
                 else:
                     cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada
                     fin_bloque = fin_estimada
