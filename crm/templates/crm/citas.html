@@ -410,6 +410,29 @@
   .calendar-filter-apply,.calendar-filter-clear{width:100%}
   .calendar-year-grid{grid-template-columns:1fr}
 }
+
+.calendar-shell .patient-appointment-history{
+  position:relative;
+  z-index:70;
+  overflow:visible!important;
+}
+.calendar-shell .patient-history-search,
+.calendar-shell .patient-history-search-row{
+  position:relative;
+  z-index:75;
+}
+.calendar-shell .patient-history-results{
+  z-index:9999;
+}
+.calendar-shell .calendar-grid,
+.calendar-shell .week-board,
+.calendar-shell .day-board,
+.calendar-shell .calendar-year-grid,
+.calendar-shell .appointment-detail-card,
+.calendar-shell .editor{
+  position:relative;
+  z-index:1;
+}
 </style>
 
 <div class="calendar-shell" data-calendar-swipe data-prev-url="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}" data-next-url="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}">
