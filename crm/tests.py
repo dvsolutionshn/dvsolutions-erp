@@ -119,6 +119,13 @@ class CRMTests(TestCase):
             nombre="Paciente Historial Agenda",
             telefono="99990091",
         )
+        otro_paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-91002",
+            identidad="08011999000992",
+            nombre="Paciente Que No Debe Salir",
+            telefono="99990092",
+        )
         consulta = ServicioClinico.objects.create(
             empresa=self.empresa,
             nombre="Consulta General",
@@ -143,6 +150,15 @@ class CRMTests(TestCase):
             fecha_hora=timezone.now() - timedelta(days=5),
             estado="finalizada",
         )
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=otro_paciente,
+            servicio_clinico=consulta,
+            titulo="Consulta de otro paciente",
+            responsable="Dra. Candy Luque",
+            fecha_hora=timezone.now() + timedelta(days=5),
+            estado="confirmada",
+        )
         self.client.login(username="crmuser", password="pass12345")
 
         response = self.client.get(
@@ -157,6 +173,7 @@ class CRMTests(TestCase):
         self.assertContains(response, "Citas anteriores")
         self.assertContains(response, "Consulta futura de prueba")
         self.assertContains(response, "Consulta pasada de prueba")
+        self.assertNotContains(response, "Consulta de otro paciente")
 
     def test_serviciosmedicos_ve_agenda_espejo_de_hospital_mia_solo_dr_luis(self):
         servicios = Empresa.objects.create(

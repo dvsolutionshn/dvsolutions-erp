@@ -173,6 +173,11 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
             citas_qs = citas_qs.filter(profesional_salud_id=int(filtro_profesional))
         except (TypeError, ValueError):
             filtro_profesional = ""
+    if paciente_historial_id:
+        try:
+            citas_qs = citas_qs.filter(paciente_id=int(paciente_historial_id))
+        except (TypeError, ValueError):
+            paciente_historial_id = ""
     citas = [cita for cita in citas_qs if _cita_pertenece_agenda_espejo(cita, empresa)]
 
     filtros_query = urlencode({

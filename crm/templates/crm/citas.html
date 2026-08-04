@@ -521,7 +521,7 @@
       <a class="patient-history-clear" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{% if filtro_servicio %}&servicio={{ filtro_servicio }}{% endif %}{% if filtro_profesional %}&profesional={{ filtro_profesional }}{% endif %}">Limpiar paciente</a>
       {% endif %}
     </div>
-    <form class="patient-history-search-row" method="get" id="patientHistoryForm">
+    <form class="patient-history-search-row" method="get" action="#historial-paciente-citas" id="patientHistoryForm">
       <input type="hidden" name="vista" value="{{ vista }}">
       <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
       {% if filtro_servicio %}<input type="hidden" name="servicio" value="{{ filtro_servicio }}">{% endif %}
