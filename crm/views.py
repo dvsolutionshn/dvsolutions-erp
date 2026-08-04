@@ -129,6 +129,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     seleccionada = _fecha_agenda(request.GET.get("fecha"))
     filtro_servicio = (request.GET.get("servicio") or "").strip()
     filtro_profesional = (request.GET.get("profesional") or "").strip()
+    paciente_historial_id = (request.GET.get("paciente_historial") or "").strip()
     meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     if vista == "anio":
         inicio = date(seleccionada.year, 1, 1)
@@ -179,6 +180,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         for clave, valor in {
             "servicio": filtro_servicio,
             "profesional": filtro_profesional,
+            "paciente_historial": paciente_historial_id,
         }.items()
         if valor
     })
@@ -245,6 +247,34 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
             }
             for cliente in form.fields["cliente"].queryset
         ]
+
+    paciente_historial = None
+    citas_historial_futuras = []
+    citas_historial_pasadas = []
+    if es_clinica and paciente_historial_id:
+        try:
+            paciente_historial = Paciente.objects.filter(
+                empresa=empresa_agenda,
+                activo=True,
+                id=int(paciente_historial_id),
+            ).first()
+        except (TypeError, ValueError):
+            paciente_historial_id = ""
+            paciente_historial = None
+    if paciente_historial:
+        ahora_historial = timezone.now()
+        citas_historial_qs = (
+            CitaCliente.objects.filter(empresa=empresa_agenda, paciente=paciente_historial)
+            .select_related("paciente", "cliente", "servicio_clinico", "producto", "profesional_salud")
+            .prefetch_related("fotos_cirugia")
+            .order_by("fecha_hora")
+        )
+        citas_historial = [
+            cita for cita in citas_historial_qs
+            if _cita_pertenece_agenda_espejo(cita, empresa)
+        ]
+        citas_historial_futuras = [cita for cita in citas_historial if cita.fecha_hora >= ahora_historial][:25]
+        citas_historial_pasadas = [cita for cita in reversed(citas_historial) if cita.fecha_hora < ahora_historial][:25]
     if paciente_id_inicial:
         try:
             paciente_busqueda_inicial = Paciente.objects.filter(
@@ -302,6 +332,10 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "filtro_profesional": filtro_profesional,
         "filtros_query": filtros_query,
         "filtros_activos": filtros_activos,
+        "paciente_historial": paciente_historial,
+        "paciente_historial_id": paciente_historial_id,
+        "citas_historial_futuras": citas_historial_futuras,
+        "citas_historial_pasadas": citas_historial_pasadas,
     }
 
 

@@ -4,7 +4,7 @@
 {% block header_kicker %}Módulo de citas{% endblock %}
 {% block header_title %}Calendario de Citas{% endblock %}
 {% block header_description %}Vista mensual, semanal y diaria de la agenda de {{ empresa.nombre }}.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="#editor" data-open-editor-top>+ Crear cita</a><a class="erp-action-link" href="{% url 'agenda_mobile' empresa.slug %}">Abrir App móvil</a>{% if modo_agenda %}<a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% else %}<a class="erp-action-link" href="{% url 'crm_dashboard' empresa.slug %}">Volver</a>{% endif %}{% endblock %}
 
 {% block content %}
 <style>
@@ -16,7 +16,9 @@
 .editor .appointment-patient-field{overflow:visible!important}.appointment-patient-picker{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}.appointment-patient-search{position:relative;min-width:0}.appointment-patient-search input[type="search"]{width:100%;min-height:45px;border:1px solid #a9cbe2;border-radius:10px;background:#fff;padding:0 42px 0 14px;color:#26394d;font:inherit;outline:none}.appointment-patient-search input[type="search"]:focus{border-color:#2878d0;box-shadow:0 0 0 3px rgba(40,120,208,.1)}.appointment-patient-search.has-selection input[type="search"]{border-color:#19a58f;background:#f2fbf9;box-shadow:0 0 0 3px rgba(25,165,143,.08)}.appointment-patient-search-icon{position:absolute;top:13px;right:14px;color:#2878d0;font-size:13px;font-weight:900;pointer-events:none}.appointment-patient-search.has-selection .appointment-patient-search-icon{color:#12806f}.appointment-patient-results{position:static;display:none;width:100%;max-height:300px;margin-top:8px;overflow:auto;padding:7px;border:1px solid #c7d7e6;border-radius:14px;background:#fff;box-shadow:0 12px 28px rgba(20,45,70,.12);box-sizing:border-box}.appointment-patient-results.is-open{display:block}.appointment-patient-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;width:100%;padding:11px 12px;border:0;border-radius:10px;background:#fff;color:#26394d;text-align:left;cursor:pointer}.appointment-patient-result:hover,.appointment-patient-result.is-active{background:#edf7ff}.appointment-patient-result strong,.appointment-patient-result span{display:block}.appointment-patient-result span{margin-top:3px;color:#718092;font-size:10px}.appointment-patient-result em{align-self:center;padding:5px 8px;border-radius:999px;background:#e8f7f4;color:#08766f;font-size:9px;font-style:normal;font-weight:900}.appointment-patient-empty{padding:12px;color:#718092;font-size:11px;text-align:center}.appointment-patient-native{display:grid;gap:5px;margin-top:8px}.appointment-patient-native span{color:#6b7e90;font-size:9px;font-weight:800;letter-spacing:.04em}.appointment-patient-native select{display:block!important;width:100%!important;height:42px!important;margin:0!important;border:1px solid #c4d5e4!important;border-radius:10px!important;background:#f8fbfe!important;padding:0 11px!important;color:#26394d!important}.appointment-patient-new{height:45px;white-space:nowrap;border:1px solid #2878d0;border-radius:10px;background:#f3f8fe;color:#2469b4;padding:0 14px;font-size:11px;font-weight:900;cursor:pointer}.appointment-patient-new:hover{background:#e7f2ff}
 .calendar-modal{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(15,28,42,.42);backdrop-filter:blur(5px)}.calendar-modal.is-open{display:flex}.calendar-modal-card{width:min(760px,96vw);max-height:88vh;overflow:auto;border:1px solid #d8e1eb;border-radius:22px;background:#fff;box-shadow:0 24px 60px rgba(18,35,56,.25)}.calendar-modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid #e2e9f1;background:linear-gradient(135deg,#fff,#f6fbff)}.calendar-modal-title{margin:0;color:#132338;font-size:20px}.calendar-modal-close{width:36px;height:36px;border:1px solid #cbd8e5;border-radius:12px;background:#fff;color:#26394d;font-size:20px;font-weight:900;cursor:pointer}.calendar-modal-body{display:grid;gap:10px;padding:18px 20px}.calendar-modal-item{display:grid;grid-template-columns:84px 1fr auto;gap:12px;align-items:center;padding:13px;border:1px solid #dfe7ef;border-left:5px solid #b89755;border-radius:14px;background:#fff}.calendar-modal-item.color-doctor-luis{border-left-color:#2878d0}.calendar-modal-item.color-dra-candy{border-left-color:#d85c97}.calendar-modal-item.color-terapias{border-left-color:#805ad5}.calendar-modal-item.color-camara_hiperbarica{border-left-color:#8b5e34}.calendar-modal-item.color-tratamientos{border-left-color:#2d9b65}.calendar-modal-item.color-cirugias{border-left-color:#c9413a}.calendar-modal-item.color-spa{border-left-color:#d7a51f}.calendar-modal-time{color:#26394d;font-size:15px;font-weight:900}.calendar-modal-info strong,.calendar-modal-info span{display:block}.calendar-modal-info span{margin-top:4px;color:#6d7d8d;font-size:11px}.calendar-modal-tag{padding:6px 9px;border-radius:999px;background:#f0f4f8;color:#4f6072;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.05em}.calendar-modal-source{display:none}
 .patient-quick-modal{width:min(780px,96vw);max-height:90vh;padding:0;border:0;border-radius:22px;background:#fff;box-shadow:0 26px 70px rgba(18,35,56,.3)}.patient-quick-modal::backdrop{background:rgba(15,28,42,.5);backdrop-filter:blur(5px)}.patient-quick-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:20px 22px;border-bottom:1px solid #e0e8f0;background:linear-gradient(135deg,#fff,#f3f8fd)}.patient-quick-head h3{margin:3px 0 0;color:#132338;font-size:21px}.patient-quick-head p{margin:6px 0 0;color:#6a7b8c;font-size:11px}.patient-quick-close{width:38px;height:38px;border:1px solid #ccd9e5;border-radius:12px;background:#fff;color:#26394d;font-size:20px;cursor:pointer}.patient-quick-body{padding:20px 22px}.patient-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.patient-quick-field{display:grid;gap:6px}.patient-quick-field label{color:#617486;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.patient-quick-field input,.patient-quick-field select{width:100%;min-height:44px;border:1px solid #b8ccdc;border-radius:10px;background:#fff;padding:0 12px;color:#25384a}.patient-quick-field input:focus,.patient-quick-field select:focus{outline:0;border-color:#2878d0;box-shadow:0 0 0 3px rgba(40,120,208,.1)}.patient-quick-status{display:none;margin-top:15px;padding:11px 13px;border-radius:10px;background:#f8eceb;color:#943d38;font-size:11px;line-height:1.45}.patient-quick-status.is-visible{display:block}.patient-quick-status.is-success{background:#e9f5ef;color:#28654d}.patient-quick-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid #e4eaf0}.patient-quick-actions button[disabled]{opacity:.55;cursor:wait}
+.patient-appointment-history{display:grid;gap:16px;overflow:visible}.patient-history-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}.patient-history-head h3{margin:3px 0 0;color:#132338}.patient-history-head p{margin:6px 0 0;color:#64798c;font-size:12px}.patient-history-search{position:relative;min-width:min(520px,100%);flex:1}.patient-history-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}.patient-history-search input[type="search"]{width:100%;min-height:46px;border:1px solid #a9cbe2;border-radius:14px;background:#fff;padding:0 43px 0 14px;color:#26394d;font:inherit;outline:none}.patient-history-search input[type="search"]:focus{border-color:#2878d0;box-shadow:0 0 0 3px rgba(40,120,208,.1)}.patient-history-search-icon{position:absolute;top:14px;right:14px;color:#2878d0;font-size:13px;font-weight:900;pointer-events:none}.patient-history-results{position:absolute;z-index:35;top:54px;left:0;right:0;display:none;max-height:320px;overflow:auto;padding:7px;border:1px solid #c7d7e6;border-radius:16px;background:#fff;box-shadow:0 18px 42px rgba(20,45,70,.18)}.patient-history-results.is-open{display:block}.patient-history-submit,.patient-history-clear{min-height:46px;display:inline-flex;align-items:center;justify-content:center;border-radius:14px;padding:0 15px;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}.patient-history-submit{border:0;background:linear-gradient(135deg,#14b8a6,#2563eb);color:#fff;box-shadow:0 14px 30px rgba(37,99,235,.16)}.patient-history-clear{border:1px solid #c9d8e5;background:#fff;color:#526477}.patient-history-selected{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid #cde0ef;border-radius:18px;background:linear-gradient(135deg,#f8fcff,#fff)}.patient-history-selected strong{display:block;color:#132338;font-size:18px}.patient-history-selected span{display:block;margin-top:4px;color:#6c7e90;font-size:11px}.patient-history-count{display:inline-flex;padding:7px 10px;border-radius:999px;background:#e7f7f4;color:#0f766e;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.05em}.patient-history-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.patient-history-column{border:1px solid #dce8f2;border-radius:18px;background:#fff;overflow:hidden}.patient-history-column h4{margin:0;padding:13px 15px;border-bottom:1px solid #e5edf4;background:#f7fbff;color:#152b3f}.patient-history-list{display:grid;gap:9px;padding:12px}.patient-history-item{display:grid;grid-template-columns:82px 1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #edf2f7;border-left:5px solid #8796a8;border-radius:14px;background:#fff}.patient-history-item.color-consulta{border-left-color:#2878d0;background:#f4f9ff}.patient-history-item.color-terapias{border-left-color:#805ad5;background:#f8f4ff}.patient-history-item.color-camara_hiperbarica{border-left-color:#8b5e34;background:#fbf4ee}.patient-history-item.color-tratamientos{border-left-color:#2d9b65;background:#f2fbf6}.patient-history-item.color-cirugias{border-left-color:#c9413a;background:#fff7f6}.patient-history-item.color-spa{border-left-color:#d7a51f;background:#fffbeb}.patient-history-date strong,.patient-history-date span{display:block}.patient-history-date strong{color:#172b3e}.patient-history-date span{margin-top:2px;color:#748596;font-size:10px}.patient-history-main strong,.patient-history-main span{display:block}.patient-history-main strong{color:#14283b}.patient-history-main span{margin-top:3px;color:#66788a;font-size:10px}.patient-history-state{padding:6px 8px;border-radius:999px;background:#eef4f8;color:#526477;font-size:9px;font-weight:900;text-transform:uppercase}.patient-history-empty{padding:18px;color:#7a8c9d;text-align:center;font-size:12px}
 @media(max-width:900px){.calendar-toolbar{align-items:flex-start}.calendar-period{order:3;width:100%;justify-content:center}.calendar-grid{grid-template-columns:repeat(7,120px)}.day-event{grid-template-columns:70px 1fr}.day-event .appointment-actions{grid-column:1/-1}.calendar-modal-item{grid-template-columns:1fr}.calendar-modal-tag{width:max-content}.appointment-patient-picker{grid-template-columns:1fr}.patient-quick-grid{grid-template-columns:1fr}.patient-quick-modal{width:94vw}}
+@media(max-width:900px){.patient-history-search-row,.patient-history-selected,.patient-history-columns,.patient-history-item{grid-template-columns:1fr}.patient-history-search{min-width:100%}.patient-history-results{position:static;margin-top:8px}}
 </style>
 <style>
 .calendar-event.color-consulta,.day-event.color-consulta,.calendar-modal-item.color-consulta{border-left-color:#2878d0;background:#eaf3ff}.calendar-event.color-control,.day-event.color-control,.calendar-modal-item.color-control{border-left-color:#13a08a;background:#eafaf7}.calendar-event.color-laboratorio,.day-event.color-laboratorio,.calendar-modal-item.color-laboratorio{border-left-color:#7c5cff;background:#f2efff}.calendar-event.color-imagen,.day-event.color-imagen,.calendar-modal-item.color-imagen{border-left-color:#1c9ac5;background:#edf9ff}.calendar-event.color-general,.day-event.color-general,.calendar-modal-item.color-general{border-left-color:#8796a8;background:#f4f7fa}.calendar-event.color-recordatorio,.day-event.color-recordatorio,.calendar-modal-item.color-recordatorio{border-left-color:#7c3aed;background:linear-gradient(135deg,#fbf7ff,#eefcff)}.calendar-event.color-recordatorio{position:relative;padding-top:20px}.calendar-event.color-recordatorio::after,.day-event.color-recordatorio::after,.calendar-modal-item.color-recordatorio::after{content:"RECORDATORIO";position:absolute;top:0;right:0;z-index:2;padding:3px 9px;border-bottom-left-radius:9px;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;font-size:8px;font-weight:900;letter-spacing:.1em}.day-event.color-recordatorio,.calendar-modal-item.color-recordatorio{position:relative;overflow:hidden}.day-event.color-recordatorio::after,.calendar-modal-item.color-recordatorio::after{top:8px;right:8px;border-radius:999px}.calendar-dot.color-consulta{background:#2878d0}.calendar-dot.color-control{background:#13a08a}.calendar-dot.color-laboratorio{background:#7c5cff}.calendar-dot.color-imagen{background:#1c9ac5}.calendar-dot.color-general{background:#8796a8}.calendar-dot.color-recordatorio{background:#7c3aed}.calendar-event[class*="professional-"],.day-event[class*="professional-"],.calendar-modal-item[class*="professional-"]{border-right:4px solid #9aa8b6}.professional-doctor-luis{border-right-color:#2878d0!important}.professional-dra-candy{border-right-color:#d85c97!important}.professional-lic-enfermeria{border-right-color:#0f9f8f!important}.professional-enfermera{border-right-color:#22b8ad!important}.professional-medico{border-right-color:#805ad5!important}.professional-profesional{border-right-color:#8796a8!important}.calendar-pro-dot{width:20px;height:4px;border-radius:999px;background:#8796a8}.calendar-pro-dot.professional-doctor-luis,.calendar-pro-dot.professional-dra-candy,.calendar-pro-dot.professional-lic-enfermeria,.calendar-pro-dot.professional-enfermera,.calendar-pro-dot.professional-medico,.calendar-pro-dot.professional-profesional{border-right:0!important}.calendar-legend-title{width:100%;margin-top:2px;color:#617487;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
@@ -434,6 +436,7 @@
     {% if es_clinica %}
     <form class="calendar-filter-bar" method="get">
       <input type="hidden" name="vista" value="dia">
+      {% if paciente_historial_id %}<input type="hidden" name="paciente_historial" value="{{ paciente_historial_id }}">{% endif %}
       <label>
         <span>Día / fecha</span>
         <input type="date" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
@@ -482,6 +485,88 @@
     </div>
     {% endif %}
   </section>
+
+  {% if es_clinica %}
+  <section class="erp-card patient-appointment-history" id="historial-paciente-citas">
+    <div class="patient-history-head">
+      <div>
+        <div class="erp-kpi-label">Historial de citas por paciente</div>
+        <h3 class="erp-panel-title">Buscar paciente y ver su agenda</h3>
+        <p>Consulte en un solo lugar las citas futuras y las citas anteriores del paciente seleccionado.</p>
+      </div>
+      {% if paciente_historial %}
+      <a class="patient-history-clear" href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{% if filtro_servicio %}&servicio={{ filtro_servicio }}{% endif %}{% if filtro_profesional %}&profesional={{ filtro_profesional }}{% endif %}">Limpiar paciente</a>
+      {% endif %}
+    </div>
+    <form class="patient-history-search-row" method="get" id="patientHistoryForm">
+      <input type="hidden" name="vista" value="{{ vista }}">
+      <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+      {% if filtro_servicio %}<input type="hidden" name="servicio" value="{{ filtro_servicio }}">{% endif %}
+      {% if filtro_profesional %}<input type="hidden" name="profesional" value="{{ filtro_profesional }}">{% endif %}
+      <input type="hidden" name="paciente_historial" id="patientHistoryId" value="{{ paciente_historial_id }}">
+      <div class="patient-history-search" data-patient-history-search>
+        <input id="patientHistorySearchInput" type="search" autocomplete="off" placeholder="Buscar por nombre, identidad, expediente, telefono o correo" value="{% if paciente_historial %}{{ paciente_historial.nombre }}{% endif %}">
+        <span class="patient-history-search-icon">⌕</span>
+        <div class="patient-history-results" id="patientHistoryResults" role="listbox"></div>
+      </div>
+      <button class="patient-history-submit" type="submit">Ver historial</button>
+    </form>
+
+    {% if paciente_historial %}
+    <div class="patient-history-selected">
+      <div>
+        <strong>{{ paciente_historial.nombre }}</strong>
+        <span>{{ paciente_historial.identidad|default:"Sin identidad" }}{% if paciente_historial.expediente_codigo %} · Exp. {{ paciente_historial.expediente_codigo }}{% endif %}{% if paciente_historial.telefono %} · {{ paciente_historial.telefono }}{% endif %}</span>
+      </div>
+      <span class="patient-history-count">{{ citas_historial_futuras|length }} futura{{ citas_historial_futuras|length|pluralize:"s" }} · {{ citas_historial_pasadas|length }} pasada{{ citas_historial_pasadas|length|pluralize:"s" }}</span>
+    </div>
+    <div class="patient-history-columns">
+      <div class="patient-history-column">
+        <h4>Próximas citas</h4>
+        <div class="patient-history-list">
+          {% for cita in citas_historial_futuras %}
+          <article class="patient-history-item color-{{ cita.agenda_color }}">
+            <div class="patient-history-date">
+              <strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong>
+              <span>{{ cita.fecha_hora|date:"h:i A" }}</span>
+            </div>
+            <div class="patient-history-main">
+              <strong>{{ cita.display_servicio }}</strong>
+              <span>{{ cita.display_responsable }} · {{ cita.titulo }}</span>
+            </div>
+            <span class="patient-history-state">{{ cita.get_estado_display }}</span>
+          </article>
+          {% empty %}
+          <div class="patient-history-empty">Este paciente no tiene citas futuras registradas.</div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="patient-history-column">
+        <h4>Citas anteriores</h4>
+        <div class="patient-history-list">
+          {% for cita in citas_historial_pasadas %}
+          <article class="patient-history-item color-{{ cita.agenda_color }}">
+            <div class="patient-history-date">
+              <strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong>
+              <span>{{ cita.fecha_hora|date:"h:i A" }}</span>
+            </div>
+            <div class="patient-history-main">
+              <strong>{{ cita.display_servicio }}</strong>
+              <span>{{ cita.display_responsable }} · {{ cita.titulo }}</span>
+            </div>
+            <span class="patient-history-state">{{ cita.get_estado_display }}</span>
+          </article>
+          {% empty %}
+          <div class="patient-history-empty">Este paciente no tiene citas anteriores registradas.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="patient-history-empty">Busque un paciente para revisar su historial completo de citas sin salir del calendario.</div>
+    {% endif %}
+  </section>
+  {% endif %}
 
   {% if vista == "anio" %}
   <section class="calendar-year-grid">
@@ -916,6 +1001,17 @@
     if(event.key === "Escape" && modal.classList.contains("is-open")){ closeModal(); }
   });
 
+  document.querySelectorAll("[data-open-editor-top]").forEach(function(button){
+    button.addEventListener("click", function(){
+      const editor = document.getElementById("editor");
+      if(!editor){ return; }
+      editor.open = true;
+      window.setTimeout(function(){
+        editor.scrollIntoView({behavior:"smooth", block:"start"});
+      }, 20);
+    });
+  });
+
   const swipeArea = document.querySelector("[data-calendar-swipe]");
   if(swipeArea){
     let startX = 0;
@@ -1114,7 +1210,138 @@
   document.addEventListener("click", function(event){
     if(!shell.contains(event.target)){ closeResults(); }
   });
-  window.appointmentPatientPicker = {choosePatient};
+window.appointmentPatientPicker = {choosePatient};
+})();
+</script>
+<script>
+(function(){
+  const shell = document.querySelector("[data-patient-history-search]");
+  const input = document.getElementById("patientHistorySearchInput");
+  const hidden = document.getElementById("patientHistoryId");
+  const results = document.getElementById("patientHistoryResults");
+  const form = document.getElementById("patientHistoryForm");
+  const patientDataNode = document.getElementById("appointmentPatientsData");
+  if(!shell || !input || !hidden || !results || !form || !patientDataNode){ return; }
+
+  let localPatients = [];
+  let activeIndex = -1;
+  try{
+    localPatients = JSON.parse(patientDataNode.textContent || "[]");
+  }catch(error){
+    localPatients = [];
+  }
+
+  function normalize(value){
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase()
+      .trim();
+  }
+
+  function filterPatients(query){
+    const terms = normalize(query).split(/\s+/).filter(Boolean);
+    if(!terms.length){ return localPatients.slice(0, 12); }
+    return localPatients.filter(function(patient){
+      const searchable = normalize([
+        patient.nombre,
+        patient.documento,
+        patient.expediente,
+        patient.telefono,
+        patient.correo,
+      ].filter(Boolean).join(" "));
+      return terms.every(term=>searchable.includes(term));
+    }).slice(0, 12);
+  }
+
+  function closeResults(){
+    results.classList.remove("is-open");
+    results.innerHTML = "";
+    activeIndex = -1;
+  }
+
+  function resultButtons(){
+    return Array.from(results.querySelectorAll("[data-history-patient-result]"));
+  }
+
+  function setActive(index){
+    const buttons = resultButtons();
+    if(!buttons.length){ activeIndex = -1; return; }
+    activeIndex = Math.max(0, Math.min(index, buttons.length - 1));
+    buttons.forEach((button, position)=>button.classList.toggle("is-active", position === activeIndex));
+    buttons[activeIndex].scrollIntoView({block:"nearest"});
+  }
+
+  function choosePatient(patient){
+    hidden.value = String(patient.id);
+    input.value = patient.nombre;
+    closeResults();
+    form.submit();
+  }
+
+  function renderPatients(patients){
+    results.innerHTML = "";
+    if(!patients.length){
+      results.innerHTML = '<div class="appointment-patient-empty">No encontramos pacientes con esos datos.</div>';
+      results.classList.add("is-open");
+      return;
+    }
+    patients.forEach(function(patient){
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "appointment-patient-result";
+      button.dataset.historyPatientResult = String(patient.id);
+      button.setAttribute("role", "option");
+
+      const info = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = patient.nombre;
+      const meta = document.createElement("span");
+      meta.textContent = [
+        patient.documento ? "ID " + patient.documento : "",
+        patient.expediente ? "Exp. " + patient.expediente : "",
+        patient.telefono || patient.correo || "",
+      ].filter(Boolean).join(" · ");
+      info.append(name, meta);
+
+      const badge = document.createElement("em");
+      badge.textContent = "Ver historial";
+      button.append(info, badge);
+      button.addEventListener("click", ()=>choosePatient(patient));
+      results.appendChild(button);
+    });
+    results.classList.add("is-open");
+    activeIndex = -1;
+  }
+
+  input.addEventListener("input", function(){
+    hidden.value = "";
+    renderPatients(filterPatients(input.value));
+  });
+  input.addEventListener("focus", function(){
+    if(!hidden.value){ renderPatients(filterPatients(input.value)); }
+  });
+  input.addEventListener("keydown", function(event){
+    const buttons = resultButtons();
+    if(event.key === "ArrowDown" && buttons.length){ event.preventDefault(); setActive(activeIndex + 1); }
+    else if(event.key === "ArrowUp" && buttons.length){ event.preventDefault(); setActive(activeIndex <= 0 ? buttons.length - 1 : activeIndex - 1); }
+    else if(event.key === "Enter" && activeIndex >= 0 && buttons[activeIndex]){ event.preventDefault(); buttons[activeIndex].click(); }
+    else if(event.key === "Escape"){ closeResults(); }
+  });
+  form.addEventListener("submit", function(event){
+    if(hidden.value){ return; }
+    const matches = filterPatients(input.value);
+    if(matches.length === 1){
+      hidden.value = String(matches[0].id);
+      return;
+    }
+    event.preventDefault();
+    renderPatients(matches);
+    input.focus();
+  });
+  document.addEventListener("click", function(event){
+    if(!shell.contains(event.target)){ closeResults(); }
+  });
 })();
 </script>
 <script>

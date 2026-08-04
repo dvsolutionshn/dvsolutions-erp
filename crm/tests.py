@@ -109,6 +109,55 @@ class CRMTests(TestCase):
         self.assertContains(response, "Calendario de Citas")
         self.assertContains(response, reverse("agenda_mobile", args=[self.empresa.slug]))
 
+    def test_agenda_citas_muestra_historial_por_paciente(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-91001",
+            identidad="08011999000991",
+            nombre="Paciente Historial Agenda",
+            telefono="99990091",
+        )
+        consulta = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta General",
+            categoria="consulta",
+            duracion_minutos=60,
+        )
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=consulta,
+            titulo="Consulta futura de prueba",
+            responsable="Dra. Candy Luque",
+            fecha_hora=timezone.now() + timedelta(days=5),
+            estado="confirmada",
+        )
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=consulta,
+            titulo="Consulta pasada de prueba",
+            responsable="Dra. Candy Luque",
+            fecha_hora=timezone.now() - timedelta(days=5),
+            estado="finalizada",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {"paciente_historial": str(paciente.id)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Historial de citas por paciente")
+        self.assertContains(response, "Paciente Historial Agenda")
+        self.assertContains(response, "Próximas citas")
+        self.assertContains(response, "Citas anteriores")
+        self.assertContains(response, "Consulta futura de prueba")
+        self.assertContains(response, "Consulta pasada de prueba")
+
     def test_serviciosmedicos_ve_agenda_espejo_de_hospital_mia_solo_dr_luis(self):
         servicios = Empresa.objects.create(
             nombre="Servicios Medicos Gonzalez",
