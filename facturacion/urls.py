@@ -123,6 +123,7 @@ urlpatterns = [
     path('reportes/power-bi/', views.configuracion_power_bi_reportes, name='configuracion_power_bi_reportes'),
     path('reportes/bancos/', views.reporte_ingresos_bancos, name='reporte_ingresos_bancos'),
     path('reportes/retenciones/', views.reporte_retenciones_pagos, name='reporte_retenciones_pagos'),
+    path('reportes/facturas-pdf/', views.descargar_facturas_filtradas_zip, name='descargar_facturas_filtradas_zip'),
 
     path('cxc/', views.reporte_cxc, name='reporte_cxc'),
     path('cxp/', views.reporte_cxp, name='reporte_cxp'),

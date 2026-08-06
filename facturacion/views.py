@@ -28,7 +28,9 @@ import os
 import logging
 import json
 import calendar
+import io
 import tempfile
+import zipfile
 from pathlib import Path
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
@@ -8007,6 +8009,64 @@ def reportes_facturacion(request, empresa_slug):
         "configuracion_power_bi": configuracion_power_bi,
         "puede_configurar_power_bi": _puede_configurar_power_bi(request.user),
     })
+
+
+@login_required
+def descargar_facturas_filtradas_zip(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    cliente_id = (request.GET.get("cliente") or "").strip()
+
+    if not cliente_id:
+        messages.error(
+            request,
+            "Selecciona un cliente antes de descargar sus facturas en PDF.",
+        )
+        destino = reverse("reportes_facturacion", args=[empresa.slug])
+        consulta = request.GET.urlencode()
+        return redirect(f"{destino}?{consulta}" if consulta else destino)
+
+    cliente = get_object_or_404(Cliente, id=cliente_id, empresa=empresa)
+    facturas = list(
+        _filtrar_facturas_reporte(empresa, request.GET)
+        .select_related("cliente")
+        .order_by("fecha_emision", "id")
+    )
+    if not facturas:
+        messages.warning(
+            request,
+            "No se encontraron facturas para el cliente y las fechas seleccionadas.",
+        )
+        destino = reverse("reportes_facturacion", args=[empresa.slug])
+        return redirect(f"{destino}?{request.GET.urlencode()}")
+
+    configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)
+    plantilla = _resolver_plantilla_factura(configuracion, empresa)
+    archivo_zip = io.BytesIO()
+    nombres_usados = set()
+
+    with zipfile.ZipFile(archivo_zip, mode="w", compression=zipfile.ZIP_DEFLATED) as paquete:
+        for factura in facturas:
+            nombre_pdf = _nombre_factura_pdf(factura)
+            nombre_pdf = nombre_pdf.replace("/", "-").replace("\\", "-")
+            if nombre_pdf in nombres_usados:
+                base, extension = os.path.splitext(nombre_pdf)
+                nombre_pdf = f"{base}_{factura.id}{extension}"
+            nombres_usados.add(nombre_pdf)
+            paquete.writestr(
+                nombre_pdf,
+                _generar_factura_pdf_bytes(empresa, factura, plantilla),
+            )
+
+    archivo_zip.seek(0)
+    fecha_desde = (request.GET.get("fecha_desde") or "inicio").strip()
+    fecha_hasta = (request.GET.get("fecha_hasta") or "actual").strip()
+    cliente_archivo = slugify(cliente.nombre) or f"cliente-{cliente.id}"
+    nombre_zip = f"Facturas_{cliente_archivo}_{fecha_desde}_{fecha_hasta}.zip"
+
+    response = HttpResponse(archivo_zip.getvalue(), content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_zip}"'
+    response["X-Total-Facturas"] = str(len(facturas))
+    return response
 
 
 def _rango_reporte_retenciones(periodo, fecha_referencia, fecha_desde="", fecha_hasta=""):

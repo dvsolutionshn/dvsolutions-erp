@@ -563,7 +563,7 @@
         <div class="erp-report-filter-head">
             <div>
                 <h3 class="erp-report-section-title">Filtros del reporte</h3>
-                <p>La exportacion a Excel toma exactamente estos filtros. Si no filtras nada, exporta toda la cartera.</p>
+                <p>Excel y la descarga de facturas toman exactamente los filtros seleccionados. Para descargar los PDF, elige un cliente.</p>
             </div>
             <div class="erp-report-filter-actions">
                 <a class="erp-btn-secondary" href="/{{ empresa.slug }}/dashboard/facturacion/reportes/">Limpiar vista</a>
@@ -608,6 +608,12 @@
             </div>
             <div class="erp-report-filter-actions" style="grid-column:1 / -1;">
                 <button type="submit" class="erp-btn">Aplicar filtros</button>
+                <button
+                    type="submit"
+                    class="erp-btn-secondary"
+                    formaction="{% url 'descargar_facturas_filtradas_zip' empresa.slug %}"
+                    title="Descarga un archivo ZIP con un PDF por cada factura del cliente y periodo seleccionados"
+                >Descargar facturas PDF</button>
                 <a href="/{{ empresa.slug }}/dashboard/facturacion/reportes/" class="erp-btn-secondary">Restablecer</a>
             </div>
         </form>

@@ -137,7 +137,7 @@ def permiso_facturacion_accion(path_suffix):
         if len(parts) > 1 and parts[1] == "factura":
             return "puede_crear_notas_credito"
         return None
-    if first == "reportes" and len(parts) > 1 and parts[1] == "excel":
+    if first == "reportes" and len(parts) > 1 and parts[1] in {"excel", "facturas-pdf"}:
         return "puede_exportar_reportes"
 
     if first.isdigit():

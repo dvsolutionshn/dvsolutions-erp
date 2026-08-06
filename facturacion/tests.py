@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 import json
+import zipfile
 from unittest.mock import patch
 
 from pypdf import PdfReader
@@ -6495,6 +6496,41 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
         self.assertContains(response, "Ver factura")
+
+    @patch("facturacion.views._generar_factura_pdf_bytes")
+    def test_descargar_facturas_pdf_respeta_cliente_y_fechas(self, generar_pdf):
+        generar_pdf.side_effect = lambda empresa, factura, plantilla: f"PDF-{factura.id}".encode()
+        factura_enero = self.crear_factura_con_linea(fecha_emision=date(2026, 1, 15))
+        self.crear_factura_con_linea(fecha_emision=date(2026, 2, 1))
+        otro_cliente = Cliente.objects.create(empresa=self.empresa, nombre="Otro Cliente")
+        self.crear_factura_para_cliente(otro_cliente, fecha_emision=date(2026, 1, 20))
+
+        response = self.client.get(
+            reverse("descargar_facturas_filtradas_zip", args=[self.empresa.slug]),
+            {
+                "cliente": self.cliente.id,
+                "fecha_desde": "2026-01-01",
+                "fecha_hasta": "2026-01-31",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        self.assertEqual(response["X-Total-Facturas"], "1")
+        with zipfile.ZipFile(BytesIO(response.content)) as paquete:
+            nombres = paquete.namelist()
+            self.assertEqual(len(nombres), 1)
+            self.assertEqual(paquete.read(nombres[0]), f"PDF-{factura_enero.id}".encode())
+        generar_pdf.assert_called_once()
+
+    def test_descargar_facturas_pdf_exige_cliente(self):
+        response = self.client.get(
+            reverse("descargar_facturas_filtradas_zip", args=[self.empresa.slug]),
+            {"fecha_desde": "2026-01-01", "fecha_hasta": "2026-01-31"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("reportes_facturacion", args=[self.empresa.slug]), response.url)
 
     def test_dashboard_bi_facturacion_renderiza_panel_ejecutivo(self):
         self.crear_factura_con_linea(estado="emitida")
