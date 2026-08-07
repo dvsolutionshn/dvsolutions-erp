@@ -998,24 +998,124 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["citas_hoy_total"] = len(citas_hoy)
     contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
-    contexto["pacientes_app_total"] = Paciente.objects.filter(empresa=empresa, activo=True).count()
-    contexto["pacientes_recientes_app"] = Paciente.objects.filter(
+    contexto["pacientes_app_premium"] = empresa.slug == "hospital_mia"
+    pacientes_activos_qs = Paciente.objects.filter(empresa=empresa, activo=True)
+    contexto["pacientes_app_total"] = pacientes_activos_qs.count()
+    contexto["pacientes_recientes_app"] = pacientes_activos_qs.filter(
         empresa=empresa,
         activo=True,
     ).order_by("-fecha_actualizacion", "-id")[:4]
-    pacientes_app_qs = Paciente.objects.filter(empresa=empresa, activo=True).order_by("-fecha_actualizacion", "nombre")[:120]
-    contexto["pacientes_app_payload"] = [
-        {
+    limite_pacientes_app = 320 if contexto["pacientes_app_premium"] else 120
+    pacientes_app_qs = list(
+        pacientes_activos_qs.select_related("cliente")
+        .order_by("-fecha_actualizacion", "nombre")[:limite_pacientes_app]
+    )
+    pacientes_ids = [paciente.id for paciente in pacientes_app_qs]
+    proximas_por_paciente = {}
+    frecuencia_por_paciente = {}
+    if contexto["pacientes_app_premium"] and pacientes_ids:
+        proximas_pacientes_qs = (
+            CitaCliente.objects.filter(
+                empresa=empresa,
+                paciente_id__in=pacientes_ids,
+                fecha_hora__gte=ahora,
+                estado__in=["pendiente", "confirmada"],
+            )
+            .select_related("servicio_clinico", "producto", "profesional_salud")
+            .order_by("fecha_hora")
+        )
+        for cita in proximas_pacientes_qs:
+            proximas_por_paciente.setdefault(cita.paciente_id, cita)
+        frecuencia_por_paciente = {
+            fila["paciente_id"]: fila["total"]
+            for fila in CitaCliente.objects.filter(
+                empresa=empresa,
+                paciente_id__in=pacientes_ids,
+            )
+            .values("paciente_id")
+            .annotate(total=Count("id"))
+        }
+
+    def _foto_paciente_app(paciente):
+        if not paciente.foto_perfil:
+            return ""
+        try:
+            return paciente.foto_perfil.url
+        except ValueError:
+            return ""
+
+    def _payload_paciente_app(paciente):
+        proxima = proximas_por_paciente.get(paciente.id)
+        fecha_actualizacion = timezone.localtime(paciente.fecha_actualizacion)
+        telefono = paciente.whatsapp or paciente.telefono or ""
+        alergias = (paciente.alergias or "").strip()
+        alergias_sin_alerta = {
+            "no",
+            "no aplica",
+            "ninguna",
+            "ninguno",
+            "n/a",
+            "na",
+            "sin alergias",
+            "no refiere",
+        }
+        alergico_app = bool(
+            paciente.es_alergico
+            and (not alergias or alergias.casefold() not in alergias_sin_alerta)
+        )
+        payload = {
             "id": paciente.id,
             "nombre": paciente.nombre,
             "documento": paciente.identidad or "",
             "expediente": paciente.expediente_codigo,
-            "telefono": paciente.whatsapp or paciente.telefono or "",
+            "telefono": telefono,
             "correo": paciente.correo or "",
             "edad": paciente.edad,
-            "alergico": paciente.es_alergico,
+            "sexo": paciente.get_sexo_display(),
+            "rh": paciente.rh or "No indicado",
+            "alergico": alergico_app,
+            "alergias": alergias,
+            "foto": _foto_paciente_app(paciente),
+            "actualizado": fecha_actualizacion.strftime("%d/%m/%Y"),
+            "actualizado_iso": fecha_actualizacion.isoformat(),
+            "frecuencia": frecuencia_por_paciente.get(paciente.id, 0),
+            "cliente_id": paciente.cliente_id,
             "url": reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id]),
         }
+        if contexto["pacientes_app_premium"]:
+            payload["links"] = {
+                "resumen": f'{payload["url"]}#resumen-clinico',
+                "historia": reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.id]),
+                "visitas": f'{payload["url"]}#historial-clinico',
+                "signos": f'{payload["url"]}#signos-vitales',
+                "diagnosticos": f'{payload["url"]}#diagnosticos',
+                "evolucion": reverse("clinica_evolucion_paciente", args=[empresa.slug, paciente.id]),
+                "recetas": reverse("clinica_recetas_paciente", args=[empresa.slug, paciente.id]),
+                "examenes": reverse("clinica_examenes_paciente", args=[empresa.slug, paciente.id]),
+                "archivos": reverse("clinica_documentos_categoria_paciente", args=[empresa.slug, paciente.id, "documento"]),
+                "consentimientos": reverse("clinica_consentimientos_paciente", args=[empresa.slug, paciente.id]),
+                "seguimientos": reverse("clinica_seguimientos_paciente", args=[empresa.slug, paciente.id]),
+                "citas": f'{payload["url"]}#citas',
+                "facturacion": f'{payload["url"]}#facturacion',
+                "pagos": f'{payload["url"]}#pagos',
+                "notas": f'{payload["url"]}#historial-clinico',
+            }
+            payload["proxima_cita"] = (
+                {
+                    "fecha": timezone.localtime(proxima.fecha_hora).strftime("%d/%m/%Y"),
+                    "hora": timezone.localtime(proxima.fecha_hora).strftime("%I:%M %p"),
+                    "fecha_iso": timezone.localtime(proxima.fecha_hora).isoformat(),
+                    "servicio": proxima.display_servicio,
+                    "profesional": proxima.display_responsable,
+                    "estado": proxima.get_estado_display(),
+                }
+                if proxima
+                else None
+            )
+        return payload
+
+    contexto["pacientes_app_payload"] = [
+        _payload_paciente_app(paciente)
         for paciente in pacientes_app_qs
     ]
     impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")

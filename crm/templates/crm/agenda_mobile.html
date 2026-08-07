@@ -14,8 +14,9 @@
   <link rel="apple-touch-icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
   <style>
   :root{--navy:#12324a;--navy2:#185d68;--teal:#22b8ad;--pink:#e675a0;--ink:#14283b;--muted:#6e8191;--line:#dbe6ed;--bg:#f2f7fa;--white:#fff;--danger:#b94343;--safe-bottom:env(safe-area-inset-bottom,0px)}
-  *{box-sizing:border-box}html{background:var(--navy)}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}button,input,select,textarea{font:inherit}.app{max-width:760px;margin:auto;min-height:100vh;padding-bottom:calc(92px + var(--safe-bottom))}
+  *{box-sizing:border-box}html{max-width:100%;overflow-x:hidden;background:var(--navy)}body{max-width:100%;overflow-x:hidden;margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}button,input,select,textarea{font:inherit}.app{max-width:760px;margin:auto;min-height:100vh;padding-bottom:calc(92px + var(--safe-bottom))}
   .hero{position:relative;z-index:40;overflow:visible;padding:calc(20px + env(safe-area-inset-top,0px)) 20px 28px;border-radius:0 0 32px 32px;background:linear-gradient(145deg,var(--navy),var(--navy2));color:#fff;box-shadow:0 18px 45px rgba(18,50,74,.2)}.hero:after{content:"";position:absolute;width:240px;height:240px;right:-110px;top:-100px;border-radius:50%;background:radial-gradient(circle,rgba(230,117,160,.44),transparent 68%);pointer-events:none}.hero-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{display:flex;align-items:center;gap:11px}.brand-logo{width:48px;height:48px;display:grid;place-items:center;border-radius:15px;background:#fff;overflow:hidden;box-shadow:0 8px 25px rgba(0,0,0,.18)}.brand-logo img{width:100%;height:100%;object-fit:contain;padding:3px}.brand small,.brand strong{display:block}.brand small{font-size:9px;letter-spacing:.16em;text-transform:uppercase;opacity:.7}.brand strong{margin-top:3px;font-size:16px}.icon-btn{width:42px;height:42px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.24);border-radius:14px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer}.hero-copy{position:relative;z-index:1;margin-top:25px}.hero-copy small{font-size:10px;letter-spacing:.17em;text-transform:uppercase;opacity:.7}.hero-copy h1{margin:6px 0 0;font-size:28px;line-height:1.12}.stats{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}.stat{padding:13px 14px;border:1px solid rgba(255,255,255,.15);border-radius:17px;background:rgba(255,255,255,.09);backdrop-filter:blur(10px)}.stat strong{display:block;font-size:22px}.stat span{font-size:10px;opacity:.72}
+  .hero:after{right:0}
   .content{padding:18px 15px}.messages{display:grid;gap:8px;margin-bottom:14px}.message{padding:12px 14px;border-radius:14px;background:#e7f7f3;color:#17665f;font-size:12px;font-weight:700}.mirror-note{margin-bottom:14px;padding:12px 14px;border:1px solid #c7d2fe;border-radius:16px;background:#f5f7ff;color:#27376f;font-size:11px;font-weight:800;line-height:1.45}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:20px 2px 11px}.section-head small{display:block;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.section-head h2{margin:4px 0 0;font-size:19px}.section-head a{color:var(--navy2);font-size:11px;font-weight:800;text-decoration:none}
   .days{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;touch-action:pan-y;user-select:none;cursor:grab}.days.is-dragging{cursor:grabbing}.day{display:grid;place-items:center;gap:4px;min-height:76px;padding:8px 3px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--ink);text-decoration:none;box-shadow:0 7px 20px rgba(30,67,91,.05);transition:transform .18s ease,box-shadow .18s ease}.days.is-dragging .day{transform:scale(.985)}.day span{font-size:9px;font-weight:800;text-transform:uppercase;color:var(--muted)}.day strong{font-size:18px}.day i{min-width:19px;height:19px;display:grid;place-items:center;border-radius:999px;background:#edf4f7;color:var(--navy2);font-size:9px;font-style:normal;font-weight:900}.day.active{border-color:transparent;background:linear-gradient(145deg,var(--teal),#178d91);color:#fff;box-shadow:0 10px 26px rgba(34,184,173,.28)}.day.active span,.day.active i{color:#fff}.day.active i{background:rgba(255,255,255,.2)}
   .appointments{display:grid;gap:10px}.appointment{position:relative;display:grid;grid-template-columns:65px minmax(0,1fr) auto;gap:12px;align-items:center;padding:15px;border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:19px;background:#fff;box-shadow:0 9px 28px rgba(25,59,82,.06)}.appointment.color-dra-candy{border-left-color:var(--pink)}.appointment.color-doctor-luis{border-left-color:#347bd1}.appointment.color-terapias{border-left-color:#805ad5}.appointment.color-camara_hiperbarica{border-left-color:#8b5e34}.appointment.color-cirugias{border-left-color:#ce514c}.appointment.color-spa{border-left-color:#d8a824}.time{font-size:13px;font-weight:900}.time small{display:block;margin-top:3px;color:var(--muted);font-size:9px}.appointment-main{min-width:0}.appointment-main strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.appointment-main span{display:block;margin-top:4px;color:var(--muted);font-size:10px;line-height:1.4}.status{display:inline-flex;margin-top:7px;padding:5px 8px;border-radius:999px;background:#fff5d9;color:#8a6411;font-size:8px;font-weight:900;text-transform:uppercase}.status.confirmada{background:#e6f6ef;color:#277158}.status.realizada{background:#edf1f4;color:#536474}.status.cancelada{background:#fae9e8;color:#9b3e39}.status.paid{background:#e8f7ef;color:#16724f}.appointment.is-paid{overflow:hidden}.appointment.is-paid:before{content:"PAGADA";position:absolute;top:0;right:0;padding:3px 9px;border-bottom-left-radius:10px;background:linear-gradient(135deg,#0f9f8f,#2563eb);color:#fff;font-size:8px;font-weight:900;letter-spacing:.1em}.more{width:34px;height:34px;border:0;border-radius:11px;background:#eef4f7;color:var(--navy);font-weight:900;cursor:pointer}.empty{padding:32px 18px;border:1px dashed #bfd0da;border-radius:20px;background:#fff;text-align:center;color:var(--muted);font-size:12px}
@@ -29,7 +30,9 @@
   .app-panel{display:none;gap:12px;margin:0 0 18px}.app-panel.active{display:grid}.app-panel-card{overflow:hidden;border:1px solid #d8e8ef;border-radius:26px;background:linear-gradient(145deg,#fff,#f7fbff);box-shadow:0 18px 40px rgba(18,50,74,.08)}.app-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #e5eef4;background:linear-gradient(135deg,#ffffff,#f0fbfa)}.app-panel-head small{display:block;color:var(--teal);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.app-panel-head h2{margin:4px 0 0;font-size:20px}.app-panel-head p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.app-panel-close{min-height:34px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--navy2);padding:0 12px;font-size:9px;font-weight:900}.app-search{position:relative;padding:13px 14px}.app-search input{width:100%;min-height:48px;border:1px solid #bfd0db;border-radius:16px;background:#fff;padding:0 42px 0 14px;color:var(--ink);box-shadow:0 8px 18px rgba(18,50,74,.04)}.app-search:after{content:"⌕";position:absolute;right:29px;top:50%;transform:translateY(-50%);color:var(--teal);font-size:17px;font-weight:900}.app-list{display:grid;gap:9px;padding:0 14px 15px}.app-patient-card,.app-product-result,.app-cart-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:center;padding:12px;border:1px solid #dce9f0;border-radius:18px;background:#fff;color:var(--ink);text-decoration:none;box-shadow:0 9px 22px rgba(18,50,74,.05)}.app-avatar{width:42px;height:42px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(135deg,var(--teal),#2878d0);color:#fff;font-weight:900}.app-patient-card strong,.app-product-result strong,.app-cart-row strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.app-patient-card span,.app-product-result span,.app-cart-row span{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.35}.app-chip{padding:5px 8px;border-radius:999px;background:#edf8f6;color:#10766d;font-size:8px;font-weight:900;text-transform:uppercase}.app-empty{padding:18px;border:1px dashed #c6d8e2;border-radius:18px;background:#fbfdff;color:var(--muted);font-size:11px;text-align:center}.quick-invoice-body{display:grid;gap:12px;padding:14px}.quick-step{display:grid;gap:9px;padding:13px;border:1px solid #dde9f0;border-radius:21px;background:rgba(255,255,255,.82)}.quick-step-title{display:flex;align-items:center;gap:9px;font-weight:900}.quick-step-title b{width:25px;height:25px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,var(--teal),#2878d0);color:#fff;font-size:11px}.quick-input,.quick-select{width:100%;min-height:46px;border:1px solid #bfd0db;border-radius:15px;background:#fff;padding:0 12px;color:var(--ink)}.quick-product-results{display:grid;gap:7px}.app-product-result{grid-template-columns:minmax(0,1fr) auto;cursor:pointer;text-align:left}.app-cart-row{grid-template-columns:minmax(0,1fr) 70px 92px 34px;gap:7px}.app-cart-row input{width:100%;min-height:38px;border:1px solid #c9dae5;border-radius:12px;padding:0 7px;text-align:center}.app-cart-row button{width:34px;height:34px;border:1px solid #fecaca;border-radius:12px;background:#fff7f7;color:#dc2626;font-weight:900}.quick-total{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-radius:18px;background:linear-gradient(135deg,#12324a,#185d68);color:#fff}.quick-total span{font-size:10px;opacity:.72}.quick-total strong{font-size:24px}.quick-submit{min-height:50px;border:0;border-radius:17px;background:linear-gradient(135deg,var(--teal),#2878d0);color:#fff;font-weight:900;box-shadow:0 12px 28px rgba(34,184,173,.22)}.quick-status{display:none;padding:12px;border-radius:15px;background:#e9f8f4;color:#17665f;font-size:11px;font-weight:800;line-height:1.45}.quick-status.show{display:block}.quick-status.error{background:#fff1f2;color:#a53142}.quick-success-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.quick-success-actions a{display:grid;place-items:center;min-height:42px;border-radius:14px;background:#12324a;color:#fff;text-decoration:none;font-size:10px;font-weight:900}.quick-success-actions a:last-child{background:#16a38f}
   .mobile-app-screen:not(.active){display:none!important}.mobile-app-screen.active{display:grid}.agenda-screen.active{display:block}.app-screen-top{position:sticky;top:8px;z-index:25;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid #cfe4ed;border-radius:18px;background:rgba(255,255,255,.94);box-shadow:0 14px 30px rgba(18,50,74,.1);backdrop-filter:blur(18px)}.app-screen-top span{color:var(--muted);font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}.app-screen-top button{min-height:38px;border:0;border-radius:999px;background:linear-gradient(135deg,#12324a,#197ad0);color:#fff;padding:0 14px;font-size:10px;font-weight:900;box-shadow:0 10px 20px rgba(25,122,208,.18)}.app-panel-head .app-panel-close{display:none}
   .mobile-company-switch{position:relative;z-index:3;margin-top:16px}.mobile-company-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:54px;padding:9px 12px;border:1px solid rgba(255,255,255,.22);border-radius:18px;background:rgba(255,255,255,.12);color:#fff;list-style:none;box-shadow:0 12px 30px rgba(0,0,0,.12);backdrop-filter:blur(14px);cursor:pointer}.mobile-company-summary::-webkit-details-marker{display:none}.mobile-company-summary-main{display:flex;align-items:center;gap:10px;min-width:0}.mobile-company-avatar{width:34px;height:34px;display:grid;place-items:center;border-radius:13px;background:linear-gradient(135deg,#fff,#dff7f5);color:var(--navy);font-size:13px;font-weight:1000;text-transform:uppercase}.mobile-company-summary small,.mobile-company-summary strong{display:block}.mobile-company-summary small{font-size:8px;letter-spacing:.14em;text-transform:uppercase;opacity:.74}.mobile-company-summary strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;margin-top:2px;font-size:12px}.mobile-company-chevron{font-size:16px;font-weight:900;opacity:.82;transition:transform .18s ease}.mobile-company-switch[open] .mobile-company-chevron{transform:rotate(180deg)}.mobile-company-menu{position:absolute;left:0;right:0;top:calc(100% + 8px);display:grid;gap:7px;padding:9px;border:1px solid #d8e8ef;border-radius:20px;background:rgba(255,255,255,.97);box-shadow:0 20px 55px rgba(18,50,74,.26);backdrop-filter:blur(18px)}.mobile-company-menu-label{padding:5px 7px;color:var(--muted);font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.13em}.mobile-company-option{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px;border-radius:15px;background:#f8fbfd;color:var(--ink);text-decoration:none;border:1px solid transparent}.mobile-company-option.is-current{border-color:#93ded7;background:linear-gradient(145deg,#edfffc,#f8fbff)}.mobile-company-option strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.mobile-company-option small{display:block;margin-top:3px;color:var(--muted);font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.mobile-company-option .mobile-company-avatar{background:linear-gradient(135deg,var(--teal),#2878d0);color:#fff}.mobile-company-check{width:24px;height:24px;display:grid;place-items:center;border-radius:999px;background:#e7f8f4;color:#08796e;font-size:12px;font-weight:1000}
-  @media(max-width:520px){.form-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.appointment{grid-template-columns:58px minmax(0,1fr) auto}.days{gap:5px}.day{border-radius:13px}.content{padding-inline:11px}.hero{padding-inline:16px}.datetime{grid-template-columns:1fr 82px 62px}}
+  .patients-premium-shell{position:relative;overflow:visible;border:1px solid #d8e8ef;border-radius:28px;background:linear-gradient(160deg,#f8fcff 0%,#fff 48%,#f2fbfa 100%);box-shadow:0 20px 48px rgba(18,50,74,.1)}.patients-premium-hero{position:relative;overflow:hidden;padding:19px 17px 17px;border-radius:27px 27px 0 0;background:linear-gradient(135deg,#12324a 0%,#176573 60%,#21a99e 100%);color:#fff}.patients-premium-hero:after{content:"";position:absolute;right:-55px;top:-72px;width:190px;height:190px;border-radius:50%;background:radial-gradient(circle,rgba(230,117,160,.42),transparent 68%)}.patients-premium-hero-row{position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.patients-premium-eyebrow{display:block;font-size:8px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;opacity:.72}.patients-premium-hero h2{margin:5px 0 0;font-size:23px;line-height:1.08}.patients-premium-hero p{max-width:430px;margin:7px 0 0;font-size:10px;line-height:1.5;opacity:.78}.patients-count-pill{position:relative;z-index:1;display:grid;place-items:center;min-width:58px;min-height:58px;padding:7px;border:1px solid rgba(255,255,255,.2);border-radius:19px;background:rgba(255,255,255,.12);backdrop-filter:blur(12px)}.patients-count-pill strong{font-size:20px}.patients-count-pill span{font-size:7px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;opacity:.7}.patients-premium-controls{display:grid;gap:10px;padding:13px 13px 4px}.patients-search{position:relative}.patients-search input{width:100%;min-height:50px;border:1px solid #c6d9e4;border-radius:17px;background:#fff;padding:0 48px 0 15px;color:var(--ink);font-size:13px;box-shadow:0 10px 24px rgba(18,50,74,.06);outline:none}.patients-search input:focus{border-color:#38bcb1;box-shadow:0 0 0 4px rgba(34,184,173,.11),0 10px 24px rgba(18,50,74,.06)}.patients-search svg{position:absolute;right:16px;top:50%;width:20px;height:20px;transform:translateY(-50%);stroke:var(--teal);fill:none;stroke-width:2}.patients-filter-row{display:flex;gap:7px;overflow-x:auto;padding:2px 1px 5px;scrollbar-width:none;-webkit-overflow-scrolling:touch}.patients-filter-row::-webkit-scrollbar{display:none}.patient-filter-chip{flex:0 0 auto;min-height:36px;border:1px solid #d5e3eb;border-radius:999px;background:#fff;color:#637888;padding:0 12px;font-size:9px;font-weight:900;white-space:nowrap}.patient-filter-chip.active{border-color:transparent;background:linear-gradient(135deg,#12324a,#197ad0);color:#fff;box-shadow:0 8px 18px rgba(25,122,208,.18)}.patients-view-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 2px 0;color:var(--muted);font-size:9px;font-weight:800}.patients-view-toggle{display:flex;gap:4px;padding:3px;border:1px solid #d9e6ed;border-radius:12px;background:#fff}.patients-view-button{width:34px;height:30px;display:grid;place-items:center;border:0;border-radius:9px;background:transparent;color:#7a8d9b}.patients-view-button.active{background:#e7f7f4;color:#0e8075}.patients-view-button svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}.premium-patient-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:10px 13px 14px}.premium-patient-list.is-list{grid-template-columns:1fr}.premium-patient-card{position:relative;overflow:hidden;display:grid;gap:11px;min-width:0;padding:13px;border:1px solid #dce8ef;border-radius:21px;background:rgba(255,255,255,.94);box-shadow:0 12px 28px rgba(18,50,74,.07);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}.premium-patient-card:active{transform:scale(.985)}.premium-patient-card.has-alert{border-color:#f2c7ce;background:linear-gradient(150deg,#fff,#fff8f9)}.premium-patient-top{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center}.premium-patient-photo{width:52px;height:52px;display:grid;place-items:center;overflow:hidden;border-radius:18px;background:linear-gradient(145deg,#1db4a9,#2878d0);color:#fff;font-size:18px;font-weight:1000;box-shadow:0 9px 20px rgba(34,184,173,.2)}.premium-patient-photo img{width:100%;height:100%;object-fit:cover}.premium-patient-name{min-width:0}.premium-patient-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.premium-patient-name span{display:block;margin-top:4px;color:var(--muted);font-size:9px;line-height:1.35}.patient-favorite{width:33px;height:33px;display:grid;place-items:center;border:1px solid #e0e8ed;border-radius:12px;background:#fff;color:#a6b3bd;font-size:17px}.patient-favorite.active{border-color:#f1d799;background:#fff9e8;color:#d79b13}.premium-patient-status{display:flex;flex-wrap:wrap;gap:6px}.premium-patient-badge{display:inline-flex;align-items:center;gap:4px;padding:5px 7px;border-radius:999px;background:#eaf7f4;color:#14766f;font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.04em}.premium-patient-badge.alert{background:#fff0f2;color:#b23c4c}.premium-patient-badge.appointment{background:#eef4ff;color:#2d61a6}.premium-next-appointment{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;align-items:center;padding:9px;border-radius:14px;background:#f1f7fb}.premium-next-date{min-width:45px;padding:7px;border-radius:11px;background:#fff;color:#176573;text-align:center;box-shadow:0 5px 12px rgba(18,50,74,.06)}.premium-next-date strong,.premium-next-date span{display:block}.premium-next-date strong{font-size:10px}.premium-next-date span{margin-top:2px;font-size:7px;font-weight:900;text-transform:uppercase}.premium-next-copy{min-width:0}.premium-next-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}.premium-next-copy span{display:block;margin-top:3px;color:var(--muted);font-size:8px}.premium-patient-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.premium-patient-action{min-height:38px;display:grid;place-items:center;border:1px solid #dce7ed;border-radius:12px;background:#fff;color:#426076;text-decoration:none}.premium-patient-action.primary{border-color:transparent;background:linear-gradient(135deg,#18aa9d,#2878d0);color:#fff}.premium-patient-action svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.patients-load-more{display:none;width:calc(100% - 26px);min-height:46px;margin:0 13px 16px;border:1px solid #bfd6e2;border-radius:15px;background:#fff;color:#176573;font-size:10px;font-weight:900}.patients-load-more.show{display:block}.new-patient-fab{position:sticky;z-index:20;bottom:84px;display:flex;align-items:center;justify-content:center;gap:8px;width:max-content;min-height:48px;margin:0 14px 14px auto;padding:0 17px;border-radius:17px;background:linear-gradient(135deg,#e675a0,#2878d0);color:#fff;text-decoration:none;font-size:10px;font-weight:900;box-shadow:0 16px 34px rgba(113,85,190,.3)}.new-patient-fab span{font-size:20px;font-weight:400}.patient-profile-shell{overflow:hidden;border:1px solid #d8e8ef;border-radius:28px;background:#fff;box-shadow:0 20px 48px rgba(18,50,74,.1)}.patient-profile-cover{position:relative;min-height:138px;padding:17px;background:linear-gradient(135deg,#12324a 0%,#176573 58%,#e675a0 145%);color:#fff}.patient-profile-cover:after{content:"";position:absolute;right:-50px;bottom:-75px;width:210px;height:210px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.2),transparent 66%)}.patient-profile-back{position:relative;z-index:2;min-height:37px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.11);color:#fff;padding:0 13px;font-size:9px;font-weight:900}.patient-profile-identity{position:relative;z-index:2;display:flex;align-items:flex-end;gap:13px;margin-top:16px}.patient-profile-photo{width:74px;height:74px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:4px solid rgba(255,255,255,.75);border-radius:24px;background:linear-gradient(145deg,#20b6aa,#2878d0);color:#fff;font-size:26px;font-weight:1000;box-shadow:0 14px 30px rgba(0,0,0,.2)}.patient-profile-photo img{width:100%;height:100%;object-fit:cover}.patient-profile-title{min-width:0;padding-bottom:3px}.patient-profile-title small{font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.7}.patient-profile-title h2{margin:4px 0 0;font-size:19px;line-height:1.15}.patient-profile-title p{margin:5px 0 0;font-size:9px;opacity:.75}.patient-profile-body{display:grid;gap:12px;padding:14px}.patient-profile-alert{display:none;padding:11px 12px;border:1px solid #f2c4ca;border-radius:15px;background:#fff2f4;color:#9f3241;font-size:10px;font-weight:800;line-height:1.45}.patient-profile-alert.show{display:block}.patient-profile-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.patient-profile-action{min-height:58px;display:grid;place-items:center;gap:4px;border:1px solid #dbe7ee;border-radius:16px;background:#fff;color:#426076;text-decoration:none;font-size:8px;font-weight:900}.patient-profile-action.primary{border-color:transparent;background:linear-gradient(135deg,#17aa9d,#2878d0);color:#fff}.patient-profile-action svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.patient-profile-next{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #dbe8ef;border-radius:18px;background:linear-gradient(145deg,#f3fbfa,#f6f9ff)}.patient-profile-next.empty{grid-template-columns:1fr;padding:15px;text-align:left}.patient-profile-next-date{display:grid;place-items:center;min-height:46px;border-radius:14px;background:#fff;color:#176573;font-size:9px;font-weight:900;box-shadow:0 7px 16px rgba(18,50,74,.07)}.patient-profile-next-copy strong{display:block;font-size:11px}.patient-profile-next-copy span{display:block;margin-top:3px;color:var(--muted);font-size:9px;line-height:1.35}.patient-profile-next em{padding:5px 7px;border-radius:999px;background:#e8f6f2;color:#16715f;font-size:7px;font-style:normal;font-weight:900;text-transform:uppercase}.patient-profile-tabs{display:flex;gap:7px;overflow-x:auto;padding:2px 0 5px;scrollbar-width:none}.patient-profile-tabs::-webkit-scrollbar{display:none}.patient-profile-tabs a{flex:0 0 auto;min-height:36px;display:grid;place-items:center;border:1px solid #d9e6ed;border-radius:999px;background:#fff;color:#516c80;padding:0 12px;text-decoration:none;font-size:8px;font-weight:900}.patient-profile-tabs a:first-child{border-color:transparent;background:#12324a;color:#fff}.patient-profile-info{display:grid;grid-template-columns:1fr 1fr;gap:8px}.patient-profile-info div{padding:11px;border:1px solid #e0e9ef;border-radius:15px;background:#fafcfd}.patient-profile-info span{display:block;color:var(--muted);font-size:7px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.patient-profile-info strong{display:block;margin-top:4px;font-size:10px;line-height:1.35;word-break:break-word}.patient-profile-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px}.patient-profile-tool{position:relative;overflow:hidden;min-height:74px;display:grid;align-content:center;gap:4px;padding:12px;border:1px solid #dbe7ee;border-radius:17px;background:linear-gradient(145deg,#fff,#f6fbff);color:var(--ink);text-decoration:none}.patient-profile-tool:after{content:"›";position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#2b7bb6;font-size:18px}.patient-profile-tool strong{font-size:10px}.patient-profile-tool span{max-width:88%;color:var(--muted);font-size:8px;line-height:1.35}
+  @media(max-width:620px){.premium-patient-list{grid-template-columns:1fr}}
+  @media(max-width:520px){.form-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.appointment{grid-template-columns:58px minmax(0,1fr) auto}.days{gap:5px}.day{border-radius:13px}.content{padding-inline:11px}.hero{padding-inline:16px}.datetime{grid-template-columns:1fr 82px 62px}.patients-premium-hero h2{font-size:21px}.patient-profile-actions{grid-template-columns:repeat(2,1fr)}.patient-profile-info,.patient-profile-tools{grid-template-columns:1fr 1fr}}
   .mobile-date-jump{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:end;margin:10px 0 12px;padding:11px;border:1px solid #d7e5ee;border-radius:18px;background:rgba(255,255,255,.78);box-shadow:0 12px 28px rgba(18,50,74,.06)}
   .mobile-date-jump label{display:grid;gap:5px;min-width:0}
   .mobile-date-jump span{color:var(--muted);font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.11em}
@@ -127,6 +130,44 @@
     </section>
     <section class="app-panel mobile-app-screen" id="pacientes-app">
       <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Pacientes</span></div>
+      {% if pacientes_app_premium %}
+      <article class="patients-premium-shell">
+        <header class="patients-premium-hero">
+          <div class="patients-premium-hero-row">
+            <div>
+              <span class="patients-premium-eyebrow">Directorio clínico</span>
+              <h2>Pacientes</h2>
+              <p>Encuentra expedientes, revisa alertas y continúa la atención sin salir de la app.</p>
+            </div>
+            <div class="patients-count-pill"><strong>{{ pacientes_app_total }}</strong><span>Activos</span></div>
+          </div>
+        </header>
+        <div class="patients-premium-controls">
+          <label class="patients-search" for="appPatientSearch">
+            <input id="appPatientSearch" type="search" placeholder="Nombre, identidad, expediente o teléfono" autocomplete="off">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </label>
+          <div class="patients-filter-row" id="patientFilterRow" aria-label="Filtros de pacientes">
+            <button class="patient-filter-chip active" type="button" data-patient-filter="todos">Todos</button>
+            <button class="patient-filter-chip" type="button" data-patient-filter="recientes">Recientes</button>
+            <button class="patient-filter-chip" type="button" data-patient-filter="cita">Con próxima cita</button>
+            <button class="patient-filter-chip" type="button" data-patient-filter="alertas">Alertas</button>
+            <button class="patient-filter-chip" type="button" data-patient-filter="favoritos">Favoritos</button>
+            <button class="patient-filter-chip" type="button" data-patient-filter="frecuentes">Frecuentes</button>
+          </div>
+          <div class="patients-view-row">
+            <span id="patientResultsSummary">Cargando expedientes...</span>
+            <div class="patients-view-toggle" aria-label="Cambiar presentación">
+              <button class="patients-view-button active" type="button" data-patient-view="grid" aria-label="Vista de tarjetas"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></button>
+              <button class="patients-view-button" type="button" data-patient-view="list" aria-label="Vista de lista"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="premium-patient-list" id="appPatientList" aria-live="polite"></div>
+        <button class="patients-load-more" id="patientsLoadMore" type="button">Mostrar más pacientes</button>
+        <a class="new-patient-fab" href="{% url 'clinica_crear_paciente' empresa.slug %}"><span>+</span> Nuevo paciente</a>
+      </article>
+      {% else %}
       <article class="app-panel-card">
         <div class="app-panel-head">
           <div>
@@ -139,7 +180,39 @@
         <div class="app-search"><input id="appPatientSearch" type="search" placeholder="Buscar paciente..." autocomplete="off"></div>
         <div class="app-list" id="appPatientList"></div>
       </article>
+      {% endif %}
     </section>
+    {% if pacientes_app_premium %}
+    <section class="app-panel mobile-app-screen" id="patient-profile-app">
+      <div class="app-screen-top"><button type="button" data-app-back-patients>← Pacientes</button><span>Expediente móvil</span></div>
+      <article class="patient-profile-shell">
+        <header class="patient-profile-cover">
+          <button class="patient-profile-back" type="button" data-app-back-patients>← Volver al directorio</button>
+          <div class="patient-profile-identity">
+            <div class="patient-profile-photo" id="patientProfilePhoto">P</div>
+            <div class="patient-profile-title">
+              <small>Expediente clínico</small>
+              <h2 id="patientProfileName">Paciente</h2>
+              <p id="patientProfileMeta">Información clínica</p>
+            </div>
+          </div>
+        </header>
+        <div class="patient-profile-body">
+          <div class="patient-profile-alert" id="patientProfileAlert"></div>
+          <div class="patient-profile-actions">
+            <a class="patient-profile-action" id="patientProfileCall" href="#"><svg viewBox="0 0 24 24"><path d="M6.6 3.5 9 8l-2 1.7a15 15 0 0 0 7.3 7.3l1.7-2 4.5 2.4-.8 3a2 2 0 0 1-2 1.5C9.1 21.1 2.9 14.9 2.1 6.3a2 2 0 0 1 1.5-2Z"/></svg><span>Llamar</span></a>
+            <a class="patient-profile-action" id="patientProfileWhatsapp" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.8 3 2 4.2 5 5"/></svg><span>WhatsApp</span></a>
+            <button class="patient-profile-action primary" id="patientProfileAppointment" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16M12 13v4M10 15h4"/></svg><span>Crear cita</span></button>
+            <a class="patient-profile-action" id="patientProfileRecord" href="#"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5M10 12h6M10 16h6"/></svg><span>Expediente</span></a>
+          </div>
+          <div class="patient-profile-next" id="patientProfileNext"></div>
+          <nav class="patient-profile-tabs" id="patientProfileTabs" aria-label="Secciones del expediente"></nav>
+          <div class="patient-profile-info" id="patientProfileInfo"></div>
+          <div class="patient-profile-tools" id="patientProfileTools"></div>
+        </div>
+      </article>
+    </section>
+    {% endif %}
     <section class="app-panel mobile-app-screen" id="factura-app">
       <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Facturación rápida</span></div>
       <article class="app-panel-card">
@@ -650,16 +723,113 @@
   const appAccounts=parseJsonScript("mobileAppAccountsData");
   const appPatientSearch=document.getElementById("appPatientSearch");
   const appPatientList=document.getElementById("appPatientList");
+  const premiumPatientExperience=Boolean(document.querySelector(".patients-premium-shell"));
+  const patientFilters=Array.from(document.querySelectorAll("[data-patient-filter]"));
+  const patientViewButtons=Array.from(document.querySelectorAll("[data-patient-view]"));
+  const patientResultsSummary=document.getElementById("patientResultsSummary");
+  const patientsLoadMore=document.getElementById("patientsLoadMore");
+  const recentPatientIds=new Set(appPatients.slice(0,20).map(patient=>String(patient.id)));
+  const patientFavoriteKey="hospital_mia_patient_favorites";
+  let patientFilter="todos",patientView="grid",visiblePatients=16,activeProfilePatient=null;
+  let patientFavorites=new Set();
+  try{patientFavorites=new Set(JSON.parse(localStorage.getItem(patientFavoriteKey)||"[]").map(String))}catch(error){patientFavorites=new Set()}
+  const patientIcons={
+    phone:'<svg viewBox="0 0 24 24"><path d="M6.6 3.5 9 8l-2 1.7a15 15 0 0 0 7.3 7.3l1.7-2 4.5 2.4-.8 3a2 2 0 0 1-2 1.5C9.1 21.1 2.9 14.9 2.1 6.3a2 2 0 0 1 1.5-2Z"/></svg>',
+    whatsapp:'<svg viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.8 3 2 4.2 5 5"/></svg>',
+    calendar:'<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16M12 13v4M10 15h4"/></svg>',
+    record:'<svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5M10 12h6M10 16h6"/></svg>'
+  };
+  const patientPhoneDigits=patient=>{
+    let digits=(patient.telefono||"").replace(/\D/g,"");
+    if(digits.length===8)digits=`504${digits}`;
+    return digits;
+  };
+  const patientPhotoMarkup=(patient,className="premium-patient-photo")=>{
+    const initial=(patient.nombre||"P").trim().charAt(0).toUpperCase()||"P";
+    return `<div class="${className}">${patient.foto?`<img src="${escapeHtml(patient.foto)}" alt="Foto de ${escapeHtml(patient.nombre||"paciente")}">`:escapeHtml(initial)}</div>`;
+  };
+  const patientMatchesActiveFilter=patient=>{
+    if(patientFilter==="recientes")return recentPatientIds.has(String(patient.id));
+    if(patientFilter==="cita")return Boolean(patient.proxima_cita);
+    if(patientFilter==="alertas")return Boolean(patient.alergico);
+    if(patientFilter==="favoritos")return patientFavorites.has(String(patient.id));
+    if(patientFilter==="frecuentes")return Number(patient.frecuencia||0)>=2;
+    return true;
+  };
+  const filteredAppPatients=()=>{
+    const term=normalize(appPatientSearch?.value||"");
+    const matches=appPatients.filter(patient=>{
+      const matchesTerm=!term||normalize([patient.nombre,patient.documento,patient.expediente,patient.telefono,patient.correo].join(" ")).includes(term);
+      return matchesTerm&&patientMatchesActiveFilter(patient);
+    });
+    if(patientFilter==="frecuentes")matches.sort((a,b)=>Number(b.frecuencia||0)-Number(a.frecuencia||0));
+    return matches;
+  };
+  const persistPatientFavorites=()=>localStorage.setItem(patientFavoriteKey,JSON.stringify(Array.from(patientFavorites)));
+  const patientAppointmentMarkup=patient=>{
+    if(!patient.proxima_cita)return '<div class="premium-patient-badge">Sin cita próxima</div>';
+    return `<div class="premium-next-appointment"><div class="premium-next-date"><strong>${escapeHtml(patient.proxima_cita.fecha)}</strong><span>${escapeHtml(patient.proxima_cita.hora)}</span></div><div class="premium-next-copy"><strong>${escapeHtml(patient.proxima_cita.servicio||"Próxima atención")}</strong><span>${escapeHtml(patient.proxima_cita.profesional||"Profesional por confirmar")}</span></div></div>`;
+  };
+  const patientCardMarkup=patient=>{
+    const digits=patientPhoneDigits(patient);
+    const favorite=patientFavorites.has(String(patient.id));
+    const meta=[patient.edad?`${patient.edad} años`:"Edad no indicada",patient.expediente].filter(Boolean).join(" · ");
+    const callAction=digits?`<a class="premium-patient-action" href="tel:+${digits}" aria-label="Llamar a ${escapeHtml(patient.nombre)}">${patientIcons.phone}</a>`:'<span class="premium-patient-action" aria-disabled="true">'+patientIcons.phone+'</span>';
+    const whatsappAction=digits?`<a class="premium-patient-action" href="https://wa.me/${digits}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">${patientIcons.whatsapp}</a>`:'<span class="premium-patient-action" aria-disabled="true">'+patientIcons.whatsapp+'</span>';
+    return `<article class="premium-patient-card${patient.alergico?" has-alert":""}" data-patient-open="${patient.id}" tabindex="0" role="button" aria-label="Abrir expediente de ${escapeHtml(patient.nombre)}"><div class="premium-patient-top">${patientPhotoMarkup(patient)}<div class="premium-patient-name"><strong>${escapeHtml(patient.nombre||"Paciente")}</strong><span>${escapeHtml(meta||"Expediente clínico")}</span></div><button class="patient-favorite${favorite?" active":""}" type="button" data-patient-favorite="${patient.id}" aria-label="${favorite?"Quitar de":"Agregar a"} favoritos">★</button></div><div class="premium-patient-status">${patient.alergico?'<span class="premium-patient-badge alert">Alerta médica</span>':'<span class="premium-patient-badge">Expediente activo</span>'}${patient.proxima_cita?'<span class="premium-patient-badge appointment">Próxima cita</span>':""}${Number(patient.frecuencia||0)>=2?`<span class="premium-patient-badge">${patient.frecuencia} citas</span>`:""}</div>${patientAppointmentMarkup(patient)}<div class="premium-patient-actions">${callAction}${whatsappAction}<button class="premium-patient-action" type="button" data-patient-appointment="${patient.id}" aria-label="Crear cita">${patientIcons.calendar}</button><button class="premium-patient-action primary" type="button" data-patient-open="${patient.id}" aria-label="Abrir expediente">${patientIcons.record}</button></div></article>`;
+  };
+  const openPatientProfile=patient=>{
+    if(!patient)return;
+    activeProfilePatient=patient;
+    const digits=patientPhoneDigits(patient);
+    const photo=document.getElementById("patientProfilePhoto");
+    if(photo)photo.outerHTML=patientPhotoMarkup(patient,"patient-profile-photo").replace('class="patient-profile-photo"','class="patient-profile-photo" id="patientProfilePhoto"');
+    const name=document.getElementById("patientProfileName"),meta=document.getElementById("patientProfileMeta");
+    if(name)name.textContent=patient.nombre||"Paciente";
+    if(meta)meta.textContent=[patient.edad?`${patient.edad} años`:"Edad no indicada",patient.expediente].filter(Boolean).join(" · ");
+    const alert=document.getElementById("patientProfileAlert");
+    if(alert){alert.classList.toggle("show",Boolean(patient.alergico));alert.textContent=patient.alergias?`Alerta de alergia: ${patient.alergias}`:"Este expediente tiene una alerta de alergia registrada."}
+    const call=document.getElementById("patientProfileCall"),whatsapp=document.getElementById("patientProfileWhatsapp"),record=document.getElementById("patientProfileRecord");
+    if(call){call.href=digits?`tel:+${digits}`:"#";call.style.opacity=digits?"1":".45"}
+    if(whatsapp){whatsapp.href=digits?`https://wa.me/${digits}`:"#";whatsapp.style.opacity=digits?"1":".45"}
+    if(record)record.href=patient.url||"#";
+    const next=document.getElementById("patientProfileNext");
+    if(next){
+      if(patient.proxima_cita){next.className="patient-profile-next";next.innerHTML=`<div class="patient-profile-next-date">${escapeHtml(patient.proxima_cita.fecha)}<br>${escapeHtml(patient.proxima_cita.hora)}</div><div class="patient-profile-next-copy"><strong>${escapeHtml(patient.proxima_cita.servicio||"Próxima cita")}</strong><span>${escapeHtml(patient.proxima_cita.profesional||"Profesional por confirmar")}</span></div><em>${escapeHtml(patient.proxima_cita.estado||"Programada")}</em>`}
+      else{next.className="patient-profile-next empty";next.innerHTML="<strong>No hay próximas citas programadas.</strong>"}
+    }
+    const tabs=document.getElementById("patientProfileTabs");
+    if(tabs){tabs.innerHTML=`<a href="${patient.links?.resumen||patient.url}">Resumen</a><a href="${patient.links?.historia||patient.url}">Historia clínica</a><a href="${patient.links?.visitas||patient.url}">Consultas</a><a href="${patient.links?.signos||patient.url}">Signos vitales</a><a href="${patient.links?.diagnosticos||patient.url}">Diagnósticos</a><a href="${patient.links?.recetas||patient.url}">Recetas</a><a href="${patient.links?.examenes||patient.url}">Exámenes</a><a href="${patient.links?.archivos||patient.url}">Archivos</a><a href="${patient.links?.citas||patient.url}">Citas</a><a href="${patient.links?.facturacion||patient.url}">Facturación</a><a href="${patient.links?.pagos||patient.url}">Pagos</a><a href="${patient.links?.notas||patient.url}">Notas</a><a href="${patient.links?.evolucion||patient.url}">Evolución</a><a href="${patient.links?.consentimientos||patient.url}">Consentimientos</a><a href="#factura-app" data-patient-invoice>Facturar</a>`}
+    const info=document.getElementById("patientProfileInfo");
+    if(info)info.innerHTML=`<div><span>Identidad</span><strong>${escapeHtml(patient.documento||"No indicada")}</strong></div><div><span>Teléfono</span><strong>${escapeHtml(patient.telefono||"No indicado")}</strong></div><div><span>Sexo</span><strong>${escapeHtml(patient.sexo||"No indicado")}</strong></div><div><span>RH</span><strong>${escapeHtml(patient.rh||"No indicado")}</strong></div><div><span>Correo</span><strong>${escapeHtml(patient.correo||"No indicado")}</strong></div><div><span>Última actualización</span><strong>${escapeHtml(patient.actualizado||"Sin fecha")}</strong></div>`;
+    const tools=document.getElementById("patientProfileTools");
+    if(tools)tools.innerHTML=`<a class="patient-profile-tool" href="${patient.links?.historia||patient.url}"><strong>Historia clínica</strong><span>Resumen, diagnósticos y evolución médica.</span></a><a class="patient-profile-tool" href="${patient.links?.examenes||patient.url}"><strong>Exámenes</strong><span>Resultados, imágenes y documentos recibidos.</span></a><a class="patient-profile-tool" href="${patient.links?.recetas||patient.url}"><strong>Recetas</strong><span>Prescripciones y tratamiento indicado.</span></a><a class="patient-profile-tool" href="${patient.links?.seguimientos||patient.url}"><strong>Seguimientos</strong><span>Controles y próximas atenciones.</span></a>`;
+    tabs?.querySelector("[data-patient-invoice]")?.addEventListener("click",event=>{
+      event.preventDefault();openAppPanel("factura-app");
+      if(quickClientSearch){quickClientSearch.value=patient.nombre||"";searchQuickClients()}
+    });
+    openAppPanel("patient-profile-app");
+  };
+  const startPatientAppointment=patient=>{
+    if(!patient)return;
+    choosePatient(patient);
+    openAppPanel("agenda-app");
+    requestAnimationFrame(()=>openSheet(editor));
+  };
   const renderAppPatients=()=>{
     if(!appPatientList)return;
-    const term=normalize(appPatientSearch?.value||"");
-    const matches=appPatients.filter(patient=>!term||normalize([patient.nombre,patient.documento,patient.expediente,patient.telefono,patient.correo].join(" ")).includes(term)).slice(0,24);
+    const allMatches=filteredAppPatients();
+    const matches=premiumPatientExperience?allMatches.slice(0,visiblePatients):allMatches.slice(0,24);
     appPatientList.innerHTML="";
+    appPatientList.classList.toggle("is-list",premiumPatientExperience&&patientView==="list");
+    if(patientResultsSummary)patientResultsSummary.textContent=`${allMatches.length} paciente${allMatches.length===1?"":"s"}`;
+    if(patientsLoadMore)patientsLoadMore.classList.toggle("show",premiumPatientExperience&&allMatches.length>matches.length);
     if(!matches.length){
-      appPatientList.innerHTML='<div class="app-empty">No encontramos pacientes con esos datos.</div>';
+      appPatientList.innerHTML='<div class="app-empty">No encontramos pacientes en esta selección. Prueba otro nombre o filtro.</div>';
       return;
     }
     matches.forEach(patient=>{
+      if(premiumPatientExperience){appPatientList.insertAdjacentHTML("beforeend",patientCardMarkup(patient));return}
       const card=document.createElement("a");
       card.className="app-patient-card";
       card.href=patient.url||"#";
@@ -669,7 +839,37 @@
       appPatientList.appendChild(card);
     });
   };
-  appPatientSearch?.addEventListener("input",renderAppPatients);
+  appPatientSearch?.addEventListener("input",()=>{visiblePatients=16;renderAppPatients()});
+  patientFilters.forEach(button=>button.addEventListener("click",()=>{
+    patientFilter=button.dataset.patientFilter||"todos";visiblePatients=16;
+    patientFilters.forEach(item=>item.classList.toggle("active",item===button));renderAppPatients();
+  }));
+  patientViewButtons.forEach(button=>button.addEventListener("click",()=>{
+    patientView=button.dataset.patientView||"grid";
+    patientViewButtons.forEach(item=>item.classList.toggle("active",item===button));renderAppPatients();
+  }));
+  patientsLoadMore?.addEventListener("click",()=>{visiblePatients+=16;renderAppPatients()});
+  appPatientList?.addEventListener("click",event=>{
+    const favoriteButton=event.target.closest("[data-patient-favorite]");
+    if(favoriteButton){
+      event.preventDefault();event.stopPropagation();const id=String(favoriteButton.dataset.patientFavorite);
+      if(patientFavorites.has(id))patientFavorites.delete(id);else patientFavorites.add(id);
+      persistPatientFavorites();renderAppPatients();return;
+    }
+    const appointmentButton=event.target.closest("[data-patient-appointment]");
+    if(appointmentButton){event.preventDefault();event.stopPropagation();startPatientAppointment(appPatients.find(item=>String(item.id)===String(appointmentButton.dataset.patientAppointment)));return}
+    if(event.target.closest("a"))return;
+    const target=event.target.closest("[data-patient-open]");
+    if(target){event.preventDefault();openPatientProfile(appPatients.find(item=>String(item.id)===String(target.dataset.patientOpen)))}
+  });
+  appPatientList?.addEventListener("keydown",event=>{
+    if(event.target.closest("button,a"))return;
+    if(event.key!=="Enter"&&event.key!==" ")return;
+    const target=event.target.closest("[data-patient-open]");
+    if(target){event.preventDefault();openPatientProfile(appPatients.find(item=>String(item.id)===String(target.dataset.patientOpen)))}
+  });
+  document.querySelectorAll("[data-app-back-patients]").forEach(button=>button.addEventListener("click",()=>openAppPanel("pacientes-app")));
+  document.getElementById("patientProfileAppointment")?.addEventListener("click",()=>startPatientAppointment(activeProfilePatient));
   renderAppPatients();
 
   const quickForm=document.getElementById("quickInvoiceForm");

@@ -302,6 +302,17 @@ class CRMTests(TestCase):
         self.assertContains(response, "vista=anio")
         self.assertContains(response, "Cambiar empresa para operar y facturar")
         self.assertContains(response, reverse("agenda_mobile", args=[medical_spa.slug]))
+        self.assertContains(response, '<article class="patients-premium-shell">')
+        self.assertContains(response, '<section class="app-panel mobile-app-screen" id="patient-profile-app">')
+        self.assertContains(response, 'data-patient-filter="favoritos"')
+        self.assertContains(response, "Signos vitales")
+        medical_response = self.client.get(
+            reverse("agenda_mobile", args=[medical_spa.slug]),
+            {"fecha": "2026-06-30"},
+        )
+        self.assertEqual(medical_response.status_code, 200)
+        self.assertNotContains(medical_response, '<article class="patients-premium-shell">')
+        self.assertContains(medical_response, "Expedientes al alcance")
         vista_anual = self.client.get(
             reverse("agenda_mobile", args=[self.empresa.slug]),
             {"vista": "anio", "fecha": "2026-06-30"},
