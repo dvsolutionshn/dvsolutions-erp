@@ -303,6 +303,14 @@ class CRMTests(TestCase):
         self.assertContains(response, "Cambiar empresa para operar y facturar")
         self.assertContains(response, reverse("agenda_mobile", args=[medical_spa.slug]))
         self.assertContains(response, '<article class="patients-premium-shell">')
+        self.assertContains(response, '<div class="premium-invoice-shell">')
+        self.assertContains(response, "premium-calendar-shell")
+        self.assertContains(response, "Caja móvil · Hospital Mía")
+        self.assertContains(response, "vista=agenda")
+        self.assertContains(response, "vista=proximas")
+        self.assertContains(response, "app=agenda")
+        self.assertContains(response, "#agenda-app")
+        self.assertContains(response, "Todos los estados")
         self.assertContains(response, '<section class="app-panel mobile-app-screen" id="patient-profile-app">')
         self.assertContains(response, 'data-patient-filter="favoritos"')
         self.assertContains(response, "Signos vitales")
@@ -312,7 +320,15 @@ class CRMTests(TestCase):
         )
         self.assertEqual(medical_response.status_code, 200)
         self.assertNotContains(medical_response, '<article class="patients-premium-shell">')
+        self.assertNotContains(medical_response, '<div class="premium-invoice-shell">')
+        self.assertNotContains(medical_response, "premium-calendar-shell")
         self.assertContains(medical_response, "Expedientes al alcance")
+        vista_agenda = self.client.get(
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            {"vista": "agenda", "fecha": "2026-06-30"},
+        )
+        self.assertEqual(vista_agenda.status_code, 200)
+        self.assertContains(vista_agenda, "Agenda cronológica")
         vista_anual = self.client.get(
             reverse("agenda_mobile", args=[self.empresa.slug]),
             {"vista": "anio", "fecha": "2026-06-30"},

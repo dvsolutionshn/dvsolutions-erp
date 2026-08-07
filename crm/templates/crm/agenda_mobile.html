@@ -43,9 +43,40 @@
   <style>
   .appointment.color-consulta{border-left-color:#2878d0}.appointment.color-camara_hiperbarica{border-left-color:#8b5e34}.appointment.color-control{border-left-color:#13a08a}.appointment.color-tratamientos{border-left-color:#2d9b65}.appointment.color-laboratorio{border-left-color:#7c5cff}.appointment.color-imagen{border-left-color:#1c9ac5}.appointment.color-general{border-left-color:#8796a8}.appointment[class*="professional-"]{border-right:4px solid #9aa8b6}.professional-doctor-luis{border-right-color:#2878d0!important}.professional-dra-candy{border-right-color:#e675a0!important}.professional-lic-enfermeria{border-right-color:#0f9f8f!important}.professional-enfermera{border-right-color:#22b8ad!important}.professional-medico{border-right-color:#805ad5!important}.professional-profesional{border-right-color:#8796a8!important}
   </style>
+  {% if hospital_mia_app_premium %}
+  <style>
+  body.hospital-mia-premium-app{background:linear-gradient(180deg,#edf5f8 0,#f7fafc 42%,#eef5f8 100%)}
+  .hospital-mia-premium-app .content{padding:16px 12px 22px}.hospital-mia-premium-app .app{padding-bottom:calc(92px + var(--safe-bottom))}
+  .premium-module-hero{position:relative;overflow:hidden;padding:18px;border-radius:25px;background:linear-gradient(140deg,#102f47 0%,#17616c 68%,#1a928a 100%);color:#fff;box-shadow:0 20px 46px rgba(18,50,74,.2)}
+  .premium-module-hero:after{content:"";position:absolute;right:-48px;top:-54px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(238,133,171,.38),transparent 68%)}
+  .premium-module-hero small{position:relative;z-index:1;display:block;font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;opacity:.72}.premium-module-hero h2{position:relative;z-index:1;margin:5px 0 0;font-size:24px;line-height:1.1}.premium-module-hero p{position:relative;z-index:1;max-width:450px;margin:7px 0 0;font-size:10px;line-height:1.5;opacity:.78}
+  .premium-progress{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:16px}.premium-progress span{min-height:30px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.16);border-radius:11px;background:rgba(255,255,255,.08);font-size:8px;font-weight:900}.premium-progress span:first-child{background:#fff;color:#155466}
+  .premium-invoice-shell{display:grid;gap:12px}.premium-invoice-shell .quick-invoice-body{padding:0}.premium-invoice-shell .quick-step{padding:14px;border-color:#d5e5ed;border-radius:22px;background:rgba(255,255,255,.94);box-shadow:0 13px 30px rgba(18,50,74,.065)}
+  .premium-invoice-shell .quick-step-title{justify-content:space-between}.premium-invoice-shell .quick-step-title .step-copy{display:flex;align-items:center;gap:9px}.premium-invoice-shell .quick-step-title small{color:var(--muted);font-size:8px;font-weight:800}.premium-invoice-shell .quick-input,.premium-invoice-shell .quick-select{min-height:49px;border-color:#bfd2dd;border-radius:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+  .premium-category-strip{display:flex;gap:7px;overflow-x:auto;padding:1px 0 4px;scrollbar-width:none}.premium-category-strip::-webkit-scrollbar{display:none}.premium-category-chip{flex:0 0 auto;min-height:34px;border:1px solid #d7e5ec;border-radius:999px;background:#fff;color:#4d687a;padding:0 12px;font-size:8px;font-weight:900}.premium-category-chip.active{border-color:transparent;background:linear-gradient(135deg,#173a54,#1aa798);color:#fff;box-shadow:0 8px 18px rgba(26,167,152,.18)}
+  .premium-invoice-shell .quick-product-results{max-height:250px;overflow:auto}.premium-invoice-shell .app-product-result{min-height:62px;border-radius:16px;background:linear-gradient(145deg,#fff,#f7fbfd)}.premium-invoice-shell .app-product-result:active{transform:scale(.985)}
+  .premium-cart-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.premium-cart-head strong{font-size:12px}.premium-cart-head span{padding:5px 8px;border-radius:999px;background:#e7f7f4;color:#14766d;font-size:8px;font-weight:900}
+  .hospital-mia-premium-app .premium-invoice-shell .app-list{padding:0;gap:8px}.hospital-mia-premium-app .premium-invoice-shell .app-cart-row{grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px;border-radius:17px;background:linear-gradient(145deg,#fff,#f8fbfd)}
+  .premium-cart-controls{grid-column:1/-1;display:grid;grid-template-columns:116px minmax(0,1fr) 34px;gap:8px;align-items:end}.premium-cart-field{display:grid;gap:4px}.premium-cart-field span{margin:0!important;color:#778998!important;font-size:7px!important;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.premium-cart-controls .quantity-control{display:grid;grid-template-columns:34px 48px 34px;border:1px solid #c9dae5;border-radius:12px;overflow:hidden}.premium-cart-controls .quantity-control button{width:34px;height:38px;border:0;border-radius:0;background:#edf6f8;color:#15566a;font-size:16px}.premium-cart-controls .quantity-control input{min-height:38px;border:0;border-radius:0}.premium-cart-controls .quick-cart-price{text-align:right}.premium-cart-controls .quick-remove{align-self:end;width:34px;height:38px;border-color:#fecaca;background:#fff7f7;color:#c84141}
+  .premium-payment-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.premium-payment-grid .wide{grid-column:1/-1}.premium-payment-card{display:grid;gap:5px}.premium-payment-card label{color:#6c8190;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.09em}
+  .premium-fiscal-summary{display:grid;gap:7px;padding:13px 14px;border-radius:17px;background:#f4f8fb}.premium-fiscal-row{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#5f7485;font-size:10px}.premium-fiscal-row strong{color:#19364b;font-size:11px}.premium-fiscal-row.total{margin-top:3px;padding-top:9px;border-top:1px solid #d5e2ea;color:#12324a;font-weight:900}.premium-fiscal-row.total strong{font-size:20px}
+  .premium-invoice-shell .quick-total{display:none}.premium-invoice-shell .quick-submit{position:sticky;bottom:82px;z-index:20;min-height:54px;font-size:12px;box-shadow:0 16px 34px rgba(34,184,173,.3)}
+  .premium-confirm-note{display:flex;gap:8px;align-items:flex-start;padding:10px 11px;border:1px solid #cfe4ec;border-radius:14px;background:#f7fbfd;color:#587083;font-size:9px;line-height:1.45}.premium-confirm-note b{color:#14776d}
+  .hospital-mia-premium-app .quick-success-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .premium-calendar-shell{display:grid;gap:12px}.premium-calendar-top{position:relative;overflow:hidden;padding:17px;border-radius:24px;background:linear-gradient(140deg,#12324a,#1b6872);color:#fff;box-shadow:0 18px 40px rgba(18,50,74,.18)}.premium-calendar-top:after{content:"";position:absolute;right:-45px;bottom:-70px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(230,117,160,.34),transparent 70%)}.premium-calendar-top-row{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px}.premium-calendar-top small{display:block;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.7}.premium-calendar-top h2{margin:5px 0 0;font-size:22px;text-transform:capitalize}.premium-calendar-create{min-height:40px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:#fff;color:#15566a;padding:0 13px;font-size:9px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.12)}
+  .hospital-mia-premium-app .premium-calendar-shell .mobile-view-switch{grid-template-columns:repeat(6,minmax(62px,1fr));overflow-x:auto;margin:0;padding:5px;scrollbar-width:none}.hospital-mia-premium-app .premium-calendar-shell .mobile-view-switch::-webkit-scrollbar{display:none}.hospital-mia-premium-app .premium-calendar-shell .mobile-view-switch a{padding:0 9px;white-space:nowrap}
+  .hospital-mia-premium-app .premium-calendar-shell .mobile-date-jump,.hospital-mia-premium-app .premium-calendar-shell .mobile-agenda-filters{margin:0;background:rgba(255,255,255,.94)}
+  .premium-calendar-shell .days{padding:2px 1px 4px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}.premium-calendar-shell .days::-webkit-scrollbar{display:none}.premium-calendar-shell .day{min-width:62px;scroll-snap-align:center}
+  .premium-calendar-shell .section-head{margin:7px 2px 0}.premium-calendar-shell .appointments{gap:9px}.premium-calendar-shell .appointment{grid-template-columns:50px 42px minmax(0,1fr) auto;padding:12px 11px;border-radius:18px;box-shadow:0 11px 27px rgba(18,50,74,.07);transition:transform .18s ease,box-shadow .18s ease}.premium-calendar-shell .appointment:active{transform:scale(.985)}.appointment-avatar{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(145deg,#e8f8f5,#e9f0fb);color:#176575;font-size:13px;font-weight:900}.premium-calendar-shell .appointment-main strong{font-size:13px}.premium-calendar-shell .time{font-size:11px}.premium-calendar-date{display:block;margin-bottom:4px;color:#267691;font-size:8px!important;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+  .premium-period-list{display:grid;gap:9px}.premium-period-day{padding:13px;border:1px solid #d9e7ee;border-radius:19px;background:#fff;box-shadow:0 10px 25px rgba(18,50,74,.06)}.premium-period-day-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.premium-period-day-head strong{font-size:12px;text-transform:capitalize}.premium-period-day-head span{padding:5px 8px;border-radius:999px;background:#e8f7f3;color:#167368;font-size:8px;font-weight:900}
+  .premium-empty-state{display:grid;place-items:center;gap:7px;min-height:180px;padding:25px;border:1px dashed #bfd5df;border-radius:23px;background:rgba(255,255,255,.72);text-align:center}.premium-empty-state b{font-size:14px}.premium-empty-state span{max-width:300px;color:var(--muted);font-size:10px;line-height:1.5}
+  .hospital-mia-premium-app .bottom{grid-template-columns:repeat(5,1fr);padding-inline:8px}.hospital-mia-premium-app .bottom .fab{width:51px;height:51px;border-radius:18px;transform:translateY(-11px)}.hospital-mia-premium-app .nav-item b{display:grid;place-items:center}.hospital-mia-premium-app .nav-item.active{color:#15776d}.hospital-mia-premium-app .nav-item.active b{color:#159c91}
+  @media(max-width:520px){.premium-payment-grid{grid-template-columns:1fr}.premium-payment-grid .wide{grid-column:auto}.premium-calendar-shell .appointment{grid-template-columns:45px 38px minmax(0,1fr) auto}.appointment-avatar{width:38px;height:38px}.premium-module-hero h2{font-size:22px}}
+  </style>
+  {% endif %}
 </head>
-<body>
-<main class="app" data-mobile-calendar-swipe data-prev-url="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}" data-next-url="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}">
+<body class="{% if hospital_mia_app_premium %}hospital-mia-premium-app{% endif %}">
+<main class="app" data-mobile-calendar-swipe data-prev-url="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}" data-next-url="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
   <header class="hero">
     <div class="hero-top">
       <div class="brand"><div class="brand-logo"><img src="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}" alt=""></div><div><small>Agenda clínica</small><strong>{{ empresa.nombre }}</strong></div></div>
@@ -215,6 +246,56 @@
     {% endif %}
     <section class="app-panel mobile-app-screen" id="factura-app">
       <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Facturación rápida</span></div>
+      {% if hospital_mia_app_premium %}
+      <div class="premium-invoice-shell">
+        <header class="premium-module-hero">
+          <small>Caja móvil · Hospital Mía</small>
+          <h2>Facturación rápida</h2>
+          <p>Cobra con un flujo corto, comprueba el total y genera el documento fiscal completo sin salir de la app.</p>
+          <div class="premium-progress" aria-label="Pasos de facturación"><span>1 · Paciente</span><span>2 · Conceptos</span><span>3 · Pago</span></div>
+        </header>
+        <form class="quick-invoice-body" id="quickInvoiceForm" method="post" action="{% url 'punto_venta' empresa.slug %}">
+          {% csrf_token %}
+          <input type="hidden" name="payload" id="quickInvoicePayload">
+          <section class="quick-step" data-quick-step="client">
+            <div class="quick-step-title"><span class="step-copy"><b>1</b><span>Paciente o cliente</span></span><small>Obligatorio</small></div>
+            <input class="quick-input" id="quickClientSearch" type="search" placeholder="Buscar por nombre, identidad o teléfono" autocomplete="off">
+            <div class="quick-status" id="quickClientSelected"></div>
+            <div class="quick-product-results" id="quickClientResults"></div>
+          </section>
+          <section class="quick-step" data-quick-step="products">
+            <div class="quick-step-title"><span class="step-copy"><b>2</b><span>Servicios y productos</span></span><small>Toca para agregar</small></div>
+            <div class="premium-category-strip" id="quickCategoryStrip" aria-label="Categorías rápidas">
+              <button class="premium-category-chip active" type="button" data-quick-category="todos">Todos</button>
+              <button class="premium-category-chip" type="button" data-quick-category="servicio">Servicios</button>
+              <button class="premium-category-chip" type="button" data-quick-category="producto">Productos</button>
+              <button class="premium-category-chip" type="button" data-quick-category="recientes">Recientes</button>
+            </div>
+            <input class="quick-input" id="quickProductSearch" type="search" placeholder="Buscar servicio, producto o código" autocomplete="off">
+            <div class="quick-product-results" id="quickProductResults"></div>
+            <div class="premium-cart-head"><strong>Detalle del cobro</strong><span id="quickCartCount">0 conceptos</span></div>
+            <div class="app-list" id="quickCartList"><div class="app-empty">Agrega al menos un producto o servicio para cobrar.</div></div>
+          </section>
+          <section class="quick-step" data-quick-step="payment">
+            <div class="quick-step-title"><span class="step-copy"><b>3</b><span>Pago y confirmación</span></span><small>Revisa antes de emitir</small></div>
+            <div class="premium-payment-grid">
+              <div class="premium-payment-card"><label for="quickPaymentMethod">Método de pago</label><select class="quick-select" id="quickPaymentMethod">{% for codigo, etiqueta in metodos_pago_app %}<option value="{{ codigo }}">{{ etiqueta }}</option>{% endfor %}</select></div>
+              <div class="premium-payment-card"><label for="quickAccount">Caja o banco</label><select class="quick-select" id="quickAccount"><option value="">Seleccione cuenta</option>{% for cuenta in cuentas_app_payload %}<option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}">{{ cuenta.nombre }}</option>{% endfor %}</select></div>
+              <div class="premium-payment-card wide"><label for="quickReference">Referencia</label><input class="quick-input" id="quickReference" type="text" placeholder="Voucher, transferencia u observación opcional"></div>
+            </div>
+            <div class="premium-fiscal-summary" aria-live="polite">
+              <div class="premium-fiscal-row"><span>Subtotal estimado</span><strong id="quickSubtotal">L. 0.00</strong></div>
+              <div class="premium-fiscal-row"><span>Impuestos incluidos</span><strong id="quickTaxes">L. 0.00</strong></div>
+              <div class="premium-fiscal-row"><span>Descuentos</span><strong id="quickDiscount">L. 0.00</strong></div>
+              <div class="premium-fiscal-row total"><span>Total a cobrar</span><strong id="quickTotal">L. 0.00</strong></div>
+            </div>
+            <div class="premium-confirm-note"><b>Documento fiscal:</b><span>La app validará paciente, productos, caja e inventario antes de generar la factura y su PDF.</span></div>
+            <div class="quick-status" id="quickInvoiceStatus"></div>
+            <button class="quick-submit" id="quickInvoiceSubmit" type="submit">Revisar y generar factura</button>
+          </section>
+        </form>
+      </div>
+      {% else %}
       <article class="app-panel-card">
         <div class="app-panel-head">
           <div>
@@ -259,35 +340,58 @@
           </div>
         </form>
       </article>
+      {% endif %}
     </section>
-    <section class="agenda-screen mobile-app-screen" id="agenda-app">
+    <section class="agenda-screen mobile-app-screen {% if hospital_mia_app_premium %}premium-calendar-shell{% endif %}" id="agenda-app">
     <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Calendario de citas</span></div>
+    {% if hospital_mia_app_premium %}
+    <header class="premium-calendar-top">
+      <div class="premium-calendar-top-row">
+        <div><small>Agenda clínica</small><h2>{{ titulo_periodo }}</h2></div>
+        <button class="premium-calendar-create" type="button" data-open-editor>+ Nueva cita</button>
+      </div>
+    </header>
+    {% endif %}
     <div class="mobile-view-switch" id="calendario">
+      {% if hospital_mia_app_premium %}
+      <a class="{% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}&app=agenda#agenda-app">Día</a>
+      <a class="{% if vista == 'semana' %}active{% endif %}" href="?vista=semana&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}&app=agenda#agenda-app">Semana</a>
+      <a class="{% if vista == 'mes' %}active{% endif %}" href="?vista=mes&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}&app=agenda#agenda-app">Mes</a>
+      <a class="{% if vista == 'agenda' %}active{% endif %}" href="?vista=agenda&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}&app=agenda#agenda-app">Agenda</a>
+      <a class="{% if vista == 'proximas' %}active{% endif %}" href="?vista=proximas&fecha={% now 'Y-m-d' %}{{ filtros_query }}&app=agenda#agenda-app">Próximas</a>
+      <a class="{% if vista == 'anio' %}active{% endif %}" href="?vista=anio&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}&app=agenda#agenda-app">Año</a>
+      {% else %}
       <a class="{% if vista == 'dia' %}active{% endif %}" href="?vista=dia&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Día</a>
       <a class="{% if vista == 'semana' %}active{% endif %}" href="?vista=semana&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Semana</a>
       <a class="{% if vista == 'mes' %}active{% endif %}" href="?vista=mes&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Mes</a>
       <a class="{% if vista == 'anio' %}active{% endif %}" href="?vista=anio&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{{ filtros_query }}">Año</a>
+      {% endif %}
     </div>
-    <div class="section-head"><div><small>Explorar agenda</small><h2>{{ titulo_periodo|capfirst }}</h2></div><a href="?vista={{ vista }}&fecha={% now 'Y-m-d' %}{{ filtros_query }}">Ir a hoy</a></div>
-    <form class="mobile-date-jump" method="get" aria-label="Buscar agenda por fecha">
+    <div class="section-head"><div><small>Explorar agenda</small><h2>{{ titulo_periodo|capfirst }}</h2></div><a href="?vista={{ vista }}&fecha={% now 'Y-m-d' %}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">Ir a hoy</a></div>
+    <form class="mobile-date-jump" method="get" action="{% url 'agenda_mobile' empresa.slug %}{% if hospital_mia_app_premium %}#agenda-app{% endif %}" aria-label="Buscar agenda por fecha">
       <input type="hidden" name="vista" value="{{ vista }}">
+      {% if hospital_mia_app_premium %}<input type="hidden" name="app" value="agenda">{% endif %}
       {% if filtro_servicio %}<input type="hidden" name="servicio" value="{{ filtro_servicio }}">{% endif %}
       {% if filtro_profesional %}<input type="hidden" name="profesional" value="{{ filtro_profesional }}">{% endif %}
+      {% if filtro_estado %}<input type="hidden" name="estado" value="{{ filtro_estado }}">{% endif %}
       <label for="mobileDateJump">
         <span>Ir directo a una fecha</span>
         <input id="mobileDateJump" type="date" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
       </label>
       <button type="submit">Ver fecha</button>
     </form>
-    <nav class="days" data-day-strip-swipe data-prev-url="?vista=dia&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}" data-next-url="?vista=dia&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}">
+    {% if not hospital_mia_app_premium or vista == 'dia' %}
+    <nav class="days" data-day-strip-swipe data-prev-url="?vista=dia&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}" data-next-url="?vista=dia&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
       {% for dia in dias_moviles %}
-      <a class="day {% if dia.fecha == fecha_seleccionada %}active{% endif %}" href="?vista=dia&fecha={{ dia.fecha|date:'Y-m-d' }}{{ filtros_query }}"><span>{{ dia.dia_corto }}</span><strong>{{ dia.fecha.day }}</strong><i>{{ dia.total }}</i></a>
+      <a class="day {% if dia.fecha == fecha_seleccionada %}active{% endif %}" href="?vista=dia&fecha={{ dia.fecha|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}"><span>{{ dia.dia_corto }}</span><strong>{{ dia.fecha.day }}</strong><i>{{ dia.total }}</i></a>
       {% endfor %}
     </nav>
-    {% if es_clinica %}
-    <form class="mobile-agenda-filters" method="get">
+    {% endif %}
+    {% if es_clinica or hospital_mia_app_premium %}
+    <form class="mobile-agenda-filters" method="get" action="{% url 'agenda_mobile' empresa.slug %}{% if hospital_mia_app_premium %}#agenda-app{% endif %}">
       <input type="hidden" name="vista" value="{{ vista }}">
       <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+      {% if hospital_mia_app_premium %}<input type="hidden" name="app" value="agenda">{% endif %}
       <label>
         <span>Tipo de consulta</span>
         <select name="servicio">
@@ -306,19 +410,51 @@
           {% endfor %}
         </select>
       </label>
+      {% if hospital_mia_app_premium %}
+      <label>
+        <span>Estado</span>
+        <select name="estado">
+          <option value="">Todos los estados</option>
+          {% for codigo, nombre in estados_cita %}<option value="{{ codigo }}" {% if filtro_estado == codigo %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
       <div class="mobile-filter-actions">
         <button type="submit">Filtrar agenda</button>
-        {% if filtros_activos %}<a href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}">Limpiar</a>{% endif %}
+        {% if filtros_activos %}<a href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">Limpiar</a>{% endif %}
       </div>
       <div class="mobile-swipe-tip">Desliza hacia la izquierda o derecha para cambiar de {% if vista == 'anio' %}año{% elif vista == 'mes' %}mes{% elif vista == 'semana' %}semana{% else %}día{% endif %}.</div>
     </form>
     {% endif %}
 
-    {% if vista == "anio" %}
+    {% if vista == "agenda" or vista == "proximas" %}
+    <div class="section-head"><div><small>{% if vista == "proximas" %}Próximas atenciones{% else %}Agenda cronológica{% endif %}</small><h2>{{ citas|length }} cita{{ citas|length|pluralize:"s" }}</h2></div></div>
+    <section class="premium-period-list">
+      {% if citas %}
+      {% for dia in dias %}
+      {% if dia.citas %}
+      <article class="premium-period-day">
+        <div class="premium-period-day-head"><strong>{{ dia.titulo_mobile }}</strong><span>{{ dia.citas|length }} cita{{ dia.citas|length|pluralize:"s" }}</span></div>
+        <div class="appointments">
+          {% for cita in dia.citas %}
+          <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %}" data-cita-actions="{{ cita.id }}">
+            <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
+            <div class="appointment-avatar">{{ cita.display_cliente|slice:":1"|upper }}</div>
+            <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{{ cita.display_servicio }}<br>{{ cita.display_responsable }}</span><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada %}<em class="status paid">Pagada</em>{% endif %}</div>
+            <button class="more" type="button" data-cita-actions="{{ cita.id }}">•••</button>
+          </article>
+          {% endfor %}
+        </div>
+      </article>
+      {% endif %}
+      {% endfor %}
+      {% else %}<div class="premium-empty-state"><b>No hay citas en este período</b><span>Cambie la fecha o los filtros, o programe una nueva atención.</span></div>{% endif %}
+    </section>
+    {% elif vista == "anio" %}
     <div class="section-head"><div><small>Resumen anual</small><h2>{{ fecha_seleccionada.year }}</h2></div></div>
     <section class="mobile-period-grid">
       {% for mes in meses_agenda %}
-      <a class="mobile-period-card" href="?vista=mes&fecha={{ mes.fecha|date:'Y-m-d' }}{{ filtros_query }}">
+      <a class="mobile-period-card" href="?vista=mes&fecha={{ mes.fecha|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
         <div class="mobile-period-card-head"><strong>{{ mes.nombre }}</strong><em>{{ mes.total }} cita{{ mes.total|pluralize:"s" }}</em></div>
         <span>Toca para abrir este mes completo.</span>
         <div class="mobile-mini-list">
@@ -331,8 +467,8 @@
     <div class="section-head"><div><small>{% if vista == "mes" %}Agenda del mes{% else %}Agenda de la semana{% endif %}</small><h2>{{ citas|length }} cita{{ citas|length|pluralize:"s" }}</h2></div></div>
     <section class="mobile-period-grid">
       {% for dia in dias %}
-      <a class="mobile-period-card" href="?vista=dia&fecha={{ dia.fecha|date:'Y-m-d' }}{{ filtros_query }}">
-        <div class="mobile-period-card-head"><strong>{{ dia.fecha|date:"D d/m" }}</strong><em>{{ dia.citas|length }} cita{{ dia.citas|length|pluralize:"s" }}</em></div>
+      <a class="mobile-period-card" href="?vista=dia&fecha={{ dia.fecha|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
+        <div class="mobile-period-card-head"><strong>{{ dia.dia_corto }} {{ dia.fecha|date:"d/m" }}</strong><em>{{ dia.citas|length }} cita{{ dia.citas|length|pluralize:"s" }}</em></div>
         <span>Toca para ver el detalle del día.</span>
         <div class="mobile-mini-list">
           {% for cita in dia.citas|slice:":4" %}<b>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.display_cliente }}</b>{% empty %}<b>Sin citas</b>{% endfor %}
@@ -346,6 +482,7 @@
       {% for cita in citas %}
       <article class="appointment color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %}" data-cita-actions="{{ cita.id }}">
         <div class="time">{{ cita.fecha_hora|date:"h:i" }}<small>{{ cita.fecha_hora|date:"A" }}</small></div>
+        {% if hospital_mia_app_premium %}<div class="appointment-avatar">{{ cita.display_cliente|slice:":1"|upper }}</div>{% endif %}
         <div class="appointment-main"><strong>{{ cita.display_cliente }}</strong><span>{% if es_clinica %}{{ cita.display_servicio }}{% else %}{{ cita.titulo }}{% endif %}<br>{{ cita.display_responsable }}</span><em class="status {{ cita.estado }}">{{ cita.get_estado_display }}</em>{% if cita.pagada %}<em class="status paid">Pagada</em>{% endif %}</div>
         <button class="more" type="button" data-cita-actions="{{ cita.id }}">•••</button>
       </article>
@@ -356,9 +493,17 @@
   </div>
 
   <nav class="bottom">
+    {% if hospital_mia_app_premium %}
+    <button class="nav-item" type="button" data-app-close><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10M10 20v-6h4v6"/></svg></b><span>Inicio</span></button>
+    <a class="nav-item" href="#pacientes-app" data-app-open="pacientes-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>
+    <button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>
+    <a class="nav-item" href="#agenda-app" data-app-open="agenda-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></b><span>Citas</span></a>
+    <a class="nav-item" href="#factura-app" data-app-open="factura-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-3-1.5-2 1-2-1-2 1-3-1.5V5a2 2 0 0 1 2-2Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></b><span>Facturar</span></a>
+    {% else %}
     <a class="nav-item" href="#pacientes-app" data-app-open="pacientes-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 19c0-2.2-1.8-4-4-4s-4 1.8-4 4"/><circle cx="12" cy="8" r="3.5"/></svg></b><span>Pacientes</span></a>
     <button class="fab" type="button" data-open-editor aria-label="Crear cita">+</button>
     <a class="nav-item" href="#factura-app" data-app-open="factura-app"><b class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-3-1.5-2 1-2-1-2 1-3-1.5V5a2 2 0 0 1 2-2Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></b><span>Facturar</span></a>
+    {% endif %}
   </nav>
 </main>
 
@@ -511,6 +656,7 @@
   };
   const openAppPanel=id=>{
     appScreens.forEach(screen=>screen.classList.toggle("active",screen.id===id));
+    document.querySelectorAll(".bottom [data-app-open]").forEach(link=>link.classList.toggle("active",link.dataset.appOpen===id));
     const panel=document.getElementById(id);
     if(panel){
       history.replaceState(null,"",`#${id}`);
@@ -519,6 +665,7 @@
   };
   const closeAppPanels=()=>{
     appScreens.forEach(screen=>screen.classList.toggle("active",screen.id==="inicio"));
+    document.querySelectorAll(".bottom [data-app-open]").forEach(link=>link.classList.remove("active"));
     history.replaceState(null,"",window.location.pathname+window.location.search);
     requestAnimationFrame(()=>mobileHome?.scrollIntoView({behavior:"smooth",block:"start"}));
   };
@@ -527,7 +674,9 @@
     openAppPanel(link.dataset.appOpen);
   }));
   document.querySelectorAll("[data-app-close]").forEach(button=>button.addEventListener("click",closeAppPanels));
-  if(["#pacientes-app","#factura-app","#agenda-app"].includes(window.location.hash))openAppPanel(window.location.hash.slice(1));
+  const requestedApp=new URLSearchParams(window.location.search).get("app");
+  if(requestedApp==="agenda")openAppPanel("agenda-app");
+  else if(["#pacientes-app","#factura-app","#agenda-app"].includes(window.location.hash))openAppPanel(window.location.hash.slice(1));
   const dayStrip=document.querySelector("[data-day-strip-swipe]");
   if(dayStrip){
     let stripStartX=0,stripStartY=0,stripTracking=false,stripSwiped=false;
@@ -883,11 +1032,26 @@
   const quickAccount=document.getElementById("quickAccount");
   const quickReference=document.getElementById("quickReference");
   const quickTotal=document.getElementById("quickTotal");
+  const quickSubtotal=document.getElementById("quickSubtotal");
+  const quickTaxes=document.getElementById("quickTaxes");
+  const quickDiscount=document.getElementById("quickDiscount");
+  const quickCartCount=document.getElementById("quickCartCount");
+  const quickCategoryStrip=document.getElementById("quickCategoryStrip");
   const quickStatus=document.getElementById("quickInvoiceStatus");
   const quickSubmit=document.getElementById("quickInvoiceSubmit");
   const quickCart=new Map();
   let quickClient=null;
   let quickClientTimer=null;
+  let quickCategory="todos";
+  let quickSubmitting=false;
+  const quickPricesIncludeTax={{ precios_incluyen_impuesto_app|yesno:"true,false" }};
+  const quickRecentIds=()=>{
+    try{return JSON.parse(localStorage.getItem("hospital-mia-quick-products")||"[]")}catch(error){return []}
+  };
+  const rememberQuickProduct=id=>{
+    const updated=[String(id),...quickRecentIds().filter(item=>String(item)!==String(id))].slice(0,12);
+    localStorage.setItem("hospital-mia-quick-products",JSON.stringify(updated));
+  };
   const setQuickStatus=(message,isError=false)=>{
     if(!quickStatus)return;
     quickStatus.classList.add("show");
@@ -953,7 +1117,18 @@
   };
   const updateQuickTotal=()=>{
     const total=Array.from(quickCart.values()).reduce((sum,item)=>sum+quickLineTotal(item),0);
-    if(quickTotal)quickTotal.textContent=moneyFormatter.format(total);
+    const taxes=Array.from(quickCart.values()).reduce((sum,item)=>{
+      const line=quickLineTotal(item),rate=Math.max(0,Number(item.impuesto||0));
+      if(!rate)return sum;
+      return sum+(quickPricesIncludeTax?(line-(line/(1+(rate/100)))):(line*(rate/100)));
+    },0);
+    const subtotal=quickPricesIncludeTax?Math.max(0,total-taxes):total;
+    const payable=quickPricesIncludeTax?total:total+taxes;
+    if(quickSubtotal)quickSubtotal.textContent=moneyFormatter.format(subtotal);
+    if(quickTaxes)quickTaxes.textContent=moneyFormatter.format(taxes);
+    if(quickDiscount)quickDiscount.textContent=moneyFormatter.format(0);
+    if(quickTotal)quickTotal.textContent=moneyFormatter.format(payable);
+    if(quickCartCount){const count=Array.from(quickCart.values()).length;quickCartCount.textContent=`${count} concepto${count===1?"":"s"}`}
   };
   const renderQuickCart=()=>{
     if(!quickCartList||!quickTotal)return;
@@ -965,7 +1140,11 @@
       items.forEach(item=>{
         const row=document.createElement("div");
         row.className="app-cart-row";
-        row.innerHTML=`<div><strong>${escapeHtml(item.nombre)}</strong><span data-line-total>${moneyFormatter.format(Number(item.precio||0))} c/u · ${moneyFormatter.format(quickLineTotal(item))}</span></div><input class="quick-cart-qty" type="number" min="0.01" step="0.01" value="${item.cantidad}" aria-label="Cantidad"><input class="quick-cart-price" type="number" min="0" step="0.01" value="${Number(item.precio||0).toFixed(2)}" aria-label="Precio o monto"><button type="button">×</button>`;
+        if(quickCartCount){
+          row.innerHTML=`<div><strong>${escapeHtml(item.nombre)}</strong><span data-line-total>${moneyFormatter.format(Number(item.precio||0))} c/u · ${moneyFormatter.format(quickLineTotal(item))}</span></div><span class="app-chip">${item.tipo_item==="servicio"?"Servicio":"Producto"}</span><div class="premium-cart-controls"><div class="premium-cart-field"><span>Cantidad</span><div class="quantity-control"><button type="button" data-qty-minus aria-label="Restar cantidad">−</button><input class="quick-cart-qty" type="number" min="0.01" step="0.01" value="${item.cantidad}" aria-label="Cantidad"><button type="button" data-qty-plus aria-label="Sumar cantidad">+</button></div></div><label class="premium-cart-field"><span>Precio / monto</span><input class="quick-cart-price" type="number" min="0" step="0.01" value="${Number(item.precio||0).toFixed(2)}" aria-label="Precio o monto"></label><button class="quick-remove" type="button" data-remove-item aria-label="Eliminar concepto">×</button></div>`;
+        }else{
+          row.innerHTML=`<div><strong>${escapeHtml(item.nombre)}</strong><span data-line-total>${moneyFormatter.format(Number(item.precio||0))} c/u · ${moneyFormatter.format(quickLineTotal(item))}</span></div><input class="quick-cart-qty" type="number" min="0.01" step="0.01" value="${item.cantidad}" aria-label="Cantidad"><input class="quick-cart-price" type="number" min="0" step="0.01" value="${Number(item.precio||0).toFixed(2)}" aria-label="Precio o monto"><button type="button" data-remove-item>×</button>`;
+        }
         const lineTotal=row.querySelector("[data-line-total]");
         const refreshLine=()=>{
           if(lineTotal)lineTotal.textContent=`${moneyFormatter.format(Number(item.precio||0))} c/u · ${moneyFormatter.format(quickLineTotal(item))}`;
@@ -981,7 +1160,13 @@
           item.precio=price||0;
           refreshLine();
         });
-        row.querySelector("button").addEventListener("click",()=>{
+        row.querySelector("[data-qty-minus]")?.addEventListener("click",()=>{
+          item.cantidad=Math.max(.01,Number(item.cantidad||0)-1);row.querySelector(".quick-cart-qty").value=item.cantidad;refreshLine();
+        });
+        row.querySelector("[data-qty-plus]")?.addEventListener("click",()=>{
+          item.cantidad=Number(item.cantidad||0)+1;row.querySelector(".quick-cart-qty").value=item.cantidad;refreshLine();
+        });
+        row.querySelector("[data-remove-item]").addEventListener("click",()=>{
           quickCart.delete(String(item.id));
           renderQuickCart();
         });
@@ -994,7 +1179,8 @@
     const key=String(product.id);
     const current=quickCart.get(key);
     if(current)current.cantidad=Number(current.cantidad||0)+1;
-    else quickCart.set(key,{id:product.id,nombre:product.nombre,precio:Number(product.precio||0),cantidad:1});
+    else quickCart.set(key,{id:product.id,nombre:product.nombre,precio:Number(product.precio||0),cantidad:1,impuesto:Number(product.impuesto||0),tipo_item:product.tipo_item||"producto"});
+    rememberQuickProduct(product.id);
     if(quickProductSearch)quickProductSearch.value="";
     if(quickProductResults)quickProductResults.innerHTML="";
     renderQuickCart();
@@ -1004,10 +1190,13 @@
     if(!quickProductResults)return;
     const term=normalize(quickProductSearch?.value||"");
     quickProductResults.innerHTML="";
-    if(term.length<1){
-      return;
-    }
-    const matches=appProducts.filter(product=>normalize([product.nombre,product.codigo].join(" ")).includes(term)).slice(0,10);
+    const recents=quickRecentIds();
+    const matches=appProducts.filter(product=>{
+      const matchesTerm=!term||normalize([product.nombre,product.codigo].join(" ")).includes(term);
+      const matchesCategory=quickCategory==="todos"||(quickCategory==="recientes"?recents.includes(String(product.id)):product.tipo_item===quickCategory);
+      return matchesTerm&&matchesCategory;
+    }).sort((a,b)=>quickCategory==="recientes"?recents.indexOf(String(a.id))-recents.indexOf(String(b.id)):0).slice(0,10);
+    if(term.length<1&&quickCategory==="todos")return;
     if(!matches.length){
       quickProductResults.innerHTML='<div class="app-empty">No encontramos productos o servicios con ese texto.</div>';
       return;
@@ -1023,6 +1212,12 @@
     });
   };
   quickProductSearch?.addEventListener("input",renderQuickProducts);
+  quickCategoryStrip?.addEventListener("click",event=>{
+    const button=event.target.closest("[data-quick-category]");if(!button)return;
+    quickCategory=button.dataset.quickCategory||"todos";
+    quickCategoryStrip.querySelectorAll("[data-quick-category]").forEach(item=>item.classList.toggle("active",item===button));
+    renderQuickProducts();
+  });
   const selectDefaultQuickAccount=()=>{
     if(!quickAccount||!quickPaymentMethod)return;
     const method=quickPaymentMethod.value;
@@ -1034,12 +1229,14 @@
   selectDefaultQuickAccount();
   quickForm?.addEventListener("submit",async event=>{
     event.preventDefault();
+    if(quickSubmitting)return;
     clearQuickStatus();
     const items=Array.from(quickCart.values()).filter(item=>Number(item.cantidad)>0);
     const total=items.reduce((sum,item)=>sum+quickLineTotal(item),0);
     if(!quickClient){setQuickStatus("Selecciona el cliente o paciente antes de facturar.",true);return}
     if(!items.length){setQuickStatus("Agrega al menos un producto o servicio.",true);return}
     if(!quickAccount?.value){setQuickStatus("Selecciona la caja o banco donde ingresó el pago.",true);return}
+    if(quickCartCount&&!window.confirm(`Se generará una factura por ${moneyFormatter.format(total)} para ${quickClient.nombre}. ¿Desea continuar?`))return;
     const payload={
       fecha:todayISO(),
       cliente_id:quickClient.id,
@@ -1051,6 +1248,7 @@
     };
     const formData=new FormData(quickForm);
     formData.set("payload",JSON.stringify(payload));
+    quickSubmitting=true;
     quickSubmit.disabled=true;
     quickSubmit.textContent="Generando factura...";
     try{
@@ -1059,14 +1257,19 @@
       if(!response.ok||!data.ok)throw new Error(data.error||"No se pudo generar la factura.");
       quickCart.clear();
       renderQuickCart();
+      quickClient=null;
+      if(quickClientSearch)quickClientSearch.value="";
+      quickClientSelected?.classList.remove("show");
       const facturaUrl=data.factura_url||"#";
       const pdfUrl=facturaUrl.replace(/\/?$/,"/pdf/");
-      setQuickStatus(`Factura <strong>${escapeHtml(data.numero_factura||"generada")}</strong> creada correctamente.<div class="quick-success-actions"><a href="${facturaUrl}">Ver factura</a><a href="${pdfUrl}" target="_blank" rel="noopener">Abrir PDF</a></div>`,false);
+      const ticketUrl=data.ticket_url||facturaUrl;
+      setQuickStatus(`Factura <strong>${escapeHtml(data.numero_factura||"generada")}</strong> creada correctamente.<div class="quick-success-actions"><a href="${facturaUrl}">Ver factura</a><a href="${pdfUrl}" target="_blank" rel="noopener">Abrir PDF</a><a href="${ticketUrl}" target="_blank" rel="noopener">Comprobante</a></div>`,false);
     }catch(error){
       setQuickStatus(escapeHtml(error.message||"No se pudo completar la factura."),true);
     }finally{
+      quickSubmitting=false;
       quickSubmit.disabled=false;
-      quickSubmit.textContent="Cobrar y generar PDF";
+      quickSubmit.textContent=quickCartCount?"Revisar y generar factura":"Cobrar y generar PDF";
     }
   });
   renderQuickCart();

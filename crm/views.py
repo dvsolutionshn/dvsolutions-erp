@@ -124,14 +124,25 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     empresa_agenda = _empresa_origen_agenda(empresa)
     agenda_espejo = empresa_agenda.id != empresa.id
     vista = request.GET.get("vista", vista_predeterminada)
-    if vista not in {"mes", "semana", "dia", "anio"}:
+    if vista not in {"mes", "semana", "dia", "anio", "agenda", "proximas"}:
         vista = "mes"
     seleccionada = _fecha_agenda(request.GET.get("fecha"))
     filtro_servicio = (request.GET.get("servicio") or "").strip()
     filtro_profesional = (request.GET.get("profesional") or "").strip()
+    filtro_estado = (request.GET.get("estado") or "").strip()
     paciente_historial_id = (request.GET.get("paciente_historial") or "").strip()
     meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-    if vista == "anio":
+    if vista == "proximas":
+        inicio = max(seleccionada, timezone.localdate())
+        fin = inicio + timedelta(days=60)
+        anterior, siguiente = inicio - timedelta(days=30), inicio + timedelta(days=30)
+        titulo_periodo = "Próximas citas"
+    elif vista == "agenda":
+        inicio = seleccionada
+        fin = inicio + timedelta(days=30)
+        anterior, siguiente = inicio - timedelta(days=30), inicio + timedelta(days=30)
+        titulo_periodo = f"Agenda desde {inicio:%d/%m/%Y}"
+    elif vista == "anio":
         inicio = date(seleccionada.year, 1, 1)
         fin = date(seleccionada.year, 12, 31)
         anterior = date(seleccionada.year - 1, seleccionada.month, min(seleccionada.day, 28))
@@ -173,6 +184,11 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
             citas_qs = citas_qs.filter(profesional_salud_id=int(filtro_profesional))
         except (TypeError, ValueError):
             filtro_profesional = ""
+    if filtro_estado:
+        if filtro_estado in dict(CitaCliente.ESTADO_CHOICES):
+            citas_qs = citas_qs.filter(estado=filtro_estado)
+        else:
+            filtro_estado = ""
     if paciente_historial_id:
         try:
             citas_qs = citas_qs.filter(paciente_id=int(paciente_historial_id))
@@ -185,12 +201,13 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         for clave, valor in {
             "servicio": filtro_servicio,
             "profesional": filtro_profesional,
+            "estado": filtro_estado,
             "paciente_historial": paciente_historial_id,
         }.items()
         if valor
     })
     filtros_query = f"&{filtros_query}" if filtros_query else ""
-    filtros_activos = bool(filtro_servicio or filtro_profesional)
+    filtros_activos = bool(filtro_servicio or filtro_profesional or filtro_estado)
     por_fecha = {}
     for cita in citas:
         clave = timezone.localtime(cita.fecha_hora).date()
@@ -335,6 +352,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "profesionales_filtro": profesionales_filtro,
         "filtro_servicio": filtro_servicio,
         "filtro_profesional": filtro_profesional,
+        "filtro_estado": filtro_estado,
         "filtros_query": filtros_query,
         "filtros_activos": filtros_activos,
         "paciente_historial": paciente_historial,
@@ -895,7 +913,7 @@ def agenda_mobile(request, empresa_slug):
         messages.success(request, "Cita actualizada correctamente." if objeto else "Cita creada correctamente.")
         fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
         vista_regreso = request.GET.get("vista") or request.POST.get("vista") or "dia"
-        if vista_regreso not in {"dia", "semana", "mes", "anio"}:
+        if vista_regreso not in {"dia", "semana", "mes", "anio", "agenda", "proximas"}:
             vista_regreso = "dia"
         return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?vista={vista_regreso}&fecha={fecha}")
 
@@ -921,6 +939,13 @@ def agenda_mobile(request, empresa_slug):
     dias_semana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
     dias_semana_largos = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    for dia_contexto in contexto.get("dias", []):
+        fecha_dia = dia_contexto["fecha"]
+        dia_contexto["dia_corto"] = dias_semana[fecha_dia.weekday()]
+        dia_contexto["titulo_mobile"] = (
+            f"{dias_semana_largos[fecha_dia.weekday()]} "
+            f"{fecha_dia.day} de {meses[fecha_dia.month - 1]}"
+        )
     contexto["titulo_fecha_mobile"] = (
         f"{dias_semana_largos[seleccionada.weekday()]}, "
         f"{seleccionada.day} de {meses[seleccionada.month - 1]}"
@@ -998,7 +1023,8 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["citas_hoy_total"] = len(citas_hoy)
     contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
-    contexto["pacientes_app_premium"] = empresa.slug == "hospital_mia"
+    contexto["hospital_mia_app_premium"] = empresa.slug == "hospital_mia"
+    contexto["pacientes_app_premium"] = contexto["hospital_mia_app_premium"]
     pacientes_activos_qs = Paciente.objects.filter(empresa=empresa, activo=True)
     contexto["pacientes_app_total"] = pacientes_activos_qs.count()
     contexto["pacientes_recientes_app"] = pacientes_activos_qs.filter(
@@ -1148,7 +1174,11 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["metodos_pago_app"] = PagoFactura.METODOS
     contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
-    return render(request, "crm/agenda_mobile.html", contexto)
+    response = render(request, "crm/agenda_mobile.html", contexto)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
 
 
 def agenda_mobile_manifest(request, empresa_slug):
