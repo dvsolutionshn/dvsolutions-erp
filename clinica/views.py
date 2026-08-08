@@ -19,6 +19,7 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
 
 from core.models import Empresa
+from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
 from facturacion.models import Cliente
 
@@ -701,12 +702,25 @@ def pacientes(request, empresa_slug):
             Q(nombre__icontains=q) | Q(expediente_codigo__icontains=q) | Q(identidad__icontains=q) | Q(telefono__icontains=q)
         )
     cumpleaneros_mes = pacientes_qs.filter(fecha_nacimiento__month=hoy.month).count()
+    pacientes_lista = list(pacientes_qs)
+    vista_premium_pacientes = empresa.slug == "hospital_mia"
+    if vista_premium_pacientes:
+        for paciente in pacientes_lista:
+            telefono_base = paciente.whatsapp or paciente.telefono or ""
+            paciente.telefono_accion = apply_phone_prefix(telefono_base, paciente.prefijo_telefono)
+            partes_nombre = [
+                paciente.primer_nombre,
+                paciente.primer_apellido,
+            ]
+            iniciales = "".join((parte or "").strip()[:1] for parte in partes_nombre if (parte or "").strip())
+            paciente.iniciales = (iniciales or (paciente.nombre or "P")[:2]).upper()
     return render(request, "clinica/pacientes.html", {
         "empresa": empresa,
-        "pacientes": pacientes_qs,
+        "pacientes": pacientes_lista,
         "q": q,
         "mes_actual": hoy,
         "cumpleaneros_mes": cumpleaneros_mes,
+        "vista_premium_pacientes": vista_premium_pacientes,
         "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
     })
 

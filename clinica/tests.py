@@ -882,11 +882,36 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Cumpleanos del mes")
-        self.assertContains(response, "Promo")
+        self.assertContains(response, "Cumpleaños del mes")
+        self.assertContains(response, "Cumple")
         nombres = list(response.context["pacientes"])
         self.assertEqual(nombres[0], cumpleanero)
         self.assertIn(paciente_normal, nombres)
+
+    def test_lista_pacientes_hospital_mia_usa_vista_premium_con_acciones_rapidas(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-0550",
+            primer_nombre="Sofia",
+            primer_apellido="Reyes",
+            nombre="Sofia Reyes",
+            identidad="0801199600550",
+            telefono="99990011",
+            prefijo_telefono="504",
+        )
+
+        response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["vista_premium_pacientes"])
+        self.assertContains(response, "patients-web-premium")
+        self.assertContains(response, "tel:+50499990011")
+        self.assertContains(response, "https://wa.me/50499990011")
+        self.assertContains(
+            response,
+            reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id]),
+        )
+        self.assertContains(response, "Historia clínica")
 
     def test_sugerencias_pacientes_busca_por_documento(self):
         paciente = Paciente.objects.create(

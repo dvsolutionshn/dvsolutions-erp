@@ -129,15 +129,304 @@
     text-decoration:none;
     white-space:nowrap;
 }
+.patients-web-premium{
+    --patient-teal:#0aa7a0;
+    --patient-blue:#2375e9;
+    --patient-ink:#102338;
+    overflow:hidden;
+    padding:0;
+    border:1px solid rgba(173,198,220,.72);
+    border-radius:28px;
+    background:
+        radial-gradient(circle at 94% 4%,rgba(72,211,202,.18),transparent 28%),
+        radial-gradient(circle at 4% 96%,rgba(72,130,234,.10),transparent 30%),
+        linear-gradient(145deg,#fbfeff 0%,#f5faff 48%,#fbf8ff 100%);
+    box-shadow:0 26px 70px rgba(25,60,94,.11);
+}
+.patients-premium-hero{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:24px;
+    align-items:center;
+    padding:28px 30px 24px;
+    color:#fff;
+    background:
+        radial-gradient(circle at 88% 10%,rgba(255,255,255,.18),transparent 25%),
+        linear-gradient(125deg,#102e45 0%,#0d5965 48%,#0ba79f 100%);
+}
+.patients-premium-eyebrow{
+    display:block;
+    margin-bottom:8px;
+    color:#96f2ea;
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+}
+.patients-premium-hero h2{margin:0;font-size:clamp(25px,2.2vw,36px);line-height:1.1}
+.patients-premium-hero p{max-width:720px;margin:10px 0 0;color:rgba(255,255,255,.78);line-height:1.6}
+.patients-premium-stats{display:flex;gap:12px;align-items:stretch}
+.patients-premium-stat{
+    min-width:136px;
+    padding:14px 16px;
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:18px;
+    background:rgba(255,255,255,.11);
+    box-shadow:inset 0 1px rgba(255,255,255,.12);
+    backdrop-filter:blur(10px);
+}
+.patients-premium-stat strong{display:block;font-size:26px;line-height:1}
+.patients-premium-stat span{display:block;margin-top:7px;color:rgba(255,255,255,.72);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.patients-premium-body{padding:22px 24px 28px}
+.patients-premium-body .patient-search-panel{margin-bottom:14px;background:rgba(255,255,255,.84)}
+.patients-premium-toolbar{display:flex;justify-content:space-between;gap:14px;align-items:center;margin:4px 0 20px}
+.patients-filter-group,.patients-view-group{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.patients-filter-button,.patients-view-button{
+    display:inline-flex;
+    min-height:39px;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    padding:0 14px;
+    border:1px solid #d6e3ee;
+    border-radius:999px;
+    color:#577087;
+    background:rgba(255,255,255,.84);
+    font:inherit;
+    font-size:12px;
+    font-weight:900;
+    cursor:pointer;
+    transition:transform .18s ease,border-color .18s ease,color .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.patients-filter-button:hover,.patients-view-button:hover{transform:translateY(-1px);border-color:#77cec9;color:#087c78}
+.patients-filter-button.is-active,.patients-view-button.is-active{color:#fff;border-color:transparent;background:linear-gradient(120deg,var(--patient-teal),var(--patient-blue));box-shadow:0 9px 22px rgba(25,133,173,.2)}
+.patients-premium-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.patients-premium-grid.is-list{grid-template-columns:1fr}
+.premium-patient-card-web{
+    position:relative;
+    display:flex;
+    min-width:0;
+    min-height:235px;
+    flex-direction:column;
+    overflow:hidden;
+    padding:18px;
+    border:1px solid rgba(186,207,225,.78);
+    border-radius:23px;
+    background:rgba(255,255,255,.93);
+    box-shadow:0 12px 32px rgba(22,54,84,.075);
+    animation:patientWebCardEnter .48s cubic-bezier(.2,.75,.25,1) both;
+    animation-delay:calc(var(--patient-index,0) * 36ms);
+    transition:transform .23s ease,box-shadow .23s ease,border-color .23s ease;
+}
+.premium-patient-card-web::before{
+    position:absolute;
+    inset:0 auto 0 0;
+    width:4px;
+    content:"";
+    background:linear-gradient(180deg,var(--patient-teal),var(--patient-blue));
+    opacity:.88;
+}
+.premium-patient-card-web:hover{transform:translateY(-5px);border-color:rgba(52,170,178,.55);box-shadow:0 22px 44px rgba(20,66,98,.14)}
+.premium-patient-card-head{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:13px;align-items:center}
+.premium-patient-avatar{
+    width:58px;
+    height:58px;
+    overflow:hidden;
+    display:grid;
+    place-items:center;
+    border:3px solid #fff;
+    border-radius:19px;
+    color:#fff;
+    background:linear-gradient(145deg,#0eaaa2,#2877e9 68%,#db65be);
+    box-shadow:0 8px 18px rgba(24,121,169,.23);
+    font-size:18px;
+    font-weight:900;
+}
+.premium-patient-avatar img{width:100%;height:100%;object-fit:cover}
+.premium-patient-identity{min-width:0}
+.premium-patient-identity h3{margin:0;overflow:hidden;color:var(--patient-ink);font-size:16px;line-height:1.25;text-overflow:ellipsis;white-space:nowrap}
+.premium-patient-identity p{margin:5px 0 0;color:#71859a;font-size:12px;font-weight:750}
+.premium-patient-status{padding:6px 9px;border-radius:999px;color:#087e72;background:#e6f7f1;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}
+.premium-patient-badges{display:flex;gap:7px;min-height:27px;align-items:center;flex-wrap:wrap;margin:15px 0 12px}
+.premium-patient-badge{padding:6px 9px;border-radius:999px;color:#45617a;background:#edf4fb;font-size:10px;font-weight:900}
+.premium-patient-badge.is-alert{color:#b42342;background:#fff0f3}
+.premium-patient-badge.is-birthday{color:#8b5d00;background:#fff6d9}
+.premium-patient-contact{display:grid;grid-template-columns:1fr;gap:5px;min-height:43px;margin-bottom:14px;color:#647b91;font-size:12px}
+.premium-patient-contact span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.premium-patient-contact strong{color:#2d4b63}
+.premium-patient-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:auto}
+.premium-patient-action{
+    display:flex;
+    min-height:40px;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    border:1px solid #d5e4ef;
+    border-radius:13px;
+    color:#34566e;
+    background:#fff;
+    font-size:11px;
+    font-weight:900;
+    text-decoration:none;
+    transition:transform .18s ease,background .18s ease,border-color .18s ease,color .18s ease;
+}
+.premium-patient-action svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.premium-patient-action:hover{transform:translateY(-1px);color:#087d79;border-color:#8fd8d3;background:#f1fffd}
+.premium-patient-action.is-primary{color:#fff;border-color:transparent;background:linear-gradient(120deg,var(--patient-teal),var(--patient-blue));box-shadow:0 8px 18px rgba(30,121,181,.18)}
+.premium-patient-action.is-disabled{cursor:not-allowed;opacity:.42}
+.premium-patient-admin{display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px;padding-top:11px;border-top:1px solid #e7eef5}
+.premium-patient-admin a,.premium-patient-admin button{padding:0;border:0;color:#7890a5;background:transparent;font:inherit;font-size:11px;font-weight:800;cursor:pointer;text-decoration:none}
+.premium-patient-admin a:hover{color:#176aa4}
+.premium-patient-admin button:hover{color:#b42318}
+.patients-premium-empty{grid-column:1/-1;padding:58px 24px;border:1px dashed #c8d9e7;border-radius:22px;color:#6d8296;background:rgba(255,255,255,.75);text-align:center}
+@keyframes patientWebCardEnter{from{opacity:0;transform:translateY(15px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media (max-width:1360px){.patients-premium-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:900px){
     .patient-search-panel{grid-template-columns:1fr}
     .patient-search-actions{justify-content:stretch}
     .patient-search-actions .erp-btn,.patient-search-actions .erp-btn-secondary,.patient-search-chip{flex:1;justify-content:center}
+    .patients-premium-hero{grid-template-columns:1fr}
+    .patients-premium-stats{justify-content:flex-start}
+    .patients-premium-toolbar{align-items:flex-start;flex-direction:column}
+    .patients-premium-grid{grid-template-columns:1fr}
+}
+@media (max-width:620px){
+    .patients-premium-hero{padding:23px 20px}
+    .patients-premium-stats{width:100%}
+    .patients-premium-stat{min-width:0;flex:1}
+    .patients-premium-body{padding:16px 13px 22px}
+    .patients-view-group{display:none}
+    .premium-patient-card-head{grid-template-columns:52px minmax(0,1fr)}
+    .premium-patient-avatar{width:52px;height:52px}
+    .premium-patient-status{grid-column:1/-1;justify-self:start}
+}
+@media (prefers-reduced-motion:reduce){
+    .premium-patient-card-web{animation:none;transition:none}
 }
 </style>
 {% endblock %}
 
 {% block content %}
+{% if vista_premium_pacientes %}
+<section class="patients-web-premium">
+    <header class="patients-premium-hero">
+        <div>
+            <span class="patients-premium-eyebrow">Directorio clínico · Hospital Mía</span>
+            <h2>Pacientes, cerca cuando los necesita.</h2>
+            <p>Consulte expedientes y comuníquese con cada paciente desde una vista clara, rápida y preparada para la atención diaria.</p>
+        </div>
+        <div class="patients-premium-stats">
+            <div class="patients-premium-stat">
+                <strong>{{ pacientes|length }}</strong>
+                <span>Pacientes visibles</span>
+            </div>
+            <div class="patients-premium-stat">
+                <strong>{{ cumpleaneros_mes }}</strong>
+                <span>Cumpleaños del mes</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="patients-premium-body">
+        <form method="get" class="patient-search-panel">
+            <div class="patient-search-box">
+                <span class="patient-search-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+                </span>
+                <input class="patient-search-input" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, expediente, documento, celular o correo" autocomplete="off" data-suggestions-url="{% url 'clinica_pacientes_sugerencias' empresa.slug %}">
+                <div class="patient-suggestions" data-patient-suggestions></div>
+            </div>
+            <a class="patient-search-chip" href="{% url 'clinica_pacientes' empresa.slug %}">Limpiar</a>
+            <div class="patient-search-actions">
+                <button class="erp-btn" type="submit">Buscar paciente</button>
+            </div>
+        </form>
+
+        <div class="patients-premium-toolbar">
+            <div class="patients-filter-group" aria-label="Filtros rápidos">
+                <button class="patients-filter-button is-active" type="button" data-patient-filter="all">Todos</button>
+                <button class="patients-filter-button" type="button" data-patient-filter="birthday">Cumpleaños</button>
+                <button class="patients-filter-button" type="button" data-patient-filter="alert">Con alerta</button>
+            </div>
+            <div class="patients-view-group" aria-label="Vista del directorio">
+                <button class="patients-view-button is-active" type="button" data-patient-view="grid">Tarjetas</button>
+                <button class="patients-view-button" type="button" data-patient-view="list">Lista compacta</button>
+            </div>
+        </div>
+
+        <div class="patients-premium-grid" data-patient-grid>
+            {% for paciente in pacientes %}
+            <article class="premium-patient-card-web" style="--patient-index:{{ forloop.counter0 }}" data-patient-card data-birthday="{% if paciente.cumple_mes == 0 %}true{% else %}false{% endif %}" data-alert="{% if paciente.es_alergico %}true{% else %}false{% endif %}">
+                <div class="premium-patient-card-head">
+                    <div class="premium-patient-avatar">
+                        {% if paciente.foto_perfil %}
+                        <img src="{{ paciente.foto_perfil.url }}" alt="Fotografía de {{ paciente.nombre }}">
+                        {% else %}
+                        <span>{{ paciente.iniciales }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="premium-patient-identity">
+                        <h3 title="{{ paciente.nombre }}">{{ paciente.nombre }}</h3>
+                        <p>{{ paciente.expediente_codigo }} · {% if paciente.edad is not None %}{{ paciente.edad }} años{% else %}Edad no indicada{% endif %}</p>
+                    </div>
+                    <span class="premium-patient-status">Activo</span>
+                </div>
+
+                <div class="premium-patient-badges">
+                    <span class="premium-patient-badge">ID {{ paciente.identidad|default:"No indicada" }}</span>
+                    {% if paciente.es_alergico %}<span class="premium-patient-badge is-alert">Alerta de alergia</span>{% endif %}
+                    {% if paciente.cumple_mes == 0 %}<span class="premium-patient-badge is-birthday">Cumple {{ paciente.fecha_nacimiento|date:"d/m" }}</span>{% endif %}
+                </div>
+
+                <div class="premium-patient-contact">
+                    <span><strong>Teléfono:</strong> {{ paciente.whatsapp|default:paciente.telefono|default:"No registrado" }}</span>
+                    <span><strong>Correo:</strong> {{ paciente.correo|default:"No registrado" }}</span>
+                </div>
+
+                <div class="premium-patient-actions">
+                    {% if paciente.telefono_accion %}
+                    <a class="premium-patient-action" href="tel:+{{ paciente.telefono_accion }}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 8l-2 1.7a15 15 0 0 0 7.3 7.3l1.7-2 4.5 2.4-.8 3a2 2 0 0 1-2 1.5C9.1 21.1 2.9 14.9 2.1 6.3a2 2 0 0 1 1.5-2Z"></path></svg>
+                        Llamar
+                    </a>
+                    <a class="premium-patient-action" href="https://wa.me/{{ paciente.telefono_accion }}" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4A8 8 0 1 1 20 11.5Z"></path><path d="M9 8.8c.5 2.4 1.8 3.8 4.3 4.7"></path></svg>
+                        WhatsApp
+                    </a>
+                    {% else %}
+                    <span class="premium-patient-action is-disabled" aria-disabled="true">Sin teléfono</span>
+                    <span class="premium-patient-action is-disabled" aria-disabled="true">Sin WhatsApp</span>
+                    {% endif %}
+                    <a class="premium-patient-action" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v15H5Z"></path><path d="M9 11h6M9 15h6M9 7h3"></path></svg>
+                        Historia clínica
+                    </a>
+                    <a class="premium-patient-action is-primary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3"></circle><path d="M5.5 20c.6-4 2.8-6 6.5-6s5.9 2 6.5 6"></path></svg>
+                        Abrir expediente
+                    </a>
+                </div>
+
+                <div class="premium-patient-admin">
+                    <a href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar datos</a>
+                    {% if puede_eliminar_pacientes %}
+                    <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
+                        {% csrf_token %}
+                        <button type="submit">Eliminar</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </article>
+            {% empty %}
+            <div class="patients-premium-empty">
+                <strong>No encontramos pacientes con ese criterio.</strong>
+                <p>Pruebe con otro nombre, documento, expediente o número de teléfono.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% else %}
 <section class="erp-grid">
     <article class="erp-card">
         <div class="erp-kpi-label">Pacientes</div>
@@ -215,6 +504,7 @@
         </table>
     </div>
 </section>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -290,6 +580,35 @@
 
     document.addEventListener("click", (event) => {
         if (!event.target.closest(".patient-search-box")) closePanel();
+    });
+})();
+
+(function(){
+    const grid = document.querySelector("[data-patient-grid]");
+    if (!grid) return;
+
+    const cards = Array.from(grid.querySelectorAll("[data-patient-card]"));
+    const filterButtons = document.querySelectorAll("[data-patient-filter]");
+    const viewButtons = document.querySelectorAll("[data-patient-view]");
+
+    filterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+            const filter = button.dataset.patientFilter;
+            cards.forEach((card) => {
+                const visible = filter === "all"
+                    || (filter === "birthday" && card.dataset.birthday === "true")
+                    || (filter === "alert" && card.dataset.alert === "true");
+                card.hidden = !visible;
+            });
+        });
+    });
+
+    viewButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            viewButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+            grid.classList.toggle("is-list", button.dataset.patientView === "list");
+        });
     });
 })();
 </script>
