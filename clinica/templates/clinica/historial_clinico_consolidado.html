@@ -6,11 +6,12 @@
 {% block header_description %}Lectura y trabajo clínico en una sola hoja: datos generales, formularios completados y cuadros médicos por área sin salir del expediente.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+<a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-.clinical-sheet{max-width:1240px;margin:0 auto 36px}
+.clinical-sheet{width:100%;max-width:1240px;min-width:0;margin:0 auto 36px}
 .sheet-cover{position:relative;overflow:hidden;border:1px solid #cfe0f3;border-radius:26px;background:linear-gradient(135deg,#fff 0%,#f8fcff 48%,#eefaf8 100%);box-shadow:0 24px 60px rgba(16,35,56,.08);padding:24px;margin-bottom:18px}
 .sheet-cover:before{content:"";position:absolute;right:-90px;top:-120px;width:330px;height:330px;border-radius:999px;background:radial-gradient(circle,rgba(35,193,184,.18),rgba(42,112,232,.07),transparent 70%)}
 .cover-grid{position:relative;display:grid;grid-template-columns:minmax(0,1fr) repeat(3,155px);gap:14px;align-items:stretch}
@@ -96,47 +97,150 @@
 .doctor-note-edit textarea:focus{border-color:#1769d2;box-shadow:0 0 0 3px rgba(23,105,210,.11)}
 .doctor-note-edit-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
 .empty-sheet{padding:24px;text-align:center;color:#60748d;border:1px dashed #cbd9e8;border-radius:18px;background:#fbfdff}
+.summary-clinical-hero{position:relative;overflow:hidden;border-radius:30px;background:radial-gradient(circle at 88% 8%,rgba(125,211,252,.25),transparent 25%),radial-gradient(circle at 72% 110%,rgba(45,212,191,.22),transparent 29%),linear-gradient(135deg,#0b3147 0%,#0d5365 54%,#176c72 100%);color:#fff;box-shadow:0 26px 65px rgba(7,45,66,.22);padding:28px;margin-bottom:16px;animation:summaryClinicalEnter .45s ease both}
+.summary-clinical-hero:after{content:"";position:absolute;right:-60px;bottom:-130px;width:360px;height:360px;border-radius:50%;border:1px solid rgba(255,255,255,.12);box-shadow:0 0 0 42px rgba(255,255,255,.035),0 0 0 84px rgba(255,255,255,.025);pointer-events:none}
+.summary-clinical-top{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;min-width:0}
+.summary-clinical-patient{display:flex;gap:18px;align-items:center;min-width:0}
+.summary-clinical-avatar{width:92px;height:92px;flex:0 0 92px;border-radius:27px;display:grid;place-items:center;overflow:hidden;border:1px solid rgba(255,255,255,.28);background:linear-gradient(135deg,rgba(255,255,255,.23),rgba(255,255,255,.08));box-shadow:0 17px 35px rgba(0,0,0,.18);font-size:30px;font-weight:950;letter-spacing:.04em}
+.summary-clinical-avatar img{width:100%;height:100%;object-fit:cover}
+.summary-clinical-eyebrow{display:block;margin-bottom:7px;color:#a7f3e8;font-size:10px;font-weight:950;letter-spacing:.16em;text-transform:uppercase}
+.summary-clinical-patient h2{margin:0;max-width:720px;color:#fff;font-size:clamp(25px,3vw,36px);line-height:1.08;letter-spacing:-.025em}
+.summary-clinical-patient p{margin:9px 0 0;color:#d8edf2;font-size:13px;font-weight:750;line-height:1.5}
+.summary-clinical-actions{display:grid;grid-template-columns:repeat(2,minmax(116px,1fr));gap:9px;width:min(330px,100%);max-width:100%;min-width:0}
+.summary-clinical-action{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:9px 13px;border:1px solid rgba(255,255,255,.24);border-radius:15px;background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-size:12px;font-weight:900;backdrop-filter:blur(10px);transition:transform .18s ease,background .18s ease,border-color .18s ease}
+.summary-clinical-action:hover{transform:translateY(-2px);background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.42)}
+.summary-clinical-action.is-primary{border-color:#5eead4;background:#fff;color:#0f5563;box-shadow:0 14px 30px rgba(0,0,0,.13)}
+.summary-clinical-action.is-wide{grid-column:1/-1}
+.summary-clinical-action svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.summary-clinical-alerts{position:relative;z-index:1;display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;padding-top:18px;border-top:1px solid rgba(255,255,255,.16)}
+.summary-clinical-badge{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:8px 11px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.09);color:#e6f5f7;font-size:11px;font-weight:850;overflow-wrap:anywhere}
+.summary-clinical-badge.is-alert{border-color:rgba(254,202,202,.36);background:#fff1f2;color:#9f1239}
+.summary-dashboard{display:grid;grid-template-columns:1.35fr repeat(3,minmax(0,.75fr));gap:12px;margin-bottom:16px}
+.summary-dashboard-card{position:relative;overflow:hidden;min-height:126px;padding:17px;border:1px solid #d8e7f1;border-radius:21px;background:linear-gradient(145deg,#fff,#f8fcff);box-shadow:0 15px 36px rgba(17,44,68,.06);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;animation:summaryClinicalEnter .4s ease both}
+.summary-dashboard-card:hover{transform:translateY(-3px);border-color:#a9cfdf;box-shadow:0 21px 44px rgba(17,44,68,.1)}
+.summary-dashboard-card.is-next{background:radial-gradient(circle at top right,rgba(45,212,191,.17),transparent 36%),linear-gradient(145deg,#fff,#f4fcfb)}
+.summary-dashboard-label{display:flex;align-items:center;gap:9px;color:#65798c;font-size:9px;font-weight:950;letter-spacing:.13em;text-transform:uppercase}
+.summary-dashboard-icon{width:30px;height:30px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#22b8b0,#2a70e8);color:#fff;font-size:10px;letter-spacing:0}
+.summary-dashboard-card strong{display:block;margin-top:13px;color:#102338;font-size:20px;line-height:1.18}
+.summary-dashboard-card.is-next strong{font-size:17px}
+.summary-dashboard-card p{margin:7px 0 0;color:#64798b;font-size:11px;line-height:1.45;font-weight:750}
+.summary-dashboard-link{position:absolute;inset:0;z-index:1;border-radius:inherit}
+.summary-section-nav{position:sticky;top:10px;z-index:12;display:flex;align-items:center;gap:7px;overflow-x:auto;margin:0 0 16px;padding:8px;border:1px solid rgba(197,218,234,.9);border-radius:18px;background:rgba(255,255,255,.92);box-shadow:0 12px 30px rgba(16,35,56,.08);backdrop-filter:blur(15px);scrollbar-width:none}
+.summary-section-nav::-webkit-scrollbar{display:none}
+.summary-section-nav a{flex:0 0 auto;padding:9px 13px;border-radius:12px;color:#486076;text-decoration:none;font-size:11px;font-weight:900;transition:.18s ease}
+.summary-section-nav a:hover{background:#edf8f7;color:#087466}
+.summary-section-nav a:first-child{background:linear-gradient(135deg,#ecfdf8,#eef6ff);color:#0d6d69}
+.sheet-panel{scroll-margin-top:78px}
+@keyframes summaryClinicalEnter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:1050px){
     .cover-grid,.sheet-grid,.inline-fields,.inline-field ul{grid-template-columns:1fr}
     .panel-head,.note-title,.doctor-note-head,.clinical-area summary{flex-direction:column;align-items:flex-start}
+    .summary-clinical-top{grid-template-columns:1fr}.summary-clinical-actions{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}.summary-clinical-action.is-wide{grid-column:auto}
+    .summary-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:650px){
+    .summary-clinical-hero{padding:21px 18px;border-radius:24px}.summary-clinical-patient{align-items:flex-start}.summary-clinical-avatar{width:68px;height:68px;flex-basis:68px;border-radius:21px}.summary-clinical-patient h2{font-size:24px}.summary-clinical-patient p{font-size:11px}
+    .summary-clinical-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-clinical-action.is-primary{grid-column:1/-1}
+    .summary-dashboard{grid-template-columns:1fr 1fr}.summary-dashboard-card{min-height:112px;padding:14px}.summary-dashboard-card.is-next{grid-column:1/-1}
+    .summary-section-nav{top:5px;border-radius:15px}
+}
+@media(prefers-reduced-motion:reduce){
+    .summary-clinical-hero,.summary-dashboard-card{animation:none}.summary-clinical-action,.summary-dashboard-card{transition:none}
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <section class="clinical-sheet">
-    <div class="sheet-cover">
-        <div class="cover-grid">
-            <div class="patient-summary">
-                {% if paciente.foto_perfil %}
-                <img class="patient-photo" src="{{ paciente.foto_perfil.url }}" alt="Foto de {{ paciente.nombre }}">
-                {% elif paciente.foto %}
-                <img class="patient-photo" src="{{ paciente.foto.url }}" alt="Foto de {{ paciente.nombre }}">
-                {% else %}
-                <div class="patient-fallback">{{ paciente.nombre|first|upper }}</div>
-                {% endif %}
+    <header class="summary-clinical-hero" id="resumen-paciente">
+        <div class="summary-clinical-top">
+            <div class="summary-clinical-patient">
+                <div class="summary-clinical-avatar">
+                    {% if paciente.foto_perfil %}
+                    <img src="{{ paciente.foto_perfil.url }}" alt="Fotografía de {{ paciente.nombre }}">
+                    {% elif paciente.foto %}
+                    <img src="{{ paciente.foto.url }}" alt="Fotografía de {{ paciente.nombre }}">
+                    {% else %}
+                    {{ paciente.iniciales_resumen }}
+                    {% endif %}
+                </div>
                 <div>
-                    <div class="erp-kpi-label">Paciente</div>
-                    <h3>{{ paciente.nombre }}</h3>
-                    <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · RH {{ paciente.rh|default:"No indicado" }}</p>
+                    <span class="summary-clinical-eyebrow">Resumen clínico · {{ paciente.expediente_codigo }}</span>
+                    <h2>{{ paciente.nombre }}</h2>
+                    <p>{{ paciente.identidad|default:"Documento no indicado" }} · {% if paciente.edad is not None %}{{ paciente.edad }} años{% else %}Edad no indicada{% endif %} · RH {{ paciente.rh|default:"No indicado" }}</p>
                 </div>
             </div>
-            <div class="cover-stat"><strong>{{ preconsultas|length }}</strong><span>formularios recibidos</span></div>
-            <div class="cover-stat"><strong>{{ historias|length }}</strong><span>notas clínicas</span></div>
-            <div class="cover-stat"><strong>{{ tipos|length }}</strong><span>cuadros de trabajo</span></div>
+            <div class="summary-clinical-actions">
+                {% if paciente.telefono_accion %}
+                <a class="summary-clinical-action" href="tel:+{{ paciente.telefono_accion }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 8l-2 1.7a15 15 0 0 0 7.3 7.3l1.7-2 4.5 2.4-.8 3a2 2 0 0 1-2 1.5C9.1 21.1 2.9 14.9 2.1 6.3a2 2 0 0 1 1.5-2Z"></path></svg>
+                    Llamar
+                </a>
+                <a class="summary-clinical-action" href="https://wa.me/{{ paciente.telefono_accion }}" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4A8 8 0 1 1 20 11.5Z"></path><path d="M9 8.8c.5 2.4 1.8 3.8 4.3 4.7"></path></svg>
+                    WhatsApp
+                </a>
+                {% endif %}
+                <a class="summary-clinical-action is-primary is-wide" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 2v4M16 2v4M8 10h8M12 14v4M10 16h4"></path></svg>
+                    Agendar cita
+                </a>
+            </div>
         </div>
-        <div class="sheet-toolbar">
+        <div class="summary-clinical-alerts">
             {% if paciente.es_alergico %}
-            <span class="sheet-pill allergy-alert">Alerta de alergia: {{ paciente.alergias|default:"Sin detalle" }}</span>
+            <span class="summary-clinical-badge is-alert">Alerta de alergia: {{ paciente.alergias|default:"Sin detalle" }}</span>
             {% else %}
-            <span class="sheet-pill">Sin alerta de alergia registrada</span>
+            <span class="summary-clinical-badge">Sin alerta de alergia registrada</span>
             {% endif %}
-            <span class="sheet-pill">Documento: {{ paciente.identidad|default:"No indicado" }}</span>
-            <span class="sheet-pill">Teléfono: {{ paciente.telefono|default:paciente.whatsapp|default:"No indicado" }}</span>
+            <span class="summary-clinical-badge">Teléfono: {{ paciente.whatsapp|default:paciente.telefono|default:"No indicado" }}</span>
+            <span class="summary-clinical-badge">Correo: {{ paciente.correo|default:"No indicado" }}</span>
         </div>
-    </div>
+    </header>
 
-    <section class="sheet-panel">
+    <section class="summary-dashboard" aria-label="Resumen operativo del paciente">
+        <article class="summary-dashboard-card is-next">
+            <div class="summary-dashboard-label"><span class="summary-dashboard-icon">01</span>Próxima cita</div>
+            {% if resumen_operativo.proxima_cita %}
+            <strong>{{ resumen_operativo.proxima_cita.fecha_hora|date:"d/m/Y · h:i A" }}</strong>
+            <p>{{ resumen_operativo.proxima_cita.motivo }}{% if resumen_operativo.proxima_cita.profesional %} con {{ resumen_operativo.proxima_cita.profesional.nombre }}{% endif %}</p>
+            {% else %}
+            <strong>Sin cita programada</strong>
+            <p>Puede agendar la próxima atención desde esta pantalla.</p>
+            {% endif %}
+            <a class="summary-dashboard-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}" aria-label="Agendar cita para {{ paciente.nombre }}"></a>
+        </article>
+        <article class="summary-dashboard-card">
+            <div class="summary-dashboard-label"><span class="summary-dashboard-icon">02</span>Historia</div>
+            <strong>{{ historias|length }} nota{{ historias|length|pluralize:"s" }}</strong>
+            <p>{{ preconsultas|length }} formulario{{ preconsultas|length|pluralize:"s" }} recibido{{ preconsultas|length|pluralize:"s" }}</p>
+            <a class="summary-dashboard-link" href="#trabajo-clinico" aria-label="Ir al trabajo clínico"></a>
+        </article>
+        <article class="summary-dashboard-card">
+            <div class="summary-dashboard-label"><span class="summary-dashboard-icon">03</span>Tratamientos</div>
+            <strong>{{ resumen_operativo.tratamientos_activos }} activo{{ resumen_operativo.tratamientos_activos|pluralize:"s" }}</strong>
+            <p>{{ resumen_operativo.citas_proximas }} próxima{{ resumen_operativo.citas_proximas|pluralize:"s" }} cita{{ resumen_operativo.citas_proximas|pluralize:"s" }}</p>
+            <a class="summary-dashboard-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}#plan-tratamiento" aria-label="Ver tratamientos"></a>
+        </article>
+        <article class="summary-dashboard-card">
+            <div class="summary-dashboard-label"><span class="summary-dashboard-icon">04</span>Archivos clínicos</div>
+            <strong>{{ resumen_operativo.examenes|add:resumen_operativo.consentimientos }}</strong>
+            <p>{{ resumen_operativo.examenes }} examen{{ resumen_operativo.examenes|pluralize:"es" }} · {{ resumen_operativo.consentimientos }} consentimiento{{ resumen_operativo.consentimientos|pluralize:"s" }}</p>
+            <a class="summary-dashboard-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}#anexos" aria-label="Ver archivos clínicos"></a>
+        </article>
+    </section>
+
+    <nav class="summary-section-nav" aria-label="Secciones de la historia clínica">
+        <a href="#resumen-paciente">Resumen</a>
+        <a href="#informacion-paciente">Formulario del paciente</a>
+        <a href="#trabajo-clinico">Trabajo clínico</a>
+        <a href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Evolución</a>
+        <a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Exámenes</a>
+        <a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas</a>
+        <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Expediente completo</a>
+    </nav>
+
+    <section class="sheet-panel" id="informacion-paciente">
         <div class="panel-head">
             <div>
                 <div class="erp-kpi-label">Información recibida</div>
@@ -183,7 +287,7 @@
         </div>
     </section>
 
-    <section class="sheet-panel">
+    <section class="sheet-panel" id="trabajo-clinico">
         <div class="panel-head">
             <div>
                 <div class="erp-kpi-label">Trabajo de la doctora</div>

@@ -119,6 +119,10 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="summary-clinical-hero"')
+        self.assertContains(response, 'id="resumen-paciente"')
+        self.assertContains(response, 'id="informacion-paciente"')
+        self.assertContains(response, 'id="trabajo-clinico"')
         self.assertContains(response, "Historia clínica completa")
         self.assertContains(response, "Cuadros clínicos para escribir sin salir de esta pantalla")
         self.assertContains(response, "Guardar historia clínica de Capilar")

@@ -1679,6 +1679,39 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         paciente.historias_especialidad.select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")
     )
+    ahora = timezone.now()
+    citas_proximas_qs = (
+        paciente.citas.exclude(estado="cancelada")
+        .filter(fecha_hora__gte=ahora)
+        .select_related("profesional", "servicio")
+        .order_by("fecha_hora")
+    )
+    total_citas_proximas = citas_proximas_qs.count()
+    citas_proximas = list(citas_proximas_qs[:5])
+    paciente.telefono_accion = apply_phone_prefix(
+        paciente.whatsapp or paciente.telefono or "",
+        paciente.prefijo_telefono,
+    )
+    nombres = [parte for parte in (paciente.nombre or "").split() if parte]
+    paciente.iniciales_resumen = "".join(
+        parte[0].upper() for parte in nombres[:2]
+    ) or "P"
+    resumen_operativo = {
+        "proxima_cita": citas_proximas[0] if citas_proximas else None,
+        "citas_proximas": total_citas_proximas,
+        "tratamientos_activos": paciente.tratamientos.filter(
+            estado__in=["planificado", "en_proceso"]
+        ).count(),
+        "examenes": ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente).count(),
+        "consentimientos": ConsentimientoClinico.objects.filter(
+            empresa=empresa,
+            paciente=paciente,
+        ).count(),
+        "evoluciones": PacienteFotoEvolucion.objects.filter(
+            empresa=empresa,
+            paciente=paciente,
+        ).count(),
+    }
     bloques_preconsulta = [
         {
             "preconsulta": preconsulta,
@@ -1721,6 +1754,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "preconsultas": preconsultas,
             "bloques_preconsulta": bloques_preconsulta,
             "puede_eliminar_notas_clinicas": puede_eliminar_notas_clinicas,
+            "resumen_operativo": resumen_operativo,
         },
     )
 
