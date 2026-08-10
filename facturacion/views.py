@@ -1113,112 +1113,129 @@ def _puede_configurar_power_bi(usuario):
     )
 
 
+def _decimal_reporte(valor):
+    return Decimal(str(valor or 0))
+
+
+def _tasa_factura_reporte(factura):
+    if factura.moneda != "USD":
+        return Decimal("1.0000")
+    tasa = _decimal_reporte(factura.tipo_cambio)
+    return tasa if tasa > 0 else Decimal("1.0000")
+
+
+def _convertir_factura_a_lempiras(factura, valor):
+    return (_decimal_reporte(valor) * _tasa_factura_reporte(factura)).quantize(
+        Decimal("0.01")
+    )
+
+
+def _preparar_factura_para_reporte(factura):
+    resumen = factura.resumen_fiscal()
+    factura.reporte_simbolo = "$" if factura.moneda == "USD" else "L."
+    factura.reporte_tasa_cambio = _tasa_factura_reporte(factura)
+    factura.reporte_subtotal_hnl = _convertir_factura_a_lempiras(
+        factura, factura.subtotal_documento_ajustado
+    )
+    factura.reporte_impuesto_hnl = _convertir_factura_a_lempiras(
+        factura, factura.impuesto_documento_ajustado
+    )
+    factura.reporte_total_hnl = _convertir_factura_a_lempiras(
+        factura, factura.total_documento_ajustado
+    )
+    factura.reporte_saldo_hnl = _convertir_factura_a_lempiras(
+        factura, factura.saldo_pendiente
+    )
+    for campo in (
+        "base_15",
+        "isv_15",
+        "base_18",
+        "isv_18",
+        "base_exento",
+        "base_exonerado",
+        "descuento_total",
+    ):
+        setattr(
+            factura,
+            f"reporte_{campo}_hnl",
+            _convertir_factura_a_lempiras(factura, resumen.get(campo, 0)),
+        )
+    return factura
+
+
+def _preparar_facturas_para_reporte(facturas):
+    return [_preparar_factura_para_reporte(factura) for factura in facturas]
+
+
 def _construir_bi_interno_facturacion(facturas):
     hoy = timezone.localdate()
     inicio_ventana = date(hoy.year, hoy.month, 1) - timedelta(days=150)
+    facturas_emitidas = [factura for factura in facturas if factura.estado != "anulada"]
 
-    facturas_emitidas = facturas.exclude(estado="anulada").select_related("cliente")
-    lineas = LineaFactura.objects.filter(factura__in=facturas_emitidas).select_related("producto")
+    ventas_por_mes = {}
+    clientes = {}
+    productos = {}
+    estados = {
+        "pagado": {"etiqueta": "Pagado", "cantidad": 0, "total": Decimal("0.00")},
+        "parcial": {"etiqueta": "Parcial", "cantidad": 0, "total": Decimal("0.00")},
+        "pendiente": {"etiqueta": "Pendiente", "cantidad": 0, "total": Decimal("0.00")},
+    }
 
-    ventas_mensuales_qs = (
-        facturas_emitidas.filter(fecha_emision__gte=inicio_ventana)
-        .annotate(periodo=TruncMonth("fecha_emision"))
-        .values("periodo")
-        .annotate(
-            total=Sum("total"),
-            documentos=Count("id"),
+    for factura in facturas_emitidas:
+        total_hnl = factura.reporte_total_hnl
+        saldo_hnl = factura.reporte_saldo_hnl
+        if factura.fecha_emision >= inicio_ventana:
+            periodo = factura.fecha_emision.replace(day=1)
+            dato_mes = ventas_por_mes.setdefault(
+                periodo,
+                {"periodo": periodo, "total": Decimal("0.00"), "saldo": Decimal("0.00"), "documentos": 0},
+            )
+            dato_mes["total"] += total_hnl
+            dato_mes["saldo"] += saldo_hnl
+            dato_mes["documentos"] += 1
+
+        nombre_cliente = factura.cliente.nombre or "Cliente sin nombre"
+        dato_cliente = clientes.setdefault(
+            nombre_cliente,
+            {"nombre": nombre_cliente, "total": Decimal("0.00"), "documentos": 0},
         )
-        .order_by("periodo")
-    )
+        dato_cliente["total"] += total_hnl
+        dato_cliente["documentos"] += 1
 
-    ventas_mensuales = []
+        estado = estados.get(factura.estado_pago, estados["pendiente"])
+        estado["cantidad"] += 1
+        estado["total"] += total_hnl
+
+        tasa = factura.reporte_tasa_cambio
+        for linea in factura.lineas.all():
+            nombre_producto = linea.producto.nombre if linea.producto else "Producto sin nombre"
+            dato_producto = productos.setdefault(
+                nombre_producto,
+                {"nombre": nombre_producto, "total": Decimal("0.00"), "cantidad": Decimal("0.00")},
+            )
+            total_linea = _decimal_reporte(linea.subtotal) + _decimal_reporte(linea.impuesto_monto)
+            dato_producto["total"] += (total_linea * tasa).quantize(Decimal("0.01"))
+            dato_producto["cantidad"] += _decimal_reporte(linea.cantidad)
+
+    ventas_mensuales = [ventas_por_mes[periodo] for periodo in sorted(ventas_por_mes)]
     max_total_mes = Decimal("0.00")
-    for item in ventas_mensuales_qs:
-        total_mes = item["total"] or Decimal("0.00")
-        periodo = item["periodo"]
-        saldo_mes = sum(
-            (
-                factura.saldo_pendiente
-                for factura in facturas_emitidas.filter(
-                    fecha_emision__year=periodo.year,
-                    fecha_emision__month=periodo.month,
-                )
-            ),
-            Decimal("0.00"),
-        )
-        max_total_mes = max(max_total_mes, total_mes)
-        ventas_mensuales.append(
-            {
-                "periodo": periodo,
-                "total": total_mes,
-                "saldo": saldo_mes,
-                "documentos": item["documentos"],
-            }
-        )
+    for item in ventas_mensuales:
+        max_total_mes = max(max_total_mes, item["total"])
     for item in ventas_mensuales:
         item["ancho"] = float((item["total"] / max_total_mes) * 100) if max_total_mes else 0
 
-    top_clientes_qs = (
-        facturas_emitidas.values("cliente__nombre")
-        .annotate(total=Sum("total"), documentos=Count("id"))
-        .order_by("-total")[:6]
-    )
-    top_clientes = []
-    max_cliente = Decimal("0.00")
-    for item in top_clientes_qs:
-        total_cliente = item["total"] or Decimal("0.00")
-        max_cliente = max(max_cliente, total_cliente)
-        top_clientes.append(
-            {
-                "nombre": item["cliente__nombre"] or "Cliente sin nombre",
-                "total": total_cliente,
-                "documentos": item["documentos"],
-            }
-        )
+    top_clientes = sorted(clientes.values(), key=lambda item: item["total"], reverse=True)[:6]
+    max_cliente = max((item["total"] for item in top_clientes), default=Decimal("0.00"))
     for item in top_clientes:
         item["ancho"] = float((item["total"] / max_cliente) * 100) if max_cliente else 0
 
-    top_productos_qs = (
-        lineas.values("producto__nombre")
-        .annotate(
-            subtotal=Sum("subtotal"),
-            impuesto_total=Sum("impuesto_monto"),
-            cantidad=Sum("cantidad"),
-        )
-        .order_by("-subtotal")[:6]
-    )
-    top_productos = []
-    max_producto = Decimal("0.00")
-    for item in top_productos_qs:
-        total_producto = (item["subtotal"] or Decimal("0.00")) + (item["impuesto_total"] or Decimal("0.00"))
-        max_producto = max(max_producto, total_producto)
-        top_productos.append(
-            {
-                "nombre": item["producto__nombre"] or "Producto sin nombre",
-                "total": total_producto,
-                "cantidad": item["cantidad"] or Decimal("0.00"),
-            }
-        )
+    top_productos = sorted(productos.values(), key=lambda item: item["total"], reverse=True)[:6]
+    max_producto = max((item["total"] for item in top_productos), default=Decimal("0.00"))
     for item in top_productos:
         item["ancho"] = float((item["total"] / max_producto) * 100) if max_producto else 0
 
-    estados = [
-        ("Pagado", facturas_emitidas.filter(estado_pago="pagado")),
-        ("Parcial", facturas_emitidas.filter(estado_pago="parcial")),
-        ("Pendiente", facturas_emitidas.filter(estado_pago="pendiente")),
-    ]
-    estado_cobro = []
-    max_estado = Decimal("0.00")
-    for etiqueta, queryset in estados:
-        total_estado = queryset.aggregate(total=Sum("total"))["total"] or Decimal("0.00")
-        max_estado = max(max_estado, total_estado)
-        estado_cobro.append(
-            {
-                "etiqueta": etiqueta,
-                "cantidad": queryset.count(),
-                "total": total_estado,
-            }
-        )
+    estado_cobro = list(estados.values())
+    max_estado = max((item["total"] for item in estado_cobro), default=Decimal("0.00"))
     for item in estado_cobro:
         item["ancho"] = float((item["total"] / max_estado) * 100) if max_estado else 0
 
@@ -1356,11 +1373,11 @@ def _construir_reporte_cxc(empresa, params):
             continue
         if q_normalizado and q_normalizado not in factura.cliente.nombre.lower():
             continue
-        facturas_con_saldo.append(factura)
+        facturas_con_saldo.append(_preparar_factura_para_reporte(factura))
 
     data = {}
     for factura in facturas_con_saldo:
-        saldo = factura.saldo_pendiente
+        saldo = factura.reporte_saldo_hnl
         cliente = factura.cliente
         dias = (hoy - (factura.fecha_vencimiento or factura.fecha_emision)).days
 
@@ -1398,7 +1415,7 @@ def _construir_reporte_cxc(empresa, params):
                 if facturas_pendientes_cliente:
                     cliente_resumen = {
                         "facturas": len(facturas_pendientes_cliente),
-                        "saldo_total": sum((f.saldo_pendiente for f in facturas_pendientes_cliente), Decimal("0.00")),
+                        "saldo_total": sum((f.reporte_saldo_hnl for f in facturas_pendientes_cliente), Decimal("0.00")),
                         "vencidas": sum(1 for f in facturas_pendientes_cliente if (f.fecha_vencimiento or f.fecha_emision) < hoy),
                         "proxima_fecha": min((f.fecha_vencimiento or f.fecha_emision for f in facturas_pendientes_cliente)),
                     }
@@ -7957,16 +7974,18 @@ def vista_previa_factura_pdf_independiente(request, empresa_slug, factura_id):
 def reportes_facturacion(request, empresa_slug):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    facturas = _filtrar_facturas_reporte(empresa, request.GET)
+    facturas = _preparar_facturas_para_reporte(
+        _filtrar_facturas_reporte(empresa, request.GET)
+    )
     configuracion_power_bi, _ = ConfiguracionPowerBIEmpresa.objects.get_or_create(empresa=empresa)
 
     totales = {
-        "subtotal": sum((f.subtotal_documento_ajustado for f in facturas), Decimal('0.00')),
-        "impuesto": sum((f.impuesto_documento_ajustado for f in facturas), Decimal('0.00')),
-        "total": sum((f.total_documento_ajustado for f in facturas), Decimal('0.00')),
+        "subtotal": sum((f.reporte_subtotal_hnl for f in facturas), Decimal('0.00')),
+        "impuesto": sum((f.reporte_impuesto_hnl for f in facturas), Decimal('0.00')),
+        "total": sum((f.reporte_total_hnl for f in facturas), Decimal('0.00')),
     }
 
-    total_saldo = sum((f.saldo_pendiente for f in facturas), Decimal('0.00'))
+    total_saldo = sum((f.reporte_saldo_hnl for f in facturas), Decimal('0.00'))
 
     total_base_15 = Decimal('0.00')
     total_isv_15 = Decimal('0.00')
@@ -7977,17 +7996,15 @@ def reportes_facturacion(request, empresa_slug):
     total_descuento = Decimal('0.00')
 
     for f in facturas:
-        r = f.resumen_fiscal()
-
-        total_base_15 += Decimal(str(r["base_15"]))
-        total_isv_15 += Decimal(str(r["isv_15"]))
-        total_base_18 += Decimal(str(r["base_18"]))
-        total_isv_18 += Decimal(str(r["isv_18"]))
-        total_exento += Decimal(str(r["base_exento"]))
-        total_exonerado += Decimal(str(r["base_exonerado"]))
+        total_base_15 += f.reporte_base_15_hnl
+        total_isv_15 += f.reporte_isv_15_hnl
+        total_base_18 += f.reporte_base_18_hnl
+        total_isv_18 += f.reporte_isv_18_hnl
+        total_exento += f.reporte_base_exento_hnl
+        total_exonerado += f.reporte_base_exonerado_hnl
 
         # 🔥 CALCULO CORRECTO DEL DESCUENTO
-        total_descuento += Decimal(str(r.get("descuento_total", 0) or 0))
+        total_descuento += f.reporte_descuento_total_hnl
 
     clientes = Cliente.objects.filter(empresa=empresa)
     bi_interno = _construir_bi_interno_facturacion(facturas)
@@ -8179,7 +8196,9 @@ def reporte_retenciones_pagos(request, empresa_slug):
 def dashboard_bi_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     facturas = _filtrar_facturas_reporte(empresa, request.GET)
-    bi_interno = _construir_bi_interno_facturacion(facturas)
+    bi_interno = _construir_bi_interno_facturacion(
+        _preparar_facturas_para_reporte(facturas)
+    )
 
     hoy = timezone.localdate()
     inicio_mes_actual = date(hoy.year, hoy.month, 1)
@@ -8897,11 +8916,11 @@ def exportar_excel_reportes(request, empresa_slug):
         ws_resumen["B5"] = contexto_cxc["resumen"]["clientes_con_saldo"]
         ws_resumen["A6"] = "Facturas pendientes"
         ws_resumen["B6"] = contexto_cxc["resumen"]["facturas_pendientes"]
-        ws_resumen["A7"] = "Total cartera"
+        ws_resumen["A7"] = "Total cartera HNL"
         ws_resumen["B7"] = float(contexto_cxc["resumen"]["total_cartera"])
 
         ws_cxc = wb.create_sheet("Antiguedad Cartera")
-        ws_cxc.append(["Cliente", "0-30", "31-60", "61-90", "90+", "Total"])
+        ws_cxc.append(["Cliente", "0-30 HNL", "31-60 HNL", "61-90 HNL", "90+ HNL", "Total HNL"])
         for item in contexto_cxc["data"]:
             ws_cxc.append([
                 item["cliente"].nombre,
@@ -8913,7 +8932,11 @@ def exportar_excel_reportes(request, empresa_slug):
             ])
 
         ws_detalle = wb.create_sheet("Detalle Facturas")
-        ws_detalle.append(["Cliente", "Factura", "Fecha", "Vencimiento", "Estado", "Total", "Saldo"])
+        ws_detalle.append([
+            "Cliente", "Factura", "Fecha", "Vencimiento", "Estado",
+            "Total original", "Saldo original", "Moneda", "Tasa de cambio",
+            "Total HNL", "Saldo HNL",
+        ])
         for factura in contexto_cxc["facturas_con_saldo"]:
             ws_detalle.append([
                 factura.cliente.nombre,
@@ -8923,6 +8946,10 @@ def exportar_excel_reportes(request, empresa_slug):
                 factura.estado_pago,
                 float(factura.total_documento_ajustado),
                 float(factura.saldo_pendiente),
+                factura.moneda,
+                float(factura.reporte_tasa_cambio),
+                float(factura.reporte_total_hnl),
+                float(factura.reporte_saldo_hnl),
             ])
 
         for sheet in wb.worksheets:
@@ -8944,19 +8971,22 @@ def exportar_excel_reportes(request, empresa_slug):
         wb.save(response)
         return response
 
-    facturas = _filtrar_facturas_reporte(empresa, request.GET)
+    facturas = _preparar_facturas_para_reporte(
+        _filtrar_facturas_reporte(empresa, request.GET)
+    )
 
     wb = Workbook()
 
     ws_resumen = wb.active
     ws_resumen.title = "Resumen Ejecutivo"
 
-    total_facturado = sum((f.total_documento_ajustado for f in facturas), Decimal('0.00'))
-    total_saldo = sum((f.saldo_pendiente for f in facturas), Decimal('0.00'))
+    total_facturado = sum((f.reporte_total_hnl for f in facturas), Decimal('0.00'))
+    total_saldo = sum((f.reporte_saldo_hnl for f in facturas), Decimal('0.00'))
     total_cobrado = total_facturado - total_saldo
     porcentaje = (total_cobrado / total_facturado * 100) if total_facturado > 0 else 0
 
     ws_resumen["A1"] = f"EMPRESA: {empresa.nombre}"
+    ws_resumen["A2"] = "Valores consolidados en lempiras; las facturas USD se convierten con la tasa guardada en cada documento."
     ws_resumen["A3"] = "INDICADORES CLAVE"
 
     data = [
@@ -8980,7 +9010,9 @@ def exportar_excel_reportes(request, empresa_slug):
         "Base 18%", "ISV 18%",
         "Exento", "Exonerado",
         'Descuento',
-        "Total", "Saldo", "Estado"
+        "Total", "Saldo", "Estado",
+        "Moneda original", "Tasa de cambio",
+        "Subtotal HNL", "Impuesto HNL", "Total HNL", "Saldo HNL"
     ]
 
     for col, h in enumerate(headers, 1):
@@ -9010,6 +9042,12 @@ def exportar_excel_reportes(request, empresa_slug):
         ws_detalle.cell(row=row, column=11, value=float(f.total_documento_ajustado))
         ws_detalle.cell(row=row, column=12, value=float(f.saldo_pendiente))
         ws_detalle.cell(row=row, column=13, value=f.estado if f.estado == "anulada" else f.estado_pago)
+        ws_detalle.cell(row=row, column=14, value=f.moneda)
+        ws_detalle.cell(row=row, column=15, value=float(f.reporte_tasa_cambio))
+        ws_detalle.cell(row=row, column=16, value=float(f.reporte_subtotal_hnl))
+        ws_detalle.cell(row=row, column=17, value=float(f.reporte_impuesto_hnl))
+        ws_detalle.cell(row=row, column=18, value=float(f.reporte_total_hnl))
+        ws_detalle.cell(row=row, column=19, value=float(f.reporte_saldo_hnl))
 
         row += 1
 
@@ -9023,8 +9061,8 @@ def exportar_excel_reportes(request, empresa_slug):
         if c not in data_clientes:
             data_clientes[c] = {"total": 0, "saldo": 0}
 
-        data_clientes[c]["total"] += f.total_documento_ajustado
-        data_clientes[c]["saldo"] += f.saldo_pendiente
+        data_clientes[c]["total"] += f.reporte_total_hnl
+        data_clientes[c]["saldo"] += f.reporte_saldo_hnl
 
     for c, v in data_clientes.items():
         ws_cliente.append([c, float(v["total"]), float(v["saldo"])])
@@ -9036,7 +9074,7 @@ def exportar_excel_reportes(request, empresa_slug):
     aging = {}
 
     for f in facturas:
-        saldo = f.saldo_pendiente
+        saldo = f.reporte_saldo_hnl
         if saldo <= 0:
             continue
 

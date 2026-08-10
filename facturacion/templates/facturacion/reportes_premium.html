@@ -184,7 +184,7 @@
     overflow-y:hidden;
 }
 .erp-report-table{
-    min-width:1100px;
+    min-width:1420px;
 }
 .erp-report-summary-chip{
     display:inline-flex;
@@ -234,6 +234,44 @@
 }
 .erp-report-total small{
     color:var(--muted);
+}
+.erp-currency-note{
+    padding:14px 16px;
+    border:1px solid #b9d9f8;
+    border-left:4px solid #247fe5;
+    border-radius:14px;
+    background:linear-gradient(135deg,#f2f8ff,#f8fffd);
+    color:#244764;
+    font-size:13px;
+    line-height:1.55;
+}
+.erp-currency-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:48px;
+    padding:6px 9px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.08em;
+    background:#e9f3ff;
+    color:#145eaa;
+}
+.erp-currency-badge.usd{
+    background:#e6f8ef;
+    color:#08754a;
+}
+.erp-conversion-stack{
+    min-width:150px;
+    display:grid;
+    gap:4px;
+    font-size:11px;
+    color:var(--muted);
+}
+.erp-conversion-stack strong{
+    color:#0f2d56;
+    font-size:13px;
 }
 .erp-bi-shell{
     display:flex;
@@ -424,6 +462,12 @@
             </article>
         </div>
     </section>
+
+    <div class="erp-currency-note">
+        <strong>Control multimoneda:</strong> los indicadores consolidados se expresan en lempiras.
+        Cada factura conserva su moneda original y, cuando fue emitida en dólares, muestra la tasa
+        registrada y su subtotal, impuesto y total convertidos a lempiras.
+    </div>
 
     <section class="erp-card erp-bi-shell">
         <div class="erp-bi-head">
@@ -705,6 +749,7 @@
                 <thead>
                     <tr>
                         <th>Cliente / Documento</th>
+                        <th>Moneda / Tasa</th>
                         <th>Fecha</th>
                         <th>Vencimiento</th>
                         <th>Fiscal 15%</th>
@@ -713,6 +758,7 @@
                         <th>Descuento</th>
                         <th>Total</th>
                         <th>Saldo</th>
+                        <th>Conversión a lempiras</th>
                         <th>Estado</th>
                         <th>Accion</th>
                     </tr>
@@ -727,34 +773,54 @@
                                 <small>{{ f.numero_factura|default:"Sin numero" }}</small>
                             </div>
                         </td>
+                        <td>
+                            <span class="erp-currency-badge {% if f.moneda == 'USD' %}usd{% endif %}">{{ f.moneda }}</span>
+                            {% if f.moneda == "USD" %}
+                            <div class="erp-report-fiscal-stack" style="margin-top:6px;min-width:95px;">
+                                <span>Tasa: L. {{ f.reporte_tasa_cambio|floatformat:4 }}</span>
+                            </div>
+                            {% else %}
+                            <div class="erp-report-fiscal-stack" style="margin-top:6px;min-width:95px;">
+                                <span>Moneda base</span>
+                            </div>
+                            {% endif %}
+                        </td>
                         <td>{{ f.fecha_emision|date:"d/m/Y" }}</td>
                         <td>{{ f.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</td>
                         <td>
                             <div class="erp-report-fiscal-stack">
-                                <strong>L. {{ r.base_15|floatformat:2|intcomma }}</strong>
-                                <span>ISV: L. {{ r.isv_15|floatformat:2|intcomma }}</span>
+                                <strong>{{ f.reporte_simbolo }} {{ r.base_15|floatformat:2|intcomma }}</strong>
+                                <span>ISV: {{ f.reporte_simbolo }} {{ r.isv_15|floatformat:2|intcomma }}</span>
                             </div>
                         </td>
                         <td>
                             <div class="erp-report-fiscal-stack">
-                                <strong>L. {{ r.base_18|floatformat:2|intcomma }}</strong>
-                                <span>ISV: L. {{ r.isv_18|floatformat:2|intcomma }}</span>
+                                <strong>{{ f.reporte_simbolo }} {{ r.base_18|floatformat:2|intcomma }}</strong>
+                                <span>ISV: {{ f.reporte_simbolo }} {{ r.isv_18|floatformat:2|intcomma }}</span>
                             </div>
                         </td>
                         <td>
                             <div class="erp-report-fiscal-stack">
-                                <strong>L. {{ r.base_exento|floatformat:2|intcomma }}</strong>
-                                <span>Exonerado: L. {{ r.base_exonerado|floatformat:2|intcomma }}</span>
+                                <strong>{{ f.reporte_simbolo }} {{ r.base_exento|floatformat:2|intcomma }}</strong>
+                                <span>Exonerado: {{ f.reporte_simbolo }} {{ r.base_exonerado|floatformat:2|intcomma }}</span>
                             </div>
                         </td>
-                        <td class="amount"><span class="erp-money">L. {{ r.descuento_total|floatformat:2|intcomma }}</span></td>
+                        <td class="amount"><span class="erp-money">{{ f.reporte_simbolo }} {{ r.descuento_total|floatformat:2|intcomma }}</span></td>
                         <td class="erp-report-total">
-                            <strong>L. {{ f.total_documento_ajustado|floatformat:2|intcomma }}</strong>
-                            <small>Total emitido</small>
+                            <strong>{{ f.reporte_simbolo }} {{ f.total_documento_ajustado|floatformat:2|intcomma }}</strong>
+                            <small>Total original</small>
                         </td>
                         <td class="erp-report-total">
-                            <strong>L. {{ f.saldo_pendiente|floatformat:2|intcomma }}</strong>
-                            <small>Saldo actual</small>
+                            <strong>{{ f.reporte_simbolo }} {{ f.saldo_pendiente|floatformat:2|intcomma }}</strong>
+                            <small>Saldo original</small>
+                        </td>
+                        <td>
+                            <div class="erp-conversion-stack">
+                                <span>Subtotal: L. {{ f.reporte_subtotal_hnl|floatformat:2|intcomma }}</span>
+                                <span>Impuesto: L. {{ f.reporte_impuesto_hnl|floatformat:2|intcomma }}</span>
+                                <strong>Total: L. {{ f.reporte_total_hnl|floatformat:2|intcomma }}</strong>
+                                {% if f.reporte_saldo_hnl %}<span>Saldo: L. {{ f.reporte_saldo_hnl|floatformat:2|intcomma }}</span>{% endif %}
+                            </div>
                         </td>
                         <td>
                             {% if f.estado == "anulada" %}
@@ -773,7 +839,7 @@
                     </tr>
                 {% endwith %}
                 {% empty %}
-                    <tr><td colspan="11" class="erp-empty">Sin resultados para los filtros seleccionados.</td></tr>
+                    <tr><td colspan="13" class="erp-empty">Sin resultados para los filtros seleccionados.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

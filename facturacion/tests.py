@@ -2720,6 +2720,46 @@ class FacturacionTests(TestCase):
         response_reporte = self.client.get(reverse("reportes_facturacion", args=[self.empresa.slug]))
         self.assertEqual(response_reporte.context["totales"]["total"], factura_vigente.total_documento_ajustado)
 
+    def test_reportes_identifican_usd_y_convierten_totales_a_lempiras(self):
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            estado="emitida",
+            moneda="USD",
+            tipo_cambio=Decimal("26.5000"),
+            fecha_emision=date.today(),
+        )
+        LineaFactura.objects.create(
+            factura=factura,
+            producto=self.producto,
+            cantidad=Decimal("1.00"),
+            precio_unitario=Decimal("100.00"),
+            impuesto=self.impuesto,
+        )
+        factura.calcular_totales()
+        factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
+
+        response = self.client.get(reverse("reportes_facturacion", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        factura_reporte = response.context["facturas"][0]
+        self.assertEqual(factura_reporte.reporte_subtotal_hnl, Decimal("2650.00"))
+        self.assertEqual(factura_reporte.reporte_impuesto_hnl, Decimal("397.50"))
+        self.assertEqual(factura_reporte.reporte_total_hnl, Decimal("3047.50"))
+        self.assertEqual(response.context["totales"]["total"], Decimal("3047.50"))
+        self.assertContains(response, "USD")
+        self.assertContains(response, "26.5000")
+
+        excel = self.client.get(reverse("exportar_excel", args=[self.empresa.slug]))
+        workbook = load_workbook(BytesIO(excel.content))
+        detalle = workbook["Detalle Facturas"]
+        self.assertEqual(detalle.cell(row=2, column=14).value, "USD")
+        self.assertEqual(detalle.cell(row=2, column=15).value, 26.5)
+        self.assertEqual(detalle.cell(row=2, column=16).value, 2650)
+        self.assertEqual(detalle.cell(row=2, column=17).value, 397.5)
+        self.assertEqual(detalle.cell(row=2, column=18).value, 3047.5)
+        self.assertEqual(workbook["Resumen Ejecutivo"]["B5"].value, 3047.5)
+
     def test_borrador_sin_cai_se_puede_ver(self):
         factura = self.crear_factura_con_linea(estado="borrador")
         factura.cai = None
