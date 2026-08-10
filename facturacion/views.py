@@ -9002,6 +9002,47 @@ def exportar_excel_reportes(request, empresa_slug):
         ws_resumen.cell(row=row, column=2, value=float(value))
         row += 1
 
+    resumen_fiscal_hnl = [
+        (
+            "Importe gravado al 15% (subtotal)",
+            sum((f.reporte_base_15_hnl for f in facturas), Decimal("0.00")),
+        ),
+        (
+            "Importe gravado al 18% (subtotal)",
+            sum((f.reporte_base_18_hnl for f in facturas), Decimal("0.00")),
+        ),
+        (
+            "Importe exonerado",
+            sum((f.reporte_base_exonerado_hnl for f in facturas), Decimal("0.00")),
+        ),
+        (
+            "Importe exento",
+            sum((f.reporte_base_exento_hnl for f in facturas), Decimal("0.00")),
+        ),
+    ]
+
+    ws_fiscal = wb.create_sheet("Resumen Fiscal")
+    ws_fiscal["A1"] = "RESUMEN FISCAL PARA DECLARACIÓN"
+    ws_fiscal["A1"].font = Font(bold=True, color="FFFFFF", size=14)
+    ws_fiscal["A1"].fill = PatternFill(start_color="1e2a38", fill_type="solid")
+    ws_fiscal["A2"] = "Empresa"
+    ws_fiscal["B2"] = empresa.nombre
+    ws_fiscal["A3"] = "Moneda del resumen"
+    ws_fiscal["B3"] = "Lempiras (HNL)"
+    ws_fiscal["A4"] = "Nota"
+    ws_fiscal["B4"] = "Las facturas USD se convirtieron con la tasa registrada en cada documento."
+    ws_fiscal["A6"] = "Concepto"
+    ws_fiscal["B6"] = "Importe HNL"
+    for cell in ws_fiscal[6]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="247FE5", fill_type="solid")
+    for fila, (concepto, importe) in enumerate(resumen_fiscal_hnl, start=7):
+        ws_fiscal.cell(row=fila, column=1, value=concepto)
+        celda_importe = ws_fiscal.cell(row=fila, column=2, value=float(importe))
+        celda_importe.number_format = 'L. #,##0.00'
+    ws_fiscal.column_dimensions["A"].width = 42
+    ws_fiscal.column_dimensions["B"].width = 24
+
     ws_detalle = wb.create_sheet("Detalle Facturas")
 
     headers = [

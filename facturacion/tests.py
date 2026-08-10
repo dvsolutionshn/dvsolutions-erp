@@ -2759,6 +2759,12 @@ class FacturacionTests(TestCase):
         self.assertEqual(detalle.cell(row=2, column=17).value, 397.5)
         self.assertEqual(detalle.cell(row=2, column=18).value, 3047.5)
         self.assertEqual(workbook["Resumen Ejecutivo"]["B5"].value, 3047.5)
+        resumen_fiscal = workbook["Resumen Fiscal"]
+        self.assertEqual(resumen_fiscal["A7"].value, "Importe gravado al 15% (subtotal)")
+        self.assertEqual(resumen_fiscal["B7"].value, 2650)
+        self.assertEqual(resumen_fiscal["A8"].value, "Importe gravado al 18% (subtotal)")
+        self.assertEqual(resumen_fiscal["A9"].value, "Importe exonerado")
+        self.assertEqual(resumen_fiscal["A10"].value, "Importe exento")
 
     def test_borrador_sin_cai_se_puede_ver(self):
         factura = self.crear_factura_con_linea(estado="borrador")
