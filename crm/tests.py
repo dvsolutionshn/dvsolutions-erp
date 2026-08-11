@@ -109,6 +109,45 @@ class CRMTests(TestCase):
         self.assertContains(response, "Calendario de Citas")
         self.assertContains(response, reverse("agenda_mobile", args=[self.empresa.slug]))
 
+    def test_agenda_hospital_mia_permite_crear_tipo_consulta_sin_salir(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "+ Agregar tipo de consulta")
+        self.assertContains(
+            response,
+            reverse("agenda_crear_tipo_consulta_rapido", args=[self.empresa.slug]),
+        )
+
+    def test_crear_tipo_consulta_rapido_lo_guarda_activo_y_lo_reutiliza(self):
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_crear_tipo_consulta_rapido", args=[self.empresa.slug])
+        datos = {
+            "nombre": "Valoracion vascular",
+            "categoria": "consulta",
+            "duracion_minutos": "45",
+        }
+
+        response = self.client.post(url, datos)
+        self.assertEqual(response.status_code, 200)
+        servicio = ServicioClinico.objects.get(empresa=self.empresa, nombre="Valoracion vascular")
+        self.assertTrue(servicio.activo)
+        self.assertEqual(servicio.categoria, "consulta")
+        self.assertEqual(servicio.duracion_minutos, 45)
+        self.assertTrue(response.json()["creado"])
+
+        servicio.activo = False
+        servicio.save(update_fields=["activo"])
+        response = self.client.post(url, {**datos, "duracion_minutos": "60"})
+        self.assertEqual(response.status_code, 200)
+        servicio.refresh_from_db()
+        self.assertTrue(servicio.activo)
+        self.assertEqual(servicio.duracion_minutos, 60)
+        self.assertFalse(response.json()["creado"])
+
     def test_agenda_citas_muestra_historial_por_paciente(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])

@@ -340,6 +340,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "estados_cita": CitaCliente.ESTADO_CHOICES,
         "es_clinica": es_clinica,
         "es_hospital_mia": empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS,
+        "permite_crear_tipo_consulta": empresa.slug == "hospital_mia",
         "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
         "paciente_busqueda_inicial": paciente_busqueda_inicial,
         "pacientes_busqueda": pacientes_busqueda,
@@ -1373,6 +1374,80 @@ def crear_paciente_rapido_cita(request, empresa_slug):
             "documento": paciente.identidad or "",
             "telefono": paciente.whatsapp or paciente.telefono or "",
             "label": str(paciente),
+        },
+    })
+
+
+@login_required
+@require_POST
+def crear_tipo_consulta_rapido(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia":
+        return JsonResponse(
+            {"ok": False, "error": "Esta función está disponible únicamente en Hospital Mía."},
+            status=403,
+        )
+    if not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"ok": False, "error": "Acceso no autorizado."}, status=403)
+    if not (
+        request.user.is_superuser
+        or request.user.tiene_permiso_erp("puede_citas", empresa)
+        or request.user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
+    ):
+        return JsonResponse(
+            {"ok": False, "error": "Tu usuario no tiene permiso para administrar tipos de consulta."},
+            status=403,
+        )
+
+    nombre = " ".join((request.POST.get("nombre") or "").split())
+    categoria = (request.POST.get("categoria") or "consulta").strip()
+    duracion_texto = (request.POST.get("duracion_minutos") or "30").strip()
+    categorias = dict(ServicioClinico.CATEGORIA_CHOICES)
+    errores = {}
+    if len(nombre) < 3:
+        errores["nombre"] = ["Escribe un nombre de al menos 3 caracteres."]
+    elif len(nombre) > 180:
+        errores["nombre"] = ["El nombre no puede superar 180 caracteres."]
+    if categoria not in categorias:
+        errores["categoria"] = ["Selecciona una categoría válida."]
+    try:
+        duracion_minutos = int(duracion_texto)
+        if duracion_minutos < 5 or duracion_minutos > 720:
+            raise ValueError
+    except (TypeError, ValueError):
+        errores["duracion_minutos"] = ["La duración debe estar entre 5 y 720 minutos."]
+    if errores:
+        return JsonResponse(
+            {"ok": False, "error": "Revisa los datos indicados.", "errors": errores},
+            status=400,
+        )
+
+    servicio = ServicioClinico.objects.filter(empresa=empresa, nombre__iexact=nombre).first()
+    creado = servicio is None
+    if servicio is None:
+        servicio = ServicioClinico.objects.create(
+            empresa=empresa,
+            nombre=nombre,
+            categoria=categoria,
+            duracion_minutos=duracion_minutos,
+            activo=True,
+        )
+    else:
+        servicio.nombre = nombre
+        servicio.categoria = categoria
+        servicio.duracion_minutos = duracion_minutos
+        servicio.activo = True
+        servicio.save(update_fields=["nombre", "categoria", "duracion_minutos", "activo"])
+
+    return JsonResponse({
+        "ok": True,
+        "creado": creado,
+        "servicio": {
+            "id": servicio.id,
+            "nombre": servicio.nombre,
+            "categoria": servicio.categoria,
+            "categoria_label": servicio.get_categoria_display(),
+            "duracion_minutos": servicio.duracion_minutos,
         },
     })
 

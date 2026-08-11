@@ -74,6 +74,7 @@
   @media(max-width:520px){.premium-payment-grid{grid-template-columns:1fr}.premium-payment-grid .wide{grid-column:auto}.premium-calendar-shell .appointment{grid-template-columns:45px 38px minmax(0,1fr) auto}.appointment-avatar{width:38px;height:38px}.premium-module-hero h2{font-size:22px}}
   </style>
   {% endif %}
+  <style>.professional-lic-enfermeria{border-right-color:#5b4bdb!important}.professional-enfermera{border-right-color:#e67e22!important}</style>
 </head>
 <body class="{% if hospital_mia_app_premium %}hospital-mia-premium-app{% endif %}">
 <main class="app" data-mobile-calendar-swipe data-prev-url="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}" data-next-url="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
