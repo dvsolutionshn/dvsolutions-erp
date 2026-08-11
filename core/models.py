@@ -397,6 +397,16 @@ class Usuario(AbstractUser):
             "sin exponer el control maestro del ERP."
         ),
     )
+    retirado_control = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=(
+            "Oculta al usuario del control operativo sin eliminar su identidad ni el historial "
+            "asociado a cierres de caja y otras operaciones."
+        ),
+    )
+    fecha_retiro_control = models.DateTimeField(null=True, blank=True)
+    motivo_retiro_control = models.CharField(max_length=500, blank=True)
     rol_sistema = models.ForeignKey(
         RolSistema,
         on_delete=models.SET_NULL,

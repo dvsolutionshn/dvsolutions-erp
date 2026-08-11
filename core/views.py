@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import OperationalError, transaction
-from django.db.models import Count, Prefetch, ProtectedError, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -1567,7 +1567,11 @@ def superadmin_empresa_edit(request, empresa_id):
 
 @superadmin_required
 def superadmin_usuarios(request):
-    usuarios = Usuario.objects.select_related("empresa", "rol_sistema").prefetch_related(
+    estado = (request.GET.get("estado") or "operativos").strip().lower()
+    if estado not in {"operativos", "retirados", "todos"}:
+        estado = "operativos"
+
+    usuarios_base = Usuario.objects.select_related("empresa", "rol_sistema").prefetch_related(
         "groups",
         "empresas_acceso",
         Prefetch(
@@ -1577,15 +1581,26 @@ def superadmin_usuarios(request):
             ).order_by("-fecha_creacion"),
             to_attr="invitaciones_recientes",
         ),
-    ).order_by("email", "username")
+    )
+    if estado == "retirados":
+        usuarios = usuarios_base.filter(retirado_control=True)
+    elif estado == "todos":
+        usuarios = usuarios_base
+    else:
+        usuarios = usuarios_base.filter(retirado_control=False)
+    usuarios = usuarios.order_by("email", "username")
+
+    resumen_base = Usuario.objects.all()
     context = {
         **_superadmin_base_context(),
         "usuarios": usuarios,
+        "estado_seleccionado": estado,
         "resumen": {
-            "total": usuarios.count(),
-            "superadmins": usuarios.filter(is_superuser=True).count(),
-            "admins_empresa": usuarios.filter(es_administrador_empresa=True).count(),
-            "activos": usuarios.filter(is_active=True).count(),
+            "total": resumen_base.filter(retirado_control=False).count(),
+            "superadmins": resumen_base.filter(is_superuser=True, retirado_control=False).count(),
+            "admins_empresa": resumen_base.filter(es_administrador_empresa=True, retirado_control=False).count(),
+            "activos": resumen_base.filter(is_active=True, retirado_control=False).count(),
+            "retirados": resumen_base.filter(retirado_control=True).count(),
         },
     }
     return render(request, "core/superadmin_usuarios.html", context)
@@ -1904,26 +1919,53 @@ def superadmin_usuario_delete(request, usuario_id):
             )
         else:
             identificacion = usuario.email or usuario.username
-            try:
-                with transaction.atomic():
-                    usuario.delete()
-            except ProtectedError as exc:
-                modelos = sorted({obj._meta.verbose_name for obj in exc.protected_objects})
-                detalle = ", ".join(modelos[:4])
-                messages.error(
-                    request,
-                    "Este usuario conserva historial protegido"
-                    f"{f' ({detalle})' if detalle else ''} y no puede borrarse. "
-                    "Desactivalo desde Editar para bloquear su acceso sin perder la trazabilidad.",
-                )
-            else:
-                messages.success(request, f"Usuario {identificacion} eliminado correctamente.")
-                return redirect("superadmin_usuarios")
+            with transaction.atomic():
+                usuario.is_active = False
+                usuario.retirado_control = True
+                usuario.fecha_retiro_control = timezone.now()
+                usuario.motivo_retiro_control = motivo
+                usuario.save(update_fields=[
+                    "is_active",
+                    "retirado_control",
+                    "fecha_retiro_control",
+                    "motivo_retiro_control",
+                ])
+                TokenAccesoUsuario.objects.filter(
+                    usuario=usuario,
+                    fecha_uso__isnull=True,
+                    revocado=False,
+                ).update(revocado=True, fecha_revocacion=timezone.now())
+            messages.success(
+                request,
+                f"Usuario {identificacion} retirado del control activo. Su historial permanece intacto.",
+            )
+            return redirect("superadmin_usuarios")
 
     return render(request, "core/superadmin_usuario_confirm_delete.html", {
         **_superadmin_base_context(),
         "usuario_obj": usuario,
     })
+
+
+@superadmin_required
+@require_POST
+def superadmin_usuario_restore(request, usuario_id):
+    usuario = get_object_or_404(Usuario, id=usuario_id, retirado_control=True)
+    usuario.is_active = True
+    usuario.retirado_control = False
+    usuario.fecha_retiro_control = None
+    usuario.motivo_retiro_control = ""
+    usuario.save(update_fields=[
+        "is_active",
+        "retirado_control",
+        "fecha_retiro_control",
+        "motivo_retiro_control",
+    ])
+    messages.success(
+        request,
+        f"Usuario {usuario.email or usuario.username} restaurado y habilitado correctamente.",
+    )
+    return redirect(f"{reverse('superadmin_usuarios')}?estado=retirados")
 
 
 @superadmin_required

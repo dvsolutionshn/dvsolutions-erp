@@ -21,7 +21,7 @@ from core.forms import EmpresaControlForm, RolSistemaForm
 from core.access import permiso_facturacion_desde_ruta
 from core.audit_context import audit_scope
 from core.middleware import AuditoriaRequestMiddleware
-from facturacion.models import Cliente
+from facturacion.models import CierreCaja, Cliente
 
 
 class SuperAdminControlTests(TestCase):
@@ -411,7 +411,7 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
         self.assertFalse(TokenAccesoUsuario.objects.filter(usuario=usuario).exists())
 
-    def test_superadmin_puede_eliminar_usuario_con_motivo_y_auditoria(self):
+    def test_superadmin_puede_retirar_usuario_con_motivo_y_auditoria(self):
         empresa = Empresa.objects.create(
             nombre="Empresa Baja Usuario",
             slug="empresa-baja-usuario",
@@ -429,7 +429,7 @@ class SuperAdminControlTests(TestCase):
 
         confirmacion = self.client.get(reverse("superadmin_usuario_delete", args=[usuario_id]))
         self.assertEqual(confirmacion.status_code, 200)
-        self.assertContains(confirmacion, "Eliminar definitivamente")
+        self.assertContains(confirmacion, "Retirar usuario")
 
         response = self.client.post(
             reverse("superadmin_usuario_delete", args=[usuario_id]),
@@ -437,15 +437,58 @@ class SuperAdminControlTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("superadmin_usuarios"))
-        self.assertFalse(Usuario.objects.filter(pk=usuario_id).exists())
-        auditoria = RegistroAuditoria.objects.get(
+        usuario.refresh_from_db()
+        self.assertFalse(usuario.is_active)
+        self.assertTrue(usuario.retirado_control)
+        self.assertEqual(usuario.motivo_retiro_control, "Usuario duplicado creado por error")
+        auditoria = RegistroAuditoria.objects.filter(
             modelo="usuario",
             objeto_id=str(usuario_id),
-            accion=RegistroAuditoria.ACCION_ELIMINAR,
-        )
+            accion=RegistroAuditoria.ACCION_MODIFICAR,
+        ).latest("id")
         self.assertEqual(auditoria.usuario, self.superadmin)
         self.assertEqual(auditoria.empresa, empresa)
         self.assertEqual(auditoria.motivo, "Usuario duplicado creado por error")
+
+        listado_operativo = self.client.get(reverse("superadmin_usuarios"))
+        self.assertNotContains(listado_operativo, "eliminar@empresa.com")
+        listado_retirados = self.client.get(reverse("superadmin_usuarios") + "?estado=retirados")
+        self.assertContains(listado_retirados, "eliminar@empresa.com")
+
+    def test_retirar_usuario_conserva_cierre_caja_y_permite_restaurarlo(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Historial Caja",
+            slug="empresa-historial-caja",
+            rtn="08011999000079",
+        )
+        cajero = Usuario.objects.create_user(
+            username="cajero-historico",
+            email="cajero@empresa.com",
+            password="pass12345",
+            empresa=empresa,
+            rol_sistema=self.rol_facturador,
+        )
+        cierre = CierreCaja.objects.create(empresa=empresa, cajero=cajero)
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.post(
+            reverse("superadmin_usuario_delete", args=[cajero.id]),
+            {"motivo_eliminacion": "La persona ya no trabaja en la empresa"},
+        )
+
+        self.assertRedirects(response, reverse("superadmin_usuarios"))
+        cajero.refresh_from_db()
+        cierre.refresh_from_db()
+        self.assertTrue(cajero.retirado_control)
+        self.assertFalse(cajero.is_active)
+        self.assertEqual(cierre.cajero_id, cajero.id)
+        self.assertIn("cajero-historico", str(cierre))
+
+        restaurar = self.client.post(reverse("superadmin_usuario_restore", args=[cajero.id]))
+        self.assertRedirects(restaurar, reverse("superadmin_usuarios") + "?estado=retirados")
+        cajero.refresh_from_db()
+        self.assertFalse(cajero.retirado_control)
+        self.assertTrue(cajero.is_active)
 
     def test_superadmin_no_puede_eliminar_su_propia_sesion(self):
         self.client.login(username="master", password="pass12345")

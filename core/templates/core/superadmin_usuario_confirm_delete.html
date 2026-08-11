@@ -1,8 +1,8 @@
 {% extends 'core/superadmin_base.html' %}
 
-{% block title %}Eliminar Usuario{% endblock %}
-{% block header_title %}Eliminar Usuario{% endblock %}
-{% block header_description %}Confirma la baja definitiva del acceso. La accion quedara registrada en la bitacora global.{% endblock %}
+{% block title %}Retirar Usuario{% endblock %}
+{% block header_title %}Retirar Usuario{% endblock %}
+{% block header_description %}Retira la cuenta del control activo sin perder cierres de caja ni trazabilidad historica.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'superadmin_usuarios' %}" class="erp-action-link">Volver a Usuarios</a>
@@ -12,24 +12,24 @@
 <section class="erp-card" style="max-width:760px;">
     <div class="erp-toolbar">
         <div>
-            <span class="erp-badge danger">Accion irreversible</span>
+            <span class="erp-badge warning">Acceso por retirar</span>
             <h3 class="erp-panel-title" style="margin-top:12px;">{{ usuario_obj.get_full_name|default:usuario_obj.username }}</h3>
             <p class="erp-card-muted">{{ usuario_obj.email|default:"Sin correo" }} · {{ usuario_obj.empresa.nombre|default:"Sin empresa" }}</p>
         </div>
     </div>
 
-    <p>Se eliminara la cuenta, sus permisos, grupos y tokens de acceso. Si posee historial protegido, el sistema impedira el borrado y te indicara que debes desactivarla.</p>
+    <p>La persona dejara de ingresar al ERP y ya no aparecera en el listado operativo. Sus cierres de caja y demas operaciones conservaran su nombre para mantener la trazabilidad. Podras restaurarla posteriormente desde Usuarios retirados.</p>
 
     <form method="post">
         {% csrf_token %}
         <div class="erp-field" style="margin-top:18px;">
-            <label for="motivo_eliminacion">Motivo de la eliminacion</label>
+            <label for="motivo_eliminacion">Motivo del retiro</label>
             <textarea id="motivo_eliminacion" name="motivo_eliminacion" rows="4" required minlength="5" placeholder="Ejemplo: usuario duplicado creado por error.">{{ request.POST.motivo_eliminacion }}</textarea>
             <span class="erp-field-help">Este motivo aparecera en la bitacora de auditoria.</span>
         </div>
         <div class="erp-form-actions" style="margin-top:22px;">
             <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Cancelar</a>
-            <button type="submit" class="erp-btn" style="background:#b42318;border-color:#b42318;">Eliminar definitivamente</button>
+            <button type="submit" class="erp-btn" style="background:#b42318;border-color:#b42318;">Retirar usuario</button>
         </div>
     </form>
 </section>

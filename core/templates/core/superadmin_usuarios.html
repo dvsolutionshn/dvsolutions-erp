@@ -28,6 +28,20 @@
     </article>
 </section>
 
+<section class="erp-card" style="padding:14px 18px; margin-bottom:18px;">
+    <div class="erp-toolbar" style="align-items:center;">
+        <div>
+            <strong>Vista de usuarios</strong>
+            <p class="erp-card-muted" style="margin:4px 0 0;">Los retirados no pueden ingresar, pero conservan intacto su historial.</p>
+        </div>
+        <div class="erp-form-actions" style="margin:0;">
+            <a class="erp-btn-secondary {% if estado_seleccionado == 'operativos' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}">Operativos</a>
+            <a class="erp-btn-secondary {% if estado_seleccionado == 'retirados' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}?estado=retirados">Retirados ({{ resumen.retirados }})</a>
+            <a class="erp-btn-secondary {% if estado_seleccionado == 'todos' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}?estado=todos">Todos</a>
+        </div>
+    </div>
+</section>
+
 <section class="erp-card erp-table-card">
     <div class="erp-table-wrap">
         <table class="erp-table">
@@ -64,7 +78,9 @@
                         {% if not usuario.is_superuser and not usuario.es_administrador_empresa and not usuario.rol_sistema and not usuario.groups.all %}<span class="erp-badge neutral">Sin rol asignado</span>{% endif %}
                     </td>
                     <td>
-                        {% if usuario.is_active %}
+                        {% if usuario.retirado_control %}
+                            <span class="erp-badge neutral">Retirado</span>
+                        {% elif usuario.is_active %}
                             <span class="erp-badge success">Activo</span>
                         {% elif usuario.invitaciones_recientes %}
                             {% with invitacion=usuario.invitaciones_recientes.0 %}
@@ -75,11 +91,18 @@
                         {% endif %}
                     </td>
                     <td class="actions">
-                        <a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar</a>
-                        {% if usuario.id != request.user.id %}
-                        <a class="erp-link" style="color:#b42318;" href="{% url 'superadmin_usuario_delete' usuario.id %}">Eliminar</a>
+                        {% if usuario.retirado_control %}
+                        <form method="post" action="{% url 'superadmin_usuario_restore' usuario.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="erp-link" style="border:0;background:none;padding:0;cursor:pointer;">Restaurar</button>
+                        </form>
+                        {% else %}
+                            <a class="erp-link" href="{% url 'superadmin_usuario_edit' usuario.id %}">Editar</a>
+                            {% if usuario.id != request.user.id %}
+                            <a class="erp-link" style="color:#b42318;" href="{% url 'superadmin_usuario_delete' usuario.id %}">Retirar</a>
+                            {% endif %}
                         {% endif %}
-                        {% if usuario.email and not usuario.is_superuser and not usuario.is_active %}
+                        {% if usuario.email and not usuario.is_superuser and not usuario.is_active and not usuario.retirado_control %}
                         <form method="post" action="{% url 'superadmin_usuario_reenviar_invitacion' usuario.id %}" style="display:inline;">
                             {% csrf_token %}
                             <button type="submit" class="erp-link" style="border:0;background:none;padding:0;cursor:pointer;">Reenviar invitacion</button>
