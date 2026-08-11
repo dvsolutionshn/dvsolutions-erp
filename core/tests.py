@@ -1659,3 +1659,72 @@ class RolSistemaPermisosTests(TestCase):
             if usuario.email == "krystel@example.com"
         )
         self.assertEqual(usuario_listado.rol_sistema, rol)
+
+
+class PermisosClinicosPorEmpresaTests(TestCase):
+    def setUp(self):
+        self.hospital = Empresa.objects.create(
+            nombre="Hospital Mia",
+            slug="hospital_mia",
+            rtn="08011999123456",
+        )
+        self.empresa_externa = Empresa.objects.create(
+            nombre="Empresa Externa",
+            slug="empresa_externa",
+            rtn="08011999654321",
+        )
+        self.rol_base = RolSistema.objects.create(
+            nombre="Enfermeria base",
+            codigo="enfermeria-base-prueba",
+            puede_clinica=True,
+            puede_pacientes=True,
+        )
+        self.doctora = Usuario.objects.create_user(
+            username="candy-permisos",
+            password="pass12345",
+            empresa=self.hospital,
+            puede_administrar_usuarios_clinicos=True,
+        )
+        self.enfermera = Usuario.objects.create_user(
+            username="rosa-enfermera",
+            password="pass12345",
+            empresa=self.hospital,
+            rol_sistema=self.rol_base,
+        )
+        self.client.force_login(self.doctora)
+
+    def test_doctora_puede_ver_usuarios_y_permisos_del_hospital(self):
+        response = self.client.get(reverse("usuarios_clinicos", args=[self.hospital.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "rosa-enfermera")
+        self.assertContains(response, "Ver pacientes")
+
+    def test_edicion_crea_permisos_individuales_solo_para_empresa_activa(self):
+        response = self.client.post(
+            reverse(
+                "usuario_clinico_permisos",
+                args=[self.hospital.slug, self.enfermera.pk],
+            ),
+            {
+                "puede_clinica": "1",
+                "puede_pacientes": "1",
+                "puede_citas": "1",
+                "puede_crear_facturas": "1",
+            },
+        )
+
+        self.assertRedirects(response, reverse("usuarios_clinicos", args=[self.hospital.slug]))
+        permiso = UsuarioEmpresaPermiso.objects.get(
+            usuario=self.enfermera,
+            empresa=self.hospital,
+        )
+        self.assertTrue(permiso.rol_sistema.puede_citas)
+        self.assertTrue(permiso.rol_sistema.puede_crear_facturas)
+        self.assertFalse(permiso.rol_sistema.puede_ver_facturas)
+        self.assertEqual(self.enfermera.rol_sistema, self.rol_base)
+
+    def test_control_clinico_no_se_expone_en_otra_empresa(self):
+        response = self.client.get(reverse("usuarios_clinicos", args=[self.empresa_externa.slug]))
+
+        self.assertEqual(response.status_code, 403)

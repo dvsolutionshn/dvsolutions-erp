@@ -270,6 +270,12 @@
 .calendar-event.color-tratamientos{background:linear-gradient(135deg,#effbf5,#e9f8f0)!important}
 .calendar-event.color-cirugias{background:linear-gradient(135deg,#fff5f4,#fff0ef)!important}
 .calendar-event.color-spa{background:linear-gradient(135deg,#fffbed,#fff8d8)!important}
+.calendar-event.color-recordatorio,.day-event.color-recordatorio,.calendar-modal-item.color-recordatorio{border-left-color:#e85d04!important;background:linear-gradient(135deg,#fff3e8,#ffe0c2)!important}
+.calendar-event.color-recordatorio{box-shadow:0 12px 28px rgba(232,93,4,.14),inset 0 1px 0 rgba(255,255,255,.9)!important}
+.calendar-event.color-recordatorio::after,.day-event.color-recordatorio::after,.calendar-modal-item.color-recordatorio::after{background:linear-gradient(135deg,#e85d04,#ff8a00)!important}
+.calendar-dot.color-recordatorio{background:#e85d04!important}
+.calendar-professional-badge{display:inline-flex!important;align-items:center;width:max-content;max-width:100%;margin-top:6px!important;padding:4px 8px;border-radius:999px;color:#fff!important;font-size:8px!important;font-weight:950;letter-spacing:.03em;line-height:1.2;white-space:normal;box-shadow:0 5px 12px rgba(25,53,75,.14)}
+.calendar-professional-badge.professional-badge-doctor-luis{background:#2878d0}.calendar-professional-badge.professional-badge-dra-candy{background:#d85c97}.calendar-professional-badge.professional-badge-lic-enfermeria{background:#0f9f8f}.calendar-professional-badge.professional-badge-enfermera{background:#22b8ad}.calendar-professional-badge.professional-badge-medico{background:#805ad5}.calendar-professional-badge.professional-badge-profesional{background:#65788a}
 .week-column,.day-event,.calendar-modal-card{
   box-shadow:0 18px 46px rgba(20,45,70,.08);
 }
@@ -628,6 +634,7 @@
         <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_espejo %}1{% else %}0{% endif %}" data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}" data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}" data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}" data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}">
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}</span>
+          <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
         </button>
         {% endfor %}
         <div class="calendar-modal-source">
@@ -636,7 +643,8 @@
             <div class="calendar-modal-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
             <div class="calendar-modal-info">
               <strong>{{ cita.display_cliente }}</strong>
-              <span>{{ cita.display_servicio }} · {{ cita.display_responsable }}</span>
+              <span>{{ cita.display_servicio }}</span>
+              <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
             </div>
             <span class="calendar-modal-tag">{{ cita.agenda_color_label }} · {{ cita.agenda_profesional_color_label }}</span>
           </article>
@@ -658,6 +666,7 @@
         <button type="button" class="calendar-event {{ cita.estado }} color-{{ cita.agenda_color }} professional-{{ cita.agenda_profesional_color }} {% if cita.pagada %}is-paid{% endif %}" data-appointment-open data-appointment-readonly="{% if agenda_espejo %}1{% else %}0{% endif %}" data-cancel-url="{% url 'agenda_cita_cancelar_whatsapp' cita.empresa.slug cita.id %}" data-reschedule-url="{% url 'agenda_cita_reagendar_whatsapp' cita.empresa.slug cita.id %}" data-edit-url="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor" data-current-datetime="{{ cita.fecha_hora|date:'Y-m-d' }}T{{ cita.fecha_hora|date:'H:i' }}" data-appointment-title="{{ cita.titulo }}" data-appointment-client="{{ cita.display_cliente }}" data-appointment-service="{{ cita.display_servicio }}" data-appointment-professional="{{ cita.display_responsable }}" data-appointment-date="{{ cita.fecha_hora|date:'d/m/Y' }}" data-appointment-time="{{ cita.fecha_hora|date:'h:i A' }}" data-appointment-status="{{ cita.get_estado_display }}" data-appointment-type="{{ cita.agenda_color_label }}" data-appointment-protype="{{ cita.agenda_profesional_color_label }}" data-appointment-duration="{% if not es_clinica %}{{ cita.duracion_minutos }} min{% endif %}" data-appointment-note="{{ cita.observacion|default:'' }}" data-appointment-surgery-detail="{{ cita.cirugia_detalle|default:'' }}" data-appointment-surgery-end="{% if cita.cirugia_fin_estimada %}{{ cita.cirugia_fin_estimada|date:'h:i A' }}{% endif %}" data-appointment-surgery-photos="{{ cita.fotos_cirugia.count }}" data-appointment-media-id="appointment-media-{{ cita.id }}" data-appointment-paid="{% if cita.pagada %}Pagada{% else %}Pendiente de pago{% endif %}">
           <strong>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.titulo }}</strong>
           <span>{{ cita.display_cliente }}{% if not es_clinica %} · {{ cita.duracion_minutos }} min{% endif %}</span>
+          <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
         </button>
         {% empty %}
         <div class="calendar-empty">Sin citas</div>
@@ -674,7 +683,8 @@
         <div class="day-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
         <div class="day-content">
           <strong>{{ cita.titulo }}</strong>
-          <span>{{ cita.display_cliente }} · {{ cita.display_servicio }} · {{ cita.display_responsable }}{% if not es_clinica %} · {{ cita.duracion_minutos }} minutos{% endif %}</span>
+          <span>{{ cita.display_cliente }} · {{ cita.display_servicio }}{% if not es_clinica %} · {{ cita.duracion_minutos }} minutos{% endif %}</span>
+          <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
         </div>
         <span class="calendar-chip">Ver cita</span>
       </article>

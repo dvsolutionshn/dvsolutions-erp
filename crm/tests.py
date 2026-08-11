@@ -701,6 +701,8 @@ class CRMTests(TestCase):
         self.assertContains(response, "color-spa")
         self.assertContains(response, "professional-doctor-luis")
         self.assertContains(response, "professional-dra-candy")
+        self.assertContains(response, "calendar-professional-badge professional-badge-doctor-luis")
+        self.assertContains(response, "#e85d04")
         self.assertContains(response, "Spa")
 
     def test_agenda_clinica_permite_filtrar_y_deslizar_periodos(self):

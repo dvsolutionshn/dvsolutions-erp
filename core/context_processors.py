@@ -131,6 +131,14 @@ def erp_access(request):
         "usa_inventario_farmaceutico": bool(clinica_activa and config_avanzada and config_avanzada.usa_inventario_farmaceutico),
         "usa_bodegas_internas": bool(config_avanzada and config_avanzada.usa_bodegas_internas),
         "ventas_solo_desde_vitrina": bool(config_avanzada and config_avanzada.ventas_solo_desde_vitrina),
+        "administrar_usuarios_clinicos": bool(
+            empresa
+            and empresa.slug in {"hospital_mia", "serviciosmedicos", "medical_spa", "luque_aestetic"}
+            and user
+            and user.is_authenticated
+            and user.puede_acceder_empresa(empresa)
+            and (user.is_superuser or getattr(user, "puede_administrar_usuarios_clinicos", False))
+        ),
     }
     if base["modo_clinico_simple"]:
         base.update({

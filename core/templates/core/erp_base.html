@@ -82,6 +82,7 @@
     {% url 'asistente_consulta' empresa.slug as asistente_consulta_url %}
     {% url 'empresa_respaldo' empresa.slug as empresa_respaldo_url %}
     {% url 'auditoria_empresa' empresa.slug as auditoria_empresa_url %}
+    {% url 'usuarios_clinicos' empresa.slug as usuarios_clinicos_url %}
 {% endif %}
 <div class="erp-shell">
     <div class="erp-mobile-topbar">
@@ -160,6 +161,12 @@
                 <a class="erp-nav-link {% if '/dashboard/clinica/' in request.path %}is-active{% endif %}" href="{{ clinica_url }}">
                     <span class="erp-nav-bullet"></span>
                     <span>Clinica</span>
+                </a>
+                {% endif %}
+                {% if erp_access.administrar_usuarios_clinicos %}
+                <a class="erp-nav-link {% if '/dashboard/usuarios-clinicos/' in request.path %}is-active{% endif %}" href="{{ usuarios_clinicos_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Usuarios y permisos</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_tecnicentro %}

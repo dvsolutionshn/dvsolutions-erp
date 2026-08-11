@@ -1,0 +1,59 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Permisos de {{ usuario_gestionado.username }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Acceso individual por empresa{% endblock %}
+{% block header_title %}Permisos de {{ usuario_gestionado.get_full_name|default:usuario_gestionado.username }}{% endblock %}
+{% block header_description %}Active únicamente las funciones que este usuario necesita dentro de {{ empresa.nombre }}.{% endblock %}
+{% block extra_head %}
+<style>
+.permission-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px;border:1px solid #d9e7ef;border-radius:20px;background:linear-gradient(135deg,#f5fbff,#f7fffc)}
+.permission-identity{display:flex;align-items:center;gap:13px}.permission-avatar{display:grid;place-items:center;width:52px;height:52px;border-radius:17px;background:linear-gradient(135deg,#17b8aa,#2679e8);color:#fff;font-size:19px;font-weight:950}.permission-identity strong{display:block;color:#11283c;font-size:18px}.permission-identity span{display:block;margin-top:4px;color:#6a8092;font-size:11px}.permission-company{padding:8px 11px;border-radius:999px;background:#fff;color:#176e70;font-size:10px;font-weight:900;box-shadow:0 8px 20px rgba(20,72,94,.08)}
+.permission-form{display:grid;gap:16px;margin-top:16px}.permission-group{padding:18px;border:1px solid #dce7ef;border-radius:20px;background:#fff;box-shadow:0 12px 32px rgba(25,58,84,.06)}.permission-group-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.permission-group-head h3{margin:0;color:#173047;font-size:15px}.permission-group-toggle{border:0;background:transparent;color:#138d8c;font-size:10px;font-weight:900;cursor:pointer}.permission-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px}.permission-option{position:relative;display:flex;align-items:center;gap:10px;min-height:46px;padding:10px 12px;border:1px solid #dce7ef;border-radius:13px;background:#fbfdff;color:#344f64;font-size:11px;font-weight:800;cursor:pointer;transition:.16s ease}.permission-option:has(input:checked){border-color:#1aaca4;background:#edfafa;color:#126d6b;box-shadow:0 8px 18px rgba(26,172,164,.1)}.permission-option input{width:18px;height:18px;accent-color:#149f99}.permission-actions{position:sticky;bottom:12px;display:flex;justify-content:flex-end;gap:10px;padding:12px;border:1px solid rgba(210,225,235,.9);border-radius:18px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);box-shadow:0 16px 35px rgba(19,50,74,.12)}.permission-actions a,.permission-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 18px;border-radius:13px;font-size:11px;font-weight:950;text-decoration:none}.permission-actions a{border:1px solid #cbdbe6;color:#51697b}.permission-actions button{border:0;background:linear-gradient(135deg,#17b8aa,#2679e8);color:#fff;cursor:pointer}
+@media(max-width:700px){.permission-hero{align-items:flex-start;flex-direction:column}.permission-options{grid-template-columns:1fr}.permission-actions>*{flex:1}}
+</style>
+{% endblock %}
+{% block content %}
+<section class="permission-hero">
+  <div class="permission-identity">
+    <div class="permission-avatar">{{ usuario_gestionado.first_name|default:usuario_gestionado.username|slice:":1"|upper }}</div>
+    <div>
+      <strong>{{ usuario_gestionado.get_full_name|default:usuario_gestionado.username }}</strong>
+      <span>{{ usuario_gestionado.username }} · Perfil actual: {{ rol_actual.nombre|default:"Sin permisos" }}</span>
+    </div>
+  </div>
+  <span class="permission-company">Solo {{ empresa.nombre }}</span>
+</section>
+
+<form method="post" class="permission-form">
+  {% csrf_token %}
+  {% for grupo in grupos %}
+  <section class="permission-group" data-permission-group>
+    <div class="permission-group-head">
+      <h3>{{ grupo.nombre }}</h3>
+      <button type="button" class="permission-group-toggle" data-toggle-group>Marcar o desmarcar todo</button>
+    </div>
+    <div class="permission-options">
+      {% for permiso in grupo.permisos %}
+      <label class="permission-option">
+        <input type="checkbox" name="{{ permiso.campo }}" value="1" {% if permiso.activo %}checked{% endif %}>
+        <span>{{ permiso.etiqueta }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+  <div class="permission-actions">
+    <a href="{% url 'usuarios_clinicos' empresa.slug %}">Cancelar</a>
+    <button type="submit">Guardar permisos</button>
+  </div>
+</form>
+<script>
+document.querySelectorAll('[data-toggle-group]').forEach(function(button){
+  button.addEventListener('click', function(){
+    var group = button.closest('[data-permission-group]');
+    var checks = Array.from(group.querySelectorAll('input[type="checkbox"]'));
+    var shouldCheck = checks.some(function(check){ return !check.checked; });
+    checks.forEach(function(check){ check.checked = shouldCheck; });
+  });
+});
+</script>
+{% endblock %}

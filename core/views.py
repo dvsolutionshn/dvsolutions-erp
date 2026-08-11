@@ -64,6 +64,112 @@ SESSION_EXPIRED_MESSAGE_KEY = "dvsolutions_session_expired_message"
 SESSION_EXPIRED_MESSAGE = "Vuelve a iniciar sesion para continuar."
 BACKUP_TOKEN_MAX_ATTEMPTS = 5
 BACKUP_TOKEN_WINDOW_SECONDS = 15 * 60
+EMPRESAS_CLINICAS_CON_CONTROL_USUARIOS = frozenset({
+    "hospital_mia",
+    "serviciosmedicos",
+    "medical_spa",
+    "luque_aestetic",
+})
+
+PERMISOS_ROL_CLINICO = (
+    ("Facturación", (
+        ("puede_facturas", "Ingresar al módulo de facturación"),
+        ("puede_crear_facturas", "Crear facturas"),
+        ("puede_ver_facturas", "Ver facturas anteriores"),
+        ("puede_editar_facturas", "Editar facturas"),
+        ("puede_anular_facturas", "Anular facturas"),
+        ("puede_eliminar_borradores", "Eliminar facturas en borrador"),
+        ("puede_eliminar_facturas", "Eliminar facturas"),
+        ("puede_registrar_pagos_clientes", "Registrar pagos"),
+        ("puede_punto_venta", "Punto de venta"),
+        ("puede_cierres_caja", "Cierres de caja"),
+        ("puede_clientes", "Ver clientes"),
+        ("puede_crear_clientes", "Crear clientes"),
+        ("puede_editar_clientes", "Editar clientes"),
+        ("puede_recibos", "Recibos"),
+        ("puede_egresos", "Egresos"),
+        ("puede_notas_credito", "Notas de crédito"),
+        ("puede_crear_notas_credito", "Crear notas de crédito"),
+        ("puede_editar_notas_credito", "Editar notas de crédito"),
+        ("puede_anular_notas_credito", "Anular notas de crédito"),
+        ("puede_reportes", "Reportes de facturación"),
+        ("puede_exportar_reportes", "Exportar reportes"),
+        ("puede_cxc", "Cuentas por cobrar"),
+    )),
+    ("Pacientes y clínica", (
+        ("puede_clinica", "Ingresar a Clínica"),
+        ("puede_pacientes", "Ver pacientes"),
+        ("puede_expediente_clinico", "Trabajar expedientes"),
+        ("puede_tratamientos_clinicos", "Tratamientos clínicos"),
+        ("puede_configuracion_clinica", "Configuración clínica"),
+        ("puede_citas", "Agenda y citas"),
+    )),
+    ("Inventario y compras", (
+        ("puede_productos", "Ver productos"),
+        ("puede_crear_productos", "Crear productos"),
+        ("puede_editar_productos", "Editar productos"),
+        ("puede_proveedores", "Ver proveedores"),
+        ("puede_crear_proveedores", "Crear proveedores"),
+        ("puede_editar_proveedores", "Editar proveedores"),
+        ("puede_inventario", "Ver inventario"),
+        ("puede_ajustar_inventario", "Ajustar inventario"),
+        ("puede_compras", "Ver compras"),
+        ("puede_crear_compras", "Crear compras"),
+        ("puede_editar_compras", "Editar compras"),
+        ("puede_aplicar_compras", "Aplicar compras"),
+        ("puede_anular_compras", "Anular compras"),
+        ("puede_registrar_pagos_proveedores", "Pagar proveedores"),
+        ("puede_cxp", "Cuentas por pagar"),
+    )),
+    ("Contabilidad y configuración", (
+        ("puede_contabilidad", "Contabilidad"),
+        ("puede_catalogo_cuentas", "Catálogo de cuentas"),
+        ("puede_crear_asientos", "Crear asientos contables"),
+        ("puede_contabilizar_asientos", "Contabilizar asientos"),
+        ("puede_reportes_contables", "Reportes contables"),
+        ("puede_cai", "Administrar CAI"),
+        ("puede_impuestos", "Administrar impuestos"),
+        ("puede_configuracion_facturacion", "Configuración de facturación"),
+    )),
+    ("Recursos Humanos", (
+        ("puede_rrhh", "Ingresar a Recursos Humanos"),
+        ("puede_empleados", "Empleados"),
+        ("puede_planillas", "Planillas"),
+        ("puede_vacaciones", "Vacaciones"),
+        ("puede_configuracion_rrhh", "Configuración de Recursos Humanos"),
+    )),
+    ("CRM y agenda", (
+        ("puede_crm", "Ingresar a CRM y Marketing"),
+        ("puede_campanias", "Campañas"),
+        ("puede_configuracion_crm", "Configuración de CRM"),
+    )),
+)
+
+
+def _puede_administrar_usuarios_clinicos(usuario, empresa):
+    return bool(
+        usuario
+        and usuario.is_authenticated
+        and empresa.slug in EMPRESAS_CLINICAS_CON_CONTROL_USUARIOS
+        and usuario.puede_acceder_empresa(empresa)
+        and (
+            usuario.is_superuser
+            or getattr(usuario, "puede_administrar_usuarios_clinicos", False)
+        )
+    )
+
+
+def _permisos_visibles_rol(rol):
+    if not rol:
+        return []
+    return [
+        {
+            "grupo": grupo,
+            "permisos": [etiqueta for campo, etiqueta in permisos if getattr(rol, campo, False)],
+        }
+        for grupo, permisos in PERMISOS_ROL_CLINICO
+        if any(getattr(rol, campo, False) for campo, _ in permisos)
+    ]
 
 
 def _usuario_empresas_config(form, request):
@@ -979,6 +1085,110 @@ def _contexto_filtros_auditoria(queryset_base, request):
             "hasta": (request.GET.get("hasta") or "").strip(),
         },
     }
+
+
+@login_required
+def usuarios_clinicos(request, slug):
+    empresa = _resolver_empresa_request(request, slug)
+    if not _puede_administrar_usuarios_clinicos(request.user, empresa):
+        return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
+
+    usuarios = (
+        Usuario.objects
+        .filter(Q(empresa=empresa) | Q(empresas_acceso=empresa), is_superuser=False)
+        .select_related("rol_sistema")
+        .prefetch_related("permisos_por_empresa__rol_sistema")
+        .distinct()
+        .order_by("first_name", "last_name", "username")
+    )
+    filas = []
+    for usuario in usuarios:
+        rol = usuario.rol_para_empresa(empresa)
+        filas.append({
+            "usuario": usuario,
+            "rol": rol,
+            "permisos": _permisos_visibles_rol(rol),
+            "total_permisos": sum(
+                1
+                for _, permisos in PERMISOS_ROL_CLINICO
+                for campo, _ in permisos
+                if rol and getattr(rol, campo, False)
+            ),
+        })
+
+    return render(request, "core/usuarios_clinicos.html", {
+        "empresa": empresa,
+        "filas": filas,
+        "total_usuarios": len(filas),
+    })
+
+
+@login_required
+def usuario_clinico_permisos(request, slug, usuario_id):
+    empresa = _resolver_empresa_request(request, slug)
+    if not _puede_administrar_usuarios_clinicos(request.user, empresa):
+        return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
+
+    usuario = get_object_or_404(
+        Usuario.objects.filter(
+            Q(empresa=empresa) | Q(empresas_acceso=empresa),
+            is_superuser=False,
+        ).distinct(),
+        pk=usuario_id,
+    )
+    rol_actual = usuario.rol_para_empresa(empresa)
+
+    if request.method == "POST":
+        valores = {
+            campo: request.POST.get(campo) == "1"
+            for _, permisos in PERMISOS_ROL_CLINICO
+            for campo, _ in permisos
+        }
+        codigo_rol = f"clinico-{empresa.pk}-{usuario.pk}"
+        nombre_usuario = usuario.get_full_name().strip() or usuario.username
+        with transaction.atomic():
+            rol_personalizado, _ = RolSistema.objects.update_or_create(
+                codigo=codigo_rol,
+                defaults={
+                    "nombre": f"Permisos de {nombre_usuario} - {empresa.nombre}"[:120],
+                    "descripcion": (
+                        f"Configuración individual de {nombre_usuario} para {empresa.nombre}."
+                    ),
+                    "activo": True,
+                    **valores,
+                },
+            )
+            UsuarioEmpresaPermiso.objects.update_or_create(
+                usuario=usuario,
+                empresa=empresa,
+                defaults={"rol_sistema": rol_personalizado, "activo": True},
+            )
+        messages.success(
+            request,
+            f"Los permisos de {nombre_usuario} se actualizaron solamente para {empresa.nombre}.",
+        )
+        return redirect("usuarios_clinicos", slug=empresa.slug)
+
+    grupos = []
+    for grupo, permisos in PERMISOS_ROL_CLINICO:
+        grupos.append({
+            "nombre": grupo,
+            "permisos": [
+                {
+                    "campo": campo,
+                    "etiqueta": etiqueta,
+                    "activo": bool(rol_actual and getattr(rol_actual, campo, False)),
+                }
+                for campo, etiqueta in permisos
+            ],
+        })
+
+    return render(request, "core/usuario_clinico_permisos.html", {
+        "empresa": empresa,
+        "usuario_gestionado": usuario,
+        "rol_actual": rol_actual,
+        "grupos": grupos,
+    })
 
 
 @login_required

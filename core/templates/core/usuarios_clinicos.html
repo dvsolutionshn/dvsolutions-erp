@@ -1,0 +1,66 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Usuarios y permisos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Control de acceso clínico{% endblock %}
+{% block header_title %}Usuarios y permisos{% endblock %}
+{% block header_description %}Revise qué puede hacer cada integrante dentro de {{ empresa.nombre }} y ajuste su acceso sin afectar las demás empresas.{% endblock %}
+{% block extra_head %}
+<style>
+.clinical-users-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px;border:1px solid #d8e6ef;border-radius:22px;background:linear-gradient(135deg,#f4fbff,#f7fffc 52%,#fff8fb)}
+.clinical-users-summary h2{margin:5px 0 0;color:#11263a;font-size:clamp(22px,3vw,34px)}
+.clinical-users-summary p{max-width:760px;margin:7px 0 0;color:#61788b;line-height:1.55}
+.clinical-users-count{display:grid;place-items:center;min-width:112px;min-height:92px;border:1px solid rgba(24,159,158,.22);border-radius:20px;background:rgba(255,255,255,.88);box-shadow:0 16px 35px rgba(25,61,89,.08)}
+.clinical-users-count strong{font-size:30px;color:#102b3f}.clinical-users-count span{font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#678093}
+.clinical-user-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:18px}
+.clinical-user-card{display:grid;gap:15px;padding:20px;border:1px solid #d9e6ef;border-radius:22px;background:#fff;box-shadow:0 16px 40px rgba(25,58,84,.07);transition:transform .18s ease,box-shadow .18s ease}
+.clinical-user-card:hover{transform:translateY(-2px);box-shadow:0 22px 48px rgba(25,58,84,.12)}
+.clinical-user-head{display:flex;align-items:center;gap:12px}.clinical-user-avatar{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:linear-gradient(135deg,#17b8aa,#2679e8);color:#fff;font-size:18px;font-weight:950;box-shadow:0 10px 22px rgba(31,127,180,.2)}
+.clinical-user-name{min-width:0;flex:1}.clinical-user-name strong{display:block;color:#12283d;font-size:16px}.clinical-user-name span{display:block;margin-top:3px;color:#718597;font-size:11px;overflow-wrap:anywhere}
+.clinical-role{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;border-radius:14px;background:#f2f8fb;color:#28475e;font-size:11px}.clinical-role b{font-size:12px}.clinical-permission-groups{display:grid;gap:9px}.clinical-permission-group strong{display:block;margin-bottom:6px;color:#526b7e;font-size:9px;letter-spacing:.1em;text-transform:uppercase}.clinical-permission-chips{display:flex;gap:6px;flex-wrap:wrap}.clinical-permission-chip{padding:5px 8px;border-radius:999px;background:#edf8f4;color:#16735f;font-size:9px;font-weight:850}.clinical-user-empty{padding:10px;border:1px dashed #d5e1ea;border-radius:12px;color:#7b8c9b;font-size:11px;text-align:center}.clinical-edit-btn{display:flex;align-items:center;justify-content:center;min-height:42px;border-radius:13px;background:linear-gradient(135deg,#17b8aa,#2679e8);color:#fff;text-decoration:none;font-size:11px;font-weight:950;box-shadow:0 12px 24px rgba(31,127,180,.18)}
+@media(max-width:700px){.clinical-users-summary{align-items:flex-start;flex-direction:column}.clinical-users-count{width:100%}.clinical-user-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+{% block content %}
+<section class="clinical-users-summary">
+  <div>
+    <div class="erp-kpi-label">Permisos exclusivos de esta empresa</div>
+    <h2>Un equipo, accesos claros</h2>
+    <p>Cada ajuste realizado aquí se aplica únicamente en <strong>{{ empresa.nombre }}</strong>. Los accesos del mismo usuario en otras empresas permanecen sin cambios.</p>
+  </div>
+  <div class="clinical-users-count"><strong>{{ total_usuarios }}</strong><span>Usuarios</span></div>
+</section>
+
+<section class="clinical-user-grid">
+  {% for fila in filas %}
+  <article class="clinical-user-card">
+    <div class="clinical-user-head">
+      <div class="clinical-user-avatar">{{ fila.usuario.first_name|default:fila.usuario.username|slice:":1"|upper }}</div>
+      <div class="clinical-user-name">
+        <strong>{{ fila.usuario.get_full_name|default:fila.usuario.username }}</strong>
+        <span>{{ fila.usuario.username }}{% if fila.usuario.email %} · {{ fila.usuario.email }}{% endif %}</span>
+      </div>
+    </div>
+    <div class="clinical-role">
+      <span>Perfil actual</span>
+      <b>{{ fila.rol.nombre|default:"Sin permisos asignados" }}</b>
+    </div>
+    {% if fila.permisos %}
+    <div class="clinical-permission-groups">
+      {% for grupo in fila.permisos %}
+      <div class="clinical-permission-group">
+        <strong>{{ grupo.grupo }}</strong>
+        <div class="clinical-permission-chips">
+          {% for permiso in grupo.permisos %}<span class="clinical-permission-chip">{{ permiso }}</span>{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="clinical-user-empty">Este usuario todavía no tiene permisos operativos en esta empresa.</div>
+    {% endif %}
+    <a class="clinical-edit-btn" href="{% url 'usuario_clinico_permisos' empresa.slug fila.usuario.id %}">Revisar y editar {{ fila.total_permisos }} permiso(s)</a>
+  </article>
+  {% empty %}
+  <article class="erp-card">No hay usuarios vinculados a esta empresa.</article>
+  {% endfor %}
+</section>
+{% endblock %}

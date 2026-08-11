@@ -390,6 +390,13 @@ class Usuario(AbstractUser):
         default=False,
         help_text="Muestra una experiencia simplificada para doctores: solo Clinica y Facturacion.",
     )
+    puede_administrar_usuarios_clinicos = models.BooleanField(
+        default=False,
+        help_text=(
+            "Permite revisar y asignar roles a los usuarios de las empresas clínicas autorizadas, "
+            "sin exponer el control maestro del ERP."
+        ),
+    )
     rol_sistema = models.ForeignKey(
         RolSistema,
         on_delete=models.SET_NULL,

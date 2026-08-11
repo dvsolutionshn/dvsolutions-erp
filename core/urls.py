@@ -41,6 +41,8 @@ from .views import (
     auditoria_empresa,
     auditoria_objeto,
     superadmin_auditoria,
+    usuarios_clinicos,
+    usuario_clinico_permisos,
 )
 
 urlpatterns = [
@@ -86,6 +88,8 @@ urlpatterns = [
     path('<slug:slug>/dashboard/asistente/consulta/', asistente_consulta, name='asistente_consulta'),
     path('<slug:slug>/dashboard/respaldo/', empresa_respaldo, name='empresa_respaldo'),
     path('<slug:slug>/dashboard/auditoria/', auditoria_empresa, name='auditoria_empresa'),
+    path('<slug:slug>/dashboard/usuarios-clinicos/', usuarios_clinicos, name='usuarios_clinicos'),
+    path('<slug:slug>/dashboard/usuarios-clinicos/<int:usuario_id>/permisos/', usuario_clinico_permisos, name='usuario_clinico_permisos'),
     path('<slug:slug>/dashboard/auditoria/<slug:app_label>/<slug:modelo>/<str:objeto_id>/', auditoria_objeto, name='auditoria_objeto'),
     path('<slug:slug>/dashboard/', dashboard, name='dashboard'),
     path('<slug:slug>/logout/', cerrar_sesion, name='cerrar_sesion'),
