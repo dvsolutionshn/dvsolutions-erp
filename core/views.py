@@ -146,6 +146,96 @@ PERMISOS_ROL_CLINICO = (
 )
 
 
+MODULOS_PERMISOS_PRESENTACION = (
+    {
+        "codigo": "facturacion",
+        "descripcion": "Ventas, documentos fiscales, cobros, caja, clientes y reportes.",
+    },
+    {
+        "codigo": "clinica",
+        "descripcion": "Pacientes, expedientes, tratamientos y agenda clínica.",
+    },
+    {
+        "codigo": "inventario",
+        "descripcion": "Catálogo, proveedores, existencias y ciclo completo de compras.",
+    },
+    {
+        "codigo": "contabilidad",
+        "descripcion": "Operación contable, configuración fiscal, CAI e impuestos.",
+    },
+    {
+        "codigo": "rrhh",
+        "descripcion": "Empleados, planillas, vacaciones y configuración laboral.",
+    },
+    {
+        "codigo": "crm",
+        "descripcion": "Relación con clientes, campañas y configuración comercial.",
+    },
+)
+
+CATEGORIAS_PERMISOS_CLINICOS = {
+    "puede_facturas": "Acceso y documentos",
+    "puede_crear_facturas": "Acceso y documentos",
+    "puede_ver_facturas": "Acceso y documentos",
+    "puede_editar_facturas": "Acceso y documentos",
+    "puede_anular_facturas": "Acceso y documentos",
+    "puede_eliminar_borradores": "Acceso y documentos",
+    "puede_eliminar_facturas": "Acceso y documentos",
+    "puede_registrar_pagos_clientes": "Cobros y caja",
+    "puede_punto_venta": "Cobros y caja",
+    "puede_cierres_caja": "Cobros y caja",
+    "puede_recibos": "Cobros y caja",
+    "puede_egresos": "Cobros y caja",
+    "puede_clientes": "Clientes",
+    "puede_crear_clientes": "Clientes",
+    "puede_editar_clientes": "Clientes",
+    "puede_notas_credito": "Notas de crédito",
+    "puede_crear_notas_credito": "Notas de crédito",
+    "puede_editar_notas_credito": "Notas de crédito",
+    "puede_anular_notas_credito": "Notas de crédito",
+    "puede_reportes": "Reportes y cartera",
+    "puede_exportar_reportes": "Reportes y cartera",
+    "puede_cxc": "Reportes y cartera",
+    "puede_clinica": "Acceso clínico",
+    "puede_pacientes": "Acceso clínico",
+    "puede_expediente_clinico": "Atención al paciente",
+    "puede_tratamientos_clinicos": "Atención al paciente",
+    "puede_citas": "Agenda clínica",
+    "puede_configuracion_clinica": "Administración clínica",
+    "puede_productos": "Productos",
+    "puede_crear_productos": "Productos",
+    "puede_editar_productos": "Productos",
+    "puede_proveedores": "Proveedores",
+    "puede_crear_proveedores": "Proveedores",
+    "puede_editar_proveedores": "Proveedores",
+    "puede_inventario": "Inventario",
+    "puede_ajustar_inventario": "Inventario",
+    "puede_compras": "Compras",
+    "puede_crear_compras": "Compras",
+    "puede_editar_compras": "Compras",
+    "puede_aplicar_compras": "Compras",
+    "puede_anular_compras": "Compras",
+    "puede_registrar_pagos_proveedores": "Compras",
+    "puede_cxp": "Compras",
+    "puede_contabilidad": "Operación contable",
+    "puede_catalogo_cuentas": "Operación contable",
+    "puede_crear_asientos": "Asientos contables",
+    "puede_contabilizar_asientos": "Asientos contables",
+    "puede_reportes_contables": "Informes contables",
+    "puede_cai": "Configuración fiscal",
+    "puede_impuestos": "Configuración fiscal",
+    "puede_configuracion_facturacion": "Configuración fiscal",
+    "puede_rrhh": "Acceso a Recursos Humanos",
+    "puede_empleados": "Gestión del personal",
+    "puede_planillas": "Gestión del personal",
+    "puede_vacaciones": "Gestión del personal",
+    "puede_configuracion_rrhh": "Configuración de RR. HH.",
+    "puede_crm": "Acceso a CRM",
+    "puede_campanias": "Campañas",
+    "puede_configuracion_crm": "Configuración de CRM",
+}
+
+
 def _puede_administrar_usuarios_clinicos(usuario, empresa):
     return bool(
         usuario
@@ -1170,17 +1260,36 @@ def usuario_clinico_permisos(request, slug, usuario_id):
         return redirect("usuarios_clinicos", slug=empresa.slug)
 
     grupos = []
-    for grupo, permisos in PERMISOS_ROL_CLINICO:
+    total_permisos_activos = 0
+    total_permisos_disponibles = 0
+    for indice, (grupo, permisos) in enumerate(PERMISOS_ROL_CLINICO):
+        meta = MODULOS_PERMISOS_PRESENTACION[indice]
+        categorias = {}
+        permisos_modulo = []
+        for campo, etiqueta in permisos:
+            permiso = {
+                "campo": campo,
+                "etiqueta": etiqueta,
+                "activo": bool(rol_actual and getattr(rol_actual, campo, False)),
+            }
+            categoria = CATEGORIAS_PERMISOS_CLINICOS.get(campo, "Funciones del módulo")
+            categorias.setdefault(categoria, []).append(permiso)
+            permisos_modulo.append(permiso)
+
+        activos = sum(1 for permiso in permisos_modulo if permiso["activo"])
+        total_permisos_activos += activos
+        total_permisos_disponibles += len(permisos_modulo)
         grupos.append({
             "nombre": grupo,
-            "permisos": [
-                {
-                    "campo": campo,
-                    "etiqueta": etiqueta,
-                    "activo": bool(rol_actual and getattr(rol_actual, campo, False)),
-                }
-                for campo, etiqueta in permisos
+            "codigo": meta["codigo"],
+            "descripcion": meta["descripcion"],
+            "permisos": permisos_modulo,
+            "categorias": [
+                {"nombre": nombre, "permisos": permisos_categoria}
+                for nombre, permisos_categoria in categorias.items()
             ],
+            "activos": activos,
+            "total": len(permisos_modulo),
         })
 
     return render(request, "core/usuario_clinico_permisos.html", {
@@ -1188,6 +1297,9 @@ def usuario_clinico_permisos(request, slug, usuario_id):
         "usuario_gestionado": usuario,
         "rol_actual": rol_actual,
         "grupos": grupos,
+        "total_permisos_activos": total_permisos_activos,
+        "total_permisos_disponibles": total_permisos_disponibles,
+        "total_modulos_activos": sum(1 for grupo in grupos if grupo["activos"]),
     })
 
 
