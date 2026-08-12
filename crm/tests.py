@@ -129,6 +129,7 @@ class CRMTests(TestCase):
             "nombre": "Valoracion vascular",
             "categoria": "consulta",
             "duracion_minutos": "45",
+            "color_calendario": "#E67E22",
         }
 
         response = self.client.post(url, datos)
@@ -137,16 +138,36 @@ class CRMTests(TestCase):
         self.assertTrue(servicio.activo)
         self.assertEqual(servicio.categoria, "consulta")
         self.assertEqual(servicio.duracion_minutos, 45)
+        self.assertEqual(servicio.color_calendario, "#E67E22")
         self.assertTrue(response.json()["creado"])
 
         servicio.activo = False
         servicio.save(update_fields=["activo"])
-        response = self.client.post(url, {**datos, "duracion_minutos": "60"})
+        response = self.client.post(
+            url,
+            {**datos, "duracion_minutos": "60", "color_calendario": "#5B4BDB"},
+        )
         self.assertEqual(response.status_code, 200)
         servicio.refresh_from_db()
         self.assertTrue(servicio.activo)
         self.assertEqual(servicio.duracion_minutos, 60)
+        self.assertEqual(servicio.color_calendario, "#5B4BDB")
         self.assertFalse(response.json()["creado"])
+
+    def test_crear_tipo_consulta_rapido_rechaza_color_invalido(self):
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.post(
+            reverse("agenda_crear_tipo_consulta_rapido", args=[self.empresa.slug]),
+            {
+                "nombre": "Consulta sin color valido",
+                "categoria": "consulta",
+                "duracion_minutos": "30",
+                "color_calendario": "rojo",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("color_calendario", response.json()["errors"])
 
     def test_agenda_citas_muestra_historial_por_paciente(self):
         self.empresa.tipo_solucion = "clinica"

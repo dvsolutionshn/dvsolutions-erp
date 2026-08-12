@@ -216,7 +216,8 @@ class ProfesionalSaludForm(BaseClinicaForm):
 class ServicioClinicoForm(BaseClinicaForm):
     class Meta:
         model = ServicioClinico
-        fields = ["nombre", "categoria", "duracion_minutos", "precio_referencia", "requiere_consentimiento", "activo"]
+        fields = ["nombre", "categoria", "duracion_minutos", "color_calendario", "precio_referencia", "requiere_consentimiento", "activo"]
+        widgets = {"color_calendario": forms.TextInput(attrs={"type": "color"})}
 
 
 class CitaClinicaForm(BaseClinicaForm):

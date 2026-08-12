@@ -11,6 +11,13 @@
 .appointment-service-picker{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.appointment-service-picker select{min-width:0}.appointment-service-new{height:45px;white-space:nowrap;border:1px solid #159a91;border-radius:10px;background:#effbf9;color:#08766f;padding:0 14px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 20px rgba(15,159,143,.08)}.appointment-service-new:hover{background:#e2f8f4;border-color:#087f78}.service-quick-help{margin-top:5px;color:#6a7b8c;font-size:9px;line-height:1.45}.service-quick-grid{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:14px}.service-quick-field{display:grid;gap:6px}.service-quick-field label{color:#617486;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.service-quick-field input,.service-quick-field select{width:100%;min-height:44px;border:1px solid #b8ccdc;border-radius:10px;background:#fff;padding:0 12px;color:#25384a}.service-quick-field input:focus,.service-quick-field select:focus{outline:0;border-color:#159a91;box-shadow:0 0 0 3px rgba(21,154,145,.1)}
 @media(max-width:900px){.appointment-service-picker,.service-quick-grid{grid-template-columns:1fr!important}}
 .professional-lic-enfermeria{border-right-color:#5b4bdb!important}.professional-enfermera{border-right-color:#e67e22!important}.calendar-professional-badge.professional-badge-lic-enfermeria{background:#5b4bdb!important}.calendar-professional-badge.professional-badge-enfermera{background:#e67e22!important}.calendar-pro-dot.professional-doctor-luis{background:#2878d0!important}.calendar-pro-dot.professional-dra-candy{background:#d85c97!important}.calendar-pro-dot.professional-lic-enfermeria{background:#5b4bdb!important}.calendar-pro-dot.professional-enfermera{background:#e67e22!important}
+.service-color-picker{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;align-items:center}.service-color-picker input[type="color"]{width:54px;height:44px;padding:4px;border-radius:12px;cursor:pointer}.service-color-swatches{display:flex;gap:6px;flex-wrap:wrap}.service-color-swatch{width:25px;height:25px;padding:0;border:2px solid #fff;border-radius:999px;background:var(--swatch);box-shadow:0 0 0 1px #c8d7e3;cursor:pointer}.service-color-swatch.is-active{box-shadow:0 0 0 3px rgba(20,61,90,.2)}.calendar-event.color-personalizado,.day-event.color-personalizado,.calendar-modal-item.color-personalizado,.patient-history-item.color-personalizado{border-left-color:var(--agenda-color)!important;background:color-mix(in srgb,var(--agenda-color) 12%,white)!important}.calendar-dot.color-personalizado{background:var(--agenda-color)!important}
+</style>
+<style>.service-quick-grid{grid-template-columns:1.4fr 1fr .7fr 1.1fr}@media(max-width:900px){.service-quick-grid{grid-template-columns:1fr}}</style>
+<style>
+{% for servicio in servicios_filtro %}{% if servicio.color_calendario %}
+.calendar-event.color-servicio-{{ servicio.id }},.day-event.color-servicio-{{ servicio.id }},.calendar-modal-item.color-servicio-{{ servicio.id }},.patient-history-item.color-servicio-{{ servicio.id }}{border-left-color:{{ servicio.color_calendario }}!important;background:color-mix(in srgb,{{ servicio.color_calendario }} 12%,#fff)!important}.calendar-dot.color-servicio-{{ servicio.id }}{background:{{ servicio.color_calendario }}!important}
+{% endif %}{% endfor %}
 </style>
 <style>
 .calendar-shell{display:grid;gap:16px}.calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.calendar-period{display:flex;align-items:center;gap:8px}.calendar-period h2{min-width:220px;margin:0;text-align:center;font-size:20px;color:#132338}.calendar-nav,.calendar-views{display:flex;gap:7px;align-items:center}.calendar-chip{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 13px;border:1px solid #cfdae7;border-radius:10px;background:#fff;color:#526477;font-size:12px;font-weight:800;text-decoration:none}.calendar-chip.active{border-color:#26394d;background:#26394d;color:#fff}.calendar-legend{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}.calendar-legend-item{display:inline-flex;gap:6px;align-items:center;padding:6px 9px;border:1px solid #d8e1eb;border-radius:999px;background:#fff;color:#526477;font-size:10px;font-weight:900}.calendar-dot{width:10px;height:10px;border-radius:999px;background:#b89755}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));border:1px solid #d8e1eb;border-radius:15px;overflow:auto;background:#d8e1eb;gap:1px}.calendar-weekday{padding:11px;background:#f1f4f7;color:#5f7081;font-size:10px;font-weight:900;text-align:center;text-transform:uppercase;letter-spacing:.1em}.calendar-day{min-height:142px;padding:9px;background:#fff;cursor:pointer;transition:background .15s ease,box-shadow .15s ease}.calendar-day:hover{background:#fbfdff;box-shadow:inset 0 0 0 1px #b9d2e7}.calendar-day.outside{background:#f7f8fa;color:#a3acb5}.calendar-day.today{box-shadow:inset 0 0 0 2px #b89755}.calendar-day-number{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;font-size:11px;font-weight:900}.calendar-day-number span{color:#8a98a6;font-size:9px}.calendar-day-hint{font-size:8px;color:#2878d0;text-transform:uppercase;letter-spacing:.08em}.calendar-event{display:block;margin:5px 0;padding:7px 8px;border-left:3px solid #b89755;border-radius:6px;background:#f5f1e8;color:#293747;text-decoration:none;font-size:10px;line-height:1.3}.calendar-event strong,.calendar-event span{display:block}.calendar-event span{margin-top:2px;color:#697887}.calendar-event.confirmada{border-color:#2d7f61;background:#eaf4ef}.calendar-event.realizada{border-color:#526477;background:#edf1f4}.calendar-event.cancelada{border-color:#a6423d;background:#f8eceb;text-decoration:line-through}.calendar-event.color-doctor-luis{border-color:#2878d0;background:#eaf3ff}.calendar-event.color-dra-candy{border-color:#d85c97;background:#fff0f7}.calendar-event.color-terapias{border-color:#805ad5;background:#f4efff}.calendar-event.color-camara_hiperbarica{border-color:#8b5e34;background:#f7efe6}.calendar-event.color-tratamientos{border-color:#2d9b65;background:#ecf8f1}.calendar-event.color-cirugias{border-color:#c9413a;background:#fff0ef}.calendar-event.color-spa{border-color:#d7a51f;background:#fff8d8}.calendar-dot.color-doctor-luis{background:#2878d0}.calendar-dot.color-dra-candy{background:#d85c97}.calendar-dot.color-terapias{background:#805ad5}.calendar-dot.color-camara_hiperbarica{background:#8b5e34}.calendar-dot.color-tratamientos{background:#2d9b65}.calendar-dot.color-cirugias{background:#c9413a}.calendar-dot.color-spa{background:#d7a51f}.week-board{display:grid;grid-template-columns:repeat(7,minmax(170px,1fr));gap:9px;overflow:auto}.week-column{min-height:390px;border:1px solid #d8e1eb;border-radius:13px;background:#fff;overflow:hidden}.week-head{padding:12px;background:#f1f4f7;border-bottom:1px solid #d8e1eb;text-align:center}.week-head strong,.week-head span{display:block}.week-head span{font-size:10px;color:#718092}.week-events{padding:8px}.day-board{display:grid;gap:8px}.day-event{display:grid;grid-template-columns:90px 1fr auto;gap:15px;align-items:center;padding:14px;border:1px solid #d8e1eb;border-left:5px solid #b89755;border-radius:12px;background:#fff}.day-event.color-doctor-luis{border-left-color:#2878d0}.day-event.color-dra-candy{border-left-color:#d85c97}.day-event.color-terapias{border-left-color:#805ad5}.day-event.color-camara_hiperbarica{border-left-color:#8b5e34}.day-event.color-tratamientos{border-left-color:#2d9b65}.day-event.color-cirugias{border-left-color:#c9413a}.day-event.color-spa{border-left-color:#d7a51f}.day-time{font-size:17px;font-weight:900;color:#26394d}.day-content strong,.day-content span{display:block}.day-content span{margin-top:4px;color:#718092;font-size:11px}.calendar-empty{padding:24px;color:#82909e;text-align:center;font-size:12px}.editor summary{list-style:none;cursor:pointer}.editor summary::-webkit-details-marker{display:none}.editor-title{display:flex;justify-content:space-between;align-items:center}.appointment-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.appointment-actions form{margin:0}.appointment-actions select{min-height:34px;border:1px solid #cfdae7;border-radius:8px;background:#fff;padding:0 7px;font-size:11px}.appointment-actions button{min-height:34px;border:0;border-radius:8px;padding:0 10px;background:#26394d;color:#fff;font-size:10px;font-weight:800;cursor:pointer}
@@ -511,6 +518,7 @@
       <span class="calendar-legend-item"><i class="calendar-dot color-spa"></i> Spa</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-control"></i> Control</span>
       <span class="calendar-legend-item"><i class="calendar-dot color-recordatorio"></i> Recordatorio</span>
+      {% for servicio in servicios_filtro %}{% if servicio.color_calendario %}<span class="calendar-legend-item"><i class="calendar-dot color-servicio-{{ servicio.id }}"></i> {{ servicio.nombre }}</span>{% endif %}{% endfor %}
       <span class="calendar-legend-title">Acento lateral por doctor / profesional</span>
       <span class="calendar-legend-item"><i class="calendar-pro-dot professional-doctor-luis"></i> Dr Luis</span>
       <span class="calendar-legend-item"><i class="calendar-pro-dot professional-dra-candy"></i> Dra Candy</span>
@@ -933,6 +941,20 @@
         <div class="service-quick-field">
           <label for="serviceQuickDuration">Duración *</label>
           <input id="serviceQuickDuration" name="duracion_minutos" type="number" min="5" max="720" step="5" value="30" required>
+        </div>
+        <div class="service-quick-field">
+          <label for="serviceQuickColor">Color en el calendario *</label>
+          <div class="service-color-picker">
+            <input id="serviceQuickColor" name="color_calendario" type="color" value="#2563EB" required>
+            <div class="service-color-swatches" aria-label="Colores sugeridos">
+              <button class="service-color-swatch is-active" type="button" style="--swatch:#2563EB" data-service-color="#2563EB" aria-label="Azul"></button>
+              <button class="service-color-swatch" type="button" style="--swatch:#D85C97" data-service-color="#D85C97" aria-label="Rosado"></button>
+              <button class="service-color-swatch" type="button" style="--swatch:#5B4BDB" data-service-color="#5B4BDB" aria-label="Índigo"></button>
+              <button class="service-color-swatch" type="button" style="--swatch:#E67E22" data-service-color="#E67E22" aria-label="Naranja"></button>
+              <button class="service-color-swatch" type="button" style="--swatch:#2D9B65" data-service-color="#2D9B65" aria-label="Verde"></button>
+              <button class="service-color-swatch" type="button" style="--swatch:#8B5E34" data-service-color="#8B5E34" aria-label="Café"></button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="patient-quick-status" id="serviceQuickStatus" role="status" aria-live="polite"></div>
@@ -1550,7 +1572,23 @@ window.appointmentPatientPicker = {choosePatient};
   const serviceSelect = document.getElementById("id_servicio_clinico");
   const status = document.getElementById("serviceQuickStatus");
   const submit = document.getElementById("serviceQuickSubmit");
+  const colorInput = document.getElementById("serviceQuickColor");
+  const colorSwatches = Array.from(document.querySelectorAll("[data-service-color]"));
   if(!modal || !form || !serviceSelect || !status || !submit){ return; }
+
+  function syncColorSwatches(){
+    const selected = String(colorInput ? colorInput.value : "").toUpperCase();
+    colorSwatches.forEach(function(swatch){
+      swatch.classList.toggle("is-active", swatch.dataset.serviceColor === selected);
+    });
+  }
+  colorSwatches.forEach(function(swatch){
+    swatch.addEventListener("click", function(){
+      if(colorInput){ colorInput.value = swatch.dataset.serviceColor; }
+      syncColorSwatches();
+    });
+  });
+  if(colorInput){ colorInput.addEventListener("input", syncColorSwatches); }
 
   function showStatus(message, success){
     status.textContent = message;
@@ -1604,6 +1642,8 @@ window.appointmentPatientPicker = {choosePatient};
       showStatus(service.nombre + " fue guardado y seleccionado.", true);
       form.reset();
       document.getElementById("serviceQuickDuration").value = "30";
+      if(colorInput){ colorInput.value = "#2563EB"; }
+      syncColorSwatches();
       window.setTimeout(closeModal, 700);
     }catch(error){
       showStatus("No se pudo conectar con el servidor. Intente nuevamente.", false);

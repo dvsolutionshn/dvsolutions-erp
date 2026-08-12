@@ -288,6 +288,7 @@ class ServicioClinico(models.Model):
     nombre = models.CharField(max_length=180)
     categoria = models.CharField(max_length=30, choices=CATEGORIA_CHOICES, default="consulta")
     duracion_minutos = models.PositiveIntegerField(default=60)
+    color_calendario = models.CharField(max_length=7, blank=True, default="")
     precio_referencia = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     requiere_consentimiento = models.BooleanField(default=False)
     activo = models.BooleanField(default=True)
@@ -346,6 +347,8 @@ class CitaClinica(models.Model):
     def agenda_color(self):
         if self.es_recordatorio_tratamiento:
             return "recordatorio"
+        if self.servicio_id and self.servicio.color_calendario:
+            return f"servicio-{self.servicio_id}"
         servicio = _normalizar_texto(self.servicio.nombre if self.servicio_id else self.motivo)
         categoria = _normalizar_texto(self.servicio.categoria if self.servicio_id else "")
         if "camara" in servicio or "hiperbar" in servicio:
@@ -373,6 +376,8 @@ class CitaClinica(models.Model):
 
     @property
     def agenda_color_label(self):
+        if self.servicio_id and self.servicio.color_calendario:
+            return self.servicio.nombre
         etiquetas = {
             "consulta": "Consulta",
             "terapias": "Terapias",
@@ -387,6 +392,12 @@ class CitaClinica(models.Model):
             "recordatorio": "Recordatorio de tratamiento",
         }
         return etiquetas.get(self.agenda_color, "General")
+
+    @property
+    def agenda_color_personalizado(self):
+        if self.servicio_id:
+            return self.servicio.color_calendario or ""
+        return ""
 
     @property
     def agenda_profesional_color(self):

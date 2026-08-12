@@ -1,6 +1,7 @@
 import calendar
 from datetime import date, datetime, timedelta
 import logging
+import re
 import unicodedata
 from urllib.parse import urlencode
 
@@ -319,7 +320,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     if es_clinica:
         servicios_filtro = list(ServicioClinico.objects.filter(empresa=empresa_agenda, activo=True).order_by("nombre"))
         servicios_clinicos_meta = [
-            {"id": servicio.id, "nombre": servicio.nombre, "categoria": servicio.categoria}
+            {"id": servicio.id, "nombre": servicio.nombre, "categoria": servicio.categoria, "color_calendario": servicio.color_calendario}
             for servicio in servicios_filtro
         ]
         profesionales_filtro = list(ProfesionalSalud.objects.filter(empresa=empresa_agenda, activo=True).order_by("nombre"))
@@ -1402,6 +1403,7 @@ def crear_tipo_consulta_rapido(request, empresa_slug):
     nombre = " ".join((request.POST.get("nombre") or "").split())
     categoria = (request.POST.get("categoria") or "consulta").strip()
     duracion_texto = (request.POST.get("duracion_minutos") or "30").strip()
+    color_calendario = (request.POST.get("color_calendario") or "").strip().upper()
     categorias = dict(ServicioClinico.CATEGORIA_CHOICES)
     errores = {}
     if len(nombre) < 3:
@@ -1410,6 +1412,8 @@ def crear_tipo_consulta_rapido(request, empresa_slug):
         errores["nombre"] = ["El nombre no puede superar 180 caracteres."]
     if categoria not in categorias:
         errores["categoria"] = ["Selecciona una categoría válida."]
+    if color_calendario and not re.fullmatch(r"#[0-9A-F]{6}", color_calendario):
+        errores["color_calendario"] = ["Selecciona un color válido para el calendario."]
     try:
         duracion_minutos = int(duracion_texto)
         if duracion_minutos < 5 or duracion_minutos > 720:
@@ -1430,14 +1434,16 @@ def crear_tipo_consulta_rapido(request, empresa_slug):
             nombre=nombre,
             categoria=categoria,
             duracion_minutos=duracion_minutos,
+            color_calendario=color_calendario,
             activo=True,
         )
     else:
         servicio.nombre = nombre
         servicio.categoria = categoria
         servicio.duracion_minutos = duracion_minutos
+        servicio.color_calendario = color_calendario
         servicio.activo = True
-        servicio.save(update_fields=["nombre", "categoria", "duracion_minutos", "activo"])
+        servicio.save(update_fields=["nombre", "categoria", "duracion_minutos", "color_calendario", "activo"])
 
     return JsonResponse({
         "ok": True,
@@ -1448,6 +1454,7 @@ def crear_tipo_consulta_rapido(request, empresa_slug):
             "categoria": servicio.categoria,
             "categoria_label": servicio.get_categoria_display(),
             "duracion_minutos": servicio.duracion_minutos,
+            "color_calendario": servicio.color_calendario,
         },
     })
 

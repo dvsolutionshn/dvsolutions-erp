@@ -75,6 +75,11 @@
   </style>
   {% endif %}
   <style>.professional-lic-enfermeria{border-right-color:#5b4bdb!important}.professional-enfermera{border-right-color:#e67e22!important}</style>
+  <style>
+  {% for servicio in servicios_filtro %}{% if servicio.color_calendario %}
+  .appointment.color-servicio-{{ servicio.id }}{border-left-color:{{ servicio.color_calendario }}!important;background:color-mix(in srgb,{{ servicio.color_calendario }} 12%,#fff)!important}
+  {% endif %}{% endfor %}
+  </style>
 </head>
 <body class="{% if hospital_mia_app_premium %}hospital-mia-premium-app{% endif %}">
 <main class="app" data-mobile-calendar-swipe data-prev-url="?vista={{ vista }}&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}" data-next-url="?vista={{ vista }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">

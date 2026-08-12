@@ -2210,7 +2210,15 @@ def registro_paciente_publico(request, token):
 def citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     citas_qs = CitaClinica.objects.filter(empresa=empresa).select_related("paciente", "profesional", "servicio")
-    return render(request, "clinica/citas.html", {"empresa": empresa, "citas": citas_qs})
+    servicios_color = ServicioClinico.objects.filter(
+        empresa=empresa,
+        activo=True,
+    ).exclude(color_calendario="").order_by("nombre")
+    return render(
+        request,
+        "clinica/citas.html",
+        {"empresa": empresa, "citas": citas_qs, "servicios_color": servicios_color},
+    )
 
 
 @login_required
