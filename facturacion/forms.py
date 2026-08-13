@@ -26,7 +26,10 @@ def configurar_campo_fecha(field, placeholder="dd/mm/aaaa"):
 class PagoFacturaForm(forms.ModelForm):
     class Meta:
         model = PagoFactura
-        fields = ['monto', 'retencion_isr', 'retencion_isv', 'metodo', 'referencia']
+        fields = [
+            'monto', 'retencion_isr', 'retencion_isv', 'metodo', 'referencia',
+            'proveedor_comision', 'porcentaje_comision', 'monto_comision',
+        ]
 
 
 class ReciboPagoForm(forms.ModelForm):

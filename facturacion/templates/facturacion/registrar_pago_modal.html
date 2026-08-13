@@ -161,6 +161,7 @@
                             <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
                             <div class="erp-field-help">Usalo cuando el cliente retiene el impuesto y no entrega ese efectivo.</div>
                         </div>
+                        {% include "facturacion/partials/campos_comision_pago.html" %}
                         <div class="erp-field">
                             <label style="display:flex;gap:10px;align-items:center;">
                                 <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
@@ -247,6 +248,7 @@
                             <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
                             <div class="erp-field-help">Permite reflejar el ISV retenido sin inflar el efectivo recibido.</div>
                         </div>
+                        {% include "facturacion/partials/campos_comision_pago.html" %}
                         <div class="erp-field">
                             <label style="display:flex;gap:10px;align-items:center;">
                                 <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
@@ -342,6 +344,7 @@ function actualizarTotalMixto(){
     const isvTarget = document.getElementById("preview-isv-mixto");
     if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
     if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
+    actualizarComision(total);
 }
 function actualizarTotalAplicadoSimple(){
     const monto = parseFloat(document.getElementById("monto")?.value || "0");
@@ -355,6 +358,15 @@ function actualizarTotalAplicadoSimple(){
     const isvTarget = document.getElementById("preview-isv-simple");
     if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
     if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
+    actualizarComision(total);
+}
+function actualizarComision(totalAplicado){
+    const porcentajeInput = document.getElementById("porcentaje_comision");
+    const montoInput = document.getElementById("monto_comision");
+    if(!porcentajeInput || !montoInput){ return; }
+    const porcentaje = parseFloat(porcentajeInput.value || "0");
+    const monto = Number.isFinite(porcentaje) ? totalAplicado * porcentaje / 100 : 0;
+    montoInput.value = monto.toFixed(2);
 }
 function seleccionarCuentaPagoPorMetodo(){
     const metodo = document.getElementById("metodo");
@@ -373,6 +385,8 @@ function seleccionarCuentaPagoPorMetodo(){
     const input = document.getElementById(id);
     if(input){ input.addEventListener("input", () => { actualizarTotalMixto(); actualizarTotalAplicadoSimple(); }); }
 });
+const porcentajeComision = document.getElementById("porcentaje_comision");
+if(porcentajeComision){ porcentajeComision.addEventListener("input", () => { actualizarTotalMixto(); actualizarTotalAplicadoSimple(); }); }
 const metodoPago = document.getElementById("metodo");
 if(metodoPago){ metodoPago.addEventListener("change", seleccionarCuentaPagoPorMetodo); }
 seleccionarCuentaPagoPorMetodo();

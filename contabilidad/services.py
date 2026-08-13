@@ -26,6 +26,7 @@ CUENTAS_BASE = {
     "devoluciones_ventas": {"codigo": "410202", "nombre": "Devoluciones sobre Ventas", "tipo": "ingreso"},
     "costo_ventas": {"codigo": "5101", "nombre": "Costo de Ventas", "tipo": "costo"},
     "gasto_salarios": {"codigo": "610101", "nombre": "Sueldos y Salarios", "tipo": "gasto"},
+    "gasto_comisiones_ventas": {"codigo": "610302", "nombre": "Comisiones sobre Ventas", "tipo": "gasto"},
     "sueldos_por_pagar": {"codigo": "210301", "nombre": "Sueldos por Pagar", "tipo": "pasivo"},
     "ihss_por_pagar": {"codigo": "210302", "nombre": "IHSS por Pagar", "tipo": "pasivo"},
     "rap_por_pagar": {"codigo": "210303", "nombre": "RAP por Pagar", "tipo": "pasivo"},
@@ -642,6 +643,25 @@ def registrar_asiento_pago_cliente(pago):
             "haber": pago.total_aplicado,
         }
     )
+
+    if pago.monto_comision > 0:
+        cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.proveedor_comision)
+        lineas.extend(
+            [
+                {
+                    "cuenta": "gasto_comisiones_ventas",
+                    "detalle": f"Comision sobre cobro a favor de {pago.proveedor_comision.nombre}",
+                    "debe": pago.monto_comision,
+                    "haber": Decimal("0.00"),
+                },
+                {
+                    "cuenta": cuenta_proveedor,
+                    "detalle": f"Comision por pagar a {pago.proveedor_comision.nombre}",
+                    "debe": Decimal("0.00"),
+                    "haber": pago.monto_comision,
+                },
+            ]
+        )
 
     return registrar_asiento_documento(
         empresa=pago.factura.empresa,

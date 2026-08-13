@@ -1956,6 +1956,75 @@ class FacturacionTests(TestCase):
         self.assertTrue(asiento.lineas.filter(cuenta__codigo="113003", debe=Decimal("10.00")).exists())
         self.assertTrue(asiento.lineas.filter(cuenta__codigo="113005", debe=Decimal("5.00")).exists())
 
+    def test_pago_con_comision_registra_gasto_y_cuenta_por_pagar_sin_reducir_saldo_cliente(self):
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110299",
+            nombre="Banco cobros comisiones",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco cobros comisiones",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+        )
+        proveedor = Proveedor.objects.create(
+            empresa=self.empresa,
+            nombre="Proveedor de servicios Demo",
+            rtn="08011999111111",
+        )
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "115.00",
+                "retencion_isr": "0.00",
+                "retencion_isv": "0.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(cuenta_financiera.id),
+                "referencia": "DEP-COM-001",
+                "proveedor_comision": str(proveedor.id),
+                "porcentaje_comision": "25.00",
+            },
+        )
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        pago = PagoFactura.objects.get(factura=factura, referencia="DEP-COM-001")
+        self.assertEqual(pago.total_aplicado, Decimal("115.00"))
+        self.assertEqual(pago.monto_comision, Decimal("28.75"))
+        self.assertEqual(pago.proveedor_comision, proveedor)
+        factura.refresh_from_db()
+        self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+
+        asiento = AsientoContable.objects.get(
+            documento_tipo="pago_factura",
+            documento_id=pago.id,
+            evento="cobro",
+        )
+        self.assertTrue(asiento.lineas.filter(cuenta__codigo="610302", debe=Decimal("28.75")).exists())
+        proveedor.refresh_from_db()
+        self.assertTrue(asiento.lineas.filter(cuenta=proveedor.cuenta_contable, haber=Decimal("28.75")).exists())
+        self.assertEqual(asiento.total_debe, asiento.total_haber)
+
+    def test_pago_con_comision_exige_proveedor(self):
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "115.00",
+                "metodo": "efectivo",
+                "porcentaje_comision": "25.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PagoFactura.objects.filter(factura=factura).exists())
+
     def test_pago_total_separa_isv_a_otra_cuenta(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
             codigo="contabilidad",

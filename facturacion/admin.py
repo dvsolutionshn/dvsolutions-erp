@@ -98,7 +98,7 @@ class FacturaAdmin(admin.ModelAdmin):
 # ==========================
 @admin.register(PagoFactura)
 class PagoFacturaAdmin(admin.ModelAdmin):
-    list_display = ('factura', 'monto', 'metodo', 'fecha', 'cajero')
+    list_display = ('factura', 'monto', 'metodo', 'fecha', 'proveedor_comision', 'monto_comision', 'cajero')
 
 
 @admin.register(CierreCaja)

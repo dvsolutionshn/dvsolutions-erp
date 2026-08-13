@@ -2194,6 +2194,15 @@ class PagoFactura(models.Model):
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     retencion_isr = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     retencion_isv = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    proveedor_comision = models.ForeignKey(
+        Proveedor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='comisiones_pagos_factura',
+    )
+    porcentaje_comision = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    monto_comision = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     subtotal_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     impuesto_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
@@ -2295,6 +2304,8 @@ class PagoFactura(models.Model):
 
         self.retencion_isr = Decimal(self.retencion_isr or 0).quantize(DOS_DECIMALES)
         self.retencion_isv = Decimal(self.retencion_isv or 0).quantize(DOS_DECIMALES)
+        self.porcentaje_comision = Decimal(self.porcentaje_comision or 0).quantize(DOS_DECIMALES)
+        self.monto_comision = Decimal(self.monto_comision or 0).quantize(DOS_DECIMALES)
 
         if self.monto < 0:
             raise ValidationError({'monto': 'El monto recibido no puede ser negativo.'})
@@ -2302,6 +2313,14 @@ class PagoFactura(models.Model):
             raise ValidationError({'retencion_isr': 'La retencion ISR no puede ser negativa.'})
         if self.retencion_isv < 0:
             raise ValidationError({'retencion_isv': 'La retencion ISV no puede ser negativa.'})
+        if self.porcentaje_comision < 0 or self.porcentaje_comision > 100:
+            raise ValidationError({'porcentaje_comision': 'El porcentaje de comision debe estar entre 0 y 100.'})
+        if self.monto_comision < 0:
+            raise ValidationError({'monto_comision': 'El monto de comision no puede ser negativo.'})
+        if self.monto_comision > 0 and not self.proveedor_comision_id:
+            raise ValidationError({'proveedor_comision': 'Selecciona el proveedor al que corresponde la comision.'})
+        if self.proveedor_comision_id and self.proveedor_comision.empresa_id != self.factura.empresa_id:
+            raise ValidationError({'proveedor_comision': 'El proveedor de la comision debe pertenecer a la misma empresa de la factura.'})
         if self.total_aplicado <= 0:
             raise ValidationError('Debes registrar un monto recibido o una retencion mayor que cero.')
 
