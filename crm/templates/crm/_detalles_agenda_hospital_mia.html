@@ -1,0 +1,66 @@
+{% if detalles_agenda_hospital_mia %}
+<section class="agenda-detail-builder" id="agendaDetailBuilder"
+  data-progress-url="{% url 'agenda_progreso_servicios' empresa.slug %}"
+  data-create-treatment-url="{% url 'agenda_crear_tratamiento_rapido' empresa.slug %}">
+  <div class="agenda-detail-heading">
+    <div><small>DETALLE DE LA ATENCIÓN</small><h3 id="agendaDetailTitle">Seleccione los servicios de esta cita</h3></div>
+    <span>Puede seleccionar varios y asignar una hora diferente a cada uno.</span>
+  </div>
+  <div class="agenda-detail-content" id="agendaDetailContent"></div>
+  <div class="agenda-detail-empty" id="agendaDetailEmpty">Seleccione Terapias, Cámara hiperbárica, Tratamientos o Spa para mostrar sus opciones.</div>
+  {% if form.detalles_agenda.errors %}
+  <div class="agenda-detail-errors">{% for error in form.detalles_agenda.errors %}{{ error }}{% endfor %}</div>
+  {% endif %}
+</section>
+
+<script type="application/json" id="agendaTreatmentOptions">[
+{% for opcion in opciones_tratamiento_agenda %}{"id":"{{ opcion.id }}","nombre":"{{ opcion.nombre|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}
+]</script>
+
+<style>
+.agenda-detail-builder{display:none;grid-column:1/-1;border:1px solid #b9d8e7;border-radius:20px;padding:18px;background:linear-gradient(145deg,#f7fdff,#fff 58%,#f8f5ff);box-shadow:0 18px 46px rgba(21,63,83,.08)}
+.agenda-detail-builder.is-visible{display:block}.agenda-detail-heading{display:flex;justify-content:space-between;gap:18px;align-items:end;margin-bottom:14px}.agenda-detail-heading small{color:#0f766e;font-weight:900;letter-spacing:.12em}.agenda-detail-heading h3{margin:3px 0 0;color:#11283b}.agenda-detail-heading span{color:#5e7383;font-size:.88rem}
+.agenda-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}.agenda-choice{position:relative;display:flex;gap:9px;align-items:center;padding:11px 12px;border:1px solid #cee0eb;border-radius:14px;background:#fff;cursor:pointer;transition:.2s}.agenda-choice:hover{transform:translateY(-2px);border-color:#19a5a0}.agenda-choice.is-selected{border-color:#0ea5a0;background:#eafbf9;box-shadow:0 8px 20px rgba(14,165,160,.12)}.agenda-choice.is-completed{background:#edf5f1;color:#648075;text-decoration:line-through;cursor:default}.agenda-choice input{width:18px;height:18px;accent-color:#0ea5a0}.agenda-phase-title{margin:14px 0 8px;color:#26465c;font-weight:900}.agenda-selected-list{display:grid;gap:10px;margin-top:16px}.agenda-selected-row{display:grid;grid-template-columns:minmax(180px,1fr) 125px 92px 40px;gap:9px;align-items:center;padding:11px;border:1px solid #cde0eb;border-radius:15px;background:#fff}.agenda-selected-row strong{color:#153448}.agenda-selected-row select{width:100%;min-height:42px;border:1px solid #bdd2df;border-radius:11px;background:#fff;padding:8px}.agenda-selected-remove{width:38px;height:38px;border:0;border-radius:11px;background:#fff1f2;color:#be123c;font-weight:900}.agenda-treatment-add{display:flex;gap:8px;margin-top:12px}.agenda-treatment-add input{flex:1;min-width:0;border:1px solid #bdd2df;border-radius:12px;padding:10px 12px}.agenda-treatment-add button{border:0;border-radius:12px;padding:10px 15px;background:linear-gradient(135deg,#16b8ad,#2563eb);color:#fff;font-weight:900}.agenda-detail-empty{padding:14px;border:1px dashed #bdd2df;border-radius:14px;color:#627789;text-align:center}.agenda-detail-errors{margin-top:12px;padding:11px 13px;border:1px solid #fecaca;border-radius:12px;background:#fff1f2;color:#9f1239;font-weight:800}
+@media(max-width:700px){.agenda-detail-heading{display:block}.agenda-detail-heading span{display:block;margin-top:6px}.agenda-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.agenda-selected-row{grid-template-columns:1fr 1fr 72px}.agenda-selected-row strong{grid-column:1/-1}.agenda-selected-remove{position:absolute;right:16px}.agenda-selected-row{position:relative}}
+</style>
+
+<script>
+(function(){
+  const builder=document.getElementById('agendaDetailBuilder');
+  const service=document.getElementById('id_servicio_clinico');
+  const patient=document.getElementById('id_paciente');
+  const hidden=document.getElementById('id_detalles_agenda');
+  const content=document.getElementById('agendaDetailContent');
+  const empty=document.getElementById('agendaDetailEmpty');
+  const title=document.getElementById('agendaDetailTitle');
+  if(!builder||!service||!hidden||!content)return;
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const times=[];for(let h=1;h<=12;h++)for(const m of ['00','15','30','45'])times.push(String(h).padStart(2,'0')+':'+m);
+  let selections=[];try{selections=JSON.parse(hidden.value||'[]')}catch(e){selections=[]}
+  let treatments=[];try{treatments=JSON.parse(document.getElementById('agendaTreatmentOptions').textContent||'[]')}catch(e){}
+  let completed={terapias:[],camara:[]};
+  function kind(){const txt=norm(service.options[service.selectedIndex]?.text);if(txt.includes('hiperbar')||txt.includes('camara'))return'camara';if(txt.includes('terapia'))return'terapias';if(txt.trim()==='tratamientos'||txt.trim()==='tratamiento')return'tratamientos';if(txt.trim()==='spa')return'spa';return''}
+  function sync(){hidden.value=JSON.stringify(selections)}
+  function optionLabel(item){if(item.fase&&item.sesion)return `Fase ${item.fase} · Sesión ${item.sesion}`;if(item.sesion)return `Sesión ${item.sesion}`;return item.opcion_nombre||item.opcion||'Servicio'}
+  function add(item){if(selections.some(x=>x.clave===item.clave))return;const baseHour=document.getElementById('id_hora_cita')?.value||'01:00',basePeriod=document.getElementById('id_periodo_cita')?.value||'AM';selections.push({...item,hora:baseHour,periodo:basePeriod});render()}
+  function choices(items){return `<div class="agenda-choice-grid">${items.map(i=>`<label class="agenda-choice${i.done?' is-completed':''}${selections.some(x=>x.clave===i.clave)?' is-selected':''}"><input type="checkbox" data-agenda-choice='${JSON.stringify(i).replace(/'/g,'&#39;')}' ${i.done?'disabled checked':''} ${selections.some(x=>x.clave===i.clave)?'checked':''}><span>${i.label}${i.done?' · Realizada':''}</span></label>`).join('')}</div>`}
+  function render(){
+    const type=kind();builder.classList.toggle('is-visible',!!type);empty.style.display=type?'none':'';if(!type){selections=[];content.innerHTML='';sync();return}
+    selections=selections.filter(x=>String(x.tipo||type)===type||!x.tipo).map(x=>({...x,tipo:type}));
+    if(type==='terapias'){title.textContent='Terapias por fase y sesión';const f1=Array.from({length:22},(_,i)=>({tipo:type,clave:`terapia-1-${i+1}`,fase:1,sesion:i+1,label:`Sesión ${i+1}`,done:completed.terapias.some(x=>x.fase===1&&x.sesion===i+1)}));const f2=Array.from({length:10},(_,i)=>({tipo:type,clave:`terapia-2-${i+1}`,fase:2,sesion:i+1,label:`Sesión ${i+1}`,done:completed.terapias.some(x=>x.fase===2&&x.sesion===i+1)}));content.innerHTML=`<div class="agenda-phase-title">Fase 1 · 22 sesiones</div>${choices(f1)}<div class="agenda-phase-title">Fase 2 · 10 sesiones</div>${choices(f2)}`}
+    else if(type==='camara'){title.textContent='Cámara hiperbárica · 22 sesiones';content.innerHTML=choices(Array.from({length:22},(_,i)=>({tipo:type,clave:`camara-${i+1}`,sesion:i+1,label:`Sesión ${i+1}`,done:completed.camara.includes(i+1)})))}
+    else if(type==='tratamientos'){title.textContent='Tratamientos';content.innerHTML=choices(treatments.map(i=>({tipo:type,clave:`tratamiento-${i.id}`,opcion_id:String(i.id),opcion_nombre:i.nombre,label:i.nombre})))+`<div class="agenda-treatment-add"><input id="newTreatmentName" placeholder="Nuevo tipo de tratamiento"><button type="button" id="addTreatmentButton">+ Agregar tratamiento</button></div>`}
+    else{title.textContent='Servicios de Spa';content.innerHTML=choices([['masaje','Masaje'],['hidroterapia','Hidroterapia'],['sauna','Sauna'],['vapor','Vapor']].map(i=>({tipo:type,clave:`spa-${i[0]}`,opcion_id:i[0],opcion_nombre:i[1],label:i[1]})))}
+    content.insertAdjacentHTML('beforeend',`<div class="agenda-selected-list">${selections.map((s,index)=>`<div class="agenda-selected-row"><strong>${optionLabel(s)}</strong><select data-time-index="${index}">${times.map(t=>`<option ${s.hora===t?'selected':''}>${t}</option>`).join('')}</select><select data-period-index="${index}"><option ${s.periodo==='AM'?'selected':''}>AM</option><option ${s.periodo==='PM'?'selected':''}>PM</option></select><button class="agenda-selected-remove" type="button" data-remove-index="${index}">×</button></div>`).join('')}</div>`);
+    sync();bind();
+  }
+  function bind(){
+    content.querySelectorAll('[data-agenda-choice]').forEach(el=>el.addEventListener('change',()=>{const i=JSON.parse(el.dataset.agendaChoice);if(el.checked)add(i);else{selections=selections.filter(x=>x.clave!==i.clave);render()}}));
+    content.querySelectorAll('[data-time-index]').forEach(el=>el.addEventListener('change',()=>{selections[+el.dataset.timeIndex].hora=el.value;sync()}));content.querySelectorAll('[data-period-index]').forEach(el=>el.addEventListener('change',()=>{selections[+el.dataset.periodIndex].periodo=el.value;sync()}));content.querySelectorAll('[data-remove-index]').forEach(el=>el.addEventListener('click',()=>{selections.splice(+el.dataset.removeIndex,1);render()}));
+    document.getElementById('addTreatmentButton')?.addEventListener('click',async()=>{const input=document.getElementById('newTreatmentName');const body=new FormData();body.append('nombre',input.value);body.append('csrfmiddlewaretoken',document.querySelector('[name=csrfmiddlewaretoken]').value);const response=await fetch(builder.dataset.createTreatmentUrl,{method:'POST',body,headers:{'X-Requested-With':'XMLHttpRequest'}});const data=await response.json();if(!response.ok){alert(data.error||'No se pudo agregar.');return}treatments.push(data.opcion);add({tipo:'tratamientos',clave:`tratamiento-${data.opcion.id}`,opcion_id:String(data.opcion.id),opcion_nombre:data.opcion.nombre,label:data.opcion.nombre})});
+  }
+  async function loadProgress(){if(!patient?.value){completed={terapias:[],camara:[]};render();return}try{const r=await fetch(builder.dataset.progressUrl+'?paciente='+encodeURIComponent(patient.value));const d=await r.json();if(d.ok)completed={terapias:d.terapias||[],camara:d.camara||[]}}catch(e){}render()}
+  service.addEventListener('change',()=>{selections=[];loadProgress()});patient?.addEventListener('change',loadProgress);loadProgress();
+})();
+</script>
+{% endif %}

@@ -1,3 +1,4 @@
+import json
 import unicodedata
 from datetime import datetime, timedelta
 
@@ -7,7 +8,7 @@ from django.utils import timezone
 from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
 
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, OpcionServicioAgenda, PlantillaMensaje
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -184,6 +185,7 @@ class CitaClienteForm(forms.ModelForm):
         widget=MultipleFileInput(attrs={"accept": "image/*,video/*", "multiple": True}),
         help_text="Adjunta fotos o videos de referencia al momento de programar la cirugia.",
     )
+    detalles_agenda = forms.CharField(required=False, widget=forms.HiddenInput())
 
     class Meta:
         model = CitaCliente
@@ -202,6 +204,7 @@ class CitaClienteForm(forms.ModelForm):
         self.es_clinica = bool(empresa and (empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")))
         self.notificaciones_cita_activas = bool(empresa and empresa.slug in self.EMPRESAS_WHATSAPP_CITAS)
         self.cirugia_extendida_activa = bool(empresa and empresa.slug in self.EMPRESAS_CIRUGIA_EXTENDIDA)
+        self.detalles_agenda_activos = bool(empresa and empresa.slug == "hospital_mia")
         if empresa:
             asegurar_profesionales_agenda_base(empresa)
             if empresa.slug in self.SERVICIOS_AGENDA_BASE:
@@ -210,6 +213,8 @@ class CitaClienteForm(forms.ModelForm):
                     if "terapia" in nombre_normalizado and ("camara" in nombre_normalizado or "hiperbar" in nombre_normalizado):
                         ServicioClinico.objects.filter(pk=servicio.pk).update(activo=False)
                     if nombre_normalizado.strip() == "cita con nosotros":
+                        ServicioClinico.objects.filter(pk=servicio.pk).update(activo=False)
+                    if empresa.slug == "hospital_mia" and nombre_normalizado.strip() in {"hidrofacial", "hydrofacial"}:
                         ServicioClinico.objects.filter(pk=servicio.pk).update(activo=False)
                 for nombre, categoria, duracion in self.SERVICIOS_AGENDA_PREDEFINIDOS:
                     servicio = (
@@ -237,6 +242,13 @@ class CitaClienteForm(forms.ModelForm):
                             duracion_minutos=duracion,
                             activo=True,
                         )
+                if empresa.slug == "hospital_mia":
+                    OpcionServicioAgenda.objects.get_or_create(
+                        empresa=empresa,
+                        categoria="tratamientos",
+                        nombre="Hidrofacial",
+                        defaults={"orden": 10, "activo": True},
+                    )
             self.fields["cliente"].queryset = Cliente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["producto"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["paciente"].queryset = Paciente.objects.filter(empresa=empresa, activo=True).order_by("nombre")
@@ -270,6 +282,44 @@ class CitaClienteForm(forms.ModelForm):
                 "hora_cita": valor_hora,
                 "periodo_cita": "PM" if fecha_local.hour >= 12 else "AM",
             })
+            if self.detalles_agenda_activos and (
+                self.instance.opcion_servicio or self.instance.sesion_servicio
+            ):
+                recurso = self._recurso_capacidad_servicio(self.instance.servicio_clinico)
+                opcion_id = ""
+                if recurso == "tratamientos" and self.instance.opcion_servicio:
+                    opcion = OpcionServicioAgenda.objects.filter(
+                        empresa=empresa,
+                        categoria="tratamientos",
+                        nombre__iexact=self.instance.opcion_servicio,
+                    ).first()
+                    opcion_id = str(opcion.id) if opcion else ""
+                elif recurso == "spa" and self.instance.opcion_servicio:
+                    opciones_spa = {
+                        "masaje": "masaje",
+                        "hidroterapia": "hidroterapia",
+                        "sauna": "sauna",
+                        "vapor": "vapor",
+                    }
+                    opcion_id = opciones_spa.get(_normalizar_texto(self.instance.opcion_servicio).strip(), "")
+                if recurso == "terapias":
+                    clave = f"terapia-{self.instance.fase_servicio}-{self.instance.sesion_servicio}"
+                elif recurso == "camara_hiperbarica":
+                    clave = f"camara-{self.instance.sesion_servicio}"
+                elif recurso == "tratamientos":
+                    clave = f"tratamiento-{opcion_id or self.instance.opcion_servicio}"
+                else:
+                    clave = f"spa-{opcion_id or self.instance.opcion_servicio}"
+                self.initial["detalles_agenda"] = json.dumps([{
+                    "tipo": recurso,
+                    "clave": clave,
+                    "opcion_id": opcion_id,
+                    "opcion_nombre": self.instance.opcion_servicio or "",
+                    "fase": self.instance.fase_servicio,
+                    "sesion": self.instance.sesion_servicio,
+                    "hora": valor_hora,
+                    "periodo": "PM" if fecha_local.hour >= 12 else "AM",
+                }])
         if self.instance and self.instance.pk and self.instance.cirugia_fin_estimada:
             fin_local = timezone.localtime(self.instance.cirugia_fin_estimada)
             hora_fin_12 = fin_local.hour % 12 or 12
@@ -286,6 +336,8 @@ class CitaClienteForm(forms.ModelForm):
         if not self.cirugia_extendida_activa:
             for nombre in ["cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia"]:
                 self.fields.pop(nombre, None)
+        if not self.detalles_agenda_activos:
+            self.fields.pop("detalles_agenda", None)
         if self.es_clinica:
             for nombre in ["cliente", "producto", "titulo", "responsable", "duracion_minutos"]:
                 self.fields.pop(nombre)
@@ -310,7 +362,7 @@ class CitaClienteForm(forms.ModelForm):
             if not self.notificaciones_cita_activas:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
         else:
             for nombre in ["paciente", "servicio_clinico", "profesional_salud", "cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre, None)
@@ -421,11 +473,108 @@ class CitaClienteForm(forms.ModelForm):
                     f"bloqueado de {inicio_local} a {fin_local}."
                 )
 
+    def _limpiar_detalles_agenda(self, servicio, fecha):
+        if not self.detalles_agenda_activos or not servicio or not fecha:
+            return []
+        recurso = self._recurso_capacidad_servicio(servicio)
+        if recurso not in {"terapias", "camara_hiperbarica", "tratamientos", "spa"}:
+            return []
+        bruto = (self.cleaned_data.get("detalles_agenda") or "").strip()
+        if not bruto and "detalles_agenda" not in self.data:
+            # Compatibilidad con integraciones anteriores que todavía envían una cita simple.
+            return []
+        if not bruto:
+            self.add_error("detalles_agenda", "Selecciona al menos una sesión, tratamiento o servicio y asigna su hora.")
+            return []
+        try:
+            filas = json.loads(bruto)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            self.add_error("detalles_agenda", "No se pudo leer el detalle de la atención. Selecciona nuevamente las opciones.")
+            return []
+        if not isinstance(filas, list) or not filas or len(filas) > 32:
+            self.add_error("detalles_agenda", "Selecciona entre 1 y 32 opciones para esta atención.")
+            return []
+
+        opciones_tratamiento = {
+            str(opcion.id): opcion.nombre
+            for opcion in OpcionServicioAgenda.objects.filter(
+                empresa=self.empresa, categoria="tratamientos", activo=True
+            )
+        }
+        opciones_spa = {"masaje": "Masaje", "hidroterapia": "Hidroterapia", "sauna": "Sauna", "vapor": "Vapor"}
+        limpias = []
+        claves = set()
+        for posicion, fila in enumerate(filas, start=1):
+            if not isinstance(fila, dict):
+                self.add_error("detalles_agenda", f"La opción {posicion} no es válida.")
+                continue
+            clave = str(fila.get("clave") or "").strip()
+            if not clave or clave in claves:
+                self.add_error("detalles_agenda", "No repitas la misma sesión o servicio.")
+                continue
+            claves.add(clave)
+            hora = str(fila.get("hora") or "").strip()
+            periodo = str(fila.get("periodo") or "").strip().upper()
+            if hora not in dict(self.HORAS_12) or periodo not in {"AM", "PM"}:
+                self.add_error("detalles_agenda", f"Selecciona una hora válida para la opción {posicion}.")
+                continue
+            inicio = self._armar_fecha_hora(fecha, hora, periodo)
+            limpia = {"clave": clave, "hora": hora, "periodo": periodo, "inicio": inicio, "opcion": "", "fase": None, "sesion": None}
+            if recurso == "terapias":
+                try:
+                    fase = int(fila.get("fase"))
+                    sesion = int(fila.get("sesion"))
+                except (TypeError, ValueError):
+                    fase = sesion = 0
+                maximo = 22 if fase == 1 else 10 if fase == 2 else 0
+                if not maximo or not 1 <= sesion <= maximo:
+                    self.add_error("detalles_agenda", "Selecciona una sesión válida de Terapias.")
+                    continue
+                limpia.update({"fase": fase, "sesion": sesion})
+            elif recurso == "camara_hiperbarica":
+                try:
+                    sesion = int(fila.get("sesion"))
+                except (TypeError, ValueError):
+                    sesion = 0
+                if not 1 <= sesion <= 22:
+                    self.add_error("detalles_agenda", "Selecciona una sesión válida de Cámara hiperbárica.")
+                    continue
+                limpia["sesion"] = sesion
+            elif recurso == "tratamientos":
+                opcion_id = str(fila.get("opcion_id") or "")
+                if not opcion_id and fila.get("opcion_nombre"):
+                    nombre_buscado = str(fila.get("opcion_nombre")).strip().casefold()
+                    opcion_id = next((clave for clave, nombre in opciones_tratamiento.items() if nombre.casefold() == nombre_buscado), "")
+                if opcion_id not in opciones_tratamiento:
+                    self.add_error("detalles_agenda", "Selecciona un tratamiento vigente de la lista.")
+                    continue
+                limpia["opcion"] = opciones_tratamiento[opcion_id]
+            else:
+                opcion_id = str(fila.get("opcion_id") or "").lower()
+                if not opcion_id and fila.get("opcion_nombre"):
+                    nombre_buscado = str(fila.get("opcion_nombre")).strip().casefold()
+                    opcion_id = next(
+                        (clave for clave, nombre in opciones_spa.items() if nombre.casefold() == nombre_buscado),
+                        "",
+                    )
+                if opcion_id not in opciones_spa:
+                    self.add_error("detalles_agenda", "Selecciona una opción válida de Spa.")
+                    continue
+                limpia["opcion"] = opciones_spa[opcion_id]
+            limpias.append(limpia)
+        return limpias
+
     def clean(self):
         cleaned_data = super().clean()
         fecha = cleaned_data.get("fecha_cita")
         hora_texto = cleaned_data.get("hora_cita")
         periodo = cleaned_data.get("periodo_cita")
+        servicio = cleaned_data.get("servicio_clinico")
+        detalles = self._limpiar_detalles_agenda(servicio, fecha)
+        if detalles:
+            hora_texto = detalles[0]["hora"]
+            periodo = detalles[0]["periodo"]
+            cleaned_data["detalles_agenda_limpios"] = detalles
 
         # Compatibilidad con integraciones y formularios anteriores al selector AM/PM.
         fecha_hora_anterior = (self.data.get("fecha_hora") or "").strip()
@@ -451,7 +600,6 @@ class CitaClienteForm(forms.ModelForm):
 
             inicio = self._armar_fecha_hora(fecha, hora_texto, periodo)
             cleaned_data["fecha_hora_compuesta"] = inicio
-        servicio = cleaned_data.get("servicio_clinico")
         profesional = cleaned_data.get("profesional_salud")
         fin_bloque = inicio + timedelta(minutes=(getattr(servicio, "duracion_minutos", None) or cleaned_data.get("duracion_minutos") or 30))
         hora_fin = cleaned_data.get("cirugia_hora_fin")
@@ -486,7 +634,22 @@ class CitaClienteForm(forms.ModelForm):
             cleaned_data["cirugia_detalle"] = ""
             cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada
 
-        if not self.errors:
+        if not self.errors and detalles:
+            duracion = getattr(servicio, "duracion_minutos", None) or 60
+            vistos = []
+            for detalle in detalles:
+                detalle_fin = detalle["inicio"] + timedelta(minutes=duracion)
+                try:
+                    self._validar_capacidad_recurso(detalle["inicio"], detalle_fin, servicio)
+                    self._validar_traslapes_agenda_extendida(detalle["inicio"], detalle_fin, profesional)
+                except forms.ValidationError as exc:
+                    self.add_error("detalles_agenda", exc)
+                    break
+                if any(detalle["inicio"] < fin and detalle_fin > otro_inicio for otro_inicio, fin in vistos):
+                    self.add_error("detalles_agenda", "Las opciones de una misma atención no pueden cruzarse entre sí. Asigna horas consecutivas.")
+                    break
+                vistos.append((detalle["inicio"], detalle_fin))
+        elif not self.errors:
             try:
                 usa_capacidad = self._validar_capacidad_recurso(inicio, fin_bloque, servicio)
                 if not usa_capacidad:

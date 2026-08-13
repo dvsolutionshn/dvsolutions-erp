@@ -747,7 +747,7 @@
             {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
             {% for error in form.cirugia_periodo_fin.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
           </div>
-          {% elif field.name != "hora_cita" and field.name != "periodo_cita" and field.name != "cirugia_periodo_fin" %}
+          {% elif field.name != "hora_cita" and field.name != "periodo_cita" and field.name != "cirugia_periodo_fin" and field.name != "detalles_agenda" %}
           <div class="erp-field" data-field-name="{{ field.name }}">
             <label for="{% if field.name == 'paciente' and es_clinica %}patientSearchInput{% else %}{{ field.id_for_label }}{% endif %}">{{ field.label }}</label>
             {% if field.name == "paciente" and es_clinica %}
@@ -776,6 +776,7 @@
           </div>
           {% endif %}
         {% endfor %}
+        {% if detalles_agenda_hospital_mia %}{{ form.detalles_agenda }}{% include "crm/_detalles_agenda_hospital_mia.html" %}{% endif %}
       </div>
       {% if es_hospital_mia %}
       <div class="whatsapp-schedule-note"><strong>Automatización WhatsApp</strong><br>La confirmación se procesa automáticamente al guardar. Los recordatorios de una semana y un día se enviarán a las 9:00 AM mediante la plantilla aprobada configurada en CRM.</div>

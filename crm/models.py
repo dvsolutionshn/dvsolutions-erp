@@ -186,6 +186,10 @@ class CitaCliente(models.Model):
     observacion = models.TextField(blank=True, null=True)
     cirugia_detalle = models.TextField(blank=True, null=True)
     cirugia_fin_estimada = models.DateTimeField(blank=True, null=True)
+    grupo_atencion = models.UUIDField(blank=True, null=True, db_index=True)
+    opcion_servicio = models.CharField(max_length=180, blank=True, null=True)
+    fase_servicio = models.PositiveSmallIntegerField(blank=True, null=True)
+    sesion_servicio = models.PositiveSmallIntegerField(blank=True, null=True)
     enviar_confirmacion_whatsapp = models.BooleanField(default=False)
     recordatorio_semana_whatsapp = models.BooleanField(default=True)
     recordatorio_dia_whatsapp = models.BooleanField(default=True)
@@ -203,7 +207,14 @@ class CitaCliente(models.Model):
 
     @property
     def display_servicio(self):
-        return self.servicio_clinico.nombre if self.servicio_clinico_id else (self.producto.nombre if self.producto_id else "Sin tipo de consulta")
+        base = self.servicio_clinico.nombre if self.servicio_clinico_id else (self.producto.nombre if self.producto_id else "Sin tipo de consulta")
+        if self.fase_servicio and self.sesion_servicio:
+            return f"{base} · Fase {self.fase_servicio} · Sesión {self.sesion_servicio}"
+        if self.sesion_servicio:
+            return f"{base} · Sesión {self.sesion_servicio}"
+        if self.opcion_servicio:
+            return f"{base} · {self.opcion_servicio}"
+        return base
 
     @property
     def display_responsable(self):
@@ -314,6 +325,39 @@ class CitaCliente(models.Model):
             f"para el {timezone.localtime(self.fecha_hora).strftime('%d/%m/%Y %I:%M %p')}."
         )
         return f"https://wa.me/{telefono}?text={quote(mensaje)}" if telefono else ""
+
+
+class OpcionServicioAgenda(models.Model):
+    CATEGORIA_CHOICES = [
+        ("tratamientos", "Tratamientos"),
+        ("spa", "Spa"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="opciones_servicio_agenda")
+    categoria = models.CharField(max_length=30, choices=CATEGORIA_CHOICES)
+    nombre = models.CharField(max_length=180)
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveSmallIntegerField(default=0)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="opciones_servicio_agenda_creadas",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["categoria", "orden", "nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["empresa", "categoria", "nombre"],
+                name="crm_opcion_agenda_empresa_categoria_nombre_uniq",
+            )
+        ]
+
+    def __str__(self):
+        return self.nombre
 
 
 class CitaCirugiaFoto(models.Model):

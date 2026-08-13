@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 import logging
 import re
 import unicodedata
+import uuid
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -24,7 +25,7 @@ from facturacion.models import Cliente, PagoFactura, Producto, TipoImpuesto
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
-from .models import CampaniaMarketing, CitaCirugiaFoto, CitaCliente, ConfiguracionCRM, EnvioCampania, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCirugiaFoto, CitaCliente, ConfiguracionCRM, EnvioCampania, OpcionServicioAgenda, PlantillaMensaje
 from .appointment_notifications import procesar_notificacion, programar_notificaciones_cita
 from .models import NotificacionCitaWhatsApp
 from .services import (
@@ -342,6 +343,12 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "es_clinica": es_clinica,
         "es_hospital_mia": empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS,
         "permite_crear_tipo_consulta": empresa.slug == "hospital_mia",
+        "detalles_agenda_hospital_mia": empresa.slug == "hospital_mia",
+        "opciones_tratamiento_agenda": list(
+            OpcionServicioAgenda.objects.filter(
+                empresa=empresa, categoria="tratamientos", activo=True
+            ).order_by("orden", "nombre")
+        ) if empresa.slug == "hospital_mia" else [],
         "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
         "paciente_busqueda_inicial": paciente_busqueda_inicial,
         "pacientes_busqueda": pacientes_busqueda,
@@ -362,6 +369,55 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
         "citas_historial_futuras": citas_historial_futuras,
         "citas_historial_pasadas": citas_historial_pasadas,
     }
+
+
+def _guardar_cita_formulario(request, empresa, form, objeto=None):
+    detalles = form.cleaned_data.get("detalles_agenda_limpios") or []
+    if objeto and len(detalles) > 1:
+        raise ValueError("Al editar una cita solo puede conservarse una opción por registro.")
+    with transaction.atomic():
+        cita_base = form.save(commit=False)
+        cita_base.empresa = empresa
+        if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
+            cita_base.enviar_confirmacion_whatsapp = True
+            cita_base.recordatorio_semana_whatsapp = True
+            cita_base.recordatorio_dia_whatsapp = True
+        grupo = cita_base.grupo_atencion or (uuid.uuid4() if detalles else None)
+        creadas = []
+        filas = detalles or [None]
+        for indice, detalle in enumerate(filas):
+            if indice == 0:
+                cita = cita_base
+            else:
+                cita = CitaCliente(
+                    empresa=empresa,
+                    cliente=cita_base.cliente,
+                    paciente=cita_base.paciente,
+                    producto=cita_base.producto,
+                    servicio_clinico=cita_base.servicio_clinico,
+                    profesional_salud=cita_base.profesional_salud,
+                    responsable=cita_base.responsable,
+                    estado=cita_base.estado,
+                    pagada=cita_base.pagada,
+                    observacion=cita_base.observacion,
+                    duracion_minutos=cita_base.duracion_minutos,
+                    enviar_confirmacion_whatsapp=False,
+                    recordatorio_semana_whatsapp=cita_base.recordatorio_semana_whatsapp,
+                    recordatorio_dia_whatsapp=cita_base.recordatorio_dia_whatsapp,
+                )
+            if detalle:
+                cita.fecha_hora = detalle["inicio"]
+                cita.grupo_atencion = grupo
+                cita.opcion_servicio = detalle["opcion"] or None
+                cita.fase_servicio = detalle["fase"]
+                cita.sesion_servicio = detalle["sesion"]
+                cita.titulo = cita.display_servicio
+            cita.save()
+            _sincronizar_cita_clinica(cita)
+            creadas.append(cita)
+        _guardar_fotos_cirugia_cita(cita_base, form.cleaned_data.get("fotos_cirugia"), request.user)
+    _programar_whatsapp_cita(request, cita_base)
+    return cita_base, creadas
 
 
 def _sincronizar_cita_clinica(cita):
@@ -855,17 +911,8 @@ def citas(request, empresa_slug):
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita = form.save(commit=False)
-        cita.empresa = empresa
-        if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
-            cita.enviar_confirmacion_whatsapp = True
-            cita.recordatorio_semana_whatsapp = True
-            cita.recordatorio_dia_whatsapp = True
-        cita.save()
-        _guardar_fotos_cirugia_cita(cita, form.cleaned_data.get("fotos_cirugia"), request.user)
-        _sincronizar_cita_clinica(cita)
-        _programar_whatsapp_cita(request, cita)
-        messages.success(request, "Cita guardada correctamente.")
+        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        messages.success(request, f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("crm_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form))
 
@@ -878,17 +925,8 @@ def agenda_citas(request, empresa_slug):
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita = form.save(commit=False)
-        cita.empresa = empresa
-        if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
-            cita.enviar_confirmacion_whatsapp = True
-            cita.recordatorio_semana_whatsapp = True
-            cita.recordatorio_dia_whatsapp = True
-        cita.save()
-        _guardar_fotos_cirugia_cita(cita, form.cleaned_data.get("fotos_cirugia"), request.user)
-        _sincronizar_cita_clinica(cita)
-        _programar_whatsapp_cita(request, cita)
-        messages.success(request, "Cita actualizada correctamente." if objeto else "Cita guardada correctamente.")
+        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
 
@@ -902,17 +940,8 @@ def agenda_mobile(request, empresa_slug):
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita = form.save(commit=False)
-        cita.empresa = empresa
-        if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
-            cita.enviar_confirmacion_whatsapp = True
-            cita.recordatorio_semana_whatsapp = True
-            cita.recordatorio_dia_whatsapp = True
-        cita.save()
-        _guardar_fotos_cirugia_cita(cita, form.cleaned_data.get("fotos_cirugia"), request.user)
-        _sincronizar_cita_clinica(cita)
-        _programar_whatsapp_cita(request, cita)
-        messages.success(request, "Cita actualizada correctamente." if objeto else "Cita creada correctamente.")
+        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) creada(s) correctamente.")
         fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
         vista_regreso = request.GET.get("vista") or request.POST.get("vista") or "dia"
         if vista_regreso not in {"dia", "semana", "mes", "anio", "agenda", "proximas"}:
@@ -1457,6 +1486,66 @@ def crear_tipo_consulta_rapido(request, empresa_slug):
             "color_calendario": servicio.color_calendario,
         },
     })
+
+
+@login_required
+@require_POST
+def crear_tratamiento_rapido(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia" or not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"ok": False, "error": "Acceso no autorizado."}, status=403)
+    if not (
+        request.user.is_superuser
+        or request.user.tiene_permiso_erp("puede_citas", empresa)
+        or request.user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
+    ):
+        return JsonResponse({"ok": False, "error": "No tiene permiso para agregar tratamientos."}, status=403)
+    nombre = " ".join((request.POST.get("nombre") or "").split())
+    if len(nombre) < 3 or len(nombre) > 180:
+        return JsonResponse(
+            {"ok": False, "error": "Escriba un nombre de tratamiento entre 3 y 180 caracteres."},
+            status=400,
+        )
+    opcion, creada = OpcionServicioAgenda.objects.get_or_create(
+        empresa=empresa,
+        categoria="tratamientos",
+        nombre__iexact=nombre,
+        defaults={"nombre": nombre, "creado_por": request.user, "activo": True},
+    )
+    if not creada and not opcion.activo:
+        opcion.activo = True
+        opcion.save(update_fields=["activo"])
+    return JsonResponse({"ok": True, "creada": creada, "opcion": {"id": opcion.id, "nombre": opcion.nombre}})
+
+
+@login_required
+def progreso_servicios_paciente(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia" or not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"ok": False, "error": "Acceso no autorizado."}, status=403)
+    try:
+        paciente_id = int(request.GET.get("paciente") or 0)
+    except (TypeError, ValueError):
+        paciente_id = 0
+    paciente = Paciente.objects.filter(empresa=empresa, activo=True, id=paciente_id).first()
+    if not paciente:
+        return JsonResponse({"ok": False, "error": "Seleccione un paciente válido."}, status=400)
+    completadas = CitaCliente.objects.filter(
+        empresa=empresa,
+        paciente=paciente,
+        estado="realizada",
+        sesion_servicio__isnull=False,
+    ).select_related("servicio_clinico")
+    terapias = []
+    camara = []
+    formulario_recurso = CitaClienteForm(empresa=empresa)
+    for cita in completadas:
+        recurso = formulario_recurso._recurso_capacidad_servicio(cita.servicio_clinico)
+        if recurso == "terapias" and cita.fase_servicio:
+            terapias.append({"fase": cita.fase_servicio, "sesion": cita.sesion_servicio})
+        elif recurso == "camara_hiperbarica":
+            camara.append(cita.sesion_servicio)
+    return JsonResponse({"ok": True, "terapias": terapias, "camara": camara})
 
 
 def _numero_contacto_cita(cita):

@@ -16,7 +16,7 @@ from facturacion.models import Cliente
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
 from .forms import CitaClienteForm
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, PlantillaMensaje
+from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, OpcionServicioAgenda, PlantillaMensaje
 from .services import enviar_plantilla_cita_whatsapp, subir_media_whatsapp
 from .tokens import generar_token_respuesta_cita
 
@@ -108,6 +108,123 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Calendario de Citas")
         self.assertContains(response, reverse("agenda_mobile", args=[self.empresa.slug]))
+
+    def test_hospital_mia_crea_varias_sesiones_con_hora_individual(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-92001",
+            identidad="08011999009201",
+            nombre="Paciente Terapias Multiples",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Lic. Terapias",
+            especialidad="Terapias",
+        )
+        form_inicial = CitaClienteForm(empresa=self.empresa)
+        servicio = ServicioClinico.objects.get(empresa=self.empresa, nombre="Terapias")
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.post(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": profesional.id,
+                "fecha_cita": "2026-09-10",
+                "hora_cita": "08:00",
+                "periodo_cita": "AM",
+                "detalles_agenda": '[{"clave":"terapia-1-1","fase":1,"sesion":1,"hora":"08:00","periodo":"AM"},{"clave":"terapia-1-2","fase":1,"sesion":2,"hora":"09:00","periodo":"AM"}]',
+                "estado": "pendiente",
+            },
+        )
+        self.assertEqual(response.status_code, 302, getattr(response.context.get("form"), "errors", None) if response.context else None)
+        citas = CitaCliente.objects.filter(empresa=self.empresa, paciente=paciente).order_by("fecha_hora")
+        self.assertEqual(citas.count(), 2)
+        self.assertEqual(list(citas.values_list("sesion_servicio", flat=True)), [1, 2])
+        self.assertEqual(citas.first().grupo_atencion, citas.last().grupo_atencion)
+        self.assertNotEqual(citas.first().fecha_hora, citas.last().fecha_hora)
+
+    def test_hidrofacial_pasa_de_tipo_consulta_a_opcion_tratamiento(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        hidro = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Hidrofacial",
+            categoria="tratamiento",
+            activo=True,
+        )
+        CitaClienteForm(empresa=self.empresa)
+        hidro.refresh_from_db()
+        self.assertFalse(hidro.activo)
+        self.assertTrue(OpcionServicioAgenda.objects.filter(
+            empresa=self.empresa, categoria="tratamientos", nombre="Hidrofacial", activo=True
+        ).exists())
+
+    def test_hospital_mia_guarda_varios_servicios_spa_con_horas_separadas(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-92002",
+            identidad="08011999009202",
+            nombre="Paciente Spa Multiple",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Profesional Spa",
+            especialidad="Spa",
+        )
+        CitaClienteForm(empresa=self.empresa)
+        servicio = ServicioClinico.objects.get(empresa=self.empresa, nombre="Spa")
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.post(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": profesional.id,
+                "fecha_cita": "2026-09-11",
+                "hora_cita": "10:00",
+                "periodo_cita": "AM",
+                "detalles_agenda": '[{"clave":"spa-masaje","opcion_id":"masaje","opcion_nombre":"Masaje","hora":"10:00","periodo":"AM"},{"clave":"spa-sauna","opcion_id":"sauna","opcion_nombre":"Sauna","hora":"11:00","periodo":"AM"}]',
+                "estado": "pendiente",
+            },
+        )
+        self.assertEqual(response.status_code, 302, getattr(response.context.get("form"), "errors", None) if response.context else None)
+        self.assertEqual(
+            list(CitaCliente.objects.filter(empresa=self.empresa, paciente=paciente).order_by("fecha_hora").values_list("opcion_servicio", flat=True)),
+            ["Masaje", "Sauna"],
+        )
+
+    def test_hospital_mia_progreso_marca_sesiones_realizadas(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-92003",
+            identidad="08011999009203",
+            nombre="Paciente Progreso",
+        )
+        CitaClienteForm(empresa=self.empresa)
+        servicio = ServicioClinico.objects.get(empresa=self.empresa, nombre="Camara hiperbarica")
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            titulo="Camara hiperbarica - Sesion 4",
+            fecha_hora=timezone.make_aware(datetime(2026, 9, 12, 8, 0)),
+            estado="realizada",
+            sesion_servicio=4,
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.get(
+            reverse("agenda_progreso_servicios", args=[self.empresa.slug]),
+            {"paciente": paciente.id},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["camara"], [4])
 
     def test_agenda_hospital_mia_permite_crear_tipo_consulta_sin_salir(self):
         self.empresa.tipo_solucion = "clinica"
