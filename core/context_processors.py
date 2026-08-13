@@ -1,4 +1,5 @@
 from core.models import Empresa
+from core.access import modo_clinico_simple_activo
 
 
 def _empresa_actual(request, user):
@@ -45,7 +46,7 @@ def erp_access(request):
         return False
 
     base = {
-        "modo_clinico_simple": bool(user and user.is_authenticated and getattr(user, "modo_clinico_simple", False)),
+        "modo_clinico_simple": modo_clinico_simple_activo(user, empresa),
         "modulo_facturacion": facturacion_activa and algun("facturacion"),
         "modulo_contabilidad": contabilidad_activa and algun("contabilidad"),
         "modulo_pos": facturacion_activa and pos_activa and permiso("puede_punto_venta"),

@@ -22,6 +22,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
+from .access import modo_clinico_simple_activo
 from .access_tokens import emitir_token_acceso, enviar_correo_acceso, hash_token_acceso
 from .backup_service import generar_respaldo_empresa
 from .backup_tokens import generar_token_respaldo, hash_token_respaldo
@@ -944,7 +945,7 @@ def dashboard(request, slug=None):
         return _redirect_login_empresa(request, empresa)
 
     modulos_activos = empresa.modulos_habilitados()
-    if getattr(request.user, "modo_clinico_simple", False):
+    if modo_clinico_simple_activo(request.user, empresa):
         modulos_activos = modulos_activos.filter(codigo__in=["clinica_medica", "facturacion"])
 
     return render(request, 'core/dashboard_premium.html', {

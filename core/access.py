@@ -26,6 +26,25 @@ FACTURACION_PERMISSION_MAP = [
     ("crear/", "puede_crear_facturas"),
 ]
 
+
+EMPRESAS_CON_MODO_CLINICO_SIMPLE = frozenset({
+    "hospital_mia",
+    "medical_spa",
+    "serviciosmedicos",
+    "luque_aestetic",
+})
+
+
+def modo_clinico_simple_activo(user, empresa):
+    """Limita la interfaz clínica simplificada a las empresas autorizadas."""
+    return bool(
+        user
+        and getattr(user, "is_authenticated", False)
+        and empresa
+        and empresa.slug in EMPRESAS_CON_MODO_CLINICO_SIMPLE
+        and getattr(user, "modo_clinico_simple", False)
+    )
+
 CONTABILIDAD_PERMISSION_MAP = [
     ("configuracion/", "puede_contabilidad"),
     ("periodos/", "puede_contabilidad"),

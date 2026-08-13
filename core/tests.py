@@ -843,7 +843,7 @@ class SuperAdminControlTests(TestCase):
     def test_modo_clinico_simple_solo_muestra_clinica_y_facturacion(self):
         empresa = Empresa.objects.create(
             nombre="Hospital Mia Simple",
-            slug="hospital-mia-simple",
+            slug="hospital_mia",
             rtn="08011999000173",
         )
         modulos = [
@@ -878,6 +878,40 @@ class SuperAdminControlTests(TestCase):
         self.assertNotContains(response, "Recursos Humanos")
         self.assertNotContains(response, "Bitacora ERP")
         self.assertNotContains(response, "Mi respaldo")
+
+    def test_modo_clinico_simple_no_afecta_digital_planning(self):
+        empresa = Empresa.objects.create(
+            nombre="Digital Planning",
+            slug="digital_planning",
+            rtn="08011999000174",
+        )
+        modulos = [
+            self.modulo,
+            Modulo.objects.create(nombre="Clinica Medica", codigo="clinica_medica"),
+            Modulo.objects.create(nombre="Contabilidad", codigo="contabilidad"),
+            Modulo.objects.create(nombre="Recursos Humanos", codigo="rrhh"),
+            Modulo.objects.create(nombre="CRM y Marketing", codigo="crm_marketing"),
+        ]
+        for modulo in modulos:
+            EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
+        usuario = Usuario.objects.create_user(
+            username="daniel-digital-planning",
+            email="daniel.digital@ejemplo.com",
+            password="ClaveDanielSegura2026",
+            empresa=empresa,
+            es_administrador_empresa=True,
+            modo_clinico_simple=True,
+        )
+        self.client.force_login(usuario)
+
+        response = self.client.get(reverse("dashboard", args=[empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["erp_access"]["modo_clinico_simple"])
+        self.assertNotContains(response, "Bienvenida doctora")
+        self.assertContains(response, "Contabilidad")
+        self.assertContains(response, "Recursos Humanos")
+        self.assertContains(response, "CRM y Marketing")
 
     def test_usuario_puede_tener_rol_diferente_por_empresa(self):
         empresa_principal = Empresa.objects.create(
