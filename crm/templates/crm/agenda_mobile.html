@@ -102,7 +102,7 @@
       <div class="mobile-company-menu">
         <div class="mobile-company-menu-label">Cambiar empresa para operar y facturar</div>
         {% for empresa_disponible in empresas_app_switch %}
-        <a class="mobile-company-option {% if empresa_disponible.actual %}is-current{% endif %}" href="{{ empresa_disponible.url }}">
+        <a class="mobile-company-option {% if empresa_disponible.actual %}is-current{% endif %}" href="{{ empresa_disponible.url }}" data-company-app-switch>
           <span class="mobile-company-avatar">{{ empresa_disponible.nombre|slice:":1" }}</span>
           <span>
             <strong>{{ empresa_disponible.nombre }}</strong>
@@ -684,6 +684,15 @@
   const requestedApp=new URLSearchParams(window.location.search).get("app");
   if(requestedApp==="agenda")openAppPanel("agenda-app");
   else if(["#pacientes-app","#factura-app","#agenda-app"].includes(window.location.hash))openAppPanel(window.location.hash.slice(1));
+  document.querySelectorAll("[data-company-app-switch]").forEach(link=>link.addEventListener("click",event=>{
+    const activeScreen=appScreens.find(screen=>screen.classList.contains("active"));
+    if(!activeScreen||activeScreen.id==="inicio")return;
+    event.preventDefault();
+    const target=new URL(link.href,window.location.origin);
+    if(activeScreen.id==="agenda-app")target.searchParams.set("app","agenda");
+    else target.hash=`#${activeScreen.id==="patient-profile-app"?"pacientes-app":activeScreen.id}`;
+    window.location.href=target.toString();
+  }));
   const dayStrip=document.querySelector("[data-day-strip-swipe]");
   if(dayStrip){
     let stripStartX=0,stripStartY=0,stripTracking=false,stripSwiped=false;

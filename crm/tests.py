@@ -61,6 +61,27 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CRM y Marketing")
 
+    def test_empresa_clinica_entra_y_regresa_siempre_a_interfaz_mejorada(self):
+        response_login = self.client.post(
+            reverse("empresa_login", args=[self.empresa.slug]),
+            {"username": "crmuser", "password": "pass12345"},
+        )
+        self.assertRedirects(
+            response_login,
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            fetch_redirect_response=False,
+        )
+
+        response_dashboard = self.client.get(reverse("dashboard", args=[self.empresa.slug]))
+        self.assertRedirects(
+            response_dashboard,
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            fetch_redirect_response=False,
+        )
+
+        response_erp = self.client.get(reverse("dashboard", args=[self.empresa.slug]), {"vista": "erp"})
+        self.assertEqual(response_erp.status_code, 200)
+
     def test_configuracion_crm_muestra_panel_premium_de_automatizaciones(self):
         self.client.login(username="crmuser", password="pass12345")
         response = self.client.get(reverse("crm_configuracion", args=[self.empresa.slug]))
@@ -439,6 +460,7 @@ class CRMTests(TestCase):
         )
         EmpresaModulo.objects.create(empresa=medical_spa, modulo=self.modulo_citas, activo=True)
         self.usuario.empresas_acceso.add(medical_spa)
+        empresas_clinicas = [self.empresa, medical_spa]
         cliente = Cliente.objects.create(
             empresa=self.empresa,
             nombre="Paciente App",
@@ -500,6 +522,8 @@ class CRMTests(TestCase):
         self.assertContains(medical_response, '<div class="premium-invoice-shell">')
         self.assertContains(medical_response, "premium-calendar-shell")
         self.assertContains(medical_response, f"Caja móvil · {medical_spa.nombre}")
+        self.assertContains(medical_response, reverse("agenda_mobile", args=[self.empresa.slug]))
+        self.assertContains(medical_response, "data-company-app-switch")
         for indice, (slug, nombre) in enumerate(
             [
                 ("luque_aestetic", "Luque Aestetic"),
@@ -515,6 +539,7 @@ class CRMTests(TestCase):
             )
             EmpresaModulo.objects.create(empresa=empresa_clinica, modulo=self.modulo_citas, activo=True)
             self.usuario.empresas_acceso.add(empresa_clinica)
+            empresas_clinicas.append(empresa_clinica)
             empresa_response = self.client.get(reverse("agenda_mobile", args=[empresa_clinica.slug]))
             with self.subTest(empresa=slug):
                 self.assertEqual(empresa_response.status_code, 200)
@@ -522,6 +547,14 @@ class CRMTests(TestCase):
                 self.assertContains(empresa_response, '<div class="premium-invoice-shell">')
                 self.assertContains(empresa_response, "premium-calendar-shell")
                 self.assertContains(empresa_response, f"Caja móvil · {nombre}")
+        for empresa_clinica in empresas_clinicas:
+            with self.subTest(entrada_predeterminada=empresa_clinica.slug):
+                dashboard_response = self.client.get(reverse("dashboard", args=[empresa_clinica.slug]))
+                self.assertRedirects(
+                    dashboard_response,
+                    reverse("agenda_mobile", args=[empresa_clinica.slug]),
+                    fetch_redirect_response=False,
+                )
         vista_agenda = self.client.get(
             reverse("agenda_mobile", args=[self.empresa.slug]),
             {"vista": "agenda", "fecha": "2026-06-30"},
