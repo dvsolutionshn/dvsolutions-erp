@@ -18,6 +18,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 
+from core.access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL
 from core.models import Empresa
 from contabilidad.models import CuentaFinanciera
 from contabilidad.services import asegurar_cuentas_financieras_base_honduras
@@ -99,8 +100,8 @@ def _configuracion_crm(empresa):
     return ConfiguracionCRM.objects.get_or_create(empresa=empresa)[0]
 
 
-def _asegurar_pacientes_hospital_mia(empresa):
-    if empresa.slug != "hospital_mia":
+def _asegurar_pacientes_empresas_clinicas(empresa):
+    if empresa.slug not in EMPRESAS_INTERFAZ_CLINICA_GLOBAL:
         return
     from clinica.services_pacientes import asegurar_paciente_desde_cliente
 
@@ -920,7 +921,7 @@ def citas(request, empresa_slug):
 @login_required
 def agenda_citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    _asegurar_pacientes_hospital_mia(empresa)
+    _asegurar_pacientes_empresas_clinicas(empresa)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
     objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
     form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
@@ -1054,7 +1055,7 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["citas_hoy_total"] = len(citas_hoy)
     contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
-    contexto["hospital_mia_app_premium"] = empresa.slug == "hospital_mia"
+    contexto["hospital_mia_app_premium"] = empresa.slug in EMPRESAS_INTERFAZ_CLINICA_GLOBAL
     contexto["pacientes_app_premium"] = contexto["hospital_mia_app_premium"]
     pacientes_activos_qs = Paciente.objects.filter(empresa=empresa, activo=True)
     contexto["pacientes_app_total"] = pacientes_activos_qs.count()
@@ -1227,7 +1228,7 @@ def agenda_mobile_manifest(request, empresa_slug):
     return JsonResponse(
         {
             "name": f"Agenda · {empresa.nombre}",
-            "short_name": "Agenda MIA",
+            "short_name": empresa.nombre[:24],
             "description": "Calendario móvil de citas conectado a DV Solutions ERP.",
             "id": inicio,
             "start_url": inicio,

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#12324a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Agenda MIA">
+  <meta name="apple-mobile-web-app-title" content="{{ empresa.nombre }}">
   <title>Agenda · {{ empresa.nombre }}</title>
   <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}" crossorigin="use-credentials">
   <link rel="icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
@@ -255,7 +255,7 @@
       {% if hospital_mia_app_premium %}
       <div class="premium-invoice-shell">
         <header class="premium-module-hero">
-          <small>Caja móvil · Hospital Mía</small>
+          <small>Caja móvil · {{ empresa.nombre }}</small>
           <h2>Facturación rápida</h2>
           <p>Cobra con un flujo corto, comprueba el total y genera el documento fiscal completo sin salir de la app.</p>
           <div class="premium-progress" aria-label="Pasos de facturación"><span>1 · Paciente</span><span>2 · Conceptos</span><span>3 · Pago</span></div>
@@ -617,7 +617,7 @@
 <section class="sheet" id="installSheet">
   <div class="sheet-card">
     <div class="sheet-grip"></div>
-    <div class="sheet-head"><div><small>App móvil oficial</small><h2>Instalar Agenda MIA</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
+    <div class="sheet-head"><div><small>App móvil oficial</small><h2>Instalar {{ empresa.nombre }}</h2></div><button class="close" type="button" data-close-sheet>×</button></div>
     <p style="margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.55">Selecciona tu teléfono. La app conservará el acceso seguro y seguirá conectada al mismo sistema.</p>
     <div class="install-grid">
       <article class="install-choice" id="androidChoice">
@@ -739,7 +739,7 @@
     if(installPrompt){
       installPrompt.prompt();
       const result=await installPrompt.userChoice;
-      status.textContent=result.outcome==="accepted"?"Instalación aceptada. Busca Agenda MIA entre tus aplicaciones.":"La instalación fue cancelada; puedes intentarlo nuevamente.";
+      status.textContent=result.outcome==="accepted"?"Instalación aceptada. Busca {{ empresa.nombre|escapejs }} entre tus aplicaciones.":"La instalación fue cancelada; puedes intentarlo nuevamente.";
       status.classList.add("show");installPrompt=null;return;
     }
     steps.classList.add("show");
@@ -885,7 +885,8 @@
   const patientResultsSummary=document.getElementById("patientResultsSummary");
   const patientsLoadMore=document.getElementById("patientsLoadMore");
   const recentPatientIds=new Set(appPatients.slice(0,20).map(patient=>String(patient.id)));
-  const patientFavoriteKey="hospital_mia_patient_favorites";
+  const appCompanySlug="{{ empresa.slug|escapejs }}";
+  const patientFavoriteKey=`${appCompanySlug}_patient_favorites`;
   let patientFilter="todos",patientView="grid",visiblePatients=16,activeProfilePatient=null;
   let patientFavorites=new Set();
   try{patientFavorites=new Set(JSON.parse(localStorage.getItem(patientFavoriteKey)||"[]").map(String))}catch(error){patientFavorites=new Set()}
@@ -1053,11 +1054,11 @@
   let quickSubmitting=false;
   const quickPricesIncludeTax={{ precios_incluyen_impuesto_app|yesno:"true,false" }};
   const quickRecentIds=()=>{
-    try{return JSON.parse(localStorage.getItem("hospital-mia-quick-products")||"[]")}catch(error){return []}
+    try{return JSON.parse(localStorage.getItem(`${appCompanySlug}_quick_products`)||"[]")}catch(error){return []}
   };
   const rememberQuickProduct=id=>{
     const updated=[String(id),...quickRecentIds().filter(item=>String(item)!==String(id))].slice(0,12);
-    localStorage.setItem("hospital-mia-quick-products",JSON.stringify(updated));
+    localStorage.setItem(`${appCompanySlug}_quick_products`,JSON.stringify(updated));
   };
   const setQuickStatus=(message,isError=false)=>{
     if(!quickStatus)return;

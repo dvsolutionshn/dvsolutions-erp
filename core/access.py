@@ -27,12 +27,16 @@ FACTURACION_PERMISSION_MAP = [
 ]
 
 
-EMPRESAS_CON_MODO_CLINICO_SIMPLE = frozenset({
+EMPRESAS_INTERFAZ_CLINICA_GLOBAL = frozenset({
     "hospital_mia",
     "medical_spa",
     "serviciosmedicos",
     "luque_aestetic",
 })
+
+# Las cuatro empresas comparten la misma experiencia clínica. Se conserva este
+# alias porque el modo simplificado y la interfaz global tienen el mismo alcance.
+EMPRESAS_CON_MODO_CLINICO_SIMPLE = EMPRESAS_INTERFAZ_CLINICA_GLOBAL
 
 
 def modo_clinico_simple_activo(user, empresa):

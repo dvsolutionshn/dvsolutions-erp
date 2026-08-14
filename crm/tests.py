@@ -482,7 +482,7 @@ class CRMTests(TestCase):
         self.assertContains(response, '<article class="patients-premium-shell">')
         self.assertContains(response, '<div class="premium-invoice-shell">')
         self.assertContains(response, "premium-calendar-shell")
-        self.assertContains(response, "Caja móvil · Hospital Mía")
+        self.assertContains(response, f"Caja móvil · {self.empresa.nombre}")
         self.assertContains(response, "vista=agenda")
         self.assertContains(response, "vista=proximas")
         self.assertContains(response, "app=agenda")
@@ -496,10 +496,32 @@ class CRMTests(TestCase):
             {"fecha": "2026-06-30"},
         )
         self.assertEqual(medical_response.status_code, 200)
-        self.assertNotContains(medical_response, '<article class="patients-premium-shell">')
-        self.assertNotContains(medical_response, '<div class="premium-invoice-shell">')
-        self.assertNotContains(medical_response, "premium-calendar-shell")
-        self.assertContains(medical_response, "Expedientes al alcance")
+        self.assertContains(medical_response, '<article class="patients-premium-shell">')
+        self.assertContains(medical_response, '<div class="premium-invoice-shell">')
+        self.assertContains(medical_response, "premium-calendar-shell")
+        self.assertContains(medical_response, f"Caja móvil · {medical_spa.nombre}")
+        for indice, (slug, nombre) in enumerate(
+            [
+                ("luque_aestetic", "Luque Aestetic"),
+                ("serviciosmedicos", "Servicios Médicos"),
+            ],
+            start=1,
+        ):
+            empresa_clinica = Empresa.objects.create(
+                nombre=nombre,
+                slug=slug,
+                rtn=f"080119991112{indice}",
+                estado_licencia="activa",
+            )
+            EmpresaModulo.objects.create(empresa=empresa_clinica, modulo=self.modulo_citas, activo=True)
+            self.usuario.empresas_acceso.add(empresa_clinica)
+            empresa_response = self.client.get(reverse("agenda_mobile", args=[empresa_clinica.slug]))
+            with self.subTest(empresa=slug):
+                self.assertEqual(empresa_response.status_code, 200)
+                self.assertContains(empresa_response, '<article class="patients-premium-shell">')
+                self.assertContains(empresa_response, '<div class="premium-invoice-shell">')
+                self.assertContains(empresa_response, "premium-calendar-shell")
+                self.assertContains(empresa_response, f"Caja móvil · {nombre}")
         vista_agenda = self.client.get(
             reverse("agenda_mobile", args=[self.empresa.slug]),
             {"vista": "agenda", "fecha": "2026-06-30"},

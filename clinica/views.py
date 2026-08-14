@@ -18,6 +18,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
 
+from core.access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
@@ -237,7 +238,7 @@ def _configuracion_clinica(empresa):
     return ConfiguracionClinica.objects.get_or_create(empresa=empresa)[0]
 
 
-EMPRESAS_FORMULARIOS_CLINICOS = {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"}
+EMPRESAS_FORMULARIOS_CLINICOS = EMPRESAS_INTERFAZ_CLINICA_GLOBAL
 
 
 def _requiere_hospital_mia(empresa):
@@ -703,7 +704,7 @@ def pacientes(request, empresa_slug):
         )
     cumpleaneros_mes = pacientes_qs.filter(fecha_nacimiento__month=hoy.month).count()
     pacientes_lista = list(pacientes_qs)
-    vista_premium_pacientes = empresa.slug == "hospital_mia"
+    vista_premium_pacientes = empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS
     if vista_premium_pacientes:
         for paciente in pacientes_lista:
             telefono_base = paciente.whatsapp or paciente.telefono or ""

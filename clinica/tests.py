@@ -917,6 +917,30 @@ class ClinicaPacienteTests(TestCase):
         )
         self.assertContains(response, "Historia clínica")
 
+    def test_directorio_premium_se_comparte_con_las_cuatro_empresas_clinicas(self):
+        modulo = Modulo.objects.get(codigo="clinica_medica")
+        empresas = [self.empresa]
+        for indice, (slug, nombre) in enumerate(
+            [
+                ("medical_spa", "Mia Medical Spa"),
+                ("luque_aestetic", "Luque Aestetic"),
+                ("serviciosmedicos", "Servicios Médicos"),
+            ],
+            start=1,
+        ):
+            empresa = Empresa.objects.create(nombre=nombre, slug=slug, rtn=f"08011999000{indice}")
+            EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
+            self.user.empresas_acceso.add(empresa)
+            empresas.append(empresa)
+
+        for empresa in empresas:
+            with self.subTest(empresa=empresa.slug):
+                response = self.client.get(reverse("clinica_pacientes", args=[empresa.slug]))
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.context["vista_premium_pacientes"])
+                self.assertContains(response, "patients-web-premium")
+                self.assertContains(response, f"Directorio clínico · {empresa.nombre}")
+
     def test_sugerencias_pacientes_busca_por_documento(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
