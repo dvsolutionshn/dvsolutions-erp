@@ -119,7 +119,7 @@
 
   <div class="content">
     {% if messages %}<div class="messages">{% for message in messages %}<div class="message">{{ message }}</div>{% endfor %}</div>{% endif %}
-    {% if agenda_espejo %}<div class="mirror-note">Vista espejo: aquí se muestran las citas de {{ agenda_empresa.nombre }} asignadas al Dr. Luis González.</div>{% endif %}
+    {% if agenda_espejo %}<div class="mirror-note">Las citas se programan directamente en {{ agenda_empresa.nombre }}.{% if empresa.slug == "serviciosmedicos" %} Aquí se muestran las asignadas al Dr. Luis González.{% else %} La edición y el seguimiento se administran desde Hospital Mía.{% endif %}</div>{% endif %}
     <section class="mobile-home mobile-app-screen active" id="inicio">
       <div class="mobile-home-title">
         <div><small>Inicio rápido</small><h2>¿Qué desea hacer ahora?</h2></div>
@@ -602,7 +602,7 @@
     <div class="actions-menu">
       {% if agenda_espejo %}
       {% if cita.whatsapp_url %}<a class="action-link whatsapp" href="{{ cita.whatsapp_url }}" target="_blank" rel="noopener">Escribir por WhatsApp</a>{% endif %}
-      <div class="mobile-swipe-tip">Vista informativa desde Servicios Médicos. Para editar, use la agenda de Hospital Mia.</div>
+      <div class="mobile-swipe-tip">Esta cita pertenece a Hospital Mía. Su edición y seguimiento se administran desde la app de Hospital Mía.</div>
       {% else %}
       <a class="action-link" href="?fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar={{ cita.id }}#editor">Editar información</a>
       {% if cita.whatsapp_url %}<a class="action-link whatsapp" href="{{ cita.whatsapp_url }}" target="_blank" rel="noopener">Escribir por WhatsApp</a>{% endif %}
@@ -647,6 +647,7 @@
 <script>
 (() => {
   const editor=document.getElementById("editor");
+  const agendaCentralizada={{ agenda_espejo|yesno:"true,false" }};
   const openSheet=sheet=>sheet&&sheet.classList.add("open");
   const closeSheet=sheet=>sheet&&sheet.classList.remove("open");
   document.querySelectorAll("[data-open-editor]").forEach(b=>b.addEventListener("click",()=>openSheet(editor)));
@@ -978,7 +979,14 @@
   };
   const startPatientAppointment=patient=>{
     if(!patient)return;
-    choosePatient(patient);
+    if(agendaCentralizada&&!patient.agenda_paciente_id){
+      if(patientInput)patientInput.value=patient.nombre||"";
+      openAppPanel("agenda-app");
+      requestAnimationFrame(()=>{openSheet(editor);searchPatients()});
+      return;
+    }
+    const agendaPatientId=patient.agenda_paciente_id||patient.id;
+    choosePatient({...patient,id:agendaPatientId,expediente:patient.agenda_expediente||patient.expediente});
     openAppPanel("agenda-app");
     requestAnimationFrame(()=>openSheet(editor));
   };

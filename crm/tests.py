@@ -82,6 +82,70 @@ class CRMTests(TestCase):
         response_erp = self.client.get(reverse("dashboard", args=[self.empresa.slug]), {"vista": "erp"})
         self.assertEqual(response_erp.status_code, 200)
 
+    def test_luque_sin_modulo_citas_programa_directamente_en_hospital_mia(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        luque = Empresa.objects.create(
+            nombre="Luque Aestetic",
+            slug="luque_aestetic",
+            rtn="08011999111991",
+            estado_licencia="activa",
+        )
+        self.usuario.empresas_acceso.add(luque)
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-APP-01",
+            identidad="0801199912345",
+            nombre="Paciente Agenda Central",
+        )
+        Paciente.objects.create(
+            empresa=luque,
+            expediente_codigo="LQ-APP-01",
+            identidad=paciente.identidad,
+            nombre=paciente.nombre,
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta central",
+            categoria="consulta",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dra. Agenda Central",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        app_response = self.client.get(reverse("agenda_mobile", args=[luque.slug]))
+        self.assertEqual(app_response.status_code, 200)
+        self.assertFalse(luque.tiene_modulo_activo("agenda_citas"))
+        self.assertContains(app_response, "Las citas se programan directamente en Hospital Mia")
+        self.assertEqual(app_response.context["pacientes_app_payload"][0]["agenda_paciente_id"], paciente.id)
+
+        search_response = self.client.get(
+            reverse("agenda_buscar_pacientes", args=[luque.slug]),
+            {"q": "Agenda Central"},
+        )
+        self.assertEqual(search_response.status_code, 200)
+        self.assertEqual(search_response.json()["results"][0]["id"], paciente.id)
+
+        response = self.client.post(
+            reverse("agenda_mobile", args=[luque.slug]),
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": profesional.id,
+                "fecha_cita": "2026-09-20",
+                "hora_cita": "10:00",
+                "periodo_cita": "AM",
+                "estado": "pendiente",
+                "observacion": "Creada desde Luque Aestetic",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(CitaCliente.objects.filter(empresa=self.empresa, paciente=paciente).exists())
+        self.assertFalse(CitaCliente.objects.filter(empresa=luque).exists())
+
     def test_configuracion_crm_muestra_panel_premium_de_automatizaciones(self):
         self.client.login(username="crmuser", password="pass12345")
         response = self.client.get(reverse("crm_configuracion", args=[self.empresa.slug]))
@@ -458,7 +522,6 @@ class CRMTests(TestCase):
             rtn="08011999111115",
             estado_licencia="activa",
         )
-        EmpresaModulo.objects.create(empresa=medical_spa, modulo=self.modulo_citas, activo=True)
         self.usuario.empresas_acceso.add(medical_spa)
         empresas_clinicas = [self.empresa, medical_spa]
         cliente = Cliente.objects.create(
@@ -517,7 +580,12 @@ class CRMTests(TestCase):
             reverse("agenda_mobile", args=[medical_spa.slug]),
             {"fecha": "2026-06-30"},
         )
+        medical_manifest = self.client.get(reverse("agenda_mobile_manifest", args=[medical_spa.slug]))
+        medical_service_worker = self.client.get(reverse("agenda_mobile_service_worker", args=[medical_spa.slug]))
         self.assertEqual(medical_response.status_code, 200)
+        self.assertEqual(medical_manifest.status_code, 200)
+        self.assertEqual(medical_service_worker.status_code, 200)
+        self.assertEqual(medical_response.context["agenda_empresa"], self.empresa)
         self.assertContains(medical_response, '<article class="patients-premium-shell">')
         self.assertContains(medical_response, '<div class="premium-invoice-shell">')
         self.assertContains(medical_response, "premium-calendar-shell")
@@ -537,12 +605,12 @@ class CRMTests(TestCase):
                 rtn=f"080119991112{indice}",
                 estado_licencia="activa",
             )
-            EmpresaModulo.objects.create(empresa=empresa_clinica, modulo=self.modulo_citas, activo=True)
             self.usuario.empresas_acceso.add(empresa_clinica)
             empresas_clinicas.append(empresa_clinica)
             empresa_response = self.client.get(reverse("agenda_mobile", args=[empresa_clinica.slug]))
             with self.subTest(empresa=slug):
                 self.assertEqual(empresa_response.status_code, 200)
+                self.assertEqual(empresa_response.context["agenda_empresa"], self.empresa)
                 self.assertContains(empresa_response, '<article class="patients-premium-shell">')
                 self.assertContains(empresa_response, '<div class="premium-invoice-shell">')
                 self.assertContains(empresa_response, "premium-calendar-shell")

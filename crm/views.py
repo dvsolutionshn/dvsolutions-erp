@@ -47,6 +47,11 @@ AGENDA_ESPEJO_SERVICIOSMEDICOS = {
     "origen": "hospital_mia",
     "profesional_tokens": ("luis", "gonz"),
 }
+EMPRESAS_AGENDA_CENTRAL_HOSPITAL_MIA = frozenset({
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+})
 
 
 def _normalizar_texto_agenda(valor):
@@ -55,7 +60,7 @@ def _normalizar_texto_agenda(valor):
 
 
 def _empresa_origen_agenda(empresa):
-    if empresa.slug == "serviciosmedicos":
+    if empresa.slug in EMPRESAS_AGENDA_CENTRAL_HOSPITAL_MIA:
         origen = Empresa.objects.filter(slug=AGENDA_ESPEJO_SERVICIOSMEDICOS["origen"]).first()
         if origen:
             return origen
@@ -123,8 +128,11 @@ def _fecha_agenda(valor):
 
 
 def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_predeterminada="mes"):
-    es_clinica = bool(empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica"))
     empresa_agenda = _empresa_origen_agenda(empresa)
+    es_clinica = bool(
+        empresa_agenda.tipo_solucion == "clinica"
+        or empresa_agenda.tiene_modulo_activo("clinica_medica")
+    )
     agenda_espejo = empresa_agenda.id != empresa.id
     vista = request.GET.get("vista", vista_predeterminada)
     if vista not in {"mes", "semana", "dia", "anio", "agenda", "proximas"}:
@@ -303,7 +311,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
     if paciente_id_inicial:
         try:
             paciente_busqueda_inicial = Paciente.objects.filter(
-                empresa=empresa,
+                empresa=empresa_agenda,
                 id=paciente_id_inicial,
             ).first()
         except (TypeError, ValueError):
@@ -350,7 +358,7 @@ def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_pre
                 empresa=empresa, categoria="tratamientos", activo=True
             ).order_by("orden", "nombre")
         ) if empresa.slug == "hospital_mia" else [],
-        "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa) if es_clinica else None,
+        "paciente_rapido_form": PacienteRapidoCitaForm(empresa=empresa_agenda) if es_clinica else None,
         "paciente_busqueda_inicial": paciente_busqueda_inicial,
         "pacientes_busqueda": pacientes_busqueda,
         "cliente_busqueda_inicial": cliente_busqueda_inicial,
@@ -908,11 +916,12 @@ def enviar_campania_whatsapp_api(request, empresa_slug, campania_id):
 @login_required
 def citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    empresa_agenda = _empresa_origen_agenda(empresa)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
+    objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)
         messages.success(request, f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("crm_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form))
@@ -922,11 +931,14 @@ def citas(request, empresa_slug):
 def agenda_citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     _asegurar_pacientes_empresas_clinicas(empresa)
+    empresa_agenda = _empresa_origen_agenda(empresa)
+    if empresa_agenda.id != empresa.id:
+        _asegurar_pacientes_empresas_clinicas(empresa_agenda)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
+    objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)
         messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
@@ -937,11 +949,15 @@ def agenda_mobile(request, empresa_slug):
     acceso_denegado = _proteger_agenda_mobile(request, empresa)
     if acceso_denegado:
         return acceso_denegado
+    empresa_agenda = _empresa_origen_agenda(empresa)
+    _asegurar_pacientes_empresas_clinicas(empresa)
+    if empresa_agenda.id != empresa.id:
+        _asegurar_pacientes_empresas_clinicas(empresa_agenda)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
+    objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
+        cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)
         messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) creada(s) correctamente.")
         fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
         vista_regreso = request.GET.get("vista") or request.POST.get("vista") or "dia"
@@ -1068,14 +1084,53 @@ def agenda_mobile(request, empresa_slug):
         pacientes_activos_qs.select_related("cliente")
         .order_by("-fecha_actualizacion", "nombre")[:limite_pacientes_app]
     )
-    pacientes_ids = [paciente.id for paciente in pacientes_app_qs]
+    pacientes_agenda_por_perfil = {}
+    pacientes_agenda_por_identidad = {}
+    pacientes_agenda_por_nombre = {}
+    if empresa_agenda.id != empresa.id:
+        for paciente_agenda in Paciente.objects.filter(
+            empresa=empresa_agenda,
+            activo=True,
+        ).select_related("cliente"):
+            perfil_id = getattr(paciente_agenda.cliente, "perfil_compartido_id", None)
+            if perfil_id:
+                pacientes_agenda_por_perfil[str(perfil_id)] = paciente_agenda
+            if paciente_agenda.identidad:
+                pacientes_agenda_por_identidad[paciente_agenda.identidad.strip().casefold()] = paciente_agenda
+            if paciente_agenda.nombre:
+                clave_nombre = paciente_agenda.nombre.strip().casefold()
+                pacientes_agenda_por_nombre[clave_nombre] = (
+                    None if clave_nombre in pacientes_agenda_por_nombre else paciente_agenda
+                )
+
+    def _paciente_en_agenda(paciente):
+        if empresa_agenda.id == empresa.id:
+            return paciente
+        perfil_id = getattr(paciente.cliente, "perfil_compartido_id", None)
+        if perfil_id and str(perfil_id) in pacientes_agenda_por_perfil:
+            return pacientes_agenda_por_perfil[str(perfil_id)]
+        identidad = (paciente.identidad or "").strip().casefold()
+        if identidad and identidad in pacientes_agenda_por_identidad:
+            return pacientes_agenda_por_identidad[identidad]
+        return pacientes_agenda_por_nombre.get((paciente.nombre or "").strip().casefold())
+
+    paciente_agenda_por_paciente = {
+        paciente.id: _paciente_en_agenda(paciente)
+        for paciente in pacientes_app_qs
+    }
+    paciente_local_por_agenda_id = {
+        paciente_agenda.id: paciente_id
+        for paciente_id, paciente_agenda in paciente_agenda_por_paciente.items()
+        if paciente_agenda
+    }
+    pacientes_agenda_ids = list(paciente_local_por_agenda_id)
     proximas_por_paciente = {}
     frecuencia_por_paciente = {}
-    if contexto["pacientes_app_premium"] and pacientes_ids:
+    if contexto["pacientes_app_premium"] and pacientes_agenda_ids:
         proximas_pacientes_qs = (
             CitaCliente.objects.filter(
-                empresa=empresa,
-                paciente_id__in=pacientes_ids,
+                empresa=empresa_agenda,
+                paciente_id__in=pacientes_agenda_ids,
                 fecha_hora__gte=ahora,
                 estado__in=["pendiente", "confirmada"],
             )
@@ -1083,15 +1138,18 @@ def agenda_mobile(request, empresa_slug):
             .order_by("fecha_hora")
         )
         for cita in proximas_pacientes_qs:
-            proximas_por_paciente.setdefault(cita.paciente_id, cita)
+            paciente_local_id = paciente_local_por_agenda_id.get(cita.paciente_id)
+            if paciente_local_id:
+                proximas_por_paciente.setdefault(paciente_local_id, cita)
         frecuencia_por_paciente = {
-            fila["paciente_id"]: fila["total"]
+            paciente_local_por_agenda_id[fila["paciente_id"]]: fila["total"]
             for fila in CitaCliente.objects.filter(
-                empresa=empresa,
-                paciente_id__in=pacientes_ids,
+                empresa=empresa_agenda,
+                paciente_id__in=pacientes_agenda_ids,
             )
             .values("paciente_id")
             .annotate(total=Count("id"))
+            if fila["paciente_id"] in paciente_local_por_agenda_id
         }
 
     def _foto_paciente_app(paciente):
@@ -1104,6 +1162,7 @@ def agenda_mobile(request, empresa_slug):
 
     def _payload_paciente_app(paciente):
         proxima = proximas_por_paciente.get(paciente.id)
+        paciente_agenda = paciente_agenda_por_paciente.get(paciente.id)
         fecha_actualizacion = timezone.localtime(paciente.fecha_actualizacion)
         telefono = paciente.whatsapp or paciente.telefono or ""
         alergias = (paciente.alergias or "").strip()
@@ -1138,6 +1197,8 @@ def agenda_mobile(request, empresa_slug):
             "actualizado_iso": fecha_actualizacion.isoformat(),
             "frecuencia": frecuencia_por_paciente.get(paciente.id, 0),
             "cliente_id": paciente.cliente_id,
+            "agenda_paciente_id": paciente_agenda.id if paciente_agenda else None,
+            "agenda_expediente": paciente_agenda.expediente_codigo if paciente_agenda else "",
             "url": reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id]),
         }
         if contexto["pacientes_app_premium"]:
@@ -1285,11 +1346,16 @@ self.addEventListener("message", event => {{
 
 @login_required
 def buscar_pacientes_cita(request, empresa_slug):
-    empresa = _empresa_desde_slug(empresa_slug)
-    if not request.user.puede_acceder_empresa(empresa):
+    empresa_operativa = _empresa_desde_slug(empresa_slug)
+    if not request.user.puede_acceder_empresa(empresa_operativa):
         return JsonResponse({"results": [], "error": "Acceso no autorizado."}, status=403)
-    if not request.user.tiene_permiso_erp("puede_citas"):
+    if not (
+        request.user.tiene_permiso_erp("puede_citas", empresa_operativa)
+        or request.user.tiene_alguna_permision_facturacion_empresa(empresa_operativa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa_operativa)
+    ):
         return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
+    empresa = _empresa_origen_agenda(empresa_operativa)
 
     query = " ".join((request.GET.get("q") or "").split())
     pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
@@ -1324,11 +1390,16 @@ def buscar_pacientes_cita(request, empresa_slug):
 
 @login_required
 def buscar_clientes_cita(request, empresa_slug):
-    empresa = _empresa_desde_slug(empresa_slug)
-    if not request.user.puede_acceder_empresa(empresa):
+    empresa_operativa = _empresa_desde_slug(empresa_slug)
+    if not request.user.puede_acceder_empresa(empresa_operativa):
         return JsonResponse({"results": [], "error": "Acceso no autorizado."}, status=403)
-    if not request.user.tiene_permiso_erp("puede_citas"):
+    if not (
+        request.user.tiene_permiso_erp("puede_citas", empresa_operativa)
+        or request.user.tiene_alguna_permision_facturacion_empresa(empresa_operativa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa_operativa)
+    ):
         return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
+    empresa = _empresa_origen_agenda(empresa_operativa)
 
     query = " ".join((request.GET.get("q") or "").split())
     clientes = Cliente.objects.filter(empresa=empresa, activo=True)
@@ -1359,7 +1430,16 @@ def buscar_clientes_cita(request, empresa_slug):
 @login_required
 @require_POST
 def crear_paciente_rapido_cita(request, empresa_slug):
-    empresa = _empresa_desde_slug(empresa_slug)
+    empresa_operativa = _empresa_desde_slug(empresa_slug)
+    if not request.user.puede_acceder_empresa(empresa_operativa):
+        return JsonResponse({"ok": False, "error": "Acceso no autorizado."}, status=403)
+    if not (
+        request.user.tiene_permiso_erp("puede_citas", empresa_operativa)
+        or request.user.tiene_alguna_permision_facturacion_empresa(empresa_operativa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa_operativa)
+    ):
+        return JsonResponse({"ok": False, "error": "Sin permiso para crear pacientes desde citas."}, status=403)
+    empresa = _empresa_origen_agenda(empresa_operativa)
     es_clinica = empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")
     if not es_clinica:
         return JsonResponse(

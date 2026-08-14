@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 from core.access import (
+    EMPRESAS_INTERFAZ_CLINICA_GLOBAL,
     permiso_contabilidad_accion,
     permiso_contabilidad_desde_ruta,
     permiso_clinica_desde_ruta,
@@ -163,12 +164,35 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
 
-                if not empresa.tiene_modulo_activo("agenda_citas"):
+                suffix = "/".join(parts[3:])
+                rutas_auxiliares_app = {
+                    "pacientes/buscar",
+                    "clientes/buscar",
+                    "pacientes/crear-rapido",
+                }
+                es_app_clinica_global = bool(
+                    empresa.slug in EMPRESAS_INTERFAZ_CLINICA_GLOBAL
+                    and (
+                        suffix == "app"
+                        or suffix.startswith("app/")
+                        or suffix in rutas_auxiliares_app
+                    )
+                )
+
+                if not empresa.tiene_modulo_activo("agenda_citas") and not es_app_clinica_global:
                     messages.error(request, "El modulo de citas no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    if not request.user.tiene_permiso_erp("puede_citas", empresa):
+                    tiene_permiso_app = bool(
+                        es_app_clinica_global
+                        and (
+                            request.user.tiene_permiso_erp("puede_citas", empresa)
+                            or request.user.tiene_alguna_permision_facturacion_empresa(empresa)
+                            or request.user.tiene_alguna_permision_clinica_empresa(empresa)
+                        )
+                    )
+                    if not tiene_permiso_app and not request.user.tiene_permiso_erp("puede_citas", empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a citas.")
                         return redirect("dashboard", slug=empresa.slug)
 
