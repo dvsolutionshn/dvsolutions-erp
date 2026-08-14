@@ -22,7 +22,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
-from .access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL, modo_clinico_simple_activo
+from .access import modo_clinico_simple_activo
 from .access_tokens import emitir_token_acceso, enviar_correo_acceso, hash_token_acceso
 from .backup_service import generar_respaldo_empresa
 from .backup_tokens import generar_token_respaldo, hash_token_respaldo
@@ -623,8 +623,6 @@ def csrf_failure(request, reason=""):
 
 
 def _redirect_dashboard_empresa(request, empresa):
-    if _puede_usar_interfaz_clinica_global(request.user, empresa):
-        return redirect("agenda_mobile", empresa_slug=empresa.slug)
     if _usa_host_empresa(request, empresa):
         return redirect("dashboard_host")
     return redirect("dashboard", slug=empresa.slug)
@@ -641,20 +639,6 @@ def _es_perfil_clinico(empresa):
         empresa.tipo_solucion == "clinica"
         or empresa.slug in {"hospital_mia", "medical_spa"}
         or empresa.tiene_modulo_activo("clinica_medica")
-    )
-
-
-def _puede_usar_interfaz_clinica_global(usuario, empresa):
-    return bool(
-        usuario
-        and usuario.is_authenticated
-        and empresa.slug in EMPRESAS_INTERFAZ_CLINICA_GLOBAL
-        and usuario.puede_acceder_empresa(empresa)
-        and (
-            usuario.tiene_permiso_erp("puede_citas", empresa)
-            or usuario.tiene_alguna_permision_facturacion_empresa(empresa)
-            or usuario.tiene_alguna_permision_clinica_empresa(empresa)
-        )
     )
 
 
@@ -694,8 +678,6 @@ def empresa_login(request, slug=None):
                     require_https=request.is_secure(),
                 ):
                     return redirect(siguiente)
-                if _puede_usar_interfaz_clinica_global(user, empresa):
-                    return redirect("agenda_mobile", empresa_slug=empresa.slug)
                 if es_perfil_clinico:
                     if (
                         empresa.tiene_modulo_activo("clinica_medica")
@@ -961,9 +943,6 @@ def dashboard(request, slug=None):
         messages.error(request, "La licencia comercial de esta empresa no se encuentra operativa. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
         logout(request)
         return _redirect_login_empresa(request, empresa)
-
-    if request.GET.get("vista") != "erp" and _puede_usar_interfaz_clinica_global(request.user, empresa):
-        return redirect("agenda_mobile", empresa_slug=empresa.slug)
 
     modulos_activos = empresa.modulos_habilitados()
     if modo_clinico_simple_activo(request.user, empresa):

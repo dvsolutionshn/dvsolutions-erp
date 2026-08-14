@@ -60,6 +60,14 @@ def _normalizar_texto_agenda(valor):
 
 
 def _empresa_origen_agenda(empresa):
+    if empresa.slug == "serviciosmedicos":
+        origen = Empresa.objects.filter(slug=AGENDA_ESPEJO_SERVICIOSMEDICOS["origen"]).first()
+        if origen:
+            return origen
+    return empresa
+
+
+def _empresa_origen_agenda_mobile(empresa):
     if empresa.slug in EMPRESAS_AGENDA_CENTRAL_HOSPITAL_MIA:
         origen = Empresa.objects.filter(slug=AGENDA_ESPEJO_SERVICIOSMEDICOS["origen"]).first()
         if origen:
@@ -127,8 +135,16 @@ def _fecha_agenda(valor):
         return timezone.localdate()
 
 
-def _contexto_calendario(empresa, request, form, *, modo_agenda=False, vista_predeterminada="mes"):
-    empresa_agenda = _empresa_origen_agenda(empresa)
+def _contexto_calendario(
+    empresa,
+    request,
+    form,
+    *,
+    modo_agenda=False,
+    vista_predeterminada="mes",
+    empresa_agenda=None,
+):
+    empresa_agenda = empresa_agenda or _empresa_origen_agenda(empresa)
     es_clinica = bool(
         empresa_agenda.tipo_solucion == "clinica"
         or empresa_agenda.tiene_modulo_activo("clinica_medica")
@@ -916,12 +932,11 @@ def enviar_campania_whatsapp_api(request, empresa_slug, campania_id):
 @login_required
 def citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    empresa_agenda = _empresa_origen_agenda(empresa)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto)
+    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)
+        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
         messages.success(request, f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("crm_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form))
@@ -931,14 +946,11 @@ def citas(request, empresa_slug):
 def agenda_citas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     _asegurar_pacientes_empresas_clinicas(empresa)
-    empresa_agenda = _empresa_origen_agenda(empresa)
-    if empresa_agenda.id != empresa.id:
-        _asegurar_pacientes_empresas_clinicas(empresa_agenda)
     cita_id = request.POST.get("cita_id") or request.GET.get("editar")
-    objeto = get_object_or_404(CitaCliente, empresa=empresa_agenda, id=cita_id) if cita_id else None
-    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa_agenda, instance=objeto)
+    objeto = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id) if cita_id else None
+    form = CitaClienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=objeto)
     if request.method == "POST" and form.is_valid():
-        cita, creadas = _guardar_cita_formulario(request, empresa_agenda, form, objeto)
+        cita, creadas = _guardar_cita_formulario(request, empresa, form, objeto)
         messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
@@ -949,7 +961,7 @@ def agenda_mobile(request, empresa_slug):
     acceso_denegado = _proteger_agenda_mobile(request, empresa)
     if acceso_denegado:
         return acceso_denegado
-    empresa_agenda = _empresa_origen_agenda(empresa)
+    empresa_agenda = _empresa_origen_agenda_mobile(empresa)
     _asegurar_pacientes_empresas_clinicas(empresa)
     if empresa_agenda.id != empresa.id:
         _asegurar_pacientes_empresas_clinicas(empresa_agenda)
@@ -971,6 +983,7 @@ def agenda_mobile(request, empresa_slug):
         form,
         modo_agenda=True,
         vista_predeterminada="dia",
+        empresa_agenda=empresa_agenda,
     )
     contexto["empresas_app_switch"] = [
         {
@@ -1355,7 +1368,7 @@ def buscar_pacientes_cita(request, empresa_slug):
         or request.user.tiene_alguna_permision_clinica_empresa(empresa_operativa)
     ):
         return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
-    empresa = _empresa_origen_agenda(empresa_operativa)
+    empresa = _empresa_origen_agenda_mobile(empresa_operativa)
 
     query = " ".join((request.GET.get("q") or "").split())
     pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
@@ -1399,7 +1412,7 @@ def buscar_clientes_cita(request, empresa_slug):
         or request.user.tiene_alguna_permision_clinica_empresa(empresa_operativa)
     ):
         return JsonResponse({"results": [], "error": "Sin permiso para gestionar citas."}, status=403)
-    empresa = _empresa_origen_agenda(empresa_operativa)
+    empresa = _empresa_origen_agenda_mobile(empresa_operativa)
 
     query = " ".join((request.GET.get("q") or "").split())
     clientes = Cliente.objects.filter(empresa=empresa, activo=True)
@@ -1439,7 +1452,7 @@ def crear_paciente_rapido_cita(request, empresa_slug):
         or request.user.tiene_alguna_permision_clinica_empresa(empresa_operativa)
     ):
         return JsonResponse({"ok": False, "error": "Sin permiso para crear pacientes desde citas."}, status=403)
-    empresa = _empresa_origen_agenda(empresa_operativa)
+    empresa = _empresa_origen_agenda_mobile(empresa_operativa)
     es_clinica = empresa.tipo_solucion == "clinica" or empresa.tiene_modulo_activo("clinica_medica")
     if not es_clinica:
         return JsonResponse(

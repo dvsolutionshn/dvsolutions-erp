@@ -61,26 +61,26 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CRM y Marketing")
 
-    def test_empresa_clinica_entra_y_regresa_siempre_a_interfaz_mejorada(self):
+    def test_empresa_clinica_mantiene_separadas_las_interfaces_web_y_app(self):
         response_login = self.client.post(
             reverse("empresa_login", args=[self.empresa.slug]),
             {"username": "crmuser", "password": "pass12345"},
         )
         self.assertRedirects(
             response_login,
-            reverse("agenda_mobile", args=[self.empresa.slug]),
+            reverse("agenda_citas", args=[self.empresa.slug]),
             fetch_redirect_response=False,
         )
 
         response_dashboard = self.client.get(reverse("dashboard", args=[self.empresa.slug]))
-        self.assertRedirects(
-            response_dashboard,
-            reverse("agenda_mobile", args=[self.empresa.slug]),
-            fetch_redirect_response=False,
-        )
+        self.assertEqual(response_dashboard.status_code, 200)
+        self.assertTemplateUsed(response_dashboard, "core/dashboard_premium.html")
+        self.assertNotContains(response_dashboard, 'class="mobile-home mobile-app-screen active"')
 
-        response_erp = self.client.get(reverse("dashboard", args=[self.empresa.slug]), {"vista": "erp"})
-        self.assertEqual(response_erp.status_code, 200)
+        response_app = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
+        self.assertEqual(response_app.status_code, 200)
+        self.assertTemplateUsed(response_app, "crm/agenda_mobile.html")
+        self.assertContains(response_app, 'class="mobile-home mobile-app-screen active"')
 
     def test_luque_sin_modulo_citas_programa_directamente_en_hospital_mia(self):
         self.empresa.tipo_solucion = "clinica"
@@ -616,13 +616,11 @@ class CRMTests(TestCase):
                 self.assertContains(empresa_response, "premium-calendar-shell")
                 self.assertContains(empresa_response, f"Caja móvil · {nombre}")
         for empresa_clinica in empresas_clinicas:
-            with self.subTest(entrada_predeterminada=empresa_clinica.slug):
+            with self.subTest(interfaz_web=empresa_clinica.slug):
                 dashboard_response = self.client.get(reverse("dashboard", args=[empresa_clinica.slug]))
-                self.assertRedirects(
-                    dashboard_response,
-                    reverse("agenda_mobile", args=[empresa_clinica.slug]),
-                    fetch_redirect_response=False,
-                )
+                self.assertEqual(dashboard_response.status_code, 200)
+                self.assertTemplateUsed(dashboard_response, "core/dashboard_premium.html")
+                self.assertNotContains(dashboard_response, 'class="mobile-home mobile-app-screen active"')
         vista_agenda = self.client.get(
             reverse("agenda_mobile", args=[self.empresa.slug]),
             {"vista": "agenda", "fecha": "2026-06-30"},

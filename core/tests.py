@@ -866,7 +866,7 @@ class SuperAdminControlTests(TestCase):
         )
         self.client.force_login(usuario)
 
-        response = self.client.get(reverse("dashboard", args=[empresa.slug]), {"vista": "erp"})
+        response = self.client.get(reverse("dashboard", args=[empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Bienvenida doctora")
