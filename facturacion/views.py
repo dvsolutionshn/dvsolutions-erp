@@ -76,6 +76,12 @@ def _registrar_cambio_costo_real(producto, costo_anterior, usuario):
     )
 
 POS_CLIENTE_OBLIGATORIO_SLUGS = {"hospital_mia", "medical_spa"}
+POS_BUSQUEDA_CLIENTES_SLUGS = {
+    "hospital_mia",
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+}
 CAJA_EXCLUYE_FACTURAS_ANULADAS_SLUGS = {"hospital_mia", "medical_spa"}
 USUARIOS_DUENOS_ELIMINAN_COMPRAS_ANULADAS = {"dannyvarela25"}
 CORREOS_DUENOS_ELIMINAN_COMPRAS_ANULADAS = {"dannyvarela25@gmail.com"}
@@ -797,7 +803,7 @@ def configurar_promocion_pos(request, empresa_slug):
 @login_required
 def pos_buscar_clientes(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    if empresa.slug not in POS_CLIENTE_OBLIGATORIO_SLUGS:
+    if empresa.slug not in POS_BUSQUEDA_CLIENTES_SLUGS:
         return JsonResponse({"ok": False, "error": "La busqueda rapida POS no esta activa para esta empresa."}, status=403)
 
     termino = request.GET.get("q", "")

@@ -1285,6 +1285,29 @@ class FacturacionTests(TestCase):
         self.assertTrue(any(item["id"] == paciente.cliente_id for item in resultados))
         self.assertTrue(Cliente.objects.filter(empresa=self.empresa, rtn="0801199413996").exists())
 
+    def test_app_pos_busca_clientes_en_luque_y_serviciosmedicos(self):
+        for indice, slug in enumerate(["luque_aestetic", "serviciosmedicos"], start=1):
+            with self.subTest(empresa=slug):
+                self.empresa.slug = slug
+                self.empresa.save(update_fields=["slug"])
+                cliente = Cliente.objects.create(
+                    empresa=self.empresa,
+                    nombre=f"Paciente App {slug}",
+                    rtn=f"08011999123{indice}",
+                    activo=True,
+                )
+
+                response = self.client.get(
+                    reverse("pos_buscar_clientes", args=[slug]),
+                    {"q": cliente.nombre},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(
+                    any(item["id"] == cliente.id for item in response.json()["clientes"])
+                )
+
     def test_pos_crea_producto_rapido_con_distribucion_bodega(self):
         self.empresa.slug = "medical_spa"
         self.empresa.save(update_fields=["slug"])
