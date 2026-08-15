@@ -19,6 +19,7 @@ urlpatterns = [
     path('pos/clientes/buscar/', views.pos_buscar_clientes, name='pos_buscar_clientes'),
     path('pos/clientes/crear-rapido/', views.pos_crear_cliente_rapido, name='pos_crear_cliente_rapido'),
     path('pos/productos/crear-rapido/', views.pos_crear_producto_rapido, name='pos_crear_producto_rapido'),
+    path('pos/facturas/<int:factura_id>/enviar-whatsapp/', views.enviar_factura_whatsapp, name='pos_enviar_factura_whatsapp'),
     path('pos/facturas/<int:factura_id>/imprimir/', views.imprimir_factura_pos, name='imprimir_factura_pos'),
     path('crear/', views.crear_factura, name='crear_factura'),
     path('facturas/prefijo-manual/', views.prefijo_factura_manual, name='prefijo_factura_manual'),

@@ -22,7 +22,7 @@ from core.access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL
 from core.models import Empresa
 from contabilidad.models import CuentaFinanciera
 from contabilidad.services import asegurar_cuentas_financieras_base_honduras
-from facturacion.models import Cliente, PagoFactura, Producto, TipoImpuesto
+from facturacion.models import BodegaInventario, Cliente, PagoFactura, Producto, TipoImpuesto
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 
 from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
@@ -1268,6 +1268,18 @@ def agenda_mobile(request, empresa_slug):
             "stock": float(producto.stock_actual),
         }
         for producto in productos_app_qs
+    ]
+    contexto["impuestos_app_payload"] = [
+        {
+            "id": impuesto.id,
+            "nombre": impuesto.nombre,
+            "porcentaje": float(impuesto.porcentaje or 0),
+        }
+        for impuesto in impuestos_qs
+    ]
+    contexto["bodegas_app_payload"] = [
+        {"id": bodega.id, "nombre": bodega.nombre}
+        for bodega in BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre")
     ]
     try:
         asegurar_cuentas_financieras_base_honduras(empresa)

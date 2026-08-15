@@ -576,6 +576,9 @@ class CRMTests(TestCase):
         self.assertContains(response, '<section class="app-panel mobile-app-screen" id="patient-profile-app">')
         self.assertContains(response, 'data-patient-filter="favoritos"')
         self.assertContains(response, "Signos vitales")
+        self.assertContains(response, "Crear producto sin salir de la factura")
+        self.assertContains(response, "Comentario para esta línea de la factura")
+        self.assertContains(response, "data-send-invoice-whatsapp")
         medical_response = self.client.get(
             reverse("agenda_mobile", args=[medical_spa.slug]),
             {"fecha": "2026-06-30"},

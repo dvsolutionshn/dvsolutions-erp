@@ -248,6 +248,40 @@ class FacturacionTests(TestCase):
         self.assertIn("001-001-01-00000001", args[3])
         self.assertIn("caption", kwargs)
 
+    @patch("facturacion.views.enviar_documento_whatsapp")
+    @patch("facturacion.views.subir_documento_whatsapp", return_value="media-app-123")
+    @patch("facturacion.views._generar_factura_pdf_bytes", return_value=b"%PDF-1.4 factura app")
+    def test_app_envia_factura_whatsapp_y_responde_json(self, _pdf_mock, _subir_mock, enviar_mock):
+        self.cliente.telefono_whatsapp = "50499998888"
+        self.cliente.save(update_fields=["telefono_whatsapp"])
+        ConfiguracionCRM.objects.create(
+            empresa=self.empresa,
+            whatsapp_activo=True,
+            whatsapp_phone_number_id="phone-id",
+            whatsapp_token="token-test",
+        )
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            numero_factura="001-001-01-00000002",
+            estado="emitida",
+            cai=self.cai,
+            cai_numero=self.cai.numero_cai,
+            fecha_emision=date.today(),
+            subtotal=Decimal("100.00"),
+            total=Decimal("115.00"),
+        )
+
+        response = self.client.post(
+            reverse("pos_enviar_factura_whatsapp", args=[self.empresa.slug, factura.id]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        self.assertEqual(response.json()["telefono"], "50499998888")
+        enviar_mock.assert_called_once()
+
     def test_factura_termica_genera_pdf_de_80_mm_para_empresa_medica(self):
         self.empresa.slug = "hospital_mia"
         self.empresa.save(update_fields=["slug"])
@@ -1331,6 +1365,81 @@ class FacturacionTests(TestCase):
         self.assertEqual(producto.stock_actual, Decimal("4.00"))
         existencia = ExistenciaLoteBodega.objects.get(lote__producto=producto, bodega=bodega)
         self.assertEqual(existencia.cantidad, Decimal("4.00"))
+
+    def test_app_crea_producto_rapido_en_luque_y_serviciosmedicos(self):
+        for indice, slug in enumerate(["luque_aestetic", "serviciosmedicos"], start=1):
+            with self.subTest(empresa=slug):
+                self.empresa.slug = slug
+                self.empresa.save(update_fields=["slug"])
+                response = self.client.post(
+                    reverse("pos_crear_producto_rapido", args=[slug]),
+                    data=json.dumps({
+                        "nombre": f"Servicio App {indice}",
+                        "codigo": f"APP-{indice}",
+                        "tipo_item": "servicio",
+                        "precio": "450.00",
+                        "controla_inventario": False,
+                    }),
+                    content_type="application/json",
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.json()["ok"])
+                producto = Producto.objects.get(empresa=self.empresa, codigo=f"APP-{indice}")
+                self.assertEqual(producto.tipo_item, "servicio")
+                self.assertFalse(producto.controla_inventario)
+
+    @patch("facturacion.views.registrar_asiento_pago_cliente")
+    @patch("facturacion.views.registrar_asiento_factura_emitida")
+    @patch("facturacion.views._registrar_salida_factura")
+    def test_app_pos_guarda_comentario_y_devuelve_accion_whatsapp(self, _salida, _asiento, _pago):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        cuenta_contable = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110199",
+            nombre="Caja App",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Caja App",
+            tipo="caja",
+            cuenta_contable=cuenta_contable,
+        )
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "cliente_id": self.cliente.id,
+                    "metodo": "efectivo",
+                    "cuenta_financiera": cuenta_financiera.id,
+                    "monto_recibido": "115.00",
+                    "items": [{
+                        "producto_id": self.producto.id,
+                        "cantidad": "1",
+                        "precio_unitario": "100.00",
+                        "comentario": "Aplicar únicamente después de la consulta.",
+                    }],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        factura = Factura.objects.get(id=data["factura_id"])
+        self.assertEqual(factura.lineas.get().comentario, "Aplicar únicamente después de la consulta.")
+        self.assertEqual(
+            data["whatsapp_url"],
+            reverse("pos_enviar_factura_whatsapp", args=[self.empresa.slug, factura.id]),
+        )
 
     def test_punto_venta_ajax_rechaza_efectivo_insuficiente_sin_crear_factura(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")

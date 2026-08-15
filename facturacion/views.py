@@ -537,6 +537,7 @@ def punto_venta(request, empresa_slug):
                     "cantidad": cantidad,
                     "precio_unitario": precio_unitario,
                     "impuesto": impuesto,
+                    "comentario": (item.get("comentario") or "").strip(),
                 })
             regalos_promocion, promocion_pos = _calcular_regalos_promocion_pos(
                 empresa,
@@ -584,6 +585,7 @@ def punto_venta(request, empresa_slug):
                         precio_unitario=linea["precio_unitario"],
                         impuesto=linea["impuesto"],
                         precio_incluye_impuesto=precios_incluyen_impuesto,
+                        comentario=linea["comentario"],
                     )
                     for linea in lineas_preparadas
                 ]
@@ -682,6 +684,7 @@ def punto_venta(request, empresa_slug):
                     "cambio": f"{cambio:.2f}",
                     "factura_url": reverse("ver_factura", args=[empresa.slug, factura.id]),
                     "ticket_url": reverse("imprimir_factura_pos", args=[empresa.slug, factura.id]),
+                    "whatsapp_url": reverse("pos_enviar_factura_whatsapp", args=[empresa.slug, factura.id]),
                 })
             messages.success(
                 request,
@@ -898,7 +901,7 @@ def pos_crear_cliente_rapido(request, empresa_slug):
 @require_POST
 def pos_crear_producto_rapido(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    if empresa.slug not in POS_CLIENTE_OBLIGATORIO_SLUGS:
+    if empresa.slug not in POS_BUSQUEDA_CLIENTES_SLUGS:
         return JsonResponse({"ok": False, "error": "La creacion rapida POS no esta activa para esta empresa."}, status=403)
 
     try:
@@ -966,6 +969,8 @@ def pos_crear_producto_rapido(request, empresa_slug):
                 _sincronizar_existencia_general_producto(producto)
     except ValidationError as exc:
         return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+    except IntegrityError:
+        return JsonResponse({"ok": False, "error": "Ya existe un producto con esos datos. Revisa el codigo o nombre."}, status=409)
 
     return JsonResponse({"ok": True, "producto": _pos_producto_payload(producto, impuesto_default)})
 
@@ -7813,17 +7818,22 @@ def validar_factura(request, empresa_slug, factura_id):
 @require_POST
 def enviar_factura_whatsapp(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    solicitud_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     factura = get_object_or_404(
         Factura.objects.select_related("cliente"),
         id=factura_id,
         empresa=empresa,
     )
     if factura.estado == "borrador":
+        if solicitud_ajax:
+            return JsonResponse({"ok": False, "error": "Valida o emite la factura antes de enviarla por WhatsApp."}, status=400)
         messages.error(request, "Valida o emite la factura antes de enviarla por WhatsApp.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
     config = ConfiguracionCRM.objects.filter(empresa=empresa).first()
     if not config or not config.whatsapp_activo:
+        if solicitud_ajax:
+            return JsonResponse({"ok": False, "error": "Activa y configura WhatsApp Cloud API en CRM antes de enviar facturas."}, status=400)
         messages.error(request, "Activa y configura WhatsApp Cloud API en CRM antes de enviar facturas.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
@@ -7833,6 +7843,8 @@ def enviar_factura_whatsapp(request, empresa_slug, factura_id):
         or ""
     )
     if not telefono:
+        if solicitud_ajax:
+            return JsonResponse({"ok": False, "error": "El cliente no tiene telefono o WhatsApp registrado."}, status=400)
         messages.error(request, "El cliente no tiene telefono o WhatsApp registrado.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
@@ -7851,12 +7863,20 @@ def enviar_factura_whatsapp(request, empresa_slug, factura_id):
         enviar_documento_whatsapp(config, telefono, media_id, nombre_archivo, caption=caption)
         enviado = True
     except WhatsAppAPIError as exc:
+        if solicitud_ajax:
+            return JsonResponse({"ok": False, "error": f"No se pudo enviar la factura por WhatsApp: {exc}"}, status=502)
         messages.error(request, f"No se pudo enviar la factura por WhatsApp: {exc}")
     finally:
         if ruta_temporal:
             ruta_temporal.unlink(missing_ok=True)
 
     if enviado:
+        if solicitud_ajax:
+            return JsonResponse({
+                "ok": True,
+                "mensaje": f"Factura enviada por WhatsApp a {factura.cliente.nombre}.",
+                "telefono": telefono,
+            })
         messages.success(request, f"Factura enviada por WhatsApp a {factura.cliente.nombre}.")
     return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
