@@ -29,6 +29,8 @@ python manage.py migrate
 ONIX_ENABLED=true
 OPENAI_API_KEY=colocar-la-clave-en-el-servidor
 ONIX_ALLOWED_COMPANY_SLUGS=demo_1
+ONIX_TRIAL_MODE=true
+ONIX_TRIAL_MONTHLY_TOKEN_LIMIT=100000
 ONIX_MODEL=gpt-5.6-luna
 ONIX_REASONING_EFFORT=low
 ONIX_TIMEOUT_SECONDS=45
@@ -44,6 +46,11 @@ Nunca guardar la clave real en Git. Reiniciar Gunicorn despues de cambiar variab
 `ONIX_ALLOWED_COMPANY_SLUGS` controla donde aparece y donde acepta consultas Onix. Durante
 el piloto debe permanecer en `demo_1`. Para habilitar varias empresas se separan sus slugs
 con comas; el valor `*` lo habilita para todas las empresas del ERP.
+
+Durante el piloto, `ONIX_TRIAL_MODE=true` aplica un segundo limite de seguridad. El limite
+efectivo es el menor entre `ONIX_TRIAL_MONTHLY_TOKEN_LIMIT` y el limite configurado para la
+empresa. Para pasar a operacion comercial se debe desactivar el modo de prueba y definir el
+limite mensual correspondiente al plan contratado.
 
 ## Separacion y permisos
 

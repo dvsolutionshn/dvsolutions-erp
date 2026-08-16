@@ -419,49 +419,105 @@
     </span>
 </button>
 
-<aside class="erp-assistant-panel" id="erpAssistantPanel" aria-hidden="true">
-    <div class="erp-assistant-head">
+<aside class="erp-assistant-panel" id="erpAssistantPanel" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Centro de operaciones de Onix">
+    <header class="erp-assistant-head">
         <div class="erp-assistant-profile">
             <span class="erp-assistant-avatar is-large" aria-hidden="true">
                 <svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg>
             </span>
             <div class="erp-assistant-identity">
-                <div class="erp-assistant-kicker">Agente empresarial</div>
+                <div class="erp-assistant-kicker">Agente empresarial de {{ empresa.nombre }}</div>
                 <div class="erp-assistant-name-row">
                     <h3>Onix</h3>
                     <span class="erp-assistant-status" data-onix-status data-mode="{% if onix_ia_activa %}ai{% else %}guided{% endif %}">
                         <i></i><span data-onix-status-label>{% if onix_ia_activa %}IA conectada{% else %}Modo guía{% endif %}</span>
                     </span>
+                    {% if onix_modo_prueba %}<span class="erp-assistant-trial-badge">Piloto controlado</span>{% endif %}
                 </div>
-                <p>Tu agente para consultar y operar la empresa de forma segura.</p>
+                <p>Consulta, comprende y acompaña la operación sin mezclar información entre empresas.</p>
             </div>
         </div>
-        <button class="erp-assistant-close" type="button" aria-label="Cerrar asistente" data-assistant-close>&times;</button>
-    </div>
-    <div class="erp-assistant-suggestions" data-assistant-suggestions>
-        <button type="button" class="erp-assistant-chip" data-assistant-question="Busca mis facturas pendientes">Facturas pendientes</button>
-        <button type="button" class="erp-assistant-chip" data-assistant-question="Que clientes tienen saldo pendiente">Cuentas por cobrar</button>
-        <button type="button" class="erp-assistant-chip" data-assistant-question="Cuantos clientes y productos tenemos">Resumen empresa</button>
-    </div>
-    <div class="erp-assistant-body" data-assistant-body>
-        <div class="erp-assistant-message is-system">
-            <strong>Onix</strong>
-            {% if onix_ia_activa %}
-            <p>Hola, soy Onix. Estoy conectado y listo para conversar sobre la información de esta empresa.</p>
-            {% else %}
-            <p>Hola, soy Onix. Por ahora estoy en modo guía; para conversar como IA falta completar la conexión de OpenAI en el servidor.</p>
+        <button class="erp-assistant-close" type="button" aria-label="Volver al ERP" data-assistant-close>
+            <span>&larr;</span><strong>Volver al ERP</strong>
+        </button>
+    </header>
+
+    <div class="erp-assistant-workspace">
+        <aside class="erp-assistant-rail" aria-label="Alcance actual de Onix">
+            <section class="erp-assistant-rail-card is-active">
+                <div class="erp-assistant-rail-kicker">Cobertura conectada</div>
+                <h4>Lo que Onix conoce hoy</h4>
+                <ul class="erp-assistant-capabilities">
+                    <li><i>✓</i><span><strong>Clientes</strong><small>Contacto, RTN y búsqueda</small></span></li>
+                    <li><i>✓</i><span><strong>Productos y servicios</strong><small>Códigos, precios y existencia</small></span></li>
+                    <li><i>✓</i><span><strong>Facturas</strong><small>Cliente, número y estado de pago</small></span></li>
+                    <li><i>✓</i><span><strong>Cuentas por cobrar</strong><small>Saldos y documentos pendientes</small></span></li>
+                </ul>
+            </section>
+
+            <section class="erp-assistant-rail-card">
+                <div class="erp-assistant-rail-kicker">Expansión progresiva</div>
+                <h4>Siguiente conocimiento</h4>
+                <div class="erp-assistant-roadmap">
+                    <span>Contabilidad</span><span>Inventario</span><span>Compras</span><span>CRM</span>
+                    <span>Citas</span><span>Planillas</span><span>Bancos</span><span>Automatizaciones</span>
+                </div>
+            </section>
+
+            {% if onix_modo_prueba %}
+            <section class="erp-assistant-rail-card is-trial">
+                <div class="erp-assistant-rail-kicker">Protección de consumo</div>
+                <h4>Modo de prueba activo</h4>
+                <p>Límite de seguridad: <strong>{{ onix_limite_prueba }} tokens por mes</strong> para la empresa piloto.</p>
+            </section>
             {% endif %}
-        </div>
+
+            <section class="erp-assistant-rail-card">
+                <div class="erp-assistant-rail-kicker">Preguntas rápidas</div>
+                <div class="erp-assistant-suggestions" data-assistant-suggestions>
+                    <button type="button" class="erp-assistant-chip" data-assistant-question="Busca mis facturas pendientes">Facturas pendientes</button>
+                    <button type="button" class="erp-assistant-chip" data-assistant-question="Que clientes tienen saldo pendiente">Cuentas por cobrar</button>
+                    <button type="button" class="erp-assistant-chip" data-assistant-question="Cuantos clientes y productos tenemos">Resumen empresa</button>
+                </div>
+            </section>
+        </aside>
+
+        <section class="erp-assistant-conversation" aria-label="Conversación con Onix">
+            <div class="erp-assistant-conversation-head">
+                <div>
+                    <div class="erp-assistant-kicker">Centro de conversación y actividad</div>
+                    <h4>¿Qué quieres que revise?</h4>
+                </div>
+                <div class="erp-assistant-operation-strip" aria-label="Proceso de Onix">
+                    <span><i>1</i>Comprende</span><b></b><span><i>2</i>Consulta el ERP</span><b></b><span><i>3</i>Responde</span>
+                </div>
+            </div>
+
+            <div class="erp-assistant-body" data-assistant-body>
+                <div class="erp-assistant-message is-system">
+                    <div class="erp-assistant-message-author"><span class="erp-assistant-avatar is-message" aria-hidden="true"><svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg></span><strong>Onix</strong></div>
+                    {% if onix_ia_activa %}
+                    <p>Hola. Estoy conectado a la IA y listo para consultar la información autorizada de {{ empresa.nombre }}.</p>
+                    {% else %}
+                    <p>Hola. Estoy en modo guía; para conversar como IA falta agregar una clave de OpenAI válida en el servidor.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <form class="erp-assistant-form" data-assistant-form>
+                <input type="hidden" value="{{ asistente_consulta_url }}">
+                <label class="erp-assistant-label" for="assistantQuestion">Escribe una instrucción para Onix</label>
+                <div class="erp-assistant-composer">
+                    <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: Onix, revisa las facturas pendientes y dime cuáles requieren seguimiento"></textarea>
+                    <button type="submit" class="erp-button-primary"><span>Enviar</span><i>&uarr;</i></button>
+                </div>
+                <div class="erp-assistant-actions">
+                    <span class="erp-assistant-context">Contexto actual: {{ request.path }}</span>
+                    <span class="erp-assistant-security-note">Datos aislados por empresa y permisos</span>
+                </div>
+            </form>
+        </section>
     </div>
-    <form class="erp-assistant-form" data-assistant-form>
-        <input type="hidden" value="{{ asistente_consulta_url }}">
-        <label class="erp-assistant-label" for="assistantQuestion">Habla con Onix</label>
-        <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: busca las facturas pendientes de Empresa ABC"></textarea>
-        <div class="erp-assistant-actions">
-            <span class="erp-assistant-context">Pantalla actual: {{ request.path }}</span>
-            <button type="submit" class="erp-button-primary">Enviar</button>
-        </div>
-    </form>
 </aside>
 {% endif %}
 {% if empresa %}
@@ -739,6 +795,7 @@ document.addEventListener("DOMContentLoaded", function(){
             guided: "Modo guía",
             fallback: "IA no disponible",
             offline: "Sin conexión",
+            limit: "Límite alcanzado",
         };
         const safeMode = labels[mode] ? mode : "guided";
         if(assistantStatus){
@@ -749,7 +806,39 @@ document.addEventListener("DOMContentLoaded", function(){
         });
     }
 
-    function appendAssistantMessage(kind, title, bodyText, steps, suggestions, contextLabel) {
+    function assistantUsageHtml(usage) {
+        if(!usage || typeof usage !== "object"){
+            return "";
+        }
+        const items = [];
+        if(usage.model){
+            items.push("Modelo: " + escapeHtml(usage.model));
+        }
+        if(Number(usage.tokens || 0) > 0){
+            items.push(Number(usage.tokens).toLocaleString() + " tokens");
+        }
+        if(Number(usage.tool_calls || 0) > 0){
+            items.push(Number(usage.tool_calls) + " consulta(s) al ERP");
+        }
+        if(Array.isArray(usage.tools)){
+            usage.tools.forEach(tool => items.push("Revisó: " + escapeHtml(tool)));
+        }
+        if(usage.monthly_limit){
+            items.push(
+                "Mes: " + Number(usage.monthly_tokens || 0).toLocaleString()
+                + " / " + Number(usage.monthly_limit).toLocaleString()
+            );
+        }
+        if(Number(usage.estimated_cost_usd || 0) > 0){
+            items.push("Costo estimado: $" + Number(usage.estimated_cost_usd).toFixed(4));
+        }
+        if(!items.length){
+            return "";
+        }
+        return '<div class="erp-assistant-activity">' + items.map(item => '<span>' + item + '</span>').join("") + "</div>";
+    }
+
+    function appendAssistantMessage(kind, title, bodyText, steps, suggestions, contextLabel, usage) {
         if(!assistantBody){
             return;
         }
@@ -767,13 +856,18 @@ document.addEventListener("DOMContentLoaded", function(){
         }
 
         const contextHtml = contextLabel ? '<span class="erp-assistant-badge">' + escapeHtml(contextLabel) + "</span>" : "";
+        const authorHtml = kind === "user"
+            ? '<div class="erp-assistant-message-author"><strong>' + escapeHtml(title) + "</strong></div>"
+            : '<div class="erp-assistant-message-author"><span class="erp-assistant-avatar is-message" aria-hidden="true"><svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg></span><strong>' + escapeHtml(title) + "</strong></div>";
+        const usageHtml = assistantUsageHtml(usage);
 
         wrapper.innerHTML = `
-            <strong>${escapeHtml(title)}</strong>
+            ${authorHtml}
             ${contextHtml}
             <p>${escapeHtml(bodyText)}</p>
             ${stepsHtml}
             ${suggestionsHtml}
+            ${usageHtml}
         `;
         assistantBody.appendChild(wrapper);
         assistantBody.scrollTop = assistantBody.scrollHeight;
@@ -835,7 +929,8 @@ document.addEventListener("DOMContentLoaded", function(){
                 (data.answer || "Aquí tienes una guía rápida.") + (data.notice ? "\n\n" + data.notice : ""),
                 data.steps || [],
                 data.suggested_questions || [],
-                data.context_label || ""
+                data.context_label || "",
+                data.usage || null
             );
         })
         .catch(() => {

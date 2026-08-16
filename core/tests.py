@@ -1581,7 +1581,12 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(consumo.respuesta_id, "resp_prueba_onix")
         self.assertGreater(consumo.costo_estimado_usd, 0)
 
-    @override_settings(ONIX_ENABLED=False, OPENAI_API_KEY="")
+    @override_settings(
+        ONIX_ENABLED=False,
+        OPENAI_API_KEY="",
+        ONIX_TRIAL_MODE=True,
+        ONIX_TRIAL_MONTHLY_TOKEN_LIMIT=100000,
+    )
     def test_onix_se_muestra_solo_en_empresa_piloto(self):
         empresa_piloto = Empresa.objects.create(
             nombre="Demo 1",
@@ -1601,6 +1606,10 @@ class SuperAdminControlTests(TestCase):
         self.assertContains(respuesta_piloto, 'class="erp-assistant-fab"')
         self.assertContains(respuesta_piloto, '<strong>Onix</strong>', html=True)
         self.assertContains(respuesta_piloto, 'Modo guía')
+        self.assertContains(respuesta_piloto, 'class="erp-assistant-workspace"')
+        self.assertContains(respuesta_piloto, 'aria-modal="true"')
+        self.assertContains(respuesta_piloto, 'Piloto controlado')
+        self.assertContains(respuesta_piloto, '100000 tokens por mes')
         self.assertNotContains(respuesta_otra, 'class="erp-assistant-fab"')
 
     @override_settings(ONIX_ENABLED=True, OPENAI_API_KEY="test-key")
@@ -1616,6 +1625,45 @@ class SuperAdminControlTests(TestCase):
 
         self.assertContains(response, 'data-mode="ai"')
         self.assertContains(response, 'IA conectada')
+
+    @override_settings(
+        ONIX_ENABLED=True,
+        OPENAI_API_KEY="test-key",
+        ONIX_ALLOWED_COMPANY_SLUGS=["demo_1"],
+        ONIX_TRIAL_MODE=True,
+        ONIX_TRIAL_MONTHLY_TOKEN_LIMIT=100,
+    )
+    @patch("openai.OpenAI")
+    def test_onix_modo_prueba_aplica_limite_de_tokens(self, openai_client):
+        empresa = Empresa.objects.create(
+            nombre="Demo 1",
+            slug="demo_1",
+            rtn="0801199900001805",
+        )
+        usuario = Usuario.objects.create_user(
+            username="usuario_limite_onix",
+            password="pass12345",
+            empresa=empresa,
+        )
+        ConsumoOnix.objects.create(
+            empresa=empresa,
+            usuario=usuario,
+            modelo="gpt-5.6-luna",
+            tokens_total=100,
+        )
+        self.client.login(username=usuario.username, password="pass12345")
+
+        response = self.client.post(
+            reverse("asistente_consulta", args=[empresa.slug]),
+            {"pregunta": "Resume la empresa", "pagina": f"/{empresa.slug}/dashboard/"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["assistant_mode"], "limit")
+        self.assertEqual(payload["usage"]["monthly_limit"], 100)
+        self.assertTrue(payload["usage"]["trial_mode"])
+        openai_client.assert_not_called()
 
     def test_onix_rechaza_consulta_fuera_de_empresa_piloto(self):
         empresa = Empresa.objects.create(

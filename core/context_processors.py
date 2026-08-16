@@ -162,4 +162,6 @@ def erp_access(request):
             getattr(settings, "ONIX_ENABLED", False)
             and getattr(settings, "OPENAI_API_KEY", "")
         ),
+        "onix_modo_prueba": bool(getattr(settings, "ONIX_TRIAL_MODE", False)),
+        "onix_limite_prueba": int(getattr(settings, "ONIX_TRIAL_MONTHLY_TOKEN_LIMIT", 0)),
     }

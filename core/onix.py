@@ -95,6 +95,14 @@ TOOLS = [
     },
 ]
 
+TOOL_LABELS = {
+    "resumen_empresa": "Resumen empresarial",
+    "buscar_clientes": "Clientes",
+    "buscar_productos": "Productos y servicios",
+    "buscar_facturas": "Facturas",
+    "cuentas_por_cobrar": "Cuentas por cobrar",
+}
+
 
 def _permiso(usuario, empresa, nombre):
     return bool(usuario and usuario.tiene_permiso_erp(nombre, empresa))
@@ -289,6 +297,17 @@ def _consumo_mes(empresa):
     )
 
 
+def _limite_mensual_efectivo(configuracion):
+    limites = []
+    if configuracion.limite_tokens_mensual:
+        limites.append(int(configuracion.limite_tokens_mensual))
+    if getattr(settings, "ONIX_TRIAL_MODE", False):
+        limite_prueba = int(getattr(settings, "ONIX_TRIAL_MONTHLY_TOKEN_LIMIT", 100000))
+        if limite_prueba:
+            limites.append(limite_prueba)
+    return min(limites) if limites else 0
+
+
 def _conversacion_activa(empresa, usuario):
     conversacion = (
         ConversacionOnix.objects.filter(empresa=empresa, usuario=usuario, activa=True)
@@ -312,7 +331,8 @@ def responder_onix(*, pregunta, pagina, empresa, usuario):
         raise RuntimeError("Onix esta desactivado para esta empresa.")
 
     consumo_actual = _consumo_mes(empresa)
-    if configuracion.limite_tokens_mensual and consumo_actual >= configuracion.limite_tokens_mensual:
+    limite_mensual = _limite_mensual_efectivo(configuracion)
+    if limite_mensual and consumo_actual >= limite_mensual:
         return {
             "title": "Onix alcanzo el limite mensual",
             "answer": "Esta empresa alcanzo su limite mensual de IA. Un administrador debe ampliar el plan o esperar al siguiente periodo.",
@@ -320,6 +340,16 @@ def responder_onix(*, pregunta, pagina, empresa, usuario):
             "suggested_questions": [],
             "context_label": "Onix · limite de uso",
             "assistant_mode": "limit",
+            "usage": {
+                "model": configuracion.modelo,
+                "tokens": 0,
+                "estimated_cost_usd": "0.000000",
+                "monthly_tokens": consumo_actual,
+                "monthly_limit": limite_mensual,
+                "trial_mode": bool(getattr(settings, "ONIX_TRIAL_MODE", False)),
+                "tools": [],
+                "tool_calls": 0,
+            },
         }
 
     try:
@@ -355,6 +385,7 @@ def responder_onix(*, pregunta, pagina, empresa, usuario):
     )
     uso = {"entrada": 0, "salida": 0, "total": 0, "cache": 0}
     llamadas_herramientas = 0
+    herramientas_usadas = []
     respuesta_id = ""
     herramientas = TOOLS if configuracion.herramientas_consulta_activas else []
     max_rondas = int(getattr(settings, "ONIX_MAX_TOOL_ROUNDS", 4))
@@ -385,6 +416,9 @@ def responder_onix(*, pregunta, pagina, empresa, usuario):
         input_items.extend(respuesta.output)
         for llamada in llamadas:
             llamadas_herramientas += 1
+            etiqueta_herramienta = TOOL_LABELS.get(llamada.name, llamada.name)
+            if etiqueta_herramienta not in herramientas_usadas:
+                herramientas_usadas.append(etiqueta_herramienta)
             try:
                 argumentos = json.loads(llamada.arguments or "{}")
             except json.JSONDecodeError:
@@ -429,6 +463,7 @@ def responder_onix(*, pregunta, pagina, empresa, usuario):
             "tokens": uso["total"],
             "costo_estimado_usd": str(costo),
             "llamadas_herramientas": llamadas_herramientas,
+            "herramientas": herramientas_usadas,
         },
     )
     conversacion.save(update_fields=["fecha_actualizacion"])
@@ -445,6 +480,9 @@ def responder_onix(*, pregunta, pagina, empresa, usuario):
             "tokens": uso["total"],
             "estimated_cost_usd": str(costo),
             "monthly_tokens": consumo_actual + uso["total"],
-            "monthly_limit": configuracion.limite_tokens_mensual,
+            "monthly_limit": limite_mensual,
+            "trial_mode": bool(getattr(settings, "ONIX_TRIAL_MODE", False)),
+            "tools": herramientas_usadas,
+            "tool_calls": llamadas_herramientas,
         },
     }
