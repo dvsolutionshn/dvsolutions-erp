@@ -1,6 +1,18 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConfiguracionAvanzadaEmpresa, Empresa, PlanComercial, PlanModulo, RolSistema, Usuario, UsuarioEmpresaPermiso
+from .models import (
+    ConfiguracionAvanzadaEmpresa,
+    ConfiguracionOnix,
+    ConsumoOnix,
+    ConversacionOnix,
+    Empresa,
+    MensajeOnix,
+    PlanComercial,
+    PlanModulo,
+    RolSistema,
+    Usuario,
+    UsuarioEmpresaPermiso,
+)
 
 
 @admin.register(Empresa)
@@ -66,3 +78,67 @@ class UsuarioEmpresaPermisoAdmin(admin.ModelAdmin):
     list_display = ("usuario", "empresa", "rol_sistema", "activo", "fecha_actualizacion")
     list_filter = ("activo", "empresa", "rol_sistema")
     search_fields = ("usuario__username", "usuario__email", "empresa__nombre", "rol_sistema__nombre")
+
+
+@admin.register(ConfiguracionOnix)
+class ConfiguracionOnixAdmin(admin.ModelAdmin):
+    list_display = (
+        "empresa",
+        "activo",
+        "modelo",
+        "herramientas_consulta_activas",
+        "limite_tokens_mensual",
+        "voz_activa",
+        "fecha_actualizacion",
+    )
+    list_filter = ("activo", "herramientas_consulta_activas", "voz_activa", "modelo")
+    search_fields = ("empresa__nombre", "empresa__slug")
+
+
+@admin.register(ConversacionOnix)
+class ConversacionOnixAdmin(admin.ModelAdmin):
+    list_display = ("empresa", "usuario", "titulo", "activa", "fecha_actualizacion")
+    list_filter = ("activa", "empresa")
+    search_fields = ("empresa__nombre", "usuario__username", "usuario__email", "titulo")
+    readonly_fields = ("fecha_creacion", "fecha_actualizacion")
+
+
+@admin.register(MensajeOnix)
+class MensajeOnixAdmin(admin.ModelAdmin):
+    list_display = ("conversacion", "rol", "resumen", "fecha")
+    list_filter = ("rol", "conversacion__empresa")
+    search_fields = ("contenido", "conversacion__empresa__nombre", "conversacion__usuario__username")
+    readonly_fields = ("conversacion", "rol", "contenido", "pagina", "metadatos", "fecha")
+
+    @admin.display(description="Mensaje")
+    def resumen(self, obj):
+        return obj.contenido[:100]
+
+
+@admin.register(ConsumoOnix)
+class ConsumoOnixAdmin(admin.ModelAdmin):
+    list_display = (
+        "empresa",
+        "usuario",
+        "modelo",
+        "tokens_total",
+        "costo_estimado_usd",
+        "llamadas_herramientas",
+        "fecha",
+    )
+    list_filter = ("empresa", "modelo", "fecha")
+    search_fields = ("empresa__nombre", "usuario__username", "respuesta_id")
+    readonly_fields = (
+        "empresa",
+        "usuario",
+        "conversacion",
+        "modelo",
+        "respuesta_id",
+        "tokens_entrada",
+        "tokens_entrada_cache",
+        "tokens_salida",
+        "tokens_total",
+        "costo_estimado_usd",
+        "llamadas_herramientas",
+        "fecha",
+    )

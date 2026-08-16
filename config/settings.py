@@ -212,6 +212,20 @@ PUBLIC_WHATSAPP_NUMBER = os.environ.get("PUBLIC_WHATSAPP_NUMBER", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://dvsolutionshn.com").rstrip("/")
 
 
+# Onix (OpenAI). Without a key the ERP keeps the local guided assistant.
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+ONIX_ENABLED = env_bool("ONIX_ENABLED", bool(OPENAI_API_KEY))
+ONIX_MODEL = os.environ.get("ONIX_MODEL", "gpt-5.6-luna").strip()
+ONIX_REASONING_EFFORT = os.environ.get("ONIX_REASONING_EFFORT", "low").strip()
+ONIX_TIMEOUT_SECONDS = int(os.environ.get("ONIX_TIMEOUT_SECONDS", "45"))
+ONIX_MAX_HISTORY_MESSAGES = int(os.environ.get("ONIX_MAX_HISTORY_MESSAGES", "12"))
+ONIX_MAX_TOOL_ROUNDS = int(os.environ.get("ONIX_MAX_TOOL_ROUNDS", "4"))
+# Defaults correspond to GPT-5.6 Luna and can be updated without changing code.
+ONIX_INPUT_PRICE_PER_MTOK = os.environ.get("ONIX_INPUT_PRICE_PER_MTOK", "0.20")
+ONIX_CACHED_INPUT_PRICE_PER_MTOK = os.environ.get("ONIX_CACHED_INPUT_PRICE_PER_MTOK", "0.02")
+ONIX_OUTPUT_PRICE_PER_MTOK = os.environ.get("ONIX_OUTPUT_PRICE_PER_MTOK", "1.20")
+
+
 # Cache
 CACHES = {
     "default": {

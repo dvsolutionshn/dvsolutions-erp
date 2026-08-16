@@ -488,6 +488,17 @@ body::after{
     margin:0;
     color:var(--muted);
     line-height:1.6;
+    white-space:pre-line;
+}
+
+.erp-assistant-message.is-pending{
+    opacity:.72;
+    animation:onix-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes onix-pulse{
+    from{ transform:translateY(0); }
+    to{ transform:translateY(-2px); }
 }
 
 .erp-assistant-badge{

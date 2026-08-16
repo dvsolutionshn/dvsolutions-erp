@@ -1088,7 +1088,14 @@ def asistente_consulta(request, slug=None):
             status=400,
         )
 
-    return JsonResponse(responder_consulta(pregunta, pagina))
+    return JsonResponse(
+        responder_consulta(
+            pregunta,
+            pagina,
+            empresa=empresa,
+            usuario=request.user,
+        )
+    )
 
 from core.models import Modulo
 

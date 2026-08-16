@@ -398,37 +398,36 @@
 {% if mostrar_asistente_erp and empresa and request.user.is_authenticated %}
 <button class="erp-assistant-fab" type="button" data-assistant-toggle aria-expanded="false" aria-controls="erpAssistantPanel">
     <span class="erp-assistant-fab-dot"></span>
-    <span>Asistente ERP</span>
+    <span>Onix</span>
 </button>
 
 <aside class="erp-assistant-panel" id="erpAssistantPanel" aria-hidden="true">
     <div class="erp-assistant-head">
         <div>
-            <div class="erp-assistant-kicker">Ayuda guiada</div>
-            <h3>Asistente ERP</h3>
-            <p>Te ayuda con facturación, contabilidad, RRHH, CRM y uso operativo del sistema.</p>
+            <div class="erp-assistant-kicker">Asistente empresarial</div>
+            <h3>Onix</h3>
+            <p>Consulta clientes, productos, facturas y saldos respetando tu empresa y permisos.</p>
         </div>
         <button class="erp-assistant-close" type="button" aria-label="Cerrar asistente" data-assistant-close>&times;</button>
     </div>
     <div class="erp-assistant-suggestions" data-assistant-suggestions>
-        <button type="button" class="erp-assistant-chip" data-assistant-question="Como crear una factura">Crear factura</button>
-        <button type="button" class="erp-assistant-chip" data-assistant-question="Como registrar un pago">Registrar pago</button>
-        <button type="button" class="erp-assistant-chip" data-assistant-question="Como calcular una planilla">Calcular planilla</button>
-        <button type="button" class="erp-assistant-chip" data-assistant-question="Como importar movimientos bancarios">Importar bancos</button>
+        <button type="button" class="erp-assistant-chip" data-assistant-question="Busca mis facturas pendientes">Facturas pendientes</button>
+        <button type="button" class="erp-assistant-chip" data-assistant-question="Que clientes tienen saldo pendiente">Cuentas por cobrar</button>
+        <button type="button" class="erp-assistant-chip" data-assistant-question="Cuantos clientes y productos tenemos">Resumen empresa</button>
     </div>
     <div class="erp-assistant-body" data-assistant-body>
         <div class="erp-assistant-message is-system">
-            <strong>Asistente ERP</strong>
-            <p>Estoy listo para ayudarte. Escribe tu duda o toca una sugerencia para responderte con pasos concretos dentro del sistema.</p>
+            <strong>Onix</strong>
+            <p>Estoy listo. Puedes preguntarme por información de esta empresa; nunca mezclaré datos con otra compañía.</p>
         </div>
     </div>
     <form class="erp-assistant-form" data-assistant-form>
         <input type="hidden" value="{{ asistente_consulta_url }}">
-        <label class="erp-assistant-label" for="assistantQuestion">Escribe tu consulta</label>
-        <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: como registrar un pago parcial o como crear una nota de credito"></textarea>
+        <label class="erp-assistant-label" for="assistantQuestion">Habla con Onix</label>
+        <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: busca las facturas pendientes de Empresa ABC"></textarea>
         <div class="erp-assistant-actions">
             <span class="erp-assistant-context">Pantalla actual: {{ request.path }}</span>
-            <button type="submit" class="erp-button-primary">Consultar</button>
+            <button type="submit" class="erp-button-primary">Enviar</button>
         </div>
     </form>
 </aside>
@@ -728,6 +727,7 @@ document.addEventListener("DOMContentLoaded", function(){
         `;
         assistantBody.appendChild(wrapper);
         assistantBody.scrollTop = assistantBody.scrollHeight;
+        return wrapper;
     }
 
     function submitAssistantQuestion(questionText) {
@@ -737,6 +737,17 @@ document.addEventListener("DOMContentLoaded", function(){
 
         setAssistantOpen(true);
         appendAssistantMessage("user", "Tu consulta", questionText.trim(), [], [], "");
+        const pendingMessage = appendAssistantMessage(
+            "system",
+            "Onix",
+            "Estoy revisando la informacion de esta empresa...",
+            [],
+            [],
+            "Procesando"
+        );
+        if(pendingMessage){
+            pendingMessage.classList.add("is-pending");
+        }
 
         const formData = new FormData();
         formData.append("pregunta", questionText.trim());
@@ -752,6 +763,9 @@ document.addEventListener("DOMContentLoaded", function(){
         })
         .then(response => response.json().then(data => ({ ok: response.ok, data })))
         .then(({ ok, data }) => {
+            if(pendingMessage){
+                pendingMessage.remove();
+            }
             if(!ok){
                 appendAssistantMessage(
                     "system",
@@ -766,13 +780,16 @@ document.addEventListener("DOMContentLoaded", function(){
             appendAssistantMessage(
                 "system",
                 data.title || "Asistente ERP",
-                data.answer || "Aquí tienes una guía rápida.",
+                (data.answer || "Aquí tienes una guía rápida.") + (data.notice ? "\n\n" + data.notice : ""),
                 data.steps || [],
                 data.suggested_questions || [],
                 data.context_label || ""
             );
         })
         .catch(() => {
+            if(pendingMessage){
+                pendingMessage.remove();
+            }
             appendAssistantMessage(
                 "system",
                 "Asistente no disponible",

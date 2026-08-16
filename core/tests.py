@@ -3,6 +3,8 @@ import io
 import json
 import tempfile
 import zipfile
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
@@ -14,7 +16,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario, UsuarioEmpresaPermiso
+from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionOnix, ConsumoOnix, ConversacionOnix, Empresa, EmpresaModulo, MensajeOnix, Modulo, PlanComercial, RegistroAuditoria, RolSistema, SolicitudComercial, Usuario, UsuarioEmpresaPermiso
 from core.models import PagoLicenciaEmpresa, RespaldoEmpresa, TokenAccesoUsuario, TokenRespaldoEmpresa
 from core.backup_tokens import hash_token_respaldo
 from core.forms import EmpresaControlForm, RolSistemaForm
@@ -1522,6 +1524,86 @@ class SuperAdminControlTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+    @override_settings(
+        ONIX_ENABLED=True,
+        OPENAI_API_KEY="test-key",
+        ONIX_MODEL="gpt-5.6-luna",
+        ONIX_INPUT_PRICE_PER_MTOK="0.20",
+        ONIX_CACHED_INPUT_PRICE_PER_MTOK="0.02",
+        ONIX_OUTPUT_PRICE_PER_MTOK="1.20",
+    )
+    @patch("openai.OpenAI")
+    def test_onix_usa_ia_y_registra_conversacion_y_consumo(self, openai_client):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Onix IA",
+            slug="empresa-onix-ia",
+            rtn="08011999000031",
+        )
+        usuario = Usuario.objects.create_user(
+            username="usuario_onix_ia",
+            password="pass12345",
+            empresa=empresa,
+        )
+        respuesta_openai = SimpleNamespace(
+            id="resp_prueba_onix",
+            output=[],
+            output_text="La empresa tiene informacion disponible para consulta.",
+            usage=SimpleNamespace(
+                input_tokens=100,
+                output_tokens=25,
+                total_tokens=125,
+                input_tokens_details=SimpleNamespace(cached_tokens=10),
+            ),
+        )
+        openai_client.return_value.responses.create.return_value = respuesta_openai
+        self.client.login(username=usuario.username, password="pass12345")
+
+        response = self.client.post(
+            reverse("asistente_consulta", args=[empresa.slug]),
+            {"pregunta": "Que informacion tenemos", "pagina": f"/{empresa.slug}/dashboard/"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["assistant_mode"], "ai")
+        self.assertEqual(payload["context_label"], "Onix · IA")
+        self.assertEqual(payload["usage"]["tokens"], 125)
+        conversacion = ConversacionOnix.objects.get(empresa=empresa, usuario=usuario)
+        self.assertEqual(conversacion.mensajes.count(), 2)
+        self.assertEqual(
+            list(conversacion.mensajes.values_list("rol", flat=True)),
+            [MensajeOnix.ROL_USUARIO, MensajeOnix.ROL_ASISTENTE],
+        )
+        consumo = ConsumoOnix.objects.get(empresa=empresa)
+        self.assertEqual(consumo.tokens_total, 125)
+        self.assertEqual(consumo.respuesta_id, "resp_prueba_onix")
+        self.assertGreater(consumo.costo_estimado_usd, 0)
+
+    def test_herramienta_onix_no_mezcla_clientes_entre_empresas(self):
+        from core.onix import _ejecutar_herramienta
+
+        empresa_a = Empresa.objects.create(nombre="Empresa Onix A", slug="onix-a", rtn="08011999000032")
+        empresa_b = Empresa.objects.create(nombre="Empresa Onix B", slug="onix-b", rtn="08011999000033")
+        usuario = Usuario.objects.create_user(
+            username="admin_onix_a",
+            password="pass12345",
+            empresa=empresa_a,
+            es_administrador_empresa=True,
+        )
+        Cliente.objects.create(empresa=empresa_a, nombre="Cliente visible", rtn="08011999000034")
+        Cliente.objects.create(empresa=empresa_b, nombre="Cliente privado", rtn="08011999000035")
+
+        resultado = _ejecutar_herramienta(
+            "buscar_clientes",
+            {"consulta": "Cliente", "limite": 10},
+            empresa=empresa_a,
+            usuario=usuario,
+        )
+
+        self.assertEqual(resultado["cantidad"], 1)
+        self.assertEqual(resultado["resultados"][0]["nombre"], "Cliente visible")
+        self.assertNotIn("Cliente privado", json.dumps(resultado))
 
     @override_settings(ALLOWED_HOSTS=["digital-planning.erp.test", "testserver"])
     def test_login_por_subdominio_redirige_a_dashboard_host(self):

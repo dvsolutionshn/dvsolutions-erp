@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+
+from django.conf import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -153,5 +159,37 @@ def _response_by_question(question: str, page_path: str) -> AssistantResponse:
     )
 
 
-def responder_consulta(question: str, page_path: str) -> dict:
-    return _response_by_question(question, page_path).as_dict()
+def responder_consulta(
+    question: str,
+    page_path: str,
+    *,
+    empresa=None,
+    usuario=None,
+) -> dict:
+    if (
+        getattr(settings, "ONIX_ENABLED", False)
+        and getattr(settings, "OPENAI_API_KEY", "")
+        and empresa is not None
+        and usuario is not None
+    ):
+        try:
+            from .onix import responder_onix
+
+            return responder_onix(
+                pregunta=question,
+                pagina=page_path,
+                empresa=empresa,
+                usuario=usuario,
+            )
+        except Exception:
+            logger.exception("Onix no pudo completar la consulta para la empresa %s", getattr(empresa, "id", None))
+            respuesta = _response_by_question(question, page_path).as_dict()
+            respuesta["assistant_mode"] = "fallback"
+            respuesta["notice"] = (
+                "La IA no estuvo disponible; Onix respondio con la guia local del ERP."
+            )
+            return respuesta
+
+    respuesta = _response_by_question(question, page_path).as_dict()
+    respuesta["assistant_mode"] = "guided"
+    return respuesta

@@ -602,6 +602,139 @@ class RegistroAuditoria(models.Model):
         return f"{self.get_accion_display()} - {self.objeto_representacion}"
 
 
+class ConfiguracionOnix(models.Model):
+    empresa = models.OneToOneField(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="configuracion_onix",
+    )
+    activo = models.BooleanField(default=True)
+    modelo = models.CharField(max_length=80, default="gpt-5.6-luna")
+    instrucciones_empresa = models.TextField(
+        blank=True,
+        help_text="Preferencias operativas aprobadas que Onix debe aplicar solo a esta empresa.",
+    )
+    herramientas_consulta_activas = models.BooleanField(default=True)
+    limite_tokens_mensual = models.PositiveBigIntegerField(
+        default=500000,
+        help_text="Cero significa sin limite interno de tokens.",
+    )
+    voz_activa = models.BooleanField(
+        default=False,
+        help_text="Reservado para la segunda fase de Onix por voz.",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuracion de Onix"
+        verbose_name_plural = "Configuraciones de Onix"
+
+    def __str__(self):
+        return f"Onix - {self.empresa.nombre}"
+
+
+class ConversacionOnix(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="conversaciones_onix",
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name="conversaciones_onix",
+    )
+    titulo = models.CharField(max_length=160, default="Conversacion con Onix")
+    activa = models.BooleanField(default=True, db_index=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        ordering = ["-fecha_actualizacion", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "usuario", "activa"]),
+        ]
+        verbose_name = "Conversacion de Onix"
+        verbose_name_plural = "Conversaciones de Onix"
+
+    def __str__(self):
+        return f"{self.empresa.nombre} - {self.usuario.username} - {self.titulo}"
+
+
+class MensajeOnix(models.Model):
+    ROL_USUARIO = "usuario"
+    ROL_ASISTENTE = "asistente"
+    ROLES = (
+        (ROL_USUARIO, "Usuario"),
+        (ROL_ASISTENTE, "Onix"),
+    )
+
+    conversacion = models.ForeignKey(
+        ConversacionOnix,
+        on_delete=models.CASCADE,
+        related_name="mensajes",
+    )
+    rol = models.CharField(max_length=12, choices=ROLES)
+    contenido = models.TextField()
+    pagina = models.CharField(max_length=500, blank=True)
+    metadatos = models.JSONField(default=dict, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["fecha", "id"]
+        indexes = [
+            models.Index(fields=["conversacion", "fecha"]),
+        ]
+        verbose_name = "Mensaje de Onix"
+        verbose_name_plural = "Mensajes de Onix"
+
+    def __str__(self):
+        return f"{self.get_rol_display()}: {self.contenido[:80]}"
+
+
+class ConsumoOnix(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="consumos_onix",
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consumos_onix",
+    )
+    conversacion = models.ForeignKey(
+        ConversacionOnix,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consumos",
+    )
+    modelo = models.CharField(max_length=80)
+    respuesta_id = models.CharField(max_length=120, blank=True)
+    tokens_entrada = models.PositiveBigIntegerField(default=0)
+    tokens_entrada_cache = models.PositiveBigIntegerField(default=0)
+    tokens_salida = models.PositiveBigIntegerField(default=0)
+    tokens_total = models.PositiveBigIntegerField(default=0)
+    costo_estimado_usd = models.DecimalField(max_digits=12, decimal_places=6, default=0)
+    llamadas_herramientas = models.PositiveIntegerField(default=0)
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-fecha", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "fecha"]),
+        ]
+        verbose_name = "Consumo de Onix"
+        verbose_name_plural = "Consumos de Onix"
+
+    def __str__(self):
+        return f"{self.empresa.nombre} - {self.tokens_total} tokens - ${self.costo_estimado_usd}"
+
+
 class Modulo(models.Model):
     nombre = models.CharField(max_length=100)
     codigo = models.CharField(max_length=50, unique=True)
