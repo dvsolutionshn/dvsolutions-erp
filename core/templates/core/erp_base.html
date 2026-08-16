@@ -396,17 +396,45 @@
     </div>
 </div>
 {% if mostrar_asistente_erp and empresa and request.user.is_authenticated %}
+<svg class="erp-onix-symbols" aria-hidden="true" focusable="false">
+    <symbol id="onixAgentIcon" viewBox="0 0 64 64">
+        <path class="onix-agent-antenna" d="M32 14V8"></path>
+        <circle class="onix-agent-signal" cx="32" cy="6" r="3"></circle>
+        <path class="onix-agent-ear" d="M13 26H9a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h4M51 26h4a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-4"></path>
+        <rect class="onix-agent-face" x="13" y="14" width="38" height="37" rx="14"></rect>
+        <path class="onix-agent-visor" d="M19 29c4-7 22-7 26 0v8c-4 7-22 7-26 0z"></path>
+        <circle class="onix-agent-eye" cx="26" cy="33" r="2.8"></circle>
+        <circle class="onix-agent-eye" cx="38" cy="33" r="2.8"></circle>
+        <path class="onix-agent-smile" d="M27 41c2.7 2 7.3 2 10 0"></path>
+        <path class="onix-agent-core" d="M25 51v3h14v-3"></path>
+    </symbol>
+</svg>
 <button class="erp-assistant-fab" type="button" data-assistant-toggle aria-expanded="false" aria-controls="erpAssistantPanel">
-    <span class="erp-assistant-fab-dot"></span>
-    <span>Onix</span>
+    <span class="erp-assistant-avatar" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg>
+    </span>
+    <span class="erp-assistant-fab-copy">
+        <strong>Onix</strong>
+        <small data-onix-status-label>{% if onix_ia_activa %}IA conectada{% else %}Modo guía{% endif %}</small>
+    </span>
 </button>
 
 <aside class="erp-assistant-panel" id="erpAssistantPanel" aria-hidden="true">
     <div class="erp-assistant-head">
-        <div>
-            <div class="erp-assistant-kicker">Asistente empresarial</div>
-            <h3>Onix</h3>
-            <p>Consulta clientes, productos, facturas y saldos respetando tu empresa y permisos.</p>
+        <div class="erp-assistant-profile">
+            <span class="erp-assistant-avatar is-large" aria-hidden="true">
+                <svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg>
+            </span>
+            <div class="erp-assistant-identity">
+                <div class="erp-assistant-kicker">Agente empresarial</div>
+                <div class="erp-assistant-name-row">
+                    <h3>Onix</h3>
+                    <span class="erp-assistant-status" data-onix-status data-mode="{% if onix_ia_activa %}ai{% else %}guided{% endif %}">
+                        <i></i><span data-onix-status-label>{% if onix_ia_activa %}IA conectada{% else %}Modo guía{% endif %}</span>
+                    </span>
+                </div>
+                <p>Tu agente para consultar y operar la empresa de forma segura.</p>
+            </div>
         </div>
         <button class="erp-assistant-close" type="button" aria-label="Cerrar asistente" data-assistant-close>&times;</button>
     </div>
@@ -418,7 +446,11 @@
     <div class="erp-assistant-body" data-assistant-body>
         <div class="erp-assistant-message is-system">
             <strong>Onix</strong>
-            <p>Estoy listo. Puedes preguntarme por información de esta empresa; nunca mezclaré datos con otra compañía.</p>
+            {% if onix_ia_activa %}
+            <p>Hola, soy Onix. Estoy conectado y listo para conversar sobre la información de esta empresa.</p>
+            {% else %}
+            <p>Hola, soy Onix. Por ahora estoy en modo guía; para conversar como IA falta completar la conexión de OpenAI en el servidor.</p>
+            {% endif %}
         </div>
     </div>
     <form class="erp-assistant-form" data-assistant-form>
@@ -677,6 +709,8 @@ document.addEventListener("DOMContentLoaded", function(){
     const assistantBody = document.querySelector("[data-assistant-body]");
     const assistantQuestion = assistantForm ? assistantForm.querySelector("textarea[name='pregunta']") : null;
     const assistantUrlInput = assistantForm ? assistantForm.querySelector("input[type='hidden']") : null;
+    const assistantStatus = document.querySelector("[data-onix-status]");
+    const assistantStatusLabels = document.querySelectorAll("[data-onix-status-label]");
 
     function getCookie(name) {
         const cookieValue = document.cookie
@@ -697,6 +731,22 @@ document.addEventListener("DOMContentLoaded", function(){
         if(open && assistantQuestion){
             window.setTimeout(() => assistantQuestion.focus(), 100);
         }
+    }
+
+    function setAssistantStatus(mode) {
+        const labels = {
+            ai: "IA conectada",
+            guided: "Modo guía",
+            fallback: "IA no disponible",
+            offline: "Sin conexión",
+        };
+        const safeMode = labels[mode] ? mode : "guided";
+        if(assistantStatus){
+            assistantStatus.dataset.mode = safeMode;
+        }
+        assistantStatusLabels.forEach(label => {
+            label.textContent = labels[safeMode];
+        });
     }
 
     function appendAssistantMessage(kind, title, bodyText, steps, suggestions, contextLabel) {
@@ -767,6 +817,7 @@ document.addEventListener("DOMContentLoaded", function(){
                 pendingMessage.remove();
             }
             if(!ok){
+                setAssistantStatus("offline");
                 appendAssistantMessage(
                     "system",
                     "No pude completar la consulta",
@@ -777,6 +828,7 @@ document.addEventListener("DOMContentLoaded", function(){
                 );
                 return;
             }
+            setAssistantStatus(data.assistant_mode || "guided");
             appendAssistantMessage(
                 "system",
                 data.title || "Asistente ERP",
@@ -787,6 +839,7 @@ document.addEventListener("DOMContentLoaded", function(){
             );
         })
         .catch(() => {
+            setAssistantStatus("offline");
             if(pendingMessage){
                 pendingMessage.remove();
             }

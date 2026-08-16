@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from core.models import Empresa
 from core.access import modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
@@ -155,5 +157,9 @@ def erp_access(request):
             user
             and user.is_authenticated
             and onix_disponible_para_empresa(empresa)
+        ),
+        "onix_ia_activa": bool(
+            getattr(settings, "ONIX_ENABLED", False)
+            and getattr(settings, "OPENAI_API_KEY", "")
         ),
     }

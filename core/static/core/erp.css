@@ -344,30 +344,136 @@ body::after{
     z-index:1100;
     display:inline-flex;
     align-items:center;
-    gap:10px;
-    border:none;
+    gap:12px;
+    overflow:hidden;
+    border:1px solid rgba(139, 233, 255, .34);
     border-radius:999px;
-    background:linear-gradient(135deg, var(--primary), var(--primary-2));
+    background:
+        radial-gradient(circle at 18% 20%, rgba(55, 230, 239, .28), transparent 34%),
+        linear-gradient(135deg, #081c36 0%, #123d68 54%, #492a7b 100%);
     color:#fff;
-    padding:14px 18px;
-    box-shadow:0 18px 34px rgba(25, 60, 125, .24);
+    padding:8px 17px 8px 9px;
+    box-shadow:0 18px 38px rgba(8, 28, 54, .34), 0 0 28px rgba(64, 219, 232, .14);
     cursor:pointer;
     font:inherit;
-    font-weight:600;
-    transition:transform .2s ease, box-shadow .2s ease;
+    isolation:isolate;
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.erp-assistant-fab::before{
+    content:"";
+    position:absolute;
+    inset:-90% auto -90% -35%;
+    width:38%;
+    z-index:-1;
+    transform:rotate(18deg);
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.24), transparent);
+    animation:onix-fab-scan 5.2s ease-in-out infinite;
 }
 
 .erp-assistant-fab:hover{
-    transform:translateY(-1px);
-    box-shadow:0 22px 38px rgba(25, 60, 125, .28);
+    transform:translateY(-3px) scale(1.015);
+    border-color:rgba(139, 233, 255, .68);
+    box-shadow:0 24px 46px rgba(8, 28, 54, .4), 0 0 34px rgba(64, 219, 232, .2);
 }
 
-.erp-assistant-fab-dot{
-    width:10px;
-    height:10px;
+.erp-onix-symbols{
+    position:absolute;
+    width:0;
+    height:0;
+    overflow:hidden;
+}
+
+.erp-assistant-avatar{
+    position:relative;
+    flex:0 0 auto;
+    display:grid;
+    place-items:center;
+    width:46px;
+    height:46px;
     border-radius:999px;
-    background:#76efd3;
-    box-shadow:0 0 0 6px rgba(118, 239, 211, .18);
+    color:#8cf8ff;
+    background:radial-gradient(circle at 50% 42%, rgba(63, 235, 238, .24), rgba(23, 65, 100, .84) 66%, #09182e 100%);
+    border:1px solid rgba(133, 246, 255, .42);
+    box-shadow:inset 0 0 16px rgba(75, 227, 240, .22), 0 0 18px rgba(52, 215, 231, .18);
+}
+
+.erp-assistant-avatar::before{
+    content:"";
+    position:absolute;
+    inset:-4px;
+    border:1px solid rgba(126, 239, 250, .24);
+    border-top-color:#8cf8ff;
+    border-bottom-color:rgba(147, 91, 255, .62);
+    border-radius:inherit;
+    animation:onix-avatar-orbit 5s linear infinite;
+}
+
+.erp-assistant-avatar svg{
+    position:relative;
+    z-index:1;
+    width:36px;
+    height:36px;
+    overflow:visible;
+}
+
+.erp-assistant-avatar.is-large{
+    width:58px;
+    height:58px;
+}
+
+.erp-assistant-avatar.is-large svg{
+    width:45px;
+    height:45px;
+}
+
+.onix-agent-antenna,
+.onix-agent-ear,
+.onix-agent-smile,
+.onix-agent-core{
+    fill:none;
+    stroke:currentColor;
+    stroke-width:2.5;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+}
+
+.onix-agent-signal,
+.onix-agent-eye{
+    fill:#b9ffff;
+    filter:drop-shadow(0 0 3px #57edf5);
+}
+
+.onix-agent-face{
+    fill:rgba(107, 229, 239, .12);
+    stroke:currentColor;
+    stroke-width:2.5;
+}
+
+.onix-agent-visor{
+    fill:rgba(5, 21, 42, .84);
+    stroke:rgba(142, 244, 255, .62);
+    stroke-width:1.5;
+}
+
+.erp-assistant-fab-copy{
+    display:grid;
+    gap:2px;
+    min-width:78px;
+    text-align:left;
+    line-height:1.05;
+}
+
+.erp-assistant-fab-copy strong{
+    font-size:15px;
+    letter-spacing:.02em;
+}
+
+.erp-assistant-fab-copy small{
+    color:rgba(214, 249, 255, .76);
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
 }
 
 .erp-assistant-panel{
@@ -377,10 +483,13 @@ body::after{
     width:min(420px, calc(100vw - 32px));
     max-height:min(76vh, 760px);
     z-index:1101;
-    background:rgba(255,255,255,.98);
-    border:1px solid rgba(184, 202, 225, .85);
-    border-radius:22px;
-    box-shadow:0 26px 60px rgba(15, 35, 73, .18);
+    background:
+        radial-gradient(circle at 8% 0%, rgba(57, 221, 230, .12), transparent 27%),
+        radial-gradient(circle at 92% 4%, rgba(112, 70, 220, .1), transparent 29%),
+        rgba(255,255,255,.98);
+    border:1px solid rgba(132, 194, 219, .72);
+    border-radius:26px;
+    box-shadow:0 28px 68px rgba(10, 31, 61, .24), 0 0 34px rgba(69, 214, 228, .08);
     backdrop-filter:blur(18px);
     padding:18px;
     display:none;
@@ -399,12 +508,31 @@ body::after{
     align-items:flex-start;
 }
 
+.erp-assistant-profile{
+    min-width:0;
+    display:flex;
+    align-items:center;
+    gap:15px;
+}
+
+.erp-assistant-identity{
+    min-width:0;
+}
+
 .erp-assistant-kicker{
     font-size:11px;
     text-transform:uppercase;
     letter-spacing:.18em;
-    color:var(--muted);
-    margin-bottom:8px;
+    color:#167a8a;
+    margin-bottom:6px;
+    font-weight:700;
+}
+
+.erp-assistant-name-row{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    flex-wrap:wrap;
 }
 
 .erp-assistant-head h3{
@@ -418,6 +546,65 @@ body::after{
     color:var(--muted);
     line-height:1.5;
     font-size:14px;
+}
+
+.erp-assistant-status{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 8px;
+    border-radius:999px;
+    background:rgba(22, 166, 161, .1);
+    color:#0c716d;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+}
+
+.erp-assistant-status i{
+    width:7px;
+    height:7px;
+    border-radius:999px;
+    background:#21c8b7;
+    box-shadow:0 0 0 4px rgba(33, 200, 183, .12);
+    animation:onix-status-pulse 1.8s ease-in-out infinite;
+}
+
+.erp-assistant-status[data-mode="guided"]{
+    background:rgba(234, 164, 45, .12);
+    color:#8d5c08;
+}
+
+.erp-assistant-status[data-mode="guided"] i{
+    background:#eaa42d;
+    box-shadow:0 0 0 4px rgba(234, 164, 45, .12);
+}
+
+.erp-assistant-status[data-mode="fallback"],
+.erp-assistant-status[data-mode="offline"]{
+    background:rgba(201, 69, 88, .1);
+    color:#9a3042;
+}
+
+.erp-assistant-status[data-mode="fallback"] i,
+.erp-assistant-status[data-mode="offline"] i{
+    background:#d85066;
+    box-shadow:0 0 0 4px rgba(216, 80, 102, .1);
+    animation:none;
+}
+
+@keyframes onix-avatar-orbit{
+    to{ transform:rotate(360deg); }
+}
+
+@keyframes onix-fab-scan{
+    0%, 54%{ left:-45%; }
+    82%, 100%{ left:125%; }
+}
+
+@keyframes onix-status-pulse{
+    50%{ transform:scale(.78); opacity:.62; }
 }
 
 .erp-assistant-close{
@@ -2378,6 +2565,28 @@ body::after{
     }
     body.erp-mobile-menu-open{
         overflow:hidden;
+    }
+    .erp-assistant-fab{
+        right:14px;
+        bottom:88px;
+        padding-right:13px;
+    }
+    .erp-assistant-panel{
+        right:10px;
+        bottom:152px;
+        width:calc(100vw - 20px);
+        max-height:calc(100vh - 176px);
+        padding:15px;
+    }
+    .erp-assistant-profile{
+        gap:11px;
+    }
+    .erp-assistant-avatar.is-large{
+        width:50px;
+        height:50px;
+    }
+    .erp-assistant-head p{
+        font-size:12px;
     }
     .erp-shell{
         display:block;

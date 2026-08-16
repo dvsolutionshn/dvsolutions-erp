@@ -1581,6 +1581,7 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(consumo.respuesta_id, "resp_prueba_onix")
         self.assertGreater(consumo.costo_estimado_usd, 0)
 
+    @override_settings(ONIX_ENABLED=False, OPENAI_API_KEY="")
     def test_onix_se_muestra_solo_en_empresa_piloto(self):
         empresa_piloto = Empresa.objects.create(
             nombre="Demo 1",
@@ -1598,8 +1599,23 @@ class SuperAdminControlTests(TestCase):
         respuesta_otra = self.client.get(reverse("dashboard", args=[otra_empresa.slug]))
 
         self.assertContains(respuesta_piloto, 'class="erp-assistant-fab"')
-        self.assertContains(respuesta_piloto, '<span>Onix</span>', html=True)
+        self.assertContains(respuesta_piloto, '<strong>Onix</strong>', html=True)
+        self.assertContains(respuesta_piloto, 'Modo guía')
         self.assertNotContains(respuesta_otra, 'class="erp-assistant-fab"')
+
+    @override_settings(ONIX_ENABLED=True, OPENAI_API_KEY="test-key")
+    def test_onix_indica_cuando_la_ia_esta_conectada(self):
+        empresa = Empresa.objects.create(
+            nombre="Demo 1",
+            slug="demo_1",
+            rtn="0801199900001804",
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.get(reverse("dashboard", args=[empresa.slug]))
+
+        self.assertContains(response, 'data-mode="ai"')
+        self.assertContains(response, 'IA conectada')
 
     def test_onix_rechaza_consulta_fuera_de_empresa_piloto(self):
         empresa = Empresa.objects.create(
