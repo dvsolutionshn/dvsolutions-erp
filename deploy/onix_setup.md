@@ -28,6 +28,7 @@ python manage.py migrate
 ```env
 ONIX_ENABLED=true
 OPENAI_API_KEY=colocar-la-clave-en-el-servidor
+ONIX_ALLOWED_COMPANY_SLUGS=demo_1
 ONIX_MODEL=gpt-5.6-luna
 ONIX_REASONING_EFFORT=low
 ONIX_TIMEOUT_SECONDS=45
@@ -39,6 +40,10 @@ ONIX_OUTPUT_PRICE_PER_MTOK=1.20
 ```
 
 Nunca guardar la clave real en Git. Reiniciar Gunicorn despues de cambiar variables.
+
+`ONIX_ALLOWED_COMPANY_SLUGS` controla donde aparece y donde acepta consultas Onix. Durante
+el piloto debe permanecer en `demo_1`. Para habilitar varias empresas se separan sus slugs
+con comas; el valor `*` lo habilita para todas las empresas del ERP.
 
 ## Separacion y permisos
 
@@ -74,4 +79,3 @@ Probar inicialmente con una sola empresa y estos casos:
 Despues del piloto se agregaran herramientas transaccionales con borrador, vista previa,
 confirmacion explicita, idempotencia y auditoria. La voz reutilizara el mismo backend de Onix,
 por lo que no sera necesario reconstruir las reglas ni las herramientas.
-

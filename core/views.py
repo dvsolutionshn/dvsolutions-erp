@@ -1077,6 +1077,14 @@ def asistente_consulta(request, slug=None):
     if not request.user.is_superuser and not request.user.puede_acceder_empresa(empresa):
         return JsonResponse({"error": "No autorizado para consultar esta empresa."}, status=403)
 
+    from .onix_access import onix_disponible_para_empresa
+
+    if not onix_disponible_para_empresa(empresa):
+        return JsonResponse(
+            {"error": "Onix esta disponible solamente para las empresas piloto autorizadas."},
+            status=403,
+        )
+
     pregunta = (request.POST.get("pregunta") or "").strip()
     pagina = (request.POST.get("pagina") or "").strip()
 

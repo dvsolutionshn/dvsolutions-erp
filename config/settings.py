@@ -215,6 +215,7 @@ PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://dvsolutionshn.com")
 # Onix (OpenAI). Without a key the ERP keeps the local guided assistant.
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 ONIX_ENABLED = env_bool("ONIX_ENABLED", bool(OPENAI_API_KEY))
+ONIX_ALLOWED_COMPANY_SLUGS = env_list("ONIX_ALLOWED_COMPANY_SLUGS", ["demo_1"])
 ONIX_MODEL = os.environ.get("ONIX_MODEL", "gpt-5.6-luna").strip()
 ONIX_REASONING_EFFORT = os.environ.get("ONIX_REASONING_EFFORT", "low").strip()
 ONIX_TIMEOUT_SECONDS = int(os.environ.get("ONIX_TIMEOUT_SECONDS", "45"))

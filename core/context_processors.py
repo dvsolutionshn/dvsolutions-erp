@@ -1,5 +1,6 @@
 from core.models import Empresa
 from core.access import modo_clinico_simple_activo
+from core.onix_access import onix_disponible_para_empresa
 
 
 def _empresa_actual(request, user):
@@ -148,4 +149,11 @@ def erp_access(request):
             "modulo_crm": False,
             "modulo_tecnicentro": False,
         })
-    return {"erp_access": base}
+    return {
+        "erp_access": base,
+        "mostrar_asistente_erp": bool(
+            user
+            and user.is_authenticated
+            and onix_disponible_para_empresa(empresa)
+        ),
+    }

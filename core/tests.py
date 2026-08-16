@@ -1473,7 +1473,7 @@ class SuperAdminControlTests(TestCase):
     def test_asistente_consulta_responde_segun_contexto_facturacion(self):
         empresa = Empresa.objects.create(
             nombre="Empresa Asistente",
-            slug="empresa-asistente",
+            slug="demo_1",
             rtn="08011999000018",
         )
         usuario = Usuario.objects.create_user(
@@ -1528,6 +1528,7 @@ class SuperAdminControlTests(TestCase):
     @override_settings(
         ONIX_ENABLED=True,
         OPENAI_API_KEY="test-key",
+        ONIX_ALLOWED_COMPANY_SLUGS=["empresa-onix-ia"],
         ONIX_MODEL="gpt-5.6-luna",
         ONIX_INPUT_PRICE_PER_MTOK="0.20",
         ONIX_CACHED_INPUT_PRICE_PER_MTOK="0.02",
@@ -1579,6 +1580,47 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(consumo.tokens_total, 125)
         self.assertEqual(consumo.respuesta_id, "resp_prueba_onix")
         self.assertGreater(consumo.costo_estimado_usd, 0)
+
+    def test_onix_se_muestra_solo_en_empresa_piloto(self):
+        empresa_piloto = Empresa.objects.create(
+            nombre="Demo 1",
+            slug="demo_1",
+            rtn="0801199900001801",
+        )
+        otra_empresa = Empresa.objects.create(
+            nombre="Empresa sin Onix",
+            slug="empresa-sin-onix",
+            rtn="0801199900001802",
+        )
+        self.client.login(username="master", password="pass12345")
+
+        respuesta_piloto = self.client.get(reverse("dashboard", args=[empresa_piloto.slug]))
+        respuesta_otra = self.client.get(reverse("dashboard", args=[otra_empresa.slug]))
+
+        self.assertContains(respuesta_piloto, 'class="erp-assistant-fab"')
+        self.assertContains(respuesta_piloto, '<span>Onix</span>', html=True)
+        self.assertNotContains(respuesta_otra, 'class="erp-assistant-fab"')
+
+    def test_onix_rechaza_consulta_fuera_de_empresa_piloto(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa sin piloto",
+            slug="empresa-sin-piloto",
+            rtn="0801199900001803",
+        )
+        usuario = Usuario.objects.create_user(
+            username="usuario_sin_piloto",
+            password="pass12345",
+            empresa=empresa,
+        )
+        self.client.login(username=usuario.username, password="pass12345")
+
+        response = self.client.post(
+            reverse("asistente_consulta", args=[empresa.slug]),
+            {"pregunta": "Que clientes tengo", "pagina": f"/{empresa.slug}/dashboard/"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("empresas piloto", response.json()["error"])
 
     def test_herramienta_onix_no_mezcla_clientes_entre_empresas(self):
         from core.onix import _ejecutar_herramienta
