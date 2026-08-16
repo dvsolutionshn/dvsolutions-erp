@@ -615,6 +615,10 @@ class ConfiguracionOnix(models.Model):
         help_text="Preferencias operativas aprobadas que Onix debe aplicar solo a esta empresa.",
     )
     herramientas_consulta_activas = models.BooleanField(default=True)
+    herramientas_accion_activas = models.BooleanField(
+        default=False,
+        help_text="Permite que Onix prepare acciones que requieren confirmacion explicita del usuario.",
+    )
     limite_tokens_mensual = models.PositiveBigIntegerField(
         default=500000,
         help_text="Cero significa sin limite interno de tokens.",
@@ -733,6 +737,71 @@ class ConsumoOnix(models.Model):
 
     def __str__(self):
         return f"{self.empresa.nombre} - {self.tokens_total} tokens - ${self.costo_estimado_usd}"
+
+
+class AccionOnix(models.Model):
+    TIPO_CREAR_BORRADOR_FACTURA = "crear_borrador_factura"
+    TIPOS = (
+        (TIPO_CREAR_BORRADOR_FACTURA, "Crear borrador de factura"),
+    )
+
+    ESTADO_PENDIENTE = "pendiente"
+    ESTADO_EJECUTADA = "ejecutada"
+    ESTADO_CANCELADA = "cancelada"
+    ESTADO_EXPIRADA = "expirada"
+    ESTADO_ERROR = "error"
+    ESTADOS = (
+        (ESTADO_PENDIENTE, "Pendiente de confirmacion"),
+        (ESTADO_EJECUTADA, "Ejecutada"),
+        (ESTADO_CANCELADA, "Cancelada"),
+        (ESTADO_EXPIRADA, "Expirada"),
+        (ESTADO_ERROR, "Error"),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="acciones_onix",
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acciones_onix",
+    )
+    conversacion = models.ForeignKey(
+        ConversacionOnix,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acciones",
+    )
+    tipo = models.CharField(max_length=50, choices=TIPOS)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default=ESTADO_PENDIENTE, db_index=True)
+    datos = models.JSONField(default=dict)
+    vista_previa = models.JSONField(default=dict)
+    resultado = models.JSONField(default=dict, blank=True)
+    detalle_error = models.TextField(blank=True)
+    expira_en = models.DateTimeField(db_index=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_index=True)
+    fecha_confirmacion = models.DateTimeField(null=True, blank=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion"]
+        indexes = [
+            models.Index(
+                fields=["empresa", "usuario", "estado"],
+                name="core_accion_empresa_c8268d_idx",
+            ),
+        ]
+        verbose_name = "Accion de Onix"
+        verbose_name_plural = "Acciones de Onix"
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} - {self.empresa.nombre} - {self.get_estado_display()}"
 
 
 class Modulo(models.Model):

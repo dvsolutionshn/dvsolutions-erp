@@ -770,6 +770,16 @@ body::after{
     font-weight:900;
 }
 
+.erp-assistant-capabilities li.is-action{
+    border:1px solid rgba(166, 127, 242, .2);
+    background:linear-gradient(135deg, rgba(128, 91, 215, .13), rgba(255,255,255,.04));
+}
+
+.erp-assistant-capabilities li.is-action > i{
+    color:#d5c3ff;
+    background:rgba(141, 99, 231, .18);
+}
+
 .erp-assistant-capabilities span,
 .erp-assistant-capabilities strong,
 .erp-assistant-capabilities small{
@@ -1002,6 +1012,251 @@ body::after{
     height:5px;
     border-radius:999px;
     background:#20aa9e;
+}
+
+.erp-onix-actions{
+    display:grid;
+    gap:12px;
+}
+
+.erp-onix-action-card{
+    overflow:hidden;
+    border:1px solid rgba(61, 145, 161, .28);
+    border-radius:18px;
+    background:linear-gradient(150deg, #f8ffff, #f4f5ff);
+    box-shadow:0 14px 34px rgba(25, 79, 102, .08);
+}
+
+.erp-onix-action-card.is-ejecutada{
+    border-color:rgba(25, 166, 118, .35);
+    background:linear-gradient(150deg, #f5fffb, #eefaf5);
+}
+
+.erp-onix-action-card.is-cancelada,
+.erp-onix-action-card.is-expirada,
+.erp-onix-action-card.is-error{
+    border-color:rgba(133, 151, 161, .28);
+    background:#f6f8f9;
+}
+
+.erp-onix-action-head{
+    padding:16px 17px 12px;
+}
+
+.erp-onix-action-head > span{
+    display:block;
+    margin-bottom:4px;
+    color:#178c8c;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+}
+
+.erp-onix-action-head > strong{
+    display:block;
+    color:#102f45;
+    font-size:16px;
+}
+
+.erp-onix-action-head p{
+    margin:5px 0 0;
+    color:#657d8d;
+    font-size:11px;
+}
+
+.erp-onix-action-meta{
+    display:grid;
+    grid-template-columns:1.5fr 1fr 1fr;
+    gap:1px;
+    border-block:1px solid rgba(156, 194, 207, .36);
+    background:rgba(156, 194, 207, .36);
+}
+
+.erp-onix-action-meta > span{
+    min-width:0;
+    padding:10px 13px;
+    background:rgba(255,255,255,.8);
+}
+
+.erp-onix-action-meta small,
+.erp-onix-action-meta strong{
+    display:block;
+}
+
+.erp-onix-action-meta small{
+    margin-bottom:2px;
+    color:#718797;
+    font-size:8px;
+    font-weight:800;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+}
+
+.erp-onix-action-meta strong{
+    overflow:hidden;
+    color:#183a50;
+    font-size:11px;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.erp-onix-action-table-wrap{
+    overflow:auto;
+    padding:7px 14px 0;
+}
+
+.erp-onix-action-table{
+    width:100%;
+    min-width:520px;
+    border-collapse:collapse;
+    color:#28495f;
+    font-size:10px;
+}
+
+.erp-onix-action-table th,
+.erp-onix-action-table td{
+    padding:9px 7px;
+    border-bottom:1px solid rgba(174, 202, 215, .42);
+    text-align:right;
+    vertical-align:top;
+}
+
+.erp-onix-action-table th:first-child,
+.erp-onix-action-table td:first-child{
+    text-align:left;
+}
+
+.erp-onix-action-table th{
+    color:#718897;
+    font-size:8px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+}
+
+.erp-onix-action-table td strong,
+.erp-onix-action-table td small{
+    display:block;
+}
+
+.erp-onix-action-table td small{
+    margin-top:2px;
+    color:#8295a2;
+    font-size:8px;
+}
+
+.erp-onix-action-totals{
+    display:flex;
+    justify-content:flex-end;
+    gap:15px;
+    padding:12px 17px;
+    color:#657d8d;
+    font-size:9px;
+}
+
+.erp-onix-action-totals span,
+.erp-onix-action-totals strong{
+    display:block;
+}
+
+.erp-onix-action-totals strong{
+    margin-top:2px;
+    color:#27495e;
+    font-size:11px;
+}
+
+.erp-onix-action-totals .is-total strong{
+    color:#0a7476;
+    font-size:15px;
+}
+
+.erp-onix-action-buttons{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    padding:13px 17px;
+    border-top:1px solid rgba(161, 195, 209, .42);
+    background:rgba(255,255,255,.62);
+}
+
+.erp-onix-action-buttons button{
+    min-height:38px;
+    padding:8px 13px;
+    border-radius:11px;
+    font:inherit;
+    font-size:10px;
+    font-weight:800;
+    cursor:pointer;
+}
+
+.erp-onix-action-buttons button:disabled{
+    cursor:wait;
+    opacity:.55;
+}
+
+.erp-onix-action-secondary{
+    border:1px solid rgba(113, 140, 154, .35);
+    color:#536c7b;
+    background:#fff;
+}
+
+.erp-onix-action-confirm{
+    border:1px solid #157c7d;
+    color:#fff;
+    background:linear-gradient(135deg, #159b98, #2869c9);
+    box-shadow:0 8px 20px rgba(24, 129, 145, .2);
+}
+
+.erp-onix-action-feedback{
+    padding:0 17px 13px;
+    color:#647d8c;
+    font-size:9px;
+    text-align:right;
+}
+
+.erp-onix-action-feedback.is-error{
+    color:#b7354c;
+    font-weight:700;
+}
+
+.erp-onix-action-result{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 17px;
+    border-top:1px solid rgba(48, 169, 119, .28);
+    color:#306b55;
+    background:rgba(35, 179, 120, .08);
+}
+
+.erp-onix-action-result strong{
+    margin-right:auto;
+    color:#17633f;
+    font-size:12px;
+}
+
+.erp-onix-action-result span{
+    font-size:10px;
+}
+
+.erp-onix-action-result a{
+    padding:7px 10px;
+    border-radius:9px;
+    color:#fff;
+    background:#178b63;
+    font-size:9px;
+    font-weight:800;
+    text-decoration:none;
+}
+
+.erp-onix-action-result.is-cancelled{
+    border-color:rgba(118, 139, 151, .25);
+    color:#6d818d;
+    background:rgba(118, 139, 151, .08);
+}
+
+.erp-onix-action-result.is-cancelled strong{
+    color:#526b78;
 }
 
 .erp-assistant-message.is-pending{

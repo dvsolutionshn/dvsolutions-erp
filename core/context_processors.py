@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from core.models import Empresa
+from core.models import ConfiguracionOnix, Empresa
 from core.access import modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
 
@@ -29,6 +29,11 @@ def erp_access(request):
             config_avanzada = empresa.configuracion_avanzada
         except Exception:
             config_avanzada = None
+    configuracion_onix = (
+        ConfiguracionOnix.objects.filter(empresa=empresa).only("herramientas_accion_activas").first()
+        if empresa
+        else None
+    )
 
     facturacion_activa = bool(empresa and empresa.tiene_modulo_activo("facturacion"))
     contabilidad_activa = bool(empresa and empresa.tiene_modulo_activo("contabilidad"))
@@ -164,4 +169,12 @@ def erp_access(request):
         ),
         "onix_modo_prueba": bool(getattr(settings, "ONIX_TRIAL_MODE", False)),
         "onix_limite_prueba": int(getattr(settings, "ONIX_TRIAL_MONTHLY_TOKEN_LIMIT", 0)),
+        "onix_acciones_activas": bool(
+            empresa
+            and (
+                configuracion_onix.herramientas_accion_activas
+                if configuracion_onix
+                else empresa.slug == "demo_1"
+            )
+        ),
     }

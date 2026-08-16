@@ -3,11 +3,12 @@
 Onix funciona en dos modos:
 
 - **Modo guia:** no requiere API y conserva las respuestas locales del ERP.
-- **Modo IA:** usa OpenAI, memoria local por empresa, herramientas de consulta y medicion de consumo.
+- **Modo IA:** usa OpenAI, memoria local por empresa, herramientas de consulta, acciones confirmables y medicion de consumo.
 
-La primera fase es deliberadamente de solo lectura. Onix puede consultar clientes, productos,
-facturas y cuentas por cobrar respetando los permisos del usuario, pero no crea, modifica,
-emite, paga ni envia documentos.
+Onix puede consultar clientes, productos, facturas y cuentas por cobrar respetando los permisos
+del usuario. En la empresa piloto tambien puede preparar una factura, mostrar su vista previa y,
+solamente despues de una confirmacion explicita, crearla como borrador. Todavia no emite,
+modifica, paga ni envia documentos.
 
 ## Configuracion
 
@@ -57,6 +58,9 @@ limite mensual correspondiente al plan contratado.
 - Cada conversacion, mensaje y consumo contiene la empresa propietaria.
 - Las herramientas vuelven a filtrar todas las consultas por empresa.
 - Los permisos actuales del rol determinan si Onix puede consultar clientes, productos o facturas.
+- Crear un borrador exige `puede_crear_facturas` tanto al prepararlo como al confirmarlo.
+- La confirmacion solo puede realizarla el mismo usuario que preparo la accion y vence en 30 minutos.
+- Una accion confirmada es idempotente: repetir la solicitud devuelve el mismo resultado y no duplica la factura.
 - Solo se envian a OpenAI los ultimos mensajes configurados y los resultados necesarios.
 - Las conversaciones completas permanecen en PostgreSQL para auditoria interna.
 
@@ -78,11 +82,14 @@ Probar inicialmente con una sola empresa y estos casos:
 3. Consultar facturas pendientes y cuentas por cobrar.
 4. Probar un usuario sin permisos de facturacion.
 5. Intentar consultar datos de otra empresa.
-6. Pedir que cree una factura y confirmar que informa que la accion aun no esta habilitada.
-7. Revisar tokens y costo estimado desde el admin interno.
+6. Pedir que prepare una factura, revisar cliente, lineas, impuestos y total sin confirmar.
+7. Confirmar la vista previa y verificar que se crea un unico borrador en facturacion.
+8. Repetir la confirmacion y comprobar que no se duplica la factura.
+9. Descartar otra vista previa y comprobar que no crea documentos.
+10. Revisar tokens, acciones y costo estimado desde el admin interno.
 
 ## Siguiente fase
 
-Despues del piloto se agregaran herramientas transaccionales con borrador, vista previa,
-confirmacion explicita, idempotencia y auditoria. La voz reutilizara el mismo backend de Onix,
-por lo que no sera necesario reconstruir las reglas ni las herramientas.
+La siguiente fase agregara emision fiscal y envio por correo o WhatsApp, cada uno con sus propias
+validaciones y confirmaciones. La voz reutilizara el mismo backend de Onix, por lo que no sera
+necesario reconstruir las reglas ni las herramientas.

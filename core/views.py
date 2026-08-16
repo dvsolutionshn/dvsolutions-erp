@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import OperationalError, transaction
@@ -1104,6 +1105,59 @@ def asistente_consulta(request, slug=None):
             usuario=request.user,
         )
     )
+
+
+@login_required
+@require_POST
+def asistente_accion(request, slug, accion_id):
+    empresa = _resolver_empresa_request(request, slug)
+
+    if not request.user.is_superuser and not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"error": "No autorizado para operar en esta empresa."}, status=403)
+
+    from .onix_access import onix_disponible_para_empresa
+
+    if not onix_disponible_para_empresa(empresa):
+        return JsonResponse(
+            {"error": "Onix esta disponible solamente para las empresas piloto autorizadas."},
+            status=403,
+        )
+
+    decision = (request.POST.get("decision") or "").strip().lower()
+    if decision not in {"confirmar", "cancelar"}:
+        return JsonResponse({"error": "Selecciona confirmar o descartar la accion."}, status=400)
+
+    from .onix_actions import cancelar_accion, ejecutar_accion
+
+    try:
+        if decision == "confirmar":
+            accion = ejecutar_accion(
+                accion_id=accion_id,
+                empresa=empresa,
+                usuario=request.user,
+            )
+            if accion.get("status") == "expirada":
+                return JsonResponse(
+                    {
+                        "error": accion.get("error") or "La vista previa vencio.",
+                        "action": accion,
+                    },
+                    status=400,
+                )
+            mensaje = "Factura creada correctamente como borrador."
+        else:
+            accion = cancelar_accion(
+                accion_id=accion_id,
+                empresa=empresa,
+                usuario=request.user,
+            )
+            mensaje = "La accion fue descartada; no se creo ninguna factura."
+    except PermissionDenied as exc:
+        return JsonResponse({"error": str(exc)}, status=403)
+    except ValidationError as exc:
+        return JsonResponse({"error": " ".join(exc.messages)}, status=400)
+
+    return JsonResponse({"message": mensaje, "action": accion})
 
 from core.models import Modulo
 

@@ -434,7 +434,7 @@
                     </span>
                     {% if onix_modo_prueba %}<span class="erp-assistant-trial-badge">Piloto controlado</span>{% endif %}
                 </div>
-                <p>Consulta, comprende y acompaña la operación sin mezclar información entre empresas.</p>
+                <p>Consulta, prepara acciones y acompaña la operación sin mezclar información entre empresas.</p>
             </div>
         </div>
         <button class="erp-assistant-close" type="button" aria-label="Volver al ERP" data-assistant-close>
@@ -452,6 +452,7 @@
                     <li><i>✓</i><span><strong>Productos y servicios</strong><small>Códigos, precios y existencia</small></span></li>
                     <li><i>✓</i><span><strong>Facturas</strong><small>Cliente, número y estado de pago</small></span></li>
                     <li><i>✓</i><span><strong>Cuentas por cobrar</strong><small>Saldos y documentos pendientes</small></span></li>
+                    {% if onix_acciones_activas %}<li class="is-action"><i>✓</i><span><strong>Borradores de factura</strong><small>Vista previa y confirmación obligatoria</small></span></li>{% endif %}
                 </ul>
             </section>
 
@@ -489,7 +490,7 @@
                     <h4>¿Qué quieres que revise?</h4>
                 </div>
                 <div class="erp-assistant-operation-strip" aria-label="Proceso de Onix">
-                    <span><i>1</i>Comprende</span><b></b><span><i>2</i>Consulta el ERP</span><b></b><span><i>3</i>Responde</span>
+                    <span><i>1</i>Comprende</span><b></b><span><i>2</i>Consulta el ERP</span><b></b><span><i>3</i>Confirma acciones</span>
                 </div>
             </div>
 
@@ -497,7 +498,7 @@
                 <div class="erp-assistant-message is-system">
                     <div class="erp-assistant-message-author"><span class="erp-assistant-avatar is-message" aria-hidden="true"><svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg></span><strong>Onix</strong></div>
                     {% if onix_ia_activa %}
-                    <p>Hola. Estoy conectado a la IA y listo para consultar la información autorizada de {{ empresa.nombre }}.</p>
+                    <p>Hola. Estoy conectado a la IA y listo para consultar la información autorizada de {{ empresa.nombre }}{% if onix_acciones_activas %} y preparar facturas en borrador con tu confirmación{% endif %}.</p>
                     {% else %}
                     <p>Hola. Estoy en modo guía; para conversar como IA falta agregar una clave de OpenAI válida en el servidor.</p>
                     {% endif %}
@@ -508,7 +509,7 @@
                 <input type="hidden" value="{{ asistente_consulta_url }}">
                 <label class="erp-assistant-label" for="assistantQuestion">Escribe una instrucción para Onix</label>
                 <div class="erp-assistant-composer">
-                    <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: Onix, revisa las facturas pendientes y dime cuáles requieren seguimiento"></textarea>
+                    <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: Onix, prepara una factura para Cliente Demo con 2 unidades del Servicio Mensual"></textarea>
                     <button type="submit" class="erp-button-primary"><span>Enviar</span><i>&uarr;</i></button>
                 </div>
                 <div class="erp-assistant-actions">
@@ -839,7 +840,88 @@ document.addEventListener("DOMContentLoaded", function(){
         return '<div class="erp-assistant-activity">' + items.map(item => '<span>' + item + '</span>').join("") + "</div>";
     }
 
-    function appendAssistantMessage(kind, title, bodyText, steps, suggestions, contextLabel, usage) {
+    function assistantMoney(value, currency) {
+        const amount = Number(value || 0);
+        const safeAmount = Number.isFinite(amount) ? amount : 0;
+        return escapeHtml(currency || "HNL") + " " + safeAmount.toLocaleString("es-HN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }
+
+    function renderAssistantActionCard(action) {
+        if(!action || typeof action !== "object"){
+            return "";
+        }
+        const status = action.status || "pendiente";
+        const client = action.client || {};
+        const items = Array.isArray(action.items) ? action.items : [];
+        const rows = items.map(item => `
+            <tr>
+                <td><strong>${escapeHtml(item.producto || "Producto")}</strong>${item.codigo ? '<small>' + escapeHtml(item.codigo) + '</small>' : ""}</td>
+                <td>${escapeHtml(item.cantidad || "0")}</td>
+                <td>${assistantMoney(item.precio_unitario, action.currency)}</td>
+                <td>${assistantMoney(item.total, action.currency)}</td>
+            </tr>
+        `).join("");
+        let footer = "";
+        if(status === "pendiente"){
+            footer = `
+                <div class="erp-onix-action-buttons">
+                    <button type="button" class="erp-onix-action-secondary" data-onix-action-decision="cancelar">Descartar</button>
+                    <button type="button" class="erp-onix-action-confirm" data-onix-action-decision="confirmar">Confirmar y crear borrador</button>
+                </div>
+                <div class="erp-onix-action-feedback" aria-live="polite">Revisa los datos: esta confirmación creará una factura real en estado borrador.</div>
+            `;
+        } else if(status === "ejecutada" && action.result){
+            footer = `
+                <div class="erp-onix-action-result">
+                    <strong>Factura creada: ${escapeHtml(action.result.number || "Borrador")}</strong>
+                    <span>Total ${assistantMoney(action.result.total, action.result.currency || action.currency)}</span>
+                    <a href="${escapeHtml(action.result.url || "#")}">Abrir factura</a>
+                </div>
+            `;
+        } else if(status === "cancelada"){
+            footer = '<div class="erp-onix-action-result is-cancelled"><strong>Acción descartada</strong><span>No se creó ninguna factura.</span></div>';
+        } else {
+            footer = '<div class="erp-onix-action-result is-cancelled"><strong>' + escapeHtml(action.error || "Esta acción ya no está disponible.") + '</strong></div>';
+        }
+        return `
+            <article class="erp-onix-action-card is-${escapeHtml(status)}" data-onix-action-card="${escapeHtml(action.id || "")}" data-onix-action-url="${escapeHtml(action.decision_url || "")}">
+                <div class="erp-onix-action-head">
+                    <span>Acción preparada</span>
+                    <strong>${escapeHtml(action.title || "Factura en borrador")}</strong>
+                    <p>${escapeHtml(action.description || "Confirma para continuar.")}</p>
+                </div>
+                <div class="erp-onix-action-meta">
+                    <span><small>Cliente</small><strong>${escapeHtml(client.name || "Sin cliente")}</strong></span>
+                    <span><small>Emisión</small><strong>${escapeHtml(action.issue_date || "Hoy")}</strong></span>
+                    <span><small>Vencimiento</small><strong>${escapeHtml(action.due_date || "No indicada")}</strong></span>
+                </div>
+                <div class="erp-onix-action-table-wrap">
+                    <table class="erp-onix-action-table">
+                        <thead><tr><th>Producto o servicio</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                <div class="erp-onix-action-totals">
+                    <span>Subtotal <strong>${assistantMoney(action.subtotal, action.currency)}</strong></span>
+                    <span>Impuesto <strong>${assistantMoney(action.tax, action.currency)}</strong></span>
+                    <span class="is-total">Total <strong>${assistantMoney(action.total, action.currency)}</strong></span>
+                </div>
+                ${footer}
+            </article>
+        `;
+    }
+
+    function assistantActionsHtml(actions) {
+        if(!Array.isArray(actions) || !actions.length){
+            return "";
+        }
+        return '<div class="erp-onix-actions">' + actions.map(renderAssistantActionCard).join("") + '</div>';
+    }
+
+    function appendAssistantMessage(kind, title, bodyText, steps, suggestions, contextLabel, usage, actions) {
         if(!assistantBody){
             return;
         }
@@ -861,6 +943,7 @@ document.addEventListener("DOMContentLoaded", function(){
             ? '<div class="erp-assistant-message-author"><strong>' + escapeHtml(title) + "</strong></div>"
             : '<div class="erp-assistant-message-author"><span class="erp-assistant-avatar is-message" aria-hidden="true"><svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg></span><strong>' + escapeHtml(title) + "</strong></div>";
         const usageHtml = assistantUsageHtml(usage);
+        const actionsHtml = assistantActionsHtml(actions);
 
         wrapper.innerHTML = `
             ${authorHtml}
@@ -868,6 +951,7 @@ document.addEventListener("DOMContentLoaded", function(){
             <p>${escapeHtml(bodyText)}</p>
             ${stepsHtml}
             ${suggestionsHtml}
+            ${actionsHtml}
             ${usageHtml}
         `;
         assistantBody.appendChild(wrapper);
@@ -931,7 +1015,8 @@ document.addEventListener("DOMContentLoaded", function(){
                 data.steps || [],
                 data.suggested_questions || [],
                 data.context_label || "",
-                data.usage || null
+                data.usage || null,
+                data.actions || []
             );
         })
         .catch(() => {
@@ -963,6 +1048,67 @@ document.addEventListener("DOMContentLoaded", function(){
     }
 
     document.addEventListener("click", function(event){
+        const actionButton = event.target.closest("[data-onix-action-decision]");
+        if(actionButton){
+            const card = actionButton.closest("[data-onix-action-card]");
+            const decision = actionButton.getAttribute("data-onix-action-decision") || "";
+            const actionUrl = card ? card.getAttribute("data-onix-action-url") : "";
+            const feedback = card ? card.querySelector(".erp-onix-action-feedback") : null;
+            if(!card || !actionUrl || !decision){
+                return;
+            }
+            card.querySelectorAll("button").forEach(button => button.disabled = true);
+            if(feedback){
+                feedback.textContent = decision === "confirmar"
+                    ? "Creando el borrador de forma segura..."
+                    : "Descartando la acción...";
+            }
+            const actionData = new FormData();
+            actionData.append("decision", decision);
+            actionData.append(
+                "motivo_auditoria",
+                decision === "confirmar" ? "Factura confirmada por el usuario mediante Onix" : "Accion de Onix descartada por el usuario"
+            );
+            fetch(actionUrl, {
+                method: "POST",
+                headers: {"X-CSRFToken": getCookie("csrftoken")},
+                body: actionData,
+                credentials: "same-origin",
+            })
+            .then(response => response.json().then(data => ({ok: response.ok, data})))
+            .then(({ok, data}) => {
+                if(!ok){
+                    if(data.action){
+                        card.outerHTML = renderAssistantActionCard(data.action);
+                        return;
+                    }
+                    card.querySelectorAll("button").forEach(button => button.disabled = false);
+                    if(feedback){
+                        feedback.textContent = data.error || "No fue posible completar la acción.";
+                        feedback.classList.add("is-error");
+                    }
+                    return;
+                }
+                card.outerHTML = renderAssistantActionCard(data.action || {});
+                appendAssistantMessage(
+                    "system",
+                    "Onix",
+                    data.message || "Acción completada.",
+                    [],
+                    [],
+                    decision === "confirmar" ? "Operación confirmada" : "Acción descartada"
+                );
+            })
+            .catch(() => {
+                card.querySelectorAll("button").forEach(button => button.disabled = false);
+                if(feedback){
+                    feedback.textContent = "No pude conectarme con el ERP para completar la acción.";
+                    feedback.classList.add("is-error");
+                }
+            });
+            return;
+        }
+
         const trigger = event.target.closest("[data-assistant-question]");
         if(!trigger){
             return;

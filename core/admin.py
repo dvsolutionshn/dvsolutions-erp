@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import (
+    AccionOnix,
     ConfiguracionAvanzadaEmpresa,
     ConfiguracionOnix,
     ConsumoOnix,
@@ -87,11 +88,18 @@ class ConfiguracionOnixAdmin(admin.ModelAdmin):
         "activo",
         "modelo",
         "herramientas_consulta_activas",
+        "herramientas_accion_activas",
         "limite_tokens_mensual",
         "voz_activa",
         "fecha_actualizacion",
     )
-    list_filter = ("activo", "herramientas_consulta_activas", "voz_activa", "modelo")
+    list_filter = (
+        "activo",
+        "herramientas_consulta_activas",
+        "herramientas_accion_activas",
+        "voz_activa",
+        "modelo",
+    )
     search_fields = ("empresa__nombre", "empresa__slug")
 
 
@@ -141,4 +149,34 @@ class ConsumoOnixAdmin(admin.ModelAdmin):
         "costo_estimado_usd",
         "llamadas_herramientas",
         "fecha",
+    )
+
+
+@admin.register(AccionOnix)
+class AccionOnixAdmin(admin.ModelAdmin):
+    list_display = (
+        "tipo",
+        "empresa",
+        "usuario",
+        "estado",
+        "fecha_creacion",
+        "fecha_confirmacion",
+    )
+    list_filter = ("tipo", "estado", "empresa", "fecha_creacion")
+    search_fields = ("empresa__nombre", "usuario__username", "usuario__email")
+    readonly_fields = (
+        "id",
+        "empresa",
+        "usuario",
+        "conversacion",
+        "tipo",
+        "estado",
+        "datos",
+        "vista_previa",
+        "resultado",
+        "detalle_error",
+        "expira_en",
+        "fecha_creacion",
+        "fecha_confirmacion",
+        "fecha_actualizacion",
     )
