@@ -1113,6 +1113,30 @@ body::after{
     font-size:12px;
 }
 
+.erp-assistant-enter-hint{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    color:#60788a;
+    font-size:10px;
+}
+
+.erp-assistant-enter-hint kbd{
+    padding:3px 7px;
+    border:1px solid rgba(149, 181, 200, .72);
+    border-bottom-width:2px;
+    border-radius:7px;
+    color:#24465c;
+    background:#fff;
+    box-shadow:0 2px 5px rgba(24, 57, 77, .06);
+    font:inherit;
+    font-weight:800;
+}
+
+.erp-assistant-enter-hint b{
+    color:#a5b5bf;
+}
+
 .erp-assistant-security-note{
     color:#16756f;
     font-size:10px;

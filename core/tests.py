@@ -1610,6 +1610,8 @@ class SuperAdminControlTests(TestCase):
         self.assertContains(respuesta_piloto, 'aria-modal="true"')
         self.assertContains(respuesta_piloto, 'Piloto controlado')
         self.assertContains(respuesta_piloto, '100000 tokens por mes')
+        self.assertContains(respuesta_piloto, 'Shift + Enter')
+        self.assertContains(respuesta_piloto, 'assistantForm.requestSubmit()')
         self.assertNotContains(respuesta_otra, 'class="erp-assistant-fab"')
 
     @override_settings(ONIX_ENABLED=True, OPENAI_API_KEY="test-key")

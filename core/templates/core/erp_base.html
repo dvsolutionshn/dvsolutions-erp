@@ -512,6 +512,7 @@
                     <button type="submit" class="erp-button-primary"><span>Enviar</span><i>&uarr;</i></button>
                 </div>
                 <div class="erp-assistant-actions">
+                    <span class="erp-assistant-enter-hint"><kbd>Enter</kbd> enviar <b>·</b> <kbd>Shift + Enter</kbd> nueva línea</span>
                     <span class="erp-assistant-context">Contexto actual: {{ request.path }}</span>
                     <span class="erp-assistant-security-note">Datos aislados por empresa y permisos</span>
                 </div>
@@ -974,6 +975,13 @@ document.addEventListener("DOMContentLoaded", function(){
     });
 
     if(assistantForm && assistantQuestion){
+        assistantQuestion.addEventListener("keydown", function(event){
+            if(event.key === "Enter" && !event.shiftKey && !event.isComposing){
+                event.preventDefault();
+                assistantForm.requestSubmit();
+            }
+        });
+
         assistantForm.addEventListener("submit", function(event){
             event.preventDefault();
             const question = assistantQuestion.value || "";
