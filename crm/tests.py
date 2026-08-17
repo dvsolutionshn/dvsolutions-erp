@@ -1006,6 +1006,55 @@ class CRMTests(TestCase):
         self.assertContains(response, "#e85d04")
         self.assertContains(response, "Spa")
 
+    def test_app_movil_muestra_fondo_de_consulta_y_badge_del_profesional(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="EXP-APP-COLOR",
+            nombre="Paciente Color Movil",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Licenciada en enfermeria",
+            especialidad="Licenciada en enfermeria",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Terapias",
+            categoria="tratamiento",
+            color_calendario="#805AD5",
+        )
+        fecha = timezone.make_aware(datetime(2026, 6, 24, 9, 0))
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=profesional,
+            titulo=servicio.nombre,
+            responsable=profesional.nombre,
+            fecha_hora=fecha,
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            {"vista": "dia", "fecha": "2026-06-24", "app": "agenda"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'appointment color-servicio-{servicio.id} professional-lic-enfermeria',
+        )
+        self.assertContains(
+            response,
+            'mobile-professional-badge professional-badge-lic-enfermeria',
+        )
+        self.assertContains(response, "background:color-mix")
+        self.assertContains(response, "Paciente Color Movil")
+        self.assertContains(response, "Licenciada en enfermeria")
+
     def test_agenda_clinica_permite_filtrar_y_deslizar_periodos(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
