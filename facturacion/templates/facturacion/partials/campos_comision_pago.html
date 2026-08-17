@@ -11,10 +11,19 @@
 <div class="erp-field">
     <label for="porcentaje_comision">Comisión del proveedor (%)</label>
     <input id="porcentaje_comision" type="number" step="0.01" min="0" max="100" name="porcentaje_comision" value="{{ form_data.porcentaje_comision|default:'0.00' }}" placeholder="Ejemplo: 25.00">
+    {% if comision_sobre_total_factura %}
+    <div class="erp-field-help">Se calcula sobre el total completo de la factura, incluyendo ISV.</div>
+    {% else %}
     <div class="erp-field-help">Se calcula sobre el total aplicado y no reduce el saldo del cliente.</div>
+    {% endif %}
 </div>
 <div class="erp-field">
     <label for="monto_comision">Comisión calculada</label>
     <input id="monto_comision" type="text" name="monto_comision" value="{{ form_data.monto_comision|default:'0.00' }}" readonly tabindex="-1">
-    <div class="erp-field-help">Se contabiliza como gasto y cuenta por pagar al proveedor.</div>
+    <div class="erp-field-help">
+        {% if comision_sobre_total_factura %}
+        Base con ISV: {% if factura.moneda == "USD" %}${% else %}L.{% endif %} {{ base_comision|floatformat:2 }}.
+        {% endif %}
+        El resultado se actualiza en vivo y se contabiliza como gasto y cuenta por pagar.
+    </div>
 </div>

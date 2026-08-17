@@ -321,6 +321,8 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
 <script>
 const subtotalPendienteCobro = parseFloat("{{ subtotal_pendiente }}");
 const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente }}");
+const comisionSobreTotalFactura = {{ comision_sobre_total_factura|yesno:"true,false" }};
+const baseComisionFactura = parseFloat("{{ base_comision }}");
 function moneyHN(value){
     return "L. " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
 }
@@ -399,7 +401,10 @@ function actualizarComision(totalAplicado){
     const montoInput = document.getElementById("monto_comision");
     if(!porcentajeInput || !montoInput){ return; }
     const porcentaje = parseFloat(porcentajeInput.value || "0");
-    const monto = Number.isFinite(porcentaje) ? totalAplicado * porcentaje / 100 : 0;
+    const base = comisionSobreTotalFactura && Number.isFinite(baseComisionFactura)
+        ? baseComisionFactura
+        : totalAplicado;
+    const monto = Number.isFinite(porcentaje) ? base * porcentaje / 100 : 0;
     montoInput.value = monto.toFixed(2);
 }
 function seleccionarCuentaPagoPorMetodo(){

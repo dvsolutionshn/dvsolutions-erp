@@ -206,7 +206,14 @@ def _form_data_pago_por_defecto(cuentas_financieras):
     }
 
 
-def _datos_comision_pago(payload, empresa, base_comision):
+def _base_comision_pago(factura, base_aplicada):
+    """Define la base comercial usada para calcular la comision del proveedor."""
+    if factura and factura.empresa.slug == "digital_planning":
+        return Decimal(factura.total or 0).quantize(Decimal("0.01"))
+    return Decimal(base_aplicada or 0).quantize(Decimal("0.01"))
+
+
+def _datos_comision_pago(payload, empresa, base_comision, factura=None):
     porcentaje_raw = str(payload.get("porcentaje_comision", "") or "").strip()
     proveedor_id = str(payload.get("proveedor_comision", "") or "").strip()
     try:
@@ -220,7 +227,7 @@ def _datos_comision_pago(payload, empresa, base_comision):
     proveedor = Proveedor.objects.filter(empresa=empresa, activo=True, id=proveedor_id).first()
     if not proveedor:
         raise ValidationError("Selecciona el proveedor al que se pagara la comision.")
-    base = Decimal(base_comision or 0).quantize(Decimal("0.01"))
+    base = _base_comision_pago(factura, base_comision)
     monto = (base * porcentaje / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return proveedor, porcentaje, monto
 
@@ -6926,6 +6933,8 @@ def registrar_pago(request, empresa_slug, factura_id):
             "today": timezone.now().date(),
             "form_data": form_data or _form_data_pago_por_defecto(cuentas_financieras),
             "es_modal": es_modal,
+            "comision_sobre_total_factura": empresa.slug == "digital_planning",
+            "base_comision": _base_comision_pago(factura, factura.saldo_pendiente),
         }
 
     def _respuesta_modal_exito(mensaje):
@@ -7071,7 +7080,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                     recibos = []
                     try:
                         proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
-                            request.POST, empresa, total_pago + retencion_isr + retencion_isv
+                            request.POST, empresa, total_pago + retencion_isr + retencion_isv, factura=factura
                         )
                         with transaction.atomic():
                             cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
@@ -7119,7 +7128,7 @@ def registrar_pago(request, empresa_slug, factura_id):
             retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
             retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")
             proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
-                request.POST, empresa, monto_decimal + retencion_isr + retencion_isv
+                request.POST, empresa, monto_decimal + retencion_isr + retencion_isv, factura=factura
             )
 
             if monto_decimal < 0:
@@ -7338,6 +7347,8 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "pago_edicion": pago,
             "modal_heading": "Editar pago",
             "modal_description": "Ajusta el monto, la cuenta o la referencia de este cobro. El sistema reconstruira recibo y contabilidad automaticamente.",
+            "comision_sobre_total_factura": empresa.slug == "digital_planning",
+            "base_comision": _base_comision_pago(factura, Decimal(pago.total_aplicado or 0)),
         }
 
     def _respuesta_modal_exito(mensaje):
@@ -7435,7 +7446,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 if not pagos_validos:
                     raise ValidationError("Ingresa al menos un monto valido para dividir el cobro.")
                 proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
-                    request.POST, empresa, total_pago + retencion_isr + retencion_isv
+                    request.POST, empresa, total_pago + retencion_isr + retencion_isv, factura=factura
                 )
 
                 saldo_editable = (Decimal(factura.saldo_pendiente or 0) + Decimal(pago.total_aplicado or 0)).quantize(Decimal("0.01"))
@@ -7488,7 +7499,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             retencion_isr = _parsear_decimal(retencion_isr_raw, "retencion ISR")
             retencion_isv = _parsear_decimal(retencion_isv_raw, "retencion ISV")
             proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
-                request.POST, empresa, monto_decimal + retencion_isr + retencion_isv
+                request.POST, empresa, monto_decimal + retencion_isr + retencion_isv, factura=factura
             )
             cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
             cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None

@@ -2157,6 +2157,59 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(PagoFactura.objects.filter(factura=factura).exists())
 
+    def test_digital_planning_calcula_comision_sobre_total_factura_con_isv(self):
+        self.empresa.slug = "digital_planning"
+        self.empresa.save(update_fields=["slug"])
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110298",
+            nombre="Banco cobros Digital Planning",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco cobros Digital Planning",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+        )
+        proveedor = Proveedor.objects.create(
+            empresa=self.empresa,
+            nombre="Proveedor comision Digital Planning",
+            rtn="08011999222222",
+        )
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "50.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(cuenta_financiera.id),
+                "referencia": "DEP-COM-DP-001",
+                "proveedor_comision": str(proveedor.id),
+                "porcentaje_comision": "25.00",
+            },
+        )
+
+        self.assertRedirects(response, reverse("ver_factura", args=[self.empresa.slug, factura.id]))
+        pago = PagoFactura.objects.get(factura=factura, referencia="DEP-COM-DP-001")
+        self.assertEqual(factura.total, Decimal("115.00"))
+        self.assertEqual(pago.monto, Decimal("50.00"))
+        self.assertEqual(pago.monto_comision, Decimal("28.75"))
+
+    def test_digital_planning_muestra_base_comision_y_calculo_en_vivo(self):
+        self.empresa.slug = "digital_planning"
+        self.empresa.save(update_fields=["slug"])
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.get(reverse("registrar_pago", args=[self.empresa.slug, factura.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Se calcula sobre el total completo de la factura, incluyendo ISV.")
+        self.assertContains(response, 'const comisionSobreTotalFactura = true;', html=False)
+        self.assertContains(response, 'const baseComisionFactura = parseFloat("115.00");', html=False)
+
     def test_pago_total_separa_isv_a_otra_cuenta(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
             codigo="contabilidad",
