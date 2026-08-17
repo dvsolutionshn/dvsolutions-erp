@@ -2247,6 +2247,18 @@ class PagoFactura(models.Model):
         return (Decimal(self.monto or 0) + self.total_retenciones).quantize(DOS_DECIMALES)
 
     @property
+    def total_comision_pagada(self):
+        if not self.pk:
+            return Decimal('0.00')
+        total = self.pagos_comision_proveedor.aggregate(total=models.Sum('monto'))['total'] or Decimal('0.00')
+        return Decimal(total).quantize(DOS_DECIMALES)
+
+    @property
+    def saldo_comision_pendiente(self):
+        saldo = (Decimal(self.monto_comision or 0) - self.total_comision_pagada).quantize(DOS_DECIMALES)
+        return saldo if saldo > 0 else Decimal('0.00')
+
+    @property
     def subtotal_recibido(self):
         subtotal = (Decimal(self.subtotal_aplicado or 0) - Decimal(self.retencion_isr or 0)).quantize(DOS_DECIMALES)
         return subtotal if subtotal > 0 else Decimal('0.00')
@@ -2321,6 +2333,10 @@ class PagoFactura(models.Model):
             raise ValidationError({'proveedor_comision': 'Selecciona el proveedor al que corresponde la comision.'})
         if self.proveedor_comision_id and self.proveedor_comision.empresa_id != self.factura.empresa_id:
             raise ValidationError({'proveedor_comision': 'El proveedor de la comision debe pertenecer a la misma empresa de la factura.'})
+        if self.pk and self.monto_comision < self.total_comision_pagada:
+            raise ValidationError({
+                'monto_comision': 'La comision no puede ser menor que los pagos ya registrados al proveedor.'
+            })
         if self.total_aplicado <= 0:
             raise ValidationError('Debes registrar un monto recibido o una retencion mayor que cero.')
 
@@ -2376,6 +2392,74 @@ class PagoFactura(models.Model):
 
     def __str__(self):
         return f"Pago {self.monto} - Factura {self.factura.numero_factura}"
+
+
+class PagoComisionProveedor(models.Model):
+    METODOS = (
+        ('efectivo', 'Efectivo'),
+        ('tarjeta', 'Tarjeta'),
+        ('transferencia', 'Transferencia'),
+        ('cheque', 'Cheque'),
+    )
+
+    comision_origen = models.ForeignKey(
+        PagoFactura,
+        on_delete=models.CASCADE,
+        related_name='pagos_comision_proveedor',
+    )
+    fecha = models.DateField(default=timezone.now)
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    metodo = models.CharField(max_length=20, choices=METODOS, default='transferencia')
+    cuenta_financiera = models.ForeignKey(
+        'contabilidad.CuentaFinanciera',
+        on_delete=models.PROTECT,
+        related_name='pagos_comisiones_proveedores',
+    )
+    referencia = models.CharField(max_length=100, blank=True, null=True)
+    observacion = models.TextField(blank=True, null=True)
+    registrado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pagos_comisiones_proveedores_registrados',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha', '-id']
+
+    @property
+    def proveedor(self):
+        return self.comision_origen.proveedor_comision
+
+    @property
+    def empresa(self):
+        return self.comision_origen.factura.empresa
+
+    def clean(self):
+        super().clean()
+        self.monto = Decimal(self.monto or 0).quantize(DOS_DECIMALES)
+        if self.monto <= 0:
+            raise ValidationError({'monto': 'El pago debe ser mayor que cero.'})
+        if Decimal(self.comision_origen.monto_comision or 0) <= 0:
+            raise ValidationError('La comision seleccionada no tiene un saldo valido por pagar.')
+        total_pagado = self.comision_origen.pagos_comision_proveedor.exclude(pk=self.pk).aggregate(
+            total=models.Sum('monto')
+        )['total'] or Decimal('0.00')
+        saldo = Decimal(self.comision_origen.monto_comision or 0) - Decimal(total_pagado)
+        if self.monto > saldo:
+            raise ValidationError({'monto': 'El pago no puede superar el saldo pendiente de la comision.'})
+        if self.cuenta_financiera_id and self.cuenta_financiera.empresa_id != self.empresa.id:
+            raise ValidationError({'cuenta_financiera': 'La cuenta financiera debe pertenecer a la empresa de la comision.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        proveedor = self.proveedor.nombre if self.comision_origen.proveedor_comision_id else 'Proveedor'
+        return f"Pago de comision {self.monto} - {proveedor}"
 
 
 class CierreCaja(models.Model):

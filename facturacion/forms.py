@@ -3,7 +3,7 @@ from django.db.models import Sum
 from decimal import Decimal
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoComisionProveedor, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
 EMPRESAS_COSTO_REAL_INVENTARIO = {"hospital_mia", "medical_spa"}
@@ -216,6 +216,31 @@ class PagoCompraForm(forms.ModelForm):
             self.fields['cuenta_financiera'].queryset = self.fields['cuenta_financiera'].queryset.none()
         self.fields['cuenta_financiera'].required = True
         self.fields['cuenta_financiera'].empty_label = 'Seleccione banco, caja o tarjeta'
+
+
+class PagoComisionProveedorForm(forms.ModelForm):
+    class Meta:
+        model = PagoComisionProveedor
+        fields = ['fecha', 'monto', 'metodo', 'cuenta_financiera', 'referencia', 'observacion']
+        widgets = {
+            'fecha': forms.DateInput(attrs={'type': 'date'}),
+            'monto': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01'}),
+            'observacion': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        empresa = kwargs.pop('empresa', None)
+        super().__init__(*args, **kwargs)
+        self.fields['cuenta_financiera'].required = True
+        self.fields['cuenta_financiera'].empty_label = 'Seleccione banco, caja o tarjeta'
+        if empresa:
+            from contabilidad.models import CuentaFinanciera
+            self.fields['cuenta_financiera'].queryset = CuentaFinanciera.objects.filter(
+                empresa=empresa,
+                activa=True,
+            ).select_related('cuenta_contable').order_by('nombre')
+        else:
+            self.fields['cuenta_financiera'].queryset = self.fields['cuenta_financiera'].queryset.none()
 
 
 class ClienteForm(forms.ModelForm):

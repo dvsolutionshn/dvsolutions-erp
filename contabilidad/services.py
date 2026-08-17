@@ -734,6 +734,36 @@ def registrar_asiento_pago_proveedor(pago):
     )
 
 
+def registrar_asiento_pago_comision_proveedor(pago):
+    cuenta_salida = pago.cuenta_financiera.cuenta_contable
+    cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.proveedor)
+    return registrar_asiento_documento(
+        empresa=pago.empresa,
+        documento_tipo="pago_comision_proveedor",
+        documento_id=pago.id,
+        evento="egreso",
+        fecha=pago.fecha,
+        descripcion=f"Pago de comision a {pago.proveedor.nombre}",
+        referencia=pago.referencia or f"COMISION-{pago.comision_origen_id}",
+        origen_modulo="cuentas_por_pagar",
+        creado_por=pago.registrado_por,
+        lineas=[
+            {
+                "cuenta": cuenta_proveedor,
+                "detalle": f"Cancelacion de comision por pagar a {pago.proveedor.nombre}",
+                "debe": pago.monto,
+                "haber": Decimal("0.00"),
+            },
+            {
+                "cuenta": cuenta_salida,
+                "detalle": "Salida de caja o banco por pago de comision",
+                "debe": Decimal("0.00"),
+                "haber": pago.monto,
+            },
+        ],
+    )
+
+
 def registrar_asiento_nota_credito(nota):
     if nota.estado != "emitida":
         return None

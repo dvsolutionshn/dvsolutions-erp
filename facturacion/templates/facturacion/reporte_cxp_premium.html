@@ -63,9 +63,9 @@
         <p class="erp-card-muted">Proveedores con compromisos pendientes por atender.</p>
     </article>
     <article class="erp-card">
-        <div class="erp-kpi-label">Compras pendientes</div>
-        <div class="erp-stat-value">{{ resumen.compras_pendientes }}</div>
-        <p class="erp-card-muted">Documentos aplicados con saldo abierto.</p>
+        <div class="erp-kpi-label">Obligaciones pendientes</div>
+        <div class="erp-stat-value">{{ resumen.obligaciones_pendientes }}</div>
+        <p class="erp-card-muted">{{ resumen.compras_pendientes }} compra(s) y {{ resumen.comisiones_pendientes }} comision(es) con saldo abierto.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Pasivo comercial</div>
@@ -148,9 +148,9 @@
         <p class="erp-card-muted">Vista enfocada en pagos pendientes de este proveedor.</p>
     </article>
     <article class="erp-card">
-        <div class="erp-kpi-label">Compras abiertas</div>
-        <div class="erp-stat-value">{{ proveedor_resumen.compras|default:0 }}</div>
-        <p class="erp-card-muted">Documentos pendientes para este proveedor.</p>
+        <div class="erp-kpi-label">Obligaciones abiertas</div>
+        <div class="erp-stat-value">{{ proveedor_resumen.obligaciones|default:0 }}</div>
+        <p class="erp-card-muted">{{ proveedor_resumen.compras|default:0 }} compra(s) y {{ proveedor_resumen.comisiones|default:0 }} comision(es).</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Saldo del proveedor</div>
@@ -218,6 +218,48 @@
         </table>
     </div>
 </section>
+
+{% if comisiones_pendientes_proveedor %}
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar">
+        <div>
+            <h3 class="erp-panel-title" style="margin:0 0 6px;">Comisiones por pagar</h3>
+            <div class="erp-card-muted">Comisiones reconocidas al proveedor al registrar cobros de facturas.</div>
+        </div>
+    </div>
+    <div class="erp-table-wrap">
+        <table class="erp-table" style="min-width:980px;">
+            <thead>
+                <tr>
+                    <th>Factura / cliente</th>
+                    <th>Fecha</th>
+                    <th>Porcentaje</th>
+                    <th>Comision</th>
+                    <th>Pagado</th>
+                    <th>Saldo</th>
+                    <th>Accion</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for comision in comisiones_pendientes_proveedor %}
+                <tr>
+                    <td>
+                        <strong>{{ comision.factura.numero_factura|default:comision.factura.id }}</strong>
+                        <div class="erp-supplier-sub">{{ comision.factura.cliente.nombre }}</div>
+                    </td>
+                    <td>{{ comision.fecha }}</td>
+                    <td>{{ comision.porcentaje_comision|floatformat:2 }}%</td>
+                    <td class="amount">L. {{ comision.monto_comision|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ comision.total_comision_pagada|floatformat:2|intcomma }}</td>
+                    <td class="amount"><strong>L. {{ comision.saldo_comision_pendiente|floatformat:2|intcomma }}</strong></td>
+                    <td><a class="erp-inline-view" href="{% url 'registrar_pago_comision_proveedor' empresa.slug comision.id %}">Registrar pago</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}
 

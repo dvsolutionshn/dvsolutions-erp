@@ -43,11 +43,12 @@ from contabilidad.services import (
     registrar_asiento_factura_emitida,
     registrar_asiento_nota_credito,
     registrar_asiento_pago_cliente,
+    registrar_asiento_pago_comision_proveedor,
     registrar_asiento_pago_proveedor,
     registrar_reversion_documento,
 )
-from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, Cotizacion, EMPRESAS_FACTURACION_SOLO_CONTADO, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaCotizacion, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
-from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
+from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, Cotizacion, EMPRESAS_FACTURACION_SOLO_CONTADO, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaCotizacion, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoComisionProveedor, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
+from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoComisionProveedorForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 from crm.models import ConfiguracionCRM
@@ -4728,6 +4729,96 @@ def revertir_pago_compra(request, empresa_slug, compra_id, pago_id):
 
 
 @login_required
+def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    comision = get_object_or_404(
+        PagoFactura.objects.select_related('factura', 'proveedor_comision').prefetch_related(
+            'pagos_comision_proveedor__cuenta_financiera'
+        ),
+        id=pago_factura_id,
+        factura__empresa=empresa,
+        proveedor_comision__isnull=False,
+        monto_comision__gt=0,
+    )
+    if comision.factura.estado == 'anulada':
+        messages.error(request, "No se puede pagar una comision originada en una factura anulada.")
+        return redirect("reporte_cxp", empresa_slug=empresa.slug)
+    if comision.saldo_comision_pendiente <= 0:
+        messages.info(request, "Esta comision ya fue pagada en su totalidad.")
+        return redirect("reporte_cxp", empresa_slug=empresa.slug)
+
+    cuentas = _cuentas_financieras_activas_para_pago(empresa)
+    if request.method == 'POST':
+        post_data = request.POST.copy()
+        if not post_data.get('cuenta_financiera'):
+            cuenta_defecto = _cuenta_financiera_por_defecto(cuentas, post_data.get('metodo'))
+            if cuenta_defecto:
+                post_data['cuenta_financiera'] = str(cuenta_defecto.id)
+        form = PagoComisionProveedorForm(post_data, empresa=empresa)
+        form.instance.comision_origen = comision
+        form.instance.registrado_por = request.user
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    pago = form.save(commit=False)
+                    pago.comision_origen = comision
+                    pago.registrado_por = request.user
+                    pago.save()
+                    registrar_asiento_pago_comision_proveedor(pago)
+                messages.success(request, "Pago de comision registrado y contabilizado correctamente.")
+                return redirect(f"{reverse('reporte_cxp', args=[empresa.slug])}?proveedor={comision.proveedor_comision_id}")
+            except ValidationError as exc:
+                if hasattr(exc, 'message_dict'):
+                    for campo, errores in exc.message_dict.items():
+                        for error in errores:
+                            form.add_error(campo if campo in form.fields else None, error)
+                else:
+                    form.add_error(None, exc.messages[0] if exc.messages else str(exc))
+    else:
+        cuenta_defecto = _cuenta_financiera_por_defecto(cuentas, 'transferencia')
+        form = PagoComisionProveedorForm(
+            initial={
+                'fecha': timezone.localdate(),
+                'monto': comision.saldo_comision_pendiente,
+                'metodo': 'transferencia',
+                'cuenta_financiera': cuenta_defecto.id if cuenta_defecto else None,
+            },
+            empresa=empresa,
+        )
+
+    return render(request, 'facturacion/registrar_pago_comision_proveedor.html', {
+        'empresa': empresa,
+        'comision': comision,
+        'form': form,
+        'historial': comision.pagos_comision_proveedor.all(),
+    })
+
+
+@login_required
+@require_POST
+def revertir_pago_comision_proveedor(request, empresa_slug, pago_factura_id, pago_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    comision = get_object_or_404(PagoFactura, id=pago_factura_id, factura__empresa=empresa)
+    pago = get_object_or_404(PagoComisionProveedor, id=pago_id, comision_origen=comision)
+    proveedor_id = comision.proveedor_comision_id
+    with transaction.atomic():
+        registrar_reversion_documento(
+            empresa=empresa,
+            documento_tipo='pago_comision_proveedor',
+            documento_id=pago.id,
+            evento_origen='egreso',
+            evento_reversion='reversion',
+            fecha=timezone.localdate(),
+            descripcion=f"Reversion pago de comision a {comision.proveedor_comision.nombre}",
+            referencia=pago.referencia or f"COMISION-{comision.id}",
+            origen_modulo='cuentas_por_pagar',
+        )
+        pago.delete()
+    messages.success(request, "Pago de comision revertido correctamente.")
+    return redirect(f"{reverse('reporte_cxp', args=[empresa.slug])}?proveedor={proveedor_id}")
+
+
+@login_required
 def ver_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     compra = get_object_or_404(
@@ -8881,6 +8972,17 @@ def reporte_cxp(request, empresa_slug):
         .prefetch_related('pagos_compra', 'lineas')
         .order_by('fecha_documento', 'id')
     )
+    comisiones = (
+        PagoFactura.objects.filter(
+            factura__empresa=empresa,
+            monto_comision__gt=0,
+            proveedor_comision__isnull=False,
+        )
+        .exclude(factura__estado='anulada')
+        .select_related('factura', 'factura__cliente', 'proveedor_comision')
+        .prefetch_related('pagos_comision_proveedor')
+        .order_by('fecha', 'id')
+    )
 
     hoy = date.today()
     proveedor_id = request.GET.get("proveedor")
@@ -8889,6 +8991,7 @@ def reporte_cxp(request, empresa_slug):
 
     data = {}
     compras_pendientes_proveedor = None
+    comisiones_pendientes_proveedor = []
     proveedor_seleccionado = None
     proveedor_resumen = None
     proveedor_nombre_seleccionado = ""
@@ -8928,6 +9031,36 @@ def reporte_cxp(request, empresa_slug):
 
         data[llave]["total"] += saldo
 
+    for comision in comisiones:
+        saldo = comision.saldo_comision_pendiente
+        if saldo <= 0:
+            continue
+        total_cxp += saldo
+        proveedor = comision.proveedor_comision
+        nombre = proveedor.nombre.strip()
+        llave = f"proveedor-{proveedor.id}"
+        dias = (hoy - comision.fecha).days
+        if llave not in data:
+            data[llave] = {
+                "llave": llave,
+                "proveedor": proveedor,
+                "nombre": nombre,
+                "0_30": Decimal('0.00'),
+                "31_60": Decimal('0.00'),
+                "61_90": Decimal('0.00'),
+                "90_mas": Decimal('0.00'),
+                "total": Decimal('0.00'),
+            }
+        if dias <= 30:
+            data[llave]["0_30"] += saldo
+        elif dias <= 60:
+            data[llave]["31_60"] += saldo
+        elif dias <= 90:
+            data[llave]["61_90"] += saldo
+        else:
+            data[llave]["90_mas"] += saldo
+        data[llave]["total"] += saldo
+
     if proveedor_id:
         try:
             proveedor_id_int = int(proveedor_id)
@@ -8937,12 +9070,23 @@ def reporte_cxp(request, empresa_slug):
                 compra for compra in compras.filter(proveedor_id=proveedor_id_int)
                 if compra.saldo_pendiente > 0
             ]
-            if compras_pendientes_proveedor:
+            comisiones_pendientes_proveedor = [
+                comision for comision in comisiones.filter(proveedor_comision_id=proveedor_id_int)
+                if comision.saldo_comision_pendiente > 0
+            ]
+            if compras_pendientes_proveedor or comisiones_pendientes_proveedor:
+                fechas = [compra.fecha_control_cxp for compra in compras_pendientes_proveedor]
+                fechas.extend(comision.fecha for comision in comisiones_pendientes_proveedor)
                 proveedor_resumen = {
                     "compras": len(compras_pendientes_proveedor),
-                    "saldo_total": sum((compra.saldo_pendiente for compra in compras_pendientes_proveedor), Decimal('0.00')),
+                    "comisiones": len(comisiones_pendientes_proveedor),
+                    "obligaciones": len(compras_pendientes_proveedor) + len(comisiones_pendientes_proveedor),
+                    "saldo_total": (
+                        sum((compra.saldo_pendiente for compra in compras_pendientes_proveedor), Decimal('0.00'))
+                        + sum((comision.saldo_comision_pendiente for comision in comisiones_pendientes_proveedor), Decimal('0.00'))
+                    ),
                     "vencidas": sum(1 for compra in compras_pendientes_proveedor if compra.fecha_control_cxp < hoy),
-                    "proxima_fecha": min((compra.fecha_control_cxp for compra in compras_pendientes_proveedor)),
+                    "proxima_fecha": min(fechas),
                 }
         except (TypeError, ValueError):
             proveedor_seleccionado = None
@@ -8977,7 +9121,9 @@ def reporte_cxp(request, empresa_slug):
         "proveedores_con_saldo": len(data_lista),
         "total_cxp": total_cxp,
         "compras_pendientes": sum(1 for compra in compras if compra.saldo_pendiente > 0),
+        "comisiones_pendientes": sum(1 for comision in comisiones if comision.saldo_comision_pendiente > 0),
     }
+    resumen["obligaciones_pendientes"] = resumen["compras_pendientes"] + resumen["comisiones_pendientes"]
 
     return render(request, "facturacion/reporte_cxp_premium.html", {
         "empresa": empresa,
@@ -8987,6 +9133,7 @@ def reporte_cxp(request, empresa_slug):
         "proveedor_nombre_seleccionado": proveedor_nombre_seleccionado,
         "proveedor_resumen": proveedor_resumen,
         "compras_pendientes_proveedor": compras_pendientes_proveedor,
+        "comisiones_pendientes_proveedor": comisiones_pendientes_proveedor,
         "q": q,
         "proveedores_sugeridos": Proveedor.objects.filter(empresa=empresa).values_list('nombre', flat=True).distinct(),
     })

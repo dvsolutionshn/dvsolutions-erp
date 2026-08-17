@@ -21,7 +21,7 @@ from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, Cuen
 from contabilidad.services import registrar_asiento_pago_cliente
 from crm.models import ConfiguracionCRM
 from .forms import ConfiguracionFacturacionEmpresaForm, ProductoForm
-from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoCompra, PagoFactura, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, Cliente, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoComisionProveedor, PagoCompra, PagoFactura, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
 from .views import _aplicar_compra_documento, _registrar_entrada_nota_credito, _registrar_salida_factura
 
 
@@ -2209,6 +2209,73 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Se calcula sobre el total completo de la factura, incluyendo ISV.")
         self.assertContains(response, 'const comisionSobreTotalFactura = true;', html=False)
         self.assertContains(response, 'const baseComisionFactura = parseFloat("115.00");', html=False)
+
+    def test_comision_aparece_en_cxp_y_su_pago_cancela_proveedor_con_salida_bancaria(self):
+        self.empresa.slug = "digital_planning"
+        self.empresa.save(update_fields=["slug"])
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110297",
+            nombre="Banco pago comisiones",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco pago comisiones",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+        )
+        proveedor = Proveedor.objects.create(
+            empresa=self.empresa,
+            nombre="Proveedor por pagar comisiones",
+            rtn="08011999333333",
+        )
+        factura = self.crear_factura_con_linea()
+        self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "115.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(cuenta_financiera.id),
+                "referencia": "COBRO-COM-CXP",
+                "proveedor_comision": str(proveedor.id),
+                "porcentaje_comision": "25.00",
+            },
+        )
+        comision = PagoFactura.objects.get(referencia="COBRO-COM-CXP")
+
+        response = self.client.get(reverse("reporte_cxp", args=[self.empresa.slug]))
+        self.assertContains(response, proveedor.nombre)
+        self.assertContains(response, "28.75")
+        response = self.client.get(
+            f"{reverse('reporte_cxp', args=[self.empresa.slug])}?proveedor={proveedor.id}"
+        )
+        self.assertContains(response, "Comisiones por pagar")
+        self.assertContains(response, reverse("registrar_pago_comision_proveedor", args=[self.empresa.slug, comision.id]))
+
+        response = self.client.post(
+            reverse("registrar_pago_comision_proveedor", args=[self.empresa.slug, comision.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "28.75",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(cuenta_financiera.id),
+                "referencia": "PAGO-COM-001",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        pago_comision = PagoComisionProveedor.objects.get(comision_origen=comision)
+        self.assertEqual(comision.saldo_comision_pendiente, Decimal("0.00"))
+        asiento = AsientoContable.objects.get(
+            documento_tipo="pago_comision_proveedor",
+            documento_id=pago_comision.id,
+            evento="egreso",
+        )
+        proveedor.refresh_from_db()
+        self.assertTrue(asiento.lineas.filter(cuenta=proveedor.cuenta_contable, debe=Decimal("28.75")).exists())
+        self.assertTrue(asiento.lineas.filter(cuenta=cuenta_banco, haber=Decimal("28.75")).exists())
+        self.assertEqual(asiento.total_debe, asiento.total_haber)
 
     def test_pago_total_separa_isv_a_otra_cuenta(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(

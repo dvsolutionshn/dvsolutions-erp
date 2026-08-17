@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ExistenciaLoteBodega, Factura, Cliente, LoteInventario, MovimientoLoteBodega, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, LineaFactura, TipoImpuesto, PagoFactura
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ExistenciaLoteBodega, Factura, Cliente, LoteInventario, MovimientoLoteBodega, PagoComisionProveedor, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, LineaFactura, TipoImpuesto, PagoFactura
 
 
 # ==========================
@@ -99,6 +99,11 @@ class FacturaAdmin(admin.ModelAdmin):
 @admin.register(PagoFactura)
 class PagoFacturaAdmin(admin.ModelAdmin):
     list_display = ('factura', 'monto', 'metodo', 'fecha', 'proveedor_comision', 'monto_comision', 'cajero')
+
+
+@admin.register(PagoComisionProveedor)
+class PagoComisionProveedorAdmin(admin.ModelAdmin):
+    list_display = ('comision_origen', 'monto', 'metodo', 'cuenta_financiera', 'fecha', 'registrado_por')
 
 
 @admin.register(CierreCaja)
