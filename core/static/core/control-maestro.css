@@ -20,10 +20,15 @@
 .control-login-orb-b{width:320px;height:320px;left:-130px;bottom:-100px;background:radial-gradient(circle,rgba(139,92,246,.42),transparent 68%);animation-delay:-4s}
 .control-login-brand{display:flex;align-items:center;gap:13px;font-size:15px;font-weight:850;letter-spacing:.06em}
 .control-login-mark{display:grid;width:46px;height:46px;place-items:center;border:1px solid rgba(255,255,255,.32);border-radius:15px;background:rgba(255,255,255,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.2);font-size:13px;letter-spacing:-.03em;backdrop-filter:blur(12px)}
-.control-login-copy{max-width:680px;margin:auto 0}
+.control-login-center{display:grid;gap:clamp(18px,2.5vh,30px);width:100%;margin:auto 0}
+.control-login-logo-stage{position:relative;isolation:isolate;width:min(560px,88%);margin:0 auto -4px;overflow:hidden;border:1px solid rgba(230,176,87,.22);border-radius:30px;background:#070b10;box-shadow:0 28px 80px rgba(0,0,0,.44),0 0 70px rgba(36,135,220,.13),inset 0 1px 0 rgba(255,255,255,.09);transform:perspective(1200px) rotateX(1deg);animation:controlLogoReveal .85s cubic-bezier(.2,.8,.2,1) both}
+.control-login-logo-stage:after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(115deg,transparent 25%,rgba(255,255,255,.10) 48%,transparent 68%);transform:translateX(-120%);animation:controlLogoShine 6.5s ease-in-out 1.2s infinite;pointer-events:none}
+.control-login-logo-stage img{position:relative;z-index:1;display:block;width:100%;height:auto;mix-blend-mode:screen}
+.control-login-logo-glow{position:absolute;z-index:0;inset:16% 18%;border-radius:50%;background:radial-gradient(circle at 35% 45%,rgba(222,155,69,.25),transparent 42%),radial-gradient(circle at 66% 44%,rgba(27,148,231,.28),transparent 44%);filter:blur(28px)}
+.control-login-copy{max-width:680px;margin:0}
 .control-eyebrow{color:#168b9b;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
 .control-eyebrow-light{color:#6ef1e6}
-.control-login-copy h1{max-width:650px;margin:18px 0 20px;font-size:clamp(40px,5.5vw,76px);line-height:.98;letter-spacing:-.055em}
+.control-login-copy h1{max-width:650px;margin:14px 0 14px;font-size:clamp(34px,4.2vw,60px);line-height:1;letter-spacing:-.05em}
 .control-login-copy p{max-width:560px;margin:0;color:rgba(233,247,252,.72);font-size:clamp(15px,1.35vw,19px);line-height:1.7}
 .control-login-features{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
 .control-login-features span{display:inline-flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.07);font-size:11px;font-weight:750;backdrop-filter:blur(10px)}
@@ -32,6 +37,7 @@
 .control-login-status span{width:8px;height:8px;border-radius:999px;background:#4ade80;box-shadow:0 0 14px #4ade80}
 .control-login-access{display:grid;min-height:100vh;padding:40px;place-items:center;background:radial-gradient(circle at 85% 10%,rgba(40,119,240,.12),transparent 25%),radial-gradient(circle at 20% 88%,rgba(23,201,189,.12),transparent 26%),#f4f9fc}
 .control-login-card{width:min(470px,100%);padding:clamp(28px,4vw,48px);border:1px solid rgba(194,213,226,.85);border-radius:30px;background:rgba(255,255,255,.86);box-shadow:0 32px 90px rgba(15,48,73,.14),inset 0 1px 0 #fff;backdrop-filter:blur(24px)}
+.control-login-mobile-logo{display:none;width:100%;margin:0 0 22px;border-radius:20px;box-shadow:0 18px 42px rgba(5,22,37,.22)}
 .control-access-symbol{display:grid;width:64px;height:64px;margin-bottom:24px;place-items:center;border-radius:21px;background:linear-gradient(145deg,#12c4b8,#2877f0);box-shadow:0 16px 36px rgba(40,119,240,.24)}
 .control-access-symbol span{position:relative;width:22px;height:25px;border:3px solid #fff;border-radius:6px}
 .control-access-symbol span:before{content:"";position:absolute;width:12px;height:11px;left:2px;top:-12px;border:3px solid #fff;border-bottom:0;border-radius:9px 9px 0 0}
@@ -50,6 +56,8 @@
 .control-login-security{text-align:center;color:#7890a2;font-size:9px;font-weight:750}.control-login-security span{color:#17a99f}
 .control-login-messages{margin:0 0 18px}.control-login-footer{position:absolute;align-self:end;margin:0 0 -28px;color:#8aa0b1;font-size:9px;letter-spacing:.12em;text-transform:uppercase}
 @keyframes controlFloat{50%{transform:translate3d(18px,24px,0) scale(1.05)}}
+@keyframes controlLogoReveal{from{opacity:0;transform:perspective(1200px) translateY(22px) scale(.96) rotateX(4deg)}to{opacity:1;transform:perspective(1200px) translateY(0) scale(1) rotateX(1deg)}}
+@keyframes controlLogoShine{0%,72%,100%{transform:translateX(-120%)}86%{transform:translateX(120%)}}
 
 /* Lenguaje visual del panel maestro */
 .control-master-body .erp-shell{background:radial-gradient(circle at 85% 0%,rgba(40,119,240,.08),transparent 26%),radial-gradient(circle at 15% 100%,rgba(23,201,189,.08),transparent 24%),#eef5f9}
@@ -108,6 +116,6 @@
 .control-view-toolbar{padding:0!important}.control-view-toolbar .erp-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;border:0}.control-view-switch{display:flex;gap:7px;flex-wrap:wrap}.control-view-switch .erp-btn-secondary{min-height:34px}.control-view-switch .is-active{border-color:transparent!important;background:linear-gradient(110deg,#12b9ad,#2877f0)!important;color:#fff!important;box-shadow:0 10px 22px rgba(40,119,240,.16)}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 @media(max-width:1180px){.control-recent-grid{grid-template-columns:repeat(3,1fr)}.control-summary-strip{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:920px){.control-login-stage{grid-template-columns:1fr}.control-login-vision{display:none}.control-login-access{padding:22px}.control-panel-grid{grid-template-columns:1fr}.control-kpi-grid{grid-template-columns:repeat(2,1fr)}.control-command-hero{grid-template-columns:1fr}.control-command-actions{justify-content:flex-start}.control-company-card[open]{grid-column:span 1}}
+@media(max-width:920px){.control-login-stage{grid-template-columns:1fr}.control-login-vision{display:none}.control-login-access{padding:22px}.control-login-mobile-logo{display:block}.control-panel-grid{grid-template-columns:1fr}.control-kpi-grid{grid-template-columns:repeat(2,1fr)}.control-command-hero{grid-template-columns:1fr}.control-command-actions{justify-content:flex-start}.control-company-card[open]{grid-column:span 1}}
 @media(max-width:620px){.control-kpi-grid,.control-shortcuts,.control-company-meta,.control-company-facts{grid-template-columns:1fr}.control-recent-grid,.control-summary-strip{grid-template-columns:repeat(2,1fr)}.control-company-grid,.control-entity-grid{grid-template-columns:1fr}.control-company-toolbar{grid-template-columns:1fr}.control-command-hero{padding:22px}.control-login-card{padding:27px 22px}.control-login-card h2{font-size:28px}.control-catalog-intro{align-items:flex-start;flex-direction:column}}
-@media(prefers-reduced-motion:reduce){.control-login-orb{animation:none}.control-company-card,.control-shortcut,.control-login-submit{transition:none}}
+@media(prefers-reduced-motion:reduce){.control-login-orb,.control-login-logo-stage,.control-login-logo-stage:after{animation:none}.control-company-card,.control-shortcut,.control-login-submit{transition:none}}
