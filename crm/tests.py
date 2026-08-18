@@ -997,7 +997,9 @@ class CRMTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "calendarDayModal")
+        self.assertContains(response, "calendar-month-compact")
         self.assertContains(response, "data-calendar-day=\"2026-06-23\"")
+        self.assertContains(response, ">2</span>")
         self.assertContains(response, "color-consulta")
         self.assertContains(response, "color-spa")
         self.assertContains(response, "professional-doctor-luis")
