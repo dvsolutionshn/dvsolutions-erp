@@ -490,6 +490,8 @@
   text-align:center;
 }
 .calendar-shell.calendar-month-compact .calendar-day-count{
+  position:relative;
+  overflow:hidden;
   display:grid;
   place-items:center;
   min-width:34px;
@@ -502,6 +504,31 @@
   font-size:15px;
   font-weight:950;
   box-shadow:0 8px 18px rgba(20,88,112,.08);
+}
+.calendar-shell.calendar-month-compact .calendar-day-count::after{
+  content:"";
+  position:absolute;
+  inset:-45%;
+  background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.72) 50%,transparent 65%);
+  transform:translateX(-75%) rotate(8deg);
+  animation:calendarCountShine 4.2s ease-in-out infinite;
+  pointer-events:none;
+}
+.calendar-shell.calendar-month-compact .calendar-day-count.count-low{
+  border-color:rgba(20,184,166,.22);
+  background:linear-gradient(135deg,#dffaf3,#d9f4ef);
+  color:#08766f;
+}
+.calendar-shell.calendar-month-compact .calendar-day-count.count-medium{
+  border-color:rgba(37,99,235,.22);
+  background:linear-gradient(135deg,#e4efff,#e9e4ff);
+  color:#3655c5;
+}
+.calendar-shell.calendar-month-compact .calendar-day-count.count-high{
+  border-color:rgba(234,88,12,.22);
+  background:linear-gradient(135deg,#fff0d9,#ffe2dc);
+  color:#c2410c;
+  box-shadow:0 9px 22px rgba(234,88,12,.14);
 }
 .calendar-shell.calendar-month-compact .calendar-day-summary small{
   color:#718497;
@@ -519,11 +546,49 @@
   color:#9aa8b5;
   box-shadow:none;
 }
+.calendar-shell.calendar-month-compact .calendar-day-count.is-empty::after{display:none}
 .calendar-shell.calendar-month-compact .calendar-day:hover .calendar-day-count:not(.is-empty){
   transform:scale(1.06);
   background:linear-gradient(135deg,#dff8f2,#e4efff);
 }
 .calendar-shell.calendar-month-compact .calendar-day-count{transition:transform .18s ease,background .18s ease}
+.calendar-modal.is-open{animation:calendarBackdropIn .2s ease both}
+.calendar-modal.is-open .calendar-modal-card{animation:calendarDayPanelIn .28s cubic-bezier(.2,.8,.2,1) both}
+.calendar-modal.is-open .calendar-modal-item{animation:calendarDayItemIn .28s ease both}
+.calendar-modal.is-open .calendar-modal-item:nth-child(2){animation-delay:.035s}
+.calendar-modal.is-open .calendar-modal-item:nth-child(3){animation-delay:.07s}
+.calendar-modal.is-open .calendar-modal-item:nth-child(4){animation-delay:.105s}
+.calendar-modal.is-open .calendar-modal-item:nth-child(n+5){animation-delay:.14s}
+.calendar-modal-head-actions{display:flex;align-items:center;gap:8px}
+.calendar-modal-back{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:36px;
+  padding:0 13px;
+  border:1px solid #b9cedf;
+  border-radius:12px;
+  background:#f4f9fd;
+  color:#175f83;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+}
+.calendar-modal-back[hidden]{display:none}
+.calendar-modal-back:hover{background:#e8f4fb;transform:translateX(-1px)}
+@keyframes calendarCountShine{
+  0%,62%,100%{transform:translateX(-80%) rotate(8deg)}
+  78%{transform:translateX(80%) rotate(8deg)}
+}
+@keyframes calendarBackdropIn{from{opacity:0}to{opacity:1}}
+@keyframes calendarDayPanelIn{
+  from{opacity:0;transform:translateY(18px) scale(.975)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes calendarDayItemIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
 .calendar-shell.calendar-month-compact .calendar-modal-item[data-appointment-open]{
   width:100%;
   color:inherit;
@@ -737,7 +802,7 @@
         </div>
         {% if empresa.slug == 'hospital_mia' %}
         <div class="calendar-day-summary" aria-label="{{ dia.citas|length }} citas programadas">
-          <span class="calendar-day-count {% if not dia.citas %}is-empty{% endif %}">{{ dia.citas|length }}</span>
+          <span class="calendar-day-count {% if not dia.citas %}is-empty{% elif dia.citas|length >= 8 %}count-high{% elif dia.citas|length >= 4 %}count-medium{% else %}count-low{% endif %}">{{ dia.citas|length }}</span>
           <small>{% if dia.citas|length == 1 %}cita{% else %}citas{% endif %}</small>
         </div>
         {% else %}
@@ -1091,7 +1156,10 @@
         <div class="erp-kpi-label">Citas del día</div>
         <h3 class="calendar-modal-title" id="calendarDayModalTitle">Agenda</h3>
       </div>
-      <button class="calendar-modal-close" type="button" data-calendar-modal-close aria-label="Cerrar">×</button>
+      <div class="calendar-modal-head-actions">
+        <button class="calendar-modal-back" id="calendarDayModalBack" type="button" hidden>← Volver a las citas del día</button>
+        <button class="calendar-modal-close" type="button" data-calendar-modal-close aria-label="Cerrar">×</button>
+      </div>
     </div>
     <div class="calendar-modal-body" id="calendarDayModalBody"></div>
   </div>
@@ -1102,12 +1170,16 @@
   const modal = document.getElementById("calendarDayModal");
   const title = document.getElementById("calendarDayModalTitle");
   const body = document.getElementById("calendarDayModalBody");
-  if(!modal || !title || !body){ return; }
+  const backButton = document.getElementById("calendarDayModalBack");
+  if(!modal || !title || !body || !backButton){ return; }
+  let previousDayView = null;
 
   function closeModal(){
     modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
     body.innerHTML = "";
+    previousDayView = null;
+    backButton.hidden = true;
   }
 
   function escapeHtml(value){
@@ -1152,6 +1224,13 @@
   }
 
   function openAppointment(trigger){
+    if(trigger.closest("#calendarDayModalBody") && !body.querySelector(".appointment-readonly")){
+      previousDayView = {title:title.textContent, html:body.innerHTML};
+      backButton.hidden = false;
+    }else if(!trigger.closest("#calendarDayModalBody")){
+      previousDayView = null;
+      backButton.hidden = true;
+    }
     const data = trigger.dataset;
     const mediaTemplate = data.appointmentMediaId ? document.getElementById(data.appointmentMediaId) : null;
     const mediaHtml = mediaTemplate ? mediaTemplate.innerHTML.trim() : "";
@@ -1216,6 +1295,8 @@
     day.addEventListener("click", function(event){
       if(event.target.closest("a,button,summary,input,select,textarea,form")){ return; }
       const source = day.querySelector(".calendar-modal-source");
+      previousDayView = null;
+      backButton.hidden = true;
       title.textContent = day.dataset.calendarTitle || "Agenda del día";
       body.innerHTML = source ? source.innerHTML : '<div class="calendar-empty">No hay citas programadas para este día.</div>';
       modal.classList.add("is-open");
@@ -1231,6 +1312,14 @@
       return;
     }
     if(event.target === modal || event.target.closest("[data-calendar-modal-close]")){ closeModal(); }
+  });
+
+  backButton.addEventListener("click", function(){
+    if(!previousDayView){ return; }
+    title.textContent = previousDayView.title;
+    body.innerHTML = previousDayView.html;
+    previousDayView = null;
+    backButton.hidden = true;
   });
   document.addEventListener("keydown", function(event){
     if(event.key === "Escape" && modal.classList.contains("is-open")){ closeModal(); }
