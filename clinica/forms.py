@@ -19,6 +19,7 @@ from .models import (
     PreconsultaClinica,
     ProfesionalSalud,
     RecetaMedica,
+    PlantillaReceta,
     ServicioClinico,
     TratamientoPaciente,
     asegurar_profesionales_agenda_base,
@@ -585,12 +586,12 @@ class RecetaMedicaForm(BaseClinicaForm):
         fields = ["fecha", "profesional", "diagnostico", "productos", "indicaciones", "observaciones"]
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}),
-            "indicaciones": forms.Textarea(attrs={"rows": 8, "placeholder": "Ejemplo:\n1. Medicamento - dosis - frecuencia - duracion.\nIndicaciones especiales..."}),
-            "observaciones": forms.Textarea(attrs={"rows": 3}),
+            "diagnostico": forms.TextInput(attrs={"placeholder": "Diagnóstico o motivo clínico"}),
+            "indicaciones": forms.Textarea(attrs={"rows": 4, "placeholder": "Indicaciones generales para el paciente"}),
+            "observaciones": forms.Textarea(attrs={"rows": 3, "placeholder": "Observaciones adicionales de la receta"}),
         }
         labels = {
-            "productos": "Productos / medicamentos del catalogo",
-            "indicaciones": "Receta e indicaciones",
+            "indicaciones": "Indicaciones generales",
         }
 
     def __init__(self, *args, **kwargs):
@@ -598,12 +599,33 @@ class RecetaMedicaForm(BaseClinicaForm):
         super().__init__(*args, **kwargs)
         self.fields["productos"].required = False
         self.fields["profesional"].required = False
+        self.fields["indicaciones"].required = False
         if empresa:
             from facturacion.models import Producto
 
             self.fields["productos"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
         self.fields["productos"].widget.attrs.update({"size": "8"})
+
+
+class PlantillaRecetaForm(BaseClinicaForm):
+    class Meta:
+        model = PlantillaReceta
+        fields = ["nombre", "diagnostico", "indicaciones_generales", "observaciones", "activa"]
+        widgets = {
+            "nombre": forms.TextInput(attrs={"placeholder": "Ejemplo: Control postoperatorio"}),
+            "diagnostico": forms.TextInput(attrs={"placeholder": "Diagnóstico sugerido (opcional)"}),
+            "indicaciones_generales": forms.Textarea(attrs={"rows": 4, "placeholder": "Indicaciones generales que se cargarán al usar la plantilla"}),
+            "observaciones": forms.Textarea(attrs={"rows": 3, "placeholder": "Observaciones predeterminadas"}),
+        }
+        labels = {
+            "indicaciones_generales": "Indicaciones generales",
+            "activa": "Plantilla disponible para usar",
+        }
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, empresa=empresa, **kwargs)
+        self.fields["indicaciones_generales"].required = False
 
 
 CAPILAR_FORMULARIO = [

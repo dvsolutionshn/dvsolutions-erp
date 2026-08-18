@@ -1,0 +1,213 @@
+<style>
+.rx-editor{border:1px solid #cfe0eb;border-radius:22px;background:linear-gradient(145deg,#fff,#f7fbfd);padding:20px;box-shadow:0 18px 44px rgba(16,49,72,.07)}
+.rx-editor-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:15px}.rx-editor-head h3{margin:0;color:#12283d;font-size:19px}.rx-editor-head p{margin:6px 0 0;color:#65798a;font-size:12px;line-height:1.55}.rx-counter{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:999px;background:#e9f8f5;color:#0c7b73;font-size:11px;font-weight:900;white-space:nowrap}.rx-counter strong{font-size:15px}
+.rx-finder{position:relative}.rx-search-shell{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;border:1px solid #abc8d9;border-radius:15px;background:#fff;box-shadow:0 10px 25px rgba(18,58,83,.06);overflow:hidden}.rx-search-icon{display:grid;place-items:center;color:#168ca4;font-size:18px}.rx-search{width:100%;height:52px;border:0!important;outline:0!important;box-shadow:none!important;padding:0 14px 0 0!important;font-size:14px}.rx-results{position:absolute;z-index:90;left:0;right:0;top:calc(100% + 7px);display:none;max-height:330px;overflow:auto;border:1px solid #bfd3df;border-radius:16px;background:#fff;box-shadow:0 22px 55px rgba(14,42,64,.2);padding:7px}.rx-results.is-open{display:block}.rx-result{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;border-radius:11px;background:#fff;padding:11px 12px;text-align:left;cursor:pointer;color:#1b3348}.rx-result:hover,.rx-result:focus{background:#edf8fb;outline:0}.rx-result strong{display:block;font-size:13px}.rx-result small{display:block;margin-top:3px;color:#718493;font-size:10px}.rx-result-action{color:#087d86;background:#effaf7}.rx-result-mark{width:31px;height:31px;border-radius:9px;display:grid;place-items:center;background:#e8f5fa;color:#168ca4;font-weight:900;flex:0 0 auto}
+.rx-selected{display:grid;gap:12px;margin-top:18px}.rx-empty{border:1px dashed #bdd2df;border-radius:16px;padding:28px;text-align:center;color:#718493;background:rgba(255,255,255,.7)}.rx-line{border:1px solid #d3e1ea;border-radius:17px;background:#fff;overflow:hidden;box-shadow:0 10px 24px rgba(20,55,78,.05);animation:rxLineIn .24s ease both}.rx-line-head{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:12px 14px;background:linear-gradient(90deg,#edf9f7,#f3f7fd)}.rx-line-title{display:flex;align-items:center;gap:10px;min-width:0}.rx-line-number{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#16b8ad,#2779e8);color:#fff;font-weight:900;font-size:11px}.rx-line-title strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#153047;font-size:13px}.rx-line-title small{display:block;color:#708291;font-size:9px;margin-top:2px}.rx-remove{width:34px;height:34px;border:1px solid #efc4c7;border-radius:10px;background:#fff7f7;color:#c33e49;cursor:pointer;font-weight:900}.rx-line-fields{display:grid;grid-template-columns:minmax(130px,.6fr) minmax(220px,1.4fr) minmax(180px,1fr);gap:12px;padding:14px}.rx-mini-field{display:grid;gap:6px}.rx-mini-field label{font-size:9px;text-transform:uppercase;letter-spacing:.11em;color:#64798b;font-weight:900}.rx-mini-field input,.rx-mini-field textarea{width:100%;border:1px solid #c5d6e1;border-radius:11px;background:#fff;color:#1c3448;padding:10px 11px;font:inherit;outline:0;resize:vertical}.rx-mini-field input{height:43px}.rx-mini-field textarea{min-height:70px}.rx-mini-field input:focus,.rx-mini-field textarea:focus{border-color:#22aab2;box-shadow:0 0 0 4px rgba(24,169,176,.09)}
+@keyframes rxLineIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:850px){.rx-line-fields{grid-template-columns:1fr 1fr}.rx-mini-field:last-child{grid-column:1/-1}}
+@media(max-width:620px){.rx-editor{padding:14px;border-radius:17px}.rx-editor-head{display:block}.rx-counter{margin-top:10px}.rx-line-fields{grid-template-columns:1fr}.rx-mini-field:last-child{grid-column:auto}.rx-line-head{align-items:flex-start}.rx-line-title strong{white-space:normal}}
+</style>
+
+<section class="rx-editor" data-rx-editor>
+    <div class="rx-editor-head">
+        <div>
+            <h3>Medicamentos y productos</h3>
+            <p>Busque en el catálogo o escriba un medicamento externo. Puede agregar todos los que necesite.</p>
+        </div>
+        <span class="rx-counter"><strong data-rx-count>0</strong> seleccionado(s)</span>
+    </div>
+    <div class="rx-finder">
+        <div class="rx-search-shell">
+            <span class="rx-search-icon" aria-hidden="true">⌕</span>
+            <input class="rx-search" type="search" autocomplete="off" placeholder="Buscar por nombre o código…" data-rx-search aria-label="Buscar medicamento">
+        </div>
+        <div class="rx-results" data-rx-results></div>
+    </div>
+    <div class="rx-selected" data-rx-selected></div>
+    <div class="rx-empty" data-rx-empty>Empiece buscando un medicamento. Las opciones aparecerán en vivo mientras escribe.</div>
+</section>
+
+{{ catalogo_medicamentos|json_script:"rxMedicationCatalog" }}
+{{ lineas_iniciales|json_script:"rxMedicationInitial" }}
+<script>
+(function(){
+    const root = document.querySelector("[data-rx-editor]");
+    if(!root){ return; }
+    const catalog = JSON.parse(document.getElementById("rxMedicationCatalog").textContent || "[]");
+    const initial = JSON.parse(document.getElementById("rxMedicationInitial").textContent || "[]");
+    const search = root.querySelector("[data-rx-search]");
+    const results = root.querySelector("[data-rx-results]");
+    const selected = root.querySelector("[data-rx-selected]");
+    const empty = root.querySelector("[data-rx-empty]");
+    const count = root.querySelector("[data-rx-count]");
+    let lines = [];
+
+    const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const clean = value => String(value == null ? "" : value);
+
+    function lineKey(line){
+        return line.producto_id ? "p:" + line.producto_id : "m:" + normalize(line.medicamento_manual || line.nombre);
+    }
+    function updateLine(index, field, value){
+        if(lines[index]){ lines[index][field] = value; }
+    }
+    function renderLines(){
+        selected.replaceChildren();
+        lines.forEach(function(line, index){
+            const article = document.createElement("article");
+            article.className = "rx-line";
+
+            const hiddenProduct = document.createElement("input");
+            hiddenProduct.type = "hidden";
+            hiddenProduct.name = "medicamento_producto_id";
+            hiddenProduct.value = line.producto_id || "";
+            article.appendChild(hiddenProduct);
+            const hiddenManual = document.createElement("input");
+            hiddenManual.type = "hidden";
+            hiddenManual.name = "medicamento_manual";
+            hiddenManual.value = line.producto_id ? "" : clean(line.medicamento_manual || line.nombre);
+            article.appendChild(hiddenManual);
+
+            const head = document.createElement("div");
+            head.className = "rx-line-head";
+            const title = document.createElement("div");
+            title.className = "rx-line-title";
+            const number = document.createElement("span");
+            number.className = "rx-line-number";
+            number.textContent = index + 1;
+            const titleText = document.createElement("div");
+            const strong = document.createElement("strong");
+            strong.textContent = line.nombre || line.medicamento_manual || "Medicamento";
+            const small = document.createElement("small");
+            small.textContent = line.producto_id ? "Producto del catálogo" : "Medicamento escrito manualmente";
+            titleText.append(strong, small);
+            title.append(number, titleText);
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "rx-remove";
+            remove.setAttribute("aria-label", "Quitar medicamento");
+            remove.textContent = "×";
+            remove.addEventListener("click", function(){ lines.splice(index, 1); renderLines(); });
+            head.append(title, remove);
+
+            const fields = document.createElement("div");
+            fields.className = "rx-line-fields";
+            [
+                ["cantidad", "Cantidad / presentación", "input", "Ej. 1 caja o 30 tabletas"],
+                ["indicaciones", "Dosis e indicaciones", "textarea", "Ej. Tomar una tableta cada 12 horas por 5 días"],
+                ["observaciones", "Observaciones", "textarea", "Indicaciones especiales (opcional)"],
+            ].forEach(function(config){
+                const field = document.createElement("div");
+                field.className = "rx-mini-field";
+                const label = document.createElement("label");
+                label.textContent = config[1];
+                const input = document.createElement(config[2]);
+                input.name = "medicamento_" + config[0];
+                input.value = clean(line[config[0]]);
+                input.placeholder = config[3];
+                input.addEventListener("input", function(){ updateLine(index, config[0], input.value); });
+                field.append(label, input);
+                fields.appendChild(field);
+            });
+            article.append(head, fields);
+            selected.appendChild(article);
+        });
+        count.textContent = lines.length;
+        empty.hidden = lines.length > 0;
+    }
+
+    function addLine(line){
+        const prepared = {
+            producto_id: line.producto_id || null,
+            nombre: clean(line.nombre || line.medicamento_manual),
+            medicamento_manual: line.producto_id ? "" : clean(line.medicamento_manual || line.nombre),
+            cantidad: clean(line.cantidad),
+            indicaciones: clean(line.indicaciones),
+            observaciones: clean(line.observaciones),
+        };
+        const key = lineKey(prepared);
+        if(key && lines.some(item => lineKey(item) === key)){
+            const existing = lines.findIndex(item => lineKey(item) === key);
+            const card = selected.children[existing];
+            if(card){ card.animate([{transform:"scale(1)"},{transform:"scale(1.012)"},{transform:"scale(1)"}],{duration:240}); }
+            return;
+        }
+        lines.push(prepared);
+        renderLines();
+    }
+
+    function renderResults(){
+        const query = normalize(search.value);
+        results.replaceChildren();
+        if(!query){ results.classList.remove("is-open"); return; }
+        const matches = catalog.filter(function(item){
+            return normalize(item.nombre + " " + (item.codigo || "") + " " + (item.descripcion || "")).includes(query);
+        }).slice(0, 10);
+        matches.forEach(function(item){
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "rx-result";
+            const text = document.createElement("span");
+            const title = document.createElement("strong");
+            title.textContent = item.nombre;
+            const detail = document.createElement("small");
+            detail.textContent = item.codigo ? "Código: " + item.codigo : (item.descripcion || "Disponible en el catálogo");
+            text.append(title, detail);
+            const mark = document.createElement("span");
+            mark.className = "rx-result-mark";
+            mark.textContent = "+";
+            button.append(text, mark);
+            button.addEventListener("click", function(){
+                addLine({producto_id:item.id, nombre:item.nombre});
+                search.value = "";
+                results.classList.remove("is-open");
+                search.focus();
+            });
+            results.appendChild(button);
+        });
+        const manual = document.createElement("button");
+        manual.type = "button";
+        manual.className = "rx-result rx-result-action";
+        const manualText = document.createElement("span");
+        const manualTitle = document.createElement("strong");
+        manualTitle.textContent = "Agregar «" + search.value.trim() + "»";
+        const manualDetail = document.createElement("small");
+        manualDetail.textContent = "Usar como medicamento externo al catálogo";
+        manualText.append(manualTitle, manualDetail);
+        const manualMark = document.createElement("span");
+        manualMark.className = "rx-result-mark";
+        manualMark.textContent = "✎";
+        manual.append(manualText, manualMark);
+        manual.addEventListener("click", function(){
+            const value = search.value.trim();
+            if(value){ addLine({medicamento_manual:value, nombre:value}); }
+            search.value = "";
+            results.classList.remove("is-open");
+            search.focus();
+        });
+        results.appendChild(manual);
+        results.classList.add("is-open");
+    }
+
+    search.addEventListener("input", renderResults);
+    search.addEventListener("focus", renderResults);
+    search.addEventListener("keydown", function(event){
+        if(event.key === "Enter"){
+            event.preventDefault();
+            const first = results.querySelector(".rx-result");
+            if(first){ first.click(); }
+        }
+        if(event.key === "Escape"){ results.classList.remove("is-open"); }
+    });
+    document.addEventListener("click", function(event){
+        if(!root.contains(event.target)){ results.classList.remove("is-open"); }
+    });
+
+    lines = initial.map(item => ({...item}));
+    renderLines();
+    window.recipeMedicationEditor = {
+        setLines: function(newLines){ lines = (newLines || []).map(item => ({...item})); renderLines(); },
+        getLines: function(){ return lines.map(item => ({...item})); },
+    };
+})();
+</script>

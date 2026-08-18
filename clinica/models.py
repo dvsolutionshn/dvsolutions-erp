@@ -860,6 +860,105 @@ class RecetaMedica(models.Model):
         return f"Receta {self.fecha:%d/%m/%Y} - {self.paciente.nombre}"
 
 
+class RecetaMedicaDetalle(models.Model):
+    receta = models.ForeignKey(RecetaMedica, on_delete=models.CASCADE, related_name="detalles_medicamentos")
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="detalles_recetas_clinicas",
+    )
+    medicamento_manual = models.CharField(max_length=220, blank=True)
+    cantidad = models.CharField(max_length=100, blank=True)
+    indicaciones = models.TextField(blank=True)
+    observaciones = models.TextField(blank=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["orden", "id"]
+        verbose_name = "Detalle de receta medica"
+        verbose_name_plural = "Detalles de recetas medicas"
+
+    @property
+    def nombre_medicamento(self):
+        return self.producto.nombre if self.producto_id else self.medicamento_manual
+
+    def clean(self):
+        super().clean()
+        if not self.producto_id and not (self.medicamento_manual or "").strip():
+            raise ValidationError({"medicamento_manual": "Seleccione o escriba un medicamento."})
+        if self.producto_id and self.receta_id and self.producto.empresa_id != self.receta.empresa_id:
+            raise ValidationError({"producto": "El producto no pertenece a la empresa de la receta."})
+
+    def __str__(self):
+        return f"{self.nombre_medicamento} - {self.receta}"
+
+
+class PlantillaReceta(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="plantillas_recetas")
+    nombre = models.CharField(max_length=180)
+    diagnostico = models.CharField(max_length=240, blank=True)
+    indicaciones_generales = models.TextField(blank=True)
+    observaciones = models.TextField(blank=True)
+    activa = models.BooleanField(default=True)
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="plantillas_recetas_creadas",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        constraints = [
+            models.UniqueConstraint(fields=["empresa", "nombre"], name="uniq_plantilla_receta_empresa_nombre"),
+        ]
+        verbose_name = "Plantilla de receta"
+        verbose_name_plural = "Plantillas de recetas"
+
+    def __str__(self):
+        return f"{self.nombre} - {self.empresa.nombre}"
+
+
+class PlantillaRecetaDetalle(models.Model):
+    plantilla = models.ForeignKey(PlantillaReceta, on_delete=models.CASCADE, related_name="detalles")
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="detalles_plantillas_recetas",
+    )
+    medicamento_manual = models.CharField(max_length=220, blank=True)
+    cantidad = models.CharField(max_length=100, blank=True)
+    indicaciones = models.TextField(blank=True)
+    observaciones = models.TextField(blank=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["orden", "id"]
+        verbose_name = "Detalle de plantilla de receta"
+        verbose_name_plural = "Detalles de plantillas de recetas"
+
+    @property
+    def nombre_medicamento(self):
+        return self.producto.nombre if self.producto_id else self.medicamento_manual
+
+    def clean(self):
+        super().clean()
+        if not self.producto_id and not (self.medicamento_manual or "").strip():
+            raise ValidationError({"medicamento_manual": "Seleccione o escriba un medicamento."})
+        if self.producto_id and self.plantilla_id and self.producto.empresa_id != self.plantilla.empresa_id:
+            raise ValidationError({"producto": "El producto no pertenece a la empresa de la plantilla."})
+
+    def __str__(self):
+        return f"{self.nombre_medicamento} - {self.plantilla.nombre}"
+
+
 class SeguimientoPostOperatorio(models.Model):
     ESTADO_CHOICES = [
         ("pendiente", "Pendiente"),

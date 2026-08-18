@@ -7,12 +7,13 @@
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+{% if recetas_avanzadas %}<a class="erp-btn-secondary" href="{% url 'clinica_plantillas_recetas' empresa.slug %}">Plantillas</a>{% endif %}
 <a class="erp-btn" href="{% url 'clinica_crear_receta_paciente' empresa.slug paciente.id %}">Crear receta</a>
 {% endblock %}
 
 {% block content %}
 <style>
-.rx-list{display:grid;gap:14px}.rx-card{border:1px solid var(--line);border-radius:22px;background:#fff;padding:18px;box-shadow:0 16px 38px rgba(16,40,62,.07)}.rx-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.rx-head h3{margin:0;color:#102338}.rx-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.rx-tag{padding:6px 9px;border-radius:999px;background:#eef7fb;color:#0f6f8a;font-size:10px;font-weight:900}.rx-body{margin-top:12px;white-space:pre-wrap;line-height:1.65;color:#26394d}.rx-products{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}.rx-product{padding:7px 10px;border-radius:999px;background:#f3f7fb;color:#26394d;font-size:11px;font-weight:800}.rx-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}@media(max-width:700px){.rx-head{display:block}}
+.rx-list{display:grid;gap:14px}.rx-card{border:1px solid var(--line);border-radius:22px;background:#fff;padding:18px;box-shadow:0 16px 38px rgba(16,40,62,.07)}.rx-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.rx-head h3{margin:0;color:#102338}.rx-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.rx-tag{padding:6px 9px;border-radius:999px;background:#eef7fb;color:#0f6f8a;font-size:10px;font-weight:900}.rx-body{margin-top:12px;white-space:pre-wrap;line-height:1.65;color:#26394d}.rx-products{margin-top:14px;display:grid;gap:8px}.rx-product{display:grid;grid-template-columns:minmax(170px,.8fr) minmax(190px,1.3fr) minmax(150px,1fr);gap:10px;padding:10px 12px;border:1px solid #dce7ee;border-radius:12px;background:#f8fbfd;color:#26394d;font-size:11px}.rx-product strong{color:#123047}.rx-product span{color:#617687}.rx-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}@media(max-width:700px){.rx-head{display:block}.rx-product{grid-template-columns:1fr}}
 </style>
 <section class="rx-list">
     {% for receta in recetas %}
@@ -27,9 +28,15 @@
             </div>
             <a class="erp-btn-secondary" href="{% url 'clinica_receta_imprimir' empresa.slug paciente.id receta.id %}" target="_blank" rel="noopener">Imprimir</a>
         </div>
-        {% if receta.productos.all %}
+        {% if receta.detalles_medicamentos.all %}
         <div class="rx-products">
-            {% for producto in receta.productos.all %}<span class="rx-product">{{ producto.nombre }}</span>{% endfor %}
+            {% for detalle in receta.detalles_medicamentos.all %}
+            <div class="rx-product"><strong>{{ detalle.nombre_medicamento }}{% if detalle.cantidad %} · {{ detalle.cantidad }}{% endif %}</strong><span>{{ detalle.indicaciones|default:"Sin indicación individual" }}</span><span>{{ detalle.observaciones|default:"" }}</span></div>
+            {% endfor %}
+        </div>
+        {% elif receta.productos.all %}
+        <div class="rx-products">
+            {% for producto in receta.productos.all %}<div class="rx-product"><strong>{{ producto.nombre }}</strong><span>Producto del catálogo</span><span></span></div>{% endfor %}
         </div>
         {% endif %}
         <div class="rx-body">{{ receta.indicaciones }}</div>

@@ -22,7 +22,7 @@ from core.access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
-from facturacion.models import Cliente
+from facturacion.models import Cliente, Producto
 
 from .forms import (
     ANTECEDENTES_FAMILIARES_CHOICES,
@@ -53,6 +53,7 @@ from .forms import (
     PreconsultaClinicaPublicaForm,
     ProfesionalSaludForm,
     RecetaMedicaForm,
+    PlantillaRecetaForm,
     ServicioClinicoForm,
     TratamientoPacienteForm,
 )
@@ -71,6 +72,9 @@ from .models import (
     PreconsultaClinica,
     ProfesionalSalud,
     RecetaMedica,
+    RecetaMedicaDetalle,
+    PlantillaReceta,
+    PlantillaRecetaDetalle,
     SeguimientoPostOperatorio,
     ServicioClinico,
     TratamientoPaciente,
@@ -82,6 +86,8 @@ from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
 logger = logging.getLogger(__name__)
+
+EMPRESAS_RECETAS_AVANZADAS = frozenset({"hospital_mia", "serviciosmedicos", "luque_aestetic"})
 
 
 def _texto_busqueda_profesional(valor):
@@ -1412,6 +1418,158 @@ def consentimientos_paciente(request, empresa_slug, paciente_id):
     )
 
 
+def _catalogo_medicamentos_receta(empresa):
+    return list(
+        Producto.objects.filter(empresa=empresa, activo=True, eliminado=False)
+        .order_by("nombre")
+        .values("id", "nombre", "codigo", "descripcion")
+    )
+
+
+def _extraer_lineas_receta(post_data, empresa):
+    producto_ids = post_data.getlist("medicamento_producto_id")
+    manuales = post_data.getlist("medicamento_manual")
+    cantidades = post_data.getlist("medicamento_cantidad")
+    indicaciones = post_data.getlist("medicamento_indicaciones")
+    observaciones = post_data.getlist("medicamento_observaciones")
+    total = max(
+        len(producto_ids),
+        len(manuales),
+        len(cantidades),
+        len(indicaciones),
+        len(observaciones),
+        0,
+    )
+    if not total:
+        producto_ids = post_data.getlist("productos")
+        total = len(producto_ids)
+
+    ids_validos = []
+    for valor in producto_ids:
+        try:
+            ids_validos.append(int(valor))
+        except (TypeError, ValueError):
+            continue
+    productos = {
+        producto.id: producto
+        for producto in Producto.objects.filter(
+            empresa=empresa,
+            activo=True,
+            eliminado=False,
+            id__in=ids_validos,
+        )
+    }
+
+    lineas = []
+    errores = []
+    for indice in range(total):
+        producto_id_texto = (producto_ids[indice] if indice < len(producto_ids) else "").strip()
+        manual = (manuales[indice] if indice < len(manuales) else "").strip()
+        cantidad = (cantidades[indice] if indice < len(cantidades) else "").strip()
+        indicacion = (indicaciones[indice] if indice < len(indicaciones) else "").strip()
+        observacion = (observaciones[indice] if indice < len(observaciones) else "").strip()
+        if not producto_id_texto and not manual:
+            continue
+
+        producto = None
+        if producto_id_texto:
+            try:
+                producto = productos.get(int(producto_id_texto))
+            except (TypeError, ValueError):
+                producto = None
+            if producto is None:
+                errores.append(f"El medicamento de la línea {indice + 1} ya no está disponible en este catálogo.")
+                continue
+
+        lineas.append(
+            {
+                "producto": producto,
+                "producto_id": producto.id if producto else None,
+                "nombre": producto.nombre if producto else manual,
+                "medicamento_manual": "" if producto else manual,
+                "cantidad": cantidad,
+                "indicaciones": indicacion,
+                "observaciones": observacion,
+            }
+        )
+    return lineas, errores
+
+
+def _guardar_detalles_receta(receta, lineas):
+    receta.detalles_medicamentos.all().delete()
+    detalles = [
+        RecetaMedicaDetalle(
+            receta=receta,
+            producto=linea["producto"],
+            medicamento_manual=linea["medicamento_manual"],
+            cantidad=linea["cantidad"],
+            indicaciones=linea["indicaciones"],
+            observaciones=linea["observaciones"],
+            orden=indice,
+        )
+        for indice, linea in enumerate(lineas)
+    ]
+    if detalles:
+        RecetaMedicaDetalle.objects.bulk_create(detalles)
+    receta.productos.set([linea["producto"] for linea in lineas if linea["producto"]])
+
+
+def _guardar_detalles_plantilla(plantilla, lineas):
+    plantilla.detalles.all().delete()
+    detalles = [
+        PlantillaRecetaDetalle(
+            plantilla=plantilla,
+            producto=linea["producto"],
+            medicamento_manual=linea["medicamento_manual"],
+            cantidad=linea["cantidad"],
+            indicaciones=linea["indicaciones"],
+            observaciones=linea["observaciones"],
+            orden=indice,
+        )
+        for indice, linea in enumerate(lineas)
+    ]
+    if detalles:
+        PlantillaRecetaDetalle.objects.bulk_create(detalles)
+
+
+def _serializar_lineas_receta(lineas):
+    return [
+        {
+            "producto_id": linea.get("producto_id") or getattr(linea.get("producto"), "id", None),
+            "nombre": linea.get("nombre") or getattr(linea.get("producto"), "nombre", "") or linea.get("medicamento_manual", ""),
+            "medicamento_manual": linea.get("medicamento_manual", ""),
+            "cantidad": linea.get("cantidad", ""),
+            "indicaciones": linea.get("indicaciones", ""),
+            "observaciones": linea.get("observaciones", ""),
+        }
+        for linea in lineas
+    ]
+
+
+def _serializar_plantillas_receta(plantillas):
+    return [
+        {
+            "id": plantilla.id,
+            "nombre": plantilla.nombre,
+            "diagnostico": plantilla.diagnostico or "",
+            "indicaciones_generales": plantilla.indicaciones_generales or "",
+            "observaciones": plantilla.observaciones or "",
+            "detalles": [
+                {
+                    "producto_id": detalle.producto_id,
+                    "nombre": detalle.nombre_medicamento,
+                    "medicamento_manual": detalle.medicamento_manual,
+                    "cantidad": detalle.cantidad,
+                    "indicaciones": detalle.indicaciones,
+                    "observaciones": detalle.observaciones,
+                }
+                for detalle in plantilla.detalles.all()
+            ],
+        }
+        for plantilla in plantillas
+    ]
+
+
 @login_required
 def recetas_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
@@ -1419,13 +1577,18 @@ def recetas_paciente(request, empresa_slug, paciente_id):
     recetas = list(
         RecetaMedica.objects.filter(empresa=empresa, paciente=paciente)
         .select_related("profesional", "creada_por")
-        .prefetch_related("productos")
+        .prefetch_related("productos", "detalles_medicamentos__producto")
         .order_by("-fecha", "-fecha_creacion")
     )
     return render(
         request,
         "clinica/recetas_paciente.html",
-        {"empresa": empresa, "paciente": paciente, "recetas": recetas},
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "recetas": recetas,
+            "recetas_avanzadas": empresa.slug in EMPRESAS_RECETAS_AVANZADAS,
+        },
     )
 
 
@@ -1434,7 +1597,9 @@ def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     receta = get_object_or_404(
-        RecetaMedica.objects.select_related("profesional", "creada_por").prefetch_related("productos"),
+        RecetaMedica.objects.select_related("profesional", "creada_por").prefetch_related(
+            "productos", "detalles_medicamentos__producto"
+        ),
         id=receta_id,
         empresa=empresa,
         paciente=paciente,
@@ -2343,22 +2508,141 @@ def subir_examen_paciente(request, empresa_slug, paciente_id):
 def crear_receta_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    form = RecetaMedicaForm(request.POST or None, empresa=empresa)
-    if request.method == "POST" and form.is_valid():
-        receta = form.save(commit=False)
-        receta.empresa = empresa
-        receta.paciente = paciente
-        receta.creada_por = request.user
-        receta.save()
-        form.save_m2m()
-        messages.success(request, "Receta medica creada correctamente.")
+    avanzada = empresa.slug in EMPRESAS_RECETAS_AVANZADAS
+    profesional_inicial = _profesional_predeterminado_usuario(empresa, request.user)
+    form = RecetaMedicaForm(
+        request.POST or None,
+        empresa=empresa,
+        initial={"profesional": profesional_inicial} if profesional_inicial else None,
+    )
+    lineas, errores_lineas = ([], [])
+    formulario_valido = False
+    if request.method == "POST":
+        formulario_valido = form.is_valid()
+        lineas, errores_lineas = _extraer_lineas_receta(request.POST, empresa)
+        if avanzada and not lineas and not (request.POST.get("indicaciones") or "").strip():
+            errores_lineas.append("Agregue al menos un medicamento o escriba las indicaciones generales.")
+        for error in errores_lineas:
+            form.add_error(None, error)
+
+    if request.method == "POST" and formulario_valido and not errores_lineas:
+        with transaction.atomic():
+            receta = form.save(commit=False)
+            receta.empresa = empresa
+            receta.paciente = paciente
+            receta.creada_por = request.user
+            receta.save()
+            form.save_m2m()
+            if lineas:
+                _guardar_detalles_receta(receta, lineas)
+        messages.success(request, "Receta médica creada correctamente.")
         return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
-    return render(request, "clinica/form.html", {
+
+    if not avanzada:
+        return render(request, "clinica/form.html", {
+            "empresa": empresa,
+            "form": form,
+            "titulo": f"Nueva receta: {paciente.nombre}",
+            "cancel_url": reverse("clinica_recetas_paciente", args=[empresa.slug, paciente.id]),
+        })
+
+    plantillas = list(
+        PlantillaReceta.objects.filter(empresa=empresa, activa=True)
+        .prefetch_related("detalles__producto")
+        .order_by("nombre")
+    )
+    return render(request, "clinica/receta_form_avanzada.html", {
         "empresa": empresa,
+        "paciente": paciente,
         "form": form,
-        "titulo": f"Nueva receta: {paciente.nombre}",
-        "cancel_url": reverse("clinica_recetas_paciente", args=[empresa.slug, paciente.id]),
+        "catalogo_medicamentos": _catalogo_medicamentos_receta(empresa),
+        "plantillas": plantillas,
+        "plantillas_json": _serializar_plantillas_receta(plantillas),
+        "lineas_iniciales": _serializar_lineas_receta(lineas),
     })
+
+
+@login_required
+def plantillas_recetas(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug not in EMPRESAS_RECETAS_AVANZADAS:
+        raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
+    plantillas = list(
+        PlantillaReceta.objects.filter(empresa=empresa)
+        .select_related("creada_por")
+        .prefetch_related("detalles__producto")
+        .order_by("nombre")
+    )
+    return render(request, "clinica/plantillas_recetas.html", {
+        "empresa": empresa,
+        "plantillas": plantillas,
+    })
+
+
+def _plantilla_receta_form_view(request, empresa, plantilla=None):
+    form = PlantillaRecetaForm(request.POST or None, instance=plantilla, empresa=empresa)
+    lineas = []
+    errores_lineas = []
+    formulario_valido = False
+    if request.method == "POST":
+        formulario_valido = form.is_valid()
+        lineas, errores_lineas = _extraer_lineas_receta(request.POST, empresa)
+        if not lineas:
+            errores_lineas.append("Agregue al menos un medicamento a la plantilla.")
+        for error in errores_lineas:
+            form.add_error(None, error)
+    elif plantilla:
+        lineas = [
+            {
+                "producto_id": detalle.producto_id,
+                "nombre": detalle.nombre_medicamento,
+                "medicamento_manual": detalle.medicamento_manual,
+                "cantidad": detalle.cantidad,
+                "indicaciones": detalle.indicaciones,
+                "observaciones": detalle.observaciones,
+            }
+            for detalle in plantilla.detalles.select_related("producto").all()
+        ]
+
+    if request.method == "POST" and formulario_valido and not errores_lineas:
+        with transaction.atomic():
+            objeto = form.save(commit=False)
+            objeto.empresa = empresa
+            if not objeto.creada_por_id:
+                objeto.creada_por = request.user
+            objeto.save()
+            _guardar_detalles_plantilla(objeto, lineas)
+        messages.success(request, f"Plantilla «{objeto.nombre}» guardada correctamente.")
+        return redirect("clinica_plantillas_recetas", empresa_slug=empresa.slug)
+
+    return render(request, "clinica/plantilla_receta_form.html", {
+        "empresa": empresa,
+        "plantilla": plantilla,
+        "form": form,
+        "catalogo_medicamentos": _catalogo_medicamentos_receta(empresa),
+        "lineas_iniciales": _serializar_lineas_receta(lineas),
+    })
+
+
+@login_required
+def crear_plantilla_receta(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug not in EMPRESAS_RECETAS_AVANZADAS:
+        raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
+    return _plantilla_receta_form_view(request, empresa)
+
+
+@login_required
+def editar_plantilla_receta(request, empresa_slug, plantilla_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug not in EMPRESAS_RECETAS_AVANZADAS:
+        raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
+    plantilla = get_object_or_404(
+        PlantillaReceta.objects.prefetch_related("detalles__producto"),
+        id=plantilla_id,
+        empresa=empresa,
+    )
+    return _plantilla_receta_form_view(request, empresa, plantilla)
 
 
 @login_required

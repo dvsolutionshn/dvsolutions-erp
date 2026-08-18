@@ -1,0 +1,33 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{% if plantilla %}Editar{% else %}Nueva{% endif %} plantilla - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Recetas médicas{% endblock %}
+{% block header_title %}{% if plantilla %}Editar plantilla{% else %}Nueva plantilla de receta{% endif %}{% endblock %}
+{% block header_description %}Defina los medicamentos y textos que se cargarán automáticamente al preparar una receta.{% endblock %}
+
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'clinica_plantillas_recetas' empresa.slug %}">Volver a plantillas</a>{% endblock %}
+
+{% block content %}
+<style>
+.tpl-form{display:grid;gap:18px}.tpl-card{border:1px solid #cfe0eb;border-radius:22px;background:#fff;padding:20px;box-shadow:0 18px 44px rgba(16,49,72,.07)}.tpl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.tpl-field{display:grid;gap:7px}.tpl-field.wide{grid-column:1/-1}.tpl-field label{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:#617789;font-weight:900}.tpl-field input,.tpl-field textarea{width:100%;border:1px solid #bdd0dc;border-radius:12px;background:#fff;color:#173047;padding:11px 13px;font:inherit;outline:0}.tpl-field input{min-height:46px}.tpl-field textarea{resize:vertical}.tpl-field input:focus,.tpl-field textarea:focus{border-color:#21aab2;box-shadow:0 0 0 4px rgba(23,168,176,.09)}.tpl-check{display:flex;align-items:center;gap:10px;border:1px solid #cfe0eb;border-radius:12px;padding:12px;background:#f5fbfa}.tpl-check input{width:18px;height:18px;min-height:auto}.tpl-errors{border:1px solid #efb8bd;border-radius:13px;background:#fff4f4;color:#a93a44;padding:12px 14px;font-size:12px;font-weight:800}.tpl-actions{display:flex;justify-content:flex-end;gap:10px}.tpl-save{border:0;border-radius:12px;background:linear-gradient(135deg,#16b8ad,#2878e9);color:#fff;padding:12px 21px;font-weight:900;cursor:pointer;box-shadow:0 12px 28px rgba(28,139,187,.2)}
+@media(max-width:700px){.tpl-grid{grid-template-columns:1fr}.tpl-field.wide{grid-column:auto}.tpl-actions>*{flex:1;text-align:center}}
+</style>
+<form method="post" class="tpl-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="tpl-errors">{{ form.non_field_errors }}</div>{% endif %}
+    <section class="tpl-card">
+        <div class="tpl-grid">
+            <div class="tpl-field"><label for="{{ form.nombre.id_for_label }}">{{ form.nombre.label }}</label>{{ form.nombre }}{% for error in form.nombre.errors %}<div class="tpl-errors">{{ error }}</div>{% endfor %}</div>
+            <div class="tpl-field"><label for="{{ form.diagnostico.id_for_label }}">{{ form.diagnostico.label }}</label>{{ form.diagnostico }}{% for error in form.diagnostico.errors %}<div class="tpl-errors">{{ error }}</div>{% endfor %}</div>
+            <div class="tpl-field wide"><label for="{{ form.indicaciones_generales.id_for_label }}">{{ form.indicaciones_generales.label }}</label>{{ form.indicaciones_generales }}{% for error in form.indicaciones_generales.errors %}<div class="tpl-errors">{{ error }}</div>{% endfor %}</div>
+            <div class="tpl-field wide"><label for="{{ form.observaciones.id_for_label }}">{{ form.observaciones.label }}</label>{{ form.observaciones }}{% for error in form.observaciones.errors %}<div class="tpl-errors">{{ error }}</div>{% endfor %}</div>
+            <label class="tpl-check">{{ form.activa }} <strong>{{ form.activa.label }}</strong></label>
+        </div>
+    </section>
+    {% include "clinica/includes/receta_medicamentos_editor.html" %}
+    <div class="tpl-actions">
+        <a class="erp-btn-secondary" href="{% url 'clinica_plantillas_recetas' empresa.slug %}">Cancelar</a>
+        <button class="tpl-save" type="submit">Guardar plantilla</button>
+    </div>
+</form>
+{% endblock %}

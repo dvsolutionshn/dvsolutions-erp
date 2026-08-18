@@ -15,7 +15,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
 from crm.models import CitaCliente, ConfiguracionCRM
 from facturacion.models import Cliente, Producto
 from .forms import PreconsultaClinicaPublicaForm
-from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, RecetaMedica, ServicioClinico
+from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -738,6 +738,114 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Receta medica")
         self.assertContains(response, "Antibiotico demo")
         self.assertContains(response, "Tomar 1 tableta")
+
+    def test_receta_avanzada_permite_busqueda_multiple_manual_y_plantillas(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-RX-ADV",
+            nombre="Paciente Receta Avanzada",
+            identidad="0801199900199",
+        )
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Medicamento catálogo",
+            codigo="RX-ADV-01",
+            precio=125,
+        )
+
+        response = self.client.post(
+            reverse("clinica_crear_plantilla_receta", args=[self.empresa.slug]),
+            {
+                "nombre": "Plantilla control",
+                "diagnostico": "Control clínico",
+                "indicaciones_generales": "Mantener hidratación.",
+                "observaciones": "Revisar en cinco días.",
+                "activa": "on",
+                "medicamento_producto_id": [str(producto.id), ""],
+                "medicamento_manual": ["", "Medicamento externo"],
+                "medicamento_cantidad": ["1 caja", "10 tabletas"],
+                "medicamento_indicaciones": ["Cada 12 horas", "Una diaria"],
+                "medicamento_observaciones": ["Con alimentos", "Por la noche"],
+            },
+        )
+        self.assertRedirects(response, reverse("clinica_plantillas_recetas", args=[self.empresa.slug]))
+        plantilla = PlantillaReceta.objects.get(empresa=self.empresa, nombre="Plantilla control")
+        self.assertEqual(plantilla.detalles.count(), 2)
+        self.assertEqual(plantilla.detalles.filter(producto=producto).count(), 1)
+        self.assertEqual(plantilla.detalles.filter(medicamento_manual="Medicamento externo").count(), 1)
+
+        response = self.client.get(reverse("clinica_crear_receta_paciente", args=[self.empresa.slug, paciente.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Buscar por nombre o código")
+        self.assertContains(response, "Plantilla control")
+
+        response = self.client.post(
+            reverse("clinica_crear_receta_paciente", args=[self.empresa.slug, paciente.id]),
+            {
+                "fecha": "2026-08-18",
+                "diagnostico": "Control clínico",
+                "indicaciones": "Mantener hidratación.",
+                "observaciones": "Revisar en cinco días.",
+                "medicamento_producto_id": [str(producto.id), ""],
+                "medicamento_manual": ["", "Medicamento externo"],
+                "medicamento_cantidad": ["1 caja", "10 tabletas"],
+                "medicamento_indicaciones": ["Cada 12 horas", "Una diaria"],
+                "medicamento_observaciones": ["Con alimentos", "Por la noche"],
+            },
+        )
+        receta = RecetaMedica.objects.get(paciente=paciente)
+        self.assertRedirects(response, reverse("clinica_receta_imprimir", args=[self.empresa.slug, paciente.id, receta.id]))
+        self.assertEqual(RecetaMedicaDetalle.objects.filter(receta=receta).count(), 2)
+        self.assertEqual(list(receta.productos.values_list("id", flat=True)), [producto.id])
+        response = self.client.get(reverse("clinica_receta_imprimir", args=[self.empresa.slug, paciente.id, receta.id]))
+        self.assertContains(response, "Medicamento catálogo")
+        self.assertContains(response, "Medicamento externo")
+        self.assertContains(response, "Cada 12 horas")
+
+    def test_recetas_avanzadas_solo_estan_disponibles_en_las_tres_empresas_clinicas(self):
+        modulo = Modulo.objects.get(codigo="clinica_medica")
+        empresas = [self.empresa]
+        for slug, nombre, rtn in [
+            ("serviciosmedicos", "Servicios Médicos", "0801199900301"),
+            ("luque_aestetic", "Luque Aesthetic", "0801199900302"),
+        ]:
+            empresa = Empresa.objects.create(nombre=nombre, slug=slug, rtn=rtn)
+            EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
+            empresas.append(empresa)
+        self.user.empresas_acceso.add(*empresas[1:])
+
+        for indice, empresa in enumerate(empresas, start=1):
+            paciente = Paciente.objects.create(
+                empresa=empresa,
+                expediente_codigo=f"RX-EMP-{indice}",
+                nombre=f"Paciente {empresa.nombre}",
+                identidad=f"08011999002{indice:02d}",
+            )
+            response = self.client.get(reverse("clinica_crear_receta_paciente", args=[empresa.slug, paciente.id]))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Buscar por nombre o código")
+            self.assertContains(response, "Administrar plantillas")
+
+        empresa_fuera = Empresa.objects.create(
+            nombre="Empresa sin recetas avanzadas",
+            slug="empresa_general",
+            rtn="0801199900303",
+        )
+        EmpresaModulo.objects.create(empresa=empresa_fuera, modulo=modulo, activo=True)
+        self.user.empresas_acceso.add(empresa_fuera)
+        paciente_fuera = Paciente.objects.create(
+            empresa=empresa_fuera,
+            expediente_codigo="RX-GENERAL",
+            nombre="Paciente General",
+            identidad="0801199900299",
+        )
+        response = self.client.get(
+            reverse("clinica_crear_receta_paciente", args=[empresa_fuera.slug, paciente_fuera.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Buscar por nombre o código")
+        response = self.client.get(reverse("clinica_plantillas_recetas", args=[empresa_fuera.slug]))
+        self.assertEqual(response.status_code, 404)
 
     def test_paciente_permite_documentos_clinicos_e_incapacidad_imprimible(self):
         paciente = Paciente.objects.create(

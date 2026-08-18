@@ -1,0 +1,46 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Plantillas de recetas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Recetas médicas{% endblock %}
+{% block header_title %}Plantillas predeterminadas{% endblock %}
+{% block header_description %}Prepare recetas reutilizables con medicamentos, cantidades e indicaciones que podrán ajustarse antes de emitir.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn" href="{% url 'clinica_crear_plantilla_receta' empresa.slug %}">+ Nueva plantilla</a>
+<a class="erp-btn-secondary" href="{% url 'clinica_dashboard' empresa.slug %}">Volver a Clínica</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.tpl-summary{display:grid;grid-template-columns:1.3fr .7fr;gap:16px;margin-bottom:18px}.tpl-hero{border:1px solid #cfe0ea;border-radius:22px;padding:22px;background:linear-gradient(135deg,#0f3448,#126071);color:#fff;box-shadow:0 18px 42px rgba(13,50,71,.14)}.tpl-hero h2{margin:0;font-size:23px}.tpl-hero p{max-width:720px;margin:8px 0 0;color:rgba(255,255,255,.73);line-height:1.6}.tpl-stat{border:1px solid #cfe0ea;border-radius:22px;padding:22px;background:linear-gradient(145deg,#fff,#f0faf8);display:grid;align-content:center}.tpl-stat strong{font-size:34px;color:#123047}.tpl-stat span{color:#687c8c;font-size:11px;text-transform:uppercase;letter-spacing:.11em;font-weight:900}.tpl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.tpl-card{display:flex;flex-direction:column;border:1px solid #cfdee8;border-radius:20px;background:#fff;overflow:hidden;box-shadow:0 14px 34px rgba(17,50,72,.06);transition:.2s ease}.tpl-card:hover{transform:translateY(-3px);box-shadow:0 20px 42px rgba(17,50,72,.1)}.tpl-head{padding:17px 18px;background:linear-gradient(135deg,#f0faf8,#f2f7fd)}.tpl-head-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.tpl-head h3{margin:0;color:#142d43;font-size:17px}.tpl-state{padding:6px 9px;border-radius:999px;background:#dff4ec;color:#19755c;font-size:9px;font-weight:900}.tpl-state.off{background:#f1f3f5;color:#667784}.tpl-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px;flex:1}.tpl-diagnosis{color:#566e80;font-size:11px}.tpl-meds{display:flex;gap:7px;flex-wrap:wrap}.tpl-med{padding:6px 8px;border-radius:999px;background:#eff6fa;color:#285069;font-size:10px;font-weight:800}.tpl-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:auto;padding-top:13px;border-top:1px solid #e4ebf0}.tpl-actions span{color:#738493;font-size:10px}.tpl-edit{border:1px solid #a8c9d7;border-radius:10px;padding:8px 12px;color:#087e87;background:#fff;font-size:11px;font-weight:900;text-decoration:none}.tpl-empty{grid-column:1/-1;border:1px dashed #bdd2df;border-radius:22px;background:#fff;padding:48px;text-align:center;color:#6d7f8e}.tpl-empty h3{margin:0 0 7px;color:#173048}
+@media(max-width:1050px){.tpl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:680px){.tpl-summary,.tpl-grid{grid-template-columns:1fr}}
+</style>
+<section class="tpl-summary">
+    <div class="tpl-hero"><h2>Recetas listas para reutilizar</h2><p>Cada plantilla conserva sus medicamentos y recomendaciones. Al aplicarla a un paciente, todo permanece editable antes de guardar e imprimir.</p></div>
+    <div class="tpl-stat"><strong>{{ plantillas|length }}</strong><span>Plantillas registradas</span></div>
+</section>
+<section class="tpl-grid">
+    {% for plantilla in plantillas %}
+    <article class="tpl-card">
+        <header class="tpl-head">
+            <div class="tpl-head-row">
+                <h3>{{ plantilla.nombre }}</h3>
+                <span class="tpl-state {% if not plantilla.activa %}off{% endif %}">{% if plantilla.activa %}Disponible{% else %}Inactiva{% endif %}</span>
+            </div>
+        </header>
+        <div class="tpl-body">
+            {% if plantilla.diagnostico %}<div class="tpl-diagnosis"><strong>Diagnóstico:</strong> {{ plantilla.diagnostico }}</div>{% endif %}
+            <div class="tpl-meds">
+                {% for detalle in plantilla.detalles.all %}<span class="tpl-med">{{ detalle.nombre_medicamento }}{% if detalle.cantidad %} · {{ detalle.cantidad }}{% endif %}</span>{% empty %}<span class="tpl-diagnosis">Sin medicamentos configurados.</span>{% endfor %}
+            </div>
+            <div class="tpl-actions">
+                <span>Actualizada {{ plantilla.fecha_actualizacion|date:"d/m/Y H:i" }}</span>
+                <a class="tpl-edit" href="{% url 'clinica_editar_plantilla_receta' empresa.slug plantilla.id %}">Editar plantilla</a>
+            </div>
+        </div>
+    </article>
+    {% empty %}
+    <div class="tpl-empty"><h3>No hay plantillas registradas</h3><p>Cree la primera para emitir recetas con mayor rapidez.</p><a class="erp-btn" href="{% url 'clinica_crear_plantilla_receta' empresa.slug %}">Crear primera plantilla</a></div>
+    {% endfor %}
+</section>
+{% endblock %}
