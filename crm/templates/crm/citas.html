@@ -553,6 +553,16 @@
 }
 .calendar-shell.calendar-month-compact .calendar-day-count{transition:transform .18s ease,background .18s ease}
 .calendar-modal.is-open{animation:calendarBackdropIn .2s ease both}
+.calendar-modal.is-open{
+  align-items:center!important;
+  justify-content:center!important;
+  padding:clamp(12px,3vh,28px)!important;
+}
+.calendar-modal.is-open .calendar-modal-card{
+  margin:auto!important;
+  max-height:min(88vh,820px);
+}
+html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
 .calendar-modal.is-open .calendar-modal-card{animation:calendarDayPanelIn .28s cubic-bezier(.2,.8,.2,1) both}
 .calendar-modal.is-open .calendar-modal-item{animation:calendarDayItemIn .28s ease both}
 .calendar-modal.is-open .calendar-modal-item:nth-child(2){animation-delay:.035s}
@@ -1172,11 +1182,25 @@
   const body = document.getElementById("calendarDayModalBody");
   const backButton = document.getElementById("calendarDayModalBack");
   if(!modal || !title || !body || !backButton){ return; }
+  document.body.appendChild(modal);
   let previousDayView = null;
+
+  function showModal(){
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.documentElement.classList.add("calendar-modal-open");
+    document.body.classList.add("calendar-modal-open");
+    window.requestAnimationFrame(function(){
+      const closeButton = modal.querySelector("[data-calendar-modal-close]");
+      if(closeButton){ closeButton.focus({preventScroll:true}); }
+    });
+  }
 
   function closeModal(){
     modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
+    document.documentElement.classList.remove("calendar-modal-open");
+    document.body.classList.remove("calendar-modal-open");
     body.innerHTML = "";
     previousDayView = null;
     backButton.hidden = true;
@@ -1279,8 +1303,7 @@
         actionsHtml,
       '</div>'
     ].join("");
-    modal.classList.add("is-open");
-    modal.setAttribute("aria-hidden", "false");
+    showModal();
   }
 
   document.querySelectorAll("[data-appointment-open]").forEach(function(trigger){
@@ -1299,8 +1322,7 @@
       backButton.hidden = true;
       title.textContent = day.dataset.calendarTitle || "Agenda del día";
       body.innerHTML = source ? source.innerHTML : '<div class="calendar-empty">No hay citas programadas para este día.</div>';
-      modal.classList.add("is-open");
-      modal.setAttribute("aria-hidden", "false");
+      showModal();
     });
   });
 
