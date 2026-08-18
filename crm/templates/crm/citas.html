@@ -609,7 +609,47 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
 }
 .calendar-shell.calendar-month-compact .calendar-modal-item[data-appointment-open]:hover{
   transform:translateY(-1px);
-  box-shadow:0 12px 26px rgba(20,45,70,.10);
+  box-shadow:0 16px 34px rgba(18,42,64,.13);
+}
+.calendar-shell.calendar-month-compact .calendar-modal-item{
+  position:relative;
+  overflow:hidden;
+  border-top-color:rgba(184,204,220,.72);
+  border-bottom-color:rgba(184,204,220,.72);
+  border-right-width:4px;
+  box-shadow:0 10px 25px rgba(18,42,64,.075),inset 0 1px 0 rgba(255,255,255,.82);
+}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-consulta{background:linear-gradient(135deg,#e8f4ff,#dcecff)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-terapias{background:linear-gradient(135deg,#f3eaff,#e9ddff)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-camara_hiperbarica{background:linear-gradient(135deg,#f4e6d8,#ead2ba)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-tratamientos{background:linear-gradient(135deg,#e5f8ed,#d6f1e2)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-cirugias{background:linear-gradient(135deg,#ffebe9,#ffdcda)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-spa{background:linear-gradient(135deg,#fff7d6,#ffedb3)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-control{background:linear-gradient(135deg,#e4f8f4,#d2f1eb)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-laboratorio{background:linear-gradient(135deg,#f0ebff,#e5dcff)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-imagen{background:linear-gradient(135deg,#e7f8ff,#d6f2fc)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-item.color-general{background:linear-gradient(135deg,#f3f6f9,#e9eef3)!important}
+.calendar-shell.calendar-month-compact .calendar-modal-service{
+  display:inline-flex;
+  width:max-content;
+  max-width:100%;
+  margin-top:5px;
+  padding:5px 9px;
+  border:1px solid rgba(50,75,98,.10);
+  border-radius:999px;
+  background:rgba(255,255,255,.66);
+  color:#31485c!important;
+  font-size:10px!important;
+  font-weight:850;
+  line-height:1.35;
+  white-space:normal;
+}
+.calendar-shell.calendar-month-compact .calendar-modal-info > strong{color:#102338;font-size:12px;line-height:1.3}
+.calendar-shell.calendar-month-compact .calendar-modal-tag{
+  border:1px solid rgba(50,75,98,.09);
+  background:rgba(255,255,255,.72);
+  color:#31485c;
+  box-shadow:0 5px 14px rgba(18,42,64,.06);
 }
 @media(max-width:900px){
   .calendar-shell.calendar-month-compact .calendar-grid{
@@ -830,7 +870,7 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
             <div class="calendar-modal-time">{{ cita.fecha_hora|date:"h:i A" }}</div>
             <div class="calendar-modal-info">
               <strong>{{ cita.display_cliente }}</strong>
-              <span>{{ cita.display_servicio }}</span>
+              <span class="calendar-modal-service">{{ cita.display_servicio }}</span>
               <span class="calendar-professional-badge professional-badge-{{ cita.agenda_profesional_color }}">{{ cita.display_responsable }}</span>
             </div>
             <span class="calendar-modal-tag">{{ cita.agenda_color_label }} · {{ cita.agenda_profesional_color_label }}</span>
