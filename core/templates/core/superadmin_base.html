@@ -13,69 +13,65 @@
 <div class="erp-shell">
     <aside class="erp-sidebar">
         <div class="erp-brand">
-            <div class="erp-brand-kicker">DV Solutions Control</div>
-            <h1>Superadmin</h1>
-            <p>Panel privado para administrar empresas, usuarios, roles y capacidad comercial del ERP.</p>
+            <div class="control-brand-row">
+                <span class="control-brand-mark">DV</span>
+                <span><span class="erp-brand-kicker">DV Solutions</span><strong>Control Maestro</strong></span>
+            </div>
+            <p>Operación privada y estratégica del ecosistema ERP.</p>
         </div>
 
         <div>
-            <div class="erp-nav-group-title">Control Maestro</div>
+            <div class="erp-nav-group-title">Administración</div>
             <nav class="erp-nav">
                 <a class="erp-nav-link {% if request.path == superadmin_dashboard_url %}is-active{% endif %}" href="{{ superadmin_dashboard_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Dashboard</span>
+                    <span class="control-nav-icon">D</span><span>Centro de Control</span>
                 </a>
                 <a class="erp-nav-link {% if '/control/empresas/' in request.path %}is-active{% endif %}" href="{{ superadmin_empresas_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Empresas</span>
+                    <span class="control-nav-icon">E</span><span>Empresas</span>
                 </a>
                 <a class="erp-nav-link {% if '/control/usuarios/' in request.path %}is-active{% endif %}" href="{{ superadmin_usuarios_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Usuarios y Roles</span>
+                    <span class="control-nav-icon">U</span><span>Usuarios y accesos</span>
                 </a>
+            </nav>
+
+            <div class="erp-nav-group-title">Producto y licencias</div>
+            <nav class="erp-nav">
                 <a class="erp-nav-link {% if '/control/planes/' in request.path %}is-active{% endif %}" href="{{ superadmin_planes_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Planes</span>
+                    <span class="control-nav-icon">P</span><span>Planes comerciales</span>
                 </a>
                 <a class="erp-nav-link {% if '/control/roles/' in request.path %}is-active{% endif %}" href="{{ superadmin_roles_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Roles</span>
+                    <span class="control-nav-icon">R</span><span>Roles y permisos</span>
                 </a>
                 <a class="erp-nav-link {% if '/control/modulos/' in request.path %}is-active{% endif %}" href="{{ superadmin_modulos_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Modulos</span>
+                    <span class="control-nav-icon">M</span><span>Módulos</span>
                 </a>
                 <a class="erp-nav-link {% if '/control/licencias/' in request.path %}is-active{% endif %}" href="{{ superadmin_licencias_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Licencias</span>
+                    <span class="control-nav-icon">L</span><span>Licencias</span>
                 </a>
+            </nav>
+
+            <div class="erp-nav-group-title">Operación</div>
+            <nav class="erp-nav">
                 <a class="erp-nav-link {% if '/control/solicitudes/' in request.path %}is-active{% endif %}" href="{{ superadmin_solicitudes_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Solicitudes</span>
+                    <span class="control-nav-icon">S</span><span>Solicitudes</span>
                 </a>
                 <a class="erp-nav-link {% if '/control/respaldos/' in request.path %}is-active{% endif %}" href="{{ superadmin_respaldos_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Respaldos</span>
+                    <span class="control-nav-icon">B</span><span>Respaldos</span>
                 </a>
                 <a class="erp-nav-link {% if '/control/auditoria/' in request.path %}is-active{% endif %}" href="{{ superadmin_auditoria_url }}">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Bitacora Global</span>
+                    <span class="control-nav-icon">A</span><span>Bitácora global</span>
                 </a>
                 {% if enable_django_admin and django_admin_url %}
-                <a class="erp-nav-link" href="{{ django_admin_url }}" target="_blank" rel="noopener">
-                    <span class="erp-nav-bullet"></span>
-                    <span>Admin Tecnico</span>
+                <a class="erp-nav-link control-nav-technical" href="{{ django_admin_url }}" target="_blank" rel="noopener">
+                    <span class="control-nav-icon">T</span><span>Admin técnico</span><b>↗</b>
                 </a>
                 {% endif %}
             </nav>
         </div>
 
         <div class="erp-sidebar-footer">
-            <div><strong>Superadmin:</strong> {{ request.user.username }}</div>
-            <div><strong>Acceso:</strong> Privado</div>
-            <div style="margin-top:10px;">
-                <a href="{% url 'superadmin_logout' %}" style="color:#fff;">Cerrar sesion</a>
-            </div>
+            <div class="control-session-user"><span>{{ request.user.username|first|upper }}</span><div><strong>{{ request.user.get_full_name|default:request.user.username }}</strong><small>Superadministrador</small></div></div>
+            <a class="control-session-logout" href="{% url 'superadmin_logout' %}">Cerrar sesión <b>→</b></a>
         </div>
     </aside>
 
@@ -84,7 +80,7 @@
             <div>
                 <div class="erp-topbar-kicker">{% block header_kicker %}Control Institucional{% endblock %}</div>
                 <h2>{% block header_title %}Superadmin{% endblock %}</h2>
-                <p>{% block header_description %}Gestion privada del ERP para operar tu cartera de empresas y usuarios sin exponer nada al cliente final.{% endblock %}</p>
+                <p>{% block header_description %}Gestión privada del ERP para operar tu cartera de empresas y usuarios sin exponer información al cliente final.{% endblock %}</p>
             </div>
             <div class="erp-topbar-actions">
                 <div class="erp-user-chip">Privado</div>

@@ -2,56 +2,32 @@
 
 {% block title %}Planes{% endblock %}
 {% block header_title %}Planes Comerciales{% endblock %}
-{% block header_description %}Define exactamente que modulos vendes por plan para que la activacion por empresa responda a tu estrategia comercial.{% endblock %}
+{% block header_description %}Define los módulos incluidos, el valor comercial y la disponibilidad de cada plan del ERP.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'superadmin_plan_create' %}" class="erp-action-link">Nuevo Plan</a>
+<a href="{% url 'superadmin_plan_create' %}" class="erp-action-link">+ Nuevo plan</a>
 {% endblock %}
 
 {% block content %}
-<section class="erp-card erp-table-card">
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Plan</th>
-                    <th>Precio</th>
-                    <th>Modulos</th>
-                    <th>Empresas</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for plan in planes %}
-                <tr>
-                    <td>{{ plan.nombre }}<br><small>{{ plan.codigo }}</small></td>
-                    <td>L. {{ plan.precio_mensual }}</td>
-                    <td>{{ plan.modulos_count }}</td>
-                    <td>{{ plan.empresas_count }}</td>
-                    <td><span class="erp-badge {% if plan.activo %}success{% else %}danger{% endif %}">{% if plan.activo %}Activo{% else %}Inactivo{% endif %}</span></td>
-                    <td class="actions"><a class="erp-link" href="{% url 'superadmin_plan_edit' plan.id %}">Editar</a></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty">Todavia no hay planes creados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<section class="control-catalog-intro">
+    <div><span class="control-eyebrow">Oferta comercial</span><h3>Portafolio de planes</h3><p>Cada tarjeta resume precio, alcance y adopción sin repetir información.</p></div>
+    <span class="control-catalog-count">{{ planes|length }} plan{{ planes|length|pluralize:"es" }}</span>
 </section>
 
-<section class="erp-grid">
+<section class="control-entity-grid">
     {% for plan in planes %}
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">{{ plan.codigo }}</div>
-        <h3>{{ plan.nombre }}</h3>
-        <p>Precio mensual: L. {{ plan.precio_mensual }}</p>
-        <div class="erp-inline-actions">
-            <span class="erp-badge info">{{ plan.modulos_count }} modulos</span>
-            <span class="erp-badge neutral">{{ plan.empresas_count }} empresas</span>
-            <span class="erp-badge {% if plan.activo %}success{% else %}danger{% endif %}">{% if plan.activo %}Activo{% else %}Inactivo{% endif %}</span>
+    <article class="control-entity-card">
+        <header><span class="control-entity-icon">P</span><span class="erp-badge {% if plan.activo %}success{% else %}danger{% endif %}">{% if plan.activo %}Activo{% else %}Inactivo{% endif %}</span></header>
+        <div class="control-entity-copy"><small>{{ plan.codigo }}</small><h3>{{ plan.nombre }}</h3><p>Configuración comercial lista para asignar a empresas.</p></div>
+        <div class="control-plan-price"><small>Valor mensual</small><strong>L. {{ plan.precio_mensual }}</strong></div>
+        <div class="control-entity-metrics">
+            <span><strong>{{ plan.modulos_count }}</strong><small>Módulos</small></span>
+            <span><strong>{{ plan.empresas_count }}</strong><small>Empresas</small></span>
         </div>
+        <a class="control-entity-action" href="{% url 'superadmin_plan_edit' plan.id %}"><span>Configurar plan</span><b>→</b></a>
     </article>
+    {% empty %}
+    <div class="control-empty-state"><span>P</span><h3>Aún no hay planes comerciales</h3><p>Crea el primero para organizar la oferta del ERP.</p></div>
     {% endfor %}
 </section>
 {% endblock %}

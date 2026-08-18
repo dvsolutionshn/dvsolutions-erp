@@ -1,11 +1,11 @@
 {% extends 'core/superadmin_base.html' %}
 
 {% block title %}Usuarios{% endblock %}
-{% block header_title %}Usuarios y Roles{% endblock %}
-{% block header_description %}Gestiona usuarios y define en que empresas puede ingresar cada persona con una sola cuenta.{% endblock %}
+{% block header_title %}Usuarios y accesos{% endblock %}
+{% block header_description %}Administra identidades, empresas permitidas, roles y estado de acceso desde una sola vista.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'superadmin_usuario_create' %}" class="erp-action-link">Nuevo Usuario</a>
+<a href="{% url 'superadmin_usuario_create' %}" class="erp-action-link">+ Nuevo usuario</a>
 {% endblock %}
 
 {% block content %}
@@ -28,13 +28,13 @@
     </article>
 </section>
 
-<section class="erp-card" style="padding:14px 18px; margin-bottom:18px;">
-    <div class="erp-toolbar" style="align-items:center;">
+<section class="erp-card control-view-toolbar">
+    <div class="erp-toolbar">
         <div>
             <strong>Vista de usuarios</strong>
             <p class="erp-card-muted" style="margin:4px 0 0;">Los retirados no pueden ingresar, pero conservan intacto su historial.</p>
         </div>
-        <div class="erp-form-actions" style="margin:0;">
+        <div class="control-view-switch">
             <a class="erp-btn-secondary {% if estado_seleccionado == 'operativos' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}">Operativos</a>
             <a class="erp-btn-secondary {% if estado_seleccionado == 'retirados' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}?estado=retirados">Retirados ({{ resumen.retirados }})</a>
             <a class="erp-btn-secondary {% if estado_seleccionado == 'todos' %}is-active{% endif %}" href="{% url 'superadmin_usuarios' %}?estado=todos">Todos</a>
