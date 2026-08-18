@@ -6,15 +6,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acceso Superadmin</title>
     <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    <link rel="stylesheet" href="{% static 'core/control-maestro.css' %}">
 </head>
-<body>
-    <div class="erp-main" style="max-width:620px;margin:0 auto;padding-top:72px;">
-        <div class="erp-form-card">
-            <div class="erp-topbar-kicker">Acceso Privado</div>
-            <h2 style="margin:0 0 12px;">Control Maestro del ERP</h2>
-            <p style="margin:0 0 22px;color:var(--muted);">Solo superusuarios autorizados pueden entrar aqui. Este panel no forma parte del portal del cliente.</p>
+<body class="control-login-body">
+    <main class="control-login-stage">
+        <section class="control-login-vision" aria-label="Control operativo DV Solutions">
+            <div class="control-login-grid"></div>
+            <div class="control-login-orb control-login-orb-a"></div>
+            <div class="control-login-orb control-login-orb-b"></div>
+            <div class="control-login-brand">
+                <span class="control-login-mark">DV</span>
+                <span>DV Solutions</span>
+            </div>
+            <div class="control-login-copy">
+                <div class="control-eyebrow control-eyebrow-light">Centro privado de operaciones</div>
+                <h1>Todo el ecosistema del ERP, bajo tu control.</h1>
+                <p>Empresas, accesos, licencias y continuidad operativa desde un entorno maestro protegido.</p>
+                <div class="control-login-features">
+                    <span><i></i> Supervisión centralizada</span>
+                    <span><i></i> Acceso exclusivo</span>
+                    <span><i></i> Trazabilidad operativa</span>
+                </div>
+            </div>
+            <div class="control-login-status"><span></span> Plataforma disponible</div>
+        </section>
+
+        <section class="control-login-access">
+          <div class="control-login-card">
+            <div class="control-access-symbol" aria-hidden="true">
+                <span></span>
+            </div>
+            <div class="control-eyebrow">Acceso maestro</div>
+            <h2>Bienvenido al Control</h2>
+            <p class="control-login-intro">Identifícate para administrar la operación interna de DV Solutions.</p>
             {% if messages %}
-            <div class="erp-message-stack" style="margin-bottom:18px;">
+            <div class="erp-message-stack control-login-messages">
                 {% for message in messages %}
                     <div class="erp-message">{{ message }}</div>
                 {% endfor %}
@@ -25,13 +51,13 @@
                 {% if form.non_field_errors %}
                 <div class="erp-field-errors">{{ form.non_field_errors }}</div>
                 {% endif %}
-                <div class="erp-form-grid">
-                    <div class="erp-field">
+                <div class="control-login-fields">
+                    <div class="erp-field control-login-field">
                         <label for="{{ form.username.id_for_label }}">Usuario</label>
                         {{ form.username }}
                     </div>
-                    <div class="erp-field">
-                        <label for="{{ form.password.id_for_label }}">Contrasena</label>
+                    <div class="erp-field control-login-field">
+                        <label for="{{ form.password.id_for_label }}">Contraseña</label>
                         <div class="erp-password-shell">
                             {{ form.password }}
                             <button class="erp-password-toggle" type="button" data-password-toggle aria-controls="{{ form.password.id_for_label }}" aria-pressed="false" aria-label="Mostrar contraseña">
@@ -40,18 +66,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="erp-form-actions">
-                    <div class="erp-field-help">Usa tu cuenta maestra. Si un usuario no es superadmin, el sistema no lo dejara entrar.</div>
-                    <button type="submit" class="erp-btn">Entrar al Control</button>
+                <div class="control-login-actions">
+                    <button type="submit" class="control-login-submit"><span>Entrar al Control</span><b>→</b></button>
+                    <div class="control-login-security"><span>◆</span> Acceso cifrado y exclusivo para superadministradores</div>
                 </div>
             </form>
-        </div>
-    </div>
-    <style>
-        .erp-password-shell{position:relative}
-        .erp-password-shell input{padding-right:92px}
-        .erp-password-toggle{position:absolute;top:50%;right:9px;transform:translateY(-50%);border:1px solid #cfe0f2;border-radius:10px;padding:8px 10px;background:#edf6ff;color:#155f82;font-weight:800;cursor:pointer}
-    </style>
+          </div>
+          <p class="control-login-footer">DV Solutions · Control Maestro ERP</p>
+        </section>
+    </main>
     <script src="{% static 'core/password-toggle.js' %}"></script>
 </body>
 </html>

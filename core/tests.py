@@ -118,6 +118,30 @@ class SuperAdminControlTests(TestCase):
         response = self.client.get(reverse("superadmin_dashboard"))
         self.assertRedirects(response, reverse("superadmin_login"))
 
+    def test_control_maestro_renderiza_centro_operativo(self):
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.get(reverse("superadmin_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Centro de Control")
+        self.assertContains(response, "control-command-hero")
+
+    def test_catalogo_empresas_renderiza_tarjetas_expandibles(self):
+        empresa = Empresa.objects.create(
+            nombre="Empresa Visual",
+            slug="empresa-visual",
+            rtn="08011999000089",
+        )
+        self.client.login(username="master", password="pass12345")
+
+        response = self.client.get(reverse("superadmin_empresas"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "control-company-grid")
+        self.assertContains(response, empresa.nombre)
+        self.assertContains(response, "selecciona una tarjeta para abrir su ficha")
+
     def test_solo_superadmin_puede_generar_respaldo(self):
         empresa = Empresa.objects.create(nombre="Empresa Protegida", slug="empresa-protegida", rtn="08011999000055")
         self.client.login(username="operador", password="pass12345")

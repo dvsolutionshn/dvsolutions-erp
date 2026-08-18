@@ -1,177 +1,71 @@
 {% extends 'core/superadmin_base.html' %}
 
-{% block title %}Control Maestro{% endblock %}
-{% block header_title %}Control Maestro{% endblock %}
-{% block header_description %}Vista ejecutiva para administrar empresas, usuarios internos y acceso operativo del ERP desde un entorno totalmente separado del cliente.{% endblock %}
+{% block title %}Centro de Control{% endblock %}
+{% block header_title %}Centro de Control{% endblock %}
+{% block header_description %}La operación esencial de DV Solutions, organizada para decidir y actuar con rapidez.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'superadmin_empresa_create' %}" class="erp-action-link">Nueva Empresa</a>
-<a href="{% url 'superadmin_usuario_create' %}" class="erp-action-link">Nuevo Usuario</a>
+<a href="{% url 'superadmin_empresa_create' %}" class="erp-action-link">+ Nueva empresa</a>
+<a href="{% url 'superadmin_usuario_create' %}" class="erp-action-link">+ Nuevo usuario</a>
 {% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Empresas activas</div>
-        <p class="erp-stat-value">{{ total_empresas_activas }}</p>
-        <p class="erp-card-muted">Empresas con acceso vigente dentro de tu cartera actual.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Usuarios internos</div>
-        <p class="erp-stat-value">{{ total_usuarios }}</p>
-        <p class="erp-card-muted">Cuentas creadas para operar, soporte o administracion empresarial.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Administradores de empresa</div>
-        <p class="erp-stat-value">{{ total_admin_empresa }}</p>
-        <p class="erp-card-muted">Usuarios que hoy pueden gestionar una empresa desde su entorno asignado.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Modulos activos</div>
-        <p class="erp-stat-value">{{ total_modulos_activos }}</p>
-        <p class="erp-card-muted">Asignaciones comerciales activas entre empresas y modulos del ERP.</p>
-    </article>
+<section class="control-command-hero">
+    <div class="control-command-copy">
+        <div class="control-eyebrow control-eyebrow-light">Operación maestra</div>
+        <h3>Todo lo importante, visible desde un solo lugar.</h3>
+        <p>Supervisa empresas, usuarios, licencias y solicitudes sin perderte entre indicadores secundarios.</p>
+    </div>
+    <div class="control-command-actions">
+        <a class="primary" href="{% url 'superadmin_empresas' %}">Ver empresas</a>
+        <a href="{% url 'superadmin_usuarios' %}">Gestionar accesos</a>
+        <a href="{% url 'superadmin_solicitudes' %}">Solicitudes</a>
+    </div>
 </section>
 
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Licencias operativas</div>
-        <p class="erp-stat-value">{{ total_licencias_operativas }}</p>
-        <p class="erp-card-muted">Empresas que hoy pueden trabajar normalmente dentro del ERP.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Licencias vencidas</div>
-        <p class="erp-stat-value">{{ total_licencias_vencidas }}</p>
-        <p class="erp-card-muted">Empresas cuyo servicio ya supero su fecha de vencimiento.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">En prueba</div>
-        <p class="erp-stat-value">{{ total_licencias_prueba }}</p>
-        <p class="erp-card-muted">Empresas en periodo de prueba listas para convertir a pago.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Solicitudes comerciales</div>
-        <p class="erp-stat-value">{{ total_solicitudes_comerciales }}</p>
-        <p class="erp-card-muted">Leads y proyectos entrantes captados desde la nueva web pública.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Pruebas solicitadas</div>
-        <p class="erp-stat-value">{{ total_solicitudes_prueba }}</p>
-        <p class="erp-card-muted">Prospectos que ya pidieron evaluar el ERP con una prueba guiada.</p>
-    </article>
+<section class="control-kpi-grid" aria-label="Resumen operativo">
+    <article class="control-kpi" style="--kpi-color:#17b8a9"><div class="control-kpi-top"><span class="control-kpi-icon">E</span><span class="control-kpi-trend">Cartera total</span></div><strong>{{ total_empresas }}</strong><p>{{ total_empresas_activas }} empresas activas</p></article>
+    <article class="control-kpi" style="--kpi-color:#2877f0"><div class="control-kpi-top"><span class="control-kpi-icon">U</span><span class="control-kpi-trend">Accesos</span></div><strong>{{ total_usuarios }}</strong><p>Usuarios registrados en el ecosistema</p></article>
+    <article class="control-kpi" style="--kpi-color:#8b5cf6"><div class="control-kpi-top"><span class="control-kpi-icon">M</span><span class="control-kpi-trend">Capacidad</span></div><strong>{{ total_modulos_activos }}</strong><p>Módulos empresariales habilitados</p></article>
+    <article class="control-kpi" style="--kpi-color:#f59e0b"><div class="control-kpi-top"><span class="control-kpi-icon">L</span><span class="control-kpi-trend">Continuidad</span></div><strong>{{ total_licencias_operativas }}</strong><p>Licencias listas para operar</p></article>
 </section>
 
-<section class="erp-grid">
-    <article class="erp-card erp-module-card">
-        <span class="erp-module-status">Empresas</span>
-        <h3>Cartera empresarial</h3>
-        <p>Controla razon social, slug, RTN, estado operativo y modulos habilitados por cada cliente.</p>
-        <a href="{% url 'superadmin_empresas' %}" class="erp-btn-secondary">Administrar Empresas</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <span class="erp-module-status">Usuarios</span>
-        <h3>Usuarios y roles</h3>
-        <p>Crea usuarios, asigna empresa, define administradores empresariales y vincula roles basados en grupos.</p>
-        <a href="{% url 'superadmin_usuarios' %}" class="erp-btn-secondary">Administrar Usuarios</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <span class="erp-module-status">Comercial</span>
-        <h3>Solicitudes web</h3>
-        <p>Controla formularios de contacto, demos y pruebas de 7 días generadas desde la página pública de DV Solutions.</p>
-        <a href="{% url 'superadmin_solicitudes' %}" class="erp-btn-secondary">Revisar Solicitudes</a>
-    </article>
-</section>
-
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Solicitudes recientes</h3>
-            <p class="erp-card-muted">Este bloque te ayuda a detectar oportunidades que vienen directo desde la web sin salir del mismo ERP.</p>
+<section class="control-panel-grid">
+    <article class="control-panel">
+        <header class="control-panel-head"><div><div class="control-eyebrow">Accesos rápidos</div><h3>¿Qué deseas administrar?</h3><p>Las funciones de uso diario, sin pasos innecesarios.</p></div></header>
+        <div class="control-shortcuts">
+            <a class="control-shortcut" href="{% url 'superadmin_empresas' %}"><span class="control-shortcut-icon">E</span><span><strong>Empresas</strong><small>Licencias, módulos y operación</small></span><b>→</b></a>
+            <a class="control-shortcut" href="{% url 'superadmin_usuarios' %}"><span class="control-shortcut-icon">U</span><span><strong>Usuarios y permisos</strong><small>Accesos por empresa y función</small></span><b>→</b></a>
+            <a class="control-shortcut" href="{% url 'superadmin_roles' %}"><span class="control-shortcut-icon">R</span><span><strong>Roles del sistema</strong><small>Perfiles y capacidades</small></span><b>→</b></a>
+            <a class="control-shortcut" href="{% url 'superadmin_respaldos' %}"><span class="control-shortcut-icon">S</span><span><strong>Respaldos</strong><small>Continuidad y recuperación</small></span><b>→</b></a>
         </div>
-        <a href="{% url 'superadmin_solicitudes' %}" class="erp-action-link">Ver todas</a>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Contacto</th>
-                    <th>Empresa</th>
-                    <th>Servicio</th>
-                    <th>Prueba</th>
-                    <th>Mensaje</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for solicitud in solicitudes_recientes %}
-                <tr>
-                    <td>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                    <td>{{ solicitud.nombre_contacto }}</td>
-                    <td>{{ solicitud.empresa_interesada|default:"-" }}</td>
-                    <td>{{ solicitud.get_servicio_interes_display }}</td>
-                    <td>{% if solicitud.solicita_prueba %}Si{% else %}No{% endif %}</td>
-                    <td class="erp-card-muted">{{ solicitud.mensaje }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="erp-empty">Todavía no han llegado solicitudes desde la web pública.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    </article>
+    <article class="control-panel">
+        <header class="control-panel-head"><div><div class="control-eyebrow">Atención requerida</div><h3>Señales operativas</h3><p>Lo que conviene revisar primero.</p></div></header>
+        <div class="control-alert-list">
+            <div class="control-alert" style="--alert:#ef5b5b"><span class="control-alert-dot"></span><span><strong>Licencias vencidas</strong><span>Empresas que requieren renovación</span></span><b>{{ total_licencias_vencidas }}</b></div>
+            <div class="control-alert" style="--alert:#f59e0b"><span class="control-alert-dot"></span><span><strong>Empresas en prueba</strong><span>Oportunidades por convertir</span></span><b>{{ total_licencias_prueba }}</b></div>
+            <div class="control-alert" style="--alert:#2877f0"><span class="control-alert-dot"></span><span><strong>Solicitudes comerciales</strong><span>Contactos recibidos desde la web</span></span><b>{{ total_solicitudes_comerciales }}</b></div>
+            <div class="control-alert" style="--alert:#17b8a9"><span class="control-alert-dot"></span><span><strong>Administradores</strong><span>Responsables empresariales activos</span></span><b>{{ total_admin_empresa }}</b></div>
+        </div>
+    </article>
 </section>
 
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Empresas Recientes</h3>
-            <p class="erp-card-muted">Cada tarjeta te deja ver de un solo vistazo la empresa, su plan, sus modulos y sus usuarios clave.</p>
-        </div>
-    </div>
-    <div class="erp-grid">
+<section class="control-panel">
+    <header class="control-panel-head"><div><div class="control-eyebrow">Actividad reciente</div><h3>Últimas empresas incorporadas</h3><p>Entra directamente a su ficha de control.</p></div><a href="{% url 'superadmin_empresas' %}">Ver toda la cartera →</a></header>
+    <div class="control-recent-grid">
         {% for empresa in empresas_recientes %}
-        <article class="erp-card erp-module-card">
-            {% if empresa.logo %}
-            <div style="margin-bottom:14px;">
-                <img src="{{ empresa.logo.url }}" alt="{{ empresa.nombre }}" style="width:72px;height:72px;object-fit:contain;border-radius:18px;border:1px solid var(--line);background:#fff;padding:8px;">
-            </div>
-            {% endif %}
-            <div class="erp-kpi-label">{{ empresa.slug }}</div>
-            <h3>{{ empresa.nombre }}</h3>
-            <p>{{ empresa.plan_comercial.nombre|default:"Sin plan asignado" }}</p>
-            <div class="erp-inline-actions" style="margin-bottom:10px;">
-                <span class="erp-badge {% if empresa.activa %}success{% else %}danger{% endif %}">{% if empresa.activa %}Activa{% else %}Inactiva{% endif %}</span>
-                <span class="erp-badge {% if empresa.estado_licencia_resuelto == 'activa' %}success{% elif empresa.estado_licencia_resuelto == 'prueba' %}info{% elif empresa.estado_licencia_resuelto == 'suspendida' %}warning{% else %}danger{% endif %}">{{ empresa.estado_licencia_resuelto|capfirst }}</span>
-                <span class="erp-badge neutral">{{ empresa.modulos_habilitados_total }} modulos</span>
-                <span class="erp-badge info">{{ empresa.usuarios_total }} usuarios</span>
-            </div>
-            <div class="erp-soft-panel" style="margin-bottom:12px;">
-                <strong>Usuarios:</strong>
-                {% for usuario in empresa.usuarios_preview %}
-                    <div>{{ usuario.username }}{% if usuario.rol_sistema %} · {{ usuario.rol_sistema.nombre }}{% endif %}</div>
-                {% empty %}
-                    <div>Sin usuarios asignados.</div>
-                {% endfor %}
-            </div>
-            <div class="erp-soft-panel" style="margin-bottom:16px;">
-                <strong>Modulos:</strong>
-                <div>
-                    {% for modulo in empresa.modulos_habilitados_preview %}
-                        <span class="erp-badge neutral">{{ modulo.nombre }}</span>
-                    {% empty %}
-                        <span class="erp-badge neutral">Sin modulos</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="erp-inline-actions">
-                <a class="erp-btn-secondary" href="{% url 'superadmin_empresa_detail' empresa.id %}">Ver detalle</a>
-                <a class="erp-btn-secondary" href="{% url 'superadmin_empresa_edit' empresa.id %}">Editar</a>
-            </div>
-        </article>
-        {% empty %}
-        <div class="erp-empty">Todavia no hay empresas registradas.</div>
-        {% endfor %}
+        <a class="control-recent-company" href="{% url 'superadmin_empresa_detail' empresa.id %}"><span class="control-recent-logo">{% if empresa.logo %}<img src="{{ empresa.logo.url }}" alt="">{% else %}{{ empresa.nombre|first|upper }}{% endif %}</span><strong>{{ empresa.nombre }}</strong><small>{{ empresa.usuarios_total }} usuarios · {{ empresa.modulos_habilitados_total }} módulos</small></a>
+        {% empty %}<div class="erp-empty">Aún no hay empresas registradas.</div>{% endfor %}
     </div>
 </section>
+
+{% if solicitudes_recientes %}
+<section class="control-panel">
+    <header class="control-panel-head"><div><div class="control-eyebrow">Entrada comercial</div><h3>Solicitudes recientes</h3></div><a href="{% url 'superadmin_solicitudes' %}">Revisar todas →</a></header>
+    <div class="control-request-list">
+        {% for solicitud in solicitudes_recientes %}<a href="{% url 'superadmin_solicitudes' %}" class="control-request-row"><span class="control-request-avatar">{{ solicitud.nombre_contacto|first|upper }}</span><span><strong>{{ solicitud.nombre_contacto }}</strong><small>{{ solicitud.empresa_interesada|default:"Sin empresa indicada" }} · {{ solicitud.get_servicio_interes_display }}</small></span><time>{{ solicitud.fecha_creacion|date:"d/m/Y" }}</time></a>{% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock %}

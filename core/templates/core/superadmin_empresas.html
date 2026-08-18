@@ -2,106 +2,74 @@
 
 {% block title %}Empresas{% endblock %}
 {% block header_title %}Empresas{% endblock %}
-{% block header_description %}Administra razon social, estado comercial y modulos habilitados sin entrar al admin tecnico.{% endblock %}
+{% block header_description %}Una vista limpia de toda la cartera. Selecciona una empresa para consultar su información y administrarla.{% endblock %}
 
-{% block topbar_actions %}
-<a href="{% url 'superadmin_empresa_create' %}" class="erp-action-link">Nueva Empresa</a>
-{% endblock %}
+{% block topbar_actions %}<a href="{% url 'superadmin_empresa_create' %}" class="erp-action-link">+ Nueva empresa</a>{% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Total empresas</div>
-        <p class="erp-stat-value">{{ resumen.total }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Activas</div>
-        <p class="erp-stat-value">{{ resumen.activas }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Inactivas</div>
-        <p class="erp-stat-value">{{ resumen.inactivas }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Modulos activos</div>
-        <p class="erp-stat-value">{{ resumen.modulos }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">En prueba</div>
-        <p class="erp-stat-value">{{ resumen.prueba }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Vencidas</div>
-        <p class="erp-stat-value">{{ resumen.vencidas }}</p>
-    </article>
+<section class="control-summary-strip" aria-label="Resumen de empresas">
+    <article class="control-summary-item"><span>Total</span><strong>{{ resumen.total }}</strong></article>
+    <article class="control-summary-item"><span>Activas</span><strong>{{ resumen.activas }}</strong></article>
+    <article class="control-summary-item"><span>Inactivas</span><strong>{{ resumen.inactivas }}</strong></article>
+    <article class="control-summary-item"><span>Módulos activos</span><strong>{{ resumen.modulos }}</strong></article>
+    <article class="control-summary-item"><span>En prueba</span><strong>{{ resumen.prueba }}</strong></article>
+    <article class="control-summary-item"><span>Vencidas</span><strong>{{ resumen.vencidas }}</strong></article>
 </section>
 
-<section class="erp-grid">
-    {% for empresa in empresas %}
-    <article class="erp-card erp-module-card">
-        {% if empresa.logo %}
-        <div style="margin-bottom:14px;">
-            <img src="{{ empresa.logo.url }}" alt="{{ empresa.nombre }}" style="width:72px;height:72px;object-fit:contain;border-radius:18px;border:1px solid var(--line);background:#fff;padding:8px;">
-        </div>
-        {% endif %}
-        <div class="erp-kpi-label">{{ empresa.slug }}</div>
-        <h3>{{ empresa.nombre }}</h3>
-        <p>{{ empresa.plan_comercial.nombre|default:"Sin plan asignado" }}</p>
-        <div class="erp-inline-actions" style="margin-bottom:10px;">
-            <span class="erp-badge {% if empresa.tipo_solucion == 'tecnicentro' %}warning{% elif empresa.tipo_solucion == 'clinica' %}info{% else %}neutral{% endif %}">{{ empresa.get_tipo_solucion_display }}</span>
-            <span class="erp-badge {% if empresa.activa %}success{% else %}danger{% endif %}">{% if empresa.activa %}Activa{% else %}Inactiva{% endif %}</span>
-            <span class="erp-badge {% if empresa.estado_licencia_resuelto == 'activa' %}success{% elif empresa.estado_licencia_resuelto == 'prueba' %}info{% elif empresa.estado_licencia_resuelto == 'suspendida' %}warning{% else %}danger{% endif %}">{{ empresa.estado_licencia_resuelto|capfirst }}</span>
-            <span class="erp-badge neutral">{{ empresa.modulos_habilitados_total }} modulos</span>
-            <span class="erp-badge info">{{ empresa.usuarios_total }} usuarios</span>
-        </div>
-        <div class="erp-soft-panel" style="margin-bottom:12px;">
-            <strong>Licencia:</strong>
-            <div>Vence: {{ empresa.fecha_vencimiento_plan|date:"F j, Y"|default:"Sin fecha" }}</div>
-            <div>
-                {% if empresa.dias_restantes_plan is None %}
-                    Sin fecha limite
-                {% else %}
-                    {{ empresa.dias_restantes_plan }} dias restantes
-                {% endif %}
-            </div>
-        </div>
-        <div class="erp-soft-panel" style="margin-bottom:12px;">
-            <strong>Usuarios:</strong>
-            {% for usuario in empresa.usuarios_preview %}
-                <div>{{ usuario.username }}{% if usuario.rol_sistema %} · {{ usuario.rol_sistema.nombre }}{% endif %}</div>
-            {% empty %}
-                <div>Sin usuarios asignados.</div>
-            {% endfor %}
-        </div>
-        <div class="erp-soft-panel" style="margin-bottom:16px;">
-            <strong>Modulos:</strong>
-            <div>
-                {% for modulo in empresa.modulos_habilitados_preview %}
-                    <span class="erp-badge neutral">{{ modulo.nombre }}</span>
-                {% empty %}
-                    <span class="erp-badge neutral">Sin modulos</span>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="erp-inline-actions">
-            <a class="erp-btn-secondary" href="{% url 'superadmin_empresa_detail' empresa.id %}">Ver detalle</a>
-            <a class="erp-btn-secondary" href="{% url 'superadmin_empresa_edit' empresa.id %}">Editar</a>
-            {% if empresa.estado_licencia_resuelto != 'suspendida' %}
-            <form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa.id %}" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="erp-btn-secondary">Suspender</button>
-            </form>
-            {% else %}
-            <form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa.id %}" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="erp-btn-secondary">Activar</button>
-            </form>
-            {% endif %}
-            <a class="erp-btn-secondary" href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa.id %}">Renovar</a>
-        </div>
-    </article>
-    {% empty %}
-    <div class="erp-empty">Todavia no hay empresas registradas.</div>
-    {% endfor %}
+<section class="control-company-toolbar">
+    <label class="control-company-search"><span class="sr-only">Buscar empresa</span><input id="control-company-search" type="search" placeholder="Buscar por empresa, identificador o RTN" autocomplete="off"></label>
+    <p><strong id="control-company-visible">{{ resumen.total }}</strong> empresas visibles · selecciona una tarjeta para abrir su ficha</p>
 </section>
+
+<section class="control-company-grid" id="control-company-grid">
+    {% for empresa in empresas %}
+    <details class="control-company-card" data-company-search="{{ empresa.nombre|lower }} {{ empresa.slug|lower }} {{ empresa.rtn|lower }}">
+        <summary>
+            <span class="control-company-logo">{% if empresa.logo %}<img src="{{ empresa.logo.url }}" alt="Logo de {{ empresa.nombre }}">{% else %}{{ empresa.nombre|first|upper }}{% endif %}</span>
+            <span class="control-company-title"><strong>{{ empresa.nombre }}</strong><small>{{ empresa.slug }}</small></span>
+            <span class="control-company-status{% if not empresa.activa %} off{% endif %}">{% if empresa.activa %}Operativa{% else %}Inactiva{% endif %}</span>
+        </summary>
+        <div class="control-company-detail">
+            <div class="control-company-facts">
+                <div class="control-company-fact"><span>Plan</span><strong>{{ empresa.plan_comercial.nombre|default:"Sin plan asignado" }}</strong></div>
+                <div class="control-company-fact"><span>Licencia</span><strong>{{ empresa.estado_licencia_resuelto|capfirst }}</strong></div>
+                <div class="control-company-fact"><span>Vencimiento</span><strong>{{ empresa.fecha_vencimiento_plan|date:"d/m/Y"|default:"Sin límite" }}</strong></div>
+            </div>
+            <div class="control-company-meta">
+                <div><h4>Usuarios · {{ empresa.usuarios_total }}</h4>{% for usuario in empresa.usuarios_preview %}<p>{{ usuario.username }}{% if usuario.rol_sistema %} · {{ usuario.rol_sistema.nombre }}{% endif %}</p>{% empty %}<p>Sin usuarios asignados.</p>{% endfor %}</div>
+                <div><h4>Módulos · {{ empresa.modulos_habilitados_total }}</h4><div class="control-company-modules">{% for modulo in empresa.modulos_habilitados_preview %}<span>{{ modulo.nombre }}</span>{% empty %}<span>Sin módulos</span>{% endfor %}</div></div>
+            </div>
+            <div class="control-company-actions">
+                <a class="primary" href="{% url 'superadmin_empresa_detail' empresa.id %}">Abrir empresa</a>
+                <a href="{% url 'superadmin_empresa_edit' empresa.id %}">Editar</a>
+                <a href="{% url 'superadmin_empresa_registrar_pago_licencia' empresa.id %}">Renovar licencia</a>
+                {% if empresa.estado_licencia_resuelto != 'suspendida' %}<form method="post" action="{% url 'superadmin_empresa_suspender_licencia' empresa.id %}">{% csrf_token %}<button type="submit">Suspender</button></form>{% else %}<form method="post" action="{% url 'superadmin_empresa_activar_licencia' empresa.id %}">{% csrf_token %}<button type="submit">Activar</button></form>{% endif %}
+            </div>
+        </div>
+    </details>
+    {% empty %}<div class="erp-empty">Aún no hay empresas registradas.</div>{% endfor %}
+</section>
+<div class="control-empty-filter" id="control-company-empty">No encontramos empresas con ese criterio.</div>
+
+<script>
+(() => {
+    const input = document.getElementById('control-company-search');
+    const cards = [...document.querySelectorAll('.control-company-card')];
+    const counter = document.getElementById('control-company-visible');
+    const empty = document.getElementById('control-company-empty');
+    if (!input) return;
+    const normalize = value => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    input.addEventListener('input', () => {
+        const query = normalize(input.value.trim());
+        let visible = 0;
+        cards.forEach(card => {
+            const match = !query || normalize(card.dataset.companySearch).includes(query);
+            card.hidden = !match;
+            if (match) visible += 1;
+        });
+        counter.textContent = visible;
+        empty.style.display = visible ? 'none' : 'block';
+    });
+})();
+</script>
 {% endblock %}

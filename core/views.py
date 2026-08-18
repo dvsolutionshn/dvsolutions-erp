@@ -1539,22 +1539,25 @@ def superadmin_logout(request):
 
 @superadmin_required
 def superadmin_dashboard(request):
-    empresas = list(
+    todas_empresas = list(
         Empresa.objects.annotate(
             usuarios_count=Count("usuario", distinct=True),
             modulos_activos_count=Count("empresamodulo", filter=Q(empresamodulo__activo=True), distinct=True),
-        ).order_by("-fecha_creacion")[:6]
+        ).order_by("-fecha_creacion")
     )
-    empresas = [_enriquecer_empresa(empresa) for empresa in empresas]
+    todas_empresas = [_enriquecer_empresa(empresa) for empresa in todas_empresas]
+    empresas = todas_empresas[:6]
     context = {
         **_superadmin_base_context(),
+        "total_empresas": len(todas_empresas),
         "total_empresas_activas": Empresa.objects.filter(activa=True).count(),
+        "total_empresas_inactivas": Empresa.objects.filter(activa=False).count(),
         "total_usuarios": Usuario.objects.count(),
         "total_admin_empresa": Usuario.objects.filter(es_administrador_empresa=True).count(),
         "total_modulos_activos": EmpresaModulo.objects.filter(activo=True).count(),
         "total_planes": PlanComercial.objects.filter(activo=True).count(),
         "total_roles": RolSistema.objects.filter(activo=True).count(),
-        "total_licencias_operativas": sum(1 for empresa in empresas if empresa.licencia_operativa_flag),
+        "total_licencias_operativas": sum(1 for empresa in todas_empresas if empresa.licencia_operativa_flag),
         "total_licencias_vencidas": Empresa.objects.filter(fecha_vencimiento_plan__lt=timezone.localdate()).count(),
         "total_licencias_prueba": Empresa.objects.filter(estado_licencia="prueba").count(),
         "total_solicitudes_comerciales": SolicitudComercial.objects.count(),
