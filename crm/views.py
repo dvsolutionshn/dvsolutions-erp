@@ -16,7 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 
 from core.access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL
 from core.models import Empresa
@@ -1775,15 +1775,27 @@ def actualizar_estado_cita(request, empresa_slug, cita_id):
 
 
 @login_required
-@require_POST
+@require_http_methods(["GET", "POST"])
 def eliminar_cita(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
     cita = get_object_or_404(CitaCliente, empresa=empresa, id=cita_id)
-    motivo = (request.POST.get("motivo_eliminacion") or "").strip()
-    regreso_movil = request.POST.get("return_to") == "mobile"
-    vista = request.POST.get("vista", "dia" if regreso_movil else "mes")
-    fecha = request.POST.get("fecha", timezone.localdate().isoformat())
+    datos_regreso = request.POST if request.method == "POST" else request.GET
+    regreso_movil = datos_regreso.get("return_to") == "mobile"
+    vista = datos_regreso.get("vista", "dia" if regreso_movil else "mes")
+    fecha = datos_regreso.get("fecha", timezone.localtime(cita.fecha_hora).date().isoformat())
     url = reverse("agenda_mobile" if regreso_movil else "agenda_citas", args=[empresa.slug])
+
+    if request.method == "GET":
+        return render(request, "crm/confirmar_eliminar_cita.html", {
+            "empresa": empresa,
+            "cita": cita,
+            "vista": vista,
+            "fecha": fecha,
+            "regreso_movil": regreso_movil,
+            "cancel_url": f"{url}?vista={vista}&fecha={fecha}",
+        })
+
+    motivo = (request.POST.get("motivo_eliminacion") or "").strip()
 
     if len(motivo) < 5:
         messages.error(request, "Explica el motivo de la eliminación con al menos 5 caracteres.")

@@ -1,0 +1,45 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Eliminar cita - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Agenda clínica{% endblock %}
+{% block header_title %}Confirmar eliminación de cita{% endblock %}
+{% block header_description %}Revise la atención y documente el motivo antes de eliminarla definitivamente.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{{ cancel_url }}">Volver al calendario</a>{% endblock %}
+
+{% block content %}
+<style>
+.appointment-delete-confirm{max-width:880px;margin:0 auto;display:grid;gap:18px}.appointment-delete-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.appointment-delete-summary article{min-width:0;border:1px solid #d6e2ec;border-radius:16px;background:#f8fbfd;padding:16px}.appointment-delete-summary span{display:block;color:#687b8d;font-size:10px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.appointment-delete-summary strong{display:block;margin-top:6px;color:#14283b;font-size:15px;line-height:1.4;overflow-wrap:anywhere}.appointment-delete-warning{border:1px solid #fecaca;border-radius:16px;background:#fff7f7;padding:16px;color:#8f2929;line-height:1.55}.appointment-delete-confirm form{display:grid;gap:10px}.appointment-delete-confirm label{color:#2c4053;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.appointment-delete-confirm input{width:100%;min-height:48px;border:1px solid #d5a7a3;border-radius:12px;background:#fff;padding:0 14px;color:#26394b}.appointment-delete-confirm input:focus{outline:0;border-color:#b93f38;box-shadow:0 0 0 4px rgba(185,63,56,.1)}.appointment-delete-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:6px}.appointment-delete-cancel,.appointment-delete-submit{min-height:44px;border-radius:12px;padding:0 18px;font-weight:900;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.appointment-delete-cancel{border:1px solid #bfd0dc;background:#fff;color:#31506a}.appointment-delete-submit{border:0;background:linear-gradient(135deg,#bd433c,#8e2c2a);color:#fff;cursor:pointer;box-shadow:0 12px 28px rgba(155,45,42,.2)}
+@media(max-width:680px){.appointment-delete-summary{grid-template-columns:1fr}.appointment-delete-actions>*{width:100%}}
+</style>
+
+<section class="erp-card appointment-delete-confirm">
+  <div>
+    <div class="erp-kpi-label">Cita seleccionada</div>
+    <h2 class="erp-panel-title">{{ cita.display_servicio|default:cita.titulo }}</h2>
+  </div>
+
+  <div class="appointment-delete-summary">
+    <article><span>Paciente</span><strong>{{ cita.display_cliente }}</strong></article>
+    <article><span>Profesional</span><strong>{{ cita.display_responsable|default:"Sin asignar" }}</strong></article>
+    <article><span>Fecha</span><strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong></article>
+    <article><span>Hora</span><strong>{{ cita.fecha_hora|date:"h:i A" }}</strong></article>
+  </div>
+
+  <div class="appointment-delete-warning">
+    Esta acción elimina la cita y sus recordatorios vinculados. Para conservar la trazabilidad operativa, indique claramente por qué se elimina.
+  </div>
+
+  <form method="post" action="{% url 'agenda_cita_eliminar' empresa.slug cita.id %}" onsubmit="return confirm('¿Confirmas que deseas eliminar definitivamente esta cita?');">
+    {% csrf_token %}
+    <input type="hidden" name="vista" value="{{ vista }}">
+    <input type="hidden" name="fecha" value="{{ fecha }}">
+    {% if regreso_movil %}<input type="hidden" name="return_to" value="mobile">{% endif %}
+    <label for="motivo_eliminacion">Motivo obligatorio</label>
+    <input id="motivo_eliminacion" name="motivo_eliminacion" type="text" minlength="5" maxlength="500" required autofocus placeholder="Ej. El paciente canceló definitivamente la atención">
+    <div class="appointment-delete-actions">
+      <a class="appointment-delete-cancel" href="{{ cancel_url }}">Cancelar y volver</a>
+      <button class="appointment-delete-submit" type="submit">Eliminar cita definitivamente</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

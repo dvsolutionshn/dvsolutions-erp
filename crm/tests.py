@@ -1143,6 +1143,14 @@ class CRMTests(TestCase):
         self.client.login(username="crmuser", password="pass12345")
         url = reverse("agenda_cita_eliminar", args=[self.empresa.slug, cita.id])
 
+        response = self.client.get(url, {
+            "vista": "dia", "fecha": "2026-06-25",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Confirmar eliminación de cita")
+        self.assertContains(response, "Paciente Eliminaci")
+        self.assertTrue(CitaCliente.objects.filter(id=cita.id).exists())
+
         response = self.client.get(
             reverse("agenda_citas", args=[self.empresa.slug]),
             {"vista": "dia", "fecha": "2026-06-25"},
