@@ -264,6 +264,24 @@ def _permisos_visibles_rol(rol):
     ]
 
 
+def _usuarios_operativos_de_empresa(empresa):
+    """Usuarios administrables vinculados realmente a una empresa.
+
+    La baja desde Control conserva la identidad para la trazabilidad histórica,
+    pero el usuario deja de formar parte de las pantallas operativas y de los
+    endpoints de permisos de todas sus empresas.
+    """
+    return (
+        Usuario.objects
+        .filter(
+            Q(empresa=empresa) | Q(empresas_acceso=empresa),
+            is_superuser=False,
+            retirado_control=False,
+        )
+        .distinct()
+    )
+
+
 def _usuario_empresas_config(form, request):
     empresas = list(Empresa.objects.filter(activa=True).order_by("nombre"))
     roles = list(RolSistema.objects.filter(activo=True).order_by("nombre"))
@@ -1254,11 +1272,9 @@ def usuarios_clinicos(request, slug):
         return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
 
     usuarios = (
-        Usuario.objects
-        .filter(Q(empresa=empresa) | Q(empresas_acceso=empresa), is_superuser=False)
+        _usuarios_operativos_de_empresa(empresa)
         .select_related("rol_sistema")
         .prefetch_related("permisos_por_empresa__rol_sistema")
-        .distinct()
         .order_by("first_name", "last_name", "username")
     )
     filas = []
@@ -1289,13 +1305,9 @@ def usuario_clinico_permisos(request, slug, usuario_id):
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
 
-    usuario = get_object_or_404(
-        Usuario.objects.filter(
-            Q(empresa=empresa) | Q(empresas_acceso=empresa),
-            is_superuser=False,
-        ).distinct(),
-        pk=usuario_id,
-    )
+    # El filtro empresarial también protege GET y POST. No se acepta un ID de
+    # usuario que pertenezca a otra empresa aunque se manipule la URL/formulario.
+    usuario = get_object_or_404(_usuarios_operativos_de_empresa(empresa), pk=usuario_id)
     rol_actual = usuario.rol_para_empresa(empresa)
 
     if request.method == "POST":

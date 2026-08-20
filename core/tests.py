@@ -2019,3 +2019,102 @@ class PermisosClinicosPorEmpresaTests(TestCase):
         response = self.client.get(reverse("usuarios_clinicos", args=[self.empresa_externa.slug]))
 
         self.assertEqual(response.status_code, 403)
+
+    def test_lista_filtra_estrictamente_usuarios_por_empresa(self):
+        usuario_externo = Usuario.objects.create_user(
+            username="usuario-solo-externo",
+            password="pass12345",
+            empresa=self.empresa_externa,
+            rol_sistema=self.rol_base,
+        )
+
+        response = self.client.get(reverse("usuarios_clinicos", args=[self.hospital.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.enfermera.username)
+        self.assertNotContains(response, usuario_externo.username)
+
+    def test_backend_bloquea_lectura_y_edicion_de_usuario_de_otra_empresa(self):
+        usuario_externo = Usuario.objects.create_user(
+            username="objetivo-empresa-externa",
+            password="pass12345",
+            empresa=self.empresa_externa,
+            rol_sistema=self.rol_base,
+        )
+        url = reverse(
+            "usuario_clinico_permisos",
+            args=[self.hospital.slug, usuario_externo.pk],
+        )
+
+        respuesta_get = self.client.get(url)
+        respuesta_post = self.client.post(url, {"puede_facturas": "1"})
+
+        self.assertEqual(respuesta_get.status_code, 404)
+        self.assertEqual(respuesta_post.status_code, 404)
+        self.assertFalse(
+            UsuarioEmpresaPermiso.objects.filter(
+                usuario=usuario_externo,
+                empresa=self.hospital,
+            ).exists()
+        )
+
+    def test_usuario_retirado_desde_control_desaparece_de_usuarios_y_permisos(self):
+        superadmin = Usuario.objects.create_superuser(
+            username="superadmin-baja-sincronizada",
+            email="superadmin-baja@example.com",
+            password="pass12345",
+        )
+        self.client.force_login(superadmin)
+        respuesta_baja = self.client.post(
+            reverse("superadmin_usuario_delete", args=[self.enfermera.pk]),
+            {"motivo_eliminacion": "La colaboradora ya no pertenece a la empresa"},
+        )
+        self.assertRedirects(respuesta_baja, reverse("superadmin_usuarios"))
+
+        self.enfermera.refresh_from_db()
+        self.assertTrue(self.enfermera.retirado_control)
+        self.assertFalse(self.enfermera.is_active)
+
+        self.client.force_login(self.doctora)
+        listado = self.client.get(reverse("usuarios_clinicos", args=[self.hospital.slug]))
+        detalle = self.client.get(
+            reverse(
+                "usuario_clinico_permisos",
+                args=[self.hospital.slug, self.enfermera.pk],
+            )
+        )
+
+        self.assertEqual(listado.status_code, 200)
+        self.assertNotContains(listado, self.enfermera.username)
+        self.assertEqual(detalle.status_code, 404)
+
+    def test_usuario_compartido_solo_aparece_en_empresas_asociadas(self):
+        tercera_empresa = Empresa.objects.create(
+            nombre="Mia Medical Spa",
+            slug="medical_spa",
+            rtn="08011999000123",
+        )
+        usuario_compartido = Usuario.objects.create_user(
+            username="usuario-compartido-controlado",
+            password="pass12345",
+            empresa=self.hospital,
+            rol_sistema=self.rol_base,
+        )
+        usuario_compartido.empresas_acceso.add(self.empresa_externa)
+
+        listado_hospital = self.client.get(reverse("usuarios_clinicos", args=[self.hospital.slug]))
+        self.assertContains(listado_hospital, usuario_compartido.username)
+
+        # Aunque la URL exista, la tercera empresa no forma parte de las
+        # asociaciones del usuario y nunca debe poder administrarlo.
+        self.doctora.empresas_acceso.add(tercera_empresa)
+        listado_tercera = self.client.get(reverse("usuarios_clinicos", args=[tercera_empresa.slug]))
+        respuesta_tercera = self.client.get(
+            reverse(
+                "usuario_clinico_permisos",
+                args=[tercera_empresa.slug, usuario_compartido.pk],
+            )
+        )
+        self.assertEqual(listado_tercera.status_code, 200)
+        self.assertNotContains(listado_tercera, usuario_compartido.username)
+        self.assertEqual(respuesta_tercera.status_code, 404)
