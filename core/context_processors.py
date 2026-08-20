@@ -44,6 +44,23 @@ def erp_access(request):
     clinica_activa = bool(empresa and empresa.tiene_modulo_activo("clinica_medica"))
     tecnicentro_activo = bool(empresa and empresa.tiene_modulo_activo("tecnicentro"))
     cotizaciones_activa = bool(empresa and empresa.tiene_modulo_activo("cotizaciones"))
+    email_usuario = str(getattr(user, "email", "") or "").strip().casefold()
+    username_usuario = str(getattr(user, "username", "") or "").strip().casefold()
+    puede_controlar_enlaces_pacientes = bool(
+        empresa
+        and empresa.slug == "hospital_mia"
+        and user
+        and user.is_authenticated
+        and (
+            email_usuario == "dannyvarela25@gmail.com"
+            or username_usuario in {
+                "dannyvarela25@gmail.com",
+                "dannyvarela25",
+                "danielvarela",
+                "daniel_varela",
+            }
+        )
+    )
     def permiso(nombre):
         return getattr(user, "tiene_permiso_erp", lambda *_: False)(nombre, empresa)
 
@@ -158,6 +175,7 @@ def erp_access(request):
         })
     return {
         "erp_access": base,
+        "puede_controlar_enlaces_pacientes": puede_controlar_enlaces_pacientes,
         "mostrar_asistente_erp": bool(
             user
             and user.is_authenticated

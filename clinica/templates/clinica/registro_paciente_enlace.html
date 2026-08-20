@@ -6,6 +6,7 @@
 {% block header_description %}Comparta este enlace una sola vez. Vence en siete días y crea el expediente únicamente cuando el formulario se completa correctamente.{% endblock %}
 
 {% block topbar_actions %}
+{% if puede_controlar_enlaces_pacientes %}<a class="erp-btn-secondary" href="{% url 'clinica_control_enlaces_registro_paciente' empresa.slug %}">Ver control de enlaces</a>{% endif %}
 <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
 {% endblock %}
 
@@ -26,6 +27,7 @@
         <a class="erp-btn-secondary" href="{{ enlace_publico }}" target="_blank" rel="noopener">Vista del paciente</a>
     </div>
     <p id="copyRegistroStatus" class="erp-card-muted" style="margin-top:14px;"></p>
+    {% if puede_controlar_enlaces_pacientes %}<p class="erp-card-muted" style="margin-top:10px;">Este enlace ya aparece en su control privado. Allí podrá verificar si fue abierto, hasta qué paso avanzó y si el expediente quedó creado.</p>{% endif %}
 </section>
 <script>
 document.getElementById("copyRegistroPaciente").addEventListener("click", async function(){

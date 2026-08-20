@@ -1,0 +1,65 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Control de enlaces de pacientes - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Seguimiento privado{% endblock %}
+{% block header_title %}Control de enlaces de pacientes{% endblock %}
+{% block header_description %}Verifique qué enlaces fueron abiertos, cuánto avanzó cada persona y cuáles terminaron creando su expediente.{% endblock %}
+
+{% block topbar_actions %}
+<form method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}">{% csrf_token %}<button class="erp-btn" type="submit">Generar nuevo enlace</button></form>
+<a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
+{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+.link-control{display:grid;gap:18px}.link-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.link-kpi{position:relative;overflow:hidden;padding:18px;border:1px solid #d3e2ef;border-radius:18px;background:linear-gradient(145deg,#fff,#f5fbff);box-shadow:0 14px 34px rgba(15,54,84,.07)}.link-kpi:after{content:"";position:absolute;width:70px;height:70px;border-radius:50%;right:-22px;top:-25px;background:var(--glow,#d8f8f2);opacity:.8}.link-kpi small{display:block;color:#60758b;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.link-kpi strong{display:block;margin-top:6px;color:#10283d;font-size:28px}.link-kpi span{color:#60758b;font-size:12px}.link-filters{display:grid;grid-template-columns:minmax(240px,2fr) minmax(170px,1fr) 150px 150px auto;gap:10px;align-items:end}.link-filters label{display:grid;gap:6px;color:#60758b;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.link-filters input,.link-filters select{width:100%;box-sizing:border-box;border:1px solid #bdd2e4;border-radius:12px;padding:11px;background:#fff;color:#10283d}.link-table-wrap{overflow:auto;border:1px solid #d2e0ec;border-radius:18px;background:#fff}.link-table{width:100%;border-collapse:collapse;min-width:1050px}.link-table th{padding:12px 14px;background:#f4f8fc;color:#5e7186;font-size:10px;letter-spacing:.08em;text-align:left;text-transform:uppercase}.link-table td{padding:14px;border-top:1px solid #e6edf4;vertical-align:top;color:#183047;font-size:12px}.link-person strong{display:block;font-size:13px;color:#0f293f}.link-person span,.link-meta{color:#718398;font-size:11px}.status-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;font-weight:900;font-size:10px;text-transform:uppercase}.status-pill:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}.status-completado{color:#087a5c;background:#dcf7ed}.status-en_progreso{color:#1563b6;background:#e2efff}.status-abierto{color:#4e46a7;background:#eceaff}.status-validacion{color:#a05b00;background:#fff1d3}.status-error_tecnico{color:#b4233b;background:#ffe1e6}.status-generado{color:#58697c;background:#edf2f6}.status-vencido,.status-revocado{color:#7a5360;background:#f1e7eb}.progress-line{width:150px;height:8px;border-radius:999px;background:#e7eef5;overflow:hidden;margin:7px 0 4px}.progress-line span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#14b8a6,#2f73f1)}.link-empty{padding:50px 20px;text-align:center;color:#667b90}.link-note{padding:13px 16px;border:1px solid #cfe5e0;border-left:4px solid #14ad9d;border-radius:14px;background:#f1fbf8;color:#365e60;font-size:12px}.pagination-row{display:flex;justify-content:center;gap:8px;align-items:center}.pagination-row a,.pagination-row span{padding:9px 12px;border:1px solid #cbdbe8;border-radius:10px;background:#fff;color:#174d69;text-decoration:none}@media(max-width:1050px){.link-kpis{grid-template-columns:repeat(2,1fr)}.link-filters{grid-template-columns:1fr 1fr}.link-filters .filter-search{grid-column:1/-1}}@media(max-width:620px){.link-kpis{grid-template-columns:1fr 1fr}.link-filters{grid-template-columns:1fr}.link-filters .filter-search{grid-column:auto}.link-kpi{padding:14px}.link-kpi strong{font-size:23px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="link-control">
+    <div class="link-kpis">
+        <article class="link-kpi"><small>Enlaces generados</small><strong>{{ conteos.total }}</strong><span>Según los filtros actuales</span></article>
+        <article class="link-kpi" style="--glow:#d6f7ec"><small>Expedientes creados</small><strong>{{ conteos.completado }}</strong><span>Formularios enviados correctamente</span></article>
+        <article class="link-kpi" style="--glow:#dceaff"><small>En progreso</small><strong>{{ conteos.en_progreso }}</strong><span>Personas que avanzaron más de un paso</span></article>
+        <article class="link-kpi" style="--glow:#ffe1e6"><small>Requieren revisión</small><strong>{{ requieren_revision }}</strong><span>Validaciones o errores técnicos</span></article>
+    </div>
+
+    <div class="link-note"><strong>Cómo leer este control:</strong> “Generado” significa que todavía no hay una apertura registrada; “En progreso” confirma actividad sin envío final; “Completado” confirma que el expediente fue creado. La entrega del mensaje de WhatsApp depende también de Meta.</div>
+
+    <section class="erp-card">
+        <form class="link-filters" method="get">
+            <label class="filter-search">Buscar<input type="search" name="q" value="{{ consulta }}" placeholder="Paciente, identidad, creador o código del enlace"></label>
+            <label>Estado<select name="estado"><option value="">Todos</option><option value="generado" {% if estado_filtro == 'generado' %}selected{% endif %}>Generado / no abierto</option><option value="abierto" {% if estado_filtro == 'abierto' %}selected{% endif %}>Abierto</option><option value="en_progreso" {% if estado_filtro == 'en_progreso' %}selected{% endif %}>En progreso</option><option value="validacion" {% if estado_filtro == 'validacion' %}selected{% endif %}>Detenido por validación</option><option value="error_tecnico" {% if estado_filtro == 'error_tecnico' %}selected{% endif %}>Error técnico</option><option value="completado" {% if estado_filtro == 'completado' %}selected{% endif %}>Completado</option><option value="vencido" {% if estado_filtro == 'vencido' %}selected{% endif %}>Vencido</option><option value="revocado" {% if estado_filtro == 'revocado' %}selected{% endif %}>Revocado</option></select></label>
+            <label>Desde<input type="date" name="desde" value="{{ fecha_desde }}"></label>
+            <label>Hasta<input type="date" name="hasta" value="{{ fecha_hasta }}"></label>
+            <button class="erp-btn" type="submit">Aplicar filtros</button>
+        </form>
+    </section>
+
+    <section class="link-table-wrap">
+        {% if pagina.object_list %}
+        <table class="link-table">
+            <thead><tr><th>Paciente / enlace</th><th>Estado</th><th>Avance</th><th>Actividad</th><th>Generado</th><th>Resultado</th></tr></thead>
+            <tbody>
+            {% for registro in pagina.object_list %}
+                {% with enlace=registro.invitacion %}
+                <tr>
+                    <td class="link-person">{% if enlace.paciente %}<strong>{{ enlace.paciente.nombre }}</strong><span>{{ enlace.paciente.identidad|default:"Sin identidad" }} · {{ enlace.paciente.expediente_codigo }}</span>{% else %}<strong>Paciente aún no identificado</strong><span>Código {{ enlace.token_preview }}</span>{% endif %}</td>
+                    <td><span class="status-pill status-{{ registro.estado_codigo }}">{{ registro.estado_etiqueta }}</span><div class="link-meta" style="margin-top:6px;max-width:230px">{{ registro.estado_explicacion }}</div></td>
+                    <td><strong>Paso {{ registro.progreso }} de 3</strong><div class="progress-line"><span style="width:{{ registro.progreso_porcentaje }}%"></span></div><span class="link-meta">{{ enlace.cantidad_aperturas }} apertura{{ enlace.cantidad_aperturas|pluralize:"s" }}</span></td>
+                    <td>{% if enlace.fecha_primera_apertura %}<strong>Abierto {{ enlace.fecha_primera_apertura|date:"d/m/Y H:i" }}</strong>{% else %}<span class="link-meta">Sin apertura</span>{% endif %}<br>{% if enlace.fecha_ultima_actividad %}<span class="link-meta">Última actividad: {{ enlace.fecha_ultima_actividad|date:"d/m/Y H:i" }}</span>{% endif %}</td>
+                    <td><strong>{{ enlace.fecha_creacion|date:"d/m/Y H:i" }}</strong><br><span class="link-meta">Por {% if enlace.creada_por %}{{ enlace.creada_por.get_full_name|default:enlace.creada_por.username }}{% else %}Sistema{% endif %}</span><br><span class="link-meta">Vence {{ enlace.fecha_expiracion|date:"d/m/Y H:i" }}</span></td>
+                    <td><strong>{{ enlace.intentos_envio }} intento{{ enlace.intentos_envio|pluralize:"s" }}</strong>{% if enlace.fecha_ultimo_intento %}<br><span class="link-meta">Último: {{ enlace.fecha_ultimo_intento|date:"d/m/Y H:i" }}</span>{% endif %}{% if enlace.fecha_completada %}<br><span class="link-meta">Completado: {{ enlace.fecha_completada|date:"d/m/Y H:i" }}</span>{% endif %}{% if enlace.paciente %}<br><a class="erp-link" href="{% url 'clinica_paciente_detalle' empresa.slug enlace.paciente.id %}">Abrir expediente</a>{% endif %}</td>
+                </tr>
+                {% endwith %}
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<div class="link-empty"><strong>No hay enlaces con estos filtros.</strong><br>Ajuste los criterios o genere un nuevo enlace.</div>{% endif %}
+    </section>
+
+    {% if pagina.paginator.num_pages > 1 %}<nav class="pagination-row">{% if pagina.has_previous %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}<span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>{% if pagina.has_next %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}</nav>{% endif %}
+</div>
+{% endblock %}

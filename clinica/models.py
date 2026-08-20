@@ -661,6 +661,12 @@ class InvitacionRegistroPaciente(models.Model):
         ("completada", "Completada"),
         ("revocada", "Revocada"),
     ]
+    RESULTADO_CHOICES = [
+        ("sin_intento", "Sin intento de envio"),
+        ("validacion", "Detenido por validacion"),
+        ("error_tecnico", "Error tecnico"),
+        ("completado", "Completado"),
+    ]
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="invitaciones_registro_paciente")
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
@@ -690,6 +696,17 @@ class InvitacionRegistroPaciente(models.Model):
         related_name="invitaciones_registro_paciente_creadas",
     )
     ip_completada = models.GenericIPAddressField(blank=True, null=True)
+    fecha_primera_apertura = models.DateTimeField(blank=True, null=True)
+    fecha_ultima_actividad = models.DateTimeField(blank=True, null=True)
+    paso_maximo = models.PositiveSmallIntegerField(default=0)
+    cantidad_aperturas = models.PositiveIntegerField(default=0)
+    intentos_envio = models.PositiveIntegerField(default=0)
+    fecha_ultimo_intento = models.DateTimeField(blank=True, null=True)
+    ultimo_resultado = models.CharField(
+        max_length=20,
+        choices=RESULTADO_CHOICES,
+        default="sin_intento",
+    )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:

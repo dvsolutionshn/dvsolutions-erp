@@ -71,6 +71,7 @@
     {% url 'agenda_citas' empresa.slug as agenda_citas_url %}
     {% url 'clinica_dashboard' empresa.slug as clinica_url %}
     {% url 'clinica_pacientes' empresa.slug as clinica_pacientes_url %}
+    {% url 'clinica_control_enlaces_registro_paciente' empresa.slug as clinica_control_enlaces_url %}
     {% url 'clinica_citas' empresa.slug as clinica_citas_url %}
     {% url 'clinica_tratamientos' empresa.slug as clinica_tratamientos_url %}
     {% url 'clinica_profesionales' empresa.slug as clinica_profesionales_url %}
@@ -304,7 +305,8 @@
             <div class="erp-nav-group-title">Clinica</div>
             <nav class="erp-nav">
                 {% if erp_access.clinica %}<a class="erp-nav-link {% if request.path == clinica_url %}is-active{% endif %}" href="{{ clinica_url }}"><span class="erp-nav-bullet"></span><span>Resumen clinico</span></a>{% endif %}
-                {% if erp_access.pacientes %}<a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}"><span class="erp-nav-bullet"></span><span>Pacientes</span></a>{% endif %}
+                {% if erp_access.pacientes %}<a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path and '/dashboard/clinica/pacientes/enlaces-registro/' not in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}"><span class="erp-nav-bullet"></span><span>Pacientes</span></a>{% endif %}
+                {% if puede_controlar_enlaces_pacientes %}<a class="erp-nav-link {% if '/dashboard/clinica/pacientes/enlaces-registro/' in request.path %}is-active{% endif %}" href="{{ clinica_control_enlaces_url }}"><span class="erp-nav-bullet"></span><span>Control de enlaces</span></a>{% endif %}
                 {% if erp_access.clinica %}<a class="erp-nav-link {% if '/dashboard/clinica/citas/' in request.path %}is-active{% endif %}" href="{{ clinica_citas_url }}"><span class="erp-nav-bullet"></span><span>Citas clinicas</span></a>{% endif %}
                 {% if erp_access.tratamientos_clinicos %}<a class="erp-nav-link {% if '/dashboard/clinica/tratamientos/' in request.path %}is-active{% endif %}" href="{{ clinica_tratamientos_url }}"><span class="erp-nav-bullet"></span><span>Tratamientos</span></a>{% endif %}
                 {% if paciente %}

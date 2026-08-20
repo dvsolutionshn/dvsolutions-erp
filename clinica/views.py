@@ -6,9 +6,10 @@ from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -135,6 +136,19 @@ def _es_dueno_erp(usuario):
         or nombre == "daniel varela"
     )
 
+
+def _puede_controlar_enlaces_pacientes(usuario):
+    if not getattr(usuario, "is_authenticated", False):
+        return False
+    email = (getattr(usuario, "email", "") or "").strip().lower()
+    username = (getattr(usuario, "username", "") or "").strip().lower()
+    return email == "dannyvarela25@gmail.com" or username in {
+        "dannyvarela25@gmail.com",
+        "dannyvarela25",
+        "danielvarela",
+        "daniel_varela",
+    }
+
 DOCUMENTOS_CLINICOS_CONFIG = {
     "laboratorio": {
         "titulo": "Trabajos de laboratorio",
@@ -255,6 +269,46 @@ def _requiere_hospital_mia(empresa):
 def _ip_cliente(request):
     forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
     return forwarded or request.META.get("REMOTE_ADDR") or None
+
+
+def _registrar_apertura_invitacion(invitacion):
+    ahora = timezone.now()
+    campos = ["fecha_ultima_actividad", "cantidad_aperturas", "paso_maximo"]
+    invitacion.fecha_ultima_actividad = ahora
+    invitacion.cantidad_aperturas = (invitacion.cantidad_aperturas or 0) + 1
+    invitacion.paso_maximo = max(invitacion.paso_maximo or 0, 1)
+    if not invitacion.fecha_primera_apertura:
+        invitacion.fecha_primera_apertura = ahora
+        campos.append("fecha_primera_apertura")
+    invitacion.save(update_fields=campos)
+
+
+def _marcar_intento_invitacion(invitacion, resultado):
+    ahora = timezone.now()
+    InvitacionRegistroPaciente.objects.filter(pk=invitacion.pk).update(
+        intentos_envio=F("intentos_envio") + 1,
+        fecha_ultimo_intento=ahora,
+        fecha_ultima_actividad=ahora,
+        ultimo_resultado=resultado,
+    )
+
+
+def _estado_control_invitacion(invitacion, ahora):
+    if invitacion.fecha_completada or invitacion.ultimo_resultado == "completado":
+        return "completado", "Completado", "El expediente fue creado correctamente."
+    if invitacion.estado == "revocada":
+        return "revocado", "Revocado", "El enlace fue desactivado."
+    if invitacion.fecha_expiracion <= ahora:
+        return "vencido", "Vencido", "El plazo terminó sin completar el registro."
+    if invitacion.ultimo_resultado == "error_tecnico":
+        return "error_tecnico", "Error técnico", "El sistema detectó un fallo durante el último envío."
+    if invitacion.ultimo_resultado == "validacion":
+        return "validacion", "Faltan datos", "La persona intentó enviarlo, pero quedaron campos obligatorios."
+    if (invitacion.paso_maximo or 0) > 1:
+        return "en_progreso", "En progreso", f"La persona llegó hasta el paso {invitacion.paso_maximo} de 3."
+    if invitacion.fecha_primera_apertura:
+        return "abierto", "Abierto", "El enlace fue abierto, pero todavía no avanzó al siguiente paso."
+    return "generado", "No abierto", "El enlace fue generado, pero todavía no registra ninguna apertura."
 
 
 def _etiquetas_seleccion(valores, choices):
@@ -2213,6 +2267,91 @@ def generar_enlace_registro_paciente(request, empresa_slug):
 
 
 @login_required
+def control_enlaces_registro_paciente(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia" or not _puede_controlar_enlaces_pacientes(request.user):
+        raise PermissionDenied("Este control es privado para el propietario del ERP.")
+
+    invitaciones_qs = InvitacionRegistroPaciente.objects.filter(empresa=empresa).select_related(
+        "paciente",
+        "creada_por",
+    )
+    consulta = (request.GET.get("q") or "").strip()
+    estado_filtro = (request.GET.get("estado") or "").strip()
+    fecha_desde = (request.GET.get("desde") or "").strip()
+    fecha_hasta = (request.GET.get("hasta") or "").strip()
+    if consulta:
+        invitaciones_qs = invitaciones_qs.filter(
+            Q(token_preview__icontains=consulta)
+            | Q(paciente__nombre__icontains=consulta)
+            | Q(paciente__identidad__icontains=consulta)
+            | Q(creada_por__username__icontains=consulta)
+            | Q(creada_por__email__icontains=consulta)
+        )
+    try:
+        fecha_desde_valida = datetime.strptime(fecha_desde, "%Y-%m-%d").date() if fecha_desde else None
+    except ValueError:
+        fecha_desde_valida = None
+        fecha_desde = ""
+    try:
+        fecha_hasta_valida = datetime.strptime(fecha_hasta, "%Y-%m-%d").date() if fecha_hasta else None
+    except ValueError:
+        fecha_hasta_valida = None
+        fecha_hasta = ""
+    if fecha_desde_valida:
+        invitaciones_qs = invitaciones_qs.filter(fecha_creacion__date__gte=fecha_desde_valida)
+    if fecha_hasta_valida:
+        invitaciones_qs = invitaciones_qs.filter(fecha_creacion__date__lte=fecha_hasta_valida)
+
+    ahora = timezone.now()
+    registros = []
+    conteos = {
+        "total": 0,
+        "generado": 0,
+        "abierto": 0,
+        "en_progreso": 0,
+        "validacion": 0,
+        "error_tecnico": 0,
+        "completado": 0,
+        "vencido": 0,
+        "revocado": 0,
+    }
+    for invitacion in invitaciones_qs:
+        codigo, etiqueta, explicacion = _estado_control_invitacion(invitacion, ahora)
+        conteos["total"] += 1
+        conteos[codigo] = conteos.get(codigo, 0) + 1
+        if estado_filtro and codigo != estado_filtro:
+            continue
+        registros.append({
+            "invitacion": invitacion,
+            "estado_codigo": codigo,
+            "estado_etiqueta": etiqueta,
+            "estado_explicacion": explicacion,
+            "progreso": min(max(invitacion.paso_maximo or 0, 0), 3),
+            "progreso_porcentaje": min(max(invitacion.paso_maximo or 0, 0), 3) * 100 // 3,
+        })
+
+    pagina = Paginator(registros, 40).get_page(request.GET.get("pagina"))
+    parametros = request.GET.copy()
+    parametros.pop("pagina", None)
+    return render(
+        request,
+        "clinica/control_enlaces_registro.html",
+        {
+            "empresa": empresa,
+            "pagina": pagina,
+            "conteos": conteos,
+            "consulta": consulta,
+            "estado_filtro": estado_filtro,
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
+            "requieren_revision": conteos["validacion"] + conteos["error_tecnico"],
+            "querystring": parametros.urlencode(),
+        },
+    )
+
+
+@login_required
 def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_hospital_mia(empresa)
@@ -2305,6 +2444,8 @@ def registro_paciente_publico(request, token):
             status=410,
         )
 
+    _registrar_apertura_invitacion(invitacion)
+
     preconsulta_base = PreconsultaClinica(
         empresa=invitacion.empresa,
         tipo="general",
@@ -2319,6 +2460,8 @@ def registro_paciente_publico(request, token):
         empresa=invitacion.empresa,
         modo_basico_paciente_nuevo=True,
     )
+    if request.method == "POST":
+        _marcar_intento_invitacion(invitacion, "validacion")
     if request.method == "POST" and form.is_valid():
         try:
             with transaction.atomic():
@@ -2334,12 +2477,19 @@ def registro_paciente_publico(request, token):
                 invitacion.fecha_completada = timezone.now()
                 invitacion.ip_completada = _ip_cliente(request)
                 invitacion.paciente = paciente
+                invitacion.ultimo_resultado = "completado"
+                invitacion.paso_maximo = 3
+                invitacion.fecha_ultima_actividad = invitacion.fecha_completada
                 invitacion.save(update_fields=[
                     "fecha_completada",
                     "ip_completada",
                     "paciente",
+                    "ultimo_resultado",
+                    "paso_maximo",
+                    "fecha_ultima_actividad",
                 ])
         except ValidationError as exc:
+            InvitacionRegistroPaciente.objects.filter(pk=invitacion.pk).update(ultimo_resultado="validacion")
             logger.warning("Validacion al completar registro publico %s: %s", invitacion.id, exc)
             if hasattr(exc, "message_dict"):
                 for campo, errores in exc.message_dict.items():
@@ -2347,6 +2497,10 @@ def registro_paciente_publico(request, token):
             else:
                 form.add_error(None, exc)
         except Exception:
+            InvitacionRegistroPaciente.objects.filter(pk=invitacion.pk).update(
+                ultimo_resultado="error_tecnico",
+                fecha_ultima_actividad=timezone.now(),
+            )
             logger.exception("Error tecnico al completar registro publico de paciente %s", invitacion.id)
             form.add_error(
                 None,
@@ -2368,8 +2522,34 @@ def registro_paciente_publico(request, token):
             "paciente": None,
             "registro_nuevo": True,
             "flujo_paciente_nuevo_corto": True,
+            "registro_actividad_url": reverse("clinica_registro_paciente_actividad", args=[token]),
         },
     )
+
+
+@never_cache
+@require_POST
+def registro_paciente_actividad_publica(request, token):
+    invitacion = get_object_or_404(
+        InvitacionRegistroPaciente,
+        token_hash=hash_token_preconsulta(token),
+        empresa__slug__in=EMPRESAS_FORMULARIOS_CLINICOS,
+    )
+    if invitacion.estado == "revocada" or invitacion.fecha_expiracion <= timezone.now():
+        return JsonResponse({"ok": False, "detalle": "Enlace no vigente."}, status=410)
+    try:
+        paso = int(request.POST.get("paso") or 1)
+    except (TypeError, ValueError):
+        paso = 1
+    paso = min(max(paso, 1), 3)
+    invitacion.paso_maximo = max(invitacion.paso_maximo or 0, paso)
+    invitacion.fecha_ultima_actividad = timezone.now()
+    campos = ["paso_maximo", "fecha_ultima_actividad"]
+    if not invitacion.fecha_primera_apertura:
+        invitacion.fecha_primera_apertura = invitacion.fecha_ultima_actividad
+        campos.append("fecha_primera_apertura")
+    invitacion.save(update_fields=campos)
+    return JsonResponse({"ok": True, "paso": invitacion.paso_maximo})
 
 
 @login_required

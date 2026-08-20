@@ -1308,7 +1308,7 @@ class ClinicaPacienteTests(TestCase):
             "Camara hiperbarica",
         ]:
             self.assertContains(selector, nombre)
-        self.assertContains(selector, "Nuevo formulario", count=6)
+        self.assertContains(selector, "Escribir en esta área", count=12)
 
     def test_historias_especialidad_no_estan_disponibles_para_otra_empresa(self):
         otra_empresa = Empresa.objects.create(
@@ -1714,6 +1714,77 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Enviar directo por WhatsApp")
         self.assertContains(response, "Abrir WhatsApp manual")
 
+    def test_control_enlaces_registro_es_privado_para_daniel_varela(self):
+        url = reverse("clinica_control_enlaces_registro_paciente", args=[self.empresa.slug])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+        dueno = get_user_model().objects.create_user(
+            username="dannyvarela25@gmail.com",
+            email="dannyvarela25@gmail.com",
+            password="pass",
+            empresa=self.empresa,
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.force_login(dueno)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Control de enlaces de pacientes")
+        self.assertContains(response, "Generar nuevo enlace")
+
+    def test_enlace_paciente_nuevo_registra_apertura_y_avance_sin_guardar_respuestas(self):
+        token_raw = "token-seguimiento-registro"
+        invitacion = InvitacionRegistroPaciente.objects.create(
+            empresa=self.empresa,
+            token_hash=hash_token_preconsulta(token_raw),
+            token_preview="token-seg...",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+            creada_por=self.user,
+        )
+        self.client.logout()
+        publica_url = reverse("clinica_registro_paciente_publico", args=[token_raw])
+        response = self.client.get(publica_url)
+        self.assertEqual(response.status_code, 200)
+        invitacion.refresh_from_db()
+        self.assertIsNotNone(invitacion.fecha_primera_apertura)
+        self.assertIsNotNone(invitacion.fecha_ultima_actividad)
+        self.assertEqual(invitacion.cantidad_aperturas, 1)
+        self.assertEqual(invitacion.paso_maximo, 1)
+
+        actividad_url = reverse("clinica_registro_paciente_actividad", args=[token_raw])
+        response = self.client.post(actividad_url, {"paso": 3})
+        self.assertEqual(response.status_code, 200)
+        invitacion.refresh_from_db()
+        self.assertEqual(invitacion.paso_maximo, 3)
+        self.assertEqual(invitacion.intentos_envio, 0)
+        self.assertIsNone(invitacion.paciente)
+
+        self.client.post(actividad_url, {"paso": 1})
+        invitacion.refresh_from_db()
+        self.assertEqual(invitacion.paso_maximo, 3)
+
+    def test_enlace_paciente_nuevo_distingue_intento_detenido_por_validacion(self):
+        token_raw = "token-validacion-registro"
+        invitacion = InvitacionRegistroPaciente.objects.create(
+            empresa=self.empresa,
+            token_hash=hash_token_preconsulta(token_raw),
+            token_preview="token-val...",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+            creada_por=self.user,
+        )
+        self.client.logout()
+        response = self.client.post(
+            reverse("clinica_registro_paciente_publico", args=[token_raw]),
+            {},
+        )
+        self.assertEqual(response.status_code, 200)
+        invitacion.refresh_from_db()
+        self.assertEqual(invitacion.intentos_envio, 1)
+        self.assertEqual(invitacion.ultimo_resultado, "validacion")
+        self.assertIsNotNone(invitacion.fecha_ultimo_intento)
+        self.assertIsNone(invitacion.paciente)
+
     def test_enlace_paciente_nuevo_crea_expediente_cliente_preconsulta_y_foto(self):
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
         self.assertContains(response, "Enlace para paciente nuevo")
@@ -1809,6 +1880,8 @@ class ClinicaPacienteTests(TestCase):
             self.assertEqual(invitacion.estado, "pendiente")
             self.assertEqual(invitacion.paciente, paciente)
             self.assertIsNone(invitacion.preconsulta)
+            self.assertEqual(invitacion.ultimo_resultado, "completado")
+            self.assertEqual(invitacion.paso_maximo, 3)
 
         response = self.client.get(publica_url)
         self.assertContains(response, "Formulario de historia clinica")
