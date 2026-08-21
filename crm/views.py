@@ -25,8 +25,26 @@ from contabilidad.services import asegurar_cuentas_financieras_base_honduras
 from facturacion.models import BodegaInventario, Cliente, PagoFactura, Producto, TipoImpuesto
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 
-from .forms import CampaniaMarketingForm, CitaClienteForm, ConfiguracionCRMForm, PacienteRapidoCitaForm, PlantillaMensajeForm
-from .models import CampaniaMarketing, CitaCirugiaFoto, CitaCliente, ConfiguracionCRM, EnvioCampania, OpcionServicioAgenda, PlantillaMensaje
+from .forms import (
+    CampaniaMarketingForm,
+    CitaClienteForm,
+    ConfiguracionCRMForm,
+    PacienteRapidoCitaForm,
+    PlantillaMensajeForm,
+    ProgramaCamaraHiperbaricaForm,
+    SesionCamaraHiperbaricaForm,
+)
+from .models import (
+    CampaniaMarketing,
+    CitaCirugiaFoto,
+    CitaCliente,
+    ConfiguracionCRM,
+    EnvioCampania,
+    OpcionServicioAgenda,
+    PlantillaMensaje,
+    ProgramaCamaraHiperbarica,
+    SesionCamaraHiperbarica,
+)
 from .appointment_notifications import procesar_notificacion, programar_notificaciones_cita
 from .models import NotificacionCitaWhatsApp
 from .services import (
@@ -133,6 +151,89 @@ def _fecha_agenda(valor):
         return date.fromisoformat(valor or "")
     except ValueError:
         return timezone.localdate()
+
+
+def _es_cita_camara_hiperbarica(cita):
+    texto = _normalizar_texto_agenda(cita.display_servicio)
+    return "camara" in texto and "hiperbar" in texto
+
+
+def _contexto_control_camara_hyperbarica(empresa, request, fecha_seleccionada):
+    if empresa.slug != "hospital_mia":
+        return {}
+
+    citas_del_dia = (
+        CitaCliente.objects.filter(
+            empresa=empresa,
+            fecha_hora__date=fecha_seleccionada,
+            paciente__isnull=False,
+        )
+        .select_related("paciente", "servicio_clinico", "profesional_salud")
+        .order_by("fecha_hora")
+    )
+    citas_camara = [cita for cita in citas_del_dia if _es_cita_camara_hiperbarica(cita)]
+
+    cita_control = None
+    control_id = (request.GET.get("control_camara") or "").strip()
+    if control_id:
+        try:
+            cita_control = next((cita for cita in citas_camara if cita.id == int(control_id)), None)
+        except (TypeError, ValueError):
+            cita_control = None
+
+    programa = None
+    sesion = None
+    historial = []
+    programa_form = None
+    sesion_form = None
+    if cita_control:
+        sesion = (
+            SesionCamaraHiperbarica.objects.filter(cita=cita_control)
+            .select_related("programa", "creado_por", "actualizado_por")
+            .first()
+        )
+        programa = sesion.programa if sesion else (
+            ProgramaCamaraHiperbarica.objects.filter(
+                empresa=empresa,
+                paciente=cita_control.paciente,
+                activo=True,
+            ).first()
+        )
+        if programa:
+            historial = list(
+                programa.sesiones.select_related("creado_por", "actualizado_por").order_by("numero_sesion")
+            )
+        numeros_usados = {registro.numero_sesion for registro in historial}
+        sugerido = cita_control.sesion_servicio if 1 <= (cita_control.sesion_servicio or 0) <= 22 else None
+        if sugerido in numeros_usados and (not sesion or sesion.numero_sesion != sugerido):
+            sugerido = None
+        if not sugerido:
+            sugerido = next((numero for numero in range(1, 23) if numero not in numeros_usados), 22)
+        programa_form = ProgramaCamaraHiperbaricaForm(instance=programa)
+        sesion_form = SesionCamaraHiperbaricaForm(
+            instance=sesion,
+            initial={"numero_sesion": sesion.numero_sesion if sesion else sugerido},
+            bloqueada=bool(sesion and sesion.bloqueada),
+        )
+
+    contexto = {
+        "citas_camara_hiperbarica": citas_camara,
+        "cita_control_camara": cita_control,
+        "programa_camara": programa,
+        "programa_camara_form": programa_form,
+        "sesion_camara": sesion,
+        "sesion_camara_form": sesion_form,
+        "historial_camara": historial,
+        "tablero_sesiones_camara": [
+            {
+                "numero": numero,
+                "registro": next((item for item in historial if item.numero_sesion == numero), None),
+            }
+            for numero in range(1, 23)
+        ],
+        "sesiones_camara_completadas": sum(1 for item in historial if item.estado == "finalizada"),
+    }
+    return contexto
 
 
 def _contexto_calendario(
@@ -356,7 +457,7 @@ def _contexto_calendario(
                 if _profesional_pertenece_agenda_espejo(profesional, empresa)
             ]
 
-    return {
+    contexto = {
         "empresa": empresa, "form": form, "citas": citas, "modo_agenda": modo_agenda,
         "agenda_empresa": empresa_agenda,
         "agenda_espejo": agenda_espejo,
@@ -394,6 +495,8 @@ def _contexto_calendario(
         "citas_historial_futuras": citas_historial_futuras,
         "citas_historial_pasadas": citas_historial_pasadas,
     }
+    contexto.update(_contexto_control_camara_hyperbarica(empresa, request, seleccionada))
+    return contexto
 
 
 def _guardar_cita_formulario(request, empresa, form, objeto=None):
@@ -954,6 +1057,119 @@ def agenda_citas(request, empresa_slug):
         messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
+
+
+@login_required
+@require_POST
+def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia":
+        return HttpResponse("Este control clínico solo está habilitado para Hospital Mia.", status=404)
+    if not request.user.puede_acceder_empresa(empresa):
+        return HttpResponse("Acceso no autorizado.", status=403)
+    puede_trabajar = (
+        request.user.is_superuser
+        or request.user.es_administrador_empresa
+        or request.user.tiene_permiso_erp("puede_citas", empresa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa)
+    )
+    if not puede_trabajar:
+        return HttpResponse("Tu usuario no tiene permiso para registrar controles clínicos.", status=403)
+
+    cita = get_object_or_404(
+        CitaCliente.objects.select_related("paciente", "servicio_clinico"),
+        empresa=empresa,
+        id=cita_id,
+        paciente__isnull=False,
+    )
+    if not _es_cita_camara_hiperbarica(cita):
+        return HttpResponse("La cita seleccionada no corresponde a cámara hiperbárica.", status=400)
+
+    sesion = SesionCamaraHiperbarica.objects.filter(cita=cita).select_related("programa").first()
+    if sesion and sesion.bloqueada:
+        messages.warning(request, "La sesión ya fue finalizada y permanece bloqueada para proteger el historial clínico.")
+        return redirect(
+            f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={cita.fecha_hora:%Y-%m-%d}"
+            f"&control_camara={cita.id}#control-camara-hiperbarica"
+        )
+
+    programa = sesion.programa if sesion else None
+    programa_id = (request.POST.get("programa_id") or "").strip()
+    if programa_id and not programa:
+        try:
+            programa = ProgramaCamaraHiperbarica.objects.filter(
+                id=int(programa_id),
+                empresa=empresa,
+                paciente=cita.paciente,
+                activo=True,
+            ).first()
+        except (TypeError, ValueError):
+            programa = None
+
+    finalizar = request.POST.get("accion") == "finalizar"
+    programa_form = ProgramaCamaraHiperbaricaForm(request.POST, instance=programa)
+    sesion_form = SesionCamaraHiperbaricaForm(
+        request.POST,
+        instance=sesion,
+        finalizar=finalizar,
+    )
+    if programa_form.is_valid() and sesion_form.is_valid():
+        numero_sesion = sesion_form.cleaned_data["numero_sesion"]
+        with transaction.atomic():
+            programa_guardado = programa_form.save(commit=False)
+            programa_guardado.empresa = empresa
+            programa_guardado.paciente = cita.paciente
+            if not programa_guardado.pk:
+                programa_guardado.creado_por = request.user
+            programa_guardado.actualizado_por = request.user
+            programa_guardado.save()
+
+            duplicada = SesionCamaraHiperbarica.objects.filter(
+                programa=programa_guardado,
+                numero_sesion=numero_sesion,
+            )
+            if sesion:
+                duplicada = duplicada.exclude(pk=sesion.pk)
+            if duplicada.exists():
+                messages.error(
+                    request,
+                    f"La sesión {numero_sesion} ya está registrada en este programa. Seleccione otro número.",
+                )
+                transaction.set_rollback(True)
+            else:
+                sesion_guardada = sesion_form.save(commit=False)
+                sesion_guardada.programa = programa_guardado
+                sesion_guardada.empresa = empresa
+                sesion_guardada.paciente = cita.paciente
+                sesion_guardada.cita = cita
+                sesion_guardada.estado = "finalizada" if finalizar else "borrador"
+                if not sesion_guardada.pk:
+                    sesion_guardada.creado_por = request.user
+                sesion_guardada.actualizado_por = request.user
+                sesion_guardada.save()
+                if finalizar:
+                    messages.success(
+                        request,
+                        f"Sesión {sesion_guardada.numero_sesion} finalizada y bloqueada correctamente.",
+                    )
+                else:
+                    messages.success(request, f"Borrador de la sesión {sesion_guardada.numero_sesion} guardado.")
+    else:
+        errores = []
+        for formulario in (programa_form, sesion_form):
+            for campo, mensajes_campo in formulario.errors.items():
+                etiqueta = formulario.fields[campo].label if campo in formulario.fields else "Formulario"
+                errores.extend(f"{etiqueta}: {mensaje}" for mensaje in mensajes_campo)
+        messages.error(
+            request,
+            "No se guardó la sesión. " + " ".join(errores[:6]),
+        )
+
+    fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
+    return redirect(
+        f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={fecha}"
+        f"&control_camara={cita.id}#control-camara-hiperbarica"
+    )
 
 
 def agenda_mobile(request, empresa_slug):

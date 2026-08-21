@@ -16,7 +16,18 @@ from facturacion.models import Cliente
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
 from .forms import CitaClienteForm
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampania, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, OpcionServicioAgenda, PlantillaMensaje
+from .models import (
+    CampaniaMarketing,
+    CitaCliente,
+    ConfiguracionCRM,
+    EnvioCampania,
+    NotificacionCitaWhatsApp,
+    NotificacionCumpleanosWhatsApp,
+    OpcionServicioAgenda,
+    PlantillaMensaje,
+    ProgramaCamaraHiperbarica,
+    SesionCamaraHiperbarica,
+)
 from .services import enviar_plantilla_cita_whatsapp, subir_media_whatsapp
 from .tokens import generar_token_respuesta_cita
 
@@ -1996,3 +2007,123 @@ class CRMTests(TestCase):
             self.assertTrue(Path(args[4]).name.endswith(".jpg"))
         finally:
             ruta_imagen.unlink(missing_ok=True)
+
+    def _crear_cita_camara_para_control(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="EXP-HBO-001",
+            nombre="Paciente Cámara Hiperbárica",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Cámara hiperbárica",
+            categoria="tratamiento",
+            duracion_minutos=60,
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Licenciada en enfermería",
+        )
+        fecha_hora = timezone.localtime(timezone.now() + timedelta(days=2)).replace(
+            hour=9,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=profesional,
+            titulo=servicio.nombre,
+            responsable=profesional.nombre,
+            fecha_hora=fecha_hora,
+            duracion_minutos=60,
+        )
+        return cita
+
+    def test_calendario_muestra_control_de_camara_hiperbarica_bajo_la_agenda(self):
+        cita = self._crear_cita_camara_para_control()
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {
+                "vista": "dia",
+                "fecha": timezone.localtime(cita.fecha_hora).date().isoformat(),
+                "control_camara": cita.id,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Control asistencial · Cámara hiperbárica")
+        self.assertContains(response, "Seguimiento de 22 sesiones")
+        self.assertContains(response, "Paciente Cámara Hiperbárica")
+        self.assertContains(response, "Guardar borrador")
+        self.assertContains(response, "Finalizar sesión")
+
+    def test_control_camara_guarda_borrador_y_bloquea_al_finalizar(self):
+        cita = self._crear_cita_camara_para_control()
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_camara_hiperbarica_guardar", args=[self.empresa.slug, cita.id])
+        respuestas = {
+            "estado_general_estable": "si",
+            "sin_fiebre": "si",
+            "sin_dificultad_respiratoria": "si",
+            "sin_dolor_toracico": "si",
+            "sin_sintomas_neurologicos": "si",
+            "sin_dolor_oido": "si",
+            "compensa_ambos_oidos": "si",
+            "area_quirurgica_revisada": "si",
+            "seguridad_camara_verificada": "si",
+            "apto_para_sesion": "si",
+        }
+        base = {
+            "cirugia": "Procedimiento de prueba",
+            "indicacion": "Indicada por el médico tratante",
+            "programa": "20x45",
+            "orden_medica": "Orden médica registrada",
+            "numero_sesion": "1",
+            "observaciones_previas": "Paciente estable",
+            "firma_control_previo": "Enfermera responsable",
+            "presion_arterial_antes": "120/80",
+            "saturacion_oxigeno_antes": "98%",
+            "presion_camara": "2 ATA",
+            "tiempo_minutos": "45",
+            "compensacion_oidos": "Adecuada",
+            "tolerancia": "buena",
+            "presion_arterial_despues": "118/78",
+            "saturacion_oxigeno_despues": "99%",
+            "evolucion_evento_adverso": "Sin eventos adversos",
+            "firma_parametros": "Enfermera responsable",
+            "nota_enfermeria": "Sesión tolerada sin complicaciones.",
+            "firma_enfermeria": "Enfermera responsable",
+            **respuestas,
+        }
+
+        response = self.client.post(url, {**base, "accion": "borrador"})
+        self.assertEqual(response.status_code, 302)
+        sesion = SesionCamaraHiperbarica.objects.get(cita=cita)
+        self.assertEqual(sesion.estado, "borrador")
+        self.assertEqual(sesion.numero_sesion, 1)
+        self.assertEqual(sesion.fecha_sesion.date(), timezone.localdate())
+        self.assertEqual(ProgramaCamaraHiperbarica.objects.filter(paciente=cita.paciente).count(), 1)
+
+        response = self.client.post(
+            url,
+            {**base, "programa_id": sesion.programa_id, "accion": "finalizar"},
+        )
+        self.assertEqual(response.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, "finalizada")
+
+        response = self.client.post(
+            url,
+            {**base, "programa_id": sesion.programa_id, "nota_enfermeria": "Intento posterior", "accion": "borrador"},
+        )
+        self.assertEqual(response.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.nota_enfermeria, "Sesión tolerada sin complicaciones.")
+        self.assertEqual(sesion.estado, "finalizada")

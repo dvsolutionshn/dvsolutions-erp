@@ -17,5 +17,10 @@ urlpatterns = [
     path("<int:cita_id>/cancelar-whatsapp/", views.cancelar_cita_whatsapp, name="agenda_cita_cancelar_whatsapp"),
     path("<int:cita_id>/reagendar-whatsapp/", views.reagendar_cita_whatsapp, name="agenda_cita_reagendar_whatsapp"),
     path("<int:cita_id>/estado/", views.actualizar_estado_cita, name="agenda_cita_estado"),
+    path(
+        "<int:cita_id>/camara-hiperbarica/guardar/",
+        views.guardar_control_camara_hiperbarica,
+        name="agenda_camara_hiperbarica_guardar",
+    ),
     path("<int:cita_id>/eliminar/", views.eliminar_cita, name="agenda_cita_eliminar"),
 ]

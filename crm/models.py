@@ -327,6 +327,194 @@ class CitaCliente(models.Model):
         return f"https://wa.me/{telefono}?text={quote(mensaje)}" if telefono else ""
 
 
+class ProgramaCamaraHiperbarica(models.Model):
+    PROGRAMA_CHOICES = [
+        ("10x90", "10 sesiones de 90 minutos"),
+        ("20x45", "20 sesiones de 45 minutos"),
+        ("otro", "Otro programa"),
+    ]
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="programas_camara_hiperbarica",
+    )
+    paciente = models.ForeignKey(
+        "clinica.Paciente",
+        on_delete=models.CASCADE,
+        related_name="programas_camara_hiperbarica",
+    )
+    cirugia = models.CharField(max_length=220, blank=True)
+    fecha_cirugia = models.DateField(blank=True, null=True)
+    indicacion = models.TextField(blank=True)
+    programa = models.CharField(max_length=20, choices=PROGRAMA_CHOICES, blank=True)
+    programa_otro = models.CharField(max_length=180, blank=True)
+    orden_medica = models.TextField(blank=True)
+    activo = models.BooleanField(default=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="programas_camara_hiperbarica_creados",
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="programas_camara_hiperbarica_actualizados",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-activo", "-fecha_creacion", "-id"]
+        indexes = [models.Index(fields=["empresa", "paciente", "activo"])]
+        verbose_name = "Programa de cámara hiperbárica"
+        verbose_name_plural = "Programas de cámara hiperbárica"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} · {self.get_programa_display() or 'Programa por definir'}"
+
+    def clean(self):
+        super().clean()
+        if self.paciente_id and self.empresa_id and self.paciente.empresa_id != self.empresa_id:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError("El paciente no pertenece a la empresa del programa hiperbárico.")
+        if self.programa == "otro" and not self.programa_otro.strip():
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError({"programa_otro": "Especifique el programa indicado."})
+
+
+class SesionCamaraHiperbarica(models.Model):
+    RESPUESTA_CHOICES = [("si", "Sí"), ("no", "No")]
+    TOLERANCIA_CHOICES = [
+        ("buena", "Buena"),
+        ("regular", "Regular"),
+        ("mala", "Mala"),
+    ]
+    ESTADO_CHOICES = [("borrador", "Borrador"), ("finalizada", "Sesión finalizada")]
+
+    programa = models.ForeignKey(
+        ProgramaCamaraHiperbarica,
+        on_delete=models.CASCADE,
+        related_name="sesiones",
+    )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="sesiones_camara_hiperbarica",
+    )
+    paciente = models.ForeignKey(
+        "clinica.Paciente",
+        on_delete=models.CASCADE,
+        related_name="sesiones_camara_hiperbarica",
+    )
+    cita = models.OneToOneField(
+        CitaCliente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="control_camara_hiperbarica",
+    )
+    numero_sesion = models.PositiveSmallIntegerField()
+    fecha_sesion = models.DateTimeField(default=timezone.now, editable=False)
+
+    estado_general_estable = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    sin_fiebre = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    sin_dificultad_respiratoria = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    sin_dolor_toracico = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    sin_sintomas_neurologicos = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    sin_dolor_oido = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    compensa_ambos_oidos = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    area_quirurgica_revisada = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    seguridad_camara_verificada = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    apto_para_sesion = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
+    observaciones_previas = models.TextField(blank=True)
+    firma_control_previo = models.CharField(max_length=180, blank=True)
+
+    presion_arterial_antes = models.CharField(max_length=30, blank=True)
+    saturacion_oxigeno_antes = models.CharField(max_length=20, blank=True)
+    presion_camara = models.CharField(max_length=30, blank=True)
+    tiempo_minutos = models.PositiveSmallIntegerField(blank=True, null=True)
+    compensacion_oidos = models.CharField(max_length=180, blank=True)
+    tolerancia = models.CharField(max_length=12, choices=TOLERANCIA_CHOICES, blank=True)
+    presion_arterial_despues = models.CharField(max_length=30, blank=True)
+    saturacion_oxigeno_despues = models.CharField(max_length=20, blank=True)
+    evolucion_evento_adverso = models.TextField(blank=True)
+    firma_parametros = models.CharField(max_length=180, blank=True)
+
+    nota_enfermeria = models.TextField(blank=True)
+    firma_enfermeria = models.CharField(max_length=180, blank=True)
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="borrador")
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sesiones_camara_hiperbarica_creadas",
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sesiones_camara_hiperbarica_actualizadas",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["numero_sesion", "fecha_sesion", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["programa", "numero_sesion"],
+                name="crm_camara_programa_numero_sesion_uniq",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(numero_sesion__gte=1, numero_sesion__lte=22),
+                name="crm_camara_numero_sesion_1_22",
+            ),
+        ]
+        indexes = [models.Index(fields=["empresa", "paciente", "estado"])]
+        verbose_name = "Sesión de cámara hiperbárica"
+        verbose_name_plural = "Sesiones de cámara hiperbárica"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} · Sesión {self.numero_sesion}"
+
+    @property
+    def bloqueada(self):
+        return self.estado == "finalizada"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        errores = {}
+        if not 1 <= (self.numero_sesion or 0) <= 22:
+            errores["numero_sesion"] = "La sesión debe estar comprendida entre 1 y 22."
+        if self.programa_id:
+            if self.programa.empresa_id != self.empresa_id or self.programa.paciente_id != self.paciente_id:
+                errores["programa"] = "El programa no corresponde a esta empresa y paciente."
+        if self.cita_id:
+            if self.cita.empresa_id != self.empresa_id or self.cita.paciente_id != self.paciente_id:
+                errores["cita"] = "La cita no corresponde a esta empresa y paciente."
+        if self.pk:
+            original = SesionCamaraHiperbarica.objects.filter(pk=self.pk).values("estado").first()
+            if original and original["estado"] == "finalizada":
+                raise ValidationError("La sesión finalizada está bloqueada y no puede modificarse.")
+        if errores:
+            raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
 class OpcionServicioAgenda(models.Model):
     CATEGORIA_CHOICES = [
         ("tratamientos", "Tratamientos"),

@@ -8,7 +8,15 @@ from django.utils import timezone
 from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
 
-from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, OpcionServicioAgenda, PlantillaMensaje
+from .models import (
+    CampaniaMarketing,
+    CitaCliente,
+    ConfiguracionCRM,
+    OpcionServicioAgenda,
+    PlantillaMensaje,
+    ProgramaCamaraHiperbarica,
+    SesionCamaraHiperbarica,
+)
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -26,6 +34,186 @@ class MultipleFileField(forms.FileField):
         if not isinstance(data, (list, tuple)):
             data = [data]
         return [super(MultipleFileField, self).clean(item, initial) for item in data if item]
+
+
+class SeleccionUnicaCheckboxField(forms.MultipleChoiceField):
+    """Presenta opciones como casillas, pero conserva un unico valor en el modelo."""
+
+    widget = forms.CheckboxSelectMultiple
+
+    def prepare_value(self, value):
+        if isinstance(value, str):
+            return [value] if value else []
+        return value
+
+    def clean(self, value):
+        valores = super().clean(value)
+        if len(valores) > 1:
+            raise forms.ValidationError("Seleccione solamente una opción.")
+        return valores[0] if valores else ""
+
+
+class ProgramaCamaraHiperbaricaForm(forms.ModelForm):
+    class Meta:
+        model = ProgramaCamaraHiperbarica
+        fields = [
+            "cirugia",
+            "fecha_cirugia",
+            "indicacion",
+            "programa",
+            "programa_otro",
+            "orden_medica",
+        ]
+        widgets = {
+            "fecha_cirugia": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "indicacion": forms.Textarea(attrs={"rows": 2}),
+            "orden_medica": forms.Textarea(attrs={"rows": 2}),
+        }
+        labels = {
+            "cirugia": "Cirugía o procedimiento relacionado",
+            "fecha_cirugia": "Fecha de cirugía",
+            "indicacion": "Indicación médica",
+            "programa": "Programa indicado",
+            "programa_otro": "Otro programa",
+            "orden_medica": "Orden médica",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["fecha_cirugia"].input_formats = ["%Y-%m-%d"]
+
+
+class SesionCamaraHiperbaricaForm(forms.ModelForm):
+    CAMPOS_SI_NO = [
+        "estado_general_estable",
+        "sin_fiebre",
+        "sin_dificultad_respiratoria",
+        "sin_dolor_toracico",
+        "sin_sintomas_neurologicos",
+        "sin_dolor_oido",
+        "compensa_ambos_oidos",
+        "area_quirurgica_revisada",
+        "seguridad_camara_verificada",
+        "apto_para_sesion",
+    ]
+    CAMPOS_REQUERIDOS_FINALIZAR = CAMPOS_SI_NO + [
+        "presion_arterial_antes",
+        "saturacion_oxigeno_antes",
+        "presion_camara",
+        "tiempo_minutos",
+        "compensacion_oidos",
+        "tolerancia",
+        "presion_arterial_despues",
+        "saturacion_oxigeno_despues",
+        "firma_control_previo",
+        "firma_parametros",
+        "nota_enfermeria",
+        "firma_enfermeria",
+    ]
+
+    estado_general_estable = SeleccionUnicaCheckboxField(
+        label="Estado general estable", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    sin_fiebre = SeleccionUnicaCheckboxField(
+        label="Sin fiebre", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    sin_dificultad_respiratoria = SeleccionUnicaCheckboxField(
+        label="Sin dificultad respiratoria", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    sin_dolor_toracico = SeleccionUnicaCheckboxField(
+        label="Sin dolor torácico", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    sin_sintomas_neurologicos = SeleccionUnicaCheckboxField(
+        label="Sin síntomas neurológicos", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    sin_dolor_oido = SeleccionUnicaCheckboxField(
+        label="Sin dolor de oído", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    compensa_ambos_oidos = SeleccionUnicaCheckboxField(
+        label="Compensa ambos oídos", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    area_quirurgica_revisada = SeleccionUnicaCheckboxField(
+        label="Área quirúrgica revisada", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    seguridad_camara_verificada = SeleccionUnicaCheckboxField(
+        label="Seguridad de la cámara verificada", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    apto_para_sesion = SeleccionUnicaCheckboxField(
+        label="Apto para la sesión", choices=SesionCamaraHiperbarica.RESPUESTA_CHOICES, required=False
+    )
+    tolerancia = SeleccionUnicaCheckboxField(
+        label="Tolerancia", choices=SesionCamaraHiperbarica.TOLERANCIA_CHOICES, required=False
+    )
+
+    class Meta:
+        model = SesionCamaraHiperbarica
+        fields = [
+            "numero_sesion",
+            "estado_general_estable",
+            "sin_fiebre",
+            "sin_dificultad_respiratoria",
+            "sin_dolor_toracico",
+            "sin_sintomas_neurologicos",
+            "sin_dolor_oido",
+            "compensa_ambos_oidos",
+            "area_quirurgica_revisada",
+            "seguridad_camara_verificada",
+            "apto_para_sesion",
+            "observaciones_previas",
+            "firma_control_previo",
+            "presion_arterial_antes",
+            "saturacion_oxigeno_antes",
+            "presion_camara",
+            "tiempo_minutos",
+            "compensacion_oidos",
+            "tolerancia",
+            "presion_arterial_despues",
+            "saturacion_oxigeno_despues",
+            "evolucion_evento_adverso",
+            "firma_parametros",
+            "nota_enfermeria",
+            "firma_enfermeria",
+        ]
+        widgets = {
+            "numero_sesion": forms.NumberInput(attrs={"min": 1, "max": 22}),
+            "observaciones_previas": forms.Textarea(attrs={"rows": 3}),
+            "evolucion_evento_adverso": forms.Textarea(attrs={"rows": 3}),
+            "nota_enfermeria": forms.Textarea(attrs={"rows": 4}),
+            "tiempo_minutos": forms.NumberInput(attrs={"min": 1, "max": 300}),
+        }
+        labels = {
+            "numero_sesion": "Número de sesión",
+            "observaciones_previas": "Observaciones del control previo",
+            "firma_control_previo": "Nombre y firma del personal que autoriza",
+            "presion_arterial_antes": "Presión arterial antes",
+            "saturacion_oxigeno_antes": "Saturación de oxígeno antes",
+            "presion_camara": "Presión de cámara",
+            "tiempo_minutos": "Tiempo en minutos",
+            "compensacion_oidos": "Compensación de oídos",
+            "presion_arterial_despues": "Presión arterial después",
+            "saturacion_oxigeno_despues": "Saturación de oxígeno después",
+            "evolucion_evento_adverso": "Evolución o evento adverso",
+            "firma_parametros": "Nombre y firma del control de parámetros",
+            "nota_enfermeria": "Observaciones y nota de enfermería",
+            "firma_enfermeria": "Nombre y firma de enfermería",
+        }
+
+    def __init__(self, *args, finalizar=False, bloqueada=False, **kwargs):
+        self.finalizar = finalizar
+        self.bloqueada = bloqueada
+        super().__init__(*args, **kwargs)
+        if bloqueada:
+            for campo in self.fields.values():
+                campo.disabled = True
+
+    def clean(self):
+        datos = super().clean()
+        if self.finalizar:
+            for nombre in self.CAMPOS_REQUERIDOS_FINALIZAR:
+                valor = datos.get(nombre)
+                if valor in (None, "", []):
+                    self.add_error(nombre, "Complete este campo antes de finalizar la sesión.")
+        return datos
 
 
 class ConfiguracionCRMForm(forms.ModelForm):
