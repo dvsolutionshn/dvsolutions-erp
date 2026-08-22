@@ -69,6 +69,7 @@
     {% url 'crm_plantillas' empresa.slug as crm_plantillas_url %}
     {% url 'crm_campanias' empresa.slug as crm_campanias_url %}
     {% url 'agenda_citas' empresa.slug as agenda_citas_url %}
+    {% url 'agenda_camara_hiperbarica' empresa.slug as agenda_camara_hiperbarica_url %}
     {% url 'clinica_dashboard' empresa.slug as clinica_url %}
     {% url 'clinica_pacientes' empresa.slug as clinica_pacientes_url %}
     {% url 'clinica_control_enlaces_registro_paciente' empresa.slug as clinica_control_enlaces_url %}
@@ -296,6 +297,7 @@
             <div class="erp-nav-group-title">Citas</div>
             <nav class="erp-nav">
                 {% if erp_access.citas %}<a class="erp-nav-link {% if request.path == agenda_citas_url %}is-active{% endif %}" href="{{ agenda_citas_url }}"><span class="erp-nav-bullet"></span><span>Calendario</span></a>{% endif %}
+                {% if empresa.slug == 'hospital_mia' and erp_access.citas %}<a class="erp-nav-link {% if request.path == agenda_camara_hiperbarica_url %}is-active{% endif %}" href="{{ agenda_camara_hiperbarica_url }}"><span class="erp-nav-bullet"></span><span>Cámara hiperbárica</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}

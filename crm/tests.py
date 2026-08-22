@@ -2044,11 +2044,11 @@ class CRMTests(TestCase):
         )
         return cita
 
-    def test_calendario_muestra_control_de_camara_hiperbarica_bajo_la_agenda(self):
+    def test_control_camara_es_modulo_independiente_y_no_aparece_en_calendario(self):
         cita = self._crear_cita_camara_para_control()
         self.client.login(username="crmuser", password="pass12345")
 
-        response = self.client.get(
+        response_calendario = self.client.get(
             reverse("agenda_citas", args=[self.empresa.slug]),
             {
                 "vista": "dia",
@@ -2056,11 +2056,24 @@ class CRMTests(TestCase):
                 "control_camara": cita.id,
             },
         )
+        self.assertEqual(response_calendario.status_code, 200)
+        self.assertNotContains(response_calendario, "Seguimiento de 22 sesiones")
+        self.assertContains(response_calendario, "Cámara hiperbárica")
 
+        response = self.client.get(
+            reverse("agenda_camara_hiperbarica", args=[self.empresa.slug]),
+            {
+                "fecha": timezone.localtime(cita.fecha_hora).date().isoformat(),
+                "control_camara": cita.id,
+            },
+        )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Control asistencial · Cámara hiperbárica")
-        self.assertContains(response, "Seguimiento de 22 sesiones")
+        self.assertContains(response, "Control de Cámara Hiperbárica")
+        self.assertContains(response, "Programa de 22 sesiones")
         self.assertContains(response, "Paciente Cámara Hiperbárica")
+        self.assertContains(response, "Control previo de seguridad")
+        self.assertContains(response, "Parámetros de la sesión")
+        self.assertContains(response, "Nota de enfermería")
         self.assertContains(response, "Guardar borrador")
         self.assertContains(response, "Finalizar sesión")
 
@@ -2105,10 +2118,11 @@ class CRMTests(TestCase):
 
         response = self.client.post(url, {**base, "accion": "borrador"})
         self.assertEqual(response.status_code, 302)
+        self.assertIn("/camara-hiperbarica/", response.url)
         sesion = SesionCamaraHiperbarica.objects.get(cita=cita)
         self.assertEqual(sesion.estado, "borrador")
         self.assertEqual(sesion.numero_sesion, 1)
-        self.assertEqual(sesion.fecha_sesion.date(), timezone.localdate())
+        self.assertEqual(timezone.localtime(sesion.fecha_sesion).date(), timezone.localdate())
         self.assertEqual(ProgramaCamaraHiperbarica.objects.filter(paciente=cita.paciente).count(), 1)
 
         response = self.client.post(

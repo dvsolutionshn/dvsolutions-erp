@@ -495,7 +495,6 @@ def _contexto_calendario(
         "citas_historial_futuras": citas_historial_futuras,
         "citas_historial_pasadas": citas_historial_pasadas,
     }
-    contexto.update(_contexto_control_camara_hyperbarica(empresa, request, seleccionada))
     return contexto
 
 
@@ -1060,6 +1059,34 @@ def agenda_citas(request, empresa_slug):
 
 
 @login_required
+def camara_hiperbarica(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia":
+        return HttpResponse("Este módulo clínico solo está habilitado para Hospital Mia.", status=404)
+    if not request.user.puede_acceder_empresa(empresa):
+        return HttpResponse("Acceso no autorizado.", status=403)
+
+    puede_consultar = (
+        request.user.is_superuser
+        or request.user.es_administrador_empresa
+        or request.user.tiene_permiso_erp("puede_citas", empresa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa)
+    )
+    if not puede_consultar:
+        return HttpResponse("Tu usuario no tiene permiso para consultar controles clínicos.", status=403)
+
+    fecha_seleccionada = _fecha_agenda(request.GET.get("fecha"))
+    contexto = {
+        "empresa": empresa,
+        "fecha_seleccionada": fecha_seleccionada,
+        "fecha_anterior": fecha_seleccionada - timedelta(days=1),
+        "fecha_siguiente": fecha_seleccionada + timedelta(days=1),
+    }
+    contexto.update(_contexto_control_camara_hyperbarica(empresa, request, fecha_seleccionada))
+    return render(request, "crm/camara_hiperbarica.html", contexto)
+
+
+@login_required
 @require_POST
 def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
@@ -1089,8 +1116,8 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
     if sesion and sesion.bloqueada:
         messages.warning(request, "La sesión ya fue finalizada y permanece bloqueada para proteger el historial clínico.")
         return redirect(
-            f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={cita.fecha_hora:%Y-%m-%d}"
-            f"&control_camara={cita.id}#control-camara-hiperbarica"
+            f"{reverse('agenda_camara_hiperbarica', args=[empresa.slug])}?fecha={cita.fecha_hora:%Y-%m-%d}"
+            f"&control_camara={cita.id}#documento-camara"
         )
 
     programa = sesion.programa if sesion else None
@@ -1167,8 +1194,8 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
 
     fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
     return redirect(
-        f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={fecha}"
-        f"&control_camara={cita.id}#control-camara-hiperbarica"
+        f"{reverse('agenda_camara_hiperbarica', args=[empresa.slug])}?fecha={fecha}"
+        f"&control_camara={cita.id}#documento-camara"
     )
 
 

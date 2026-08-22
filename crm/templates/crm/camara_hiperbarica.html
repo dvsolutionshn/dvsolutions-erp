@@ -1,0 +1,138 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Control de Cámara Hiperbárica - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Módulo clínico independiente{% endblock %}
+{% block header_title %}Control de Cámara Hiperbárica{% endblock %}
+{% block header_description %}Registro interactivo, cronológico y protegido de las 22 sesiones del paciente.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_citas' empresa.slug %}">Calendario de citas</a><a class="erp-action-link" href="{% url 'dashboard' empresa.slug %}">Panel Principal</a>{% endblock %}
+
+{% block content %}
+<style>
+.hbo-page{display:grid;gap:18px}.hbo-toolbar{display:grid;grid-template-columns:auto minmax(220px,1fr) auto;gap:12px;align-items:center;padding:14px 16px;border:1px solid #caddea;border-radius:20px;background:radial-gradient(circle at 8% 0%,rgba(20,184,166,.12),transparent 34%),radial-gradient(circle at 92% 10%,rgba(37,99,235,.10),transparent 32%),linear-gradient(135deg,#fff,#f7fbff);box-shadow:0 20px 48px rgba(19,46,76,.08)}
+.hbo-date-nav{display:flex;gap:8px}.hbo-date-nav a,.hbo-date-submit{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 15px;border:1px solid #c7d9e7;border-radius:13px;background:#fff;color:#37536b;text-decoration:none;font-size:10px;font-weight:950}.hbo-date-submit{border:0;background:linear-gradient(135deg,#14b8a6,#2563eb);color:#fff;cursor:pointer}.hbo-date-field{display:grid;grid-template-columns:auto minmax(150px,260px) auto;gap:10px;align-items:center;justify-content:center}.hbo-date-field label{color:#60768a;font-size:9px;font-weight:950;letter-spacing:.1em;text-transform:uppercase}.hbo-date-field input{min-height:42px;border:1px solid #bfd3e2;border-radius:13px;background:#fff;padding:0 12px;color:#153047;font-weight:850}
+.hbo-kicker{display:block;color:#5f768a;font-size:8px;font-weight:950;letter-spacing:.14em;text-transform:uppercase}.hbo-appointments{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:10px}.hbo-appointment{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #d5e3ed;border-left:6px solid #8b5e34;border-radius:17px;background:#fff;color:#173047;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}.hbo-appointment:hover,.hbo-appointment.is-active{transform:translateY(-2px);border-color:#8b5e34;box-shadow:0 16px 34px rgba(76,54,32,.13)}.hbo-appointment-time{font-size:13px;font-weight:950}.hbo-appointment strong,.hbo-appointment span{display:block}.hbo-appointment span{margin-top:3px;color:#718293;font-size:9px}.hbo-appointment em{padding:6px 9px;border-radius:999px;background:#f3e7d9;color:#6f4828;font-size:8px;font-style:normal;font-weight:950;text-transform:uppercase}.hbo-empty{padding:22px;border:1px dashed #c8d9e6;border-radius:17px;background:rgba(255,255,255,.72);color:#718293;text-align:center;font-size:11px}
+.hbo-document{overflow:hidden;border:1px solid #cbdde9;border-radius:24px;background:#fff;box-shadow:0 28px 70px rgba(17,43,66,.11)}.hbo-document-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:20px 22px;border-bottom:1px solid #d7e5ee;background:radial-gradient(circle at 90% 0%,rgba(139,94,52,.13),transparent 34%),linear-gradient(135deg,#f8fcff,#fff)}.hbo-document-head h2{margin:5px 0 0;color:#102338;font-size:24px}.hbo-document-head p{margin:7px 0 0;color:#62788b;font-size:11px}.hbo-state{display:inline-flex;padding:8px 11px;border-radius:999px;background:#fff3d6;color:#896315;font-size:9px;font-weight:950;text-transform:uppercase}.hbo-state.finalized{background:#ddf5ea;color:#126b4d}
+.hbo-summary{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:1px;background:#dbe7ef;border-bottom:1px solid #dbe7ef}.hbo-summary-item{min-width:0;padding:13px 16px;background:#fbfdff}.hbo-summary-item span{display:block;color:#62788b;font-size:8px;font-weight:950;letter-spacing:.1em;text-transform:uppercase}.hbo-summary-item strong{display:block;margin-top:5px;color:#132a3e;font-size:12px;overflow-wrap:anywhere}
+.hbo-progress-wrap{padding:16px 20px;border-bottom:1px solid #dce7ee;background:#f9fcfe}.hbo-progress-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.hbo-progress-head strong{color:#123047;font-size:14px}.hbo-progress-head span{color:#0f766e;font-size:11px;font-weight:950}.hbo-session-board{display:grid;grid-template-columns:repeat(11,minmax(42px,1fr));gap:7px}.hbo-session-slot{display:grid;place-items:center;min-height:46px;border:1px solid #d8e5ef;border-radius:12px;background:#fff;color:#728394;font-size:10px;font-weight:950}.hbo-session-slot.done{border-color:#8ed1bf;background:#e5f7f1;color:#087565}.hbo-session-slot.draft{border-color:#ead39b;background:#fff8e7;color:#8a6717}
+.hbo-form{display:grid;gap:0}.hbo-panel{padding:20px 22px;border-bottom:1px solid #dce7ee;background:#fff}.hbo-panel:nth-child(even){background:#fbfdff}.hbo-panel-head{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;align-items:center;margin-bottom:16px}.hbo-panel-number{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#14b8a6,#2563eb);color:#fff;font-size:13px;font-weight:950;box-shadow:0 10px 22px rgba(37,99,235,.15)}.hbo-panel-head h3{margin:3px 0 0;color:#132a3e;font-size:17px}.hbo-panel-head p{margin:4px 0 0;color:#718293;font-size:10px}
+.hbo-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.hbo-field{display:grid;gap:6px;min-width:0}.hbo-field.wide{grid-column:1/-1}.hbo-field label,.hbo-check-card>label{color:#536b7f;font-size:8px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}.hbo-field input,.hbo-field select,.hbo-field textarea{width:100%;min-height:42px;border:1px solid #bfd2e1;border-radius:11px;background:#fff;padding:9px 11px;color:#173047;box-sizing:border-box}.hbo-field textarea{min-height:76px;resize:vertical}.hbo-field input:focus,.hbo-field select:focus,.hbo-field textarea:focus{outline:0;border-color:#168f86;box-shadow:0 0 0 3px rgba(22,143,134,.10)}.hbo-field .errorlist{margin:0;padding:0;list-style:none;color:#a62929;font-size:9px}
+.hbo-check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.hbo-check-card{display:grid;grid-template-columns:minmax(0,1fr) 185px;gap:12px;align-items:center;padding:11px 13px;border:1px solid #dce7ef;border-radius:14px;background:#fff}.hbo-check-card>label{margin:0;color:#314b61;font-size:9px}.hbo-check-card ul{display:flex;gap:7px;margin:0;padding:0;list-style:none}.hbo-check-card li{flex:1}.hbo-check-card li label{display:flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 8px;border:1px solid #d0dee8;border-radius:10px;background:#fff;color:#30485c;font-size:10px;font-weight:850;cursor:pointer}.hbo-check-card input[type=checkbox]{width:17px;height:17px;accent-color:#159a91}.hbo-check-card:has(input:checked){border-color:#80cabe;background:#f1fbf8}
+.hbo-actions{position:sticky;bottom:12px;z-index:5;display:flex;justify-content:flex-end;gap:10px;margin:14px 18px 18px;padding:12px;border:1px solid rgba(205,221,233,.94);border-radius:16px;background:rgba(255,255,255,.94);box-shadow:0 18px 40px rgba(18,42,64,.12);backdrop-filter:blur(12px)}.hbo-actions button{min-height:43px;border:0;border-radius:12px;padding:0 19px;font-size:10px;font-weight:950;cursor:pointer}.hbo-save{background:#edf5fa;color:#31536e}.hbo-finalize{background:linear-gradient(135deg,#14b8a6,#2563eb);color:#fff;box-shadow:0 12px 26px rgba(37,99,235,.18)}.hbo-locked{margin:18px;padding:15px;border:1px solid #a8d9c9;border-radius:14px;background:#ecf9f4;color:#17664f;font-size:11px;font-weight:850;text-align:center}
+@media(max-width:1050px){.hbo-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.hbo-session-board{grid-template-columns:repeat(6,minmax(42px,1fr))}.hbo-check-card{grid-template-columns:1fr}.hbo-summary{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.hbo-toolbar,.hbo-date-field,.hbo-appointments,.hbo-check-grid,.hbo-fields,.hbo-summary,.hbo-document-head{grid-template-columns:1fr}.hbo-date-nav{justify-content:center}.hbo-session-board{grid-template-columns:repeat(4,minmax(42px,1fr))}.hbo-appointment{grid-template-columns:54px 1fr}.hbo-appointment em{grid-column:1/-1;width:max-content}.hbo-actions{position:static;display:grid;grid-template-columns:1fr}.hbo-actions button{width:100%}}
+</style>
+
+<div class="hbo-page">
+  <section class="hbo-toolbar" aria-label="Seleccionar fecha de atención">
+    <div class="hbo-date-nav"><a href="?fecha={{ fecha_anterior|date:'Y-m-d' }}">← Día anterior</a></div>
+    <form class="hbo-date-field" method="get">
+      <label for="hbo-date">Fecha de atención</label>
+      <input id="hbo-date" name="fecha" type="date" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+      <button class="hbo-date-submit" type="submit">Consultar</button>
+    </form>
+    <div class="hbo-date-nav"><a href="?fecha={{ fecha_siguiente|date:'Y-m-d' }}">Día siguiente →</a></div>
+  </section>
+
+  <section class="erp-card">
+    <span class="hbo-kicker">Pacientes programados · {{ fecha_seleccionada|date:"d/m/Y" }}</span>
+    {% if citas_camara_hiperbarica %}
+    <div class="hbo-appointments" style="margin-top:12px" aria-label="Citas de cámara hiperbárica del día">
+      {% for cita_camara in citas_camara_hiperbarica %}
+      <a class="hbo-appointment {% if cita_control_camara.id == cita_camara.id %}is-active{% endif %}" href="?fecha={{ fecha_seleccionada|date:'Y-m-d' }}&amp;control_camara={{ cita_camara.id }}#documento-camara">
+        <strong class="hbo-appointment-time">{{ cita_camara.fecha_hora|date:"h:i A" }}</strong>
+        <span><strong>{{ cita_camara.display_cliente }}</strong><span>{{ cita_camara.display_profesional|default:"Profesional sin asignar" }}</span></span>
+        <em>{% if cita_control_camara.id == cita_camara.id %}En atención{% else %}Abrir control{% endif %}</em>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="hbo-empty" style="margin-top:12px">No hay citas de Cámara hiperbárica para esta fecha. Las citas continúan programándose normalmente desde el calendario.</div>
+    {% endif %}
+  </section>
+
+  {% if cita_control_camara and sesion_camara_form and programa_camara_form %}
+  <section id="documento-camara" class="hbo-document">
+    <header class="hbo-document-head">
+      <div><span class="hbo-kicker">Documento asistencial interactivo</span><h2>Control de sesión hiperbárica</h2><p>La fecha y hora quedan registradas automáticamente con el usuario responsable.</p></div>
+      <span class="hbo-state {% if sesion_camara.estado == 'finalizada' %}finalized{% endif %}">{% if sesion_camara %}{{ sesion_camara.get_estado_display }}{% else %}Nueva sesión{% endif %}</span>
+    </header>
+    <div class="hbo-summary">
+      <div class="hbo-summary-item"><span>Paciente</span><strong>{{ cita_control_camara.display_cliente }}</strong></div>
+      <div class="hbo-summary-item"><span>Fecha y hora de la cita</span><strong>{{ cita_control_camara.fecha_hora|date:"d/m/Y · h:i A" }}</strong></div>
+      <div class="hbo-summary-item"><span>Profesional</span><strong>{{ cita_control_camara.display_profesional|default:"Sin asignar" }}</strong></div>
+    </div>
+    <div class="hbo-progress-wrap">
+      <div class="hbo-progress-head"><strong>Programa de 22 sesiones</strong><span>{{ sesiones_camara_completadas|default:0 }} finalizadas</span></div>
+      <div class="hbo-session-board">
+        {% for item in tablero_sesiones_camara %}<div class="hbo-session-slot {% if item.registro.estado == 'finalizada' %}done{% elif item.registro %}draft{% endif %}" title="Sesión {{ item.numero }}{% if item.registro %} · {{ item.registro.get_estado_display }} · {{ item.registro.fecha_sesion|date:'d/m/Y H:i' }}{% endif %}">{{ item.numero }}</div>{% endfor %}
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'agenda_camara_hiperbarica_guardar' empresa.slug cita_control_camara.id %}" class="hbo-form" data-hbo-form>
+      {% csrf_token %}{% if programa_camara %}<input type="hidden" name="programa_id" value="{{ programa_camara.id }}">{% endif %}
+      <section class="hbo-panel">
+        <div class="hbo-panel-head"><span class="hbo-panel-number">01</span><div><span class="hbo-kicker">Datos del paciente y programa médico</span><h3>Información general del tratamiento</h3><p>Estos datos acompañan todo el ciclo de sesiones del paciente.</p></div></div>
+        <div class="hbo-fields">
+          <div class="hbo-field">{{ programa_camara_form.cirugia.label_tag }}{{ programa_camara_form.cirugia }}{{ programa_camara_form.cirugia.errors }}</div>
+          <div class="hbo-field">{{ programa_camara_form.fecha_cirugia.label_tag }}{{ programa_camara_form.fecha_cirugia }}{{ programa_camara_form.fecha_cirugia.errors }}</div>
+          <div class="hbo-field">{{ programa_camara_form.programa.label_tag }}{{ programa_camara_form.programa }}{{ programa_camara_form.programa.errors }}</div>
+          <div class="hbo-field wide">{{ programa_camara_form.programa_otro.label_tag }}{{ programa_camara_form.programa_otro }}{{ programa_camara_form.programa_otro.errors }}</div>
+          <div class="hbo-field wide">{{ programa_camara_form.indicacion.label_tag }}{{ programa_camara_form.indicacion }}{{ programa_camara_form.indicacion.errors }}</div>
+          <div class="hbo-field wide">{{ programa_camara_form.orden_medica.label_tag }}{{ programa_camara_form.orden_medica }}{{ programa_camara_form.orden_medica.errors }}</div>
+        </div>
+      </section>
+
+      <section class="hbo-panel">
+        <div class="hbo-panel-head"><span class="hbo-panel-number">02</span><div><span class="hbo-kicker">Control previo de seguridad</span><h3>Verificación antes de ingresar a cámara</h3><p>Seleccione una sola respuesta, Sí o No, para cada condición.</p></div></div>
+        <div class="hbo-fields" style="margin-bottom:12px">
+          <div class="hbo-field">{{ sesion_camara_form.numero_sesion.label_tag }}{{ sesion_camara_form.numero_sesion }}{{ sesion_camara_form.numero_sesion.errors }}</div>
+          <div class="hbo-field"><label>Fecha y hora del registro</label><input type="text" value="{% if sesion_camara %}{{ sesion_camara.fecha_sesion|date:'d/m/Y h:i A' }}{% else %}Se asignará automáticamente al guardar{% endif %}" readonly></div>
+        </div>
+        <div class="hbo-check-grid">
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.estado_general_estable.label }}</label>{{ sesion_camara_form.estado_general_estable }}{{ sesion_camara_form.estado_general_estable.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.sin_fiebre.label }}</label>{{ sesion_camara_form.sin_fiebre }}{{ sesion_camara_form.sin_fiebre.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.sin_dificultad_respiratoria.label }}</label>{{ sesion_camara_form.sin_dificultad_respiratoria }}{{ sesion_camara_form.sin_dificultad_respiratoria.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.sin_dolor_toracico.label }}</label>{{ sesion_camara_form.sin_dolor_toracico }}{{ sesion_camara_form.sin_dolor_toracico.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.sin_sintomas_neurologicos.label }}</label>{{ sesion_camara_form.sin_sintomas_neurologicos }}{{ sesion_camara_form.sin_sintomas_neurologicos.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.sin_dolor_oido.label }}</label>{{ sesion_camara_form.sin_dolor_oido }}{{ sesion_camara_form.sin_dolor_oido.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.compensa_ambos_oidos.label }}</label>{{ sesion_camara_form.compensa_ambos_oidos }}{{ sesion_camara_form.compensa_ambos_oidos.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.area_quirurgica_revisada.label }}</label>{{ sesion_camara_form.area_quirurgica_revisada }}{{ sesion_camara_form.area_quirurgica_revisada.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.seguridad_camara_verificada.label }}</label>{{ sesion_camara_form.seguridad_camara_verificada }}{{ sesion_camara_form.seguridad_camara_verificada.errors }}</div>
+          <div class="hbo-check-card"><label>{{ sesion_camara_form.apto_para_sesion.label }}</label>{{ sesion_camara_form.apto_para_sesion }}{{ sesion_camara_form.apto_para_sesion.errors }}</div>
+        </div>
+        <div class="hbo-fields" style="margin-top:12px"><div class="hbo-field wide">{{ sesion_camara_form.observaciones_previas.label_tag }}{{ sesion_camara_form.observaciones_previas }}{{ sesion_camara_form.observaciones_previas.errors }}</div><div class="hbo-field wide">{{ sesion_camara_form.firma_control_previo.label_tag }}{{ sesion_camara_form.firma_control_previo }}{{ sesion_camara_form.firma_control_previo.errors }}</div></div>
+      </section>
+
+      <section class="hbo-panel">
+        <div class="hbo-panel-head"><span class="hbo-panel-number">03</span><div><span class="hbo-kicker">Parámetros de la sesión</span><h3>Signos vitales, cámara y tolerancia</h3><p>Registre los parámetros antes, durante y después de la atención.</p></div></div>
+        <div class="hbo-fields">
+          <div class="hbo-field">{{ sesion_camara_form.presion_arterial_antes.label_tag }}{{ sesion_camara_form.presion_arterial_antes }}{{ sesion_camara_form.presion_arterial_antes.errors }}</div><div class="hbo-field">{{ sesion_camara_form.saturacion_oxigeno_antes.label_tag }}{{ sesion_camara_form.saturacion_oxigeno_antes }}{{ sesion_camara_form.saturacion_oxigeno_antes.errors }}</div><div class="hbo-field">{{ sesion_camara_form.presion_camara.label_tag }}{{ sesion_camara_form.presion_camara }}{{ sesion_camara_form.presion_camara.errors }}</div>
+          <div class="hbo-field">{{ sesion_camara_form.tiempo_minutos.label_tag }}{{ sesion_camara_form.tiempo_minutos }}{{ sesion_camara_form.tiempo_minutos.errors }}</div><div class="hbo-field">{{ sesion_camara_form.compensacion_oidos.label_tag }}{{ sesion_camara_form.compensacion_oidos }}{{ sesion_camara_form.compensacion_oidos.errors }}</div><div class="hbo-check-card"><label>{{ sesion_camara_form.tolerancia.label }}</label>{{ sesion_camara_form.tolerancia }}{{ sesion_camara_form.tolerancia.errors }}</div>
+          <div class="hbo-field">{{ sesion_camara_form.presion_arterial_despues.label_tag }}{{ sesion_camara_form.presion_arterial_despues }}{{ sesion_camara_form.presion_arterial_despues.errors }}</div><div class="hbo-field">{{ sesion_camara_form.saturacion_oxigeno_despues.label_tag }}{{ sesion_camara_form.saturacion_oxigeno_despues }}{{ sesion_camara_form.saturacion_oxigeno_despues.errors }}</div><div class="hbo-field wide">{{ sesion_camara_form.evolucion_evento_adverso.label_tag }}{{ sesion_camara_form.evolucion_evento_adverso }}{{ sesion_camara_form.evolucion_evento_adverso.errors }}</div><div class="hbo-field wide">{{ sesion_camara_form.firma_parametros.label_tag }}{{ sesion_camara_form.firma_parametros }}{{ sesion_camara_form.firma_parametros.errors }}</div>
+        </div>
+      </section>
+
+      <section class="hbo-panel">
+        <div class="hbo-panel-head"><span class="hbo-panel-number">04</span><div><span class="hbo-kicker">Registro cronológico</span><h3>Nota de enfermería</h3><p>Documente la evolución y deje el nombre o firma del personal responsable.</p></div></div>
+        <div class="hbo-fields"><div class="hbo-field wide">{{ sesion_camara_form.nota_enfermeria.label_tag }}{{ sesion_camara_form.nota_enfermeria }}{{ sesion_camara_form.nota_enfermeria.errors }}</div><div class="hbo-field wide">{{ sesion_camara_form.firma_enfermeria.label_tag }}{{ sesion_camara_form.firma_enfermeria }}{{ sesion_camara_form.firma_enfermeria.errors }}</div></div>
+      </section>
+
+      {% if sesion_camara.estado == 'finalizada' %}<div class="hbo-locked">Sesión finalizada. El registro está protegido y ya no puede editarse.</div>{% else %}<div class="hbo-actions"><button class="hbo-save" type="submit" name="accion" value="borrador">Guardar borrador</button><button class="hbo-finalize" type="submit" name="accion" value="finalizar" data-hbo-finalize>Finalizar sesión</button></div>{% endif %}
+    </form>
+  </section>
+  {% endif %}
+</div>
+
+<script>
+(function(){
+  document.querySelectorAll(".hbo-check-card ul").forEach(function(group){
+    group.addEventListener("change",function(event){
+      var selected=event.target;
+      if(!selected.matches('input[type="checkbox"]')||!selected.checked){return;}
+      group.querySelectorAll('input[type="checkbox"]').forEach(function(input){if(input!==selected){input.checked=false;}});
+    });
+  });
+  document.querySelectorAll("[data-hbo-finalize]").forEach(function(button){button.addEventListener("click",function(event){if(!window.confirm("¿Finalizar esta sesión? Después de finalizarla ya no podrá editarse.")){event.preventDefault();}});});
+})();
+</script>
+{% endblock %}

@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     path("", views.agenda_citas, name="agenda_citas"),
+    path("camara-hiperbarica/", views.camara_hiperbarica, name="agenda_camara_hiperbarica"),
     path("app/", views.agenda_mobile, name="agenda_mobile"),
     path("app/manifest.webmanifest", views.agenda_mobile_manifest, name="agenda_mobile_manifest"),
     path("app/service-worker.js", views.agenda_mobile_service_worker, name="agenda_mobile_service_worker"),
