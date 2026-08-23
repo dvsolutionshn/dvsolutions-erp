@@ -49,4 +49,6 @@ urlpatterns = [
     path("profesionales/", views.profesionales, name="clinica_profesionales"),
     path("profesionales/<int:profesional_id>/editar/", views.editar_profesional, name="clinica_profesional_editar"),
     path("servicios/", views.servicios, name="clinica_servicios"),
+    path("servicios/<int:servicio_id>/editar/", views.editar_servicio, name="clinica_servicio_editar"),
+    path("servicios/<int:servicio_id>/eliminar/", views.eliminar_servicio, name="clinica_servicio_eliminar"),
 ]

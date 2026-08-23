@@ -93,6 +93,16 @@
     box-shadow:0 10px 24px rgba(16,40,62,.06);
 }
 .clinic-action-btn:hover{border-color:rgba(20,184,166,.55);box-shadow:0 14px 30px rgba(20,184,166,.12)}
+.clinic-action-form{margin:0}
+.clinic-action-btn.danger{
+    border-color:rgba(220,38,38,.22);
+    color:#b91c1c;
+    cursor:pointer;
+}
+.clinic-action-btn.danger:hover{
+    border-color:rgba(220,38,38,.48);
+    box-shadow:0 14px 30px rgba(220,38,38,.1);
+}
 @media (max-width:980px){
     .clinic-catalog-grid{grid-template-columns:1fr}
 }
@@ -123,7 +133,11 @@
             {% if form.non_field_errors %}<div class="clinic-error">{{ form.non_field_errors }}</div>{% endif %}
             <button class="erp-btn" type="submit">Guardar</button>
             {% if objeto_editando %}
-            <a class="erp-btn ghost" href="{% url 'clinica_profesionales' empresa.slug %}">Cancelar edicion</a>
+                {% if cancelar_url_name == "clinica_servicios" %}
+                <a class="erp-btn ghost" href="{% url 'clinica_servicios' empresa.slug %}">Cancelar edicion</a>
+                {% else %}
+                <a class="erp-btn ghost" href="{% url 'clinica_profesionales' empresa.slug %}">Cancelar edicion</a>
+                {% endif %}
             {% endif %}
         </form>
         </div>
@@ -148,6 +162,14 @@
                             <div class="clinic-actions">
                                 {% if editar_url_name == "clinica_profesional_editar" %}
                                 <a class="clinic-action-btn" href="{% url 'clinica_profesional_editar' empresa.slug item.id %}">Editar</a>
+                                {% elif editar_url_name == "clinica_servicio_editar" %}
+                                <a class="clinic-action-btn" href="{% url 'clinica_servicio_editar' empresa.slug item.id %}">Editar</a>
+                                {% endif %}
+                                {% if eliminar_url_name == "clinica_servicio_eliminar" %}
+                                <form class="clinic-action-form" method="post" action="{% url 'clinica_servicio_eliminar' empresa.slug item.id %}" onsubmit="return confirm('¿Eliminar este servicio del catalogo clinico?');">
+                                    {% csrf_token %}
+                                    <button class="clinic-action-btn danger" type="submit">Eliminar</button>
+                                </form>
                                 {% endif %}
                             </div>
                         </td>

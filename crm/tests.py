@@ -1532,7 +1532,7 @@ class CRMTests(TestCase):
             duracion_minutos=60,
         )
         fecha_hora = timezone.make_aware(datetime(2026, 7, 22, 10, 0))
-        for indice in range(7):
+        for indice in range(4):
             paciente = Paciente.objects.create(
                 empresa=self.empresa,
                 expediente_codigo=f"EXP-TRAT-{indice}",
@@ -1581,10 +1581,10 @@ class CRMTests(TestCase):
         }, empresa=self.empresa)
 
         self.assertFalse(form_lleno.is_valid())
-        self.assertIn("Capacidad: 7; ocupados: 7", form_lleno.errors.as_text())
+        self.assertIn("Capacidad: 4; ocupados: 4", form_lleno.errors.as_text())
         self.assertTrue(form_con_espacio.is_valid(), form_con_espacio.errors.as_text())
         self.assertFalse(form_legacy_lleno.is_valid())
-        self.assertIn("Capacidad: 7; ocupados: 7", form_legacy_lleno.errors.as_text())
+        self.assertIn("Capacidad: 4; ocupados: 4", form_legacy_lleno.errors.as_text())
 
     def test_agenda_respeta_capacidad_de_terapias_y_camara(self):
         self.empresa.tipo_solucion = "clinica"
@@ -1635,6 +1635,87 @@ class CRMTests(TestCase):
 
             self.assertFalse(form.is_valid())
             self.assertIn("Capacidad: 3; ocupados: 3", form.errors.as_text())
+
+    def test_agenda_permite_repetir_enfermeria_hasta_completar_cupos(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        enfermeria = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Enfermeria")
+        recursos = [
+            ("Tratamientos", "tratamiento", 4, "08:00"),
+            ("Terapias", "tratamiento", 3, "10:00"),
+            ("Camara hiperbarica", "tratamiento", 3, "12:00"),
+        ]
+
+        for nombre, categoria, capacidad, hora in recursos:
+            servicio = ServicioClinico.objects.create(
+                empresa=self.empresa,
+                nombre=nombre,
+                categoria=categoria,
+                duracion_minutos=60,
+            )
+            hora_datetime = datetime.strptime(hora, "%H:%M")
+            fecha_hora = timezone.make_aware(datetime(2026, 7, 24, hora_datetime.hour, 0))
+            for indice in range(capacidad - 1):
+                paciente = Paciente.objects.create(
+                    empresa=self.empresa,
+                    expediente_codigo=f"EXP-CUPO-{nombre[:3]}-{indice}",
+                    nombre=f"Paciente Cupo {nombre} {indice}",
+                )
+                CitaCliente.objects.create(
+                    empresa=self.empresa,
+                    paciente=paciente,
+                    servicio_clinico=servicio,
+                    profesional_salud=enfermeria,
+                    titulo=servicio.nombre,
+                    responsable=enfermeria.nombre,
+                    fecha_hora=fecha_hora,
+                    duracion_minutos=60,
+                )
+
+            paciente_ultimo_cupo = Paciente.objects.create(
+                empresa=self.empresa,
+                expediente_codigo=f"EXP-CUPO-{nombre[:3]}-ULTIMO",
+                nombre=f"Ultimo cupo {nombre}",
+            )
+            form_ultimo_cupo = CitaClienteForm(
+                {
+                    "paciente": paciente_ultimo_cupo.id,
+                    "servicio_clinico": servicio.id,
+                    "profesional_salud": enfermeria.id,
+                    "fecha_cita": "2026-07-24",
+                    "hora_cita": hora,
+                    "periodo_cita": "AM" if hora_datetime.hour < 12 else "PM",
+                    "estado": "pendiente",
+                },
+                empresa=self.empresa,
+            )
+            self.assertTrue(form_ultimo_cupo.is_valid(), form_ultimo_cupo.errors.as_text())
+            cita = form_ultimo_cupo.save(commit=False)
+            cita.empresa = self.empresa
+            cita.save()
+
+            paciente_sin_cupo = Paciente.objects.create(
+                empresa=self.empresa,
+                expediente_codigo=f"EXP-CUPO-{nombre[:3]}-LLENO",
+                nombre=f"Sin cupo {nombre}",
+            )
+            form_sin_cupo = CitaClienteForm(
+                {
+                    "paciente": paciente_sin_cupo.id,
+                    "servicio_clinico": servicio.id,
+                    "profesional_salud": enfermeria.id,
+                    "fecha_cita": "2026-07-24",
+                    "hora_cita": hora,
+                    "periodo_cita": "AM" if hora_datetime.hour < 12 else "PM",
+                    "estado": "pendiente",
+                },
+                empresa=self.empresa,
+            )
+            self.assertFalse(form_sin_cupo.is_valid())
+            self.assertIn(
+                f"Capacidad: {capacidad}; ocupados: {capacidad}",
+                form_sin_cupo.errors.as_text(),
+            )
 
     @patch("crm.views.enviar_plantilla_cita_whatsapp")
     def test_modal_cita_permite_cancelar_y_reagendar_con_whatsapp(self, mock_whatsapp):

@@ -326,7 +326,7 @@ class CitaClienteForm(forms.ModelForm):
     EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
     EMPRESAS_CIRUGIA_EXTENDIDA = {"hospital_mia", "serviciosmedicos"}
     CAPACIDAD_RECURSOS_AGENDA = {
-        "tratamientos": {"nombre": "Tratamientos", "capacidad": 7},
+        "tratamientos": {"nombre": "Tratamientos", "capacidad": 4},
         "camara_hiperbarica": {"nombre": "Camaras hiperbaricas", "capacidad": 3},
         "terapias": {"nombre": "Terapias", "capacidad": 3},
         "spa": {"nombre": "Spa", "capacidad": 6},
@@ -828,8 +828,9 @@ class CitaClienteForm(forms.ModelForm):
             for detalle in detalles:
                 detalle_fin = detalle["inicio"] + timedelta(minutes=duracion)
                 try:
-                    self._validar_capacidad_recurso(detalle["inicio"], detalle_fin, servicio)
-                    self._validar_traslapes_agenda_extendida(detalle["inicio"], detalle_fin, profesional)
+                    usa_capacidad = self._validar_capacidad_recurso(detalle["inicio"], detalle_fin, servicio)
+                    if not usa_capacidad:
+                        self._validar_traslapes_agenda_extendida(detalle["inicio"], detalle_fin, profesional)
                 except forms.ValidationError as exc:
                     self.add_error("detalles_agenda", exc)
                     break

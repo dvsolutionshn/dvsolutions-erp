@@ -564,6 +564,73 @@ class ClinicaPacienteTests(TestCase):
             "Faciales, masajes, hidrataciones, tratamientos esteticos no medicos",
         )
 
+    def test_dueno_erp_puede_editar_y_eliminar_servicios_clinicos(self):
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Servicio temporal",
+            categoria="tratamiento",
+            duracion_minutos=60,
+        )
+        dueno = get_user_model().objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=self.user.rol_sistema,
+        )
+        self.client.force_login(dueno)
+
+        listado = self.client.get(reverse("clinica_servicios", args=[self.empresa.slug]))
+        self.assertContains(listado, reverse("clinica_servicio_editar", args=[self.empresa.slug, servicio.id]))
+        self.assertContains(listado, reverse("clinica_servicio_eliminar", args=[self.empresa.slug, servicio.id]))
+
+        response = self.client.post(
+            reverse("clinica_servicio_editar", args=[self.empresa.slug, servicio.id]),
+            {
+                "nombre": "Servicio actualizado",
+                "categoria": "tratamiento",
+                "duracion_minutos": 45,
+                "color_calendario": "#2563eb",
+                "precio_referencia": "100.00",
+                "activo": "on",
+            },
+        )
+        self.assertRedirects(response, reverse("clinica_servicios", args=[self.empresa.slug]))
+        servicio.refresh_from_db()
+        self.assertEqual(servicio.nombre, "Servicio actualizado")
+
+        response = self.client.post(
+            reverse("clinica_servicio_eliminar", args=[self.empresa.slug, servicio.id])
+        )
+        self.assertRedirects(response, reverse("clinica_servicios", args=[self.empresa.slug]))
+        self.assertFalse(ServicioClinico.objects.filter(id=servicio.id).exists())
+
+    def test_usuario_ajeno_no_puede_editar_ni_eliminar_servicios_clinicos(self):
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Servicio protegido",
+            categoria="consulta",
+        )
+
+        response = self.client.post(
+            reverse("clinica_servicio_editar", args=[self.empresa.slug, servicio.id]),
+            {
+                "nombre": "Cambio no autorizado",
+                "categoria": "consulta",
+                "duracion_minutos": 60,
+                "precio_referencia": "0.00",
+            },
+        )
+        self.assertRedirects(response, reverse("clinica_servicios", args=[self.empresa.slug]))
+        servicio.refresh_from_db()
+        self.assertEqual(servicio.nombre, "Servicio protegido")
+
+        response = self.client.post(
+            reverse("clinica_servicio_eliminar", args=[self.empresa.slug, servicio.id])
+        )
+        self.assertRedirects(response, reverse("clinica_servicios", args=[self.empresa.slug]))
+        self.assertTrue(ServicioClinico.objects.filter(id=servicio.id).exists())
+
     def test_crear_paciente_alergico_y_mostrar_alerta_en_lista(self):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)

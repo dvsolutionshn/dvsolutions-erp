@@ -1080,6 +1080,14 @@ def _puede_administrar_catalogo_clinico(user, empresa):
     )
 
 
+def _puede_administrar_servicios_clinicos(user, empresa):
+    return bool(
+        empresa.slug == "hospital_mia"
+        and _es_dueno_erp(user)
+        and (getattr(user, "is_superuser", False) or user.puede_acceder_empresa(empresa))
+    )
+
+
 @login_required
 @require_POST
 def eliminar_paciente(request, empresa_slug, paciente_id):
@@ -2922,4 +2930,72 @@ def servicios(request, empresa_slug):
         messages.success(request, "Servicio clinico guardado correctamente.")
         return redirect("clinica_servicios", empresa_slug=empresa.slug)
     servicios_qs = ServicioClinico.objects.filter(empresa=empresa)
-    return render(request, "clinica/catalogo.html", {"empresa": empresa, "form": form, "items": servicios_qs, "titulo": "Servicios clinicos"})
+    puede_administrar = _puede_administrar_servicios_clinicos(request.user, empresa)
+    return render(
+        request,
+        "clinica/catalogo.html",
+        {
+            "empresa": empresa,
+            "form": form,
+            "items": servicios_qs,
+            "titulo": "Servicios clinicos",
+            "form_titulo": "Agregar servicio",
+            "form_descripcion": "Configura los servicios disponibles para la agenda y la atencion clinica.",
+            "puede_editar_catalogo": puede_administrar,
+            "editar_url_name": "clinica_servicio_editar",
+            "eliminar_url_name": "clinica_servicio_eliminar",
+            "cancelar_url_name": "clinica_servicios",
+        },
+    )
+
+
+@login_required
+def editar_servicio(request, empresa_slug, servicio_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    servicio = get_object_or_404(ServicioClinico, id=servicio_id, empresa=empresa)
+    if not _puede_administrar_servicios_clinicos(request.user, empresa):
+        messages.error(request, "Solo el propietario del ERP puede editar este catalogo clinico.")
+        return redirect("clinica_servicios", empresa_slug=empresa.slug)
+
+    form = ServicioClinicoForm(request.POST or None, empresa=empresa, instance=servicio)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Servicio clinico actualizado correctamente.")
+        return redirect("clinica_servicios", empresa_slug=empresa.slug)
+
+    servicios_qs = ServicioClinico.objects.filter(empresa=empresa)
+    return render(
+        request,
+        "clinica/catalogo.html",
+        {
+            "empresa": empresa,
+            "form": form,
+            "items": servicios_qs,
+            "titulo": "Servicios clinicos",
+            "form_titulo": "Editar servicio",
+            "form_descripcion": "Actualiza el nombre, categoria, duracion, color y estado del servicio seleccionado.",
+            "puede_editar_catalogo": True,
+            "editar_url_name": "clinica_servicio_editar",
+            "eliminar_url_name": "clinica_servicio_eliminar",
+            "cancelar_url_name": "clinica_servicios",
+            "objeto_editando": servicio,
+        },
+    )
+
+
+@login_required
+@require_POST
+def eliminar_servicio(request, empresa_slug, servicio_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    servicio = get_object_or_404(ServicioClinico, id=servicio_id, empresa=empresa)
+    if not _puede_administrar_servicios_clinicos(request.user, empresa):
+        messages.error(request, "Solo el propietario del ERP puede eliminar este catalogo clinico.")
+        return redirect("clinica_servicios", empresa_slug=empresa.slug)
+
+    nombre = servicio.nombre
+    servicio.delete()
+    messages.success(
+        request,
+        f"El servicio {nombre} fue eliminado del catalogo. Los registros clinicos anteriores se conservaron.",
+    )
+    return redirect("clinica_servicios", empresa_slug=empresa.slug)
