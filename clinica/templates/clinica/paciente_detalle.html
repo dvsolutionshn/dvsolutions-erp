@@ -405,6 +405,15 @@
         </div>
         <a class="erp-action-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar entrada</a>
     </div>
+    {% if empresa.slug == "hospital_mia" %}
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid #b79a7b;border-radius:12px;background:linear-gradient(135deg,#fbf6f0,#fff);flex-wrap:wrap;">
+        <div>
+            <strong style="display:block;color:#563b25;">Cámara hiperbárica · Programa de 22 sesiones</strong>
+            <span class="erp-card-muted">Consulte en una sola tabla las sesiones finalizadas, parámetros, evolución y notas de enfermería.</span>
+        </div>
+        <a class="erp-btn-secondary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Ver control completo</a>
+    </div>
+    {% endif %}
     {% if formularios_hospitalarios %}
     <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid var(--line);border-radius:12px;background:#f7fbff;flex-wrap:wrap;">
         <div>

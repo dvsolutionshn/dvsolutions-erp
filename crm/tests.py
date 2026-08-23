@@ -2089,7 +2089,7 @@ class CRMTests(TestCase):
         finally:
             ruta_imagen.unlink(missing_ok=True)
 
-    def _crear_cita_camara_para_control(self):
+    def _crear_cita_camara_para_control(self, *, sesion_servicio=0):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])
         paciente = Paciente.objects.create(
@@ -2122,8 +2122,42 @@ class CRMTests(TestCase):
             responsable=profesional.nombre,
             fecha_hora=fecha_hora,
             duracion_minutos=60,
+            sesion_servicio=sesion_servicio,
         )
         return cita
+
+    def _datos_validos_control_camara(self):
+        return {
+            "cirugia": "Procedimiento de prueba",
+            "indicacion": "Indicada por el médico tratante",
+            "programa": "20x45",
+            "orden_medica": "Orden médica registrada",
+            "numero_sesion": "1",
+            "observaciones_previas": "Paciente estable",
+            "firma_control_previo": "Enfermera responsable",
+            "presion_arterial_antes": "120/80",
+            "saturacion_oxigeno_antes": "98%",
+            "presion_camara": "2 ATA",
+            "tiempo_minutos": "45",
+            "compensacion_oidos": "Adecuada",
+            "tolerancia": "buena",
+            "presion_arterial_despues": "118/78",
+            "saturacion_oxigeno_despues": "99%",
+            "evolucion_evento_adverso": "Sin eventos adversos",
+            "firma_parametros": "Enfermera responsable",
+            "nota_enfermeria": "Sesión tolerada sin complicaciones.",
+            "firma_enfermeria": "Enfermera responsable",
+            "estado_general_estable": "si",
+            "sin_fiebre": "si",
+            "sin_dificultad_respiratoria": "si",
+            "sin_dolor_toracico": "si",
+            "sin_sintomas_neurologicos": "si",
+            "sin_dolor_oido": "si",
+            "compensa_ambos_oidos": "si",
+            "area_quirurgica_revisada": "si",
+            "seguridad_camara_verificada": "si",
+            "apto_para_sesion": "si",
+        }
 
     def test_control_camara_es_modulo_independiente_y_no_aparece_en_calendario(self):
         cita = self._crear_cita_camara_para_control()
@@ -2162,40 +2196,7 @@ class CRMTests(TestCase):
         cita = self._crear_cita_camara_para_control()
         self.client.login(username="crmuser", password="pass12345")
         url = reverse("agenda_camara_hiperbarica_guardar", args=[self.empresa.slug, cita.id])
-        respuestas = {
-            "estado_general_estable": "si",
-            "sin_fiebre": "si",
-            "sin_dificultad_respiratoria": "si",
-            "sin_dolor_toracico": "si",
-            "sin_sintomas_neurologicos": "si",
-            "sin_dolor_oido": "si",
-            "compensa_ambos_oidos": "si",
-            "area_quirurgica_revisada": "si",
-            "seguridad_camara_verificada": "si",
-            "apto_para_sesion": "si",
-        }
-        base = {
-            "cirugia": "Procedimiento de prueba",
-            "indicacion": "Indicada por el médico tratante",
-            "programa": "20x45",
-            "orden_medica": "Orden médica registrada",
-            "numero_sesion": "1",
-            "observaciones_previas": "Paciente estable",
-            "firma_control_previo": "Enfermera responsable",
-            "presion_arterial_antes": "120/80",
-            "saturacion_oxigeno_antes": "98%",
-            "presion_camara": "2 ATA",
-            "tiempo_minutos": "45",
-            "compensacion_oidos": "Adecuada",
-            "tolerancia": "buena",
-            "presion_arterial_despues": "118/78",
-            "saturacion_oxigeno_despues": "99%",
-            "evolucion_evento_adverso": "Sin eventos adversos",
-            "firma_parametros": "Enfermera responsable",
-            "nota_enfermeria": "Sesión tolerada sin complicaciones.",
-            "firma_enfermeria": "Enfermera responsable",
-            **respuestas,
-        }
+        base = self._datos_validos_control_camara()
 
         response = self.client.post(url, {**base, "accion": "borrador"})
         self.assertEqual(response.status_code, 302)
@@ -2222,3 +2223,36 @@ class CRMTests(TestCase):
         sesion.refresh_from_db()
         self.assertEqual(sesion.nota_enfermeria, "Sesión tolerada sin complicaciones.")
         self.assertEqual(sesion.estado, "finalizada")
+
+    def test_control_camara_toma_numero_de_sesion_desde_la_cita(self):
+        cita = self._crear_cita_camara_para_control(sesion_servicio=6)
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_camara_hiperbarica_guardar", args=[self.empresa.slug, cita.id])
+
+        response = self.client.post(
+            url,
+            {**self._datos_validos_control_camara(), "numero_sesion": "1", "accion": "finalizar"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        sesion = SesionCamaraHiperbarica.objects.get(cita=cita)
+        self.assertEqual(sesion.numero_sesion, 6)
+        self.assertEqual(sesion.estado, "finalizada")
+
+    def test_control_camara_con_error_conserva_datos_y_marca_pendientes(self):
+        cita = self._crear_cita_camara_para_control(sesion_servicio=4)
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_camara_hiperbarica_guardar", args=[self.empresa.slug, cita.id])
+        datos = self._datos_validos_control_camara()
+        datos["nota_enfermeria"] = "Texto clínico que debe conservarse"
+        datos["firma_enfermeria"] = ""
+        datos["accion"] = "finalizar"
+
+        response = self.client.post(url, datos)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Faltan datos para finalizar la sesión")
+        self.assertContains(response, "Texto clínico que debe conservarse")
+        self.assertContains(response, "Desde la cita")
+        self.assertContains(response, ">4<", html=False)
+        self.assertFalse(SesionCamaraHiperbarica.objects.filter(cita=cita).exists())
