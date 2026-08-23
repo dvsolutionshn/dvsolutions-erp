@@ -83,7 +83,11 @@ from .models import (
 )
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from crm.forms import PacienteRapidoCitaForm
-from crm.models import ConfiguracionCRM, OpcionServicioAgenda
+from crm.models import (
+    ConfiguracionCRM,
+    OpcionServicioAgenda,
+    ProgramaCamaraHiperbarica,
+)
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
 logger = logging.getLogger(__name__)
@@ -1995,6 +1999,57 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
+    if tipo == "camara_hiperbarica":
+        programas = list(
+            ProgramaCamaraHiperbarica.objects.filter(
+                empresa=empresa,
+                paciente=paciente,
+            )
+            .prefetch_related("sesiones__cita", "sesiones__creado_por", "sesiones__actualizado_por")
+            .order_by("-activo", "-fecha_creacion", "-id")
+        )
+        programa = None
+        programa_id = (request.GET.get("programa") or "").strip()
+        if programa_id:
+            programa = next((item for item in programas if str(item.id) == programa_id), None)
+        if programa is None and programas:
+            programa = programas[0]
+
+        sesiones = list(programa.sesiones.all()) if programa else []
+        sesiones_por_numero = {sesion.numero_sesion: sesion for sesion in sesiones}
+        tablero_sesiones = []
+        for numero in range(1, 23):
+            sesion = sesiones_por_numero.get(numero)
+            abrir_url = ""
+            if sesion and sesion.cita_id:
+                fecha_cita = timezone.localtime(sesion.cita.fecha_hora).date().isoformat()
+                abrir_url = (
+                    reverse("agenda_camara_hiperbarica", args=[empresa.slug])
+                    + f"?fecha={fecha_cita}&control_camara={sesion.cita_id}#documento-camara"
+                )
+            tablero_sesiones.append(
+                {
+                    "numero": numero,
+                    "registro": sesion,
+                    "abrir_url": abrir_url,
+                }
+            )
+
+        return render(
+            request,
+            "clinica/historia_camara_hiperbarica.html",
+            {
+                "empresa": empresa,
+                "paciente": paciente,
+                "tipo": tipo,
+                "tipo_nombre": tipos_validos[tipo],
+                "programas_camara": programas,
+                "programa_camara": programa,
+                "tablero_sesiones_camara": tablero_sesiones,
+                "sesiones_finalizadas": sum(1 for sesion in sesiones if sesion.estado == "finalizada"),
+                "sesiones_borrador": sum(1 for sesion in sesiones if sesion.estado == "borrador"),
+            },
+        )
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
     if profesional_usuario:

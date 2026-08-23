@@ -12,7 +12,13 @@ from django.utils import timezone
 from PIL import Image
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
-from crm.models import CitaCliente, ConfiguracionCRM, OpcionServicioAgenda
+from crm.models import (
+    CitaCliente,
+    ConfiguracionCRM,
+    OpcionServicioAgenda,
+    ProgramaCamaraHiperbarica,
+    SesionCamaraHiperbarica,
+)
 from facturacion.models import Cliente, Producto
 from .forms import PreconsultaClinicaPublicaForm
 from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
@@ -1266,6 +1272,56 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.estado, "finalizada")
         self.assertIn("Caida de cabello actualizada", historia.plan_tratamiento)
         self.assertEqual(historia.actualizado_por, self.user)
+
+    def test_historia_camara_muestra_cuadro_longitudinal_de_22_sesiones(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-HBO-001",
+            primer_nombre="Sofia",
+            primer_apellido="Mendez",
+            nombre="Sofia Mendez",
+            identidad="0801199500911",
+        )
+        programa = ProgramaCamaraHiperbarica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            cirugia="Cirugía reconstructiva",
+            programa="20x45",
+            indicacion="Control postoperatorio",
+            creado_por=self.user,
+        )
+        SesionCamaraHiperbarica.objects.create(
+            programa=programa,
+            empresa=self.empresa,
+            paciente=paciente,
+            numero_sesion=1,
+            estado_general_estable="si",
+            sin_fiebre="si",
+            apto_para_sesion="si",
+            presion_arterial_antes="120/80",
+            tolerancia="buena",
+            nota_enfermeria="Sesión tolerada sin complicaciones.",
+            firma_enfermeria="Lic. Enfermería",
+            estado="finalizada",
+            creado_por=self.user,
+        )
+
+        response = self.client.get(
+            reverse(
+                "clinica_crear_historia_especialidad",
+                args=[self.empresa.slug, paciente.id, "camara_hiperbarica"],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "clinica/historia_camara_hiperbarica.html")
+        self.assertContains(response, "Programa longitudinal de 22 sesiones")
+        self.assertContains(response, "Checklist antes de la sesión")
+        self.assertContains(response, "Sesión tolerada sin complicaciones")
+        self.assertContains(response, "Cirugía reconstructiva")
+        self.assertEqual(len(response.context["tablero_sesiones_camara"]), 22)
+        self.assertEqual(response.context["sesiones_finalizadas"], 1)
+        self.assertFalse(HistoriaClinicaEspecialidad.objects.filter(paciente=paciente).exists())
 
     def test_medicina_estetica_guarda_formulario_estructurado(self):
         paciente = Paciente.objects.create(

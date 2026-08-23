@@ -1,0 +1,72 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Historia de Cámara Hiperbárica - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Control clínico de Cámara Hiperbárica{% endblock %}
+{% block header_description %}Programa longitudinal de 22 sesiones integrado directamente al expediente del paciente.{% endblock %}
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'agenda_camara_hiperbarica' empresa.slug %}">Abrir módulo de atención</a>
+<a class="erp-action-link" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver al historial</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.hbo-history{display:grid;gap:16px}.hbo-patient{display:grid;grid-template-columns:1.5fr repeat(3,minmax(150px,.55fr));gap:1px;overflow:hidden;border:1px solid #cbdde9;border-radius:18px;background:#d9e6ef}.hbo-patient>div{padding:14px 16px;background:#fff}.hbo-label{display:block;color:#60768a;font-size:8px;font-weight:950;letter-spacing:.09em;text-transform:uppercase}.hbo-value{display:block;margin-top:4px;color:#10283d;font-size:13px;font-weight:900}.hbo-program-bar{display:grid;grid-template-columns:minmax(280px,1fr) auto;gap:14px;align-items:end;padding:15px;border:1px solid #cbdde9;border-radius:18px;background:linear-gradient(135deg,#fff,#f5faff)}.hbo-program-select{display:grid;gap:5px}.hbo-program-select select{min-height:42px;border:1px solid #bfd3e2;border-radius:11px;padding:0 11px;background:#fff;color:#173047;font-weight:800}.hbo-program-stats{display:flex;gap:8px;flex-wrap:wrap}.hbo-stat{min-width:112px;padding:9px 12px;border-radius:12px;background:#eef5fa;color:#31536e}.hbo-stat strong,.hbo-stat span{display:block}.hbo-stat strong{font-size:17px}.hbo-stat span{font-size:8px;font-weight:900;text-transform:uppercase}.hbo-course{display:grid;grid-template-columns:1.1fr .65fr .8fr 1.5fr;gap:1px;overflow:hidden;border:1px solid #cbdde9;border-radius:16px;background:#dce7ef}.hbo-course>div{padding:11px 13px;background:#fff}.hbo-empty{padding:22px;border:1px dashed #bfd3e2;border-radius:16px;background:#fff;color:#64798c;text-align:center}.hbo-sheet{overflow:hidden;border:1px solid #c7d9e6;border-radius:18px;background:#fff;box-shadow:0 16px 38px rgba(22,49,72,.08)}.hbo-sheet-head{padding:14px 16px;border-bottom:1px solid #d9e5ed;text-align:center;background:linear-gradient(135deg,#f7fbfe,#fff)}.hbo-sheet-head h2{margin:0;color:#13283c;font-size:16px;text-transform:uppercase}.hbo-sheet-head p{margin:4px 0 0;color:#65798b;font-size:9px}.hbo-table-wrap{overflow:auto}.hbo-table{width:100%;min-width:1780px;border-collapse:collapse;table-layout:fixed}.hbo-table.parameters{min-width:1600px}.hbo-table.notes{min-width:900px}.hbo-table th{padding:8px 6px;border-right:1px solid #aab4bc;border-bottom:1px solid #8e989f;background:#eceff1;color:#162838;font-size:8px;line-height:1.25;text-align:center}.hbo-table td{padding:7px 6px;border-right:1px solid #c2ccd3;border-bottom:1px solid #dbe3e8;color:#243a4c;font-size:9px;line-height:1.35;vertical-align:top;text-align:center;word-break:break-word}.hbo-table tr:last-child td{border-bottom:0}.hbo-table th:last-child,.hbo-table td:last-child{border-right:0}.hbo-table tr.is-finalized td{background:#f2fbf7}.hbo-table tr.is-draft td{background:#fffbef}.hbo-session-number{display:grid;place-items:center;width:28px;height:28px;margin:auto;border-radius:50%;background:#e9f2f8;color:#31536e;font-weight:950}.hbo-status{display:inline-flex;margin-top:4px;padding:4px 7px;border-radius:999px;background:#edf3f7;color:#5d7284;font-size:7px;font-weight:950;text-transform:uppercase}.hbo-status.finalized{background:#dff5eb;color:#137052}.hbo-status.draft{background:#fff0c9;color:#8a6510}.hbo-answer{display:inline-flex;min-width:27px;justify-content:center;padding:3px 5px;border-radius:6px;background:#edf4f8;font-weight:900}.hbo-answer.yes{background:#daf4e8;color:#126c4e}.hbo-answer.no{background:#fde8e8;color:#a33131}.hbo-open{display:inline-flex;margin-top:5px;padding:5px 7px;border:1px solid #bfd3e2;border-radius:7px;color:#0b817d;text-decoration:none;font-size:7px;font-weight:950}.hbo-blank{color:#a7b3bd}.hbo-text{text-align:left!important}.hbo-help{padding:12px 15px;border:1px solid #b9dfd4;border-radius:14px;background:#effaf6;color:#236854;font-size:10px}@media(max-width:1000px){.hbo-patient{grid-template-columns:1fr 1fr}.hbo-course{grid-template-columns:1fr 1fr}}@media(max-width:650px){.hbo-patient,.hbo-course,.hbo-program-bar{grid-template-columns:1fr}.hbo-program-stats{display:grid;grid-template-columns:1fr 1fr}.hbo-stat{min-width:0}}
+.hbo-answer.si{background:#daf4e8;color:#126c4e}
+</style>
+
+<div class="hbo-history">
+  <section class="hbo-patient">
+    <div><span class="hbo-label">Paciente</span><strong class="hbo-value">{{ paciente.nombre }}</strong></div>
+    <div><span class="hbo-label">Expediente</span><strong class="hbo-value">{{ paciente.expediente_codigo }}</strong></div>
+    <div><span class="hbo-label">Identidad</span><strong class="hbo-value">{{ paciente.identidad|default:"No registrada" }}</strong></div>
+    <div><span class="hbo-label">Teléfono</span><strong class="hbo-value">{{ paciente.telefono|default:paciente.whatsapp|default:"No registrado" }}</strong></div>
+  </section>
+
+  <section class="hbo-program-bar">
+    <form class="hbo-program-select" method="get">
+      <label class="hbo-label" for="programa-camara">Programa clínico</label>
+      <select id="programa-camara" name="programa" onchange="this.form.submit()">
+        {% if not programas_camara %}<option value="">Sin programa registrado</option>{% endif %}
+        {% for programa in programas_camara %}<option value="{{ programa.id }}" {% if programa_camara.id == programa.id %}selected{% endif %}>{{ programa.get_programa_display|default:"Programa por definir" }} · {{ programa.fecha_creacion|date:"d/m/Y" }}{% if programa.activo %} · Activo{% endif %}</option>{% endfor %}
+      </select>
+    </form>
+    <div class="hbo-program-stats"><div class="hbo-stat"><strong>{{ sesiones_finalizadas }}</strong><span>Finalizadas</span></div><div class="hbo-stat"><strong>{{ sesiones_borrador }}</strong><span>Borradores</span></div><div class="hbo-stat"><strong>22</strong><span>Sesiones</span></div></div>
+  </section>
+
+  {% if programa_camara %}
+  <section class="hbo-course">
+    <div><span class="hbo-label">Cirugía / procedimiento</span><strong class="hbo-value">{{ programa_camara.cirugia|default:"No especificado" }}</strong></div>
+    <div><span class="hbo-label">Fecha de cirugía</span><strong class="hbo-value">{{ programa_camara.fecha_cirugia|date:"d/m/Y"|default:"No registrada" }}</strong></div>
+    <div><span class="hbo-label">Programa</span><strong class="hbo-value">{{ programa_camara.get_programa_display|default:programa_camara.programa_otro|default:"Por definir" }}</strong></div>
+    <div><span class="hbo-label">Indicación / orden médica</span><strong class="hbo-value">{{ programa_camara.indicacion|default:programa_camara.orden_medica|default:"No registrada" }}</strong></div>
+  </section>
+  {% else %}<div class="hbo-empty">Este paciente aún no tiene sesiones de Cámara Hiperbárica registradas. Al finalizar la primera sesión desde el módulo de atención, aparecerá automáticamente en este expediente.</div>{% endif %}
+
+  <div class="hbo-help">Las sesiones se registran durante la atención en el módulo de Cámara Hiperbárica. Este expediente se actualiza automáticamente y conserva bloqueadas las sesiones finalizadas.</div>
+
+  <section class="hbo-sheet">
+    <header class="hbo-sheet-head"><h2>1. Checklist antes de la sesión · Sesiones 1 a 22</h2><p>Control previo de seguridad registrado por sesión.</p></header>
+    <div class="hbo-table-wrap"><table class="hbo-table"><colgroup><col style="width:64px"><col style="width:92px"><col span="10" style="width:108px"><col style="width:210px"><col style="width:150px"></colgroup><thead><tr><th>Sesión</th><th>Fecha</th><th>Estado general estable</th><th>Sin fiebre</th><th>Sin dificultad respiratoria</th><th>Sin dolor en el pecho</th><th>Sin síntomas neurológicos</th><th>Sin dolor de oído</th><th>Compensa ambos oídos</th><th>Área quirúrgica revisada</th><th>Seguridad de cámara verificada</th><th>Apto para la sesión</th><th>Observaciones</th><th>Firma</th></tr></thead><tbody>
+      {% for item in tablero_sesiones_camara %}{% with r=item.registro %}<tr class="{% if r.estado == 'finalizada' %}is-finalized{% elif r %}is-draft{% endif %}">
+        <td><span class="hbo-session-number">{{ item.numero }}</span>{% if r %}<span class="hbo-status {% if r.estado == 'finalizada' %}finalized{% else %}draft{% endif %}">{{ r.get_estado_display }}</span>{% if item.abrir_url %}<a class="hbo-open" href="{{ item.abrir_url }}">Abrir</a>{% endif %}{% endif %}</td><td>{% if r %}{{ r.fecha_sesion|date:"d/m/Y" }}{% else %}<span class="hbo-blank">—</span>{% endif %}</td>
+        <td>{% if r %}<span class="hbo-answer {{ r.estado_general_estable }}">{{ r.get_estado_general_estable_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.sin_fiebre }}">{{ r.get_sin_fiebre_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.sin_dificultad_respiratoria }}">{{ r.get_sin_dificultad_respiratoria_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.sin_dolor_toracico }}">{{ r.get_sin_dolor_toracico_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.sin_sintomas_neurologicos }}">{{ r.get_sin_sintomas_neurologicos_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.sin_dolor_oido }}">{{ r.get_sin_dolor_oido_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.compensa_ambos_oidos }}">{{ r.get_compensa_ambos_oidos_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.area_quirurgica_revisada }}">{{ r.get_area_quirurgica_revisada_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.seguridad_camara_verificada }}">{{ r.get_seguridad_camara_verificada_display|default:"—" }}</span>{% else %}—{% endif %}</td><td>{% if r %}<span class="hbo-answer {{ r.apto_para_sesion }}">{{ r.get_apto_para_sesion_display|default:"—" }}</span>{% else %}—{% endif %}</td><td class="hbo-text">{{ r.observaciones_previas|default:"—" }}</td><td>{{ r.firma_control_previo|default:"—" }}</td>
+      </tr>{% endwith %}{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="hbo-sheet">
+    <header class="hbo-sheet-head"><h2>2. Parámetros de la sesión y evolución</h2><p>Signos vitales, parámetros de cámara y respuesta clínica.</p></header>
+    <div class="hbo-table-wrap"><table class="hbo-table parameters"><colgroup><col style="width:64px"><col style="width:92px"><col style="width:78px"><col span="8" style="width:120px"><col style="width:230px"><col style="width:150px"></colgroup><thead><tr><th>Sesión</th><th>Fecha</th><th>Hora</th><th>Presión arterial antes</th><th>Saturación de oxígeno antes</th><th>Presión de cámara</th><th>Minutos</th><th>Compensación de oídos</th><th>Tolerancia</th><th>Presión arterial después</th><th>Saturación de oxígeno después</th><th>Evolución o evento adverso</th><th>Firma</th></tr></thead><tbody>
+      {% for item in tablero_sesiones_camara %}{% with r=item.registro %}<tr class="{% if r.estado == 'finalizada' %}is-finalized{% elif r %}is-draft{% endif %}"><td><span class="hbo-session-number">{{ item.numero }}</span></td><td>{{ r.fecha_sesion|date:"d/m/Y"|default:"—" }}</td><td>{{ r.fecha_sesion|date:"h:i A"|default:"—" }}</td><td>{{ r.presion_arterial_antes|default:"—" }}</td><td>{{ r.saturacion_oxigeno_antes|default:"—" }}</td><td>{{ r.presion_camara|default:"—" }}</td><td>{{ r.tiempo_minutos|default:"—" }}</td><td>{{ r.compensacion_oidos|default:"—" }}</td><td>{{ r.get_tolerancia_display|default:"—" }}</td><td>{{ r.presion_arterial_despues|default:"—" }}</td><td>{{ r.saturacion_oxigeno_despues|default:"—" }}</td><td class="hbo-text">{{ r.evolucion_evento_adverso|default:"—" }}</td><td>{{ r.firma_parametros|default:"—" }}</td></tr>{% endwith %}{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="hbo-sheet">
+    <header class="hbo-sheet-head"><h2>3. Notas de enfermería</h2><p>Bitácora cronológica de las 22 sesiones.</p></header>
+    <div class="hbo-table-wrap"><table class="hbo-table notes"><colgroup><col style="width:72px"><col style="width:105px"><col><col style="width:190px"><col style="width:110px"></colgroup><thead><tr><th>Sesión</th><th>Fecha</th><th>Nota de enfermería</th><th>Firma</th><th>Estado</th></tr></thead><tbody>
+      {% for item in tablero_sesiones_camara %}{% with r=item.registro %}<tr class="{% if r.estado == 'finalizada' %}is-finalized{% elif r %}is-draft{% endif %}"><td><span class="hbo-session-number">{{ item.numero }}</span></td><td>{{ r.fecha_sesion|date:"d/m/Y"|default:"—" }}</td><td class="hbo-text">{{ r.nota_enfermeria|default:"—" }}</td><td>{{ r.firma_enfermeria|default:"—" }}</td><td>{% if r %}<span class="hbo-status {% if r.estado == 'finalizada' %}finalized{% else %}draft{% endif %}">{{ r.get_estado_display }}</span>{% else %}<span class="hbo-blank">Sin registrar</span>{% endif %}</td></tr>{% endwith %}{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endblock %}

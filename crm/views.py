@@ -201,7 +201,7 @@ def _contexto_control_camara_hyperbarica(empresa, request, fecha_seleccionada):
         )
         if programa:
             historial = list(
-                programa.sesiones.select_related("creado_por", "actualizado_por").order_by("numero_sesion")
+                programa.sesiones.select_related("cita", "creado_por", "actualizado_por").order_by("numero_sesion")
             )
         numeros_usados = {registro.numero_sesion for registro in historial}
         sugerido = cita_control.sesion_servicio if 1 <= (cita_control.sesion_servicio or 0) <= 22 else None
