@@ -3152,6 +3152,7 @@ def inventario_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     mostrar_costo_real = _empresa_muestra_costo_real_inventario(empresa)
     q = (request.GET.get("q") or "").strip()
+    estado_inventario = (request.GET.get("estado") or "").strip().lower()
     if request.method == "POST" and request.POST.get("accion") == "actualizar_costo_real":
         if not mostrar_costo_real:
             messages.error(request, "El costo real de inventario no esta habilitado para esta empresa.")
@@ -3180,22 +3181,15 @@ def inventario_facturacion(request, empresa_slug):
         messages.success(request, f"Costo real actualizado para {producto.nombre}.")
         return redirect(f"{reverse('inventario_facturacion', args=[empresa.slug])}?producto={producto.id}")
 
-    productos = Producto.objects.filter(
+    productos_base = Producto.objects.filter(
         empresa=empresa,
         controla_inventario=True,
         eliminado=False,
     ).select_related('impuesto_predeterminado').order_by('nombre')
-    if q:
-        productos = productos.filter(
-            Q(nombre__icontains=q) |
-            Q(codigo__icontains=q) |
-            Q(descripcion__icontains=q)
-        )
-
-    for producto in productos:
+    for producto in productos_base:
         _obtener_inventario_producto(producto)
 
-    productos = Producto.objects.filter(
+    productos_todos = Producto.objects.filter(
         empresa=empresa,
         controla_inventario=True,
         eliminado=False,
@@ -3206,12 +3200,17 @@ def inventario_facturacion(request, empresa_slug):
             to_attr='historial_costos_recientes',
         )
     ).order_by('nombre')
+    productos = productos_todos
     if q:
         productos = productos.filter(
             Q(nombre__icontains=q) |
             Q(codigo__icontains=q) |
             Q(descripcion__icontains=q)
         )
+    if estado_inventario == "alerta":
+        productos = productos.filter(inventario__existencias__lte=F("inventario__stock_minimo"))
+    elif estado_inventario == "agotados":
+        productos = productos.filter(inventario__existencias__lte=0)
 
     producto_id = request.GET.get('producto')
     producto_seleccionado = None
@@ -3229,20 +3228,20 @@ def inventario_facturacion(request, empresa_slug):
             movimientos = None
 
     resumen = {
-        'productos_controlados': productos.count(),
-        'stock_total': sum((p.stock_actual for p in productos), Decimal('0.00')),
+        'productos_controlados': productos_todos.count(),
+        'stock_total': sum((p.stock_actual for p in productos_todos), Decimal('0.00')),
         'con_alerta': sum(
-            1 for p in productos
+            1 for p in productos_todos
             if hasattr(p, 'inventario') and p.inventario.existencias <= p.inventario.stock_minimo
         ),
         'agotados': sum(
-            1 for p in productos
+            1 for p in productos_todos
             if hasattr(p, 'inventario') and p.inventario.existencias <= 0
         ),
         'movimientos': MovimientoInventario.objects.filter(empresa=empresa).count(),
     }
     productos_alerta = [
-        p for p in productos
+        p for p in productos_todos
         if hasattr(p, 'inventario') and p.inventario.existencias <= p.inventario.stock_minimo
     ][:8]
     productos = _anotar_existencias_por_bodega(productos, empresa)
@@ -3256,6 +3255,7 @@ def inventario_facturacion(request, empresa_slug):
         "productos_alerta": productos_alerta,
         "mostrar_costo_real_inventario": mostrar_costo_real,
         "q": q,
+        "estado_inventario": estado_inventario,
         "productos_sugeridos": Producto.objects.filter(
             empresa=empresa,
             controla_inventario=True,

@@ -83,7 +83,7 @@ from .models import (
 )
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
 from crm.forms import PacienteRapidoCitaForm
-from crm.models import ConfiguracionCRM
+from crm.models import ConfiguracionCRM, OpcionServicioAgenda
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
 logger = logging.getLogger(__name__)
@@ -2836,8 +2836,90 @@ def editar_plantilla_receta(request, empresa_slug, plantilla_id):
 @login_required
 def tratamientos(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    puede_administrar_catalogo = _puede_administrar_catalogo_clinico(request.user, empresa)
+    if request.method == "POST" and request.POST.get("accion") == "crear_opcion_agenda":
+        if not puede_administrar_catalogo:
+            messages.error(request, "Solo administradores de la empresa pueden administrar este catálogo.")
+            return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
+        nombre = " ".join((request.POST.get("nombre") or "").split())
+        if len(nombre) < 3 or len(nombre) > 180:
+            messages.error(request, "Escriba un nombre de tratamiento entre 3 y 180 caracteres.")
+        elif OpcionServicioAgenda.objects.filter(
+            empresa=empresa,
+            categoria="tratamientos",
+            nombre__iexact=nombre,
+        ).exists():
+            messages.warning(request, "Ese tratamiento ya existe en el catálogo de citas.")
+        else:
+            OpcionServicioAgenda.objects.create(
+                empresa=empresa,
+                categoria="tratamientos",
+                nombre=nombre,
+                creado_por=request.user,
+            )
+            messages.success(request, f"{nombre} fue agregado al catálogo de citas.")
+        return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
+
     tratamientos_qs = TratamientoPaciente.objects.filter(empresa=empresa).select_related("paciente", "profesional", "servicio")
-    return render(request, "clinica/tratamientos.html", {"empresa": empresa, "tratamientos": tratamientos_qs})
+    opciones_agenda = OpcionServicioAgenda.objects.filter(
+        empresa=empresa,
+        categoria="tratamientos",
+    ).select_related("creado_por").order_by("orden", "nombre")
+    return render(request, "clinica/tratamientos.html", {
+        "empresa": empresa,
+        "tratamientos": tratamientos_qs,
+        "opciones_agenda": opciones_agenda,
+        "puede_administrar_catalogo": puede_administrar_catalogo,
+    })
+
+
+@login_required
+@require_POST
+def editar_opcion_tratamiento_agenda(request, empresa_slug, opcion_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not _puede_administrar_catalogo_clinico(request.user, empresa):
+        messages.error(request, "Solo administradores de la empresa pueden editar este catálogo.")
+        return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
+    opcion = get_object_or_404(
+        OpcionServicioAgenda,
+        id=opcion_id,
+        empresa=empresa,
+        categoria="tratamientos",
+    )
+    nombre = " ".join((request.POST.get("nombre") or "").split())
+    if len(nombre) < 3 or len(nombre) > 180:
+        messages.error(request, "Escriba un nombre de tratamiento entre 3 y 180 caracteres.")
+    elif OpcionServicioAgenda.objects.filter(
+        empresa=empresa,
+        categoria="tratamientos",
+        nombre__iexact=nombre,
+    ).exclude(id=opcion.id).exists():
+        messages.error(request, "Ya existe otro tratamiento con ese nombre.")
+    else:
+        opcion.nombre = nombre
+        opcion.activo = request.POST.get("activo") == "on"
+        opcion.save(update_fields=["nombre", "activo"])
+        messages.success(request, "Tratamiento actualizado correctamente.")
+    return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
+
+
+@login_required
+@require_POST
+def eliminar_opcion_tratamiento_agenda(request, empresa_slug, opcion_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not _puede_administrar_catalogo_clinico(request.user, empresa):
+        messages.error(request, "Solo administradores de la empresa pueden eliminar este catálogo.")
+        return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
+    opcion = get_object_or_404(
+        OpcionServicioAgenda,
+        id=opcion_id,
+        empresa=empresa,
+        categoria="tratamientos",
+    )
+    nombre = opcion.nombre
+    opcion.delete()
+    messages.success(request, f"{nombre} fue eliminado del catálogo de citas.")
+    return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
 
 
 @login_required

@@ -12,7 +12,7 @@ from django.utils import timezone
 from PIL import Image
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
-from crm.models import CitaCliente, ConfiguracionCRM
+from crm.models import CitaCliente, ConfiguracionCRM, OpcionServicioAgenda
 from facturacion.models import Cliente, Producto
 from .forms import PreconsultaClinicaPublicaForm
 from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
@@ -563,6 +563,43 @@ class ClinicaPacienteTests(TestCase):
             response,
             "Faciales, masajes, hidrataciones, tratamientos esteticos no medicos",
         )
+
+    def test_catalogo_tratamientos_de_citas_se_administra_desde_clinica(self):
+        self.user.es_administrador_empresa = True
+        self.user.save(update_fields=["es_administrador_empresa"])
+
+        response = self.client.post(
+            reverse("clinica_tratamientos", args=[self.empresa.slug]),
+            {"accion": "crear_opcion_agenda", "nombre": "Terapia intravenosa"},
+        )
+        self.assertRedirects(response, reverse("clinica_tratamientos", args=[self.empresa.slug]))
+        opcion = OpcionServicioAgenda.objects.get(
+            empresa=self.empresa,
+            categoria="tratamientos",
+            nombre="Terapia intravenosa",
+        )
+
+        listado = self.client.get(reverse("clinica_tratamientos", args=[self.empresa.slug]))
+        self.assertContains(listado, "Terapia intravenosa")
+        self.assertContains(
+            listado,
+            reverse("clinica_tratamiento_agenda_editar", args=[self.empresa.slug, opcion.id]),
+        )
+
+        response = self.client.post(
+            reverse("clinica_tratamiento_agenda_editar", args=[self.empresa.slug, opcion.id]),
+            {"nombre": "Terapia intravenosa premium"},
+        )
+        self.assertRedirects(response, reverse("clinica_tratamientos", args=[self.empresa.slug]))
+        opcion.refresh_from_db()
+        self.assertEqual(opcion.nombre, "Terapia intravenosa premium")
+        self.assertFalse(opcion.activo)
+
+        response = self.client.post(
+            reverse("clinica_tratamiento_agenda_eliminar", args=[self.empresa.slug, opcion.id]),
+        )
+        self.assertRedirects(response, reverse("clinica_tratamientos", args=[self.empresa.slug]))
+        self.assertFalse(OpcionServicioAgenda.objects.filter(id=opcion.id).exists())
 
     def test_dueno_erp_puede_editar_y_eliminar_servicios_clinicos(self):
         servicio = ServicioClinico.objects.create(

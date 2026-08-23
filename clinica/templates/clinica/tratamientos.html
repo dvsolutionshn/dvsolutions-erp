@@ -1,31 +1,38 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Tratamientos - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Plan Clinico{% endblock %}
+{% block header_kicker %}Catálogo clínico{% endblock %}
 {% block header_title %}Tratamientos{% endblock %}
-{% block header_description %}Seguimiento de procedimientos, planes esteticos, cirugias y controles postoperatorios.{% endblock %}
-{% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Nuevo tratamiento</a>{% endblock %}
+{% block header_description %}Administra las opciones que aparecen al crear citas y consulta los tratamientos asignados a pacientes.{% endblock %}
+{% block topbar_actions %}<a class="erp-btn" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Nuevo tratamiento para paciente</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+.treatment-catalog{display:grid;grid-template-columns:minmax(300px,.72fr) minmax(0,1.55fr);gap:18px;align-items:start}.treatment-intro{padding:24px;background:radial-gradient(circle at 100% 0,rgba(45,212,191,.16),transparent 40%),linear-gradient(145deg,#102b3d,#16475a);color:#fff}.treatment-intro h2{margin:7px 0 8px;font-size:24px}.treatment-intro p{margin:0;color:#d5e8ef;line-height:1.6}.treatment-kicker{font-size:10px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;color:#62e4d6}.treatment-create{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:22px}.treatment-create input,.treatment-row input[type=text]{width:100%;box-sizing:border-box;border:1px solid #c8d9e7;border-radius:12px;background:#fff;padding:11px 13px;color:#173047}.treatment-create button,.treatment-save{border:0;border-radius:12px;background:linear-gradient(135deg,#17b7a8,#2877ea);color:#fff;padding:11px 16px;font-weight:900;cursor:pointer}.treatment-list{padding:20px}.treatment-list-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.treatment-list-head h2{margin:0;color:#142b3e;font-size:19px}.treatment-count{padding:7px 10px;border-radius:999px;background:#e8f5f3;color:#08756d;font-size:11px;font-weight:900}.treatment-rows{display:grid;gap:10px}.treatment-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:11px;border:1px solid #d7e4ed;border-radius:15px;background:#fbfdff}.treatment-status{display:flex;align-items:center;gap:7px;color:#536b7f;font-size:11px;font-weight:850;white-space:nowrap}.treatment-status input{width:18px;height:18px;accent-color:#13a696}.treatment-actions{display:flex;gap:7px}.treatment-delete{border:1px solid #efc3c3;border-radius:11px;background:#fff7f7;color:#b42318;padding:10px 12px;font-weight:900;cursor:pointer}.treatment-empty{padding:28px;border:1px dashed #cbdbe7;border-radius:15px;text-align:center;color:#687f92}.patient-treatments{margin-top:18px}.patient-treatments h2{margin:0 0 6px;color:#142b3e}.treatment-note{margin-top:12px;padding:12px;border:1px solid rgba(255,255,255,.2);border-radius:13px;background:rgba(255,255,255,.08);font-size:11px;color:#d6edf1}.erp-table-wrap{overflow:auto}@media(max-width:900px){.treatment-catalog{grid-template-columns:1fr}.treatment-row{grid-template-columns:1fr}.treatment-actions{justify-content:flex-end}.treatment-create{grid-template-columns:1fr}}
+.treatment-row{grid-template-columns:minmax(0,1fr) auto auto auto}
+@media(max-width:900px){.treatment-row{grid-template-columns:1fr}}
+</style>
+{% endblock %}
 
 {% block content %}
-<section class="erp-card">
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead><tr><th>Paciente</th><th>Tratamiento</th><th>Profesional</th><th>Inicio</th><th>Estado</th><th>Monto estimado</th></tr></thead>
-            <tbody>
-                {% for tratamiento in tratamientos %}
-                <tr>
-                    <td><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug tratamiento.paciente.id %}">{{ tratamiento.paciente.nombre }}</a></td>
-                    <td>{{ tratamiento.nombre }}</td>
-                    <td>{{ tratamiento.profesional.nombre|default:"-" }}</td>
-                    <td>{{ tratamiento.fecha_inicio|date:"d/m/Y" }}</td>
-                    <td>{{ tratamiento.get_estado_display }}</td>
-                    <td>L. {{ tratamiento.monto_estimado }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty">No hay tratamientos registrados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<section class="treatment-catalog">
+  <article class="erp-card treatment-intro">
+    <span class="treatment-kicker">Agenda y atención</span><h2>Catálogo de tratamientos para citas</h2>
+    <p>Todo tratamiento creado desde el calendario aparece aquí. Los cambios se reflejan automáticamente al programar nuevas citas.</p>
+    {% if puede_administrar_catalogo %}<form method="post" class="treatment-create">{% csrf_token %}<input type="hidden" name="accion" value="crear_opcion_agenda"><input type="text" name="nombre" maxlength="180" placeholder="Nombre del nuevo tratamiento" required><button type="submit">Agregar</button></form>{% else %}<div class="treatment-note">El catálogo puede ser administrado por los administradores autorizados de la empresa.</div>{% endif %}
+  </article>
+  <article class="erp-card treatment-list">
+    <div class="treatment-list-head"><div><span class="treatment-kicker" style="color:#168b82">Opciones disponibles</span><h2>Tratamientos creados en citas</h2></div><span class="treatment-count">{{ opciones_agenda|length }} registros</span></div>
+    <div class="treatment-rows">
+      {% for opcion in opciones_agenda %}<div class="treatment-row">
+        {% if puede_administrar_catalogo %}
+        <form method="post" action="{% url 'clinica_tratamiento_agenda_editar' empresa.slug opcion.id %}" style="display:contents">{% csrf_token %}<input type="text" name="nombre" value="{{ opcion.nombre }}" maxlength="180" aria-label="Nombre del tratamiento" required><label class="treatment-status"><input type="checkbox" name="activo" {% if opcion.activo %}checked{% endif %}> Activo</label><div class="treatment-actions"><button class="treatment-save" type="submit">Guardar</button></div></form>
+        <form method="post" action="{% url 'clinica_tratamiento_agenda_eliminar' empresa.slug opcion.id %}" onsubmit="return confirm('¿Eliminar {{ opcion.nombre|escapejs }} del catálogo de citas?');">{% csrf_token %}<button class="treatment-delete" type="submit">Eliminar</button></form>
+        {% else %}<strong>{{ opcion.nombre }}</strong><span class="treatment-status">{% if opcion.activo %}Activo{% else %}Inactivo{% endif %}</span><span></span>{% endif %}
+      </div>{% empty %}<div class="treatment-empty">Todavía no hay tratamientos creados desde citas.</div>{% endfor %}
     </div>
+  </article>
 </section>
+
+<section class="erp-card patient-treatments"><div class="erp-toolbar"><div><span class="treatment-kicker" style="color:#168b82">Seguimiento clínico</span><h2>Tratamientos asignados a pacientes</h2><p class="erp-card-muted">Planes y procedimientos vinculados directamente a un expediente.</p></div></div><div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Paciente</th><th>Tratamiento</th><th>Profesional</th><th>Inicio</th><th>Estado</th><th>Monto estimado</th></tr></thead><tbody>{% for tratamiento in tratamientos %}<tr><td><a class="erp-inline-link" href="{% url 'clinica_paciente_detalle' empresa.slug tratamiento.paciente.id %}">{{ tratamiento.paciente.nombre }}</a></td><td>{{ tratamiento.nombre }}</td><td>{{ tratamiento.profesional.nombre|default:"-" }}</td><td>{{ tratamiento.fecha_inicio|date:"d/m/Y" }}</td><td>{{ tratamiento.get_estado_display }}</td><td>L. {{ tratamiento.monto_estimado }}</td></tr>{% empty %}<tr><td colspan="6" class="erp-empty">No hay tratamientos asignados a pacientes.</td></tr>{% endfor %}</tbody></table></div></section>
 {% endblock %}

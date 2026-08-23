@@ -24,6 +24,11 @@
 .erp-inventory-table{
     min-width:1480px;
 }
+.erp-inventory-kpi-link{display:block;color:inherit;text-decoration:none;border-radius:22px;transition:transform .2s ease,box-shadow .2s ease}
+.erp-inventory-kpi-link:hover,.erp-inventory-kpi-link:focus{outline:0;transform:translateY(-4px);box-shadow:0 20px 42px rgba(16,35,56,.13)}
+.erp-inventory-kpi-link .erp-card{height:100%;box-sizing:border-box;transition:border-color .2s ease,background .2s ease}
+.erp-inventory-kpi-link:hover .erp-card,.erp-inventory-kpi-link:focus .erp-card{border-color:rgba(20,184,166,.42);background:linear-gradient(145deg,#fff,#f0fbfa)}
+.erp-inventory-kpi-link.is-active .erp-card{border-color:#16a89c;box-shadow:inset 0 0 0 1px rgba(22,168,156,.18);background:linear-gradient(145deg,#f0fbfa,#fff)}
 .erp-stock-critical{
     color:#b42318;
     font-weight:700;
@@ -122,31 +127,31 @@
 
 {% block content %}
 <section class="erp-inventory-kpis">
-    <article class="erp-card">
+    <a class="erp-inventory-kpi-link {% if not estado_inventario %}is-active{% endif %}" href="{% url 'inventario_facturacion' empresa.slug %}#existencias-inventario" aria-label="Ver todos los productos controlados"><article class="erp-card">
         <div class="erp-kpi-label">Productos Controlados</div>
         <div class="erp-stat-value">{{ resumen.productos_controlados }}</div>
         <p class="erp-card-muted">Items físicos con seguimiento de existencias.</p>
-    </article>
-    <article class="erp-card">
+    </article></a>
+    <a class="erp-inventory-kpi-link" href="{% url 'inventario_facturacion' empresa.slug %}#existencias-inventario" aria-label="Ver el inventario completo"><article class="erp-card">
         <div class="erp-kpi-label">Stock Total</div>
         <div class="erp-stat-value">{{ resumen.stock_total|floatformat:2|intcomma }}</div>
         <p class="erp-card-muted">Suma global de unidades disponibles.</p>
-    </article>
-    <article class="erp-card">
+    </article></a>
+    <a class="erp-inventory-kpi-link {% if estado_inventario == 'alerta' %}is-active{% endif %}" href="{% url 'inventario_facturacion' empresa.slug %}?estado=alerta#existencias-inventario" aria-label="Ver productos con alerta"><article class="erp-card">
         <div class="erp-kpi-label">Con Alerta</div>
         <div class="erp-stat-value">{{ resumen.con_alerta }}</div>
         <p class="erp-card-muted">Productos en o por debajo del mínimo esperado.</p>
-    </article>
-    <article class="erp-card">
+    </article></a>
+    <a class="erp-inventory-kpi-link {% if estado_inventario == 'agotados' %}is-active{% endif %}" href="{% url 'inventario_facturacion' empresa.slug %}?estado=agotados#existencias-inventario" aria-label="Ver productos agotados"><article class="erp-card">
         <div class="erp-kpi-label">Agotados</div>
         <div class="erp-stat-value">{{ resumen.agotados }}</div>
         <p class="erp-card-muted">Productos sin existencias disponibles para salida.</p>
-    </article>
-    <article class="erp-card">
+    </article></a>
+    <a class="erp-inventory-kpi-link" href="{% url 'kardex_inventario' empresa.slug %}" aria-label="Abrir movimientos del Kardex"><article class="erp-card">
         <div class="erp-kpi-label">Movimientos</div>
         <div class="erp-stat-value">{{ resumen.movimientos }}</div>
         <p class="erp-card-muted">Bitácora acumulada de entradas, salidas y ajustes.</p>
-    </article>
+    </article></a>
 </section>
 
 {% if productos_alerta %}
@@ -167,7 +172,7 @@
     </div>
 </section>
 
-<section class="erp-card erp-table-card">
+<section id="existencias-inventario" class="erp-card erp-table-card">
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title" style="margin:0 0 6px;">Alertas de stock minimo</h3>
@@ -211,6 +216,7 @@
     </div>
     <div class="erp-inventory-search-panel">
         <form method="get" class="erp-inventory-search-form">
+            {% if estado_inventario %}<input type="hidden" name="estado" value="{{ estado_inventario }}">{% endif %}
             <div>
                 <label for="inventario-q">Buscar en inventario</label>
                 <div class="erp-inventory-autocomplete">
@@ -219,7 +225,7 @@
                 </div>
             </div>
             <button class="erp-btn" type="submit">Buscar</button>
-            <a class="erp-btn-secondary" href="{% url 'inventario_facturacion' empresa.slug %}">Limpiar</a>
+            <a class="erp-btn-secondary" href="{% url 'inventario_facturacion' empresa.slug %}#existencias-inventario">Limpiar</a>
         </form>
     </div>
     <div class="erp-table-wrap">
