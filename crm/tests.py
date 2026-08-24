@@ -2268,3 +2268,34 @@ class CRMTests(TestCase):
         self.assertEqual(sesion.nota_enfermeria, "Texto clínico que debe conservarse")
         self.assertEqual(sesion.sin_fiebre, "si")
         self.assertEqual(sesion.firma_enfermeria, "")
+
+    def test_control_camara_marca_todos_los_campos_faltantes_y_conserva_el_resto(self):
+        cita = self._crear_cita_camara_para_control(sesion_servicio=8)
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_camara_hiperbarica_guardar", args=[self.empresa.slug, cita.id])
+        datos = self._datos_validos_control_camara()
+        datos.update({
+            "numero_sesion": "8",
+            "observaciones_previas": "",
+            "presion_camara": "",
+            "evolucion_evento_adverso": "",
+            "nota_enfermeria": "Contenido que no debe borrarse",
+            "accion": "finalizar",
+        })
+
+        response = self.client.post(url, datos)
+
+        self.assertEqual(response.status_code, 200)
+        formulario = response.context["sesion_camara_form"]
+        self.assertTrue(formulario.is_bound)
+        self.assertIn("observaciones_previas", formulario.errors)
+        self.assertIn("presion_camara", formulario.errors)
+        self.assertIn("evolucion_evento_adverso", formulario.errors)
+        self.assertContains(response, "Contenido que no debe borrarse")
+        self.assertContains(response, 'data-hbo-form novalidate', html=False)
+        self.assertContains(response, 'class="hbo-cell has-error"', count=3, html=False)
+
+        sesion = SesionCamaraHiperbarica.objects.get(cita=cita)
+        self.assertEqual(sesion.estado, "borrador")
+        self.assertEqual(sesion.numero_sesion, 8)
+        self.assertEqual(sesion.nota_enfermeria, "Contenido que no debe borrarse")

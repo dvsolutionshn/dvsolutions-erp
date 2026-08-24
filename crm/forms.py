@@ -97,6 +97,7 @@ class SesionCamaraHiperbaricaForm(forms.ModelForm):
         "apto_para_sesion",
     ]
     CAMPOS_REQUERIDOS_FINALIZAR = CAMPOS_SI_NO + [
+        "observaciones_previas",
         "presion_arterial_antes",
         "saturacion_oxigeno_antes",
         "presion_camara",
@@ -105,6 +106,7 @@ class SesionCamaraHiperbaricaForm(forms.ModelForm):
         "tolerancia",
         "presion_arterial_despues",
         "saturacion_oxigeno_despues",
+        "evolucion_evento_adverso",
         "firma_control_previo",
         "firma_parametros",
         "nota_enfermeria",

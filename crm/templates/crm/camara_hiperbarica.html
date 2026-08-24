@@ -13,7 +13,7 @@
 <style>
 .hbo-session-slot{position:relative;color:inherit;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease}.hbo-session-slot[href]:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(20,68,91,.14)}
 .hbo-session-slot.done{text-decoration:line-through;text-decoration-thickness:2px;opacity:.82}.hbo-session-slot.done::after{content:"✓";position:absolute;top:2px;right:5px;color:#087565;font-size:9px;text-decoration:none}.hbo-session-slot.active{border-color:#0b8f62;background:linear-gradient(135deg,#15a875,#087b59);color:#fff;box-shadow:0 0 0 3px rgba(21,168,117,.18),0 9px 20px rgba(8,123,89,.23);transform:translateY(-1px)}
-.hbo-error-summary{margin:14px 16px 0;padding:13px 15px;border:1px solid #ef7777;border-radius:12px;background:#fff3f3;color:#8c2020}.hbo-error-summary strong{display:block;margin-bottom:5px}.hbo-error-summary ul{margin:0;padding-left:18px;font-size:10px}.hbo-field.has-error,.hbo-cell.has-error{background:#fff1f1!important;box-shadow:inset 0 0 0 2px #e44747}.hbo-field.has-error input,.hbo-field.has-error select,.hbo-field.has-error textarea,.hbo-cell.has-error input,.hbo-cell.has-error select,.hbo-cell.has-error textarea{border-color:#d93434!important;background:#fffafa}.hbo-field.has-error .errorlist,.hbo-cell.has-error .errorlist{display:block;margin:5px 0 0;padding:4px 6px;border-radius:5px;background:#d93434;color:#fff;font-size:8px;font-weight:900;list-style:none}.hbo-session-fixed{display:grid;place-items:center;min-height:48px;border-radius:6px;background:#e7f7f0;color:#087557;font-size:13px;font-weight:950}.hbo-session-fixed small{display:block;font-size:7px;text-transform:uppercase}
+.hbo-error-summary{margin:14px 16px 0;padding:13px 15px;border:1px solid #ef7777;border-radius:12px;background:#fff3f3;color:#8c2020}.hbo-error-summary strong{display:block;margin-bottom:5px}.hbo-error-summary ul{margin:0;padding-left:18px;font-size:10px}.hbo-field.has-error,.hbo-cell.has-error,.hbo-field.client-error,.hbo-cell.client-error{background:#fff1f1!important;box-shadow:inset 0 0 0 2px #e44747}.hbo-field.has-error input,.hbo-field.has-error select,.hbo-field.has-error textarea,.hbo-cell.has-error input,.hbo-cell.has-error select,.hbo-cell.has-error textarea,.hbo-field.client-error input,.hbo-field.client-error select,.hbo-field.client-error textarea,.hbo-cell.client-error input,.hbo-cell.client-error select,.hbo-cell.client-error textarea{border-color:#d93434!important;background:#fffafa}.hbo-field.has-error .errorlist,.hbo-cell.has-error .errorlist{display:block;margin:5px 0 0;padding:4px 6px;border-radius:5px;background:#d93434;color:#fff;font-size:8px;font-weight:900;list-style:none}.hbo-client-error{display:block;margin:5px 0 0;padding:4px 6px;border-radius:5px;background:#d93434;color:#fff;font-size:8px;font-weight:900}.hbo-session-fixed{display:grid;place-items:center;min-height:48px;border-radius:6px;background:#e7f7f0;color:#087557;font-size:13px;font-weight:950}.hbo-session-fixed small{display:block;font-size:7px;text-transform:uppercase}
 </style>
 
 <div class="hbo-page">
@@ -26,7 +26,7 @@
     <div class="hbo-summary"><div><span>Paciente</span><strong>{{ cita_control_camara.display_cliente }}</strong></div><div><span>Fecha y hora de la cita</span><strong>{{ cita_control_camara.fecha_hora|date:"d/m/Y · h:i A" }}</strong></div><div><span>Profesional</span><strong>{{ cita_control_camara.display_profesional|default:"Sin asignar" }}</strong></div></div>
     <div class="hbo-progress"><div class="hbo-progress-head"><strong>Programa de 22 sesiones</strong><span>{{ sesiones_camara_completadas|default:0 }} finalizadas</span></div><div class="hbo-session-board">{% for item in tablero_sesiones_camara %}{% if item.registro.cita_id %}<a class="hbo-session-slot {% if item.registro.estado == 'finalizada' %}done{% else %}draft{% endif %} {% if item.actual %}active{% endif %}" href="?fecha={{ item.registro.cita.fecha_hora|date:'Y-m-d' }}&amp;control_camara={{ item.registro.cita_id }}#documento-camara" title="Abrir sesión {{ item.numero }}">{{ item.numero }}</a>{% else %}<span class="hbo-session-slot {% if item.actual %}active{% endif %}" title="Sesión {{ item.numero }}{% if item.actual %} en atención{% endif %}">{{ item.numero }}</span>{% endif %}{% endfor %}</div></div>
 
-    <form method="post" action="{% url 'agenda_camara_hiperbarica_guardar' empresa.slug cita_control_camara.id %}" data-hbo-form>{% csrf_token %}{% if programa_camara %}<input type="hidden" name="programa_id" value="{{ programa_camara.id }}">{% endif %}
+    <form method="post" action="{% url 'agenda_camara_hiperbarica_guardar' empresa.slug cita_control_camara.id %}" data-hbo-form novalidate>{% csrf_token %}{% if programa_camara %}<input type="hidden" name="programa_id" value="{{ programa_camara.id }}">{% endif %}
       {% if errores_control_camara %}<div class="hbo-error-summary" data-hbo-errors><strong>Faltan datos para finalizar la sesión</strong><ul>{% for error in errores_control_camara %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
       {% if programa_camara_form.non_field_errors or sesion_camara_form.non_field_errors %}<div class="hbo-locked">{{ programa_camara_form.non_field_errors }}{{ sesion_camara_form.non_field_errors }}</div>{% endif %}
       <p class="hbo-kicker" style="padding:12px 16px 0;margin:0;">Control previo de seguridad, parámetros clínicos y nota de enfermería</p>
@@ -44,5 +44,97 @@
     </form>
   </section>{% endif %}
 </div>
-<script>(function(){document.querySelectorAll('.hbo-yesno ul,.hbo-tolerance ul').forEach(function(group){group.addEventListener('change',function(event){var selected=event.target;if(!selected.matches('input[type="checkbox"]')||!selected.checked){return;}group.querySelectorAll('input[type="checkbox"]').forEach(function(input){if(input!==selected){input.checked=false;}});});});document.querySelectorAll('[data-hbo-finalize]').forEach(function(button){button.addEventListener('click',function(event){if(!window.confirm('¿Finalizar esta sesión? Después de finalizarla ya no podrá editarse.')){event.preventDefault();}});});var errors=document.querySelector('[data-hbo-errors]');if(errors){window.setTimeout(function(){errors.scrollIntoView({behavior:'smooth',block:'center'});var first=document.querySelector('.has-error input,.has-error textarea,.has-error select');if(first){first.focus({preventScroll:true});}},120);}})();</script>
+<script>
+(function(){
+  var form=document.querySelector('[data-hbo-form]');
+  var requiredNames=[
+    'estado_general_estable','sin_fiebre','sin_dificultad_respiratoria',
+    'sin_dolor_toracico','sin_sintomas_neurologicos','sin_dolor_oido',
+    'compensa_ambos_oidos','area_quirurgica_revisada',
+    'seguridad_camara_verificada','apto_para_sesion','observaciones_previas',
+    'firma_control_previo','presion_arterial_antes','saturacion_oxigeno_antes',
+    'presion_camara','tiempo_minutos','compensacion_oidos','tolerancia',
+    'presion_arterial_despues','saturacion_oxigeno_despues',
+    'evolucion_evento_adverso','firma_parametros','nota_enfermeria','firma_enfermeria'
+  ];
+
+  function containerFor(field){return field.closest('.hbo-cell,.hbo-field');}
+  function clearClientError(container){
+    if(!container){return;}
+    container.classList.remove('client-error');
+    container.querySelectorAll('.hbo-client-error').forEach(function(node){node.remove();});
+  }
+  function fieldIsEmpty(name){
+    var fields=Array.from(form.querySelectorAll('[name="'+name+'"]'));
+    if(!fields.length){return false;}
+    if(fields[0].type==='checkbox'||fields[0].type==='radio'){
+      return !fields.some(function(field){return field.checked;});
+    }
+    return !String(fields[0].value||'').trim();
+  }
+  function markMissing(name){
+    var field=form.querySelector('[name="'+name+'"]');
+    if(!field){return null;}
+    var container=containerFor(field);
+    clearClientError(container);
+    container.classList.add('client-error');
+    var message=document.createElement('span');
+    message.className='hbo-client-error';
+    message.textContent='Complete este campo antes de finalizar la sesión.';
+    container.appendChild(message);
+    return container;
+  }
+  function clearFieldError(event){
+    var field=event.target.closest('input,textarea,select');
+    if(field){clearClientError(containerFor(field));}
+  }
+
+  document.querySelectorAll('.hbo-yesno ul,.hbo-tolerance ul').forEach(function(group){
+    group.addEventListener('change',function(event){
+      var selected=event.target;
+      if(!selected.matches('input[type="checkbox"]')||!selected.checked){return;}
+      group.querySelectorAll('input[type="checkbox"]').forEach(function(input){
+        if(input!==selected){input.checked=false;}
+      });
+    });
+  });
+
+  if(form){
+    form.addEventListener('input',clearFieldError);
+    form.addEventListener('change',clearFieldError);
+    form.addEventListener('submit',function(event){
+      var submitter=event.submitter;
+      if(!submitter||submitter.value!=='finalizar'){return;}
+      form.querySelectorAll('.client-error').forEach(clearClientError);
+      var firstMissing=null;
+      requiredNames.forEach(function(name){
+        if(fieldIsEmpty(name)){
+          var missing=markMissing(name);
+          if(!firstMissing){firstMissing=missing;}
+        }
+      });
+      if(firstMissing){
+        event.preventDefault();
+        firstMissing.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+        var focusable=firstMissing.querySelector('input,textarea,select');
+        if(focusable){window.setTimeout(function(){focusable.focus({preventScroll:true});},350);}
+        return;
+      }
+      if(!window.confirm('¿Finalizar esta sesión? Después de finalizarla ya no podrá editarse.')){
+        event.preventDefault();
+      }
+    });
+  }
+
+  var errors=document.querySelector('[data-hbo-errors]');
+  if(errors){
+    window.setTimeout(function(){
+      var first=document.querySelector('.has-error');
+      (first||errors).scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+      var focusable=first&&first.querySelector('input,textarea,select');
+      if(focusable){window.setTimeout(function(){focusable.focus({preventScroll:true});},350);}
+    },120);
+  }
+})();
+</script>
 {% endblock %}
