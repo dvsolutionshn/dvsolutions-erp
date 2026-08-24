@@ -2384,6 +2384,101 @@ class CRMTests(TestCase):
         self.assertContains(response, "Finalizar sesión")
         self.assertEqual(len(response.context["tablero_sesiones_terapia"]), 12)
 
+    def test_post_cirugia_se_agenda_normal_y_abre_terapia_desde_web_y_app(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        formulario = CitaClienteForm(empresa=self.empresa)
+        servicio = ServicioClinico.objects.get(empresa=self.empresa, nombre="Post Cirugía")
+
+        self.assertIn(servicio, formulario.fields["servicio_clinico"].queryset)
+        self.assertFalse(formulario._servicio_es_cirugia(servicio))
+        self.assertEqual(formulario._recurso_capacidad_servicio(servicio), "")
+
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="EXP-POST-001",
+            nombre="Paciente Post Cirugía",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Licenciada en enfermería",
+        )
+        fecha_hora = timezone.localtime(timezone.now() + timedelta(days=4)).replace(
+            hour=9,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=profesional,
+            titulo=servicio.nombre,
+            responsable=profesional.nombre,
+            fecha_hora=fecha_hora,
+            duracion_minutos=60,
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        fecha = fecha_hora.date().isoformat()
+
+        response_web = self.client.get(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {"fecha": fecha, "vista": "dia"},
+        )
+        self.assertEqual(response_web.status_code, 200)
+        self.assertContains(response_web, "Abrir Terapias Post Quirúrgicas")
+        self.assertContains(response_web, f"control_terapia={cita.id}")
+
+        response_app = self.client.get(
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            {"fecha": fecha},
+        )
+        self.assertEqual(response_app.status_code, 200)
+        self.assertContains(response_app, "Abrir Terapias Post Quirúrgicas")
+        self.assertContains(response_app, f"control_terapia={cita.id}")
+
+        response_terapia = self.client.get(
+            reverse("agenda_terapias_postquirurgicas", args=[self.empresa.slug]),
+            {"fecha": fecha, "control_terapia": cita.id},
+        )
+        self.assertEqual(response_terapia.status_code, 200)
+        self.assertEqual(response_terapia.context["cita_control_terapia"], cita)
+        self.assertEqual(response_terapia.context["cita_control_terapia"].paciente, paciente)
+        self.assertIsNotNone(response_terapia.context["programa_terapia_form"])
+        self.assertIsNotNone(response_terapia.context["sesion_terapia_form"])
+
+    def test_post_cirugia_no_se_siembra_fuera_de_hospital_mia(self):
+        otra_empresa = Empresa.objects.create(
+            nombre="Empresa General",
+            slug="empresa_general_post",
+            rtn="08011999111992",
+            estado_licencia="activa",
+        )
+
+        CitaClienteForm(empresa=otra_empresa)
+
+        self.assertFalse(
+            ServicioClinico.objects.filter(empresa=otra_empresa, nombre="Post Cirugía").exists()
+        )
+
+    def test_terapia_generica_no_abre_el_modulo_postquirurgico(self):
+        cita = self._crear_cita_terapia_postquirurgica()
+        cita.servicio_clinico.nombre = "Terapias"
+        cita.servicio_clinico.save(update_fields=["nombre"])
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {
+                "fecha": timezone.localtime(cita.fecha_hora).date().isoformat(),
+                "vista": "dia",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Abrir Terapias Post Quirúrgicas")
+
     def test_terapia_postquirurgica_guarda_borrador_finaliza_y_bloquea(self):
         cita = self._crear_cita_terapia_postquirurgica(sesion_servicio=3)
         self.client.login(username="crmuser", password="pass12345")

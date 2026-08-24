@@ -21,6 +21,15 @@ from .models import (
 )
 
 
+def _normalizar_texto(valor):
+    return (
+        unicodedata.normalize("NFKD", str(valor or ""))
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .casefold()
+    )
+
+
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
@@ -430,6 +439,9 @@ class CitaClienteForm(forms.ModelForm):
         ("Terapias", "tratamiento", 60),
         ("Spa", "spa", 60),
     ]
+    SERVICIOS_AGENDA_HOSPITAL_MIA = [
+        ("Post Cirugía", "tratamiento", 60),
+    ]
 
     HORAS_12 = [
         (f"{hora:02d}:{minuto:02d}", f"{hora:02d}:{minuto:02d}")
@@ -518,6 +530,31 @@ class CitaClienteForm(forms.ModelForm):
                             activo=True,
                         )
                 if empresa.slug == "hospital_mia":
+                    for nombre, categoria, duracion in self.SERVICIOS_AGENDA_HOSPITAL_MIA:
+                        servicio = (
+                            ServicioClinico.objects.filter(empresa=empresa, nombre__iexact=nombre).first()
+                        )
+                        if servicio:
+                            cambios = []
+                            if not servicio.activo:
+                                servicio.activo = True
+                                cambios.append("activo")
+                            if servicio.categoria != categoria:
+                                servicio.categoria = categoria
+                                cambios.append("categoria")
+                            if servicio.duracion_minutos != duracion:
+                                servicio.duracion_minutos = duracion
+                                cambios.append("duracion_minutos")
+                            if cambios:
+                                servicio.save(update_fields=cambios)
+                        else:
+                            ServicioClinico.objects.create(
+                                empresa=empresa,
+                                nombre=nombre,
+                                categoria=categoria,
+                                duracion_minutos=duracion,
+                                activo=True,
+                            )
                     OpcionServicioAgenda.objects.get_or_create(
                         empresa=empresa,
                         categoria="tratamientos",
@@ -654,14 +691,18 @@ class CitaClienteForm(forms.ModelForm):
         if not servicio:
             return False
         categoria = (getattr(servicio, "categoria", "") or "").lower()
-        nombre = (getattr(servicio, "nombre", "") or "").lower()
+        nombre = _normalizar_texto(getattr(servicio, "nombre", "") or "")
+        if "post cirugia" in nombre or "postquirurg" in nombre or "post quirurg" in nombre:
+            return False
         return categoria == "cirugia" or "cirug" in nombre
 
     def _recurso_capacidad_servicio(self, servicio):
         if not servicio:
             return ""
         categoria = (getattr(servicio, "categoria", "") or "").lower()
-        nombre = (getattr(servicio, "nombre", "") or "").lower()
+        nombre = _normalizar_texto(getattr(servicio, "nombre", "") or "")
+        if "post cirugia" in nombre or "postquirurg" in nombre or "post quirurg" in nombre:
+            return ""
         texto = f"{categoria} {nombre}"
         if "camara" in texto or "cámara" in texto or "hiperbar" in texto:
             return "camara_hiperbarica"

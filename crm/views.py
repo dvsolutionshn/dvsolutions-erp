@@ -158,13 +158,41 @@ def _fecha_agenda(valor):
 
 
 def _es_cita_camara_hiperbarica(cita):
-    texto = _normalizar_texto_agenda(cita.display_servicio)
+    texto = _normalizar_texto_agenda(
+        cita.servicio_clinico.nombre if cita.servicio_clinico_id else cita.display_servicio
+    )
     return "camara" in texto and "hiperbar" in texto
 
 
 def _es_cita_terapia_postquirurgica(cita):
-    texto = _normalizar_texto_agenda(cita.display_servicio)
-    return "terapia" in texto and "camara" not in texto
+    texto = _normalizar_texto_agenda(
+        cita.servicio_clinico.nombre if cita.servicio_clinico_id else cita.display_servicio
+    )
+    return any(
+        referencia in texto
+        for referencia in ("post cirugia", "post quirurg", "postquirurg")
+    )
+
+
+def _preparar_acceso_atencion_cita(cita):
+    """Expone el destino clínico sin trasladar la atención al calendario."""
+    fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
+    if _es_cita_camara_hiperbarica(cita):
+        cita.atencion_url = (
+            f"{reverse('agenda_camara_hiperbarica', args=[cita.empresa.slug])}"
+            f"?fecha={fecha}&control_camara={cita.id}#documento-camara"
+        )
+        cita.atencion_label = "Abrir Cámara Hiperbárica"
+    elif _es_cita_terapia_postquirurgica(cita):
+        cita.atencion_url = (
+            f"{reverse('agenda_terapias_postquirurgicas', args=[cita.empresa.slug])}"
+            f"?fecha={fecha}&control_terapia={cita.id}#documento-terapia"
+        )
+        cita.atencion_label = "Abrir Terapias Post Quirúrgicas"
+    else:
+        cita.atencion_url = ""
+        cita.atencion_label = ""
+    return cita
 
 
 def _contexto_terapias_postquirurgicas(empresa, request, fecha_seleccionada, *, cita_control_id=None):
@@ -409,7 +437,11 @@ def _contexto_calendario(
             citas_qs = citas_qs.filter(paciente_id=int(paciente_historial_id))
         except (TypeError, ValueError):
             paciente_historial_id = ""
-    citas = [cita for cita in citas_qs if _cita_pertenece_agenda_espejo(cita, empresa)]
+    citas = [
+        _preparar_acceso_atencion_cita(cita)
+        for cita in citas_qs
+        if _cita_pertenece_agenda_espejo(cita, empresa)
+    ]
 
     filtros_query = urlencode({
         clave: valor
@@ -507,7 +539,7 @@ def _contexto_calendario(
             .order_by("fecha_hora")
         )
         citas_historial = [
-            cita for cita in citas_historial_qs
+            _preparar_acceso_atencion_cita(cita) for cita in citas_historial_qs
             if _cita_pertenece_agenda_espejo(cita, empresa)
         ]
         citas_historial_futuras = [cita for cita in citas_historial if cita.fecha_hora >= ahora_historial][:25]
