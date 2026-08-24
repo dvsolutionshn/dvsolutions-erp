@@ -57,6 +57,12 @@ from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_docu
 logger = logging.getLogger(__name__)
 
 EMPRESAS_COSTO_REAL_INVENTARIO = {"hospital_mia", "medical_spa"}
+EMPRESAS_CONTROL_LOTES_FEFO = {
+    "hospital_mia",
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+}
 
 
 def _empresa_muestra_costo_real_inventario(empresa):
@@ -349,6 +355,14 @@ def _empresa_usa_perfil_farmaceutico(empresa):
         empresa.tiene_modulo_activo("clinica_medica")
         and config.usa_inventario_farmaceutico
     )
+
+
+def _empresa_usa_control_lotes_fefo(empresa):
+    return bool(empresa and empresa.slug in EMPRESAS_CONTROL_LOTES_FEFO)
+
+
+def _empresa_usa_inventario_por_lotes(empresa):
+    return _empresa_usa_control_lotes_fefo(empresa) or _empresa_usa_perfil_farmaceutico(empresa)
 
 
 # =====================================================
@@ -1966,7 +1980,7 @@ def _obtener_bodega_venta(empresa):
 
 
 def _obtener_bodega_destino_compra(empresa):
-    if not _empresa_usa_perfil_farmaceutico(empresa):
+    if not _empresa_usa_inventario_por_lotes(empresa):
         return None
     bodegas = _asegurar_bodegas_farmaceuticas(empresa)
     if empresa.slug == "hospital_mia":
@@ -1985,6 +1999,10 @@ def _obtener_lote_generico(producto):
 
 
 def _registrar_movimiento_lote_bodega(*, empresa, bodega, lote, tipo, cantidad, referencia="", observacion="", factura=None):
+    if not empresa or bodega.empresa_id != empresa.id or lote.empresa_id != empresa.id:
+        raise ValidationError("La empresa, la bodega y el lote deben pertenecer a la misma empresa.")
+    if lote.producto.empresa_id != empresa.id:
+        raise ValidationError("El producto del lote no pertenece a la empresa activa.")
     existencia, _ = ExistenciaLoteBodega.objects.get_or_create(
         empresa=empresa,
         bodega=bodega,
@@ -2016,7 +2034,7 @@ def _registrar_movimiento_lote_bodega(*, empresa, bodega, lote, tipo, cantidad, 
 
 
 def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", observacion="", bodega_destino=None):
-    if not _empresa_usa_perfil_farmaceutico(empresa) or not producto.controla_inventario:
+    if not _empresa_usa_inventario_por_lotes(empresa) or not producto.controla_inventario:
         return
     bodega = bodega_destino or _asegurar_bodegas_farmaceuticas(empresa)["principal"]
     lote = _obtener_lote_generico(producto)
@@ -2256,24 +2274,139 @@ def _parse_vencimiento_lote_rapido(valor):
 
 def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
     config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config.ventas_solo_desde_vitrina:
+    usa_fefo = _empresa_usa_control_lotes_fefo(empresa)
+    if not usa_fefo and not config.ventas_solo_desde_vitrina:
         return []
-    bodega_venta = _obtener_bodega_venta(empresa)
+    bodega_venta = _obtener_bodega_venta(empresa) if config.ventas_solo_desde_vitrina else None
+    hoy = timezone.localdate()
     faltantes = []
     for item in cantidades_por_producto.values():
         producto = item["producto"]
         cantidad = item["cantidad"]
-        disponible = ExistenciaLoteBodega.objects.filter(
+        existencias = ExistenciaLoteBodega.objects.filter(
             empresa=empresa,
-            bodega=bodega_venta,
             lote__producto=producto,
             lote__activo=True,
-        ).aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00")
+            cantidad__gt=0,
+        ).filter(
+            Q(lote__fecha_vencimiento__isnull=True) | Q(lote__fecha_vencimiento__gte=hoy)
+        )
+        if bodega_venta:
+            existencias = existencias.filter(bodega=bodega_venta)
+        disponible = existencias.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00")
         if cantidad > disponible:
+            ubicacion = "Vitrina" if bodega_venta else "lotes vigentes"
             faltantes.append(
-                f"{producto.nombre}: en Vitrina {disponible:.2f}, solicitado {cantidad:.2f}"
+                f"{producto.nombre}: en {ubicacion} {disponible:.2f}, solicitado {cantidad:.2f}"
             )
     return faltantes
+
+
+def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None):
+    """Descuenta por FEFO y deja trazabilidad exacta por lote y bodega."""
+    if not _empresa_usa_control_lotes_fefo(factura.empresa):
+        return False
+    if not forzar and MovimientoLoteBodega.objects.filter(
+        factura=factura,
+        tipo="salida_factura",
+    ).exists():
+        return True
+
+    config = ConfiguracionAvanzadaEmpresa.para_empresa(factura.empresa)
+    bodega_venta = _obtener_bodega_venta(factura.empresa) if config.ventas_solo_desde_vitrina else None
+    hoy = timezone.localdate()
+    observacion = observacion or "Salida automatica por FEFO desde el lote con vencimiento mas cercano."
+    cantidades = {}
+    for linea in factura.lineas.select_related("producto").all():
+        producto = linea.producto
+        if not producto or not producto.controla_inventario:
+            continue
+        cantidades.setdefault(producto.id, {"producto": producto, "cantidad": Decimal("0.00")})
+        cantidades[producto.id]["cantidad"] += linea.cantidad
+
+    # Validar todo antes de descontar evita que una factura deje salidas parciales.
+    faltantes = _validar_stock_vitrina_para_lineas(factura.empresa, cantidades)
+    if faltantes:
+        raise ValidationError("Stock FEFO insuficiente: " + "; ".join(faltantes) + ".")
+
+    for item in cantidades.values():
+        pendiente = item["cantidad"]
+        existencias = ExistenciaLoteBodega.objects.select_for_update().filter(
+            empresa=factura.empresa,
+            lote__producto=item["producto"],
+            lote__activo=True,
+            cantidad__gt=0,
+        ).filter(
+            Q(lote__fecha_vencimiento__isnull=True) | Q(lote__fecha_vencimiento__gte=hoy)
+        )
+        if bodega_venta:
+            existencias = existencias.filter(bodega=bodega_venta)
+        existencias = existencias.select_related("lote", "bodega").order_by(
+            F("lote__fecha_vencimiento").asc(nulls_last=True),
+            "lote__fecha_creacion",
+            "id",
+        )
+        for existencia in existencias:
+            if pendiente <= 0:
+                break
+            salida = min(pendiente, existencia.cantidad)
+            _registrar_movimiento_lote_bodega(
+                empresa=factura.empresa,
+                bodega=existencia.bodega,
+                lote=existencia.lote,
+                tipo="salida_factura",
+                cantidad=salida,
+                referencia=factura.numero_factura or f"Factura {factura.id}",
+                observacion=observacion,
+                factura=factura,
+            )
+            pendiente -= salida
+    return True
+
+
+def _registrar_ajuste_salida_fefo(*, empresa, producto, cantidad, referencia, observacion):
+    """Consume existencias por FEFO para ajustes/salidas no asociados a factura."""
+    if not _empresa_usa_control_lotes_fefo(empresa) or not producto.controla_inventario:
+        return
+
+    config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    bodega_venta = _obtener_bodega_venta(empresa) if config.ventas_solo_desde_vitrina else None
+    cantidades = {producto.id: {"producto": producto, "cantidad": cantidad}}
+    faltantes = _validar_stock_vitrina_para_lineas(empresa, cantidades)
+    if faltantes:
+        raise ValidationError("Stock FEFO insuficiente: " + "; ".join(faltantes) + ".")
+
+    hoy = timezone.localdate()
+    pendiente = cantidad
+    existencias = ExistenciaLoteBodega.objects.select_for_update().filter(
+        empresa=empresa,
+        lote__producto=producto,
+        lote__activo=True,
+        cantidad__gt=0,
+    ).filter(
+        Q(lote__fecha_vencimiento__isnull=True) | Q(lote__fecha_vencimiento__gte=hoy)
+    )
+    if bodega_venta:
+        existencias = existencias.filter(bodega=bodega_venta)
+    existencias = existencias.select_related("lote", "bodega").order_by(
+        F("lote__fecha_vencimiento").asc(nulls_last=True),
+        "lote__fecha_creacion",
+        "id",
+    )
+    for existencia in existencias:
+        if pendiente <= 0:
+            break
+        salida = min(pendiente, existencia.cantidad)
+        _registrar_movimiento_lote_bodega(
+            empresa=empresa,
+            bodega=existencia.bodega,
+            lote=existencia.lote,
+            tipo="ajuste_salida",
+            cantidad=salida,
+            referencia=referencia,
+            observacion=observacion,
+        )
+        pendiente -= salida
 
 
 def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None):
@@ -2366,12 +2499,14 @@ def _registrar_movimiento_inventario(
     )
 
 
+@transaction.atomic
 def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
     if not forzar and MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
 
     observacion = observacion or 'Salida generada automaticamente por emision de factura.'
-    _registrar_salida_vitrina_factura(factura, forzar=forzar, observacion=observacion)
+    if not _registrar_salida_fefo_factura(factura, forzar=forzar, observacion=observacion):
+        _registrar_salida_vitrina_factura(factura, forzar=forzar, observacion=observacion)
 
     for linea in factura.lineas.select_related('producto').all():
         if not linea.producto_id or not linea.producto:
@@ -3150,6 +3285,7 @@ def editar_proveedor(request, empresa_slug, proveedor_id):
 @login_required
 def inventario_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    control_lotes_fefo = _empresa_usa_control_lotes_fefo(empresa)
     mostrar_costo_real = _empresa_muestra_costo_real_inventario(empresa)
     q = (request.GET.get("q") or "").strip()
     estado_inventario = (request.GET.get("estado") or "").strip().lower()
@@ -3256,6 +3392,7 @@ def inventario_facturacion(request, empresa_slug):
         "mostrar_costo_real_inventario": mostrar_costo_real,
         "q": q,
         "estado_inventario": estado_inventario,
+        "control_lotes_fefo": control_lotes_fefo,
         "productos_sugeridos": Producto.objects.filter(
             empresa=empresa,
             controla_inventario=True,
@@ -3267,39 +3404,74 @@ def inventario_facturacion(request, empresa_slug):
 @login_required
 def inventario_farmaceutico(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    if not _empresa_usa_perfil_farmaceutico(empresa):
-        messages.error(request, "El inventario farmaceutico no esta activo para esta empresa.")
+    if not _empresa_usa_inventario_por_lotes(empresa):
+        messages.error(request, "El control de inventario por lotes no esta activo para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
     bodegas = _asegurar_bodegas_farmaceuticas(empresa)
     hoy = timezone.localdate()
     fecha_alerta = hoy + timezone.timedelta(days=60)
-    existencias = (
+    existencias_qs = (
         ExistenciaLoteBodega.objects.filter(empresa=empresa, cantidad__gt=0)
         .select_related("bodega", "lote", "lote__producto")
-        .order_by("lote__fecha_vencimiento", "lote__producto__nombre", "bodega__tipo")
+        .order_by(
+            "lote__producto__nombre",
+            F("lote__fecha_vencimiento").asc(nulls_last=True),
+            "lote__numero_lote",
+            "bodega__tipo",
+        )
     )
-    lotes_alerta = existencias.filter(
+    lotes_alerta = existencias_qs.filter(
         lote__fecha_vencimiento__isnull=False,
         lote__fecha_vencimiento__lte=fecha_alerta,
     )
+    # El cuadro FEFO debe reflejar todos los lotes activos del producto. Un
+    # recorte global haria que el total visual no coincidiera con inventario.
+    existencias = list(existencias_qs)
+    productos_lotes = []
+    grupos = {}
+    for existencia in existencias:
+        producto = existencia.lote.producto
+        grupo = grupos.get(producto.id)
+        if grupo is None:
+            grupo = {
+                "producto": producto,
+                "total": Decimal("0.00"),
+                "lotes": [],
+                "lotes_ids": set(),
+            }
+            grupos[producto.id] = grupo
+            productos_lotes.append(grupo)
+        grupo["total"] += existencia.cantidad
+        grupo["lotes"].append(existencia)
+        grupo["lotes_ids"].add(existencia.lote_id)
+    for grupo in productos_lotes:
+        grupo["cantidad_lotes"] = len(grupo.pop("lotes_ids"))
+
+    movimientos_recientes = (
+        MovimientoLoteBodega.objects.filter(empresa=empresa)
+        .select_related("bodega", "lote", "lote__producto", "factura")[:40]
+    )
     resumen_bodegas = []
     for bodega in BodegaInventario.objects.filter(empresa=empresa, activa=True):
-        total = existencias.filter(bodega=bodega).aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00")
+        total = existencias_qs.filter(bodega=bodega).aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00")
         resumen_bodegas.append({"bodega": bodega, "total": total})
 
     return render(request, "facturacion/inventario_farmaceutico.html", {
         "empresa": empresa,
         "bodegas_base": bodegas,
-        "existencias": existencias[:250],
+        "existencias": existencias,
+        "productos_lotes": productos_lotes,
+        "movimientos_recientes": movimientos_recientes,
         "lotes_alerta": lotes_alerta[:30],
         "resumen_bodegas": resumen_bodegas,
         "resumen": {
             "lotes": LoteInventario.objects.filter(empresa=empresa, activo=True).count(),
             "bodegas": BodegaInventario.objects.filter(empresa=empresa, activa=True).count(),
-            "unidades": existencias.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00"),
-            "por_vencer": lotes_alerta.count(),
+            "unidades": existencias_qs.aggregate(total=Sum("cantidad"))["total"] or Decimal("0.00"),
+            "por_vencer": lotes_alerta.values("lote_id").distinct().count(),
         },
+        "control_lotes_fefo": _empresa_usa_control_lotes_fefo(empresa),
     })
 
 
@@ -3357,6 +3529,7 @@ def bodegas_dashboard(request, empresa_slug):
     ).count()
     return render(request, "facturacion/bodegas_dashboard.html", {
         "empresa": empresa,
+        "control_lotes_fefo": _empresa_usa_control_lotes_fefo(empresa),
         "resumen_bodegas": resumen_bodegas,
         "mostrar_resumen_comercial": empresa.slug in {"medical_spa", "luque_aestetic"},
         "resumen": {
@@ -3417,8 +3590,8 @@ def ver_bodega_inventario(request, empresa_slug, bodega_id):
 @login_required
 def crear_lote_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    if not _empresa_usa_perfil_farmaceutico(empresa):
-        messages.error(request, "El inventario farmaceutico no esta activo para esta empresa.")
+    if not _empresa_usa_inventario_por_lotes(empresa):
+        messages.error(request, "El control de inventario por lotes no esta activo para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
     bodegas = _asegurar_bodegas_farmaceuticas(empresa)
@@ -3446,6 +3619,8 @@ def crear_lote_inventario(request, empresa_slug):
 
         if fecha_vencimiento == "__invalida__":
             pass
+        elif _empresa_usa_control_lotes_fefo(empresa) and not fecha_vencimiento:
+            messages.error(request, "La fecha de vencimiento es obligatoria para registrar un lote FEFO.")
         elif not producto or not bodega or not numero_lote or cantidad <= 0:
             messages.error(request, "Completa producto, bodega, lote y cantidad mayor que cero.")
         else:
@@ -3493,6 +3668,8 @@ def crear_lote_inventario(request, empresa_slug):
         "bodega_principal": bodegas["principal"],
         "producto_preseleccionado": producto_preseleccionado,
         "next": next_url,
+        "control_lotes_fefo": _empresa_usa_control_lotes_fefo(empresa),
+        "valores": request.POST if request.method == "POST" else {},
     })
 
 
@@ -3676,19 +3853,43 @@ def ajustar_inventario(request, empresa_slug):
             observacion = form.cleaned_data['observacion']
             stock_minimo = form.cleaned_data['stock_minimo']
 
-            inventario = _obtener_inventario_producto(producto)
-            if stock_minimo is not None:
-                inventario.stock_minimo = stock_minimo
-                inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
+            if _empresa_usa_control_lotes_fefo(empresa) and tipo_ajuste == 'ajuste_entrada':
+                messages.error(
+                    request,
+                    "Para sumar existencias registra el lote, vencimiento y bodega desde Lotes y Vencimientos.",
+                )
+                return redirect("crear_lote_inventario", empresa_slug=empresa.slug)
 
-            _registrar_movimiento_inventario(
-                empresa=empresa,
-                producto=producto,
-                tipo=tipo_ajuste,
-                cantidad=cantidad,
-                referencia=f"Ajuste manual {timezone.now().strftime('%Y-%m-%d')}",
-                observacion=observacion or 'Ajuste manual de inventario.',
-            )
+            referencia = f"Ajuste manual {timezone.now().strftime('%Y-%m-%d')}"
+            observacion_final = observacion or 'Ajuste manual de inventario.'
+            try:
+                with transaction.atomic():
+                    inventario = _obtener_inventario_producto(producto)
+                    if stock_minimo is not None:
+                        inventario.stock_minimo = stock_minimo
+                        inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
+                    if _empresa_usa_control_lotes_fefo(empresa) and tipo_ajuste == 'ajuste_salida':
+                        _registrar_ajuste_salida_fefo(
+                            empresa=empresa,
+                            producto=producto,
+                            cantidad=cantidad,
+                            referencia=referencia,
+                            observacion=observacion_final,
+                        )
+                    _registrar_movimiento_inventario(
+                        empresa=empresa,
+                        producto=producto,
+                        tipo=tipo_ajuste,
+                        cantidad=cantidad,
+                        referencia=referencia,
+                        observacion=observacion_final,
+                    )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return render(request, "facturacion/ajustar_inventario.html", {
+                    "empresa": empresa,
+                    "form": form,
+                })
             messages.success(request, "Inventario ajustado correctamente.")
             return redirect("inventario_facturacion", empresa_slug=empresa.slug)
     else:
@@ -3703,6 +3904,9 @@ def ajustar_inventario(request, empresa_slug):
 @login_required
 def entrada_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if _empresa_usa_control_lotes_fefo(empresa):
+        messages.info(request, "Registra la entrada con su lote y vencimiento para mantener el control FEFO.")
+        return redirect("crear_lote_inventario", empresa_slug=empresa.slug)
     if empresa.slug in {"hospital_mia", "medical_spa"}:
         _asegurar_bodegas_farmaceuticas(empresa)
 

@@ -155,6 +155,9 @@ def erp_access(request):
         "usa_pagos_mixtos": bool(config_avanzada and config_avanzada.usa_pagos_mixtos),
         "usa_reporte_bancos": bool(config_avanzada and config_avanzada.usa_reporte_bancos),
         "usa_inventario_farmaceutico": bool(clinica_activa and config_avanzada and config_avanzada.usa_inventario_farmaceutico),
+        "usa_control_lotes_fefo": bool(
+            empresa and empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"}
+        ),
         "usa_bodegas_internas": bool(config_avanzada and config_avanzada.usa_bodegas_internas),
         "ventas_solo_desde_vitrina": bool(config_avanzada and config_avanzada.ventas_solo_desde_vitrina),
         "administrar_usuarios_clinicos": bool(

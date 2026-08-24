@@ -8,6 +8,9 @@
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'inventario_facturacion' empresa.slug %}">Nuevo Producto</a>
 <a class="erp-action-link" href="{% url 'entrada_inventario' empresa.slug %}">Nueva Entrada</a>
+{% if control_lotes_fefo %}
+<a class="erp-action-link" href="{% url 'inventario_farmaceutico' empresa.slug %}">Lotes y Vencimientos</a>
+{% endif %}
 <a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras</a>
 <a class="erp-action-link" href="{% url 'entradas_inventario_dashboard' empresa.slug %}">Entradas</a>
 <a class="erp-action-link" href="{% url 'ajustar_inventario' empresa.slug %}">Nuevo Ajuste</a>

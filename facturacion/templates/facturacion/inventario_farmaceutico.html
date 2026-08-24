@@ -1,107 +1,57 @@
 {% extends "core/erp_base.html" %}
 {% load humanize %}
 
-{% block title %}Inventario Farmaceutico - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Control Farmaceutico{% endblock %}
-{% block header_title %}Inventario Farmaceutico{% endblock %}
-{% block header_description %}Existencias por lote, vencimiento y ubicacion: bodega principal, provisional y vitrina.{% endblock %}
+{% block title %}Lotes y vencimientos - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Inventario FEFO{% endblock %}
+{% block header_title %}Lotes y vencimientos{% endblock %}
+{% block header_description %}Cada producto conserva sus lotes separados. Las salidas usan primero el lote vigente con vencimiento mas cercano.{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'inventario_farmaceutico' empresa.slug %}">Nuevo Producto</a>
-<a class="erp-action-link" href="{% url 'crear_lote_inventario' empresa.slug %}">Nuevo Lote</a>
-<a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
-<a class="erp-action-link" href="{% url 'traslado_inventario_farmaceutico' empresa.slug %}">Trasladar</a>
-<a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Inventario Base</a>
+<a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'inventario_farmaceutico' empresa.slug %}">Nuevo producto</a>
+<a class="erp-action-link" href="{% url 'crear_lote_inventario' empresa.slug %}">Registrar lote</a>
+{% if usa_bodegas_internas %}<a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia rapida</a>{% endif %}
+<a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Inventario general</a>
 {% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Lotes activos</div>
-        <p class="erp-stat-value">{{ resumen.lotes }}</p>
-        <p class="erp-card-muted">Productos separados por lote.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Bodegas</div>
-        <p class="erp-stat-value">{{ resumen.bodegas }}</p>
-        <p class="erp-card-muted">Principal, provisional y vitrina.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Unidades</div>
-        <p class="erp-stat-value">{{ resumen.unidades|floatformat:2|intcomma }}</p>
-        <p class="erp-card-muted">Total por lotes y bodegas.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Por vencer</div>
-        <p class="erp-stat-value">{{ resumen.por_vencer }}</p>
-        <p class="erp-card-muted">Lotes vencidos o a 60 dias.</p>
-    </article>
+<style>
+    .fefo-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}.fefo-products{display:grid;gap:16px}.fefo-product{overflow:hidden}.fefo-product-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;border-bottom:1px solid #d8e5ef}.fefo-product-title{margin:0;font-size:1.1rem}.fefo-product-meta{color:#64788a;font-size:.82rem;margin-top:4px}.fefo-product-total{text-align:right;white-space:nowrap}.fefo-product-total strong{display:block;font-size:1.35rem;color:#10283b}.fefo-lot-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:16px 20px 20px}.fefo-lot{border:1px solid #d9e6f0;border-radius:15px;padding:14px;background:#fbfdff;min-width:0}.fefo-lot.danger{border-color:#f4b5b5;background:#fff7f7}.fefo-lot.warning{border-color:#f2d59a;background:#fffbf1}.fefo-lot-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}.fefo-lot-code{font-weight:800;overflow-wrap:anywhere}.fefo-lot-row{display:flex;justify-content:space-between;gap:12px;border-top:1px dashed #dce7ef;padding-top:8px;margin-top:8px;font-size:.84rem}.fefo-lot-row span{color:#65798b}.fefo-lot-row strong{text-align:right}.fefo-empty{padding:30px;text-align:center;color:#687d8f}@media(max-width:1100px){.fefo-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.fefo-lot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:680px){.fefo-summary,.fefo-lot-grid{grid-template-columns:1fr}.fefo-product-head{align-items:flex-start}}
+</style>
+
+<section class="fefo-summary">
+ <article class="erp-card"><div class="erp-kpi-label">Productos con lotes</div><p class="erp-stat-value">{{ productos_lotes|length }}</p><p class="erp-card-muted">Catalogo sin productos duplicados.</p></article>
+ <article class="erp-card"><div class="erp-kpi-label">Lotes activos</div><p class="erp-stat-value">{{ resumen.lotes }}</p><p class="erp-card-muted">Identificados individualmente.</p></article>
+ <article class="erp-card"><div class="erp-kpi-label">Unidades disponibles</div><p class="erp-stat-value">{{ resumen.unidades|floatformat:2|intcomma }}</p><p class="erp-card-muted">Suma de todos los lotes y bodegas.</p></article>
+ <article class="erp-card"><div class="erp-kpi-label">Vencidos o proximos</div><p class="erp-stat-value">{{ resumen.por_vencer }}</p><p class="erp-card-muted">Requieren revision prioritaria.</p></article>
+</section>
+{% if lotes_alerta %}<section class="erp-card erp-alert-banner"><div><strong>Hay lotes vencidos o proximos a vencer</strong><p>El sistema no despacha lotes vencidos y prioriza automaticamente los vigentes con vencimiento mas cercano.</p></div></section>{% endif %}
+
+<section class="erp-section-heading"><div><h3>Productos y sus lotes</h3><p>La existencia total de cada producto corresponde a la suma de los lotes mostrados.</p></div></section>
+<section class="fefo-products">
+ {% for grupo in productos_lotes %}
+ <article class="erp-card fefo-product">
+  <header class="fefo-product-head">
+   <div><h3 class="fefo-product-title">{{ grupo.producto.nombre }}</h3><div class="fefo-product-meta">{{ grupo.producto.codigo|default:"Sin codigo" }} · {{ grupo.cantidad_lotes }} lote{{ grupo.cantidad_lotes|pluralize }}</div></div>
+   <div class="fefo-product-total"><strong>{{ grupo.total|floatformat:2|intcomma }}</strong><span>existencia total</span></div>
+  </header>
+  <div class="fefo-lot-grid">
+   {% for existencia in grupo.lotes %}
+   <div class="fefo-lot {% if existencia.lote.vencido %}danger{% elif existencia.lote.por_vencer %}warning{% endif %}">
+    <div class="fefo-lot-top"><div><div class="erp-kpi-label">Lote</div><div class="fefo-lot-code">{{ existencia.lote.numero_lote }}</div></div>{% if existencia.lote.vencido %}<span class="erp-badge danger">Vencido</span>{% elif existencia.lote.por_vencer %}<span class="erp-badge warning">Por vencer</span>{% else %}<span class="erp-badge success">Vigente</span>{% endif %}</div>
+    <div class="fefo-lot-row"><span>Vencimiento</span><strong>{{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"Legado sin fecha" }}</strong></div>
+    <div class="fefo-lot-row"><span>Bodega</span><strong>{{ existencia.bodega.nombre }}</strong></div>
+    <div class="fefo-lot-row"><span>Disponible</span><strong>{{ existencia.cantidad|floatformat:2|intcomma }}</strong></div>
+   </div>
+   {% endfor %}
+  </div>
+ </article>
+ {% empty %}<article class="erp-card fefo-empty">Todavia no hay lotes con existencias. Usa <strong>Registrar lote</strong> para ingresar el primero.</article>{% endfor %}
 </section>
 
-<section class="erp-grid">
-    {% for item in resumen_bodegas %}
-    <article class="erp-card">
-        <div class="erp-kpi-label">{{ item.bodega.get_tipo_display }}</div>
-        <p class="erp-stat-value">{{ item.total|floatformat:2|intcomma }}</p>
-        <p class="erp-card-muted">{{ item.bodega.nombre }}</p>
-    </article>
-    {% endfor %}
-</section>
-
-{% if lotes_alerta %}
-<section class="erp-card erp-alert-banner">
-    <div>
-        <strong>Productos proximos a vencer</strong>
-        <p>Prioriza estos lotes para venta o revision antes de seguir abasteciendo vitrina.</p>
-    </div>
-</section>
-{% endif %}
-
-<section class="erp-table-card">
-    <div class="erp-section-heading">
-        <div>
-            <h3>Existencias por lote y bodega</h3>
-            <p>Ordenado por vencimiento para vender primero lo que vence antes.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Producto</th>
-                    <th>Lote</th>
-                    <th>Vencimiento</th>
-                    <th>Bodega</th>
-                    <th class="erp-money">Cantidad</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for existencia in existencias %}
-                <tr>
-                    <td>
-                        <strong>{{ existencia.lote.producto.nombre }}</strong>
-                        <div class="erp-card-muted">{{ existencia.lote.producto.codigo|default:"Sin codigo" }}</div>
-                    </td>
-                    <td>{{ existencia.lote.numero_lote }}</td>
-                    <td>{{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"Sin vencimiento" }}</td>
-                    <td><span class="erp-badge neutral">{{ existencia.bodega.nombre }}</span></td>
-                    <td class="erp-money">{{ existencia.cantidad|floatformat:2|intcomma }}</td>
-                    <td>
-                        {% if existencia.lote.vencido %}
-                        <span class="erp-badge danger">Vencido</span>
-                        {% elif existencia.lote.por_vencer %}
-                        <span class="erp-badge warning">Por vencer</span>
-                        {% else %}
-                        <span class="erp-badge success">Disponible</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="erp-empty-row">Todavia no hay lotes registrados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<section class="erp-table-card" style="margin-top:18px">
+ <div class="erp-section-heading"><div><h3>Trazabilidad reciente</h3><p>Entradas, salidas, transferencias y ajustes con el lote exacto involucrado.</p></div></div>
+ <div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Fecha</th><th>Producto / lote</th><th>Movimiento</th><th>Bodega</th><th class="erp-money">Cantidad</th><th>Referencia</th></tr></thead><tbody>
+ {% for movimiento in movimientos_recientes %}<tr><td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td><td><strong>{{ movimiento.lote.producto.nombre }}</strong><div class="erp-card-muted">Lote {{ movimiento.lote.numero_lote }}</div></td><td>{{ movimiento.get_tipo_display }}</td><td>{{ movimiento.bodega.nombre }}</td><td class="erp-money">{{ movimiento.cantidad|floatformat:2|intcomma }}</td><td>{{ movimiento.referencia|default:"-" }}</td></tr>{% empty %}<tr><td colspan="6" class="erp-empty-row">No hay movimientos por lote registrados.</td></tr>{% endfor %}
+ </tbody></table></div>
 </section>
 {% endblock %}

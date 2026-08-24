@@ -618,6 +618,13 @@ class LoteInventario(models.Model):
         ordering = ['fecha_vencimiento', 'producto__nombre', 'numero_lote']
         unique_together = ('empresa', 'producto', 'numero_lote')
 
+    def clean(self):
+        super().clean()
+        if self.producto_id and self.empresa_id != self.producto.empresa_id:
+            raise ValidationError("El producto y el lote deben pertenecer a la misma empresa.")
+        if self.proveedor_id and self.empresa_id != self.proveedor.empresa_id:
+            raise ValidationError("El proveedor del lote debe pertenecer a la misma empresa.")
+
     @property
     def dias_para_vencer(self):
         if not self.fecha_vencimiento:
@@ -651,6 +658,10 @@ class ExistenciaLoteBodega(models.Model):
 
     def clean(self):
         super().clean()
+        if self.bodega_id and self.empresa_id != self.bodega.empresa_id:
+            raise ValidationError("La existencia y la bodega deben pertenecer a la misma empresa.")
+        if self.lote_id and self.empresa_id != self.lote.empresa_id:
+            raise ValidationError("La existencia y el lote deben pertenecer a la misma empresa.")
         if self.bodega_id and self.lote_id and self.bodega.empresa_id != self.lote.empresa_id:
             raise ValidationError("La bodega y el lote deben pertenecer a la misma empresa.")
 
@@ -683,6 +694,15 @@ class MovimientoLoteBodega(models.Model):
 
     class Meta:
         ordering = ['-fecha', '-id']
+
+    def clean(self):
+        super().clean()
+        if self.bodega_id and self.empresa_id != self.bodega.empresa_id:
+            raise ValidationError("El movimiento y la bodega deben pertenecer a la misma empresa.")
+        if self.lote_id and self.empresa_id != self.lote.empresa_id:
+            raise ValidationError("El movimiento y el lote deben pertenecer a la misma empresa.")
+        if self.factura_id and self.empresa_id != self.factura.empresa_id:
+            raise ValidationError("La factura del movimiento debe pertenecer a la misma empresa.")
 
     def __str__(self):
         return f"{self.get_tipo_display()} - {self.lote} - {self.cantidad}"
