@@ -2255,4 +2255,16 @@ class CRMTests(TestCase):
         self.assertContains(response, "Texto clínico que debe conservarse")
         self.assertContains(response, "Desde la cita")
         self.assertContains(response, ">4<", html=False)
-        self.assertFalse(SesionCamaraHiperbarica.objects.filter(cita=cita).exists())
+        self.assertContains(response, "has-error")
+        formulario = response.context["sesion_camara_form"]
+        self.assertTrue(formulario.is_bound)
+        self.assertEqual(formulario.data["nota_enfermeria"], "Texto clínico que debe conservarse")
+        self.assertEqual(formulario.data.getlist("sin_fiebre"), ["si"])
+        self.assertIn("firma_enfermeria", formulario.errors)
+
+        sesion = SesionCamaraHiperbarica.objects.get(cita=cita)
+        self.assertEqual(sesion.estado, "borrador")
+        self.assertEqual(sesion.numero_sesion, 4)
+        self.assertEqual(sesion.nota_enfermeria, "Texto clínico que debe conservarse")
+        self.assertEqual(sesion.sin_fiebre, "si")
+        self.assertEqual(sesion.firma_enfermeria, "")

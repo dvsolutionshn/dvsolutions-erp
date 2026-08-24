@@ -1165,7 +1165,11 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
         instance=sesion,
         finalizar=finalizar,
     )
-    formularios_validos = programa_form.is_valid() and sesion_form.is_valid()
+    # Valide ambos formularios siempre. El operador necesita ver todos los
+    # campos pendientes en una sola respuesta, no solo el primer error.
+    programa_valido = programa_form.is_valid()
+    sesion_valida = sesion_form.is_valid()
+    formularios_validos = programa_valido and sesion_valida
     if formularios_validos:
         numero_sesion = sesion_form.cleaned_data["numero_sesion"]
         programa_para_duplicado = programa or ProgramaCamaraHiperbarica.objects.filter(
@@ -1215,15 +1219,72 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
             else:
                 messages.success(request, f"Borrador de la sesión {sesion_guardada.numero_sesion} guardado.")
     else:
+        borrador_guardado_automaticamente = False
+        # Si se intentó finalizar una sesión incompleta, preserve de inmediato
+        # todo lo capturado en la base de datos. Se vuelve a validar como
+        # borrador porque los campos clínicos solo son obligatorios al cerrar.
+        if finalizar and programa_valido:
+            borrador_form = SesionCamaraHiperbaricaForm(
+                datos_sesion,
+                instance=sesion,
+                finalizar=False,
+            )
+            if borrador_form.is_valid():
+                numero_borrador = borrador_form.cleaned_data["numero_sesion"]
+                programa_para_duplicado = programa or ProgramaCamaraHiperbarica.objects.filter(
+                    empresa=empresa,
+                    paciente=cita.paciente,
+                    activo=True,
+                ).first()
+                duplicada = SesionCamaraHiperbarica.objects.none()
+                if programa_para_duplicado:
+                    duplicada = SesionCamaraHiperbarica.objects.filter(
+                        programa=programa_para_duplicado,
+                        numero_sesion=numero_borrador,
+                    )
+                    if sesion:
+                        duplicada = duplicada.exclude(pk=sesion.pk)
+
+                if not duplicada.exists():
+                    with transaction.atomic():
+                        programa_guardado = programa_form.save(commit=False)
+                        programa_guardado.empresa = empresa
+                        programa_guardado.paciente = cita.paciente
+                        if not programa_guardado.pk:
+                            programa_guardado.creado_por = request.user
+                        programa_guardado.actualizado_por = request.user
+                        programa_guardado.save()
+
+                        sesion_guardada = borrador_form.save(commit=False)
+                        sesion_guardada.programa = programa_guardado
+                        sesion_guardada.empresa = empresa
+                        sesion_guardada.paciente = cita.paciente
+                        sesion_guardada.cita = cita
+                        sesion_guardada.estado = "borrador"
+                        if not sesion_guardada.pk:
+                            sesion_guardada.creado_por = request.user
+                        sesion_guardada.actualizado_por = request.user
+                        sesion_guardada.save()
+                    programa = programa_guardado
+                    sesion = sesion_guardada
+                    borrador_guardado_automaticamente = True
+
         errores = []
         for formulario in (programa_form, sesion_form):
             for campo, mensajes_campo in formulario.errors.items():
                 etiqueta = formulario.fields[campo].label if campo in formulario.fields else "Formulario"
                 errores.extend(f"{etiqueta}: {mensaje}" for mensaje in mensajes_campo)
-        messages.error(
-            request,
-            "Revise los campos marcados en rojo. La información escrita se conserva en pantalla.",
-        )
+        if borrador_guardado_automaticamente:
+            messages.error(
+                request,
+                "La sesión no se finalizó porque faltan datos. Todo lo escrito quedó guardado "
+                "automáticamente como borrador; complete los campos marcados en rojo.",
+            )
+        else:
+            messages.error(
+                request,
+                "Revise los campos marcados en rojo. La información escrita se conserva en pantalla.",
+            )
 
         fecha = timezone.localtime(cita.fecha_hora).date()
         contexto = {
