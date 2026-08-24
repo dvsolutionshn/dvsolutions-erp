@@ -503,6 +503,7 @@ class HistoriaClinicaEspecialidad(models.Model):
         ("enfermeria", "Enfermeria"),
         ("terapias", "Terapias"),
         ("camara_hiperbarica", "Camara hiperbarica"),
+        ("terapias_postquirurgicas", "Terapias Post Quirurgicas"),
     ]
     ESTADO_CHOICES = [
         ("borrador", "Borrador"),

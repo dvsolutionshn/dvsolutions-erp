@@ -413,6 +413,13 @@
         </div>
         <a class="erp-btn-secondary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Ver control completo</a>
     </div>
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid #87c9bf;border-radius:12px;background:linear-gradient(135deg,#effbf8,#fff);flex-wrap:wrap;">
+        <div>
+            <strong style="display:block;color:#135e57;">Terapias Post Quirúrgicas · Programa de 12 sesiones</strong>
+            <span class="erp-card-muted">Consulte signos vitales, estado, equipos, cuidados y notas de cada sesión.</span>
+        </div>
+        <a class="erp-btn-secondary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Ver cuadro completo</a>
+    </div>
     {% endif %}
     {% if formularios_hospitalarios %}
     <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid var(--line);border-radius:12px;background:#f7fbff;flex-wrap:wrap;">

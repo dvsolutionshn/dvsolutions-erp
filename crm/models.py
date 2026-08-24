@@ -510,6 +510,190 @@ class SesionCamaraHiperbarica(models.Model):
         if errores:
             raise ValidationError(errores)
 
+
+class ProgramaTerapiaPostQuirurgica(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="programas_terapia_postquirurgica",
+    )
+    paciente = models.ForeignKey(
+        "clinica.Paciente",
+        on_delete=models.CASCADE,
+        related_name="programas_terapia_postquirurgica",
+    )
+    cirugia = models.CharField(max_length=220, blank=True)
+    fecha_cirugia = models.DateField(blank=True, null=True)
+    activo = models.BooleanField(default=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="programas_terapia_postquirurgica_creados",
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="programas_terapia_postquirurgica_actualizados",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-activo", "-fecha_creacion", "-id"]
+        indexes = [models.Index(fields=["empresa", "paciente", "activo"])]
+        verbose_name = "Programa de terapias post quirúrgicas"
+        verbose_name_plural = "Programas de terapias post quirúrgicas"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} · {self.cirugia or 'Terapias post quirúrgicas'}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if self.paciente_id and self.empresa_id and self.paciente.empresa_id != self.empresa_id:
+            raise ValidationError("El paciente no pertenece a la empresa del programa post quirúrgico.")
+
+
+class SesionTerapiaPostQuirurgica(models.Model):
+    ESTADO_CHOICES = [("borrador", "Borrador"), ("finalizada", "Sesión finalizada")]
+    ESTADO_PACIENTE_CHOICES = [
+        ("bueno", "Bueno"), ("regular", "Regular"), ("malo", "Malo"),
+        ("edema", "Edema"), ("equimosis", "Equimosis"), ("induracion", "Induración"),
+        ("fibrosis", "Fibrosis"), ("seroma", "Seroma"), ("eritema", "Eritema"),
+        ("herida_alterada", "Herida alterada"),
+    ]
+    EQUIPO_CHOICES = [
+        ("usg", "USG"), ("tens", "TENS"), ("vibrata", "Vibrata"),
+        ("vacuum", "Vacuum"), ("faja_ajuste", "Faja / ajuste"), ("presoterapia", "Presoterapia"),
+        ("frio_calor", "Frío / Calor"), ("laser_corporal", "Láser corporal"),
+        ("radiofrecuencia", "Radiofrecuencia"), ("exilis", "Exilis"),
+        ("emsculpt", "Emsculpt"),
+    ]
+    CUIDADO_CHOICES = [
+        ("drenaje_linfatico", "Drenaje linfático"),
+        ("curacion_heridas", "Curación de heridas"),
+        ("cups", "Cups"),
+        ("otro", "Otro"),
+    ]
+
+    programa = models.ForeignKey(
+        ProgramaTerapiaPostQuirurgica,
+        on_delete=models.CASCADE,
+        related_name="sesiones",
+    )
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="sesiones_terapia_postquirurgica")
+    paciente = models.ForeignKey(
+        "clinica.Paciente", on_delete=models.CASCADE, related_name="sesiones_terapia_postquirurgica"
+    )
+    cita = models.OneToOneField(
+        CitaCliente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="control_terapia_postquirurgica",
+    )
+    numero_sesion = models.PositiveSmallIntegerField()
+    fecha_sesion = models.DateTimeField(default=timezone.now, editable=False)
+    hora_inicio = models.TimeField(blank=True, null=True)
+    hora_finalizacion = models.TimeField(blank=True, null=True)
+    presion_arterial = models.CharField(max_length=30, blank=True)
+    frecuencia_cardiaca = models.CharField(max_length=20, blank=True)
+    frecuencia_respiratoria = models.CharField(max_length=20, blank=True)
+    saturacion_oxigeno = models.CharField(max_length=20, blank=True)
+    temperatura = models.CharField(max_length=20, blank=True)
+    escala_dolor = models.PositiveSmallIntegerField(blank=True, null=True)
+    estado_paciente = models.JSONField(default=list, blank=True)
+    equipos_utilizados = models.JSONField(default=list, blank=True)
+    minutos_area = models.CharField(max_length=180, blank=True)
+    cuidados_realizados = models.JSONField(default=list, blank=True)
+    cuidado_otro = models.CharField(max_length=220, blank=True)
+    nota_enfermeria = models.TextField(blank=True)
+    enfermera_nombre = models.CharField(max_length=180, blank=True)
+    firma_enfermeria = models.CharField(max_length=180, blank=True)
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="borrador")
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sesiones_terapia_postquirurgica_creadas",
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sesiones_terapia_postquirurgica_actualizadas",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["numero_sesion", "fecha_sesion", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["programa", "numero_sesion"], name="crm_terapia_post_programa_sesion_uniq"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(numero_sesion__gte=1, numero_sesion__lte=12),
+                name="crm_terapia_post_sesion_1_12",
+            ),
+        ]
+        indexes = [models.Index(fields=["empresa", "paciente", "estado"])]
+        verbose_name = "Sesión de terapia post quirúrgica"
+        verbose_name_plural = "Sesiones de terapia post quirúrgica"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} · Terapia post quirúrgica {self.numero_sesion}"
+
+    @property
+    def bloqueada(self):
+        return self.estado == "finalizada"
+
+    @staticmethod
+    def _etiquetas_seleccionadas(valores, opciones):
+        etiquetas = dict(opciones)
+        return [etiquetas.get(valor, valor) for valor in (valores or [])]
+
+    @property
+    def estado_paciente_display(self):
+        return self._etiquetas_seleccionadas(self.estado_paciente, self.ESTADO_PACIENTE_CHOICES)
+
+    @property
+    def equipos_utilizados_display(self):
+        return self._etiquetas_seleccionadas(self.equipos_utilizados, self.EQUIPO_CHOICES)
+
+    @property
+    def cuidados_realizados_display(self):
+        return self._etiquetas_seleccionadas(self.cuidados_realizados, self.CUIDADO_CHOICES)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        errores = {}
+        if not 1 <= (self.numero_sesion or 0) <= 12:
+            errores["numero_sesion"] = "La sesión debe estar comprendida entre 1 y 12."
+        if self.escala_dolor is not None and self.escala_dolor > 10:
+            errores["escala_dolor"] = "La escala de dolor debe estar entre 0 y 10."
+        if self.programa_id:
+            if self.empresa_id != self.programa.empresa_id or self.paciente_id != self.programa.paciente_id:
+                errores["programa"] = "El programa no corresponde a esta empresa y paciente."
+        if self.cita_id:
+            if self.cita.empresa_id != self.empresa_id or self.cita.paciente_id != self.paciente_id:
+                errores["cita"] = "La cita no corresponde a esta empresa y paciente."
+        if self.pk:
+            original = SesionTerapiaPostQuirurgica.objects.filter(pk=self.pk).values("estado").first()
+            if original and original["estado"] == "finalizada":
+                raise ValidationError("La sesión finalizada está bloqueada y no puede modificarse.")
+        if errores:
+            raise ValidationError(errores)
+
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)

@@ -26,7 +26,9 @@ from .models import (
     OpcionServicioAgenda,
     PlantillaMensaje,
     ProgramaCamaraHiperbarica,
+    ProgramaTerapiaPostQuirurgica,
     SesionCamaraHiperbarica,
+    SesionTerapiaPostQuirurgica,
 )
 from .services import enviar_plantilla_cita_whatsapp, subir_media_whatsapp
 from .tokens import generar_token_respuesta_cita
@@ -2299,3 +2301,142 @@ class CRMTests(TestCase):
         self.assertEqual(sesion.estado, "borrador")
         self.assertEqual(sesion.numero_sesion, 8)
         self.assertEqual(sesion.nota_enfermeria, "Contenido que no debe borrarse")
+
+    def _crear_cita_terapia_postquirurgica(self, *, sesion_servicio=0):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="EXP-TPQ-001",
+            nombre="Paciente Terapia Post Quirúrgica",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Terapias Post Quirúrgicas",
+            categoria="tratamiento",
+            duracion_minutos=60,
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Licenciada en enfermería",
+        )
+        fecha_hora = timezone.localtime(timezone.now() + timedelta(days=3)).replace(
+            hour=10,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        return CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=profesional,
+            titulo=servicio.nombre,
+            responsable=profesional.nombre,
+            fecha_hora=fecha_hora,
+            duracion_minutos=60,
+            sesion_servicio=sesion_servicio,
+        )
+
+    def _datos_validos_terapia_postquirurgica(self):
+        return {
+            "cirugia": "Abdominoplastia",
+            "fecha_cirugia": "2026-08-20",
+            "numero_sesion": "1",
+            "hora_inicio": "10:00",
+            "hora_finalizacion": "11:00",
+            "presion_arterial": "120/80",
+            "frecuencia_cardiaca": "76",
+            "frecuencia_respiratoria": "18",
+            "saturacion_oxigeno": "98",
+            "temperatura": "36.5",
+            "escala_dolor": "3",
+            "estado_paciente": ["bueno", "edema"],
+            "equipos_utilizados": ["usg", "presoterapia"],
+            "minutos_area": "30 minutos en abdomen",
+            "cuidados_realizados": ["drenaje_linfatico"],
+            "cuidado_otro": "",
+            "nota_enfermeria": "Paciente tolera la terapia sin complicaciones.",
+            "enfermera_nombre": "Lic. Enfermería",
+            "firma_enfermeria": "Lic. Enfermería",
+        }
+
+    def test_terapias_postquirurgicas_es_modulo_independiente(self):
+        cita = self._crear_cita_terapia_postquirurgica(sesion_servicio=2)
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(
+            reverse("agenda_terapias_postquirurgicas", args=[self.empresa.slug]),
+            {
+                "fecha": timezone.localtime(cita.fecha_hora).date().isoformat(),
+                "control_terapia": cita.id,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "crm/terapias_postquirurgicas.html")
+        self.assertContains(response, "Terapias Post Quirúrgicas")
+        self.assertContains(response, "Programa de 12 sesiones")
+        self.assertContains(response, "Signos vitales")
+        self.assertContains(response, "Protocolo / máquinas")
+        self.assertContains(response, "Terapia manual / cuidados")
+        self.assertContains(response, "Guardar borrador")
+        self.assertContains(response, "Finalizar sesión")
+        self.assertEqual(len(response.context["tablero_sesiones_terapia"]), 12)
+
+    def test_terapia_postquirurgica_guarda_borrador_finaliza_y_bloquea(self):
+        cita = self._crear_cita_terapia_postquirurgica(sesion_servicio=3)
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_terapias_postquirurgicas_guardar", args=[self.empresa.slug, cita.id])
+        datos = self._datos_validos_terapia_postquirurgica()
+
+        response = self.client.post(url, {**datos, "accion": "borrador"})
+        self.assertEqual(response.status_code, 302)
+        sesion = SesionTerapiaPostQuirurgica.objects.get(cita=cita)
+        self.assertEqual(sesion.estado, "borrador")
+        self.assertEqual(sesion.numero_sesion, 3)
+        self.assertEqual(sesion.estado_paciente, ["bueno", "edema"])
+        self.assertEqual(ProgramaTerapiaPostQuirurgica.objects.filter(paciente=cita.paciente).count(), 1)
+
+        response = self.client.post(
+            url,
+            {**datos, "programa_id": sesion.programa_id, "accion": "finalizar"},
+        )
+        self.assertEqual(response.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, "finalizada")
+
+        response = self.client.post(
+            url,
+            {**datos, "programa_id": sesion.programa_id, "nota_enfermeria": "Cambio posterior", "accion": "borrador"},
+        )
+        self.assertEqual(response.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.nota_enfermeria, "Paciente tolera la terapia sin complicaciones.")
+
+    def test_terapia_postquirurgica_con_error_conserva_borrador_y_marca_campos(self):
+        cita = self._crear_cita_terapia_postquirurgica(sesion_servicio=4)
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_terapias_postquirurgicas_guardar", args=[self.empresa.slug, cita.id])
+        datos = self._datos_validos_terapia_postquirurgica()
+        datos.update({
+            "nota_enfermeria": "Contenido clínico que debe conservarse",
+            "firma_enfermeria": "",
+            "accion": "finalizar",
+        })
+
+        response = self.client.post(url, datos)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Faltan datos para finalizar la sesión")
+        self.assertContains(response, "Contenido clínico que debe conservarse")
+        self.assertContains(response, "has-error")
+        formulario = response.context["sesion_terapia_form"]
+        self.assertTrue(formulario.is_bound)
+        self.assertIn("firma_enfermeria", formulario.errors)
+        self.assertEqual(formulario.data.getlist("estado_paciente"), ["bueno", "edema"])
+
+        sesion = SesionTerapiaPostQuirurgica.objects.get(cita=cita)
+        self.assertEqual(sesion.estado, "borrador")
+        self.assertEqual(sesion.numero_sesion, 4)
+        self.assertEqual(sesion.nota_enfermeria, "Contenido clínico que debe conservarse")

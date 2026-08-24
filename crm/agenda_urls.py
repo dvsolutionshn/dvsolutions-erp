@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path("", views.agenda_citas, name="agenda_citas"),
     path("camara-hiperbarica/", views.camara_hiperbarica, name="agenda_camara_hiperbarica"),
+    path("terapias-post-quirurgicas/", views.terapias_postquirurgicas, name="agenda_terapias_postquirurgicas"),
     path("app/", views.agenda_mobile, name="agenda_mobile"),
     path("app/manifest.webmanifest", views.agenda_mobile_manifest, name="agenda_mobile_manifest"),
     path("app/service-worker.js", views.agenda_mobile_service_worker, name="agenda_mobile_service_worker"),
@@ -22,6 +23,11 @@ urlpatterns = [
         "<int:cita_id>/camara-hiperbarica/guardar/",
         views.guardar_control_camara_hiperbarica,
         name="agenda_camara_hiperbarica_guardar",
+    ),
+    path(
+        "<int:cita_id>/terapias-post-quirurgicas/guardar/",
+        views.guardar_terapia_postquirurgica,
+        name="agenda_terapias_postquirurgicas_guardar",
     ),
     path("<int:cita_id>/eliminar/", views.eliminar_cita, name="agenda_cita_eliminar"),
 ]

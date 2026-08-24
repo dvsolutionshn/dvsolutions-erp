@@ -15,7 +15,9 @@ from .models import (
     OpcionServicioAgenda,
     PlantillaMensaje,
     ProgramaCamaraHiperbarica,
+    ProgramaTerapiaPostQuirurgica,
     SesionCamaraHiperbarica,
+    SesionTerapiaPostQuirurgica,
 )
 
 
@@ -215,6 +217,89 @@ class SesionCamaraHiperbaricaForm(forms.ModelForm):
                 valor = datos.get(nombre)
                 if valor in (None, "", []):
                     self.add_error(nombre, "Complete este campo antes de finalizar la sesión.")
+        return datos
+
+
+class ProgramaTerapiaPostQuirurgicaForm(forms.ModelForm):
+    class Meta:
+        model = ProgramaTerapiaPostQuirurgica
+        fields = ["cirugia", "fecha_cirugia"]
+        widgets = {"fecha_cirugia": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
+        labels = {"cirugia": "Cirugía realizada", "fecha_cirugia": "Fecha de cirugía"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["fecha_cirugia"].input_formats = ["%Y-%m-%d"]
+
+
+class SesionTerapiaPostQuirurgicaForm(forms.ModelForm):
+    estado_paciente = forms.MultipleChoiceField(
+        label="Estado del paciente",
+        choices=SesionTerapiaPostQuirurgica.ESTADO_PACIENTE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+    equipos_utilizados = forms.MultipleChoiceField(
+        label="Protocolo / equipos utilizados",
+        choices=SesionTerapiaPostQuirurgica.EQUIPO_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+    cuidados_realizados = forms.MultipleChoiceField(
+        label="Terapia manual y cuidados",
+        choices=SesionTerapiaPostQuirurgica.CUIDADO_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+    CAMPOS_REQUERIDOS_FINALIZAR = [
+        "hora_inicio", "hora_finalizacion", "presion_arterial", "frecuencia_cardiaca",
+        "frecuencia_respiratoria", "saturacion_oxigeno", "temperatura", "escala_dolor",
+        "estado_paciente", "equipos_utilizados", "minutos_area", "cuidados_realizados",
+        "nota_enfermeria", "enfermera_nombre", "firma_enfermeria",
+    ]
+
+    class Meta:
+        model = SesionTerapiaPostQuirurgica
+        fields = [
+            "numero_sesion", "hora_inicio", "hora_finalizacion", "presion_arterial",
+            "frecuencia_cardiaca", "frecuencia_respiratoria", "saturacion_oxigeno",
+            "temperatura", "escala_dolor", "estado_paciente", "equipos_utilizados",
+            "minutos_area", "cuidados_realizados", "cuidado_otro", "nota_enfermeria",
+            "enfermera_nombre", "firma_enfermeria",
+        ]
+        widgets = {
+            "numero_sesion": forms.NumberInput(attrs={"min": 1, "max": 12}),
+            "hora_inicio": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
+            "hora_finalizacion": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
+            "escala_dolor": forms.NumberInput(attrs={"min": 0, "max": 10}),
+            "nota_enfermeria": forms.Textarea(attrs={"rows": 4}),
+        }
+        labels = {
+            "numero_sesion": "Sesión", "hora_inicio": "Hora inicio", "hora_finalizacion": "Hora final",
+            "presion_arterial": "PA", "frecuencia_cardiaca": "FC", "frecuencia_respiratoria": "FR",
+            "saturacion_oxigeno": "SpO₂", "temperatura": "Temperatura", "escala_dolor": "Dolor /10",
+            "minutos_area": "Minutos / área", "cuidado_otro": "Otro cuidado",
+            "nota_enfermeria": "Nota de enfermería", "enfermera_nombre": "Nombre de enfermera",
+            "firma_enfermeria": "Firma",
+        }
+
+    def __init__(self, *args, finalizar=False, bloqueada=False, **kwargs):
+        self.finalizar = finalizar
+        super().__init__(*args, **kwargs)
+        self.fields["hora_inicio"].input_formats = ["%H:%M"]
+        self.fields["hora_finalizacion"].input_formats = ["%H:%M"]
+        if bloqueada:
+            for campo in self.fields.values():
+                campo.disabled = True
+
+    def clean(self):
+        datos = super().clean()
+        if self.finalizar:
+            for nombre in self.CAMPOS_REQUERIDOS_FINALIZAR:
+                if datos.get(nombre) in (None, "", []):
+                    self.add_error(nombre, "Complete este campo antes de finalizar la sesión.")
+        if "otro" in (datos.get("cuidados_realizados") or []) and not (datos.get("cuidado_otro") or "").strip():
+            self.add_error("cuidado_otro", "Especifique el otro cuidado realizado.")
         return datos
 
 

@@ -17,7 +17,9 @@ from crm.models import (
     ConfiguracionCRM,
     OpcionServicioAgenda,
     ProgramaCamaraHiperbarica,
+    ProgramaTerapiaPostQuirurgica,
     SesionCamaraHiperbarica,
+    SesionTerapiaPostQuirurgica,
 )
 from facturacion.models import Cliente, Producto
 from .forms import PreconsultaClinicaPublicaForm
@@ -1322,6 +1324,62 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(len(response.context["tablero_sesiones_camara"]), 22)
         self.assertEqual(response.context["sesiones_finalizadas"], 1)
         self.assertFalse(HistoriaClinicaEspecialidad.objects.filter(paciente=paciente).exists())
+
+    def test_historia_terapias_postquirurgicas_muestra_cuadro_completo_de_12_sesiones(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-TPQ-001",
+            primer_nombre="Andrea",
+            primer_apellido="Reyes",
+            nombre="Andrea Reyes",
+            identidad="0801199500999",
+        )
+        programa = ProgramaTerapiaPostQuirurgica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            cirugia="Liposucción",
+            fecha_cirugia=datetime(2026, 8, 20).date(),
+            creado_por=self.user,
+        )
+        SesionTerapiaPostQuirurgica.objects.create(
+            programa=programa,
+            empresa=self.empresa,
+            paciente=paciente,
+            numero_sesion=1,
+            hora_inicio=datetime.strptime("09:00", "%H:%M").time(),
+            hora_finalizacion=datetime.strptime("10:00", "%H:%M").time(),
+            presion_arterial="118/76",
+            frecuencia_cardiaca="74",
+            frecuencia_respiratoria="18",
+            saturacion_oxigeno="99",
+            temperatura="36.4",
+            escala_dolor=2,
+            estado_paciente=["bueno", "edema"],
+            equipos_utilizados=["usg", "presoterapia"],
+            minutos_area="30 minutos en abdomen",
+            cuidados_realizados=["drenaje_linfatico"],
+            nota_enfermeria="Evolución postoperatoria satisfactoria.",
+            enfermera_nombre="Lic. Enfermería",
+            firma_enfermeria="Lic. Enfermería",
+            estado="finalizada",
+            creado_por=self.user,
+        )
+
+        response = self.client.get(
+            reverse(
+                "clinica_crear_historia_especialidad",
+                args=[self.empresa.slug, paciente.id, "terapias_postquirurgicas"],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "clinica/historia_terapias_postquirurgicas.html")
+        self.assertContains(response, "Registro de Terapias Postoperatorias")
+        self.assertContains(response, "Cuadro clínico completo de 12 sesiones")
+        self.assertContains(response, "Evolución postoperatoria satisfactoria")
+        self.assertContains(response, "Liposucción")
+        self.assertEqual(len(response.context["tablero_sesiones_terapia"]), 12)
+        self.assertEqual(response.context["sesiones_finalizadas"], 1)
 
     def test_medicina_estetica_guarda_formulario_estructurado(self):
         paciente = Paciente.objects.create(

@@ -87,6 +87,7 @@ from crm.models import (
     ConfiguracionCRM,
     OpcionServicioAgenda,
     ProgramaCamaraHiperbarica,
+    ProgramaTerapiaPostQuirurgica,
 )
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
@@ -2048,6 +2049,39 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                 "tablero_sesiones_camara": tablero_sesiones,
                 "sesiones_finalizadas": sum(1 for sesion in sesiones if sesion.estado == "finalizada"),
                 "sesiones_borrador": sum(1 for sesion in sesiones if sesion.estado == "borrador"),
+            },
+        )
+    if tipo == "terapias_postquirurgicas":
+        programas = list(
+            ProgramaTerapiaPostQuirurgica.objects.filter(empresa=empresa, paciente=paciente)
+            .prefetch_related("sesiones__cita", "sesiones__creado_por", "sesiones__actualizado_por")
+            .order_by("-activo", "-fecha_creacion", "-id")
+        )
+        programa_id = (request.GET.get("programa") or "").strip()
+        programa = next((item for item in programas if str(item.id) == programa_id), None) if programa_id else None
+        programa = programa or (programas[0] if programas else None)
+        sesiones = list(programa.sesiones.all()) if programa else []
+        por_numero = {sesion.numero_sesion: sesion for sesion in sesiones}
+        tablero = []
+        for numero in range(1, 13):
+            sesion = por_numero.get(numero)
+            abrir_url = ""
+            if sesion and sesion.cita_id:
+                fecha = timezone.localtime(sesion.cita.fecha_hora).date().isoformat()
+                abrir_url = (
+                    reverse("agenda_terapias_postquirurgicas", args=[empresa.slug])
+                    + f"?fecha={fecha}&control_terapia={sesion.cita_id}#documento-terapia"
+                )
+            tablero.append({"numero": numero, "registro": sesion, "abrir_url": abrir_url})
+        return render(
+            request,
+            "clinica/historia_terapias_postquirurgicas.html",
+            {
+                "empresa": empresa, "paciente": paciente, "tipo": tipo,
+                "tipo_nombre": tipos_validos[tipo], "programas_terapia": programas,
+                "programa_terapia": programa, "tablero_sesiones_terapia": tablero,
+                "sesiones_finalizadas": sum(item.estado == "finalizada" for item in sesiones),
+                "sesiones_borrador": sum(item.estado == "borrador" for item in sesiones),
             },
         )
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}

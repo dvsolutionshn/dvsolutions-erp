@@ -32,7 +32,9 @@ from .forms import (
     PacienteRapidoCitaForm,
     PlantillaMensajeForm,
     ProgramaCamaraHiperbaricaForm,
+    ProgramaTerapiaPostQuirurgicaForm,
     SesionCamaraHiperbaricaForm,
+    SesionTerapiaPostQuirurgicaForm,
 )
 from .models import (
     CampaniaMarketing,
@@ -43,7 +45,9 @@ from .models import (
     OpcionServicioAgenda,
     PlantillaMensaje,
     ProgramaCamaraHiperbarica,
+    ProgramaTerapiaPostQuirurgica,
     SesionCamaraHiperbarica,
+    SesionTerapiaPostQuirurgica,
 )
 from .appointment_notifications import procesar_notificacion, programar_notificaciones_cita
 from .models import NotificacionCitaWhatsApp
@@ -156,6 +160,70 @@ def _fecha_agenda(valor):
 def _es_cita_camara_hiperbarica(cita):
     texto = _normalizar_texto_agenda(cita.display_servicio)
     return "camara" in texto and "hiperbar" in texto
+
+
+def _es_cita_terapia_postquirurgica(cita):
+    texto = _normalizar_texto_agenda(cita.display_servicio)
+    return "terapia" in texto and "camara" not in texto
+
+
+def _contexto_terapias_postquirurgicas(empresa, request, fecha_seleccionada, *, cita_control_id=None):
+    if empresa.slug != "hospital_mia":
+        return {}
+    citas = list(
+        CitaCliente.objects.filter(
+            empresa=empresa, fecha_hora__date=fecha_seleccionada, paciente__isnull=False
+        ).select_related("paciente", "servicio_clinico", "profesional_salud").order_by("fecha_hora")
+    )
+    citas = [cita for cita in citas if _es_cita_terapia_postquirurgica(cita)]
+    control_id = str(cita_control_id or request.GET.get("control_terapia") or "").strip()
+    cita_control = None
+    if control_id:
+        try:
+            cita_control = next((cita for cita in citas if cita.id == int(control_id)), None)
+        except (TypeError, ValueError):
+            pass
+
+    programa = sesion = None
+    historial = []
+    programa_form = sesion_form = None
+    numero_desde_cita = numero_actual = None
+    if cita_control:
+        sesion = SesionTerapiaPostQuirurgica.objects.filter(cita=cita_control).select_related("programa").first()
+        programa = sesion.programa if sesion else ProgramaTerapiaPostQuirurgica.objects.filter(
+            empresa=empresa, paciente=cita_control.paciente, activo=True
+        ).first()
+        if programa:
+            historial = list(programa.sesiones.select_related("cita", "creado_por", "actualizado_por"))
+        usados = {item.numero_sesion for item in historial}
+        numero_desde_cita = cita_control.sesion_servicio if 1 <= (cita_control.sesion_servicio or 0) <= 12 else None
+        sugerido = numero_desde_cita
+        if sugerido in usados and (not sesion or sesion.numero_sesion != sugerido):
+            sugerido = None
+        sugerido = sugerido or next((numero for numero in range(1, 13) if numero not in usados), 12)
+        numero_actual = None if sesion and sesion.bloqueada else (sesion.numero_sesion if sesion else sugerido)
+        programa_form = ProgramaTerapiaPostQuirurgicaForm(instance=programa)
+        sesion_form = SesionTerapiaPostQuirurgicaForm(
+            instance=sesion,
+            initial={"numero_sesion": sesion.numero_sesion if sesion else sugerido},
+            bloqueada=bool(sesion and sesion.bloqueada),
+        )
+    por_numero = {item.numero_sesion: item for item in historial}
+    return {
+        "citas_terapias_post": citas,
+        "cita_control_terapia": cita_control,
+        "programa_terapia": programa,
+        "programa_terapia_form": programa_form,
+        "sesion_terapia": sesion,
+        "sesion_terapia_form": sesion_form,
+        "numero_sesion_desde_cita": numero_desde_cita,
+        "historial_terapias_post": historial,
+        "tablero_sesiones_terapia": [
+            {"numero": numero, "registro": por_numero.get(numero), "actual": numero == numero_actual}
+            for numero in range(1, 13)
+        ],
+        "sesiones_terapia_completadas": sum(item.estado == "finalizada" for item in historial),
+    }
 
 
 def _contexto_control_camara_hyperbarica(
@@ -1316,6 +1384,159 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
         f"{reverse('agenda_camara_hiperbarica', args=[empresa.slug])}?fecha={fecha}"
         f"&control_camara={cita.id}#documento-camara"
     )
+
+
+@login_required
+def terapias_postquirurgicas(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia":
+        return HttpResponse("Este módulo clínico solo está habilitado para Hospital Mia.", status=404)
+    if not request.user.puede_acceder_empresa(empresa):
+        return HttpResponse("Acceso no autorizado.", status=403)
+    if not (
+        request.user.is_superuser or request.user.es_administrador_empresa
+        or request.user.tiene_permiso_erp("puede_citas", empresa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa)
+    ):
+        return HttpResponse("Tu usuario no tiene permiso para consultar controles clínicos.", status=403)
+    fecha = _fecha_agenda(request.GET.get("fecha"))
+    contexto = {
+        "empresa": empresa, "fecha_seleccionada": fecha,
+        "fecha_anterior": fecha - timedelta(days=1), "fecha_siguiente": fecha + timedelta(days=1),
+    }
+    contexto.update(_contexto_terapias_postquirurgicas(empresa, request, fecha))
+    return render(request, "crm/terapias_postquirurgicas.html", contexto)
+
+
+@login_required
+@require_POST
+def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if empresa.slug != "hospital_mia":
+        return HttpResponse("Este control clínico solo está habilitado para Hospital Mia.", status=404)
+    if not request.user.puede_acceder_empresa(empresa):
+        return HttpResponse("Acceso no autorizado.", status=403)
+    if not (
+        request.user.is_superuser or request.user.es_administrador_empresa
+        or request.user.tiene_permiso_erp("puede_citas", empresa)
+        or request.user.tiene_alguna_permision_clinica_empresa(empresa)
+    ):
+        return HttpResponse("Tu usuario no tiene permiso para registrar controles clínicos.", status=403)
+    cita = get_object_or_404(
+        CitaCliente.objects.select_related("paciente", "servicio_clinico"),
+        empresa=empresa, id=cita_id, paciente__isnull=False,
+    )
+    if not _es_cita_terapia_postquirurgica(cita):
+        return HttpResponse("La cita seleccionada no corresponde a terapias post quirúrgicas.", status=400)
+    sesion = SesionTerapiaPostQuirurgica.objects.filter(cita=cita).select_related("programa").first()
+    fecha_iso = timezone.localtime(cita.fecha_hora).date().isoformat()
+    regreso = (
+        f"{reverse('agenda_terapias_postquirurgicas', args=[empresa.slug])}?fecha={fecha_iso}"
+        f"&control_terapia={cita.id}#documento-terapia"
+    )
+    if sesion and sesion.bloqueada:
+        messages.warning(request, "La sesión ya fue finalizada y permanece bloqueada.")
+        return redirect(regreso)
+    programa = sesion.programa if sesion else None
+    programa_id = (request.POST.get("programa_id") or "").strip()
+    if programa_id and not programa:
+        programa = ProgramaTerapiaPostQuirurgica.objects.filter(
+            id=programa_id, empresa=empresa, paciente=cita.paciente, activo=True
+        ).first()
+    finalizar = request.POST.get("accion") == "finalizar"
+    programa_form = ProgramaTerapiaPostQuirurgicaForm(request.POST, instance=programa)
+    datos = request.POST.copy()
+    numero_cita = cita.sesion_servicio if 1 <= (cita.sesion_servicio or 0) <= 12 else None
+    if numero_cita:
+        datos["numero_sesion"] = str(numero_cita)
+    sesion_form = SesionTerapiaPostQuirurgicaForm(datos, instance=sesion, finalizar=finalizar)
+    programa_valido = programa_form.is_valid()
+    sesion_valida = sesion_form.is_valid()
+    validos = programa_valido and sesion_valida
+    if validos:
+        programa_actual = programa or ProgramaTerapiaPostQuirurgica.objects.filter(
+            empresa=empresa, paciente=cita.paciente, activo=True
+        ).first()
+        if programa_actual:
+            duplicada = SesionTerapiaPostQuirurgica.objects.filter(
+                programa=programa_actual, numero_sesion=sesion_form.cleaned_data["numero_sesion"]
+            )
+            if sesion:
+                duplicada = duplicada.exclude(pk=sesion.pk)
+            if duplicada.exists():
+                sesion_form.add_error("numero_sesion", "Esta sesión ya está registrada en el programa.")
+                validos = False
+
+    def guardar(programa_limpio, sesion_limpia, estado):
+        with transaction.atomic():
+            programa_guardado = programa_limpio.save(commit=False)
+            programa_guardado.empresa = empresa
+            programa_guardado.paciente = cita.paciente
+            if not programa_guardado.pk:
+                programa_guardado.creado_por = request.user
+            programa_guardado.actualizado_por = request.user
+            programa_guardado.save()
+            sesion_guardada = sesion_limpia.save(commit=False)
+            sesion_guardada.programa = programa_guardado
+            sesion_guardada.empresa = empresa
+            sesion_guardada.paciente = cita.paciente
+            sesion_guardada.cita = cita
+            sesion_guardada.estado = estado
+            if not sesion_guardada.pk:
+                sesion_guardada.creado_por = request.user
+            sesion_guardada.actualizado_por = request.user
+            sesion_guardada.save()
+        return programa_guardado, sesion_guardada
+
+    if validos:
+        _, guardada = guardar(programa_form, sesion_form, "finalizada" if finalizar else "borrador")
+        messages.success(
+            request,
+            f"Sesión {guardada.numero_sesion} finalizada y vinculada al expediente."
+            if finalizar else f"Borrador de la sesión {guardada.numero_sesion} guardado.",
+        )
+        return redirect(regreso)
+
+    borrador_guardado = False
+    if finalizar and programa_valido:
+        borrador_form = SesionTerapiaPostQuirurgicaForm(datos, instance=sesion, finalizar=False)
+        if borrador_form.is_valid():
+            programa_actual = programa or ProgramaTerapiaPostQuirurgica.objects.filter(
+                empresa=empresa, paciente=cita.paciente, activo=True
+            ).first()
+            duplicada = SesionTerapiaPostQuirurgica.objects.none()
+            if programa_actual:
+                duplicada = SesionTerapiaPostQuirurgica.objects.filter(
+                    programa=programa_actual, numero_sesion=borrador_form.cleaned_data["numero_sesion"]
+                )
+                if sesion:
+                    duplicada = duplicada.exclude(pk=sesion.pk)
+            if not duplicada.exists():
+                programa, sesion = guardar(programa_form, borrador_form, "borrador")
+                borrador_guardado = True
+    errores = []
+    for formulario in (programa_form, sesion_form):
+        for campo, lista in formulario.errors.items():
+            etiqueta = formulario.fields[campo].label if campo in formulario.fields else "Formulario"
+            errores.extend(f"{etiqueta}: {mensaje}" for mensaje in lista)
+    messages.error(
+        request,
+        "No se finalizó la sesión. Todo lo escrito quedó guardado como borrador; complete los campos en rojo."
+        if borrador_guardado else "Revise los campos marcados en rojo. La información se conserva en pantalla.",
+    )
+    fecha = timezone.localtime(cita.fecha_hora).date()
+    contexto = {
+        "empresa": empresa, "fecha_seleccionada": fecha,
+        "fecha_anterior": fecha - timedelta(days=1), "fecha_siguiente": fecha + timedelta(days=1),
+        "errores_terapia_post": errores,
+    }
+    contexto.update(_contexto_terapias_postquirurgicas(empresa, request, fecha, cita_control_id=cita.id))
+    contexto.update({
+        "programa_terapia": programa, "programa_terapia_form": programa_form,
+        "sesion_terapia": sesion, "sesion_terapia_form": sesion_form,
+        "numero_sesion_desde_cita": numero_cita,
+    })
+    return render(request, "crm/terapias_postquirurgicas.html", contexto)
 
 
 def agenda_mobile(request, empresa_slug):
