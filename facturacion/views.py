@@ -3749,18 +3749,51 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         messages.error(request, "Los traslados internos no estan activos para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
-    bodegas = _asegurar_bodegas_farmaceuticas(empresa)
-    if empresa.slug == "luque_aestetic":
+    bodegas_base = _asegurar_bodegas_farmaceuticas(empresa)
+    usar_selectores_bodega = empresa.slug == "medical_spa"
+    if usar_selectores_bodega:
+        bodegas_activas = BodegaInventario.objects.filter(
+            empresa=empresa,
+            activa=True,
+        ).order_by("tipo", "nombre")
+        origen_id = request.POST.get("bodega_origen") or request.GET.get("bodega_origen")
+        destino_id = request.POST.get("bodega_destino") or request.GET.get("bodega_destino")
+        bodega_origen = bodegas_activas.filter(
+            id=origen_id
+        ).first()
+        if not bodega_origen and request.method != "POST":
+            bodega_origen = bodegas_activas.first()
+
+        bodega_destino = bodegas_activas.filter(
+            id=destino_id
+        ).first()
+        if request.method != "POST" and (
+            not bodega_destino or bodega_destino.id == bodega_origen.id
+        ):
+            bodega_destino = bodegas_activas.exclude(id=bodega_origen.id).first()
+
+        ruta = {
+            "label": (
+                f"{bodega_origen.nombre} -> {bodega_destino.nombre}"
+                if bodega_origen and bodega_destino
+                else "Selecciona origen y destino"
+            ),
+            "origen": bodega_origen,
+            "destino": bodega_destino,
+        }
+        ruta_key = ""
+        rutas = {}
+    elif empresa.slug == "luque_aestetic":
         rutas = {
             "principal_clinica": {
                 "label": "Principal -> Clinica",
-                "origen": bodegas["principal"],
-                "destino": bodegas["provisional"],
+                "origen": bodegas_base["principal"],
+                "destino": bodegas_base["provisional"],
             },
             "clinica_principal": {
                 "label": "Clinica -> Principal",
-                "origen": bodegas["provisional"],
-                "destino": bodegas["principal"],
+                "origen": bodegas_base["provisional"],
+                "destino": bodegas_base["principal"],
             },
         }
         ruta_default = "principal_clinica"
@@ -3768,24 +3801,25 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         rutas = {
             "principal_provisional": {
                 "label": "Principal -> Provisional",
-                "origen": bodegas["principal"],
-                "destino": bodegas["provisional"],
+                "origen": bodegas_base["principal"],
+                "destino": bodegas_base["provisional"],
             },
             "principal_vitrina": {
                 "label": "Principal -> Vitrina",
-                "origen": bodegas["principal"],
-                "destino": bodegas["vitrina"],
+                "origen": bodegas_base["principal"],
+                "destino": bodegas_base["vitrina"],
             },
             "provisional_vitrina": {
                 "label": "Provisional -> Vitrina",
-                "origen": bodegas["provisional"],
-                "destino": bodegas["vitrina"],
+                "origen": bodegas_base["provisional"],
+                "destino": bodegas_base["vitrina"],
             },
         }
         ruta_default = "principal_vitrina"
 
-    ruta_key = request.POST.get("ruta") or request.GET.get("ruta") or ruta_default
-    ruta = rutas.get(ruta_key, rutas[ruta_default])
+    if not usar_selectores_bodega:
+        ruta_key = request.POST.get("ruta") or request.GET.get("ruta") or ruta_default
+        ruta = rutas.get(ruta_key, rutas[ruta_default])
     existencias = (
         ExistenciaLoteBodega.objects.filter(
             empresa=empresa,
@@ -3804,7 +3838,11 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         except InvalidOperation:
             cantidad = Decimal("0.00")
 
-        if not existencia or cantidad <= 0:
+        if usar_selectores_bodega and (not ruta["origen"] or not ruta["destino"]):
+            messages.error(request, "Selecciona bodegas de origen y destino activas.")
+        elif usar_selectores_bodega and ruta["origen"].id == ruta["destino"].id:
+            messages.error(request, "La bodega destino debe ser diferente a la bodega origen.")
+        elif not existencia or cantidad <= 0:
             messages.error(request, "Selecciona un lote disponible y una cantidad mayor que cero.")
         elif cantidad > existencia.cantidad:
             messages.error(request, "La cantidad supera lo disponible en la bodega origen.")
@@ -3820,6 +3858,7 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
                     cantidad=cantidad,
                     referencia=referencia,
                     observacion=observacion,
+                    usuario=request.user,
                 )
                 _registrar_movimiento_lote_bodega(
                     empresa=empresa,
@@ -3829,11 +3868,16 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
                     cantidad=cantidad,
                     referencia=referencia,
                     observacion=observacion,
+                    usuario=request.user,
                 )
             messages.success(
                 request,
                 f"Traslado rapido realizado: {cantidad:.2f} unidad(es) de {existencia.lote.producto.nombre} hacia {ruta['destino'].nombre}."
             )
+            if usar_selectores_bodega:
+                return redirect(
+                    f"{request.path}?bodega_origen={ruta['origen'].id}&bodega_destino={ruta['destino'].id}"
+                )
             return redirect(f"{request.path}?ruta={ruta_key}")
 
     return render(request, "facturacion/traslado_rapido_farmaceutico.html", {
@@ -3842,6 +3886,8 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         "ruta_key": ruta_key,
         "ruta": ruta,
         "existencias": existencias,
+        "bodegas": bodegas_activas if usar_selectores_bodega else (),
+        "usar_selectores_bodega": usar_selectores_bodega,
     })
 
 

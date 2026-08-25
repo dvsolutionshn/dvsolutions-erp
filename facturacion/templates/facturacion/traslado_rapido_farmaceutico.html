@@ -47,10 +47,20 @@
 .quick-transfer-select option{
     font-size:.95rem;
 }
+.quick-warehouse-selects{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(220px,1fr));
+    gap:18px;
+    grid-column:1 / -1;
+}
+@media (max-width:720px){
+    .quick-warehouse-selects{grid-template-columns:1fr;}
+}
 </style>
 {% endblock %}
 
 {% block content %}
+{% if not usar_selectores_bodega %}
 <section class="quick-route-grid">
     {% for key, item in rutas.items %}
     <a class="quick-route {% if ruta_key == key %}is-active{% endif %}" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}?ruta={{ key }}">
@@ -60,17 +70,45 @@
     </a>
     {% endfor %}
 </section>
+{% endif %}
 
 <section class="erp-form-card">
     <div class="erp-form-actions">
         <div>
             <h3 style="margin:0 0 8px;">Mover producto</h3>
+            {% if usar_selectores_bodega %}
+            <p>Selecciona cualquier bodega activa como origen y destino. Los lotes disponibles se actualizan según el origen.</p>
+            {% else %}
             <p>Ruta seleccionada: <strong>{{ ruta.label }}</strong>. Solo aparecen lotes disponibles en la bodega origen.</p>
+            {% endif %}
         </div>
     </div>
     <form method="post" class="erp-form-grid three" style="margin-top:18px;">
         {% csrf_token %}
+        {% if usar_selectores_bodega %}
+        <div class="quick-warehouse-selects">
+            <div class="erp-field">
+                <label for="bodega_origen">Bodega origen</label>
+                <select id="bodega_origen" name="bodega_origen" required>
+                    {% for bodega in bodegas %}
+                    <option value="{{ bodega.id }}" {% if bodega.id == ruta.origen.id %}selected{% endif %}>{{ bodega.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <div class="erp-field-help">De aquí se descuenta el producto.</div>
+            </div>
+            <div class="erp-field">
+                <label for="bodega_destino">Bodega destino</label>
+                <select id="bodega_destino" name="bodega_destino" required>
+                    {% for bodega in bodegas %}
+                    <option value="{{ bodega.id }}" {% if bodega.id == ruta.destino.id %}selected{% endif %} {% if bodega.id == ruta.origen.id %}disabled{% endif %}>{{ bodega.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <div class="erp-field-help">Aquí se suma el producto.</div>
+            </div>
+        </div>
+        {% else %}
         <input type="hidden" name="ruta" value="{{ ruta_key }}">
+        {% endif %}
         <div class="erp-field" style="grid-column:1 / -1;">
             <label for="existencia">Producto / lote disponible</label>
             <select id="existencia" class="quick-transfer-select" name="existencia" required>
@@ -87,7 +125,7 @@
             <label for="cantidad">Cantidad a mover</label>
             <input id="cantidad" type="number" step="0.01" name="cantidad" required placeholder="0.00">
         </div>
-        <div class="erp-field">
+        {% if not usar_selectores_bodega %}<div class="erp-field">
             <label>Origen</label>
             <div class="erp-info-value">{{ ruta.origen.nombre }}</div>
             <div class="erp-field-help">Se descuenta automaticamente.</div>
@@ -96,7 +134,7 @@
             <label>Destino</label>
             <div class="erp-info-value">{{ ruta.destino.nombre }}</div>
             <div class="erp-field-help">Se suma automaticamente.</div>
-        </div>
+        </div>{% endif %}
         <div class="erp-field" style="grid-column:1 / -1;">
             <label for="observacion">Observacion</label>
             <input id="observacion" type="text" name="observacion" placeholder="Opcional: abastecimiento vitrina, producto por vencer, revision de bodega.">
@@ -153,4 +191,33 @@
         </table>
     </div>
 </section>
+
+{% if usar_selectores_bodega %}
+<script>
+(() => {
+    const origin = document.getElementById("bodega_origen");
+    const destination = document.getElementById("bodega_destino");
+    if (!origin || !destination) return;
+
+    const syncDestination = () => {
+        Array.from(destination.options).forEach(option => {
+            option.disabled = option.value === origin.value;
+        });
+        if (destination.value === origin.value) {
+            const next = Array.from(destination.options).find(option => !option.disabled);
+            destination.value = next ? next.value : "";
+        }
+    };
+    origin.addEventListener("change", () => {
+        syncDestination();
+        const params = new URLSearchParams({
+            bodega_origen: origin.value,
+            bodega_destino: destination.value,
+        });
+        window.location.assign(`${window.location.pathname}?${params.toString()}`);
+    });
+    syncDestination();
+})();
+</script>
+{% endif %}
 {% endblock %}

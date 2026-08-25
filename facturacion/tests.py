@@ -3843,6 +3843,138 @@ class FacturacionTests(TestCase):
         self.assertEqual(response.context["resumen"]["costo_real"], Decimal("300.00"))
         self.assertEqual(response.context["resumen"]["valor_venta"], Decimal("750.00"))
 
+    def test_transferencia_rapida_medical_spa_lista_todas_las_bodegas_activas(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        bodega_extra = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Cabina Facial",
+            tipo="otra",
+        )
+        BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega cerrada",
+            tipo="otra",
+            activa=False,
+        )
+
+        response = self.client.get(reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="bodega_origen"')
+        self.assertContains(response, 'name="bodega_destino"')
+        self.assertContains(response, bodega_extra.nombre, count=3)
+        self.assertNotContains(response, "Bodega cerrada")
+        self.assertNotContains(response, "Ruta rapida")
+
+    def test_transferencia_rapida_medical_spa_mueve_entre_cualquier_bodega_y_deja_trazabilidad(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        origen = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Cabina Corporal",
+            tipo="otra",
+        )
+        self.client.get(reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]))
+        destino = BodegaInventario.objects.get(empresa=self.empresa, nombre="Bodega Hospital")
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Aceite de masaje",
+            codigo="ACE-001",
+            precio=Decimal("250.00"),
+            controla_inventario=True,
+        )
+        lote = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="ACE-LOTE-1",
+        )
+        existencia_origen = ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=origen,
+            lote=lote,
+            cantidad=Decimal("8.00"),
+        )
+
+        response = self.client.post(
+            reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]),
+            {
+                "bodega_origen": str(origen.id),
+                "bodega_destino": str(destino.id),
+                "existencia": str(existencia_origen.id),
+                "cantidad": "3.00",
+                "observacion": "Reposicion para tratamientos",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        existencia_origen.refresh_from_db()
+        self.assertEqual(existencia_origen.cantidad, Decimal("5.00"))
+        self.assertEqual(
+            ExistenciaLoteBodega.objects.get(bodega=destino, lote=lote).cantidad,
+            Decimal("3.00"),
+        )
+        movimientos = MovimientoLoteBodega.objects.filter(lote=lote).order_by("id")
+        self.assertEqual(movimientos.count(), 2)
+        self.assertEqual(
+            list(movimientos.values_list("tipo", "bodega_id", "cantidad")),
+            [
+                ("traslado_salida", origen.id, Decimal("3.00")),
+                ("traslado_entrada", destino.id, Decimal("3.00")),
+            ],
+        )
+        self.assertEqual(movimientos[0].referencia, movimientos[1].referencia)
+        self.assertEqual(movimientos[0].usuario, self.user)
+        self.assertEqual(movimientos[1].usuario, self.user)
+
+    def test_transferencia_rapida_medical_spa_rechaza_misma_bodega(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        self.client.get(reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]))
+        origen = BodegaInventario.objects.get(empresa=self.empresa, nombre="Bodega General")
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Crema corporal",
+            precio=Decimal("100.00"),
+            controla_inventario=True,
+        )
+        lote = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="CREMA-1",
+        )
+        existencia = ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=origen,
+            lote=lote,
+            cantidad=Decimal("4.00"),
+        )
+
+        response = self.client.post(
+            reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]),
+            {
+                "bodega_origen": str(origen.id),
+                "bodega_destino": str(origen.id),
+                "existencia": str(existencia.id),
+                "cantidad": "1.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "La bodega destino debe ser diferente a la bodega origen.")
+        existencia.refresh_from_db()
+        self.assertEqual(existencia.cantidad, Decimal("4.00"))
+        self.assertFalse(MovimientoLoteBodega.objects.filter(lote=lote).exists())
+
     def test_luque_aestetic_crea_dos_bodegas_y_muestra_cantidades_en_producto(self):
         self.empresa.slug = "luque_aestetic"
         self.empresa.save(update_fields=["slug"])
