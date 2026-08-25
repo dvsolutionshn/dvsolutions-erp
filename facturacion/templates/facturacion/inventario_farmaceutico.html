@@ -10,6 +10,7 @@
 <a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'inventario_farmaceutico' empresa.slug %}">Nuevo producto</a>
 <a class="erp-action-link" href="{% url 'crear_lote_inventario' empresa.slug %}">Registrar lote</a>
 {% if usa_bodegas_internas %}<a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia rapida</a>{% endif %}
+<a class="erp-action-link" href="{% url 'regalias_inventario' empresa.slug %}">Regalias</a>
 <a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Inventario general</a>
 {% endblock %}
 

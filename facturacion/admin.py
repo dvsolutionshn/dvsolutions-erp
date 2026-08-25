@@ -136,7 +136,7 @@ class ExistenciaLoteBodegaAdmin(admin.ModelAdmin):
 
 @admin.register(MovimientoLoteBodega)
 class MovimientoLoteBodegaAdmin(admin.ModelAdmin):
-    list_display = ('empresa', 'fecha', 'bodega', 'lote', 'tipo', 'cantidad', 'referencia')
+    list_display = ('empresa', 'fecha', 'bodega', 'lote', 'tipo', 'cantidad', 'usuario', 'referencia')
     list_filter = ('empresa', 'tipo', 'bodega')
     search_fields = ('lote__numero_lote', 'lote__producto__nombre', 'referencia')
 

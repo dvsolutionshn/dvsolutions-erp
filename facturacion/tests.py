@@ -3920,6 +3920,100 @@ class FacturacionTests(TestCase):
         self.assertContains(transferencia, "Clinica -&gt; Principal")
         self.assertNotContains(transferencia, "Vitrina")
 
+    def test_regalia_descuenta_por_fefo_y_registra_usuario_bodega_y_lote(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        bodega = BodegaInventario.objects.create(
+            empresa=self.empresa, nombre="Bodega Principal", tipo="principal"
+        )
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Crema de prueba",
+            codigo="REG-001",
+            tipo_item="producto",
+            precio=Decimal("100.00"),
+            controla_inventario=True,
+        )
+        InventarioProducto.objects.create(
+            empresa=self.empresa, producto=producto, existencias=Decimal("8.00")
+        )
+        lote_primero = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="REG-FEFO-1",
+            fecha_vencimiento=date.today() + timedelta(days=30),
+        )
+        lote_segundo = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="REG-FEFO-2",
+            fecha_vencimiento=date.today() + timedelta(days=90),
+        )
+        existencia_primera = ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa, bodega=bodega, lote=lote_primero, cantidad=Decimal("3.00")
+        )
+        existencia_segunda = ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa, bodega=bodega, lote=lote_segundo, cantidad=Decimal("5.00")
+        )
+
+        response = self.client.post(
+            reverse("regalias_inventario", args=[self.empresa.slug]),
+            {
+                "producto_id": str(producto.id),
+                "bodega": str(bodega.id),
+                "cantidad": "4.00",
+                "observacion": "Muestra promocional",
+            },
+        )
+
+        self.assertRedirects(response, reverse("regalias_inventario", args=[self.empresa.slug]))
+        existencia_primera.refresh_from_db()
+        existencia_segunda.refresh_from_db()
+        producto.inventario.refresh_from_db()
+        self.assertEqual(existencia_primera.cantidad, Decimal("0.00"))
+        self.assertEqual(existencia_segunda.cantidad, Decimal("4.00"))
+        self.assertEqual(producto.inventario.existencias, Decimal("4.00"))
+        movimientos = MovimientoLoteBodega.objects.filter(tipo="regalia").order_by("lote__fecha_vencimiento")
+        self.assertEqual(list(movimientos.values_list("cantidad", flat=True)), [Decimal("3.00"), Decimal("1.00")])
+        self.assertTrue(all(movimiento.usuario == self.user for movimiento in movimientos))
+        general = MovimientoInventario.objects.get(producto=producto, tipo="regalia")
+        self.assertEqual(general.usuario, self.user)
+        self.assertEqual(general.bodega, bodega)
+
+    def test_regalias_no_permite_exceso_y_buscador_excluye_servicios(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = False
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        InventarioProducto.objects.create(
+            empresa=self.empresa, producto=self.producto, existencias=Decimal("2.00")
+        )
+        Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Servicio de regalo",
+            tipo_item="servicio",
+            unidad_medida="servicio",
+            precio=Decimal("50.00"),
+            controla_inventario=False,
+        )
+
+        busqueda = self.client.get(
+            reverse("regalias_buscar_productos", args=[self.empresa.slug]), {"q": "regalo"}
+        )
+        self.assertEqual(busqueda.status_code, 200)
+        self.assertEqual(busqueda.json()["resultados"], [])
+
+        response = self.client.post(
+            reverse("regalias_inventario", args=[self.empresa.slug]),
+            {"producto_id": str(self.producto.id), "cantidad": "3.00"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.producto.inventario.refresh_from_db()
+        self.assertEqual(self.producto.inventario.existencias, Decimal("2.00"))
+        self.assertFalse(MovimientoInventario.objects.filter(producto=self.producto, tipo="regalia").exists())
+
     def test_crear_lotes_del_mismo_producto_con_vencimientos_rapidos(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
         EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})

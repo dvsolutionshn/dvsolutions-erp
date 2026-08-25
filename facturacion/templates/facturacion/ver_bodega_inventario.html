@@ -10,6 +10,7 @@
 <a class="erp-action-link" href="{% url 'bodegas_dashboard' empresa.slug %}">Volver a bodegas</a>
 <a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={{ request.path }}">Nuevo Producto</a>
 <a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
+<a class="erp-action-link" href="{% url 'regalias_inventario' empresa.slug %}?bodega={{ bodega.id }}">Regalias</a>
 {% endblock %}
 
 {% block content %}

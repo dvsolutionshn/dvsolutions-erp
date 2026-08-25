@@ -1998,7 +1998,9 @@ def _obtener_lote_generico(producto):
     return lote
 
 
-def _registrar_movimiento_lote_bodega(*, empresa, bodega, lote, tipo, cantidad, referencia="", observacion="", factura=None):
+def _registrar_movimiento_lote_bodega(
+    *, empresa, bodega, lote, tipo, cantidad, referencia="", observacion="", factura=None, usuario=None
+):
     if not empresa or bodega.empresa_id != empresa.id or lote.empresa_id != empresa.id:
         raise ValidationError("La empresa, la bodega y el lote deben pertenecer a la misma empresa.")
     if lote.producto.empresa_id != empresa.id:
@@ -2030,6 +2032,7 @@ def _registrar_movimiento_lote_bodega(*, empresa, bodega, lote, tipo, cantidad, 
         referencia=referencia,
         observacion=observacion,
         factura=factura,
+        usuario=usuario if getattr(usuario, "is_authenticated", False) else None,
     )
 
 
@@ -2467,6 +2470,7 @@ def _registrar_movimiento_inventario(
     entrada_documento=None,
     compra_documento=None,
     bodega=None,
+    usuario=None,
 ):
     if not producto.controla_inventario:
         return None
@@ -2496,6 +2500,7 @@ def _registrar_movimiento_inventario(
         nota_credito=nota_credito,
         entrada_documento=entrada_documento,
         compra_documento=compra_documento,
+        usuario=usuario if getattr(usuario, "is_authenticated", False) else None,
     )
 
 
@@ -3837,6 +3842,192 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         "ruta_key": ruta_key,
         "ruta": ruta,
         "existencias": existencias,
+    })
+
+
+def _existencias_regalia_producto(empresa, producto, bodega):
+    existencias = ExistenciaLoteBodega.objects.select_for_update().filter(
+        empresa=empresa,
+        bodega=bodega,
+        lote__producto=producto,
+        lote__activo=True,
+        cantidad__gt=0,
+    )
+    if _empresa_usa_control_lotes_fefo(empresa):
+        hoy = timezone.localdate()
+        existencias = existencias.filter(
+            Q(lote__fecha_vencimiento__isnull=True) | Q(lote__fecha_vencimiento__gte=hoy)
+        )
+    return existencias.select_related("lote", "bodega").order_by(
+        F("lote__fecha_vencimiento").asc(nulls_last=True),
+        "lote__fecha_creacion",
+        "id",
+    )
+
+
+@login_required
+def regalias_buscar_productos(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    q = (request.GET.get("q") or "").strip()
+    config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    productos = Producto.objects.filter(
+        empresa=empresa,
+        tipo_item="producto",
+        controla_inventario=True,
+        activo=True,
+        eliminado=False,
+    )
+    if q:
+        productos = productos.filter(
+            Q(nombre__icontains=q) | Q(codigo__icontains=q) | Q(descripcion__icontains=q)
+        )
+
+    if config.usa_bodegas_internas:
+        bodega = BodegaInventario.objects.filter(
+            id=request.GET.get("bodega"), empresa=empresa, activa=True
+        ).first()
+        if not bodega:
+            return JsonResponse({"resultados": []})
+        filtro_existencias = Q(
+            lotes_inventario__existencias_bodega__empresa=empresa,
+            lotes_inventario__existencias_bodega__bodega=bodega,
+            lotes_inventario__existencias_bodega__cantidad__gt=0,
+            lotes_inventario__activo=True,
+        )
+        if _empresa_usa_control_lotes_fefo(empresa):
+            hoy = timezone.localdate()
+            filtro_existencias &= (
+                Q(lotes_inventario__fecha_vencimiento__isnull=True)
+                | Q(lotes_inventario__fecha_vencimiento__gte=hoy)
+            )
+        productos = productos.annotate(
+            disponible=Sum("lotes_inventario__existencias_bodega__cantidad", filter=filtro_existencias)
+        ).filter(disponible__gt=0)
+    else:
+        productos = productos.select_related("inventario").filter(inventario__existencias__gt=0)
+
+    resultados = []
+    for producto in productos.order_by("nombre")[:15]:
+        disponible = (
+            producto.disponible
+            if config.usa_bodegas_internas
+            else producto.inventario.existencias
+        )
+        resultados.append({
+            "id": producto.id,
+            "nombre": producto.nombre,
+            "codigo": producto.codigo or "",
+            "disponible": f"{disponible:.2f}",
+            "unidad": producto.get_unidad_medida_display(),
+        })
+    return JsonResponse({"resultados": resultados})
+
+
+@login_required
+def regalias_inventario(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    usa_bodegas = config.usa_bodegas_internas
+    bodegas = BodegaInventario.objects.none()
+    if usa_bodegas:
+        _asegurar_bodegas_farmaceuticas(empresa)
+        bodegas = BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre")
+
+    if request.method == "POST":
+        producto = Producto.objects.filter(
+            id=request.POST.get("producto_id"),
+            empresa=empresa,
+            tipo_item="producto",
+            controla_inventario=True,
+            activo=True,
+            eliminado=False,
+        ).first()
+        bodega = None
+        if usa_bodegas:
+            bodega = bodegas.filter(id=request.POST.get("bodega")).first()
+        try:
+            cantidad = Decimal((request.POST.get("cantidad") or "").strip())
+        except InvalidOperation:
+            cantidad = Decimal("0.00")
+
+        if not producto:
+            messages.error(request, "Selecciona un producto valido. Los servicios no pueden registrarse como regalia.")
+        elif usa_bodegas and not bodega:
+            messages.error(request, "Selecciona la bodega de origen.")
+        elif not cantidad.is_finite() or cantidad <= 0:
+            messages.error(request, "La cantidad debe ser mayor que cero.")
+        else:
+            observacion = (request.POST.get("observacion") or "").strip()
+            referencia = f"Regalia {timezone.localtime():%Y%m%d-%H%M%S-%f}"
+            try:
+                with transaction.atomic():
+                    inventario = InventarioProducto.objects.select_for_update().filter(
+                        empresa=empresa, producto=producto
+                    ).first()
+                    disponible_general = inventario.existencias if inventario else Decimal("0.00")
+                    if cantidad > disponible_general:
+                        raise ValidationError(
+                            f"No puedes entregar {cantidad:.2f}; la existencia disponible es {disponible_general:.2f}."
+                        )
+
+                    if bodega:
+                        existencias = list(_existencias_regalia_producto(empresa, producto, bodega))
+                        disponible_bodega = sum(
+                            (existencia.cantidad for existencia in existencias), Decimal("0.00")
+                        )
+                        if cantidad > disponible_bodega:
+                            raise ValidationError(
+                                f"No puedes entregar {cantidad:.2f}; en {bodega.nombre} hay {disponible_bodega:.2f} disponible(s)."
+                            )
+                        pendiente = cantidad
+                        for existencia in existencias:
+                            if pendiente <= 0:
+                                break
+                            salida = min(pendiente, existencia.cantidad)
+                            _registrar_movimiento_lote_bodega(
+                                empresa=empresa,
+                                bodega=bodega,
+                                lote=existencia.lote,
+                                tipo="regalia",
+                                cantidad=salida,
+                                referencia=referencia,
+                                observacion=observacion or "Salida de inventario sin factura por regalia.",
+                                usuario=request.user,
+                            )
+                            pendiente -= salida
+
+                    _registrar_movimiento_inventario(
+                        empresa=empresa,
+                        producto=producto,
+                        bodega=bodega,
+                        tipo="regalia",
+                        cantidad=cantidad,
+                        referencia=referencia,
+                        observacion=observacion or "Salida de inventario sin factura por regalia.",
+                        usuario=request.user,
+                    )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                messages.success(
+                    request,
+                    f"Regalia registrada: {cantidad:.2f} {producto.get_unidad_medida_display()} de {producto.nombre}.",
+                )
+                return redirect("regalias_inventario", empresa_slug=empresa.slug)
+
+    historial_lotes = MovimientoLoteBodega.objects.filter(
+        empresa=empresa, tipo="regalia"
+    ).select_related("lote", "lote__producto", "bodega", "usuario")[:100]
+    historial_general = MovimientoInventario.objects.filter(
+        empresa=empresa, tipo="regalia", bodega__isnull=True
+    ).select_related("producto", "usuario")[:100]
+    return render(request, "facturacion/regalias_inventario.html", {
+        "empresa": empresa,
+        "usa_bodegas": usa_bodegas,
+        "bodegas": bodegas,
+        "historial_lotes": historial_lotes,
+        "historial_general": historial_general,
+        "control_lotes_fefo": _empresa_usa_control_lotes_fefo(empresa),
     })
 
 

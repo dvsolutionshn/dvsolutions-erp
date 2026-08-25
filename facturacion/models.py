@@ -676,6 +676,7 @@ class MovimientoLoteBodega(models.Model):
         ('traslado_salida', 'Traslado salida'),
         ('traslado_entrada', 'Traslado entrada'),
         ('ajuste', 'Ajuste'),
+        ('regalia', 'Regalia'),
         ('reversion', 'Reversion'),
     )
 
@@ -689,6 +690,13 @@ class MovimientoLoteBodega(models.Model):
     referencia = models.CharField(max_length=140, blank=True, null=True)
     observacion = models.TextField(blank=True, null=True)
     factura = models.ForeignKey('Factura', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos_lotes')
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='movimientos_lote_bodega',
+    )
     fecha = models.DateTimeField(default=timezone.now)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
@@ -715,6 +723,7 @@ class MovimientoInventario(models.Model):
         ('devolucion_nota_credito', 'Entrada por Nota de Credito'),
         ('ajuste_entrada', 'Ajuste Positivo'),
         ('ajuste_salida', 'Ajuste Negativo'),
+        ('regalia', 'Regalia'),
         ('reversion_factura', 'Reversion de Factura'),
         ('reversion_nota_credito', 'Reversion de Nota de Credito'),
         ('reversion_compra', 'Reversion de Compra'),
@@ -739,6 +748,13 @@ class MovimientoInventario(models.Model):
     nota_credito = models.ForeignKey('NotaCredito', on_delete=models.SET_NULL, null=True, blank=True)
     entrada_documento = models.ForeignKey('EntradaInventarioDocumento', on_delete=models.SET_NULL, null=True, blank=True)
     compra_documento = models.ForeignKey('CompraInventario', on_delete=models.SET_NULL, null=True, blank=True)
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='movimientos_inventario_registrados',
+    )
     fecha = models.DateTimeField(default=timezone.now)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 

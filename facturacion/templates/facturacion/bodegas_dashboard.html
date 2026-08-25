@@ -43,6 +43,7 @@
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'crear_producto_facturacion' empresa.slug %}?next={% url 'bodegas_dashboard' empresa.slug %}">Nuevo Producto</a>
 <a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>
+<a class="erp-action-link" href="{% url 'regalias_inventario' empresa.slug %}">Regalias</a>
 {% if erp_access.usa_inventario_farmaceutico %}<a class="erp-action-link" href="{% url 'inventario_farmaceutico' empresa.slug %}">Inventario Farmaceutico</a>{% endif %}
 {% endblock %}
 

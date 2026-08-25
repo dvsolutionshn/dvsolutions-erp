@@ -1,0 +1,136 @@
+{% extends "core/erp_base.html" %}
+{% load humanize %}
+
+{% block title %}Regalias - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Salida sin factura{% endblock %}
+{% block header_title %}Regalias{% endblock %}
+{% block header_description %}Entrega productos sin facturar y rebaja automáticamente la existencia disponible.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Inventario</a>
+{% if usa_bodegas %}<a class="erp-action-link" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}">Transferencia Rapida</a>{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.gift-search{position:relative}.gift-results{position:absolute;z-index:20;top:100%;left:0;right:0;margin-top:6px;max-height:310px;overflow:auto;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow-soft)}
+.gift-result{display:flex;width:100%;align-items:center;justify-content:space-between;gap:14px;padding:13px 15px;border:0;border-bottom:1px solid var(--line);background:#fff;color:var(--ink);text-align:left;cursor:pointer}.gift-result:last-child{border-bottom:0}.gift-result:hover,.gift-result:focus{background:#f1f7fb}.gift-result small{display:block;margin-top:3px;color:var(--muted)}
+.gift-selected{display:none;margin-top:10px;padding:12px 14px;border:1px solid rgba(20,184,166,.25);border-radius:14px;background:#f0fdfa}.gift-selected.is-visible{display:flex;justify-content:space-between;gap:12px}.gift-empty{padding:15px;color:var(--muted)}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <div class="erp-section-heading">
+        <div>
+            <h3>Entregar producto</h3>
+            <p>La operación no genera factura. {% if control_lotes_fefo %}El sistema consume automáticamente los lotes vigentes por FEFO.{% endif %}</p>
+        </div>
+    </div>
+    <form method="post" class="erp-form-grid three" id="gift-form">
+        {% csrf_token %}
+        {% if usa_bodegas %}
+        <div class="erp-field">
+            <label for="bodega">Bodega de origen</label>
+            <select id="bodega" name="bodega" required>
+                <option value="">Seleccione la bodega</option>
+                {% for bodega in bodegas %}<option value="{{ bodega.id }}" {% if request.POST.bodega == bodega.id|stringformat:'s' or request.GET.bodega == bodega.id|stringformat:'s' %}selected{% endif %}>{{ bodega.nombre }}</option>{% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="erp-field gift-search" style="grid-column:{% if usa_bodegas %}2 / -1{% else %}1 / -1{% endif %};">
+            <label for="producto_busqueda">Buscar producto</label>
+            <input id="producto_busqueda" type="search" autocomplete="off" placeholder="Escribe nombre, código o descripción">
+            <input id="producto_id" type="hidden" name="producto_id" value="{{ request.POST.producto_id|default:'' }}">
+            <div id="gift-results" class="gift-results" hidden></div>
+            <div id="gift-selected" class="gift-selected"><span id="gift-selected-name"></span><strong id="gift-selected-stock"></strong></div>
+            <div class="erp-field-help">Solo aparecen productos activos con existencia; los servicios están excluidos.</div>
+        </div>
+        <div class="erp-field">
+            <label for="cantidad">Cantidad</label>
+            <input id="cantidad" type="number" min="0.01" step="0.01" name="cantidad" required value="{{ request.POST.cantidad|default:'' }}" placeholder="0.00">
+        </div>
+        <div class="erp-field" style="grid-column:2 / -1;">
+            <label for="observacion">Observación</label>
+            <input id="observacion" type="text" name="observacion" maxlength="300" value="{{ request.POST.observacion|default:'' }}" placeholder="Opcional: destinatario o motivo de la entrega">
+        </div>
+        <div class="erp-form-actions" style="grid-column:1 / -1;">
+            <div class="erp-field-help">Se validará nuevamente la existencia al confirmar.</div>
+            <button class="erp-btn" type="submit">Confirmar Regalia</button>
+        </div>
+    </form>
+</section>
+
+<section class="erp-table-card">
+    <div class="erp-section-heading"><div><h3>Historial de regalias</h3><p>Producto, cantidad, fecha, usuario, bodega y lote utilizado.</p></div></div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Fecha</th><th>Producto</th><th class="erp-money">Cantidad</th><th>Usuario</th><th>Bodega</th><th>Lote</th><th>Observación</th></tr></thead>
+            <tbody>
+                {% for movimiento in historial_lotes %}
+                <tr>
+                    <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td>
+                    <td><strong>{{ movimiento.lote.producto.nombre }}</strong><div class="erp-card-muted">{{ movimiento.lote.producto.codigo|default:"Sin código" }}</div></td>
+                    <td class="erp-money">{{ movimiento.cantidad|floatformat:2|intcomma }}</td>
+                    <td>{{ movimiento.usuario.get_full_name|default:movimiento.usuario.username|default:"Usuario eliminado" }}</td>
+                    <td>{{ movimiento.bodega.nombre }}</td><td>{{ movimiento.lote.numero_lote }}</td><td>{{ movimiento.observacion|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+                {% for movimiento in historial_general %}
+                <tr>
+                    <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td><td><strong>{{ movimiento.producto.nombre }}</strong><div class="erp-card-muted">{{ movimiento.producto.codigo|default:"Sin código" }}</div></td>
+                    <td class="erp-money">{{ movimiento.cantidad|floatformat:2|intcomma }}</td><td>{{ movimiento.usuario.get_full_name|default:movimiento.usuario.username|default:"Usuario eliminado" }}</td><td>No aplica</td><td>No aplica</td><td>{{ movimiento.observacion|default:"-" }}</td>
+                </tr>
+                {% empty %}{% if not historial_lotes %}<tr><td colspan="7" class="erp-empty-row">Todavía no hay regalias registradas.</td></tr>{% endif %}{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<script>
+(() => {
+    const input = document.getElementById('producto_busqueda');
+    const productId = document.getElementById('producto_id');
+    const results = document.getElementById('gift-results');
+    const selected = document.getElementById('gift-selected');
+    const selectedName = document.getElementById('gift-selected-name');
+    const selectedStock = document.getElementById('gift-selected-stock');
+    const warehouse = document.getElementById('bodega');
+    const endpoint = "{% url 'regalias_buscar_productos' empresa.slug %}";
+    let timer;
+
+    function clearSelection(){ productId.value = ''; selected.classList.remove('is-visible'); }
+    function hideResults(){ results.hidden = true; results.innerHTML = ''; }
+    async function search(){
+        if (warehouse && !warehouse.value) { hideResults(); return; }
+        const params = new URLSearchParams({q: input.value.trim()});
+        if (warehouse) params.set('bodega', warehouse.value);
+        try {
+            const response = await fetch(`${endpoint}?${params}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+            const data = await response.json();
+            results.innerHTML = '';
+            if (!data.resultados.length) results.innerHTML = '<div class="gift-empty">No hay productos coincidentes con existencia disponible.</div>';
+            data.resultados.forEach(product => {
+                const button = document.createElement('button');
+                button.type = 'button'; button.className = 'gift-result';
+                const label = document.createElement('span'); label.textContent = product.nombre;
+                const meta = document.createElement('small'); meta.textContent = product.codigo || 'Sin código'; label.appendChild(meta);
+                const stock = document.createElement('strong'); stock.textContent = `${product.disponible} ${product.unidad}`;
+                button.append(label, stock);
+                button.addEventListener('click', () => {
+                    productId.value = product.id; input.value = product.nombre;
+                    selectedName.textContent = product.nombre; selectedStock.textContent = `Disponible: ${product.disponible}`;
+                    selected.classList.add('is-visible'); hideResults();
+                });
+                results.appendChild(button);
+            });
+            results.hidden = false;
+        } catch (_) { hideResults(); }
+    }
+    input.addEventListener('input', () => { clearSelection(); clearTimeout(timer); timer = setTimeout(search, 180); });
+    input.addEventListener('focus', search);
+    if (warehouse) warehouse.addEventListener('change', () => { input.value = ''; clearSelection(); hideResults(); input.focus(); });
+    document.addEventListener('click', event => { if (!event.target.closest('.gift-search')) hideResults(); });
+})();
+</script>
+{% endblock %}
