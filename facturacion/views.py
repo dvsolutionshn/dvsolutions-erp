@@ -3877,7 +3877,7 @@ def regalias_buscar_productos(request, empresa_slug):
         ).first()
         if not bodega:
             return JsonResponse({"resultados": []})
-    return JsonResponse({"resultados": _datos_productos_regalia(empresa, q=q, bodega=bodega, limite=15)})
+    return JsonResponse({"resultados": _datos_productos_regalia(empresa, q=q, bodega=bodega)})
 
 
 def _datos_productos_regalia(empresa, *, q="", bodega=None, limite=None):

@@ -4090,6 +4090,42 @@ class FacturacionTests(TestCase):
         self.assertEqual(movimientos.count(), 2)
         self.assertEqual(len(set(movimientos.values_list("referencia", flat=True))), 1)
 
+    def test_regalias_lista_todos_los_productos_en_las_cuatro_empresas(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        productos_creados = [
+            Producto.objects.create(
+                empresa=self.empresa,
+                nombre=f"Producto regalia {indice:02d}",
+                codigo=f"REG-LISTA-{indice:02d}",
+                tipo_item="producto",
+                precio=Decimal("10.00"),
+                controla_inventario=True,
+            )
+            for indice in range(1, 17)
+        ]
+        servicio = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Servicio no visible en regalias",
+            codigo="SERV-NO-REG",
+            tipo_item="servicio",
+            unidad_medida="servicio",
+            precio=Decimal("100.00"),
+            controla_inventario=False,
+        )
+
+        for slug in ("hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"):
+            with self.subTest(empresa=slug):
+                self.empresa.slug = slug
+                self.empresa.save(update_fields=["slug"])
+                response = self.client.get(reverse("regalias_inventario", args=[slug]))
+                self.assertEqual(response.status_code, 200)
+                ids_listados = {item["id"] for item in response.context["productos_regalia"]}
+                self.assertTrue({producto.id for producto in productos_creados}.issubset(ids_listados))
+                self.assertNotIn(servicio.id, ids_listados)
+                self.assertGreater(len(ids_listados), 12)
+
     def test_crear_lotes_del_mismo_producto_con_vencimientos_rapidos(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
         EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})

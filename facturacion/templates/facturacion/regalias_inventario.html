@@ -145,7 +145,7 @@
             });
             line.classList.add('is-active');
             const filter = normalize(term.trim());
-            const visible = options.filter(option => !filter || normalize(option.textContent).includes(filter)).slice(0, 12);
+            const visible = options.filter(option => !filter || normalize(option.textContent).includes(filter));
             results.innerHTML = '';
             visible.forEach(option => {
                 const button = document.createElement('button');
