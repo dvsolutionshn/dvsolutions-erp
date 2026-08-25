@@ -3967,6 +3967,10 @@ class FacturacionTests(TestCase):
         self.assertEqual(busqueda_sin_bodega.json()["resultados"][0]["id"], producto.id)
         self.assertEqual(busqueda_sin_bodega.json()["resultados"][0]["disponible"], "8.00")
         self.assertEqual(busqueda_sin_bodega.json()["resultados"][0]["alcance"], "total")
+        pagina = self.client.get(reverse("regalias_inventario", args=[self.empresa.slug]))
+        self.assertContains(pagina, "Crema de prueba")
+        self.assertContains(pagina, "erp-suggestion-list")
+        self.assertContains(pagina, "REG-001")
 
         response = self.client.post(
             reverse("regalias_inventario", args=[self.empresa.slug]),
@@ -4007,12 +4011,25 @@ class FacturacionTests(TestCase):
             precio=Decimal("50.00"),
             controla_inventario=False,
         )
+        producto_sin_stock = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto Prueba sin stock",
+            codigo="PRUEBA-0",
+            tipo_item="producto",
+            precio=Decimal("25.00"),
+            controla_inventario=True,
+        )
 
         busqueda = self.client.get(
             reverse("regalias_buscar_productos", args=[self.empresa.slug]), {"q": "regalo"}
         )
         self.assertEqual(busqueda.status_code, 200)
         self.assertEqual(busqueda.json()["resultados"], [])
+        busqueda_producto = self.client.get(
+            reverse("regalias_buscar_productos", args=[self.empresa.slug]), {"q": "Prueba"}
+        )
+        self.assertEqual(busqueda_producto.json()["resultados"][0]["id"], producto_sin_stock.id)
+        self.assertEqual(busqueda_producto.json()["resultados"][0]["disponible"], "0.00")
 
         response = self.client.post(
             reverse("regalias_inventario", args=[self.empresa.slug]),

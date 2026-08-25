@@ -3871,6 +3871,17 @@ def regalias_buscar_productos(request, empresa_slug):
     q = (request.GET.get("q") or "").strip()
     config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     bodega = None
+    if config.usa_bodegas_internas and request.GET.get("bodega"):
+        bodega = BodegaInventario.objects.filter(
+            id=request.GET.get("bodega"), empresa=empresa, activa=True
+        ).first()
+        if not bodega:
+            return JsonResponse({"resultados": []})
+    return JsonResponse({"resultados": _datos_productos_regalia(empresa, q=q, bodega=bodega, limite=15)})
+
+
+def _datos_productos_regalia(empresa, *, q="", bodega=None, limite=None):
+    config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     productos = Producto.objects.filter(
         empresa=empresa,
         tipo_item="producto",
@@ -3884,9 +3895,6 @@ def regalias_buscar_productos(request, empresa_slug):
         )
 
     if config.usa_bodegas_internas:
-        bodega = BodegaInventario.objects.filter(
-            id=request.GET.get("bodega"), empresa=empresa, activa=True
-        ).first()
         filtro_existencias = Q(
             lotes_inventario__existencias_bodega__empresa=empresa,
             lotes_inventario__existencias_bodega__bodega__activa=True,
@@ -3903,16 +3911,19 @@ def regalias_buscar_productos(request, empresa_slug):
             )
         productos = productos.annotate(
             disponible=Sum("lotes_inventario__existencias_bodega__cantidad", filter=filtro_existencias)
-        ).filter(disponible__gt=0)
+        )
     else:
-        productos = productos.select_related("inventario").filter(inventario__existencias__gt=0)
+        productos = productos.select_related("inventario")
 
+    productos = productos.order_by("nombre")
+    if limite:
+        productos = productos[:limite]
     resultados = []
-    for producto in productos.order_by("nombre")[:15]:
+    for producto in productos:
         disponible = (
-            producto.disponible
+            producto.disponible or Decimal("0.00")
             if config.usa_bodegas_internas
-            else producto.inventario.existencias
+            else getattr(getattr(producto, "inventario", None), "existencias", Decimal("0.00"))
         )
         resultados.append({
             "id": producto.id,
@@ -3923,7 +3934,7 @@ def regalias_buscar_productos(request, empresa_slug):
             "unidad": producto.get_unidad_medida_display(),
             "alcance": "bodega" if config.usa_bodegas_internas and bodega else "total",
         })
-    return JsonResponse({"resultados": resultados})
+    return resultados
 
 
 @login_required
@@ -4031,6 +4042,7 @@ def regalias_inventario(request, empresa_slug):
         "historial_lotes": historial_lotes,
         "historial_general": historial_general,
         "control_lotes_fefo": _empresa_usa_control_lotes_fefo(empresa),
+        "productos_regalia": _datos_productos_regalia(empresa),
     })
 
 

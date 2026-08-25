@@ -13,8 +13,7 @@
 
 {% block extra_head %}
 <style>
-.gift-search{position:relative}.gift-results{position:absolute;z-index:20;top:100%;left:0;right:0;margin-top:6px;max-height:310px;overflow:auto;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow-soft)}
-.gift-result{display:flex;width:100%;align-items:center;justify-content:space-between;gap:14px;padding:13px 15px;border:0;border-bottom:1px solid var(--line);background:#fff;color:var(--ink);text-align:left;cursor:pointer}.gift-result:last-child{border-bottom:0}.gift-result:hover,.gift-result:focus{background:#f1f7fb}.gift-result small{display:block;margin-top:3px;color:var(--muted)}
+.erp-search-select{display:flex;flex-direction:column;gap:10px;position:relative;min-width:0}.erp-native-select-hidden{display:none}.erp-suggestion-list{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:60;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 34px rgba(15,39,66,.14);padding:8px;display:none;max-height:280px;overflow:auto}.erp-suggestion-item{display:flex;width:100%;align-items:center;justify-content:space-between;gap:14px;border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer;color:var(--primary)}.erp-suggestion-item:hover,.erp-suggestion-item:focus{background:#f1f7fb}.erp-suggestion-item small{display:block;margin-top:3px;color:var(--muted)}
 .gift-selected{display:none;margin-top:10px;padding:12px 14px;border:1px solid rgba(20,184,166,.25);border-radius:14px;background:#f0fdfa}.gift-selected.is-visible{display:flex;justify-content:space-between;gap:12px}.gift-empty{padding:15px;color:var(--muted)}
 </style>
 {% endblock %}
@@ -38,13 +37,20 @@
             </select>
         </div>
         {% endif %}
-        <div class="erp-field gift-search" style="grid-column:{% if usa_bodegas %}2 / -1{% else %}1 / -1{% endif %};">
+        <div class="erp-field" style="grid-column:{% if usa_bodegas %}2 / -1{% else %}1 / -1{% endif %};">
             <label for="producto_busqueda">Buscar producto</label>
-            <input id="producto_busqueda" type="search" autocomplete="off" placeholder="Escribe nombre, código o descripción">
-            <input id="producto_id" type="hidden" name="producto_id" value="{{ request.POST.producto_id|default:'' }}">
-            <div id="gift-results" class="gift-results" hidden></div>
+            <div class="erp-search-select" id="regalia-product-search">
+                <input id="producto_busqueda" class="erp-select-search" type="search" autocomplete="off" placeholder="Buscar producto por nombre, referencia o descripción" required>
+                <select id="producto_id" class="erp-native-select-hidden" name="producto_id" tabindex="-1" aria-hidden="true">
+                    <option value="">Seleccione un producto</option>
+                    {% for producto in productos_regalia %}
+                    <option value="{{ producto.id }}" data-nombre="{{ producto.nombre }}" data-codigo="{{ producto.codigo }}" data-descripcion="{{ producto.descripcion }}" data-disponible="{{ producto.disponible }}" data-unidad="{{ producto.unidad }}" {% if request.POST.producto_id == producto.id|stringformat:'s' %}selected{% endif %}>{{ producto.nombre }}{% if producto.codigo %} | Ref. {{ producto.codigo }}{% endif %} | Disponible {{ producto.disponible }} {{ producto.unidad }}</option>
+                    {% endfor %}
+                </select>
+                <div id="productos-sugerencias" class="erp-suggestion-list"></div>
+            </div>
             <div id="gift-selected" class="gift-selected"><span id="gift-selected-name"></span><strong id="gift-selected-stock"></strong></div>
-            <div class="erp-field-help">Escribe para ver coincidencias al instante. Puedes buscar antes de seleccionar la bodega; los servicios están excluidos.</div>
+            <div class="erp-field-help">Haz clic para ver todos los productos o escribe para filtrar la lista. Los servicios están excluidos.</div>
         </div>
         <div class="erp-field">
             <label for="cantidad">Cantidad</label>
@@ -90,51 +96,66 @@
 <script>
 (() => {
     const input = document.getElementById('producto_busqueda');
-    const productId = document.getElementById('producto_id');
-    const results = document.getElementById('gift-results');
+    const productSelect = document.getElementById('producto_id');
+    const results = document.getElementById('productos-sugerencias');
     const selected = document.getElementById('gift-selected');
     const selectedName = document.getElementById('gift-selected-name');
     const selectedStock = document.getElementById('gift-selected-stock');
-    const warehouse = document.getElementById('bodega');
-    const endpoint = "{% url 'regalias_buscar_productos' empresa.slug %}";
-    let timer;
+    const form = document.getElementById('gift-form');
+    const options = Array.from(productSelect.options).slice(1);
 
-    function clearSelection(){ productId.value = ''; selected.classList.remove('is-visible'); }
-    function hideResults(){ results.hidden = true; results.innerHTML = ''; }
-    async function search(){
-        const params = new URLSearchParams({q: input.value.trim()});
-        if (warehouse && warehouse.value) params.set('bodega', warehouse.value);
-        try {
-            const response = await fetch(`${endpoint}?${params}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
-            const data = await response.json();
-            results.innerHTML = '';
-            if (!data.resultados.length) results.innerHTML = '<div class="gift-empty">No hay productos coincidentes con existencia disponible.</div>';
-            data.resultados.forEach(product => {
-                const button = document.createElement('button');
-                button.type = 'button'; button.className = 'gift-result';
-                const label = document.createElement('span'); label.textContent = product.nombre;
-                const meta = document.createElement('small');
-                const reference = product.codigo ? `Ref. ${product.codigo}` : 'Sin referencia';
-                meta.textContent = product.descripcion ? `${reference} · ${product.descripcion}` : reference;
-                label.appendChild(meta);
-                const stock = document.createElement('strong');
-                stock.textContent = `${product.disponible} ${product.unidad}${product.alcance === 'total' ? ' total' : ''}`;
-                button.append(label, stock);
-                button.addEventListener('click', () => {
-                    productId.value = product.id; input.value = product.nombre;
-                    selectedName.textContent = product.codigo ? `${product.nombre} · Ref. ${product.codigo}` : product.nombre;
-                    selectedStock.textContent = `Disponible: ${product.disponible}`;
-                    selected.classList.add('is-visible'); hideResults();
-                });
-                results.appendChild(button);
-            });
-            results.hidden = false;
-        } catch (_) { hideResults(); }
+    function normalize(value){
+        return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     }
-    input.addEventListener('input', () => { clearSelection(); clearTimeout(timer); timer = setTimeout(search, 180); });
-    input.addEventListener('focus', search);
-    if (warehouse) warehouse.addEventListener('change', () => { clearSelection(); search(); input.focus(); });
-    document.addEventListener('click', event => { if (!event.target.closest('.gift-search')) hideResults(); });
+    function hideResults(){ results.style.display = 'none'; }
+    function clearSelection(){ productSelect.value = ''; selected.classList.remove('is-visible'); }
+    function selectProduct(option){
+        productSelect.value = option.value;
+        input.value = option.dataset.nombre;
+        input.setCustomValidity('');
+        selectedName.textContent = option.dataset.codigo ? `${option.dataset.nombre} · Ref. ${option.dataset.codigo}` : option.dataset.nombre;
+        selectedStock.textContent = `Disponible total: ${option.dataset.disponible} ${option.dataset.unidad}`;
+        selected.classList.add('is-visible');
+        hideResults();
+    }
+    function renderSuggestions(term = ''){
+        const filter = normalize(term.trim());
+        const visible = options.filter(option => !filter || normalize(option.textContent).includes(filter)).slice(0, 12);
+        results.innerHTML = '';
+        visible.forEach(option => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'erp-suggestion-item';
+            const label = document.createElement('span');
+            label.textContent = option.dataset.nombre;
+            const meta = document.createElement('small');
+            const reference = option.dataset.codigo ? `Ref. ${option.dataset.codigo}` : 'Sin referencia';
+            meta.textContent = option.dataset.descripcion ? `${reference} · ${option.dataset.descripcion}` : reference;
+            label.appendChild(meta);
+            const stock = document.createElement('strong');
+            stock.textContent = `${option.dataset.disponible} ${option.dataset.unidad}`;
+            button.append(label, stock);
+            button.addEventListener('mousedown', event => event.preventDefault());
+            button.addEventListener('click', () => selectProduct(option));
+            results.appendChild(button);
+        });
+        if(!visible.length){ results.innerHTML = '<div class="gift-empty">No hay productos coincidentes.</div>'; }
+        results.style.display = 'block';
+    }
+    input.addEventListener('input', () => { clearSelection(); input.setCustomValidity(''); renderSuggestions(input.value); });
+    input.addEventListener('focus', () => renderSuggestions(input.value));
+    input.addEventListener('blur', () => window.setTimeout(hideResults, 120));
+    form.addEventListener('submit', event => {
+        if(!productSelect.value){
+            event.preventDefault();
+            input.setCustomValidity('Selecciona un producto de la lista.');
+            input.reportValidity();
+            input.focus();
+            renderSuggestions(input.value);
+        }
+    });
+    const initiallySelected = options.find(option => option.value === productSelect.value);
+    if(initiallySelected){ selectProduct(initiallySelected); }
 })();
 </script>
 {% endblock %}
