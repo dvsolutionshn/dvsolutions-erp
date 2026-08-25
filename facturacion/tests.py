@@ -4040,6 +4040,56 @@ class FacturacionTests(TestCase):
         self.assertEqual(self.producto.inventario.existencias, Decimal("2.00"))
         self.assertFalse(MovimientoInventario.objects.filter(producto=self.producto, tipo="regalia").exists())
 
+    def test_regalia_permite_varios_productos_y_no_hace_rebajas_parciales(self):
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = False
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        InventarioProducto.objects.create(
+            empresa=self.empresa, producto=self.producto, existencias=Decimal("5.00")
+        )
+        segundo = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Segundo producto regalia",
+            codigo="REG-002",
+            tipo_item="producto",
+            precio=Decimal("30.00"),
+            controla_inventario=True,
+        )
+        InventarioProducto.objects.create(
+            empresa=self.empresa, producto=segundo, existencias=Decimal("1.00")
+        )
+
+        respuesta_invalida = self.client.post(
+            reverse("regalias_inventario", args=[self.empresa.slug]),
+            {
+                "producto_id": [str(self.producto.id), str(segundo.id)],
+                "cantidad": ["2.00", "2.00"],
+            },
+        )
+        self.assertEqual(respuesta_invalida.status_code, 200)
+        self.producto.inventario.refresh_from_db()
+        segundo.inventario.refresh_from_db()
+        self.assertEqual(self.producto.inventario.existencias, Decimal("5.00"))
+        self.assertEqual(segundo.inventario.existencias, Decimal("1.00"))
+        self.assertFalse(MovimientoInventario.objects.filter(tipo="regalia").exists())
+
+        respuesta_valida = self.client.post(
+            reverse("regalias_inventario", args=[self.empresa.slug]),
+            {
+                "producto_id": [str(self.producto.id), str(segundo.id)],
+                "cantidad": ["2.00", "1.00"],
+                "observacion": "Regalia de dos productos",
+            },
+        )
+        self.assertRedirects(respuesta_valida, reverse("regalias_inventario", args=[self.empresa.slug]))
+        self.producto.inventario.refresh_from_db()
+        segundo.inventario.refresh_from_db()
+        self.assertEqual(self.producto.inventario.existencias, Decimal("3.00"))
+        self.assertEqual(segundo.inventario.existencias, Decimal("0.00"))
+        movimientos = MovimientoInventario.objects.filter(tipo="regalia").order_by("producto_id")
+        self.assertEqual(movimientos.count(), 2)
+        self.assertEqual(len(set(movimientos.values_list("referencia", flat=True))), 1)
+
     def test_crear_lotes_del_mismo_producto_con_vencimientos_rapidos(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
         EmpresaModulo.objects.update_or_create(empresa=self.empresa, modulo=modulo_clinica, defaults={"activo": True})

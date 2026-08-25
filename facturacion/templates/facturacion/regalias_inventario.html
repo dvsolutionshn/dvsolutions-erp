@@ -13,8 +13,9 @@
 
 {% block extra_head %}
 <style>
-.regalia-product-field{position:relative;z-index:100}.erp-search-select{display:flex;flex-direction:column;gap:10px;position:relative;min-width:0}.erp-native-select-hidden{display:none}.erp-suggestion-list{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:110;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 34px rgba(15,39,66,.14);padding:8px;display:none;max-height:280px;overflow:auto}.erp-suggestion-item{display:flex;width:100%;align-items:center;justify-content:space-between;gap:14px;border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer;color:var(--primary)}.erp-suggestion-item:hover,.erp-suggestion-item:focus{background:#f1f7fb}.erp-suggestion-item small{display:block;margin-top:3px;color:var(--muted)}
+.regalia-lines{display:flex;flex-direction:column;gap:14px}.regalia-line{display:grid;grid-template-columns:minmax(0,1fr) 170px 44px;gap:14px;align-items:start;padding:14px;border:1px solid var(--line);border-radius:14px;background:#fbfdff;position:relative}.regalia-line.is-active{z-index:120}.regalia-product-field{position:relative;z-index:100}.erp-search-select{display:flex;flex-direction:column;gap:10px;position:relative;min-width:0}.erp-native-select-hidden{display:none}.erp-suggestion-list{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:130;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 34px rgba(15,39,66,.14);padding:8px;display:none;max-height:280px;overflow:auto}.erp-suggestion-item{display:flex;width:100%;align-items:center;justify-content:space-between;gap:14px;border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer;color:var(--primary)}.erp-suggestion-item:hover,.erp-suggestion-item:focus{background:#f1f7fb}.erp-suggestion-item small{display:block;margin-top:3px;color:var(--muted)}
 .gift-selected{display:none;margin-top:10px;padding:12px 14px;border:1px solid rgba(20,184,166,.25);border-radius:14px;background:#f0fdfa}.gift-selected.is-visible{display:flex;justify-content:space-between;gap:12px}.gift-empty{padding:15px;color:var(--muted)}
+.regalia-remove{width:42px;height:42px;margin-top:25px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#b91c1c;font-weight:800;cursor:pointer}.regalia-remove:disabled{opacity:.35;cursor:not-allowed}@media(max-width:760px){.regalia-line{grid-template-columns:1fr}.regalia-remove{margin-top:0;width:100%}}
 </style>
 {% endblock %}
 
@@ -22,7 +23,7 @@
 <section class="erp-form-card erp-overflow-visible">
     <div class="erp-section-heading">
         <div>
-            <h3>Entregar producto</h3>
+            <h3>Entregar productos</h3>
             <p>La operación no genera factura. {% if control_lotes_fefo %}El sistema consume automáticamente los lotes vigentes por FEFO.{% endif %}</p>
         </div>
     </div>
@@ -37,31 +38,40 @@
             </select>
         </div>
         {% endif %}
-        <div class="erp-field erp-overflow-visible regalia-product-field" style="grid-column:{% if usa_bodegas %}2 / -1{% else %}1 / -1{% endif %};">
-            <label for="producto_busqueda">Buscar producto</label>
-            <div class="erp-search-select" id="regalia-product-search">
-                <input id="producto_busqueda" class="erp-select-search" type="search" autocomplete="off" placeholder="Buscar producto por nombre, referencia o descripción" required>
-                <select id="producto_id" class="erp-native-select-hidden" name="producto_id" tabindex="-1" aria-hidden="true">
-                    <option value="">Seleccione un producto</option>
-                    {% for producto in productos_regalia %}
-                    <option value="{{ producto.id }}" data-nombre="{{ producto.nombre }}" data-codigo="{{ producto.codigo }}" data-descripcion="{{ producto.descripcion }}" data-disponible="{{ producto.disponible }}" data-unidad="{{ producto.unidad }}" {% if request.POST.producto_id == producto.id|stringformat:'s' %}selected{% endif %}>{{ producto.nombre }}{% if producto.codigo %} | Ref. {{ producto.codigo }}{% endif %} | Disponible {{ producto.disponible }} {{ producto.unidad }}</option>
-                    {% endfor %}
-                </select>
-                <div id="productos-sugerencias" class="erp-suggestion-list"></div>
+        <div style="grid-column:{% if usa_bodegas %}2 / -1{% else %}1 / -1{% endif %};display:flex;justify-content:flex-end;align-items:end;">
+            <button class="erp-btn-secondary" id="agregar-producto-regalia" type="button">Agregar producto</button>
+        </div>
+        <div id="regalia-lines" class="regalia-lines" style="grid-column:1 / -1;">
+            {% for linea in lineas_regalia %}
+            <div class="regalia-line">
+                <div class="erp-field erp-overflow-visible regalia-product-field">
+                    <label>Buscar producto</label>
+                    <div class="erp-search-select">
+                        <input class="erp-select-search producto-busqueda" type="search" autocomplete="off" placeholder="Buscar por nombre, referencia o descripción" required>
+                        <select class="erp-native-select-hidden producto-id" name="producto_id" tabindex="-1" aria-hidden="true">
+                            <option value="">Seleccione un producto</option>
+                            {% for producto in productos_regalia %}
+                            <option value="{{ producto.id }}" data-nombre="{{ producto.nombre }}" data-codigo="{{ producto.codigo }}" data-descripcion="{{ producto.descripcion }}" data-disponible="{{ producto.disponible }}" data-unidad="{{ producto.unidad }}" {% if linea.producto_id == producto.id|stringformat:'s' %}selected{% endif %}>{{ producto.nombre }}{% if producto.codigo %} | Ref. {{ producto.codigo }}{% endif %} | Disponible {{ producto.disponible }} {{ producto.unidad }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="erp-suggestion-list"></div>
+                    </div>
+                    <div class="gift-selected"><span class="gift-selected-name"></span><strong class="gift-selected-stock"></strong></div>
+                </div>
+                <div class="erp-field">
+                    <label>Cantidad</label>
+                    <input class="regalia-cantidad" type="number" min="0.01" step="0.01" name="cantidad" required value="{{ linea.cantidad }}" placeholder="0.00">
+                </div>
+                <button class="regalia-remove" type="button" title="Quitar producto">×</button>
             </div>
-            <div id="gift-selected" class="gift-selected"><span id="gift-selected-name"></span><strong id="gift-selected-stock"></strong></div>
-            <div class="erp-field-help">Haz clic para ver todos los productos o escribe para filtrar la lista. Los servicios están excluidos.</div>
+            {% endfor %}
         </div>
-        <div class="erp-field">
-            <label for="cantidad">Cantidad</label>
-            <input id="cantidad" type="number" min="0.01" step="0.01" name="cantidad" required value="{{ request.POST.cantidad|default:'' }}" placeholder="0.00">
-        </div>
-        <div class="erp-field" style="grid-column:2 / -1;">
+        <div class="erp-field" style="grid-column:1 / -1;">
             <label for="observacion">Observación</label>
             <input id="observacion" type="text" name="observacion" maxlength="300" value="{{ request.POST.observacion|default:'' }}" placeholder="Opcional: destinatario o motivo de la entrega">
         </div>
         <div class="erp-form-actions" style="grid-column:1 / -1;">
-            <div class="erp-field-help">Se validará nuevamente la existencia al confirmar.</div>
+            <div class="erp-field-help">Todos los productos se validarán antes de realizar cualquier rebaja.</div>
             <button class="erp-btn" type="submit">Confirmar Regalia</button>
         </div>
     </form>
@@ -95,67 +105,102 @@
 
 <script>
 (() => {
-    const input = document.getElementById('producto_busqueda');
-    const productSelect = document.getElementById('producto_id');
-    const results = document.getElementById('productos-sugerencias');
-    const selected = document.getElementById('gift-selected');
-    const selectedName = document.getElementById('gift-selected-name');
-    const selectedStock = document.getElementById('gift-selected-stock');
     const form = document.getElementById('gift-form');
-    const options = Array.from(productSelect.options).slice(1);
+    const lines = document.getElementById('regalia-lines');
+    const addButton = document.getElementById('agregar-producto-regalia');
 
     function normalize(value){
         return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     }
-    function hideResults(){ results.style.display = 'none'; }
-    function clearSelection(){ productSelect.value = ''; selected.classList.remove('is-visible'); }
-    function selectProduct(option){
-        productSelect.value = option.value;
-        input.value = option.dataset.nombre;
-        input.setCustomValidity('');
-        selectedName.textContent = option.dataset.codigo ? `${option.dataset.nombre} · Ref. ${option.dataset.codigo}` : option.dataset.nombre;
-        selectedStock.textContent = `Disponible total: ${option.dataset.disponible} ${option.dataset.unidad}`;
-        selected.classList.add('is-visible');
-        hideResults();
+
+    function updateRemoveButtons(){
+        const rows = lines.querySelectorAll('.regalia-line');
+        rows.forEach(row => { row.querySelector('.regalia-remove').disabled = rows.length === 1; });
     }
-    function renderSuggestions(term = ''){
-        const filter = normalize(term.trim());
-        const visible = options.filter(option => !filter || normalize(option.textContent).includes(filter)).slice(0, 12);
-        results.innerHTML = '';
-        visible.forEach(option => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'erp-suggestion-item';
-            const label = document.createElement('span');
-            label.textContent = option.dataset.nombre;
-            const meta = document.createElement('small');
-            const reference = option.dataset.codigo ? `Ref. ${option.dataset.codigo}` : 'Sin referencia';
-            meta.textContent = option.dataset.descripcion ? `${reference} · ${option.dataset.descripcion}` : reference;
-            label.appendChild(meta);
-            const stock = document.createElement('strong');
-            stock.textContent = `${option.dataset.disponible} ${option.dataset.unidad}`;
-            button.append(label, stock);
-            button.addEventListener('mousedown', event => event.preventDefault());
-            button.addEventListener('click', () => selectProduct(option));
-            results.appendChild(button);
-        });
-        if(!visible.length){ results.innerHTML = '<div class="gift-empty">No hay productos coincidentes.</div>'; }
-        results.style.display = 'block';
+    function initLine(line){
+        if(line.dataset.initialized === '1') return;
+        line.dataset.initialized = '1';
+        const input = line.querySelector('.producto-busqueda');
+        const productSelect = line.querySelector('.producto-id');
+        const results = line.querySelector('.erp-suggestion-list');
+        const selected = line.querySelector('.gift-selected');
+        const selectedName = line.querySelector('.gift-selected-name');
+        const selectedStock = line.querySelector('.gift-selected-stock');
+        const options = Array.from(productSelect.options).slice(1);
+
+        function hideResults(){ results.style.display = 'none'; line.classList.remove('is-active'); }
+        function clearSelection(){ productSelect.value = ''; selected.classList.remove('is-visible'); }
+        function selectProduct(option){
+            productSelect.value = option.value;
+            input.value = option.dataset.nombre;
+            input.setCustomValidity('');
+            selectedName.textContent = option.dataset.codigo ? `${option.dataset.nombre} · Ref. ${option.dataset.codigo}` : option.dataset.nombre;
+            selectedStock.textContent = `Disponible total: ${option.dataset.disponible} ${option.dataset.unidad}`;
+            selected.classList.add('is-visible');
+            hideResults();
+        }
+        function renderSuggestions(term = ''){
+            document.querySelectorAll('.regalia-line.is-active').forEach(other => {
+                if(other !== line){ other.classList.remove('is-active'); other.querySelector('.erp-suggestion-list').style.display = 'none'; }
+            });
+            line.classList.add('is-active');
+            const filter = normalize(term.trim());
+            const visible = options.filter(option => !filter || normalize(option.textContent).includes(filter)).slice(0, 12);
+            results.innerHTML = '';
+            visible.forEach(option => {
+                const button = document.createElement('button');
+                button.type = 'button'; button.className = 'erp-suggestion-item';
+                const label = document.createElement('span'); label.textContent = option.dataset.nombre;
+                const meta = document.createElement('small');
+                const reference = option.dataset.codigo ? `Ref. ${option.dataset.codigo}` : 'Sin referencia';
+                meta.textContent = option.dataset.descripcion ? `${reference} · ${option.dataset.descripcion}` : reference;
+                label.appendChild(meta);
+                const stock = document.createElement('strong'); stock.textContent = `${option.dataset.disponible} ${option.dataset.unidad}`;
+                button.append(label, stock);
+                button.addEventListener('mousedown', event => event.preventDefault());
+                button.addEventListener('click', () => selectProduct(option));
+                results.appendChild(button);
+            });
+            if(!visible.length) results.innerHTML = '<div class="gift-empty">No hay productos coincidentes.</div>';
+            results.style.display = 'block';
+        }
+        input.addEventListener('input', () => { clearSelection(); input.setCustomValidity(''); renderSuggestions(input.value); });
+        input.addEventListener('focus', () => renderSuggestions(input.value));
+        input.addEventListener('blur', () => window.setTimeout(hideResults, 120));
+        line.querySelector('.regalia-remove').addEventListener('click', () => { line.remove(); updateRemoveButtons(); });
+        const initiallySelected = options.find(option => option.value === productSelect.value);
+        if(initiallySelected) selectProduct(initiallySelected);
     }
-    input.addEventListener('input', () => { clearSelection(); input.setCustomValidity(''); renderSuggestions(input.value); });
-    input.addEventListener('focus', () => renderSuggestions(input.value));
-    input.addEventListener('blur', () => window.setTimeout(hideResults, 120));
+
+    lines.querySelectorAll('.regalia-line').forEach(initLine);
+    updateRemoveButtons();
+    addButton.addEventListener('click', () => {
+        const source = lines.querySelector('.regalia-line');
+        const line = source.cloneNode(true);
+        line.dataset.initialized = '';
+        line.classList.remove('is-active');
+        line.querySelector('.producto-id').value = '';
+        line.querySelector('.producto-busqueda').value = '';
+        line.querySelector('.regalia-cantidad').value = '';
+        line.querySelector('.gift-selected').classList.remove('is-visible');
+        line.querySelector('.erp-suggestion-list').innerHTML = '';
+        line.querySelector('.erp-suggestion-list').style.display = 'none';
+        lines.appendChild(line);
+        initLine(line);
+        updateRemoveButtons();
+        line.querySelector('.producto-busqueda').focus();
+    });
     form.addEventListener('submit', event => {
-        if(!productSelect.value){
-            event.preventDefault();
-            input.setCustomValidity('Selecciona un producto de la lista.');
-            input.reportValidity();
-            input.focus();
-            renderSuggestions(input.value);
+        for(const line of lines.querySelectorAll('.regalia-line')){
+            const input = line.querySelector('.producto-busqueda');
+            if(!line.querySelector('.producto-id').value){
+                event.preventDefault();
+                input.setCustomValidity('Selecciona un producto de la lista.');
+                input.reportValidity(); input.focus();
+                return;
+            }
         }
     });
-    const initiallySelected = options.find(option => option.value === productSelect.value);
-    if(initiallySelected){ selectProduct(initiallySelected); }
 })();
 </script>
 {% endblock %}

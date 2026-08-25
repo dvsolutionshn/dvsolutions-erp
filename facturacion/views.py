@@ -3947,54 +3947,99 @@ def regalias_inventario(request, empresa_slug):
         _asegurar_bodegas_farmaceuticas(empresa)
         bodegas = BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre")
 
+    lineas_regalia = [{"producto_id": "", "cantidad": ""}]
     if request.method == "POST":
-        producto = Producto.objects.filter(
-            id=request.POST.get("producto_id"),
-            empresa=empresa,
-            tipo_item="producto",
-            controla_inventario=True,
-            activo=True,
-            eliminado=False,
-        ).first()
+        producto_ids_raw = request.POST.getlist("producto_id")
+        cantidades_raw = request.POST.getlist("cantidad")
+        lineas_regalia = [
+            {"producto_id": producto_id, "cantidad": cantidades_raw[indice] if indice < len(cantidades_raw) else ""}
+            for indice, producto_id in enumerate(producto_ids_raw)
+        ] or [{"producto_id": "", "cantidad": ""}]
         bodega = None
         if usa_bodegas:
             bodega = bodegas.filter(id=request.POST.get("bodega")).first()
-        try:
-            cantidad = Decimal((request.POST.get("cantidad") or "").strip())
-        except InvalidOperation:
-            cantidad = Decimal("0.00")
 
-        if not producto:
-            messages.error(request, "Selecciona un producto valido. Los servicios no pueden registrarse como regalia.")
-        elif usa_bodegas and not bodega:
-            messages.error(request, "Selecciona la bodega de origen.")
-        elif not cantidad.is_finite() or cantidad <= 0:
-            messages.error(request, "La cantidad debe ser mayor que cero.")
+        error_validacion = None
+        cantidades_por_producto = {}
+        ids_validos = []
+        for indice, linea in enumerate(lineas_regalia, start=1):
+            producto_id = (linea["producto_id"] or "").strip()
+            cantidad_raw = (linea["cantidad"] or "").strip()
+            if not producto_id and not cantidad_raw:
+                continue
+            if not producto_id.isdigit():
+                error_validacion = f"Selecciona un producto valido en la linea {indice}."
+                break
+            try:
+                cantidad = Decimal(cantidad_raw)
+            except InvalidOperation:
+                cantidad = Decimal("0.00")
+            if not cantidad.is_finite() or cantidad <= 0:
+                error_validacion = f"La cantidad de la linea {indice} debe ser mayor que cero."
+                break
+            producto_id_int = int(producto_id)
+            ids_validos.append(producto_id_int)
+            cantidades_por_producto[producto_id_int] = (
+                cantidades_por_producto.get(producto_id_int, Decimal("0.00")) + cantidad
+            )
+
+        productos = {
+            producto.id: producto
+            for producto in Producto.objects.filter(
+                id__in=set(ids_validos),
+                empresa=empresa,
+                tipo_item="producto",
+                controla_inventario=True,
+                activo=True,
+                eliminado=False,
+            )
+        }
+        if not error_validacion and not cantidades_por_producto:
+            error_validacion = "Agrega al menos un producto a la regalia."
+        elif not error_validacion and len(productos) != len(set(ids_validos)):
+            error_validacion = "Una de las lineas contiene un producto invalido o un servicio."
+        elif not error_validacion and usa_bodegas and not bodega:
+            error_validacion = "Selecciona la bodega de origen."
+
+        if error_validacion:
+            messages.error(request, error_validacion)
         else:
             observacion = (request.POST.get("observacion") or "").strip()
             referencia = f"Regalia {timezone.localtime():%Y%m%d-%H%M%S-%f}"
             try:
                 with transaction.atomic():
-                    inventario = InventarioProducto.objects.select_for_update().filter(
-                        empresa=empresa, producto=producto
-                    ).first()
-                    disponible_general = inventario.existencias if inventario else Decimal("0.00")
-                    if cantidad > disponible_general:
-                        raise ValidationError(
-                            f"No puedes entregar {cantidad:.2f}; la existencia disponible es {disponible_general:.2f}."
+                    inventarios = {
+                        inventario.producto_id: inventario
+                        for inventario in InventarioProducto.objects.select_for_update().filter(
+                            empresa=empresa, producto_id__in=cantidades_por_producto
                         )
-
-                    if bodega:
+                    }
+                    existencias_preparadas = {}
+                    # Se valida el documento completo antes de realizar la primera rebaja.
+                    for producto_id, cantidad in cantidades_por_producto.items():
+                        producto = productos[producto_id]
+                        inventario = inventarios.get(producto_id)
+                        disponible_general = inventario.existencias if inventario else Decimal("0.00")
+                        if cantidad > disponible_general:
+                            raise ValidationError(
+                                f"{producto.nombre}: solicitado {cantidad:.2f}, disponible {disponible_general:.2f}."
+                            )
+                        if not bodega:
+                            continue
                         existencias = list(_existencias_regalia_producto(empresa, producto, bodega))
                         disponible_bodega = sum(
                             (existencia.cantidad for existencia in existencias), Decimal("0.00")
                         )
                         if cantidad > disponible_bodega:
                             raise ValidationError(
-                                f"No puedes entregar {cantidad:.2f}; en {bodega.nombre} hay {disponible_bodega:.2f} disponible(s)."
+                                f"{producto.nombre}: solicitado {cantidad:.2f}, en {bodega.nombre} hay {disponible_bodega:.2f}."
                             )
+                        existencias_preparadas[producto_id] = existencias
+
+                    for producto_id, cantidad in cantidades_por_producto.items():
+                        producto = productos[producto_id]
                         pendiente = cantidad
-                        for existencia in existencias:
+                        for existencia in existencias_preparadas.get(producto_id, []):
                             if pendiente <= 0:
                                 break
                             salida = min(pendiente, existencia.cantidad)
@@ -4009,23 +4054,22 @@ def regalias_inventario(request, empresa_slug):
                                 usuario=request.user,
                             )
                             pendiente -= salida
-
-                    _registrar_movimiento_inventario(
-                        empresa=empresa,
-                        producto=producto,
-                        bodega=bodega,
-                        tipo="regalia",
-                        cantidad=cantidad,
-                        referencia=referencia,
-                        observacion=observacion or "Salida de inventario sin factura por regalia.",
-                        usuario=request.user,
-                    )
+                        _registrar_movimiento_inventario(
+                            empresa=empresa,
+                            producto=producto,
+                            bodega=bodega,
+                            tipo="regalia",
+                            cantidad=cantidad,
+                            referencia=referencia,
+                            observacion=observacion or "Salida de inventario sin factura por regalia.",
+                            usuario=request.user,
+                        )
             except ValidationError as exc:
                 messages.error(request, "; ".join(exc.messages))
             else:
                 messages.success(
                     request,
-                    f"Regalia registrada: {cantidad:.2f} {producto.get_unidad_medida_display()} de {producto.nombre}.",
+                    f"Regalia registrada correctamente con {len(cantidades_por_producto)} producto(s).",
                 )
                 return redirect("regalias_inventario", empresa_slug=empresa.slug)
 
@@ -4043,6 +4087,7 @@ def regalias_inventario(request, empresa_slug):
         "historial_general": historial_general,
         "control_lotes_fefo": _empresa_usa_control_lotes_fefo(empresa),
         "productos_regalia": _datos_productos_regalia(empresa),
+        "lineas_regalia": lineas_regalia,
     })
 
 
