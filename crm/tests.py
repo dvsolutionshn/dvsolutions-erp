@@ -1738,6 +1738,7 @@ class CRMTests(TestCase):
             servicio_clinico=servicio,
             titulo=servicio.nombre,
             fecha_hora=fecha_hora,
+            observacion="Nota clinica extensa. " * 20,
         )
         self.client.login(username="crmuser", password="pass12345")
         agenda = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]), {"vista": "dia", "fecha": "2026-07-15"})
@@ -1757,6 +1758,9 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 302)
         cita.refresh_from_db()
         self.assertEqual(timezone.localtime(cita.fecha_hora).strftime("%Y-%m-%dT%H:%M"), "2026-07-16T11:30")
+        self.assertEqual(cita.cita_clinica.motivo, servicio.nombre)
+        self.assertLessEqual(len(cita.cita_clinica.motivo), 220)
+        self.assertIn("Nota clinica extensa", cita.cita_clinica.observaciones)
         self.assertEqual(mock_whatsapp.call_count, 2)
         self.assertEqual(mock_whatsapp.call_args_list[0].kwargs["aviso"], "cita cancelada")
         self.assertEqual(mock_whatsapp.call_args_list[1].kwargs["aviso"], "cita reagendada")

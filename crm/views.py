@@ -683,6 +683,11 @@ def _sincronizar_cita_clinica(cita):
                 "(incluye bloqueo de recuperacion de 1 hora)."
             )
     observaciones = "\n".join(parte for parte in [detalle_cirugia, cita.observacion or ""] if parte).strip()
+    # ``CitaClinica.motivo`` es un CharField de 220 caracteres. Las
+    # observaciones acumulan el historial de cancelaciones/reagendamientos y
+    # pueden crecer sin limite; copiarlas como motivo provoca un DataError en
+    # PostgreSQL. El historial ya se conserva completo en ``observaciones``.
+    motivo = (cita.cirugia_detalle or cita.titulo or "")[:220]
     valores = {
         "empresa": cita.empresa,
         "paciente": cita.paciente,
@@ -692,7 +697,7 @@ def _sincronizar_cita_clinica(cita):
         "estado": estados.get(cita.estado, "solicitada"),
         "pagada": cita.pagada,
         "canal": "recepcion",
-        "motivo": cita.cirugia_detalle or cita.observacion or cita.titulo,
+        "motivo": motivo,
         "observaciones": observaciones,
     }
     if cita.cita_clinica_id:
