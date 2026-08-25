@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block content %}
-<section class="erp-form-card">
+<section class="erp-form-card erp-overflow-visible">
     <div class="erp-section-heading">
         <div>
             <h3>Entregar producto</h3>
@@ -44,7 +44,7 @@
             <input id="producto_id" type="hidden" name="producto_id" value="{{ request.POST.producto_id|default:'' }}">
             <div id="gift-results" class="gift-results" hidden></div>
             <div id="gift-selected" class="gift-selected"><span id="gift-selected-name"></span><strong id="gift-selected-stock"></strong></div>
-            <div class="erp-field-help">Solo aparecen productos activos con existencia; los servicios están excluidos.</div>
+            <div class="erp-field-help">Escribe para ver coincidencias al instante. Puedes buscar antes de seleccionar la bodega; los servicios están excluidos.</div>
         </div>
         <div class="erp-field">
             <label for="cantidad">Cantidad</label>
@@ -102,9 +102,8 @@
     function clearSelection(){ productId.value = ''; selected.classList.remove('is-visible'); }
     function hideResults(){ results.hidden = true; results.innerHTML = ''; }
     async function search(){
-        if (warehouse && !warehouse.value) { hideResults(); return; }
         const params = new URLSearchParams({q: input.value.trim()});
-        if (warehouse) params.set('bodega', warehouse.value);
+        if (warehouse && warehouse.value) params.set('bodega', warehouse.value);
         try {
             const response = await fetch(`${endpoint}?${params}`, {headers:{'X-Requested-With':'XMLHttpRequest'}});
             const data = await response.json();
@@ -114,12 +113,17 @@
                 const button = document.createElement('button');
                 button.type = 'button'; button.className = 'gift-result';
                 const label = document.createElement('span'); label.textContent = product.nombre;
-                const meta = document.createElement('small'); meta.textContent = product.codigo || 'Sin código'; label.appendChild(meta);
-                const stock = document.createElement('strong'); stock.textContent = `${product.disponible} ${product.unidad}`;
+                const meta = document.createElement('small');
+                const reference = product.codigo ? `Ref. ${product.codigo}` : 'Sin referencia';
+                meta.textContent = product.descripcion ? `${reference} · ${product.descripcion}` : reference;
+                label.appendChild(meta);
+                const stock = document.createElement('strong');
+                stock.textContent = `${product.disponible} ${product.unidad}${product.alcance === 'total' ? ' total' : ''}`;
                 button.append(label, stock);
                 button.addEventListener('click', () => {
                     productId.value = product.id; input.value = product.nombre;
-                    selectedName.textContent = product.nombre; selectedStock.textContent = `Disponible: ${product.disponible}`;
+                    selectedName.textContent = product.codigo ? `${product.nombre} · Ref. ${product.codigo}` : product.nombre;
+                    selectedStock.textContent = `Disponible: ${product.disponible}`;
                     selected.classList.add('is-visible'); hideResults();
                 });
                 results.appendChild(button);
@@ -129,7 +133,7 @@
     }
     input.addEventListener('input', () => { clearSelection(); clearTimeout(timer); timer = setTimeout(search, 180); });
     input.addEventListener('focus', search);
-    if (warehouse) warehouse.addEventListener('change', () => { input.value = ''; clearSelection(); hideResults(); input.focus(); });
+    if (warehouse) warehouse.addEventListener('change', () => { clearSelection(); search(); input.focus(); });
     document.addEventListener('click', event => { if (!event.target.closest('.gift-search')) hideResults(); });
 })();
 </script>

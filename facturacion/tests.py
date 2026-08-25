@@ -3959,6 +3959,15 @@ class FacturacionTests(TestCase):
             empresa=self.empresa, bodega=bodega, lote=lote_segundo, cantidad=Decimal("5.00")
         )
 
+        busqueda_sin_bodega = self.client.get(
+            reverse("regalias_buscar_productos", args=[self.empresa.slug]),
+            {"q": "Crema"},
+        )
+        self.assertEqual(busqueda_sin_bodega.status_code, 200)
+        self.assertEqual(busqueda_sin_bodega.json()["resultados"][0]["id"], producto.id)
+        self.assertEqual(busqueda_sin_bodega.json()["resultados"][0]["disponible"], "8.00")
+        self.assertEqual(busqueda_sin_bodega.json()["resultados"][0]["alcance"], "total")
+
         response = self.client.post(
             reverse("regalias_inventario", args=[self.empresa.slug]),
             {

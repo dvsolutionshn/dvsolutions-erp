@@ -3870,6 +3870,7 @@ def regalias_buscar_productos(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     q = (request.GET.get("q") or "").strip()
     config = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    bodega = None
     productos = Producto.objects.filter(
         empresa=empresa,
         tipo_item="producto",
@@ -3886,14 +3887,14 @@ def regalias_buscar_productos(request, empresa_slug):
         bodega = BodegaInventario.objects.filter(
             id=request.GET.get("bodega"), empresa=empresa, activa=True
         ).first()
-        if not bodega:
-            return JsonResponse({"resultados": []})
         filtro_existencias = Q(
             lotes_inventario__existencias_bodega__empresa=empresa,
-            lotes_inventario__existencias_bodega__bodega=bodega,
+            lotes_inventario__existencias_bodega__bodega__activa=True,
             lotes_inventario__existencias_bodega__cantidad__gt=0,
             lotes_inventario__activo=True,
         )
+        if bodega:
+            filtro_existencias &= Q(lotes_inventario__existencias_bodega__bodega=bodega)
         if _empresa_usa_control_lotes_fefo(empresa):
             hoy = timezone.localdate()
             filtro_existencias &= (
@@ -3917,8 +3918,10 @@ def regalias_buscar_productos(request, empresa_slug):
             "id": producto.id,
             "nombre": producto.nombre,
             "codigo": producto.codigo or "",
+            "descripcion": (producto.descripcion or "")[:100],
             "disponible": f"{disponible:.2f}",
             "unidad": producto.get_unidad_medida_display(),
+            "alcance": "bodega" if config.usa_bodegas_internas and bodega else "total",
         })
     return JsonResponse({"resultados": resultados})
 
