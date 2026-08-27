@@ -4,6 +4,7 @@ import '../app.dart';
 import '../models.dart';
 import '../onix_controller.dart';
 import '../theme.dart';
+import '../widgets/onix_markdown.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, required this.controller});
@@ -437,14 +438,16 @@ class _MessageBubble extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: SelectableText(
-                    message.content,
-                    style: TextStyle(
-                      color: message.fromUser ? Colors.white : onixInk,
-                      height: 1.45,
-                      fontSize: 15,
-                    ),
-                  ),
+                  child: message.fromUser
+                      ? SelectableText(
+                          message.content,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            height: 1.45,
+                            fontSize: 15,
+                          ),
+                        )
+                      : OnixMarkdown(data: message.content),
                 ),
               ),
             ],

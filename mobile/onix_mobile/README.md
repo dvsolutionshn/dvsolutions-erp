@@ -16,10 +16,21 @@ Aplicacion Flutter de Onix para iOS y Android. La app permite iniciar sesion con
 - Inicio de sesion con empresa, usuario/correo y contrasena del ERP.
 - Sesion persistente y cierre remoto de sesion.
 - Chat de pantalla completa e historial sincronizado con Onix web.
+- Respuestas enriquecidas para movil con titulos, listas, negritas y totales legibles.
 - Categorias disponibles segun modulos y permisos: resumen, facturas, cobros, clientes, productos, calendario y pagos recibidos.
 - Estado visible del motor: `IA activa` cuando OpenAI esta configurado en el servidor o `Modo guiado` cuando falta activarlo.
 - Vista previa, confirmacion y descarte de borradores de factura.
 - Categorias visibles para las siguientes etapas: gastos, bancos e inquilinos.
+
+## Siguientes etapas del producto completo
+
+- Envio real de facturas por correo y WhatsApp, con confirmacion y auditoria.
+- Registro de pagos, gastos y recordatorios mediante acciones confirmables.
+- Facturacion mensual recurrente y reglas por cliente o contrato.
+- Carga y conciliacion de estados de cuenta bancarios y tarjetas.
+- Gestion operativa de inquilinos, contratos, mensualidades y mora.
+- Memoria empresarial aprobada, aprendizaje controlado y administracion por empresa.
+- Voz, notificaciones, evaluaciones de calidad y distribucion oficial en tiendas.
 
 ## Entorno nativo preparado
 

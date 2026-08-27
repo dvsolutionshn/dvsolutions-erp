@@ -338,4 +338,7 @@ class OnixInvoiceActionTests(TestCase):
         self.assertEqual(Factura.objects.count(), 0)
         primera_llamada = openai_client.return_value.responses.create.call_args_list[0].kwargs
         self.assertIn("preparar_factura", [tool["name"] for tool in primera_llamada["tools"]])
+        self.assertIn("Formato obligatorio", primera_llamada["instructions"])
+        self.assertIn("No uses tablas Markdown", primera_llamada["instructions"])
+        self.assertIn("Muestra como maximo cinco resultados", primera_llamada["instructions"])
         self.assertFalse(primera_llamada["parallel_tool_calls"])
