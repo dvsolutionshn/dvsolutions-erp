@@ -3,7 +3,7 @@
 {% block title %}{{ paciente.nombre }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
 {% block header_title %}{{ paciente.nombre }}{% endblock %}
-{% block header_description %}Centro clinico del paciente: historial, tratamiento, evolucion fotografica, citas, anexos y consentimientos.{% endblock %}
+{% block header_description %}Datos principales, accesos clinicos y recordatorios de seguimiento del paciente.{% endblock %}
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}">Volver a pacientes</a>
@@ -125,7 +125,7 @@
 {% endblock %}
 
 {% block content %}
-<section class="erp-card">
+<section class="erp-card patient-anchor-offset" id="datos-generales">
     <div class="patient-hero">
         <div class="patient-profile-photo">
             {% if paciente.foto_perfil %}
@@ -157,29 +157,47 @@
             <strong>{{ paciente.nombre }}</strong>
             <small>{{ paciente.expediente_codigo }} · {{ paciente.identidad|default:"Sin documento" }}</small>
         </div>
-        <nav class="clinical-side-nav">
-            <a class="clinical-side-link" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><i>01</i>Clinica completa</a>
-            <a class="clinical-side-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}"><i>02</i>Nueva nota</a>
-            {% if formularios_hospitalarios %}<a class="clinical-side-link" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><i>03</i>Formularios</a>{% endif %}
-            <a class="clinical-side-link" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}"><i>04</i>Evolucion</a>
-            <a class="clinical-side-link" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><i>05</i>Consentimientos</a>
-            <a class="clinical-side-link" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}"><i>06</i>Recetas</a>
-            <a class="clinical-side-link" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><i>07</i>Examenes</a>
-            <a class="clinical-side-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}"><i>08</i>Tratamientos</a>
-            <a class="clinical-side-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}"><i>09</i>Agendar cita</a>
-            <a class="clinical-side-link" href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}"><i>10</i>Seguimientos</a>
-        </nav>
         <details class="clinical-side-group" open>
-            <summary><i>11</i>Anexos completos</summary>
+            <summary><i>01</i>Historial Clinico</summary>
             <div class="clinical-submenu">
-                <a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Examenes</a>
-                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'laboratorio' %}">Trabajos de laboratorio</a>
-                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'radiologico' %}">Solicitud estudio radiologico</a>
+                <a href="#datos-generales">Datos generales</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Motivo de consulta</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Funciones orgánicas</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Antecedentes</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico">Diagnóstico</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico">Plan y tratamiento</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Historia clínica completa</a>
+                <a href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota clinica</a>
+            </div>
+        </details>
+        <details class="clinical-side-group" open>
+            <summary><i>02</i>Anexos</summary>
+            <div class="clinical-submenu">
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'laboratorio' %}">Laboratorio</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'radiologico' %}">Radiografías</a>
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'documento' %}">Documentos</a>
-                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'remision' %}">Remision y contraremision</a>
-                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'detalle_remision' %}">Detalle remisiones</a>
-                <a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Prescripciones / recetas</a>
+                <a href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}">Consentimientos</a>
+                <a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas médicas</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'remision' %}">Remisiones</a>
+                <a href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Fotografías / Videos</a>
+                <a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Exámenes generales</a>
+                <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'detalle_remision' %}">Detalle de remisiones</a>
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'incapacidad' %}">Incapacidades</a>
+            </div>
+        </details>
+        <details class="clinical-side-group">
+            <summary><i>03</i>Atención y especialidades</summary>
+            <div class="clinical-submenu">
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-cirugia_plastica">Cirugía Plástica</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-medicina_estetica">Medicina Estética</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-capilar">Capilar</a>
+                <a href="#recordatorios-tratamiento">Citas / Recordatorios</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-camara_hiperbarica">Cámara Hiperbárica</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-terapias_postquirurgicas">Terapias Post Quirúrgicas</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-enfermeria">Enfermería / Tratamientos</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-terapias">Terapias clínicas</a>
+                <a href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}">Tratamientos del paciente</a>
+                <a href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}">Seguimiento Estético / Clínico</a>
             </div>
         </details>
         <div class="clinical-side-actions">
@@ -201,8 +219,8 @@
             <div class="clinical-focus-head">
                 <div>
                     <div class="erp-kpi-label">Accesos de consulta</div>
-                    <h3>Seleccione que necesita hacer con este paciente</h3>
-                    <p>Un punto de entrada simple para trabajar: abrir la historia completa, escribir la consulta, revisar formularios, subir documentos o agendar sin perderse entre pantallas.</p>
+                    <h3>Expediente clínico organizado por función</h3>
+                    <p>Abra el historial, consulte anexos, trabaje por especialidad o programe el siguiente control sin perder el contexto del paciente.</p>
                 </div>
                 <div class="clinical-focus-actions">
                     <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
@@ -211,14 +229,10 @@
                 </div>
             </div>
             <div class="clinical-quick-grid">
-                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><strong>Clinica completa</strong><span>Ver todo el Historial Clinico del paciente en una lectura ordenada.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}"><strong>Escribir consulta</strong><span>Registrar diagnostico, plan y nota medica del dia.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><strong>Formularios</strong><span>Preconsultas, formularios por area y notas especializadas.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}"><strong>Fotos y videos</strong><span>Seguimiento visual de evolucion por fecha.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}"><strong>Tratamiento</strong><span>Crear o registrar una ruta de tratamiento para el paciente.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}"><strong>Consentimientos</strong><span>PDF firmados y control documental del paciente.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}"><strong>Agendar cita</strong><span>Enviar este paciente al calendario de atenciones.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}"><strong>Seguimientos</strong><span>Programar y editar recordatorios de tratamiento.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><strong>Historial Clínico</strong><span>Datos generales, consulta, funciones orgánicas, antecedentes, diagnóstico y plan.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><strong>Anexos</strong><span>Laboratorio, radiografías, documentos, consentimientos, recetas y archivos visuales.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico"><strong>Atención y especialidades</strong><span>Cirugía, estética, capilar, terapias, cámara hiperbárica y enfermería.</span></a>
+                <a class="clinical-quick-card" href="#recordatorios-tratamiento"><strong>Citas / Recordatorios</strong><span>Agenda y seguimiento estético o clínico conectado al calendario.</span></a>
             </div>
         </section>
 
@@ -330,8 +344,7 @@
         </label>
     </div>
     <div class="patient-reminder-preset-actions">
-        <span>Seleccione uno o varios retoques y el sistema calculara automaticamente la fecha sugerida desde hoy, segun el intervalo configurado.</span>
-        <button type="button" class="erp-btn-secondary" id="addReminderPresets">Agregar seleccionados</button>
+        <span>Al seleccionar un seguimiento aparecera inmediatamente con su fecha sugerida. Puede ajustarla antes de enviarlo al calendario.</span>
     </div>
     <form method="post" action="{% url 'clinica_crear_recordatorios_tratamiento' empresa.slug paciente.id %}" id="treatmentReminderForm">
         {% csrf_token %}
@@ -382,7 +395,7 @@
         </div>
         <div class="patient-reminder-actions">
             <button type="button" class="erp-btn-secondary" id="addTreatmentReminder">+ Agregar otro seguimiento</button>
-            <button type="submit" class="erp-btn">Enviar al calendario</button>
+            <button type="submit" class="erp-btn" id="treatmentReminderSubmit" disabled>Enviar al calendario</button>
         </div>
     </form>
     {% if recordatorios_tratamiento %}
@@ -395,170 +408,6 @@
         {% endfor %}
     </div>
     {% endif %}
-</section>
-
-<section id="historial-clinico" class="erp-card patient-anchor-offset">
-    <div class="erp-section-heading">
-        <div>
-            <div class="erp-kpi-label">Historial clinico</div>
-            <h3>Evaluacion medica integral</h3>
-        </div>
-        <a class="erp-action-link" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar entrada</a>
-    </div>
-    {% if empresa.slug == "hospital_mia" %}
-    <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid #b79a7b;border-radius:12px;background:linear-gradient(135deg,#fbf6f0,#fff);flex-wrap:wrap;">
-        <div>
-            <strong style="display:block;color:#563b25;">Cámara hiperbárica · Programa de 22 sesiones</strong>
-            <span class="erp-card-muted">Consulte en una sola tabla las sesiones finalizadas, parámetros, evolución y notas de enfermería.</span>
-        </div>
-        <a class="erp-btn-secondary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Ver control completo</a>
-    </div>
-    <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid #87c9bf;border-radius:12px;background:linear-gradient(135deg,#effbf8,#fff);flex-wrap:wrap;">
-        <div>
-            <strong style="display:block;color:#135e57;">Terapias Post Quirúrgicas · Programa de 12 sesiones</strong>
-            <span class="erp-card-muted">Consulte signos vitales, estado, equipos, cuidados y notas de cada sesión.</span>
-        </div>
-        <a class="erp-btn-secondary" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Ver cuadro completo</a>
-    </div>
-    {% endif %}
-    {% if formularios_hospitalarios %}
-    <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid var(--line);border-radius:12px;background:#f7fbff;flex-wrap:wrap;">
-        <div>
-            <strong style="display:block;color:#102338;">Formularios hospitalarios</strong>
-            <span class="erp-card-muted">{{ historias_especialidad|length }} registro(s) especializado(s) en este expediente.</span>
-        </div>
-        <a class="erp-btn-secondary" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Abrir formularios</a>
-    </div>
-    {% endif %}
-    <div class="patient-section-grid">
-        <div class="patient-mini-card"><strong>Antecedentes</strong><span>{{ paciente.antecedentes_medicos|default:"Sin antecedentes registrados." }}</span></div>
-        <div class="patient-mini-card"><strong>Funciones</strong><span>Funciones vitales, habitos y sistemas se registran como eventos del expediente.</span></div>
-        <div class="patient-mini-card"><strong>Examen Fisico</strong><span>Documenta hallazgos en descripcion y signos vitales del evento clinico.</span></div>
-        <div class="patient-mini-card"><strong>Diagnosticos</strong><span>Diagnosticos consolidados desde las entradas del expediente.</span></div>
-        <div class="patient-mini-card"><strong>Plan</strong><span>Plan medico registrado por evento o tratamiento activo.</span></div>
-        <div class="patient-mini-card"><strong>Historial Clinica Tricopigmentacion</strong><span>Espacio preparado para controles, pigmentos, zonas tratadas y sesiones.</span></div>
-    </div>
-    <div style="margin-top:14px;">
-        {% for evento in eventos %}
-        <div class="patient-timeline-item">
-            <div class="erp-kpi-label">{{ evento.get_tipo_display }} - {{ evento.fecha|date:"d/m/Y H:i" }}</div>
-            <h4 style="margin:6px 0;">{{ evento.titulo }}</h4>
-            <p style="margin:0;line-height:1.7;">{{ evento.descripcion }}</p>
-            {% if evento.signos_vitales %}<p class="erp-card-muted"><strong>Funciones / signos:</strong> {{ evento.signos_vitales }}</p>{% endif %}
-            {% if evento.diagnostico %}<p class="erp-card-muted"><strong>Diagnostico:</strong> {{ evento.diagnostico }}</p>{% endif %}
-            {% if evento.plan %}<p class="erp-card-muted"><strong>Plan:</strong> {{ evento.plan }}</p>{% endif %}
-        </div>
-        {% empty %}
-        <div class="erp-empty">Aun no hay historial clinico registrado.</div>
-        {% endfor %}
-    </div>
-</section>
-
-<section class="erp-grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);">
-    <article class="erp-card patient-anchor-offset" id="anexos">
-        <div class="erp-kpi-label">Anexos</div>
-        <h3 class="erp-panel-title">Documentos clinicos</h3>
-        <div class="patient-section-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:12px;">
-            <a class="patient-mini-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}" style="text-decoration:none;"><strong>Examenes</strong><span>{% if examenes %}{{ examenes|length }} examen(es) cargados.{% else %}Subir PDF o foto de resultados.{% endif %}</span></a>
-            <a class="patient-mini-card" href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'laboratorio' %}" style="text-decoration:none;"><strong>Trabajos de laboratorio</strong><span>{% if documentos_clinicos_conteos.laboratorio %}{{ documentos_clinicos_conteos.laboratorio }} registro(s) cargados.{% else %}Resultados y solicitudes por fecha.{% endif %}</span></a>
-            <a class="patient-mini-card" href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'radiologico' %}" style="text-decoration:none;"><strong>Solicitud Estudio Radiologico</strong><span>{% if documentos_clinicos_conteos.radiologico %}{{ documentos_clinicos_conteos.radiologico }} registro(s) cargados.{% else %}Ordenes e imagenologia.{% endif %}</span></a>
-            <a class="patient-mini-card" href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'documento' %}" style="text-decoration:none;"><strong>Documentos</strong><span>{% if documentos_clinicos_conteos.documento %}{{ documentos_clinicos_conteos.documento }} documento(s) cargados.{% else %}Adjuntos generales del paciente.{% endif %}</span></a>
-            <a class="patient-mini-card" href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'remision' %}" style="text-decoration:none;"><strong>Remision y contraremision</strong><span>{% if documentos_clinicos_conteos.remision %}{{ documentos_clinicos_conteos.remision }} registro(s) cargados.{% else %}Control de referencias externas.{% endif %}</span></a>
-            <a class="patient-mini-card" href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'detalle_remision' %}" style="text-decoration:none;"><strong>Detalle Remisiones</strong><span>{% if documentos_clinicos_conteos.detalle_remision %}{{ documentos_clinicos_conteos.detalle_remision }} seguimiento(s) cargados.{% else %}Seguimiento de cada remision.{% endif %}</span></a>
-            <a class="patient-mini-card" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}" style="text-decoration:none;"><strong>Recetas</strong><span>{% if recetas %}{{ recetas|length }} receta(s) emitidas.{% else %}Crear receta imprimible.{% endif %}</span></a>
-            <a class="patient-mini-card" href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'incapacidad' %}" style="text-decoration:none;"><strong>Incapacidades</strong><span>{% if documentos_clinicos_conteos.incapacidad %}{{ documentos_clinicos_conteos.incapacidad }} certificado(s) emitidos.{% else %}Certificados e incapacidades emitidas.{% endif %}</span></a>
-        </div>
-    </article>
-    <article class="erp-card patient-anchor-offset" id="consentimientos">
-        <div class="erp-section-heading" style="align-items:flex-start;">
-            <div>
-                <div class="erp-kpi-label">Plan de consentimiento</div>
-                <h3 class="erp-panel-title">Biblioteca documental</h3>
-                <p class="erp-card-muted">{{ consentimientos|length }} plan(es) registrado(s). Abra la pantalla profesional para revisar PDF, fechas, version y estado.</p>
-            </div>
-            <a class="erp-action-link" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}">Abrir planes</a>
-        </div>
-        <div class="patient-consent-list">
-        {% if consentimientos %}
-        {% with consentimiento=consentimientos.0 %}
-        <article class="patient-consent-card">
-            <div>
-                <strong>Ultimo documento: {{ consentimiento.titulo }}</strong>
-                <span>{{ consentimiento.get_estado_display }} · Version {{ consentimiento.version }}{% if consentimiento.fecha_firma %} · Firmado {{ consentimiento.fecha_firma|date:"d/m/Y H:i" }}{% endif %}{% if consentimiento.firmado_por %} · {{ consentimiento.firmado_por }}{% endif %}</span>
-            </div>
-            <div class="patient-consent-actions">
-                {% if consentimiento.archivo %}<a class="erp-btn-secondary" href="{{ consentimiento.archivo.url }}" target="_blank" rel="noopener">Ver PDF</a>{% endif %}
-                <a class="erp-btn-secondary" href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}">Ver biblioteca</a>
-            </div>
-        </article>
-        {% endwith %}
-        {% else %}
-        <div class="erp-empty">Sin consentimientos registrados. Use la pantalla propia para subir el primer PDF.</div>
-        {% endif %}
-        </div>
-    </article>
-</section>
-
-<section id="plan-tratamiento" class="erp-card patient-anchor-offset">
-    <div class="erp-section-heading">
-        <div><div class="erp-kpi-label">Plan de tratamiento</div><h3>Tratamientos del paciente</h3></div>
-        <a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}">Crear tratamiento</a>
-    </div>
-    {% for tratamiento in tratamientos %}
-    <div class="patient-timeline-item">
-        <strong>{{ tratamiento.nombre }}</strong>
-        <p class="erp-card-muted">{{ tratamiento.get_estado_display }} - Inicio {{ tratamiento.fecha_inicio|date:"d/m/Y" }}{% if tratamiento.profesional %} - {{ tratamiento.profesional.nombre }}{% endif %}</p>
-        {% if tratamiento.objetivo %}<p><strong>Objetivo:</strong> {{ tratamiento.objetivo }}</p>{% endif %}
-        {% if tratamiento.plan_clinico %}<p><strong>Plan clinico:</strong> {{ tratamiento.plan_clinico }}</p>{% endif %}
-    </div>
-    {% empty %}
-    <div class="erp-empty">Sin tratamientos registrados.</div>
-    {% endfor %}
-</section>
-
-<section id="evolucion" class="erp-card patient-anchor-offset">
-    <div class="erp-section-heading">
-        <div>
-            <div class="erp-kpi-label">Evolucion</div>
-            <h3>Biblioteca visual del paciente</h3>
-            <p class="erp-card-muted">{{ fotos_evolucion|length }} registro(s) recientes. Abra la pantalla profesional para ver fotos y videos separados por fecha.</p>
-        </div>
-        <a class="erp-action-link" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Abrir evolucion</a>
-    </div>
-    <div class="patient-consent-list">
-        {% if fotos_evolucion %}
-        {% with registro=fotos_evolucion.0 %}
-        <article class="patient-consent-card">
-            <div>
-                <strong>Ultimo registro: {{ registro.titulo }}</strong>
-                <span>{{ registro.get_tipo_display }} · {{ registro.fecha|date:"d/m/Y H:i" }}{% if registro.video %} · Video{% else %} · Foto{% endif %}{% if registro.descripcion %} · {{ registro.descripcion }}{% endif %}</span>
-            </div>
-            <div class="patient-consent-actions">
-                <a class="erp-btn-secondary" href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Ver biblioteca</a>
-                <a class="erp-btn-secondary" href="{% url 'clinica_registrar_foto_evolucion' empresa.slug paciente.id %}">Subir archivo</a>
-            </div>
-        </article>
-        {% endwith %}
-        {% else %}
-        <div class="erp-empty">Aun no hay fotos ni videos de evolucion registrados. Use la pantalla propia para subir el primer archivo.</div>
-        {% endif %}
-    </div>
-</section>
-
-<section id="citas" class="erp-card patient-anchor-offset">
-    <div class="erp-section-heading">
-        <div><div class="erp-kpi-label">Citas</div><h3>Agenda del paciente</h3></div>
-        <a class="erp-action-link" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Programar cita</a>
-    </div>
-    {% for cita in citas %}
-    <div class="patient-timeline-item">
-        <strong>{{ cita.fecha_hora|date:"d/m/Y H:i" }} - {{ cita.motivo }}</strong>
-        <p class="erp-card-muted">{{ cita.get_estado_display }}{% if cita.profesional %} con {{ cita.profesional.nombre }}{% endif %}{% if cita.servicio %} - {{ cita.servicio.nombre }}{% endif %}</p>
-        {% if cita.observaciones %}<p>{{ cita.observaciones }}</p>{% endif %}
-    </div>
-    {% empty %}
-    <div class="erp-empty">Sin citas registradas para este paciente.</div>
-    {% endfor %}
 </section>
 
 </div>
@@ -582,7 +431,8 @@
 (function(){
     const rows = document.getElementById("treatmentReminderRows");
     const addButton = document.getElementById("addTreatmentReminder");
-    const presetButton = document.getElementById("addReminderPresets");
+    const submitButton = document.getElementById("treatmentReminderSubmit");
+    const presets = Array.from(document.querySelectorAll("[data-reminder-preset]"));
     if(!rows || !addButton){ return; }
     function addMonths(date, months){
         const target = new Date(date.getTime());
@@ -624,6 +474,7 @@
         return `${year}-${month}-${day}`;
     }
     function resetRow(row){
+        delete row.dataset.presetKey;
         row.querySelectorAll("input").forEach(input => input.value = "");
         row.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
         const periodo = row.querySelector('select[name="periodo[]"]');
@@ -648,14 +499,29 @@
         const remove = row.querySelector("[data-remove-reminder]");
         if(remove){
             remove.addEventListener("click", function(){
+                const presetKey = row.dataset.presetKey;
+                if(presetKey !== undefined && presets[Number(presetKey)]){
+                    presets[Number(presetKey)].checked = false;
+                }
                 const allRows = rows.querySelectorAll(".patient-reminder-row");
                 if(allRows.length <= 1){
                     resetRow(row);
+                    updateSubmitState();
                     return;
                 }
                 row.remove();
+                updateSubmitState();
             });
         }
+    }
+    function updateSubmitState(){
+        if(!submitButton){ return; }
+        submitButton.disabled = !Array.from(rows.querySelectorAll(".patient-reminder-row")).some(function(row){
+            return Boolean(
+                row.querySelector('input[name="tratamiento[]"]')?.value.trim()
+                && row.querySelector('input[name="fecha[]"]')?.value
+            );
+        });
     }
     rows.querySelectorAll(".patient-reminder-row").forEach(wireRow);
     addButton.addEventListener("click", function(){
@@ -663,28 +529,39 @@
         if(!row){ return; }
         const firstInput = row.querySelector('input[name="tratamiento[]"]');
         if(firstInput){ firstInput.focus(); }
+        updateSubmitState();
     });
-    if(presetButton){
-        presetButton.addEventListener("click", function(){
-            const selected = Array.from(document.querySelectorAll("[data-reminder-preset]:checked"));
-            if(!selected.length){ return; }
-            selected.forEach(function(preset){
-                const row = createRow();
-                if(!row){ return; }
-                const treatment = row.querySelector('input[name="tratamiento[]"]');
-                const date = row.querySelector('input[name="fecha[]"]');
-                const note = row.querySelector('input[name="nota[]"]');
-                const calculatedDate = calculatePresetDate(preset);
-                const intervalLabel = presetIntervalLabel(preset);
-                if(treatment){ treatment.value = preset.dataset.treatment || ""; }
-                if(date){ date.value = toDateInputValue(calculatedDate); }
-                if(note){ note.value = `Retoque automatico sugerido a ${intervalLabel}.`; }
-                preset.checked = false;
+    presets.forEach(function(preset, index){
+        const presetKey = String(index);
+        preset.addEventListener("change", function(){
+            const existing = rows.querySelector(`[data-preset-key="${presetKey}"]`);
+            if(!preset.checked){
+                if(existing){
+                    if(rows.querySelectorAll(".patient-reminder-row").length === 1){ resetRow(existing); }
+                    else{ existing.remove(); }
+                }
+                updateSubmitState();
+                return;
+            }
+            const reusable = Array.from(rows.querySelectorAll(".patient-reminder-row")).find(function(candidate){
+                return candidate.dataset.presetKey === undefined
+                    && !candidate.querySelector('input[name="tratamiento[]"]')?.value.trim()
+                    && !candidate.querySelector('input[name="fecha[]"]')?.value;
             });
-            const lastRow = rows.querySelector(".patient-reminder-row:last-child");
-            if(lastRow){ lastRow.scrollIntoView({behavior:"smooth", block:"center"}); }
+            const row = existing || reusable || createRow();
+            if(!row){ return; }
+            row.dataset.presetKey = presetKey;
+            row.querySelector('input[name="tratamiento[]"]').value = preset.dataset.treatment || "";
+            row.querySelector('input[name="fecha[]"]').value = toDateInputValue(calculatePresetDate(preset));
+            const note = row.querySelector('input[name="nota[]"]');
+            if(note){ note.value = `Retoque automatico sugerido a ${presetIntervalLabel(preset)}.`; }
+            updateSubmitState();
+            row.scrollIntoView({behavior:"smooth", block:"center"});
         });
-    }
+    });
+    rows.addEventListener("input", updateSubmitState);
+    rows.addEventListener("change", updateSubmitState);
+    updateSubmitState();
 })();
 
 (function(){

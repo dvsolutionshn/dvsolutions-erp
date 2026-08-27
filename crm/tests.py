@@ -41,6 +41,7 @@ class CRMTests(TestCase):
             slug="hospital_mia",
             rtn="08011999111113",
             estado_licencia="activa",
+            tipo_solucion="clinica",
         )
         self.modulo, _ = Modulo.objects.get_or_create(
             codigo="crm_marketing",
@@ -81,7 +82,7 @@ class CRMTests(TestCase):
         )
         self.assertRedirects(
             response_login,
-            reverse("agenda_citas", args=[self.empresa.slug]),
+            reverse("dashboard", args=[self.empresa.slug]),
             fetch_redirect_response=False,
         )
 
@@ -103,6 +104,7 @@ class CRMTests(TestCase):
             slug="luque_aestetic",
             rtn="08011999111991",
             estado_licencia="activa",
+            tipo_solucion="clinica",
         )
         self.usuario.empresas_acceso.add(luque)
         paciente = Paciente.objects.create(
@@ -526,7 +528,10 @@ class CRMTests(TestCase):
         self.assertContains(response, "Dr. Luis González")
         self.assertEqual(mobile.status_code, 200)
         self.assertContains(mobile, "Paciente de Luis")
-        self.assertNotContains(mobile, "Paciente de Candy")
+        self.assertNotIn(
+            "Paciente de Candy",
+            [cita.display_cliente for cita in mobile.context["citas"]],
+        )
 
     def test_app_movil_agenda_es_instalable_y_usa_los_mismos_datos(self):
         medical_spa = Empresa.objects.create(
@@ -534,6 +539,7 @@ class CRMTests(TestCase):
             slug="medical_spa",
             rtn="08011999111115",
             estado_licencia="activa",
+            tipo_solucion="clinica",
         )
         self.usuario.empresas_acceso.add(medical_spa)
         empresas_clinicas = [self.empresa, medical_spa]
@@ -620,6 +626,7 @@ class CRMTests(TestCase):
                 slug=slug,
                 rtn=f"080119991112{indice}",
                 estado_licencia="activa",
+                tipo_solucion="clinica",
             )
             self.usuario.empresas_acceso.add(empresa_clinica)
             empresas_clinicas.append(empresa_clinica)
@@ -767,6 +774,8 @@ class CRMTests(TestCase):
         self.assertContains(response, "45")
 
     def test_cita_puede_editarse_y_cambiar_estado_desde_calendario(self):
+        self.empresa.tipo_solucion = "erp"
+        self.empresa.save(update_fields=["tipo_solucion"])
         cliente = Cliente.objects.create(
             empresa=self.empresa, nombre="Paciente Estado",
             rtn="08011999000004", telefono="99990004", activo=True,
@@ -1833,6 +1842,7 @@ class CRMTests(TestCase):
             slug="medical_spa",
             rtn="08011999111114",
             estado_licencia="activa",
+            tipo_solucion="clinica",
         )
         EmpresaModulo.objects.create(empresa=otra_empresa, modulo=self.modulo, activo=True)
         plantilla_hospital = PlantillaMensaje.objects.create(

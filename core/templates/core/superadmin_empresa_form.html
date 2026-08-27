@@ -30,7 +30,7 @@
         <p>Este formulario queda reservado para tu operacion interna y no se expone a los clientes finales.</p>
         <div class="erp-form-grid">
             {% for field in form %}
-                {% if field.name != 'modulos_activos' and field.name != 'tipo_solucion' %}
+                {% if field.name != 'modulos_activos' and field.name != 'tipo_solucion' and field.name != 'modulos_adicionales_visibles_clinica' %}
                 <div class="erp-field {% if field.name == 'direccion' or field.name == 'slogan' or field.name == 'observaciones_comerciales' %}erp-field-span-full{% endif %}">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
@@ -52,6 +52,16 @@
             <span class="erp-badge warning">Suspendida: acceso detenido por gestion interna</span>
             <span class="erp-badge danger">Vencida: servicio fuera de fecha</span>
         </div>
+    </div>
+</section>
+
+<section class="erp-form-card">
+    <h3>Navegacion del producto clinico</h3>
+    <p>Los modulos clinicos y Facturacion respetan su activacion y permisos. Aqui puedes sumar accesos ERP a la interfaz limpia sin alterar ninguna funcion.</p>
+    <div class="erp-soft-panel">
+        {{ form.modulos_adicionales_visibles_clinica }}
+        {% if form.modulos_adicionales_visibles_clinica.help_text %}<div class="erp-field-help">{{ form.modulos_adicionales_visibles_clinica.help_text }}</div>{% endif %}
+        {{ form.modulos_adicionales_visibles_clinica.errors }}
     </div>
 </section>
 

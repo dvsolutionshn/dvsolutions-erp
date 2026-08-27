@@ -23,7 +23,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .assistant import responder_consulta
-from .access import modo_clinico_simple_activo
+from .access import interfaz_clinica_activa
 from .access_tokens import emitir_token_acceso, enviar_correo_acceso, hash_token_acceso
 from .backup_service import generar_respaldo_empresa
 from .backup_tokens import generar_token_respaldo, hash_token_respaldo
@@ -42,6 +42,7 @@ from .forms import (
 from .models import Empresa
 from .models import EmpresaModulo
 from .models import (
+    ConfiguracionAvanzadaEmpresa,
     PagoLicenciaEmpresa,
     PlanComercial,
     PlanModulo,
@@ -66,13 +67,6 @@ SESSION_EXPIRED_MESSAGE_KEY = "dvsolutions_session_expired_message"
 SESSION_EXPIRED_MESSAGE = "Vuelve a iniciar sesion para continuar."
 BACKUP_TOKEN_MAX_ATTEMPTS = 5
 BACKUP_TOKEN_WINDOW_SECONDS = 15 * 60
-EMPRESAS_CLINICAS_CON_CONTROL_USUARIOS = frozenset({
-    "hospital_mia",
-    "serviciosmedicos",
-    "medical_spa",
-    "luque_aestetic",
-})
-
 PERMISOS_ROL_CLINICO = (
     ("Facturación", (
         ("puede_facturas", "Ingresar al módulo de facturación"),
@@ -242,7 +236,7 @@ def _puede_administrar_usuarios_clinicos(usuario, empresa):
     return bool(
         usuario
         and usuario.is_authenticated
-        and empresa.slug in EMPRESAS_CLINICAS_CON_CONTROL_USUARIOS
+        and interfaz_clinica_activa(empresa)
         and usuario.puede_acceder_empresa(empresa)
         and (
             usuario.is_superuser
@@ -654,11 +648,7 @@ def _minutes_remaining(seconds):
 
 
 def _es_perfil_clinico(empresa):
-    return bool(
-        empresa.tipo_solucion == "clinica"
-        or empresa.slug in {"hospital_mia", "medical_spa"}
-        or empresa.tiene_modulo_activo("clinica_medica")
-    )
+    return interfaz_clinica_activa(empresa)
 
 
 def empresa_login(request, slug=None):
@@ -697,17 +687,6 @@ def empresa_login(request, slug=None):
                     require_https=request.is_secure(),
                 ):
                     return redirect(siguiente)
-                if es_perfil_clinico:
-                    if (
-                        empresa.tiene_modulo_activo("clinica_medica")
-                        and user.tiene_alguna_permision_clinica_empresa(empresa)
-                    ):
-                        return redirect("clinica_dashboard", empresa_slug=empresa.slug)
-                    if (
-                        empresa.tiene_modulo_activo("agenda_citas")
-                        and user.tiene_permiso_erp("puede_citas", empresa)
-                    ):
-                        return redirect("agenda_citas", empresa_slug=empresa.slug)
                 return _redirect_dashboard_empresa(request, empresa)
             else:
                 bloqueo_restante = _register_login_failure(throttle_scope, request)
@@ -964,8 +943,16 @@ def dashboard(request, slug=None):
         return _redirect_login_empresa(request, empresa)
 
     modulos_activos = empresa.modulos_habilitados()
-    if modo_clinico_simple_activo(request.user, empresa):
-        modulos_activos = modulos_activos.filter(codigo__in=["clinica_medica", "facturacion"])
+    if interfaz_clinica_activa(empresa):
+        try:
+            adicionales = empresa.configuracion_avanzada.modulos_adicionales_visibles_clinica.values_list(
+                "codigo", flat=True
+            )
+        except ConfiguracionAvanzadaEmpresa.DoesNotExist:
+            adicionales = []
+        modulos_activos = modulos_activos.filter(
+            codigo__in={"clinica_medica", "agenda_citas", "facturacion", "punto_venta", *adicionales}
+        )
 
     return render(request, 'core/dashboard_premium.html', {
         'empresa': empresa,

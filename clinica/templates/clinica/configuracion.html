@@ -1,0 +1,74 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+
+{% block title %}Configuración clínica - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Sistema clínico{% endblock %}
+{% block header_title %}Configuración{% endblock %}
+{% block header_description %}Administre catálogos, usuarios e integraciones habilitadas para esta empresa, sin alterar los módulos ni sus permisos.{% endblock %}
+
+{% block extra_head %}
+<style>
+.clinical-config-shell{max-width:1180px;margin:0 auto 34px}
+.clinical-config-intro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;padding:24px;border:1px solid #d9e8f1;border-radius:25px;background:radial-gradient(circle at 94% 8%,rgba(45,212,191,.15),transparent 31%),linear-gradient(135deg,#fff,#f6fbff);box-shadow:0 20px 48px rgba(18,42,66,.07)}
+.clinical-config-intro h3{margin:6px 0 8px;color:#102338;font-size:26px}.clinical-config-intro p{max-width:760px;margin:0;color:#61788c;line-height:1.6}
+.clinical-config-badge{display:inline-flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid #bde7e1;border-radius:999px;background:#edfcf9;color:#08766d;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+.clinical-config-section{margin-top:22px}.clinical-config-section-head{display:flex;justify-content:space-between;gap:16px;align-items:end;margin-bottom:12px}.clinical-config-section-head h3{margin:0;color:#102338;font-size:18px}.clinical-config-section-head p{margin:4px 0 0;color:#6a7d8f;font-size:12px}
+.clinical-config-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.clinical-config-card{position:relative;display:flex;gap:13px;min-height:116px;padding:16px;border:1px solid #d9e7f1;border-radius:19px;background:#fff;color:#102338;text-decoration:none;box-shadow:0 13px 32px rgba(18,42,66,.05);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.clinical-config-card:hover{transform:translateY(-2px);border-color:#8fc7d9;box-shadow:0 18px 38px rgba(18,42,66,.1)}
+.clinical-config-icon{width:43px;height:43px;flex:0 0 43px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(135deg,#e8fbf8,#eaf2ff);color:#08766d;font-size:19px;font-weight:900}.clinical-config-card strong{display:block;margin:2px 0 6px;font-size:14px}.clinical-config-card span{display:block;color:#687c8d;font-size:11px;line-height:1.5}
+.clinical-config-empty{padding:18px;border:1px dashed #bdd0df;border-radius:18px;background:#fbfdff;color:#60758a}
+@media(max-width:920px){.clinical-config-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.clinical-config-intro{grid-template-columns:1fr}.clinical-config-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="clinical-config-shell">
+    <section class="clinical-config-intro">
+        <div>
+            <div class="erp-kpi-label">Configuración por empresa</div>
+            <h3>Un solo centro para preparar la operación clínica</h3>
+            <p>Solo aparecen las opciones autorizadas para su usuario y los módulos habilitados para {{ empresa.nombre }}.</p>
+        </div>
+        <span class="clinical-config-badge">Configuración reutilizable</span>
+    </section>
+
+    <section class="clinical-config-section">
+        <div class="clinical-config-section-head">
+            <div><h3>Atención clínica</h3><p>Catálogos y recursos usados en agenda, tratamiento y expediente.</p></div>
+        </div>
+        <div class="clinical-config-grid">
+            {% if erp_access.configuracion_clinica %}
+            <a class="clinical-config-card" href="{% url 'clinica_profesionales' empresa.slug %}"><i class="clinical-config-icon">P</i><span><strong>Profesionales</strong><span>Personal médico y responsables disponibles en agenda.</span></span></a>
+            <a class="clinical-config-card" href="{% url 'clinica_servicios' empresa.slug %}"><i class="clinical-config-icon">C</i><span><strong>Servicios y categorías de citas</strong><span>Servicios, duración y organización de las atenciones.</span></span></a>
+            {% endif %}
+            {% if erp_access.tratamientos_clinicos %}
+            <a class="clinical-config-card" href="{% url 'clinica_tratamientos' empresa.slug %}"><i class="clinical-config-icon">T</i><span><strong>Catálogo de tratamientos</strong><span>Opciones que conectan la cita, el tratamiento y el expediente.</span></span></a>
+            {% endif %}
+            {% if erp_access.configuracion_clinica and recetas_avanzadas %}
+            <a class="clinical-config-card" href="{% url 'clinica_plantillas_recetas' empresa.slug %}"><i class="clinical-config-icon">Rx</i><span><strong>Plantillas de recetas</strong><span>Indicaciones y medicamentos reutilizables en consulta.</span></span></a>
+            {% endif %}
+            {% if puede_controlar_enlaces_pacientes %}
+            <a class="clinical-config-card" href="{% url 'clinica_control_enlaces_registro_paciente' empresa.slug %}"><i class="clinical-config-icon">↗</i><span><strong>Enlaces de registro</strong><span>Control de formularios enviados a nuevos pacientes.</span></span></a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="clinical-config-section">
+        <div class="clinical-config-section-head">
+            <div><h3>Empresa e integraciones</h3><p>Administración conservada dentro de los módulos correspondientes.</p></div>
+        </div>
+        <div class="clinical-config-grid">
+            {% if erp_access.administrar_usuarios_clinicos %}
+            <a class="clinical-config-card" href="{% url 'usuarios_clinicos' empresa.slug %}"><i class="clinical-config-icon">U</i><span><strong>Usuarios y permisos</strong><span>Acceso por empresa, roles y permisos clínicos.</span></span></a>
+            {% endif %}
+            {% if erp_access.configuracion_facturacion %}
+            <a class="clinical-config-card" href="{% url 'configuracion_facturacion' empresa.slug %}"><i class="clinical-config-icon">F</i><span><strong>Configuración de facturación</strong><span>Datos fiscales, comprobantes y opciones de cobro.</span></span></a>
+            {% endif %}
+            {% if erp_access.modulo_crm %}
+            <a class="clinical-config-card" href="{% url 'crm_dashboard' empresa.slug %}"><i class="clinical-config-icon">M</i><span><strong>CRM y Marketing</strong><span>Campañas, comunicaciones y seguimiento comercial habilitado.</span></span></a>
+            {% endif %}
+        </div>
+    </section>
+</main>
+{% endblock %}

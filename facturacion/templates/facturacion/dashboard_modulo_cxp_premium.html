@@ -1,47 +1,40 @@
 {% extends "core/erp_base.html" %}
 {% load static %}
 
-{% block title %}Facturacion - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Modulo Financiero{% endblock %}
-{% block header_title %}Facturacion{% endblock %}
-{% block header_description %}Gestion comercial, fiscal y operativa con una interfaz refinada, coherente y preparada para una institucion de alto nivel.{% endblock %}
+{% block title %}Facturación - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}{% if erp_access.interfaz_clinica %}Gestion de cobros y documentos{% else %}Modulo Financiero{% endif %}{% endblock %}
+{% block header_title %}Facturación{% endblock %}
+{% block header_description %}Todos los accesos de facturacion, organizados en una vista compacta y facil de recorrer.{% endblock %}
 
 {% block extra_head %}
 <style>
-.erp-facturacion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:stretch;}
-.erp-facturacion-module{position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:360px;animation:erpFacturacionRise .48s ease both;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;}
+.erp-billing-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;padding:16px 18px;border:1px solid #dce8ef;border-radius:18px;background:#fff;box-shadow:0 10px 28px rgba(16,35,56,.045)}
+.erp-billing-summary h3{margin:2px 0 4px;color:#102338;font-size:20px}.erp-billing-summary p{margin:0;color:var(--muted);font-size:13px}.erp-billing-summary-badges{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.erp-billing-summary-badges span{padding:7px 10px;border:1px solid #d9e7ee;border-radius:999px;background:#f8fbfd;color:#496276;font-size:11px;font-weight:850}
+.erp-facturacion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px;align-items:stretch;}
+.erp-facturacion-module{position:relative;overflow:hidden;display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto auto 1fr;column-gap:10px;min-height:108px;padding:12px;animation:erpFacturacionRise .38s ease both;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;}
 .erp-facturacion-module:nth-child(2){animation-delay:.04s}.erp-facturacion-module:nth-child(3){animation-delay:.08s}.erp-facturacion-module:nth-child(4){animation-delay:.12s}.erp-facturacion-module:nth-child(5){animation-delay:.16s}.erp-facturacion-module:nth-child(6){animation-delay:.2s}.erp-facturacion-module:nth-child(7){animation-delay:.24s}.erp-facturacion-module:nth-child(8){animation-delay:.28s}
-.erp-facturacion-module:hover{transform:translateY(-5px);border-color:#c8d7ea;box-shadow:0 20px 42px rgba(12,34,56,.09);}
-.erp-facturacion-visual{position:relative;height:118px;margin:-6px -6px 18px;border-radius:14px;overflow:hidden;border:1px solid rgba(190,207,232,.7);background:#f8fbff;}
-.erp-facturacion-visual::after{content:"";position:absolute;inset:-40% auto auto -20%;width:70%;height:130%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.62),rgba(255,255,255,0));opacity:.55;transform:rotate(18deg);animation:erpFacturacionSweep 5.8s ease-in-out infinite;}
-.erp-facturacion-visual img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.01);transition:transform .42s ease,filter .42s ease;}
-.erp-facturacion-module:hover .erp-facturacion-visual img{transform:scale(1.07) translateY(-3px);filter:saturate(1.08);}
-.erp-facturacion-module h3{margin:8px 0 10px;font-size:22px;color:#102338;}
-.erp-facturacion-module p{margin:0;color:var(--muted);line-height:1.7;}
+.erp-facturacion-module:hover{transform:translateY(-3px);border-color:#9bcbd1;box-shadow:0 15px 34px rgba(12,60,72,.09);}
+.erp-facturacion-visual{grid-row:1/3;position:relative;width:44px;height:44px;margin:0;border-radius:13px;overflow:hidden;border:1px solid #d5e6eb;background:linear-gradient(145deg,#f4fbfb,#edf5ff);}
+.erp-facturacion-visual::after{content:"";position:absolute;inset:auto -12px -18px auto;width:34px;height:34px;border-radius:50%;background:rgba(31,182,170,.13)}
+.erp-facturacion-visual img{position:absolute;inset:5px;width:34px;height:34px;object-fit:contain;transition:transform .28s ease;}
+.erp-facturacion-module:hover .erp-facturacion-visual img{transform:scale(1.08)}
+.erp-facturacion-module .erp-kpi-label{align-self:end;font-size:8px}.erp-facturacion-module h3{align-self:start;margin:2px 0 0;font-size:15px;line-height:1.12;color:#102338;}
+.erp-facturacion-module p{grid-column:1/-1;margin:7px 0 0;color:var(--muted);font-size:10.5px;line-height:1.32;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
 @keyframes erpFacturacionRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes erpFacturacionSweep{0%,58%{transform:translateX(-120%) rotate(18deg)}100%{transform:translateX(260%) rotate(18deg)}}
+@media(max-width:680px){.erp-billing-summary{align-items:flex-start;flex-direction:column}.erp-billing-summary-badges{justify-content:flex-start}.erp-facturacion-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.erp-facturacion-module{min-height:126px}.erp-facturacion-module p{-webkit-line-clamp:2}}
+@media(max-width:430px){.erp-facturacion-grid{grid-template-columns:1fr}.erp-facturacion-module{min-height:112px}}
 </style>
 {% endblock %}
 
 {% block content %}
 <div style="display:none;">Facturacion</div>
+<div style="display:none;">Facturación</div>
 <div style="display:none;">Notas de Credito</div>
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Operacion</div>
-        <div class="erp-stat-value">360</div>
-        <p class="erp-card-muted">Facturacion, ajustes, cobranza, abastecimiento y reportes dentro de un mismo entorno corporativo.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Fiscal</div>
-        <div class="erp-stat-value">CAI</div>
-        <p class="erp-card-muted">Control documental y trazabilidad historica listos para crecimiento regulado.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Tesoreria</div>
-        <div class="erp-stat-value">CxC / CxP</div>
-        <p class="erp-card-muted">Seguimiento fino de saldos, recibos, pagos a proveedores y comportamiento financiero.</p>
-    </article>
+<div style="display:none;">Notas de Crédito</div>
+<section class="erp-billing-summary">
+    <div><div class="erp-kpi-label">Centro de facturacion</div><h3>Seleccione una operacion</h3><p>Se muestran todas las funciones habilitadas por los permisos actuales.</p></div>
+    <div class="erp-billing-summary-badges" aria-label="Areas de facturacion"><span>Emision</span><span>Fiscal</span><span>Inventario</span><span>Tesoreria</span></div>
 </section>
 
 <section class="erp-facturacion-grid">
@@ -59,9 +52,9 @@
     {% if erp_access.inventario and erp_access.usa_bodegas_internas %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/inventory.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Operacion Rapida</div><h3>Transferencia Rapida</h3><p>Mueve productos entre bodegas internas con el menor numero de pasos.</p></a>{% endif %}
     {% if erp_access.inventario %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'regalias_inventario' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/gifts.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Salida sin factura</div><h3>Regalias</h3><p>Entrega productos y descuenta el inventario con trazabilidad de usuario, bodega y lote.</p></a>{% endif %}
     {% if erp_access.compras %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'compras_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/purchases.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Abastecimiento</div><h3>Compras</h3><p>Documentos de compra conectados con el ingreso real de existencias al inventario.</p></a>{% endif %}
-    {% if erp_access.cai %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'cai_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/credit-notes.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Fiscal</div><h3>CAI</h3><p>Administracion fina de rangos fiscales y correlativos con trazabilidad historica.</p></a>{% endif %}
+    {% if erp_access.cai %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'cai_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/tax.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Fiscal</div><h3>CAI</h3><p>Administracion fina de rangos fiscales y correlativos con trazabilidad historica.</p></a>{% endif %}
     {% if erp_access.impuestos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'impuestos_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/tax.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Fiscal</div><h3>Impuestos</h3><p>Configuracion tributaria lista para facturacion, ajustes y evolucion contable.</p></a>{% endif %}
-    {% if erp_access.notas_credito %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'notas_credito_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/credit-notes.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Ajustes</div><h3>Notas de Credito</h3><p>Documentos de ajuste conectados con factura origen y saldo disponible real.</p></a>{% endif %}
+    {% if erp_access.notas_credito %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'notas_credito_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/credit-notes.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Ajustes</div><h3>Notas de Crédito</h3><p>Documentos de ajuste conectados con factura origen y saldo disponible real.</p></a>{% endif %}
     {% if erp_access.recibos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'recibos_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/receipts.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Cobranza</div><h3>Recibos</h3><p>Comprobantes de pago formales vinculados con facturas y clientes.</p></a>{% endif %}
     {% if erp_access.cierres_caja and erp_access.usa_cierre_caja %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'cierres_caja' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/cash.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Caja</div><h3>Cierres de Caja</h3><p>Cierres diarios por cajero para controlar efectivo, tarjetas y transferencias por turno.</p></a>{% endif %}
     {% if erp_access.cierres_caja and erp_access.usa_cierre_caja and erp_access.historial_cierres_caja %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'resumen_diario_caja' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/reports.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Gerencia</div><h3>Resumen Diario</h3><p>Vista ejecutiva de cobros por cajero, metodo, banco y diferencia de cierres.</p></a>{% endif %}

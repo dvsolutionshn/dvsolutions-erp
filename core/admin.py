@@ -29,13 +29,19 @@ class ConfiguracionAvanzadaEmpresaAdmin(admin.ModelAdmin):
         'usa_pagos_mixtos',
         'usa_reporte_bancos',
         'usa_inventario_farmaceutico',
+        'usa_control_lotes_fefo',
         'usa_bodegas_internas',
+        'modulos_clinicos_visibles',
     )
+
+    def modulos_clinicos_visibles(self, obj):
+        return ", ".join(obj.modulos_adicionales_visibles_clinica.values_list("nombre", flat=True)) or "-"
     list_filter = (
         'usa_cierre_caja',
         'usa_pagos_mixtos',
         'usa_reporte_bancos',
         'usa_inventario_farmaceutico',
+        'usa_control_lotes_fefo',
         'usa_bodegas_internas',
     )
 

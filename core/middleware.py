@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 from core.access import (
-    EMPRESAS_INTERFAZ_CLINICA_GLOBAL,
+    interfaz_clinica_activa,
     permiso_contabilidad_accion,
     permiso_contabilidad_desde_ruta,
     permiso_clinica_desde_ruta,
@@ -171,7 +171,7 @@ class EmpresaAccessMiddleware:
                     "pacientes/crear-rapido",
                 }
                 es_app_clinica_global = bool(
-                    empresa.slug in EMPRESAS_INTERFAZ_CLINICA_GLOBAL
+                    interfaz_clinica_activa(empresa)
                     and (
                         suffix == "app"
                         or suffix.startswith("app/")

@@ -101,8 +101,7 @@
                 <label class="preset"><input type="checkbox" data-reminder-preset data-treatment="Paciente que no ha venido" data-months="7"><span><strong>Paciente que no ha venido</strong><span>7 meses</span></span></label>
             </div>
             <div class="preset-actions">
-                <span>El sistema calcula la fecha sugerida desde hoy. Puede modificarla antes de guardar.</span>
-                <button type="button" class="erp-btn-secondary" id="addReminderPresets">Agregar seleccionados</button>
+                <span>Al seleccionar un seguimiento aparecera inmediatamente con su fecha sugerida. Puede modificarla antes de guardar.</span>
             </div>
             <form method="post" action="{% url 'clinica_crear_recordatorios_tratamiento' empresa.slug paciente.id %}" id="treatmentReminderForm">
                 {% csrf_token %}
@@ -119,7 +118,7 @@
                 </div>
                 <div class="follow-actions">
                     <button type="button" class="erp-btn-secondary" id="addTreatmentReminder">+ Agregar otro seguimiento</button>
-                    <button type="submit" class="erp-btn">Enviar al calendario</button>
+                    <button type="submit" class="erp-btn" id="treatmentReminderSubmit" disabled>Enviar al calendario</button>
                 </div>
             </form>
         </div>
@@ -171,7 +170,8 @@
 (function(){
     const rows = document.getElementById("treatmentReminderRows");
     const addButton = document.getElementById("addTreatmentReminder");
-    const presetButton = document.getElementById("addReminderPresets");
+    const submitButton = document.getElementById("treatmentReminderSubmit");
+    const presets = Array.from(document.querySelectorAll("[data-reminder-preset]"));
     if(!rows || !addButton){ return; }
     function calculatePresetDate(preset){
         const date = new Date();
@@ -185,6 +185,7 @@
         return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
     }
     function resetRow(row){
+        delete row.dataset.presetKey;
         row.querySelectorAll("input").forEach(input => input.value = "");
         row.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
         const periodo = row.querySelector('select[name="periodo[]"]');
@@ -196,11 +197,25 @@
         const remove = row.querySelector("[data-remove-reminder]");
         if(remove){
             remove.onclick = function(){
+                const presetKey = row.dataset.presetKey;
+                if(presetKey !== undefined && presets[Number(presetKey)]){
+                    presets[Number(presetKey)].checked = false;
+                }
                 const allRows = rows.querySelectorAll(".reminder-row");
-                if(allRows.length <= 1){ resetRow(row); return; }
+                if(allRows.length <= 1){ resetRow(row); updateSubmitState(); return; }
                 row.remove();
+                updateSubmitState();
             };
         }
+    }
+    function updateSubmitState(){
+        if(!submitButton){ return; }
+        submitButton.disabled = !Array.from(rows.querySelectorAll(".reminder-row")).some(function(row){
+            return Boolean(
+                row.querySelector('input[name="tratamiento[]"]')?.value.trim()
+                && row.querySelector('input[name="fecha[]"]')?.value
+            );
+        });
     }
     function createRow(){
         const base = rows.querySelector(".reminder-row");
@@ -215,20 +230,39 @@
     addButton.addEventListener("click", function(){
         const row = createRow();
         row?.querySelector('input[name="tratamiento[]"]')?.focus();
+        updateSubmitState();
     });
-    presetButton?.addEventListener("click", function(){
-        const selected = Array.from(document.querySelectorAll("[data-reminder-preset]:checked"));
-        selected.forEach(function(preset){
-            const row = createRow();
+    presets.forEach(function(preset, index){
+        const presetKey = String(index);
+        preset.addEventListener("change", function(){
+            const existing = rows.querySelector(`[data-preset-key="${presetKey}"]`);
+            if(!preset.checked){
+                if(existing){
+                    if(rows.querySelectorAll(".reminder-row").length === 1){ resetRow(existing); }
+                    else{ existing.remove(); }
+                }
+                updateSubmitState();
+                return;
+            }
+            const reusable = Array.from(rows.querySelectorAll(".reminder-row")).find(function(candidate){
+                return candidate.dataset.presetKey === undefined
+                    && !candidate.querySelector('input[name="tratamiento[]"]')?.value.trim()
+                    && !candidate.querySelector('input[name="fecha[]"]')?.value;
+            });
+            const row = existing || reusable || createRow();
             if(!row){ return; }
+            row.dataset.presetKey = presetKey;
             row.querySelector('input[name="tratamiento[]"]').value = preset.dataset.treatment || "";
             row.querySelector('input[name="fecha[]"]').value = toDateInputValue(calculatePresetDate(preset));
             const note = row.querySelector('input[name="nota[]"]');
             if(note){ note.value = "Seguimiento sugerido automaticamente desde expediente."; }
-            preset.checked = false;
+            updateSubmitState();
+            row.scrollIntoView({behavior:"smooth", block:"center"});
         });
-        rows.querySelector(".reminder-row:last-child")?.scrollIntoView({behavior:"smooth", block:"center"});
     });
+    rows.addEventListener("input", updateSubmitState);
+    rows.addEventListener("change", updateSubmitState);
+    updateSubmitState();
 })();
 </script>
 {% endblock %}

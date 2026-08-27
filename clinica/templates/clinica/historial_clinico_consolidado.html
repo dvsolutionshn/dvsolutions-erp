@@ -220,24 +220,24 @@
             <div class="summary-dashboard-label"><span class="summary-dashboard-icon">03</span>Tratamientos</div>
             <strong>{{ resumen_operativo.tratamientos_activos }} activo{{ resumen_operativo.tratamientos_activos|pluralize:"s" }}</strong>
             <p>{{ resumen_operativo.citas_proximas }} próxima{{ resumen_operativo.citas_proximas|pluralize:"s" }} cita{{ resumen_operativo.citas_proximas|pluralize:"s" }}</p>
-            <a class="summary-dashboard-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}#plan-tratamiento" aria-label="Ver tratamientos"></a>
+            <a class="summary-dashboard-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}" aria-label="Ver tratamientos"></a>
         </article>
         <article class="summary-dashboard-card">
             <div class="summary-dashboard-label"><span class="summary-dashboard-icon">04</span>Archivos clínicos</div>
             <strong>{{ resumen_operativo.examenes|add:resumen_operativo.consentimientos }}</strong>
             <p>{{ resumen_operativo.examenes }} examen{{ resumen_operativo.examenes|pluralize:"es" }} · {{ resumen_operativo.consentimientos }} consentimiento{{ resumen_operativo.consentimientos|pluralize:"s" }}</p>
-            <a class="summary-dashboard-link" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}#anexos" aria-label="Ver archivos clínicos"></a>
+            <a class="summary-dashboard-link" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}" aria-label="Ver archivos clínicos"></a>
         </article>
     </section>
 
     <nav class="summary-section-nav" aria-label="Secciones de la historia clínica">
-        <a href="#resumen-paciente">Resumen</a>
-        <a href="#informacion-paciente">Formulario del paciente</a>
-        <a href="#trabajo-clinico">Trabajo clínico</a>
-        <a href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Evolución</a>
-        <a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Exámenes</a>
-        <a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas</a>
-        <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Expediente completo</a>
+        <a href="#resumen-paciente">Datos generales</a>
+        <a href="#informacion-paciente">Motivo de consulta</a>
+        <a href="#informacion-paciente">Funciones orgánicas</a>
+        <a href="#informacion-paciente">Antecedentes</a>
+        <a href="#trabajo-clinico">Diagnóstico</a>
+        <a href="#trabajo-clinico">Plan y tratamiento</a>
+        <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
     </nav>
 
     <section class="sheet-panel" id="informacion-paciente">

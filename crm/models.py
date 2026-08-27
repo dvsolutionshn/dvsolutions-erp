@@ -207,7 +207,9 @@ class CitaCliente(models.Model):
 
     @property
     def display_servicio(self):
-        base = self.servicio_clinico.nombre if self.servicio_clinico_id else (self.producto.nombre if self.producto_id else "Sin tipo de consulta")
+        base = self.servicio_clinico.nombre if self.servicio_clinico_id else (
+            self.producto.nombre if self.producto_id else (self.titulo or "Sin tipo de consulta")
+        )
         if self.fase_servicio and self.sesion_servicio:
             return f"{base} · Fase {self.fase_servicio} · Sesión {self.sesion_servicio}"
         if self.sesion_servicio:

@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST, require_http_methods
 
-from core.access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL
+from core.access import interfaz_clinica_activa
 from core.models import Empresa
 from contabilidad.models import CuentaFinanciera
 from contabilidad.services import asegurar_cuentas_financieras_base_honduras
@@ -136,7 +136,7 @@ def _configuracion_crm(empresa):
 
 
 def _asegurar_pacientes_empresas_clinicas(empresa):
-    if empresa.slug not in EMPRESAS_INTERFAZ_CLINICA_GLOBAL:
+    if not interfaz_clinica_activa(empresa):
         return
     from clinica.services_pacientes import asegurar_paciente_desde_cliente
 
@@ -1704,7 +1704,7 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["citas_hoy_total"] = len(citas_hoy)
     contexto["pendientes_hoy"] = sum(1 for cita in citas_hoy if cita.estado in ["pendiente", "confirmada"])
-    contexto["hospital_mia_app_premium"] = empresa.slug in EMPRESAS_INTERFAZ_CLINICA_GLOBAL
+    contexto["hospital_mia_app_premium"] = interfaz_clinica_activa(empresa)
     contexto["pacientes_app_premium"] = contexto["hospital_mia_app_premium"]
     pacientes_activos_qs = Paciente.objects.filter(empresa=empresa, activo=True)
     contexto["pacientes_app_total"] = pacientes_activos_qs.count()

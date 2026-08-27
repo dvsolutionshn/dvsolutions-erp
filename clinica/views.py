@@ -19,7 +19,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
 
-from core.access import EMPRESAS_INTERFAZ_CLINICA_GLOBAL
+from core.access import interfaz_clinica_activa
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
@@ -92,9 +92,6 @@ from crm.models import (
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
 logger = logging.getLogger(__name__)
-
-EMPRESAS_RECETAS_AVANZADAS = frozenset({"hospital_mia", "serviciosmedicos", "luque_aestetic"})
-
 
 def _texto_busqueda_profesional(valor):
     return unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii").lower().strip()
@@ -263,12 +260,13 @@ def _configuracion_clinica(empresa):
     return ConfiguracionClinica.objects.get_or_create(empresa=empresa)[0]
 
 
-EMPRESAS_FORMULARIOS_CLINICOS = EMPRESAS_INTERFAZ_CLINICA_GLOBAL
+def _requiere_interfaz_clinica(empresa):
+    if not interfaz_clinica_activa(empresa):
+        raise Http404("Los formularios clinicos no estan habilitados para esta empresa.")
 
 
-def _requiere_hospital_mia(empresa):
-    if empresa.slug not in EMPRESAS_FORMULARIOS_CLINICOS:
-        raise Http404("Los formularios hospitalarios no estan habilitados para esta empresa.")
+def _recetas_avanzadas_activas(empresa):
+    return interfaz_clinica_activa(empresa)
 
 
 def _ip_cliente(request):
@@ -746,6 +744,20 @@ def clinica_dashboard(request, empresa_slug):
 
 
 @login_required
+def configuracion_producto_clinico(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_interfaz_clinica(empresa)
+    return render(
+        request,
+        "clinica/configuracion.html",
+        {
+            "empresa": empresa,
+            "recetas_avanzadas": _recetas_avanzadas_activas(empresa),
+        },
+    )
+
+
+@login_required
 def pacientes(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     hoy = timezone.localdate()
@@ -769,7 +781,7 @@ def pacientes(request, empresa_slug):
         )
     cumpleaneros_mes = pacientes_qs.filter(fecha_nacimiento__month=hoy.month).count()
     pacientes_lista = list(pacientes_qs)
-    vista_premium_pacientes = empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS
+    vista_premium_pacientes = interfaz_clinica_activa(empresa)
     if vista_premium_pacientes:
         for paciente in pacientes_lista:
             telefono_base = paciente.whatsapp or paciente.telefono or ""
@@ -830,7 +842,7 @@ def pacientes_sugerencias(request, empresa_slug):
 @login_required
 def crear_paciente(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    if empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS:
+    if interfaz_clinica_activa(empresa):
         preconsulta_base = PreconsultaClinica(
             empresa=empresa,
             tipo="general",
@@ -947,7 +959,7 @@ def crear_paciente(request, empresa_slug):
 def editar_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    if empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS:
+    if interfaz_clinica_activa(empresa):
         preconsulta = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
         if preconsulta is None:
             token_raw, token_hash, token_preview = generar_token_preconsulta()
@@ -1202,7 +1214,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "recetas": recetas,
             "documentos_clinicos_conteos": documentos_clinicos_conteos,
             "historias_especialidad": historias_especialidad,
-            "formularios_hospitalarios": empresa.slug in EMPRESAS_FORMULARIOS_CLINICOS,
+            "formularios_hospitalarios": interfaz_clinica_activa(empresa),
             "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
             "historia_clinica_pendiente_doctor": historia_clinica_pendiente_doctor,
         },
@@ -1654,7 +1666,7 @@ def recetas_paciente(request, empresa_slug, paciente_id):
             "empresa": empresa,
             "paciente": paciente,
             "recetas": recetas,
-            "recetas_avanzadas": empresa.slug in EMPRESAS_RECETAS_AVANZADAS,
+            "recetas_avanzadas": _recetas_avanzadas_activas(empresa),
         },
     )
 
@@ -1807,7 +1819,7 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
 @login_required
 def historias_especialidad(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
     preconsultas = paciente.preconsultas.filter(estado="completada").select_related("creada_por")[:30]
@@ -1838,7 +1850,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
 @login_required
 def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
@@ -1995,7 +2007,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
 @login_required
 def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     if tipo not in tipos_validos:
@@ -2156,7 +2168,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
 @login_required
 def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historia = get_object_or_404(
         HistoriaClinicaEspecialidad,
@@ -2223,7 +2235,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
 @require_POST
 def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general"):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
     if tipo not in tipos_validos:
@@ -2281,7 +2293,7 @@ def _render_preconsulta_enlace(request, *, empresa, paciente, preconsulta, enlac
 @require_POST
 def enviar_preconsulta_whatsapp(request, empresa_slug, paciente_id, preconsulta_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     preconsulta = get_object_or_404(
         PreconsultaClinica,
@@ -2335,7 +2347,7 @@ def enviar_preconsulta_whatsapp(request, empresa_slug, paciente_id, preconsulta_
 @require_POST
 def generar_enlace_registro_paciente(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     token_raw, token_hash, token_preview = generar_token_preconsulta()
     invitacion = InvitacionRegistroPaciente.objects.create(
         empresa=empresa,
@@ -2451,7 +2463,7 @@ def control_enlaces_registro_paciente(request, empresa_slug):
 @login_required
 def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    _requiere_hospital_mia(empresa)
+    _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     preconsulta = get_object_or_404(
         PreconsultaClinica,
@@ -2478,7 +2490,7 @@ def preconsulta_publica(request, token):
     preconsulta = get_object_or_404(
         PreconsultaClinica.objects.select_related("empresa", "paciente"),
         token_hash=hash_token_preconsulta(token),
-        empresa__slug__in=EMPRESAS_FORMULARIOS_CLINICOS,
+        empresa__tipo_solucion="clinica",
     )
     if preconsulta.estado == "completada":
         return render(request, "clinica/preconsulta_publica_finalizada.html", {"completada": True})
@@ -2531,7 +2543,7 @@ def registro_paciente_publico(request, token):
     invitacion = get_object_or_404(
         InvitacionRegistroPaciente.objects.select_related("empresa", "paciente"),
         token_hash=hash_token_preconsulta(token),
-        empresa__slug__in=EMPRESAS_FORMULARIOS_CLINICOS,
+        empresa__tipo_solucion="clinica",
     )
     if invitacion.estado == "revocada" or invitacion.fecha_expiracion <= timezone.now():
         return render(
@@ -2630,7 +2642,7 @@ def registro_paciente_actividad_publica(request, token):
     invitacion = get_object_or_404(
         InvitacionRegistroPaciente,
         token_hash=hash_token_preconsulta(token),
-        empresa__slug__in=EMPRESAS_FORMULARIOS_CLINICOS,
+        empresa__tipo_solucion="clinica",
     )
     if invitacion.estado == "revocada" or invitacion.fecha_expiracion <= timezone.now():
         return JsonResponse({"ok": False, "detalle": "Enlace no vigente."}, status=410)
@@ -2785,7 +2797,7 @@ def subir_examen_paciente(request, empresa_slug, paciente_id):
 def crear_receta_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    avanzada = empresa.slug in EMPRESAS_RECETAS_AVANZADAS
+    avanzada = _recetas_avanzadas_activas(empresa)
     profesional_inicial = _profesional_predeterminado_usuario(empresa, request.user)
     form = RecetaMedicaForm(
         request.POST or None,
@@ -2842,7 +2854,7 @@ def crear_receta_paciente(request, empresa_slug, paciente_id):
 @login_required
 def plantillas_recetas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    if empresa.slug not in EMPRESAS_RECETAS_AVANZADAS:
+    if not _recetas_avanzadas_activas(empresa):
         raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
     plantillas = list(
         PlantillaReceta.objects.filter(empresa=empresa)
@@ -2904,7 +2916,7 @@ def _plantilla_receta_form_view(request, empresa, plantilla=None):
 @login_required
 def crear_plantilla_receta(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    if empresa.slug not in EMPRESAS_RECETAS_AVANZADAS:
+    if not _recetas_avanzadas_activas(empresa):
         raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
     return _plantilla_receta_form_view(request, empresa)
 
@@ -2912,7 +2924,7 @@ def crear_plantilla_receta(request, empresa_slug):
 @login_required
 def editar_plantilla_receta(request, empresa_slug, plantilla_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    if empresa.slug not in EMPRESAS_RECETAS_AVANZADAS:
+    if not _recetas_avanzadas_activas(empresa):
         raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
     plantilla = get_object_or_404(
         PlantillaReceta.objects.prefetch_related("detalles__producto"),

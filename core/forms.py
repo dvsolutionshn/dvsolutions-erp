@@ -60,6 +60,18 @@ class EmpresaControlForm(forms.ModelForm):
         label="Permitir plantilla de factura independiente",
         help_text="Activalo para habilitar un formato PDF exclusivo, mas sobrio y visualmente separado del resto del ERP.",
     )
+    modulos_adicionales_visibles_clinica = forms.ModelMultipleChoiceField(
+        queryset=Modulo.objects.filter(es_comercial=True).exclude(
+            codigo__in=["facturacion", "punto_venta", "clinica_medica", "agenda_citas"]
+        ).order_by("nombre"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Modulos adicionales visibles en la interfaz clinica",
+        help_text=(
+            "Solo controla su visibilidad en la navegacion clinica. Los modulos, permisos y rutas "
+            "permanecen intactos."
+        ),
+    )
 
     class Meta:
         model = Empresa
@@ -107,6 +119,10 @@ class EmpresaControlForm(forms.ModelForm):
         self.fields["permite_plantilla_factura_independiente"].initial = bool(
             configuracion_avanzada and configuracion_avanzada.permite_plantilla_factura_independiente
         )
+        if configuracion_avanzada:
+            self.fields["modulos_adicionales_visibles_clinica"].initial = (
+                configuracion_avanzada.modulos_adicionales_visibles_clinica.all()
+            )
         self.fields["modulos_activos"].help_text = "Sirve como activacion adicional o ajuste especial por empresa, ademas del plan comercial."
         textos = {
             "nombre": ("Nombre de la empresa", ""),
@@ -131,6 +147,7 @@ class EmpresaControlForm(forms.ModelForm):
             "activa": ("Empresa activa", "Si la desactivas, toda la empresa queda fuera de operacion aunque tenga plan."),
             "permite_cai_historico": ("Permitir correccion fiscal historica", "Activalo solo cuando necesites ajustes especiales de CAI, facturacion historica o correcciones fiscales ya emitidas."),
             "permite_plantilla_factura_independiente": ("Permitir plantilla de factura independiente", "Activalo solo cuando quieras habilitar un PDF de factura exclusivo para esta empresa, con una presentacion separada del estilo general del ERP."),
+            "modulos_adicionales_visibles_clinica": ("Modulos adicionales visibles en la interfaz clinica", "No activa ni desactiva funciones; solo permite mostrar accesos ERP adicionales dentro del perfil clinico."),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:
@@ -221,6 +238,9 @@ class EmpresaControlForm(forms.ModelForm):
             campos_actualizar.append("permite_plantilla_factura_independiente")
         if campos_actualizar:
             configuracion.save(update_fields=campos_actualizar)
+        configuracion.modulos_adicionales_visibles_clinica.set(
+            self.cleaned_data.get("modulos_adicionales_visibles_clinica", [])
+        )
 
 
 def generar_username_tecnico(email):

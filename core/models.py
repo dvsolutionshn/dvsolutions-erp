@@ -835,10 +835,23 @@ class ConfiguracionAvanzadaEmpresa(models.Model):
     usa_pagos_mixtos = models.BooleanField(default=False)
     usa_reporte_bancos = models.BooleanField(default=False)
     usa_inventario_farmaceutico = models.BooleanField(default=False)
+    usa_control_lotes_fefo = models.BooleanField(
+        default=False,
+        help_text="Muestra el control de lotes, vencimientos y salida por FEFO en Inventario.",
+    )
     usa_bodegas_internas = models.BooleanField(default=False)
     ventas_solo_desde_vitrina = models.BooleanField(default=False)
     permite_cai_historico = models.BooleanField(default=False)
     permite_plantilla_factura_independiente = models.BooleanField(default=False)
+    modulos_adicionales_visibles_clinica = models.ManyToManyField(
+        Modulo,
+        blank=True,
+        related_name="configuraciones_clinicas_visibles",
+        help_text=(
+            "Modulos ERP que tambien deben aparecer en la navegacion limpia de una "
+            "empresa con perfil clinico. No activa ni desactiva modulos."
+        ),
+    )
     bodega_venta_predeterminada = models.CharField(max_length=80, default="Vitrina")
     notas = models.TextField(blank=True, null=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

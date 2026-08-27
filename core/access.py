@@ -27,16 +27,9 @@ FACTURACION_PERMISSION_MAP = [
 ]
 
 
-EMPRESAS_INTERFAZ_CLINICA_GLOBAL = frozenset({
-    "hospital_mia",
-    "medical_spa",
-    "serviciosmedicos",
-    "luque_aestetic",
-})
-
-# Las cuatro empresas comparten la misma experiencia clínica. Se conserva este
-# alias porque el modo simplificado y la interfaz global tienen el mismo alcance.
-EMPRESAS_CON_MODO_CLINICO_SIMPLE = EMPRESAS_INTERFAZ_CLINICA_GLOBAL
+def interfaz_clinica_activa(empresa):
+    """Indica si la empresa usa la experiencia del producto clinico."""
+    return bool(empresa and getattr(empresa, "tipo_solucion", "") == "clinica")
 
 
 def modo_clinico_simple_activo(user, empresa):
@@ -45,7 +38,7 @@ def modo_clinico_simple_activo(user, empresa):
         user
         and getattr(user, "is_authenticated", False)
         and empresa
-        and empresa.slug in EMPRESAS_CON_MODO_CLINICO_SIMPLE
+        and interfaz_clinica_activa(empresa)
         and getattr(user, "modo_clinico_simple", False)
     )
 

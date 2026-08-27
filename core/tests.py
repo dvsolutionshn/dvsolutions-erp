@@ -866,11 +866,12 @@ class SuperAdminControlTests(TestCase):
             reverse("facturacion_dashboard", args=[empresa_secundaria.slug]),
         )
 
-    def test_modo_clinico_simple_solo_muestra_clinica_y_facturacion(self):
+    def test_producto_clinico_muestra_las_cinco_areas_principales(self):
         empresa = Empresa.objects.create(
             nombre="Hospital Mia Simple",
             slug="hospital_mia",
             rtn="08011999000173",
+            tipo_solucion="clinica",
         )
         modulos = [
             self.modulo,
@@ -895,10 +896,18 @@ class SuperAdminControlTests(TestCase):
         response = self.client.get(reverse("dashboard", args=[empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Bienvenida doctora")
+        self.assertContains(response, "Centro de atencion clinica")
         self.assertContains(response, "Pacientes")
-        self.assertContains(response, "Calendario de citas")
-        self.assertContains(response, "Crear factura")
+        self.assertContains(response, "Inventario")
+        self.assertContains(response, "Facturación")
+        self.assertContains(response, "Agenda")
+        self.assertContains(response, "Configuración")
+        self.assertNotContains(response, "Crear factura")
+        self.assertNotContains(response, "Sistema clinico")
+        self.assertNotContains(
+            response,
+            f'href="{reverse("clinica_dashboard", args=[empresa.slug])}"',
+        )
         self.assertNotContains(response, "CRM y Marketing")
         self.assertNotContains(response, "Contabilidad")
         self.assertNotContains(response, "Recursos Humanos")
@@ -938,6 +947,46 @@ class SuperAdminControlTests(TestCase):
         self.assertContains(response, "Contabilidad")
         self.assertContains(response, "Recursos Humanos")
         self.assertContains(response, "CRM y Marketing")
+
+    def test_perfil_clinico_muestra_solo_modulos_erp_configurados(self):
+        empresa = Empresa.objects.create(
+            nombre="Clinica Configurable",
+            slug="clinica-configurable",
+            rtn="08011999000175",
+            tipo_solucion="clinica",
+        )
+        crm = Modulo.objects.create(nombre="CRM y Marketing", codigo="crm_marketing")
+        contabilidad = Modulo.objects.create(nombre="Contabilidad", codigo="contabilidad")
+        clinica = Modulo.objects.create(nombre="Clínica Médica", codigo="clinica_medica")
+        for modulo in [self.modulo, clinica, crm, contabilidad]:
+            EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+        configuracion.modulos_adicionales_visibles_clinica.add(crm)
+        empresa.marcar_prueba()
+        empresa.save(update_fields=["estado_licencia", "fecha_inicio_plan", "fecha_vencimiento_plan"])
+        usuario = Usuario.objects.create_user(
+            username="admin-clinica-configurable",
+            password="ClaveClinicaConfig2026",
+            empresa=empresa,
+            es_administrador_empresa=True,
+        )
+        self.client.force_login(usuario)
+
+        response = self.client.get(reverse("dashboard", args=[empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["erp_access"]["interfaz_clinica"])
+        self.assertTrue(response.context["erp_access"]["modulo_crm"])
+        self.assertFalse(response.context["erp_access"]["modulo_contabilidad"])
+        self.assertNotContains(response, "CRM y Marketing")
+        self.assertNotContains(response, "Contabilidad")
+        self.assertTrue(empresa.tiene_modulo_activo("contabilidad"))
+
+        response = self.client.get(reverse("clinica_configuracion", args=[empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "CRM y Marketing")
+        self.assertNotContains(response, "Contabilidad")
 
     def test_usuario_puede_tener_rol_diferente_por_empresa(self):
         empresa_principal = Empresa.objects.create(
@@ -1299,7 +1348,7 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "bloqueamos temporalmente este acceso")
 
-    def test_empresa_clinica_usa_login_medico_y_entra_directo_a_clinica(self):
+    def test_empresa_clinica_usa_login_medico_y_entra_directo_al_panel_principal(self):
         empresa = Empresa.objects.create(
             nombre="Clinica Perfil",
             slug="clinica-perfil",
@@ -1326,9 +1375,9 @@ class SuperAdminControlTests(TestCase):
             "username": "medico-perfil",
             "password": "ClaveClinica2026",
         })
-        self.assertRedirects(response, reverse("clinica_dashboard", args=[empresa.slug]))
+        self.assertRedirects(response, reverse("dashboard", args=[empresa.slug]))
 
-    def test_usuario_solo_citas_entra_directo_a_agenda_sin_acceso_clinico(self):
+    def test_usuario_solo_citas_entra_al_panel_principal_sin_acceso_clinico(self):
         empresa = Empresa.objects.create(
             nombre="Clinica Solo Agenda",
             slug="clinica-solo-agenda",
@@ -1360,7 +1409,7 @@ class SuperAdminControlTests(TestCase):
             "username": "agenda-perfil",
             "password": "ClaveAgenda2026",
         })
-        self.assertRedirects(response, reverse("agenda_citas", args=[empresa.slug]))
+        self.assertRedirects(response, reverse("dashboard", args=[empresa.slug]))
 
         response = self.client.get(reverse("agenda_citas", args=[empresa.slug]))
         self.assertEqual(response.status_code, 200)
@@ -1370,13 +1419,13 @@ class SuperAdminControlTests(TestCase):
         response = self.client.get(reverse("clinica_dashboard", args=[empresa.slug]))
         self.assertRedirects(response, reverse("dashboard", args=[empresa.slug]))
 
-    def test_empresas_medicas_historicas_conservan_login_futurista(self):
+    def test_empresas_con_perfil_clinico_usan_login_clinico(self):
         for indice, slug in enumerate(["hospital_mia", "medical_spa"], start=1):
             empresa = Empresa.objects.create(
                 nombre=slug.replace("_", " ").title(),
                 slug=slug,
                 rtn=f"08011999009{indice:03d}",
-                tipo_solucion="erp",
+                tipo_solucion="clinica",
                 estado_licencia="activa",
             )
             response = self.client.get(reverse("empresa_login", args=[empresa.slug]))
@@ -1958,6 +2007,7 @@ class PermisosClinicosPorEmpresaTests(TestCase):
             nombre="Hospital Mia",
             slug="hospital_mia",
             rtn="08011999123456",
+            tipo_solucion="clinica",
         )
         self.empresa_externa = Empresa.objects.create(
             nombre="Empresa Externa",
@@ -2093,6 +2143,7 @@ class PermisosClinicosPorEmpresaTests(TestCase):
             nombre="Mia Medical Spa",
             slug="medical_spa",
             rtn="08011999000123",
+            tipo_solucion="clinica",
         )
         usuario_compartido = Usuario.objects.create_user(
             username="usuario-compartido-controlado",

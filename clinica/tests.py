@@ -29,7 +29,9 @@ from .tokens import hash_token_preconsulta
 
 class ClinicaPacienteTests(TestCase):
     def setUp(self):
-        self.empresa = Empresa.objects.create(nombre="Hospital MIA", slug="hospital_mia")
+        self.empresa = Empresa.objects.create(
+            nombre="Hospital MIA", slug="hospital_mia", tipo_solucion="clinica"
+        )
         modulo, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo, activo=True)
         rol = RolSistema.objects.create(
@@ -314,6 +316,8 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Seguimiento estético / clínico")
         self.assertContains(response, "Recordatorios del paciente")
+        self.assertNotContains(response, "Agregar seleccionados")
+        self.assertContains(response, 'id="treatmentReminderSubmit"')
 
         response = self.client.post(url, {
             "accion": "editar_recordatorio",
@@ -707,11 +711,25 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Historial Clinico")
-        self.assertContains(response, "Plan de tratamiento")
-        self.assertContains(response, "Evolucion")
-        self.assertContains(response, "Citas")
         self.assertContains(response, "Anexos")
-        self.assertContains(response, "Plan de consentimiento")
+        self.assertContains(response, "Datos generales")
+        self.assertContains(response, "Motivo de consulta")
+        self.assertContains(response, "Funciones orgánicas")
+        self.assertContains(response, "Plan y tratamiento")
+        self.assertContains(response, "Laboratorio")
+        self.assertContains(response, "Radiografías")
+        self.assertContains(response, "Recetas médicas")
+        self.assertContains(response, "Fotografías / Videos")
+        self.assertContains(response, "Cirugía Plástica")
+        self.assertContains(response, "Seguimiento Estético / Clínico")
+        self.assertContains(response, "Recordatorios de tratamiento al calendario")
+        self.assertNotContains(response, "Evaluacion medica integral")
+        self.assertNotContains(response, "Documentos clinicos")
+        self.assertNotContains(response, "Biblioteca documental")
+        self.assertContains(response, "Tratamientos del paciente")
+        self.assertNotContains(response, "Biblioteca visual del paciente")
+        self.assertNotContains(response, "Agenda del paciente")
+        self.assertNotContains(response, "Agregar seleccionados")
         self.assertContains(response, "patient-evolution-carousel")
         self.assertContains(response, "patientPhotoModal")
 
@@ -914,14 +932,16 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Medicamento externo")
         self.assertContains(response, "Cada 12 horas")
 
-    def test_recetas_avanzadas_solo_estan_disponibles_en_las_tres_empresas_clinicas(self):
+    def test_recetas_avanzadas_se_configuran_por_tipo_solucion_clinica(self):
         modulo = Modulo.objects.get(codigo="clinica_medica")
         empresas = [self.empresa]
         for slug, nombre, rtn in [
             ("serviciosmedicos", "Servicios Médicos", "0801199900301"),
             ("luque_aestetic", "Luque Aesthetic", "0801199900302"),
+            ("medical_spa", "Medical Spa", "0801199900304"),
+            ("clinica_futura", "Clínica Futura", "0801199900305"),
         ]:
-            empresa = Empresa.objects.create(nombre=nombre, slug=slug, rtn=rtn)
+            empresa = Empresa.objects.create(nombre=nombre, slug=slug, rtn=rtn, tipo_solucion="clinica")
             EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
             empresas.append(empresa)
         self.user.empresas_acceso.add(*empresas[1:])
@@ -1148,7 +1168,12 @@ class ClinicaPacienteTests(TestCase):
             ],
             start=1,
         ):
-            empresa = Empresa.objects.create(nombre=nombre, slug=slug, rtn=f"08011999000{indice}")
+            empresa = Empresa.objects.create(
+                nombre=nombre,
+                slug=slug,
+                rtn=f"08011999000{indice}",
+                tipo_solucion="clinica",
+            )
             EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
             self.user.empresas_acceso.add(empresa)
             empresas.append(empresa)
@@ -1503,6 +1528,7 @@ class ClinicaPacienteTests(TestCase):
             nombre="Paciente Preconsultas",
             identidad="0801199000103",
         )
+        preconsultas_iniciales = paciente.preconsultas.count()
         for tipo in dict(HistoriaClinicaEspecialidad.TIPO_CHOICES):
             response = self.client.post(
                 reverse(
@@ -1513,7 +1539,10 @@ class ClinicaPacienteTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.context["preconsulta"].tipo, tipo)
 
-        self.assertEqual(paciente.preconsultas.count(), 6)
+        self.assertEqual(
+            paciente.preconsultas.count(),
+            preconsultas_iniciales + len(HistoriaClinicaEspecialidad.TIPO_CHOICES),
+        )
         selector = self.client.get(
             reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id])
         )
@@ -1526,13 +1555,18 @@ class ClinicaPacienteTests(TestCase):
             "Camara hiperbarica",
         ]:
             self.assertContains(selector, nombre)
-        self.assertContains(selector, "Escribir en esta área", count=12)
+        self.assertContains(
+            selector,
+            "Escribir en esta área",
+            count=2 * len(HistoriaClinicaEspecialidad.TIPO_CHOICES),
+        )
 
     def test_historias_especialidad_no_estan_disponibles_para_otra_empresa(self):
         otra_empresa = Empresa.objects.create(
             nombre="Mia Medical Spa",
             slug="medical_spa",
             rtn="08011999000999",
+            tipo_solucion="clinica",
         )
         modulo = Modulo.objects.get(codigo="clinica_medica")
         EmpresaModulo.objects.create(empresa=otra_empresa, modulo=modulo, activo=True)

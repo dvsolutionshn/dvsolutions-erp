@@ -1,7 +1,7 @@
 from django.conf import settings
 
 from core.models import ConfiguracionOnix, Empresa
-from core.access import modo_clinico_simple_activo
+from core.access import interfaz_clinica_activa, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
 
 
@@ -44,6 +44,12 @@ def erp_access(request):
     clinica_activa = bool(empresa and empresa.tiene_modulo_activo("clinica_medica"))
     tecnicentro_activo = bool(empresa and empresa.tiene_modulo_activo("tecnicentro"))
     cotizaciones_activa = bool(empresa and empresa.tiene_modulo_activo("cotizaciones"))
+    interfaz_clinica = interfaz_clinica_activa(empresa)
+    modulos_adicionales_clinica = set()
+    if interfaz_clinica and config_avanzada:
+        modulos_adicionales_clinica = set(
+            config_avanzada.modulos_adicionales_visibles_clinica.values_list("codigo", flat=True)
+        )
     email_usuario = str(getattr(user, "email", "") or "").strip().casefold()
     username_usuario = str(getattr(user, "username", "") or "").strip().casefold()
     puede_controlar_enlaces_pacientes = bool(
@@ -71,6 +77,7 @@ def erp_access(request):
         return False
 
     base = {
+        "interfaz_clinica": interfaz_clinica,
         "modo_clinico_simple": modo_clinico_simple_activo(user, empresa),
         "modulo_facturacion": facturacion_activa and algun("facturacion"),
         "modulo_contabilidad": contabilidad_activa and algun("contabilidad"),
@@ -156,26 +163,36 @@ def erp_access(request):
         "usa_reporte_bancos": bool(config_avanzada and config_avanzada.usa_reporte_bancos),
         "usa_inventario_farmaceutico": bool(clinica_activa and config_avanzada and config_avanzada.usa_inventario_farmaceutico),
         "usa_control_lotes_fefo": bool(
-            empresa and empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"}
+            clinica_activa and config_avanzada and config_avanzada.usa_control_lotes_fefo
         ),
         "usa_bodegas_internas": bool(config_avanzada and config_avanzada.usa_bodegas_internas),
         "ventas_solo_desde_vitrina": bool(config_avanzada and config_avanzada.ventas_solo_desde_vitrina),
         "administrar_usuarios_clinicos": bool(
             empresa
-            and empresa.slug in {"hospital_mia", "serviciosmedicos", "medical_spa", "luque_aestetic"}
+            and interfaz_clinica
             and user
             and user.is_authenticated
             and user.puede_acceder_empresa(empresa)
             and (user.is_superuser or getattr(user, "puede_administrar_usuarios_clinicos", False))
         ),
     }
-    if base["modo_clinico_simple"]:
+    if interfaz_clinica:
         base.update({
-            "modulo_contabilidad": False,
-            "modulo_rrhh": False,
-            "modulo_crm": False,
-            "modulo_tecnicentro": False,
+            "modulo_contabilidad": base["modulo_contabilidad"] and "contabilidad" in modulos_adicionales_clinica,
+            "modulo_rrhh": base["modulo_rrhh"] and "rrhh" in modulos_adicionales_clinica,
+            "modulo_crm": base["modulo_crm"] and "crm_marketing" in modulos_adicionales_clinica,
+            "modulo_tecnicentro": base["modulo_tecnicentro"] and "tecnicentro" in modulos_adicionales_clinica,
         })
+    base["configuracion_producto_clinico"] = bool(
+        interfaz_clinica
+        and (
+            base["configuracion_clinica"]
+            or base["configuracion_facturacion"]
+            or base["configuracion_crm"]
+            or base["administrar_usuarios_clinicos"]
+            or base["modulo_crm"]
+        )
+    )
     return {
         "erp_access": base,
         "puede_controlar_enlaces_pacientes": puede_controlar_enlaces_pacientes,
