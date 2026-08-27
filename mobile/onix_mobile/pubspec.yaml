@@ -9,14 +9,27 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_secure_storage: ^11.0.0
+  flutter_secure_storage: ^10.3.1
   http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/icon/onix-agent-logo.png
+  min_sdk_android: 24
+  adaptive_icon_background: "#071525"
+  adaptive_icon_foreground: assets/icon/onix-agent-logo.png
+  adaptive_icon_foreground_inset: 8
+  remove_alpha_ios: true
+  background_color_ios: "#071525"
 
 flutter:
   uses-material-design: true
-
+  assets:
+    - assets/icon/onix-agent-logo.png

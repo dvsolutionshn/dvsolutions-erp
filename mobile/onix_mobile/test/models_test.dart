@@ -51,4 +51,3 @@ void main() {
     expect(updated.actions.single.status, 'ejecutada');
   });
 }
-

@@ -20,19 +20,18 @@ Aplicacion Flutter de Onix para iOS y Android. La app permite iniciar sesion con
 - Vista previa, confirmacion y descarte de borradores de factura.
 - Categorias visibles para las siguientes etapas: calendario, gastos, pagos, bancos e inquilinos.
 
-## Preparar el proyecto nativo
+## Entorno nativo preparado
 
-Este equipo no tiene instalado el SDK de Flutter. En una computadora de desarrollo con Flutter estable, ejecuta una sola vez:
+El proyecto incluye los directorios Android e iOS generados con Flutter estable. Android usa API minima 24, desactiva el respaldo de secretos y bloquea trafico HTTP no cifrado. iOS incluye los entitlements de Keychain Sharing requeridos por `flutter_secure_storage`.
+
+En una computadora con Flutter instalado:
 
 ```bash
 cd mobile/onix_mobile
-flutter create --platforms=android,ios --org com.dvsolutions --project-name onix_mobile .
 flutter pub get
+flutter analyze
+flutter test
 ```
-
-Para `flutter_secure_storage` 11, Android debe usar `minSdk = 23`. Tambien debe desactivarse el respaldo de datos cifrados agregando `android:allowBackup="false"` al elemento `<application>` de `android/app/src/main/AndroidManifest.xml`. En iOS se debe activar la capacidad Keychain Sharing para Runner antes de distribuir la app.
-
-No confirmes los directorios nativos hasta ejecutar y revisar la generacion con la version de Flutter que se utilizara para publicar.
 
 ## Ejecutar contra el servidor
 
@@ -65,5 +64,4 @@ iOS, desde macOS con Xcode:
 flutter build ipa --release --dart-define=ONIX_API_URL=https://dvsolutionshn.com
 ```
 
-La firma, los identificadores definitivos, los iconos y las fichas de App Store/Google Play se configuran en la etapa de publicacion.
-
+El APK piloto usa la firma de desarrollo para poder instalarse directamente. Antes de publicar en Google Play se debe crear y proteger una clave de firma definitiva. iOS requiere macOS, Xcode y una cuenta de Apple Developer para firmar y distribuir por TestFlight o App Store.

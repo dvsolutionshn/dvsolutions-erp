@@ -46,4 +46,3 @@ ThemeData buildOnixTheme() {
     ),
   );
 }
-

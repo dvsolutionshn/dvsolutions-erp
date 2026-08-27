@@ -9,13 +9,13 @@ class OnixCategory {
   });
 
   factory OnixCategory.fromJson(Map<String, dynamic> json) => OnixCategory(
-        id: json['id']?.toString() ?? '',
-        title: json['title']?.toString() ?? '',
-        description: json['description']?.toString() ?? '',
-        icon: json['icon']?.toString() ?? '',
-        status: json['status']?.toString() ?? 'next',
-        prompt: json['prompt']?.toString() ?? '',
-      );
+    id: json['id']?.toString() ?? '',
+    title: json['title']?.toString() ?? '',
+    description: json['description']?.toString() ?? '',
+    icon: json['icon']?.toString() ?? '',
+    status: json['status']?.toString() ?? 'next',
+    prompt: json['prompt']?.toString() ?? '',
+  );
 
   final String id;
   final String title;
@@ -39,8 +39,12 @@ class OnixBootstrap {
 
   factory OnixBootstrap.fromJson(Map<String, dynamic> json) {
     final user = Map<String, dynamic>.from(json['user'] as Map? ?? const {});
-    final company = Map<String, dynamic>.from(json['company'] as Map? ?? const {});
-    final assistant = Map<String, dynamic>.from(json['assistant'] as Map? ?? const {});
+    final company = Map<String, dynamic>.from(
+      json['company'] as Map? ?? const {},
+    );
+    final assistant = Map<String, dynamic>.from(
+      json['assistant'] as Map? ?? const {},
+    );
     return OnixBootstrap(
       userName: user['name']?.toString() ?? '',
       companyName: company['name']?.toString() ?? '',
@@ -50,7 +54,9 @@ class OnixBootstrap {
           .whereType<Map>()
           .map((item) => OnixCategory.fromJson(Map<String, dynamic>.from(item)))
           .toList(),
-      capabilities: Map<String, dynamic>.from(json['capabilities'] as Map? ?? const {}),
+      capabilities: Map<String, dynamic>.from(
+        json['capabilities'] as Map? ?? const {},
+      ),
     );
   }
 
@@ -71,11 +77,11 @@ class OnixAction {
   });
 
   factory OnixAction.fromJson(Map<String, dynamic> json) => OnixAction(
-        id: json['id']?.toString() ?? '',
-        type: json['type']?.toString() ?? '',
-        status: json['status']?.toString() ?? '',
-        data: json,
-      );
+    id: json['id']?.toString() ?? '',
+    type: json['type']?.toString() ?? '',
+    status: json['status']?.toString() ?? '',
+    data: json,
+  );
 
   final String id;
   final String type;
@@ -110,15 +116,19 @@ class OnixMessage {
   });
 
   factory OnixMessage.fromJson(Map<String, dynamic> json) => OnixMessage(
-        id: json['id']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
-        role: json['role']?.toString() ?? 'asistente',
-        content: json['content']?.toString() ?? '',
-        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
-        actions: (json['actions'] as List? ?? const [])
-            .whereType<Map>()
-            .map((item) => OnixAction.fromJson(Map<String, dynamic>.from(item)))
-            .toList(),
-      );
+    id:
+        json['id']?.toString() ??
+        DateTime.now().microsecondsSinceEpoch.toString(),
+    role: json['role']?.toString() ?? 'asistente',
+    content: json['content']?.toString() ?? '',
+    createdAt:
+        DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+        DateTime.now(),
+    actions: (json['actions'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => OnixAction.fromJson(Map<String, dynamic>.from(item)))
+        .toList(),
+  );
 
   final String id;
   final String role;
@@ -130,13 +140,15 @@ class OnixMessage {
   bool get fromUser => role == 'usuario';
 
   OnixMessage replaceAction(OnixAction action) => OnixMessage(
-        id: id,
-        role: role,
-        content: content,
-        createdAt: createdAt,
-        pending: pending,
-        actions: actions.map((current) => current.id == action.id ? action : current).toList(),
-      );
+    id: id,
+    role: role,
+    content: content,
+    createdAt: createdAt,
+    pending: pending,
+    actions: actions
+        .map((current) => current.id == action.id ? action : current)
+        .toList(),
+  );
 }
 
 class OnixLoginResult {
@@ -145,4 +157,3 @@ class OnixLoginResult {
   final String token;
   final OnixBootstrap bootstrap;
 }
-

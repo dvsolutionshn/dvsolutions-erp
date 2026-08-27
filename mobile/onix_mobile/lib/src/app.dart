@@ -29,18 +29,22 @@ class _OnixMobileAppState extends State<OnixMobileApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Onix',
-        debugShowCheckedModeBanner: false,
-        theme: buildOnixTheme(),
-        home: ListenableBuilder(
-          listenable: _controller,
-          builder: (context, _) {
-            if (_controller.initializing) return const _LaunchScreen();
-            if (!_controller.authenticated) return LoginScreen(controller: _controller);
-            return ChatScreen(controller: _controller);
-          },
-        ),
-      );
+    title: 'Onix',
+    debugShowCheckedModeBanner: false,
+    theme: buildOnixTheme(),
+    home: ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) {
+        if (_controller.initializing) {
+          return const _LaunchScreen();
+        }
+        if (!_controller.authenticated) {
+          return LoginScreen(controller: _controller);
+        }
+        return ChatScreen(controller: _controller);
+      },
+    ),
+  );
 }
 
 class _LaunchScreen extends StatelessWidget {
@@ -48,32 +52,32 @@ class _LaunchScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Scaffold(
-        backgroundColor: onixInk,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              OnixAvatar(size: 86),
-              SizedBox(height: 22),
-              Text(
-                'ONIX',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  letterSpacing: 8,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 24),
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(color: onixCyan, strokeWidth: 2.5),
-              ),
-            ],
+    backgroundColor: onixInk,
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          OnixAvatar(size: 86),
+          SizedBox(height: 22),
+          Text(
+            'ONIX',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              letterSpacing: 8,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-      );
+          SizedBox(height: 24),
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(color: onixCyan, strokeWidth: 2.5),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class OnixAvatar extends StatelessWidget {
@@ -83,20 +87,25 @@ class OnixAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [onixCyan, onixBlue, onixLavender],
-          ),
-          boxShadow: [
-            BoxShadow(color: onixCyan.withValues(alpha: .28), blurRadius: 24, spreadRadius: 2),
-          ],
+    width: size,
+    height: size,
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: onixInk,
+      boxShadow: [
+        BoxShadow(
+          color: onixCyan.withValues(alpha: .28),
+          blurRadius: 24,
+          spreadRadius: 2,
         ),
-        child: Icon(Icons.smart_toy_rounded, color: onixInk, size: size * .56),
-      );
+      ],
+    ),
+    child: Image.asset(
+      'assets/icon/onix-agent-logo.png',
+      fit: BoxFit.cover,
+      width: size,
+      height: size,
+    ),
+  );
 }
-

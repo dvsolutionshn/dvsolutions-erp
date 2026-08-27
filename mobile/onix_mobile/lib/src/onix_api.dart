@@ -34,7 +34,7 @@ class OnixApi {
 
   String get _baseUrl => _configuredUrl.endsWith('/')
       ? '${_configuredUrl}api/onix/mobile/v1/'
-      : '${_configuredUrl}/api/onix/mobile/v1/';
+      : '$_configuredUrl/api/onix/mobile/v1/';
 
   Uri _uri(String path) => Uri.parse('$_baseUrl$path');
 
@@ -142,9 +142,15 @@ class OnixApi {
     try {
       response = method == 'POST'
           ? await _client
-              .post(_uri(path), headers: headers, body: jsonEncode(body ?? const {}))
-              .timeout(const Duration(seconds: 60))
-          : await _client.get(_uri(path), headers: headers).timeout(const Duration(seconds: 30));
+                .post(
+                  _uri(path),
+                  headers: headers,
+                  body: jsonEncode(body ?? const {}),
+                )
+                .timeout(const Duration(seconds: 60))
+          : await _client
+                .get(_uri(path), headers: headers)
+                .timeout(const Duration(seconds: 30));
     } on Exception {
       throw const OnixApiException(
         'No pudimos conectar con Onix. Revisa tu conexion e intenta nuevamente.',
@@ -162,7 +168,9 @@ class OnixApi {
         statusCode: response.statusCode,
       );
     }
-    if (response.statusCode < 200 || response.statusCode >= 300 || payload['ok'] == false) {
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300 ||
+        payload['ok'] == false) {
       final exception = OnixApiException(
         payload['error']?.toString() ?? 'Onix no pudo completar la solicitud.',
         statusCode: response.statusCode,
@@ -176,4 +184,3 @@ class OnixApi {
 
   void dispose() => _client.close();
 }
-

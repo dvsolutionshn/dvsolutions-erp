@@ -111,7 +111,9 @@ class OnixController extends ChangeNotifier {
     notifyListeners();
     try {
       final updated = await _api.decideAction(action.id, decision);
-      messages = messages.map((message) => message.replaceAction(updated)).toList();
+      messages = messages
+          .map((message) => message.replaceAction(updated))
+          .toList();
       notifyListeners();
       return true;
     } on OnixApiException catch (exception) {
@@ -136,4 +138,3 @@ class OnixController extends ChangeNotifier {
     super.dispose();
   }
 }
-

@@ -4,12 +4,16 @@
 .packages
 .pub-cache/
 .pub/
+.idea/
 /build/
 /coverage/
+/dist/
 android/.gradle/
 android/local.properties
+android/key.properties
+android/*.jks
+android/*.keystore
 ios/Flutter/ephemeral/
 ios/Pods/
 ios/.symlinks/
 *.iml
-
