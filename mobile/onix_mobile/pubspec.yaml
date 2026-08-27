@@ -1,7 +1,7 @@
 name: onix_mobile
 description: Aplicacion movil de Onix para operar DV Solutions ERP por chat.
 publish_to: "none"
-version: 0.2.1+3
+version: 0.3.0+4
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
@@ -12,6 +12,8 @@ dependencies:
   flutter_markdown_plus: ^1.0.12
   flutter_secure_storage: ^10.3.1
   http: ^1.6.0
+  open_filex: ^4.7.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

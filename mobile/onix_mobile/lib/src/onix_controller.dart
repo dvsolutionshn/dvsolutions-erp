@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'models.dart';
 import 'onix_api.dart';
@@ -114,6 +118,14 @@ class OnixController extends ChangeNotifier {
       messages = messages
           .map((message) => message.replaceAction(updated))
           .toList();
+      if (decision == 'confirmar') {
+        try {
+          messages = await _api.history();
+        } on OnixApiException {
+          // La accion ya fue confirmada. Conserva el resultado local si la
+          // actualizacion del historial falla por una interrupcion de red.
+        }
+      }
       notifyListeners();
       return true;
     } on OnixApiException catch (exception) {
@@ -122,6 +134,43 @@ class OnixController extends ChangeNotifier {
         bootstrap = null;
         messages = [];
       }
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> openInvoicePdf(int invoiceId) async {
+    error = null;
+    notifyListeners();
+    try {
+      final downloaded = await _api.downloadInvoicePdf(invoiceId);
+      final directory = await getTemporaryDirectory();
+      final safeName = downloaded.name.replaceAll(
+        RegExp(r'[^a-zA-Z0-9._-]'),
+        '_',
+      );
+      final file = File('${directory.path}${Platform.pathSeparator}$safeName');
+      await file.writeAsBytes(downloaded.bytes, flush: true);
+      final result = await OpenFilex.open(file.path, type: 'application/pdf');
+      if (result.type != ResultType.done) {
+        error = result.message.isNotEmpty
+            ? result.message
+            : 'El PDF se descargo, pero el telefono no encontro una aplicacion para abrirlo.';
+        notifyListeners();
+        return false;
+      }
+      return true;
+    } on OnixApiException catch (exception) {
+      error = exception.message;
+      if (exception.unauthorized) {
+        bootstrap = null;
+        messages = [];
+      }
+      notifyListeners();
+      return false;
+    } on Exception {
+      error =
+          'El PDF se descargo, pero no fue posible abrirlo en este dispositivo.';
       notifyListeners();
       return false;
     }

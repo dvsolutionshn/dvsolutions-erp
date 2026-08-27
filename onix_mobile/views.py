@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
@@ -276,10 +276,68 @@ def action(request, accion_id):
 
 @csrf_exempt
 @autenticar_token_movil
+def invoice_pdf(request, factura_id):
+    error_metodo = _solo_metodo(request, "GET")
+    if error_metodo:
+        return error_metodo
+    if not any(
+        request.user.tiene_permiso_erp(permiso, request.empresa)
+        for permiso in ("puede_ver_facturas", "puede_crear_facturas")
+    ):
+        return _json_error(
+            "El usuario no tiene permiso para descargar facturas.",
+            status=403,
+            codigo="permission_denied",
+        )
+
+    from facturacion.models import ConfiguracionFacturacionEmpresa, Factura
+    from facturacion.views import (
+        _generar_factura_pdf_bytes,
+        _nombre_factura_pdf,
+        _resolver_plantilla_factura,
+    )
+
+    factura = (
+        Factura.objects.filter(empresa=request.empresa, pk=factura_id)
+        .select_related("cliente", "empresa", "cai")
+        .first()
+    )
+    if not factura:
+        return _json_error(
+            "La factura no existe o no pertenece a la empresa activa.",
+            status=404,
+            codigo="invoice_not_found",
+        )
+    try:
+        configuracion, _ = ConfiguracionFacturacionEmpresa.objects.get_or_create(
+            empresa=request.empresa
+        )
+        plantilla = _resolver_plantilla_factura(configuracion, request.empresa)
+        pdf_bytes = _generar_factura_pdf_bytes(request.empresa, factura, plantilla)
+        nombre = _nombre_factura_pdf(factura)
+    except Exception:
+        logger.exception(
+            "Onix Mobile no pudo generar el PDF de la factura %s de la empresa %s",
+            factura.id,
+            request.empresa.id,
+        )
+        return _json_error(
+            "No fue posible generar el PDF de la factura en este momento.",
+            status=500,
+            codigo="pdf_generation_failed",
+        )
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@csrf_exempt
+@autenticar_token_movil
 def logout(request):
     error_metodo = _solo_metodo(request, "POST")
     if error_metodo:
         return error_metodo
     request.onix_mobile_session.revocar()
     return JsonResponse({"ok": True, "message": "Sesion cerrada correctamente."})
-

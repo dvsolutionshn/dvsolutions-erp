@@ -15,7 +15,7 @@ CATEGORIAS_ONIX = (
     {
         "id": "facturas",
         "title": "Facturas",
-        "description": "Consulta facturas y prepara nuevos borradores.",
+        "description": "Consulta, prepara, valida y descarga facturas.",
         "icon": "receipt_long",
         "status": "available",
         "prompt": "Muestrame las facturas mas recientes",
@@ -173,6 +173,9 @@ def construir_bootstrap(*, usuario, empresa):
     facturacion_activa = empresa.tiene_modulo_activo("facturacion")
     agenda_activa = empresa.tiene_modulo_activo("agenda_citas")
     puede_ver_facturas = usuario.tiene_permiso_erp("puede_ver_facturas", empresa)
+    puede_descargar_facturas = puede_ver_facturas or usuario.tiene_permiso_erp(
+        "puede_crear_facturas", empresa
+    )
     puede_clientes = usuario.tiene_permiso_erp("puede_clientes", empresa) or puede_ver_facturas
     puede_productos = usuario.tiene_permiso_erp("puede_productos", empresa) or usuario.tiene_permiso_erp(
         "puede_facturas", empresa
@@ -231,6 +234,8 @@ def construir_bootstrap(*, usuario, empresa):
             "ai": ia_activa,
             "query_tools": consultas_activas,
             "invoice_drafts": puede_preparar_facturas,
+            "invoice_issuing": puede_preparar_facturas,
+            "invoice_pdf": puede_descargar_facturas,
             "calendar": puede_citas,
             "payments": facturacion_activa and puede_pagos,
             "voice": False,

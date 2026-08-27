@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +17,13 @@ class OnixApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class OnixDownloadedFile {
+  const OnixDownloadedFile({required this.name, required this.bytes});
+
+  final String name;
+  final Uint8List bytes;
 }
 
 class OnixApi {
@@ -106,6 +114,49 @@ class OnixApi {
     );
   }
 
+  Future<OnixDownloadedFile> downloadInvoicePdf(int invoiceId) async {
+    final headers = await _headers(accept: 'application/pdf');
+    late http.Response response;
+    try {
+      response = await _client
+          .get(_uri('invoices/$invoiceId/pdf/'), headers: headers)
+          .timeout(const Duration(seconds: 60));
+    } on Exception {
+      throw const OnixApiException(
+        'No pudimos descargar el PDF. Revisa tu conexion e intenta nuevamente.',
+      );
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String message = 'Onix no pudo descargar el PDF de la factura.';
+      String? code;
+      try {
+        final payload = Map<String, dynamic>.from(
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map,
+        );
+        message = payload['error']?.toString() ?? message;
+        code = payload['code']?.toString();
+      } on Exception {
+        // Conserva el mensaje seguro cuando el servidor no devuelve JSON.
+      }
+      final exception = OnixApiException(
+        message,
+        statusCode: response.statusCode,
+        code: code,
+      );
+      if (exception.unauthorized) await clearSession();
+      throw exception;
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final match = RegExp(r'filename="?([^";]+)').firstMatch(disposition);
+    final fileName = match?.group(1)?.trim();
+    return OnixDownloadedFile(
+      name: fileName?.isNotEmpty == true ? fileName! : 'Factura-$invoiceId.pdf',
+      bytes: response.bodyBytes,
+    );
+  }
+
   Future<void> logout() async {
     try {
       await _request('logout/', method: 'POST', body: const {});
@@ -122,21 +173,7 @@ class OnixApi {
     Map<String, dynamic>? body,
     bool authenticated = true,
   }) async {
-    final headers = <String, String>{
-      'Accept': 'application/json',
-      'Content-Type': 'application/json; charset=UTF-8',
-    };
-    if (authenticated) {
-      final token = await readToken();
-      if (token == null || token.isEmpty) {
-        throw const OnixApiException(
-          'Inicia sesion para continuar.',
-          statusCode: 401,
-          code: 'authentication_required',
-        );
-      }
-      headers['Authorization'] = 'Bearer $token';
-    }
+    final headers = await _headers(authenticated: authenticated);
 
     late http.Response response;
     try {
@@ -180,6 +217,28 @@ class OnixApi {
       throw exception;
     }
     return payload;
+  }
+
+  Future<Map<String, String>> _headers({
+    bool authenticated = true,
+    String accept = 'application/json',
+  }) async {
+    final headers = <String, String>{
+      'Accept': accept,
+      'Content-Type': 'application/json; charset=UTF-8',
+    };
+    if (!authenticated) return headers;
+
+    final token = await readToken();
+    if (token == null || token.isEmpty) {
+      throw const OnixApiException(
+        'Inicia sesion para continuar.',
+        statusCode: 401,
+        code: 'authentication_required',
+      );
+    }
+    headers['Authorization'] = 'Bearer $token';
+    return headers;
   }
 
   void dispose() => _client.close();

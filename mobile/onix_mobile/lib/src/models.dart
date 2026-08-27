@@ -103,8 +103,19 @@ class OnixAction {
   bool get pending => status == 'pendiente';
   String get title => data['title']?.toString() ?? 'Accion de Onix';
   String get description => data['description']?.toString() ?? '';
+  String get confirmationLabel =>
+      data['confirmation_label']?.toString() ?? 'Confirmar';
   String get total => data['total']?.toString() ?? '';
   String get currency => data['currency']?.toString() ?? 'HNL';
+  Map<String, dynamic> get result =>
+      Map<String, dynamic>.from(data['result'] as Map? ?? const {});
+  int? get invoiceId => int.tryParse(
+    (result['invoice_id'] ?? data['invoice_id'])?.toString() ?? '',
+  );
+  String get invoiceNumber =>
+      result['number']?.toString() ?? data['number']?.toString() ?? '';
+  String get invoiceStatus => result['status']?.toString() ?? '';
+  bool get pdfAvailable => result['pdf_available'] == true;
   String get clientName {
     final client = data['client'];
     if (client is Map) return client['name']?.toString() ?? '';

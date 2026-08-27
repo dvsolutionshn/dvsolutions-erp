@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 ONIX_SUGGESTIONS = [
     "Prepara una factura en borrador",
+    "Valida una factura y dame su PDF",
     "Busca mis facturas pendientes",
     "Que clientes tienen saldo pendiente",
-    "Busca un cliente por nombre",
 ]
 
 
@@ -217,7 +217,28 @@ ACTION_TOOLS = [
             "additionalProperties": False,
         },
         "strict": True,
-    }
+    },
+    {
+        "type": "function",
+        "name": "preparar_emision_factura",
+        "description": (
+            "Prepara la validacion y emision fiscal de una factura existente en borrador. "
+            "La emision asigna numero fiscal y CAI, afecta inventario y contabilidad, y por eso "
+            "siempre devuelve una accion que el usuario debe confirmar explicitamente."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "factura_id": {
+                    "type": "integer",
+                    "description": "ID exacto de una factura en borrador obtenido con buscar_facturas.",
+                },
+            },
+            "required": ["factura_id"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
 ]
 
 TOOL_LABELS = {
@@ -229,6 +250,7 @@ TOOL_LABELS = {
     "buscar_citas": "Calendario",
     "buscar_pagos": "Pagos recibidos",
     "preparar_factura": "Preparacion de factura",
+    "preparar_emision_factura": "Validacion fiscal de factura",
 }
 
 
@@ -253,11 +275,18 @@ def _inicio_dia(fecha):
 def _ejecutar_herramienta(nombre, argumentos, *, empresa, usuario, conversacion=None):
     from facturacion.models import Cliente, Factura, PagoFactura, Producto
 
-    if nombre == "preparar_factura":
-        from .onix_actions import preparar_borrador_factura
+    if nombre in {"preparar_factura", "preparar_emision_factura"}:
+        from .onix_actions import preparar_borrador_factura, preparar_emision_factura
 
         try:
-            return preparar_borrador_factura(
+            if nombre == "preparar_factura":
+                return preparar_borrador_factura(
+                    argumentos=argumentos,
+                    empresa=empresa,
+                    usuario=usuario,
+                    conversacion=conversacion,
+                )
+            return preparar_emision_factura(
                 argumentos=argumentos,
                 empresa=empresa,
                 usuario=usuario,
@@ -369,6 +398,8 @@ def _ejecutar_herramienta(nombre, argumentos, *, empresa, usuario, conversacion=
                     "moneda": factura.moneda,
                     "total": str(factura.total),
                     "saldo_pendiente": str(saldo),
+                    "puede_emitir": factura.estado == "borrador",
+                    "pdf_disponible": True,
                 }
             )
         return {
@@ -528,7 +559,14 @@ Puedes preparar facturas en borrador, pero nunca las crees sin confirmacion. Cua
    Usa precio_unitario null para tomar el precio del catalogo, salvo que el usuario haya indicado otro valor explicitamente.
 4. Explica que la factura aun no existe y que el usuario debe revisar y confirmar la tarjeta mostrada por el ERP.
 Despues de preparar la vista previa no vuelvas a llamar preparar_factura en la misma respuesta.
-No puedes emitir, validar fiscalmente, modificar, anular, registrar pagos ni enviar facturas todavia.
+
+Tambien puedes preparar la validacion y emision fiscal de una factura en borrador:
+1. Busca primero la factura para obtener su ID, estado y datos actuales.
+2. Solo si hay una coincidencia inequívoca en estado borrador, usa preparar_emision_factura.
+3. Explica que la emision asignara numero fiscal y CAI, actualizara inventario y contabilidad, y requiere confirmacion expresa.
+4. Despues de preparar la emision no vuelvas a llamar la herramienta en la misma respuesta.
+Si la factura ya esta emitida, no intentes emitirla otra vez; informa que su PDF ya esta disponible.
+No puedes modificar, anular, registrar pagos ni enviar facturas por correo o WhatsApp todavia.
 """ if configuracion.herramientas_accion_activas else """
 En esta empresa solo puedes consultar. No puedes crear, emitir, modificar, anular, pagar ni enviar documentos.
 Si te piden una accion de escritura, explica que las acciones confirmables aun no estan habilitadas para esta empresa.

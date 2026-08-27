@@ -19,7 +19,7 @@ from facturacion.models import (
     TipoImpuesto,
 )
 
-from .models import AccionOnix, ConfiguracionOnix
+from .models import AccionOnix, ConfiguracionOnix, MensajeOnix
 
 
 DOS_DECIMALES = Decimal("0.01")
@@ -292,6 +292,89 @@ def preparar_borrador_factura(*, argumentos, empresa, usuario, conversacion):
     }
 
 
+def preparar_emision_factura(*, argumentos, empresa, usuario, conversacion):
+    _validar_acceso_acciones(empresa, usuario)
+    try:
+        factura_id = int(argumentos.get("factura_id"))
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Selecciona una factura valida antes de preparar la emision.") from exc
+
+    factura = (
+        Factura.objects.filter(empresa=empresa, pk=factura_id)
+        .select_related("cliente")
+        .prefetch_related("lineas__producto", "lineas__impuesto")
+        .first()
+    )
+    if not factura:
+        raise ValidationError("La factura no existe o pertenece a otra empresa.")
+    if factura.estado == "emitida":
+        raise ValidationError(
+            f"La factura {factura.numero_factura or factura.id} ya fue emitida y no debe validarse otra vez."
+        )
+    if factura.estado == "anulada":
+        raise ValidationError("Una factura anulada no puede validarse ni emitirse.")
+
+    lineas_factura = list(factura.lineas.all())
+    if not lineas_factura:
+        raise ValidationError("La factura debe tener al menos una linea antes de emitirse.")
+    lineas = [
+        {
+            "producto": (
+                linea.producto.nombre
+                if linea.producto_id
+                else (linea.descripcion_manual or "Concepto")
+            ),
+            "cantidad": str(linea.cantidad),
+            "precio_unitario": str(linea.precio_unitario),
+            "impuesto": linea.impuesto.nombre,
+            "total": str(linea.total_linea),
+        }
+        for linea in lineas_factura
+    ]
+    vista_previa = {
+        "title": "Factura lista para validacion fiscal",
+        "description": (
+            "Al confirmar, el ERP asignara numero fiscal y CAI, registrara inventario y contabilidad. "
+            "Esta emision no se puede convertir nuevamente en borrador."
+        ),
+        "confirmation_label": "Validar y emitir",
+        "warning": "Revisa cliente, conceptos, impuestos y total antes de emitir.",
+        "client": {
+            "id": factura.cliente_id,
+            "name": factura.cliente.nombre,
+            "rtn": factura.cliente.rtn or "",
+        },
+        "invoice_id": factura.id,
+        "number": factura.numero_factura or f"Borrador #{factura.id}",
+        "document_status": factura.estado,
+        "currency": factura.moneda,
+        "issue_date": factura.fecha_emision.isoformat(),
+        "due_date": factura.fecha_vencimiento.isoformat() if factura.fecha_vencimiento else None,
+        "items": lineas,
+        "subtotal": str(factura.subtotal),
+        "tax": str(factura.impuesto),
+        "total": str(factura.total),
+    }
+    accion = AccionOnix.objects.create(
+        empresa=empresa,
+        usuario=usuario,
+        conversacion=conversacion,
+        tipo=AccionOnix.TIPO_EMITIR_FACTURA,
+        datos={"factura_id": factura.id},
+        vista_previa=vista_previa,
+        expira_en=timezone.now() + timedelta(minutes=20),
+    )
+    return {
+        "ok": True,
+        "requires_confirmation": True,
+        "message": (
+            "La factura fue revisada y la emision fiscal esta lista. "
+            "El usuario debe confirmar la tarjeta antes de asignar CAI."
+        ),
+        "action": _serializar_accion(accion),
+    }
+
+
 def _validar_propietario(accion, usuario):
     if not accion.usuario_id or accion.usuario_id != usuario.id:
         raise PermissionDenied("Solo el usuario que preparo la accion puede confirmarla o descartarla.")
@@ -313,6 +396,155 @@ def cancelar_accion(*, accion_id, empresa, usuario):
         return _serializar_accion(accion)
 
 
+def _resultado_factura(factura):
+    return {
+        "invoice_id": factura.id,
+        "number": factura.numero_factura or f"Borrador #{factura.id}",
+        "status": factura.estado,
+        "cai": factura.cai_numero_historico or "",
+        "total": str(factura.total),
+        "currency": factura.moneda,
+        "pdf_available": True,
+        "pdf_endpoint": f"/api/onix/mobile/v1/invoices/{factura.id}/pdf/",
+        "url": reverse(
+            "ver_factura",
+            kwargs={"empresa_slug": factura.empresa.slug, "factura_id": factura.id},
+        ),
+    }
+
+
+def _registrar_resultado(accion, resultado, mensaje):
+    accion.estado = AccionOnix.ESTADO_EJECUTADA
+    accion.resultado = resultado
+    accion.fecha_confirmacion = timezone.now()
+    accion.detalle_error = ""
+    accion.save(
+        update_fields=[
+            "estado",
+            "resultado",
+            "fecha_confirmacion",
+            "detalle_error",
+            "fecha_actualizacion",
+        ]
+    )
+    if accion.conversacion_id:
+        MensajeOnix.objects.create(
+            conversacion=accion.conversacion,
+            rol=MensajeOnix.ROL_ASISTENTE,
+            contenido=mensaje,
+            pagina="onix-action://confirmation",
+            metadatos={"resultado_accion": str(accion.id)},
+        )
+        accion.conversacion.save(update_fields=["fecha_actualizacion"])
+
+
+def _crear_borrador_desde_accion(accion, empresa, usuario):
+    datos = accion.datos or {}
+    cliente = Cliente.objects.filter(
+        empresa=empresa,
+        activo=True,
+        pk=datos.get("cliente_id"),
+    ).first()
+    if not cliente:
+        raise ValidationError("El cliente dejo de estar disponible. Prepara la factura nuevamente.")
+
+    factura = Factura.objects.create(
+        empresa=empresa,
+        cliente=cliente,
+        vendedor=usuario,
+        moneda=datos["moneda"],
+        tipo_cambio=Decimal(datos["tipo_cambio"]),
+        fecha_emision=parse_date(datos["fecha_emision"]),
+        fecha_vencimiento=parse_date(datos["fecha_vencimiento"]) if datos.get("fecha_vencimiento") else None,
+        estado="borrador",
+        estado_pago="pendiente",
+    )
+    for linea_datos in datos.get("lineas", []):
+        producto = Producto.objects.filter(
+            empresa=empresa,
+            activo=True,
+            eliminado=False,
+            pk=linea_datos["producto_id"],
+        ).first()
+        impuesto = TipoImpuesto.objects.filter(
+            activo=True,
+            pk=linea_datos["impuesto_id"],
+        ).first()
+        if not producto or not impuesto:
+            raise ValidationError(
+                "Un producto o impuesto cambio despues de la vista previa. Prepara la factura nuevamente."
+            )
+        if str(impuesto.porcentaje) != linea_datos["impuesto_porcentaje"]:
+            raise ValidationError(
+                f"El impuesto de {producto.nombre} cambio despues de la vista previa. Prepara la factura nuevamente."
+            )
+        LineaFactura.objects.create(
+            factura=factura,
+            producto=producto,
+            cantidad=Decimal(linea_datos["cantidad"]),
+            precio_unitario=Decimal(linea_datos["precio_unitario"]),
+            precio_incluye_impuesto=bool(linea_datos["precio_incluye_impuesto"]),
+            descuento_porcentaje=Decimal(linea_datos["descuento_porcentaje"]),
+            comentario=linea_datos.get("comentario") or "",
+            impuesto=impuesto,
+        )
+
+    if not factura.lineas.exists():
+        raise ValidationError("La vista previa no contiene lineas validas.")
+    factura.calcular_totales()
+    if (
+        factura.subtotal.quantize(DOS_DECIMALES) != Decimal(datos["subtotal"])
+        or factura.impuesto.quantize(DOS_DECIMALES) != Decimal(datos["impuesto"])
+        or factura.total.quantize(DOS_DECIMALES) != Decimal(datos["total"])
+    ):
+        raise ValidationError(
+            "Los totales cambiaron despues de la vista previa. No se creo la factura; preparala nuevamente."
+        )
+    factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
+    resultado = _resultado_factura(factura)
+    _registrar_resultado(
+        accion,
+        resultado,
+        (
+            f"Factura **Borrador #{factura.id}** creada correctamente para **{cliente.nombre}** "
+            f"por **{factura.moneda} {factura.total}**. El PDF del borrador ya esta disponible. "
+            "Puedes pedirme que la valide y emita cuando estes listo."
+        ),
+    )
+
+
+def _emitir_factura_desde_accion(accion, empresa, usuario):
+    factura = (
+        Factura.objects.select_for_update()
+        .select_related("empresa", "cliente", "cai")
+        .filter(empresa=empresa, pk=(accion.datos or {}).get("factura_id"))
+        .first()
+    )
+    if not factura:
+        raise ValidationError("La factura dejo de estar disponible antes de confirmarse.")
+    if factura.estado == "emitida":
+        raise ValidationError("La factura ya fue emitida y no se realizo una segunda emision.")
+    if factura.estado != "borrador":
+        raise ValidationError("La factura ya no esta en borrador y no puede emitirse desde esta accion.")
+
+    # Reutiliza el mismo flujo fiscal del ERP: valida stock, asigna CAI,
+    # registra la salida de inventario y crea el asiento contable.
+    from facturacion.views import _emitir_factura_desde_borrador
+
+    _emitir_factura_desde_borrador(factura, usuario)
+    factura.refresh_from_db()
+    resultado = _resultado_factura(factura)
+    _registrar_resultado(
+        accion,
+        resultado,
+        (
+            f"Factura **{factura.numero_factura}** validada y emitida correctamente para "
+            f"**{factura.cliente.nombre}** por **{factura.moneda} {factura.total}**. "
+            "El CAI, inventario y asiento contable quedaron registrados. El PDF fiscal esta listo."
+        ),
+    )
+
+
 def ejecutar_accion(*, accion_id, empresa, usuario):
     with transaction.atomic():
         accion = AccionOnix.objects.select_for_update().filter(pk=accion_id, empresa=empresa).first()
@@ -332,94 +564,10 @@ def ejecutar_accion(*, accion_id, empresa, usuario):
             return _serializar_accion(accion)
 
         _validar_acceso_acciones(empresa, usuario)
-        if accion.tipo != AccionOnix.TIPO_CREAR_BORRADOR_FACTURA:
+        if accion.tipo == AccionOnix.TIPO_CREAR_BORRADOR_FACTURA:
+            _crear_borrador_desde_accion(accion, empresa, usuario)
+        elif accion.tipo == AccionOnix.TIPO_EMITIR_FACTURA:
+            _emitir_factura_desde_accion(accion, empresa, usuario)
+        else:
             raise ValidationError("Onix no reconoce el tipo de accion solicitado.")
-
-        datos = accion.datos or {}
-        cliente = Cliente.objects.filter(
-            empresa=empresa,
-            activo=True,
-            pk=datos.get("cliente_id"),
-        ).first()
-        if not cliente:
-            raise ValidationError("El cliente dejo de estar disponible. Prepara la factura nuevamente.")
-
-        factura = Factura.objects.create(
-            empresa=empresa,
-            cliente=cliente,
-            vendedor=usuario,
-            moneda=datos["moneda"],
-            tipo_cambio=Decimal(datos["tipo_cambio"]),
-            fecha_emision=parse_date(datos["fecha_emision"]),
-            fecha_vencimiento=parse_date(datos["fecha_vencimiento"]) if datos.get("fecha_vencimiento") else None,
-            estado="borrador",
-            estado_pago="pendiente",
-        )
-        for linea_datos in datos.get("lineas", []):
-            producto = Producto.objects.filter(
-                empresa=empresa,
-                activo=True,
-                eliminado=False,
-                pk=linea_datos["producto_id"],
-            ).first()
-            impuesto = TipoImpuesto.objects.filter(
-                activo=True,
-                pk=linea_datos["impuesto_id"],
-            ).first()
-            if not producto or not impuesto:
-                raise ValidationError(
-                    "Un producto o impuesto cambio despues de la vista previa. Prepara la factura nuevamente."
-                )
-            if str(impuesto.porcentaje) != linea_datos["impuesto_porcentaje"]:
-                raise ValidationError(
-                    f"El impuesto de {producto.nombre} cambio despues de la vista previa. Prepara la factura nuevamente."
-                )
-            LineaFactura.objects.create(
-                factura=factura,
-                producto=producto,
-                cantidad=Decimal(linea_datos["cantidad"]),
-                precio_unitario=Decimal(linea_datos["precio_unitario"]),
-                precio_incluye_impuesto=bool(linea_datos["precio_incluye_impuesto"]),
-                descuento_porcentaje=Decimal(linea_datos["descuento_porcentaje"]),
-                comentario=linea_datos.get("comentario") or "",
-                impuesto=impuesto,
-            )
-
-        if not factura.lineas.exists():
-            raise ValidationError("La vista previa no contiene lineas validas.")
-        factura.calcular_totales()
-        if (
-            factura.subtotal.quantize(DOS_DECIMALES) != Decimal(datos["subtotal"])
-            or factura.impuesto.quantize(DOS_DECIMALES) != Decimal(datos["impuesto"])
-            or factura.total.quantize(DOS_DECIMALES) != Decimal(datos["total"])
-        ):
-            raise ValidationError(
-                "Los totales cambiaron despues de la vista previa. No se creo la factura; preparala nuevamente."
-            )
-        factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
-
-        resultado = {
-            "invoice_id": factura.id,
-            "number": f"Borrador #{factura.id}",
-            "status": factura.estado,
-            "total": str(factura.total),
-            "currency": factura.moneda,
-            "url": reverse(
-                "ver_factura",
-                kwargs={"empresa_slug": empresa.slug, "factura_id": factura.id},
-            ),
-        }
-        accion.estado = AccionOnix.ESTADO_EJECUTADA
-        accion.resultado = resultado
-        accion.fecha_confirmacion = timezone.now()
-        accion.detalle_error = ""
-        accion.save(
-            update_fields=[
-                "estado",
-                "resultado",
-                "fecha_confirmacion",
-                "detalle_error",
-                "fecha_actualizacion",
-            ]
-        )
         return _serializar_accion(accion)

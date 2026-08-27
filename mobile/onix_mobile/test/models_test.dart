@@ -50,4 +50,25 @@ void main() {
     expect(updated.content, 'Confirma');
     expect(updated.actions.single.status, 'ejecutada');
   });
+
+  test('expone el resultado fiscal y el PDF de una accion ejecutada', () {
+    final action = OnixAction.fromJson({
+      'id': 'accion-emision',
+      'type': 'emitir_factura',
+      'status': 'ejecutada',
+      'confirmation_label': 'Validar y emitir',
+      'result': {
+        'invoice_id': 42,
+        'number': '001-001-01-00000042',
+        'status': 'emitida',
+        'pdf_available': true,
+      },
+    });
+
+    expect(action.confirmationLabel, 'Validar y emitir');
+    expect(action.invoiceId, 42);
+    expect(action.invoiceNumber, '001-001-01-00000042');
+    expect(action.invoiceStatus, 'emitida');
+    expect(action.pdfAvailable, isTrue);
+  });
 }

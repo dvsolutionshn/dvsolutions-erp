@@ -741,8 +741,10 @@ class ConsumoOnix(models.Model):
 
 class AccionOnix(models.Model):
     TIPO_CREAR_BORRADOR_FACTURA = "crear_borrador_factura"
+    TIPO_EMITIR_FACTURA = "emitir_factura"
     TIPOS = (
         (TIPO_CREAR_BORRADOR_FACTURA, "Crear borrador de factura"),
+        (TIPO_EMITIR_FACTURA, "Validar y emitir factura"),
     )
 
     ESTADO_PENDIENTE = "pendiente"

@@ -198,6 +198,20 @@ class _ChatScreenState extends State<ChatScreen> {
                               );
                             }
                           },
+                          onOpenInvoicePdf: (action) async {
+                            final invoiceId = action.invoiceId;
+                            if (invoiceId == null) return;
+                            final ok = await widget.controller.openInvoicePdf(
+                              invoiceId,
+                            );
+                            if (ok && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('PDF descargado y abierto.'),
+                                ),
+                              );
+                            }
+                          },
                         );
                       },
                     ),
@@ -390,10 +404,15 @@ class _QuickPrompt extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.onDecision});
+  const _MessageBubble({
+    required this.message,
+    required this.onDecision,
+    required this.onOpenInvoicePdf,
+  });
 
   final OnixMessage message;
   final Future<void> Function(OnixAction, String) onDecision;
+  final Future<void> Function(OnixAction) onOpenInvoicePdf;
 
   @override
   Widget build(BuildContext context) => Align(
@@ -453,7 +472,11 @@ class _MessageBubble extends StatelessWidget {
             ],
           ),
           for (final action in message.actions)
-            _ActionCard(action: action, onDecision: onDecision),
+            _ActionCard(
+              action: action,
+              onDecision: onDecision,
+              onOpenInvoicePdf: onOpenInvoicePdf,
+            ),
         ],
       ),
     ),
@@ -461,10 +484,15 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _ActionCard extends StatefulWidget {
-  const _ActionCard({required this.action, required this.onDecision});
+  const _ActionCard({
+    required this.action,
+    required this.onDecision,
+    required this.onOpenInvoicePdf,
+  });
 
   final OnixAction action;
   final Future<void> Function(OnixAction, String) onDecision;
+  final Future<void> Function(OnixAction) onOpenInvoicePdf;
 
   @override
   State<_ActionCard> createState() => _ActionCardState();
@@ -472,11 +500,18 @@ class _ActionCard extends StatefulWidget {
 
 class _ActionCardState extends State<_ActionCard> {
   bool processing = false;
+  bool openingPdf = false;
 
   Future<void> _decide(String decision) async {
     setState(() => processing = true);
     await widget.onDecision(widget.action, decision);
     if (mounted) setState(() => processing = false);
+  }
+
+  Future<void> _openPdf() async {
+    setState(() => openingPdf = true);
+    await widget.onOpenInvoicePdf(widget.action);
+    if (mounted) setState(() => openingPdf = false);
   }
 
   @override
@@ -553,6 +588,65 @@ class _ActionCardState extends State<_ActionCard> {
               ],
             ),
           ],
+          if (!action.pending && action.invoiceNumber.isNotEmpty) ...[
+            const SizedBox(height: 13),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    action.invoiceStatus == 'emitida'
+                        ? Icons.verified_rounded
+                        : Icons.edit_document,
+                    color: const Color(0xFF087E82),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          action.invoiceNumber,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          action.invoiceStatus == 'emitida'
+                              ? 'Factura fiscal emitida'
+                              : 'Factura guardada como borrador',
+                          style: const TextStyle(
+                            color: Color(0xFF4C6670),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (action.pdfAvailable && action.invoiceId != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: openingPdf ? null : _openPdf,
+                icon: openingPdf
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_rounded),
+                label: Text(openingPdf ? 'Descargando...' : 'Abrir PDF'),
+              ),
+            ),
+          ],
           if (action.pending) ...[
             const SizedBox(height: 14),
             Row(
@@ -579,7 +673,7 @@ class _ActionCardState extends State<_ActionCard> {
                               strokeWidth: 2,
                             ),
                           )
-                        : const Text('Confirmar'),
+                        : Text(action.confirmationLabel),
                   ),
                 ),
               ],

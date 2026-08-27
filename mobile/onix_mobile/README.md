@@ -20,11 +20,13 @@ Aplicacion Flutter de Onix para iOS y Android. La app permite iniciar sesion con
 - Categorias disponibles segun modulos y permisos: resumen, facturas, cobros, clientes, productos, calendario y pagos recibidos.
 - Estado visible del motor: `IA activa` cuando OpenAI esta configurado en el servidor o `Modo guiado` cuando falta activarlo.
 - Vista previa, confirmacion y descarte de borradores de factura.
+- Validacion y emision fiscal confirmable con asignacion de CAI, inventario y asiento contable.
+- Descarga autenticada y apertura del PDF de cada factura desde la aplicacion.
 - Categorias visibles para las siguientes etapas: gastos, bancos e inquilinos.
 
-## Siguientes etapas del producto completo
+## Siguientes etapas del agente financiero completo
 
-- Envio real de facturas por correo y WhatsApp, con confirmacion y auditoria.
+- Envio de facturas por correo y WhatsApp desde Onix, reutilizando las integraciones del ERP.
 - Registro de pagos, gastos y recordatorios mediante acciones confirmables.
 - Facturacion mensual recurrente y reglas por cliente o contrato.
 - Carga y conciliacion de estados de cuenta bancarios y tarjetas.

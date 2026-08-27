@@ -16,6 +16,7 @@ from core.models import (
     Modulo,
     Usuario,
 )
+from facturacion.models import Cliente, Factura
 
 from .models import SesionOnixMovil
 
@@ -237,6 +238,59 @@ class OnixMobileApiTests(TestCase):
         accion.refresh_from_db()
         self.assertEqual(accion.estado, AccionOnix.ESTADO_CANCELADA)
         self.assertEqual(response.json()["action"]["status"], "cancelada")
+
+    @patch("facturacion.views._generar_factura_pdf_bytes", return_value=b"%PDF-1.7 onix-test")
+    def test_descarga_pdf_de_factura_con_token_y_empresa_correctos(self, generar_pdf):
+        cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Cliente PDF Onix",
+            rtn="08011999008802",
+        )
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=cliente,
+            vendedor=self.usuario,
+            estado="borrador",
+            subtotal="100.00",
+            impuesto="15.00",
+            total="115.00",
+            total_lempiras="115.00",
+        )
+
+        sin_token = self.client.get(
+            reverse("onix_mobile:invoice_pdf", args=[factura.id])
+        )
+        response = self.client.get(
+            reverse("onix_mobile:invoice_pdf", args=[factura.id]),
+            **self._authorization(),
+        )
+        otra_empresa = Empresa.objects.create(
+            nombre="Empresa PDF privada",
+            slug="empresa-pdf-privada",
+            rtn="08011999008803",
+        )
+        cliente_privado = Cliente.objects.create(
+            empresa=otra_empresa,
+            nombre="Cliente privado",
+            rtn="08011999008804",
+        )
+        factura_privada = Factura.objects.create(
+            empresa=otra_empresa,
+            cliente=cliente_privado,
+            estado="borrador",
+        )
+        otra_empresa_response = self.client.get(
+            reverse("onix_mobile:invoice_pdf", args=[factura_privada.id]),
+            **self._authorization(),
+        )
+
+        self.assertEqual(sin_token.status_code, 401)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(otra_empresa_response.status_code, 404)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+        generar_pdf.assert_called_once()
 
     def test_logout_revoca_sesion(self):
         token = self._token()

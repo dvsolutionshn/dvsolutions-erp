@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from crm.models import CitaCliente
-from facturacion.models import Cliente, Factura, LineaFactura, PagoFactura, Producto, TipoImpuesto
+from facturacion.models import CAI, Cliente, Factura, LineaFactura, PagoFactura, Producto, TipoImpuesto
 
 from core.models import (
     AccionOnix,
@@ -17,6 +17,7 @@ from core.models import (
     ConversacionOnix,
     Empresa,
     EmpresaModulo,
+    MensajeOnix,
     Modulo,
     RolSistema,
     Usuario,
@@ -125,6 +126,76 @@ class OnixInvoiceActionTests(TestCase):
         self.assertEqual(LineaFactura.objects.get().comentario, "Mensualidad")
         self.assertEqual(primera.json()["action"]["result"]["invoice_id"], factura.id)
         self.assertEqual(segunda.json()["action"]["result"]["invoice_id"], factura.id)
+        self.assertTrue(primera.json()["action"]["result"]["pdf_available"])
+
+    def test_onix_valida_emite_y_entrega_pdf_solo_despues_de_confirmar(self):
+        resultado = self._preparar()
+        self.client.login(username=self.usuario.username, password="pass12345")
+        confirmar_borrador = self.client.post(
+            reverse("asistente_accion", args=[self.empresa.slug, resultado["action"]["id"]]),
+            {"decision": "confirmar"},
+        )
+        factura = Factura.objects.get(
+            pk=confirmar_borrador.json()["action"]["result"]["invoice_id"]
+        )
+        hoy = timezone.localdate()
+        cai = CAI.objects.create(
+            empresa=self.empresa,
+            numero_cai="CAI-ONIX-PRUEBA",
+            establecimiento="001",
+            punto_emision="001",
+            tipo_documento="01",
+            rango_inicial=1,
+            rango_final=100,
+            correlativo_actual=0,
+            fecha_activacion=hoy - timedelta(days=1),
+            fecha_limite=hoy + timedelta(days=365),
+        )
+
+        preparacion = _ejecutar_herramienta(
+            "preparar_emision_factura",
+            {"factura_id": factura.id},
+            empresa=self.empresa,
+            usuario=self.usuario,
+            conversacion=self.conversacion,
+        )
+
+        factura.refresh_from_db()
+        self.assertEqual(factura.estado, "borrador")
+        self.assertTrue(preparacion["requires_confirmation"])
+        self.assertEqual(preparacion["action"]["type"], AccionOnix.TIPO_EMITIR_FACTURA)
+        self.assertEqual(preparacion["action"]["confirmation_label"], "Validar y emitir")
+
+        primera = self.client.post(
+            reverse("asistente_accion", args=[self.empresa.slug, preparacion["action"]["id"]]),
+            {"decision": "confirmar"},
+        )
+        segunda = self.client.post(
+            reverse("asistente_accion", args=[self.empresa.slug, preparacion["action"]["id"]]),
+            {"decision": "confirmar"},
+        )
+
+        self.assertEqual(primera.status_code, 200)
+        self.assertEqual(segunda.status_code, 200)
+        factura.refresh_from_db()
+        cai.refresh_from_db()
+        self.assertEqual(factura.estado, "emitida")
+        self.assertEqual(factura.numero_factura, "001-001-01-00000001")
+        self.assertEqual(factura.cai_numero_historico, cai.numero_cai)
+        self.assertEqual(cai.correlativo_actual, 1)
+        resultado_emision = primera.json()["action"]["result"]
+        self.assertTrue(resultado_emision["pdf_available"])
+        self.assertEqual(
+            resultado_emision["pdf_endpoint"],
+            f"/api/onix/mobile/v1/invoices/{factura.id}/pdf/",
+        )
+        self.assertEqual(
+            MensajeOnix.objects.filter(
+                conversacion=self.conversacion,
+                contenido__icontains="PDF fiscal esta listo",
+            ).count(),
+            1,
+        )
 
     def test_descartar_accion_no_crea_factura(self):
         resultado = self._preparar()
@@ -338,6 +409,7 @@ class OnixInvoiceActionTests(TestCase):
         self.assertEqual(Factura.objects.count(), 0)
         primera_llamada = openai_client.return_value.responses.create.call_args_list[0].kwargs
         self.assertIn("preparar_factura", [tool["name"] for tool in primera_llamada["tools"]])
+        self.assertIn("preparar_emision_factura", [tool["name"] for tool in primera_llamada["tools"]])
         self.assertIn("Formato obligatorio", primera_llamada["instructions"])
         self.assertIn("No uses tablas Markdown", primera_llamada["instructions"])
         self.assertIn("Muestra como maximo cinco resultados", primera_llamada["instructions"])
