@@ -4,7 +4,7 @@
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
 {% block header_title %}Registro de Terapias Postoperatorias{% endblock %}
 {% block header_description %}Cuadro clínico completo de 12 sesiones integrado al expediente del paciente.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_terapias_postquirurgicas' empresa.slug %}">Abrir módulo de atención</a><a class="erp-action-link" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver al historial</a>{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_terapias_postquirurgicas' empresa.slug %}">Abrir módulo de atención</a><a class="erp-action-link" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#controles-especiales">Volver al expediente</a>{% endblock %}
 
 {% block content %}
 <style>

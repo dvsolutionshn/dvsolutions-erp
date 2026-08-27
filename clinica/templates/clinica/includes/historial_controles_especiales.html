@@ -1,0 +1,33 @@
+<section class="sheet-panel" id="controles-especiales">
+    <div class="panel-head">
+        <div>
+            <div class="erp-kpi-label">Programas longitudinales</div>
+            <h3>Controles clínicos completos</h3>
+            <p>Acceso a los cuadros existentes; las sesiones y sus registros permanecen intactos.</p>
+        </div>
+    </div>
+    <div class="panel-body special-control-grid">
+        <article class="special-control-card is-hyperbaric">
+            <div class="special-control-icon">O₂</div>
+            <div>
+                <span>Cámara Hiperbárica</span>
+                <h4>Programa completo de 22 sesiones</h4>
+                {% if programa_camara %}
+                <p>{{ programa_camara.sesiones.all|length }} sesión(es) registrada(s) · {{ programa_camara.cirugia|default:"Procedimiento no indicado" }}</p>
+                {% else %}<p>Sin programa registrado todavía. El cuadro está listo para la primera sesión.</p>{% endif %}
+            </div>
+            <a class="save-clinical-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Ver control completo</a>
+        </article>
+        <article class="special-control-card is-post">
+            <div class="special-control-icon">12</div>
+            <div>
+                <span>Terapias Post Quirúrgicas</span>
+                <h4>Cuadro completo de 12 sesiones</h4>
+                {% if programa_postquirurgico %}
+                <p>{{ programa_postquirurgico.sesiones.all|length }} sesión(es) registrada(s) · {{ programa_postquirurgico.cirugia|default:"Cirugía no indicada" }}</p>
+                {% else %}<p>Sin programa registrado todavía. El cuadro está listo para la primera sesión.</p>{% endif %}
+            </div>
+            <a class="save-clinical-btn" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Ver cuadro completo</a>
+        </article>
+    </div>
+</section>

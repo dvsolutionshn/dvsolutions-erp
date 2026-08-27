@@ -800,6 +800,161 @@ FORMULARIOS_ESTRUCTURADOS = {
 BITACORA_TIPOS = {"enfermeria", "terapias", "camara_hiperbarica"}
 
 
+FUNCIONES_ORGANICAS_SISTEMAS = [
+    ("cabeza", "Cabeza"),
+    ("ojos", "Ojos"),
+    ("nariz", "Nariz"),
+    ("boca", "Boca"),
+    ("oidos", "Oídos"),
+    ("cuello", "Cuello"),
+    ("respiratorio", "Respiratorio"),
+    ("cardiovascular", "Cardiovascular"),
+    ("gastrointestinal", "Gastrointestinal"),
+    ("genitourinario", "Genitourinario"),
+    ("extremidades", "Extremidades"),
+    ("endocrino", "Endocrino"),
+    ("piel", "Piel"),
+    ("faneras", "Faneras"),
+]
+
+EXAMEN_FISICO_CAMPOS = [
+    ("peso", "Peso (kg)"),
+    ("estatura", "Estatura (cm)"),
+    ("imc", "IMC"),
+    ("perimetro_abdominal", "Perímetro abdominal"),
+    ("perimetro_cefalico", "Perímetro cefálico"),
+    ("temperatura", "Temperatura (°C)"),
+    ("frecuencia_cardiaca", "Frecuencia cardiaca (minutos)"),
+    ("frecuencia_respiratoria", "Frecuencia respiratoria (minutos)"),
+    ("ta_sistolica", "TA sistólica"),
+    ("ta_diastolica", "TA diastólica"),
+    ("glucometria", "Glucometría"),
+    ("saturacion_spo2", "Saturación SpO2"),
+]
+
+
+class EvaluacionClinicaIntegralForm(forms.Form):
+    profesional = forms.ModelChoiceField(
+        queryset=ProfesionalSalud.objects.none(),
+        required=False,
+        label="Profesional",
+    )
+    fecha_atencion = forms.DateTimeField(
+        label="Fecha de evaluación",
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+    funciones_generales = forms.CharField(
+        required=False,
+        label="Funciones orgánicas generales (apetito, micción, defecación, sueño)",
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
+    examen_fisico = forms.CharField(
+        required=False,
+        label="Examen físico",
+        widget=forms.Textarea(attrs={"rows": 5}),
+    )
+    estado = forms.ChoiceField(choices=HistoriaClinicaEspecialidad.ESTADO_CHOICES, initial="borrador")
+
+    def __init__(self, *args, empresa=None, instance=None, **kwargs):
+        self.instance = instance
+        super().__init__(*args, **kwargs)
+        self.fields["profesional"].queryset = (
+            ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            if empresa
+            else ProfesionalSalud.objects.none()
+        )
+        opciones_revision = [("normal", "Normal"), ("alterada", "Alterada")]
+        campos = OrderedDict()
+        campos["profesional"] = self.fields["profesional"]
+        campos["fecha_atencion"] = self.fields["fecha_atencion"]
+        campos["funciones_generales"] = self.fields["funciones_generales"]
+        for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS:
+            campos[f"funcion_{codigo}"] = forms.ChoiceField(
+                required=True,
+                label=etiqueta,
+                choices=opciones_revision,
+            )
+            campos[f"funcion_{codigo}_detalle"] = forms.CharField(
+                required=False,
+                label=f"Si hay alteración en {etiqueta.lower()}, explique",
+            )
+        for codigo, etiqueta in EXAMEN_FISICO_CAMPOS:
+            campos[f"examen_{codigo}"] = forms.CharField(required=False, label=etiqueta)
+        campos["examen_fisico"] = self.fields["examen_fisico"]
+        campos["estado"] = self.fields["estado"]
+        self.fields = campos
+
+        if instance and not self.is_bound:
+            datos = instance.datos_especialidad if isinstance(instance.datos_especialidad, dict) else {}
+            self.initial.update({
+                "profesional": instance.profesional_id,
+                "fecha_atencion": timezone.localtime(instance.fecha_atencion).strftime("%Y-%m-%dT%H:%M"),
+                "funciones_generales": datos.get("funciones_generales", ""),
+                "examen_fisico": instance.examen_fisico,
+                "estado": instance.estado,
+            })
+            for codigo, _etiqueta in FUNCIONES_ORGANICAS_SISTEMAS:
+                funcion = (datos.get("funciones_organicas", {}) or {}).get(codigo, {})
+                self.initial[f"funcion_{codigo}"] = funcion.get("estado", "")
+                self.initial[f"funcion_{codigo}_detalle"] = funcion.get("detalle", "")
+            for codigo, _etiqueta in EXAMEN_FISICO_CAMPOS:
+                self.initial[f"examen_{codigo}"] = (datos.get("examen_fisico", {}) or {}).get(codigo, "")
+
+    def datos_estructurados(self):
+        return {
+            "funciones_generales": self.cleaned_data.get("funciones_generales", ""),
+            "funciones_organicas": {
+                codigo: {
+                    "estado": self.cleaned_data.get(f"funcion_{codigo}", ""),
+                    "detalle": self.cleaned_data.get(f"funcion_{codigo}_detalle", ""),
+                }
+                for codigo, _etiqueta in FUNCIONES_ORGANICAS_SISTEMAS
+            },
+            "examen_fisico": {
+                codigo: self.cleaned_data.get(f"examen_{codigo}", "")
+                for codigo, _etiqueta in EXAMEN_FISICO_CAMPOS
+            },
+        }
+
+
+class TricopigmentacionForm(forms.Form):
+    profesional = forms.ModelChoiceField(queryset=ProfesionalSalud.objects.none(), required=False, label="Profesional")
+    fecha_atencion = forms.DateTimeField(
+        label="Fecha de atención",
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+    numero_sesion = forms.CharField(required=False, label="Número de sesión")
+    zona_tratada = forms.CharField(required=False, label="Zona tratada")
+    pigmento = forms.CharField(required=False, label="Pigmento / color")
+    marca_lote = forms.CharField(required=False, label="Marca y lote")
+    tecnica = forms.CharField(required=False, label="Técnica aplicada")
+    aguja_cartucho = forms.CharField(required=False, label="Aguja / cartucho")
+    evaluacion = forms.CharField(required=False, label="Evaluación y evolución", widget=forms.Textarea(attrs={"rows": 4}))
+    procedimiento = forms.CharField(required=False, label="Procedimiento realizado", widget=forms.Textarea(attrs={"rows": 4}))
+    indicaciones = forms.CharField(required=False, label="Indicaciones y cuidados", widget=forms.Textarea(attrs={"rows": 4}))
+    proxima_sesion = forms.DateField(required=False, label="Próxima sesión", widget=forms.DateInput(attrs={"type": "date"}))
+    observaciones = forms.CharField(required=False, label="Observaciones", widget=forms.Textarea(attrs={"rows": 4}))
+    estado = forms.ChoiceField(choices=HistoriaClinicaEspecialidad.ESTADO_CHOICES, initial="borrador")
+
+    CAMPOS_DATOS = ["numero_sesion", "zona_tratada", "pigmento", "marca_lote", "tecnica", "aguja_cartucho", "proxima_sesion"]
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["profesional"].queryset = (
+            ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            if empresa
+            else ProfesionalSalud.objects.none()
+        )
+
+    def datos_estructurados(self):
+        datos = {campo: self.cleaned_data.get(campo) for campo in self.CAMPOS_DATOS}
+        if datos.get("proxima_sesion"):
+            datos["proxima_sesion"] = datos["proxima_sesion"].isoformat()
+        return datos
+
+
 class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
     CAMPOS_POR_TIPO = {
         "capilar": {

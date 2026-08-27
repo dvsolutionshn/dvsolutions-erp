@@ -497,7 +497,9 @@ class ExpedienteEvento(models.Model):
 
 class HistoriaClinicaEspecialidad(models.Model):
     TIPO_CHOICES = [
+        ("evaluacion_integral", "Evaluacion medica integral"),
         ("capilar", "Capilar"),
+        ("tricopigmentacion", "Tricopigmentacion"),
         ("cirugia_plastica", "Cirugia plastica y reconstructiva"),
         ("medicina_estetica", "Tratamiento Estetico / Piel"),
         ("enfermeria", "Enfermeria"),

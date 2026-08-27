@@ -469,13 +469,6 @@
                         <span>Registrar motivo, servicio, profesional y estado de atencion.</span>
                     </div>
                 </a>
-                <a class="clinic-action-card" href="{% url 'clinica_crear_evento' empresa.slug %}">
-                    <div class="clinic-action-icon">03</div>
-                    <div>
-                        <strong>Nota clinica</strong>
-                        <span>Agregar diagnostico, evolucion, plan o indicacion al expediente.</span>
-                    </div>
-                </a>
             </div>
         </div>
 
@@ -623,7 +616,6 @@
                 <div class="erp-kpi-label">Expediente vivo</div>
                 <h3 class="erp-panel-title" style="margin:6px 0 0;">Ultima actividad clinica</h3>
             </div>
-            <a class="erp-action-link" href="{% url 'clinica_crear_evento' empresa.slug %}">Registrar nota</a>
         </div>
         {% for evento in ultimos_eventos %}
         <div class="clinic-event">

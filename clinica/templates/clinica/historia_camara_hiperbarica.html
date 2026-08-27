@@ -6,7 +6,7 @@
 {% block header_description %}Programa longitudinal de 22 sesiones integrado directamente al expediente del paciente.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'agenda_camara_hiperbarica' empresa.slug %}">Abrir módulo de atención</a>
-<a class="erp-action-link" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Volver al historial</a>
+<a class="erp-action-link" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#controles-especiales">Volver al expediente</a>
 {% endblock %}
 
 {% block content %}

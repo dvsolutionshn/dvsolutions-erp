@@ -24,7 +24,6 @@
     <button class="erp-btn-secondary" style="border-color:#f2b8b5;background:#fff5f5;color:#b42318;" type="submit">Eliminar paciente</button>
 </form>
 {% endif %}
-<a class="erp-btn" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Agregar historial</a>
 {% endblock %}
 
 {% block extra_head %}
@@ -160,14 +159,13 @@
         <details class="clinical-side-group" open>
             <summary><i>01</i>Historial Clinico</summary>
             <div class="clinical-submenu">
-                <a href="#datos-generales">Datos generales</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Motivo de consulta</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Funciones orgánicas</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#evaluacion-integral">Funciones orgánicas</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#evaluacion-integral">Examen físico</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Antecedentes</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico">Diagnóstico</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico">Plan y tratamiento</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Historia clínica completa</a>
-                <a href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota clinica</a>
             </div>
         </details>
         <details class="clinical-side-group" open>
@@ -191,28 +189,16 @@
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-cirugia_plastica">Cirugía Plástica</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-medicina_estetica">Medicina Estética</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-capilar">Capilar</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#tricopigmentacion">Tricopigmentación</a>
                 <a href="#recordatorios-tratamiento">Citas / Recordatorios</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-camara_hiperbarica">Cámara Hiperbárica</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-terapias_postquirurgicas">Terapias Post Quirúrgicas</a>
+                <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>
+                <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-enfermeria">Enfermería / Tratamientos</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-terapias">Terapias clínicas</a>
                 <a href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}">Tratamientos del paciente</a>
                 <a href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}">Seguimiento Estético / Clínico</a>
             </div>
         </details>
-        <div class="clinical-side-actions">
-            <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
-            {% if formularios_hospitalarios %}
-            {% if historia_clinica_pendiente_doctor %}<a class="erp-btn-secondary" href="{% url 'clinica_completar_historia_clinica_paciente' empresa.slug paciente.id %}">Terminar expediente</a>{% endif %}
-            <form method="post" action="{% url 'clinica_generar_enlace_preconsulta' empresa.slug paciente.id %}" class="erp-inline-form">
-                {% csrf_token %}
-                <button class="erp-btn-secondary" type="submit" style="width:100%;">Enviar historia clinica</button>
-            </form>
-            {% endif %}
-            <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota clínica</a>
-            <a class="erp-btn-secondary" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Crear receta</a>
-            <a class="erp-btn-secondary" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Subir examen</a>
-        </div>
     </aside>
     <div class="clinical-workspace-main">
         <section class="erp-card clinical-focus-panel patient-anchor-offset" id="resumen-clinico">
@@ -225,14 +211,16 @@
                 <div class="clinical-focus-actions">
                     <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
                     <a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
-                    <a class="erp-btn-secondary" href="{% url 'clinica_crear_evento_paciente' empresa.slug paciente.id %}">Nueva nota</a>
                 </div>
             </div>
             <div class="clinical-quick-grid">
-                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><strong>Historial Clínico</strong><span>Datos generales, consulta, funciones orgánicas, antecedentes, diagnóstico y plan.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><strong>Historial Clínico</strong><span>Consulta, funciones orgánicas, examen físico, antecedentes, diagnóstico y plan.</span></a>
                 <a class="clinical-quick-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><strong>Anexos</strong><span>Laboratorio, radiografías, documentos, consentimientos, recetas y archivos visuales.</span></a>
                 <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico"><strong>Atención y especialidades</strong><span>Cirugía, estética, capilar, terapias, cámara hiperbárica y enfermería.</span></a>
                 <a class="clinical-quick-card" href="#recordatorios-tratamiento"><strong>Citas / Recordatorios</strong><span>Agenda y seguimiento estético o clínico conectado al calendario.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}"><strong>Cámara Hiperbárica</strong><span>Cuadro longitudinal completo de 22 sesiones.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}"><strong>Terapias Post Quirúrgicas</strong><span>Cuadro clínico completo de 12 sesiones.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#tricopigmentacion"><strong>Tricopigmentación</strong><span>Sesiones, pigmentos, zonas tratadas, evolución y cuidados.</span></a>
             </div>
         </section>
 

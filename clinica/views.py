@@ -46,6 +46,9 @@ from .forms import (
     DocumentoClinicoPacienteForm,
     ExamenPacienteForm,
     ExpedienteEventoForm,
+    EXAMEN_FISICO_CAMPOS,
+    FUNCIONES_ORGANICAS_SISTEMAS,
+    EvaluacionClinicaIntegralForm,
     HistoriaClinicaEspecialidadForm,
     IncapacidadClinicaForm,
     PacienteForm,
@@ -57,6 +60,7 @@ from .forms import (
     PlantillaRecetaForm,
     ServicioClinicoForm,
     TratamientoPacienteForm,
+    TricopigmentacionForm,
 )
 from .models import (
     CitaClinica,
@@ -383,29 +387,7 @@ def _secciones_preconsulta(preconsulta):
         general = preconsulta.datos_generales.get("formulario_general", {}) or {}
     secciones = [
         {
-            "titulo": "1. Datos generales",
-            "descripcion": "Identificación y contacto reportado por el paciente.",
-            "campos": [
-                _campo_lectura_preconsulta(general, "Nombre completo", "nombres"),
-                _campo_lectura_preconsulta(general, "Apellidos", "apellidos"),
-                _campo_lectura_preconsulta(general, "Identidad", "identidad"),
-                _campo_lectura_preconsulta(general, "Fecha de nacimiento", "fecha_nacimiento"),
-                _campo_lectura_preconsulta(general, "Sexo", "sexo"),
-                _campo_lectura_preconsulta(general, "Estado civil", "estado_civil"),
-                _campo_lectura_preconsulta(general, "Teléfono / WhatsApp", "telefono"),
-                _campo_lectura_preconsulta(general, "Correo", "correo"),
-                _campo_lectura_preconsulta(general, "Residencia", "direccion"),
-                _campo_lectura_preconsulta(general, "Ocupación", "ocupacion"),
-                _campo_lectura_preconsulta(general, "Lugar de trabajo", "lugar_trabajo"),
-                _campo_lectura_preconsulta(general, "Contacto de emergencia", "contacto_emergencia_completo"),
-                _campo_lectura_preconsulta(general, "Persona que proporciona la información", "informante"),
-                _campo_lectura_preconsulta(general, "Nombre del informante", "informante_detalle"),
-                _campo_lectura_preconsulta(general, "Cómo conoció la clínica", "referido_por"),
-                _campo_lectura_preconsulta(general, "Referencia", "referido_por_detalle"),
-            ],
-        },
-        {
-            "titulo": "2. Motivo y procedimientos de interés",
+            "titulo": "1. Motivo y procedimientos de interés",
             "descripcion": "Áreas seleccionadas y procedimientos que motivan la consulta.",
             "campos": [
                 _campo_lectura_preconsulta(general, "Motivo principal", "motivo_categoria", MOTIVO_CATEGORIA_CHOICES, "chips"),
@@ -418,7 +400,7 @@ def _secciones_preconsulta(preconsulta):
             ],
         },
         {
-            "titulo": "3. Antecedentes, alergias y medicamentos",
+            "titulo": "2. Antecedentes, alergias y medicamentos",
             "descripcion": "Condiciones, alergias y tratamientos reportados.",
             "campos": [
                 {"label": "Antecedentes personales", "value": _etiquetas_seleccion(preconsulta.antecedentes_personales, ANTECEDENTES_PERSONALES_CHOICES), "type": "chips"},
@@ -435,7 +417,7 @@ def _secciones_preconsulta(preconsulta):
             ],
         },
         {
-            "titulo": "4. Hábitos y estilo de vida",
+            "titulo": "3. Hábitos y estilo de vida",
             "descripcion": "Datos no patológicos y riesgos de consumo.",
             "campos": [
                 _campo_lectura_preconsulta(general, "Operado anteriormente", "quirurgicos_operado", SI_NO_CHOICES, "chips"),
@@ -452,7 +434,7 @@ def _secciones_preconsulta(preconsulta):
             ],
         },
         {
-            "titulo": "5. Familiares, ginecología y riesgos",
+            "titulo": "4. Familiares, ginecología y riesgos",
             "descripcion": "Antecedentes familiares y datos ginecológicos cuando aplican.",
             "campos": [
                 {"label": "Antecedentes familiares", "value": _etiquetas_seleccion(preconsulta.antecedentes_familiares, ANTECEDENTES_FAMILIARES_CHOICES), "type": "chips"},
@@ -472,7 +454,7 @@ def _secciones_preconsulta(preconsulta):
             ],
         },
         {
-            "titulo": "6. Evaluación psicológica y consentimiento",
+            "titulo": "5. Evaluación psicológica y consentimiento",
             "descripcion": "Expectativas y elementos emocionales declarados.",
             "campos": [
                 _campo_lectura_preconsulta(general, "Evaluación psicológica", "evaluacion_psicologica", PSICOLOGICA_CHOICES, "chips"),
@@ -1856,6 +1838,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
     puede_eliminar_notas_clinicas = _es_dueno_erp(request.user)
+    evaluacion_form = None
+    tricopigmentacion_form = None
     if request.method == "POST" and request.POST.get("accion") == "eliminar_historia":
         if not puede_eliminar_notas_clinicas:
             messages.error(request, "Solo el dueño del ERP puede eliminar notas clínicas guardadas.")
@@ -1893,6 +1877,71 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         else:
             messages.success(request, f"Texto de {historia.get_tipo_display()} actualizado correctamente.")
         return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    if request.method == "POST" and request.POST.get("accion") == "guardar_evaluacion_integral":
+        evaluacion_form = EvaluacionClinicaIntegralForm(
+            request.POST,
+            empresa=empresa,
+            prefix="evaluacion",
+        )
+        if evaluacion_form.is_valid():
+            datos = evaluacion_form.datos_estructurados()
+            examen_resumen = [
+                f"{etiqueta}: {datos['examen_fisico'].get(codigo)}"
+                for codigo, etiqueta in EXAMEN_FISICO_CAMPOS
+                if datos["examen_fisico"].get(codigo)
+            ]
+            funciones_resumen = []
+            for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS:
+                funcion = datos["funciones_organicas"].get(codigo, {})
+                if funcion.get("estado"):
+                    texto = f"{etiqueta}: {funcion['estado'].title()}"
+                    if funcion.get("detalle"):
+                        texto += f" - {funcion['detalle']}"
+                    funciones_resumen.append(texto)
+            historia = HistoriaClinicaEspecialidad(
+                empresa=empresa,
+                paciente=paciente,
+                tipo="evaluacion_integral",
+                profesional=evaluacion_form.cleaned_data.get("profesional") or profesional_usuario,
+                fecha_atencion=evaluacion_form.cleaned_data["fecha_atencion"],
+                signos_vitales="\n".join(examen_resumen),
+                examen_fisico=evaluacion_form.cleaned_data.get("examen_fisico", ""),
+                evaluacion_clinica="\n".join(funciones_resumen),
+                datos_especialidad=datos,
+                estado=evaluacion_form.cleaned_data["estado"],
+                creado_por=request.user,
+                actualizado_por=request.user,
+            )
+            historia.save()
+            messages.success(request, "Funciones orgánicas y examen físico guardados correctamente.")
+            return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        messages.error(request, "Revise los campos de Funciones Orgánicas y Examen Físico.")
+    if request.method == "POST" and request.POST.get("accion") == "guardar_tricopigmentacion":
+        tricopigmentacion_form = TricopigmentacionForm(
+            request.POST,
+            empresa=empresa,
+            prefix="tricopigmentacion",
+        )
+        if tricopigmentacion_form.is_valid():
+            historia = HistoriaClinicaEspecialidad(
+                empresa=empresa,
+                paciente=paciente,
+                tipo="tricopigmentacion",
+                profesional=tricopigmentacion_form.cleaned_data.get("profesional") or profesional_usuario,
+                fecha_atencion=tricopigmentacion_form.cleaned_data["fecha_atencion"],
+                evaluacion_clinica=tricopigmentacion_form.cleaned_data.get("evaluacion", ""),
+                procedimiento=tricopigmentacion_form.cleaned_data.get("procedimiento", ""),
+                indicaciones=tricopigmentacion_form.cleaned_data.get("indicaciones", ""),
+                observaciones=tricopigmentacion_form.cleaned_data.get("observaciones", ""),
+                datos_especialidad=tricopigmentacion_form.datos_estructurados(),
+                estado=tricopigmentacion_form.cleaned_data["estado"],
+                creado_por=request.user,
+                actualizado_por=request.user,
+            )
+            historia.save()
+            messages.success(request, "Control de tricopigmentación guardado correctamente.")
+            return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
+        messages.error(request, "Revise los campos del control de Tricopigmentación.")
     if request.method == "POST" and tipo_post in tipos_validos:
         form_inline = HistoriaClinicaEspecialidadForm(
             request.POST,
@@ -1924,6 +1973,42 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         paciente.historias_especialidad.select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")
     )
+    historias_evaluacion = [historia for historia in historias if historia.tipo == "evaluacion_integral"]
+    historias_tricopigmentacion = [historia for historia in historias if historia.tipo == "tricopigmentacion"]
+    for historia in historias_evaluacion:
+        datos = historia.datos_especialidad if isinstance(historia.datos_especialidad, dict) else {}
+        funciones = datos.get("funciones_organicas", {}) or {}
+        examen = datos.get("examen_fisico", {}) or {}
+        historia.funciones_generales_registradas = datos.get("funciones_generales", "")
+        historia.funciones_registradas = [
+            {
+                "label": etiqueta,
+                "estado": (funciones.get(codigo, {}) or {}).get("estado", ""),
+                "detalle": (funciones.get(codigo, {}) or {}).get("detalle", ""),
+            }
+            for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS
+        ]
+        historia.examen_registrado = [
+            {"label": etiqueta, "value": examen.get(codigo, "")}
+            for codigo, etiqueta in EXAMEN_FISICO_CAMPOS
+            if examen.get(codigo)
+        ]
+    etiquetas_tricopigmentacion = {
+        "numero_sesion": "Número de sesión",
+        "zona_tratada": "Zona tratada",
+        "pigmento": "Pigmento / color",
+        "marca_lote": "Marca y lote",
+        "tecnica": "Técnica aplicada",
+        "aguja_cartucho": "Aguja / cartucho",
+        "proxima_sesion": "Próxima sesión",
+    }
+    for historia in historias_tricopigmentacion:
+        datos = historia.datos_especialidad if isinstance(historia.datos_especialidad, dict) else {}
+        historia.datos_tricopigmentacion = [
+            {"label": etiqueta, "value": datos.get(codigo, "")}
+            for codigo, etiqueta in etiquetas_tricopigmentacion.items()
+            if datos.get(codigo)
+        ]
     ahora = timezone.now()
     citas_proximas_qs = (
         paciente.citas.exclude(estado="cancelada")
@@ -1967,6 +2052,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     tipos = []
     ahora = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
     for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES:
+        if codigo in {"evaluacion_integral", "tricopigmentacion", "camara_hiperbarica", "terapias_postquirurgicas"}:
+            continue
         historias_tipo = [historia for historia in historias if historia.tipo == codigo]
         initial_formulario = {"fecha_atencion": ahora}
         if profesional_usuario:
@@ -1988,6 +2075,48 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "preconsultas": [preconsulta for preconsulta in preconsultas if preconsulta.tipo == codigo],
             "form": formulario,
         })
+    if evaluacion_form is None:
+        evaluacion_initial = {"fecha_atencion": ahora}
+        if profesional_usuario:
+            evaluacion_initial["profesional"] = profesional_usuario
+        evaluacion_form = EvaluacionClinicaIntegralForm(
+            empresa=empresa,
+            prefix="evaluacion",
+            initial=evaluacion_initial,
+        )
+    if tricopigmentacion_form is None:
+        tricopigmentacion_initial = {"fecha_atencion": ahora}
+        if profesional_usuario:
+            tricopigmentacion_initial["profesional"] = profesional_usuario
+        tricopigmentacion_form = TricopigmentacionForm(
+            empresa=empresa,
+            prefix="tricopigmentacion",
+            initial=tricopigmentacion_initial,
+        )
+    evaluacion_funciones_form = [
+        {
+            "label": etiqueta,
+            "estado": evaluacion_form[f"funcion_{codigo}"],
+            "detalle": evaluacion_form[f"funcion_{codigo}_detalle"],
+        }
+        for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS
+    ]
+    evaluacion_examen_form = [
+        evaluacion_form[f"examen_{codigo}"]
+        for codigo, _etiqueta in EXAMEN_FISICO_CAMPOS
+    ]
+    programa_camara = (
+        ProgramaCamaraHiperbarica.objects.filter(empresa=empresa, paciente=paciente)
+        .prefetch_related("sesiones")
+        .order_by("-activo", "-fecha_creacion", "-id")
+        .first()
+    )
+    programa_postquirurgico = (
+        ProgramaTerapiaPostQuirurgica.objects.filter(empresa=empresa, paciente=paciente)
+        .prefetch_related("sesiones")
+        .order_by("-activo", "-fecha_creacion", "-id")
+        .first()
+    )
     return render(
         request,
         "clinica/historial_clinico_consolidado.html",
@@ -1998,6 +2127,16 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "historias": historias,
             "preconsultas": preconsultas,
             "bloques_preconsulta": bloques_preconsulta,
+            "evaluacion_form": evaluacion_form,
+            "historias_evaluacion": historias_evaluacion,
+            "funciones_organicas_sistemas": FUNCIONES_ORGANICAS_SISTEMAS,
+            "examen_fisico_campos": EXAMEN_FISICO_CAMPOS,
+            "evaluacion_funciones_form": evaluacion_funciones_form,
+            "evaluacion_examen_form": evaluacion_examen_form,
+            "tricopigmentacion_form": tricopigmentacion_form,
+            "historias_tricopigmentacion": historias_tricopigmentacion,
+            "programa_camara": programa_camara,
+            "programa_postquirurgico": programa_postquirurgico,
             "puede_eliminar_notas_clinicas": puede_eliminar_notas_clinicas,
             "resumen_operativo": resumen_operativo,
         },
@@ -2012,6 +2151,13 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
+    if tipo in {"evaluacion_integral", "tricopigmentacion"}:
+        ancla = "evaluacion-integral" if tipo == "evaluacion_integral" else "tricopigmentacion"
+        destino = reverse(
+            "clinica_historial_clinico_consolidado",
+            args=[empresa.slug, paciente.id],
+        )
+        return redirect(f"{destino}#{ancla}")
     if tipo == "camara_hiperbarica":
         programas = list(
             ProgramaCamaraHiperbarica.objects.filter(

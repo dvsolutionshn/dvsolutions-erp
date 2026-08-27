@@ -131,18 +131,21 @@
 .summary-section-nav a:hover{background:#edf8f7;color:#087466}
 .summary-section-nav a:first-child{background:linear-gradient(135deg,#ecfdf8,#eef6ff);color:#0d6d69}
 .sheet-panel{scroll-margin-top:78px}
+.clinical-form-panel .panel-body{display:grid;gap:20px}.integral-form,.tricopig-form{display:grid;gap:18px}.integral-meta-grid{display:grid;grid-template-columns:1fr 1fr .65fr;gap:12px}.integral-clinical-grid{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(340px,.82fr);gap:16px;align-items:start}.integral-box{overflow:hidden;border:1px solid #cfe0eb;border-radius:19px;background:#fbfdff}.integral-box>header{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #d9e6ed;background:linear-gradient(135deg,#edf9f7,#f4f8ff)}.integral-box>header>span{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#fff;color:#0c7f78;font-size:11px;font-weight:950;box-shadow:0 7px 18px rgba(18,70,90,.09)}.integral-box h4,.integral-history h4{margin:0;color:#112b40}.integral-box header p{margin:3px 0 0;color:#687d8d;font-size:10px}.integral-general-field{display:grid;gap:6px;padding:14px 16px}.integral-general-field label,.inline-field label{color:#3a5368;font-size:10px;font-weight:900}.integral-general-field textarea,.inline-field input,.inline-field select,.inline-field textarea,.organic-row input,.organic-row select{width:100%;box-sizing:border-box;border:1px solid #c5d8e5;border-radius:10px;background:#fff;color:#173047;padding:9px 10px;font:inherit}.organic-table{border-top:1px solid #dce7ee}.organic-table-head,.organic-row{display:grid;grid-template-columns:minmax(100px,.55fr) minmax(100px,.65fr) minmax(150px,1.25fr);gap:10px;align-items:center;padding:8px 12px}.organic-table-head{background:#f0f4f6;color:#476074;font-size:8px;font-weight:950;text-transform:uppercase;letter-spacing:.06em}.organic-row{border-top:1px solid #e1e9ee}.organic-row label{color:#253f54;font-size:10px;font-weight:900}.organic-row select,.organic-row input{min-height:36px;padding:7px 9px;font-size:10px}.physical-grid,.tricopig-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:14px 16px}.inline-field{display:grid;gap:5px}.tricopig-grid{padding:0}.tricopig-grid .is-wide{grid-column:1/-1}.integral-history{display:grid;gap:10px;border-top:1px solid #dbe7ee;padding-top:18px}.integral-record{overflow:hidden;border:1px solid #d2e1ea;border-radius:15px;background:#fff}.integral-record summary{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;background:#f7fbfd;color:#173047}.integral-record summary span{color:#647b8d;font-size:10px}.integral-record-body{display:grid;gap:12px;padding:14px}.record-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.record-grid>div,.record-wide{padding:10px 11px;border:1px solid #dbe7ed;border-radius:11px;background:#fcfeff}.record-grid span,.record-wide span{display:block;margin-bottom:4px;color:#6b7f8f;font-size:8px;font-weight:950;text-transform:uppercase}.record-grid strong,.record-wide strong{color:#263f52;font-size:10px;line-height:1.45}.special-control-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.special-control-card{display:grid;grid-template-columns:auto 1fr;gap:13px;align-items:center;padding:16px;border:1px solid #c8dfeb;border-radius:18px;background:linear-gradient(135deg,#f7fbff,#fff)}.special-control-card.is-post{border-color:#bce0d6;background:linear-gradient(135deg,#effbf7,#fff)}.special-control-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:#e8f5fb;color:#0b7184;font-weight:950}.is-post .special-control-icon{background:#ddf5ed;color:#14725b}.special-control-card span{color:#577184;font-size:8px;font-weight:950;text-transform:uppercase}.special-control-card h4{margin:4px 0;color:#173047}.special-control-card p{margin:0;color:#657b8d;font-size:10px;line-height:1.45}.special-control-card>a{grid-column:1/-1;justify-self:start;text-decoration:none}
 @keyframes summaryClinicalEnter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:1050px){
     .cover-grid,.sheet-grid,.inline-fields,.inline-field ul{grid-template-columns:1fr}
     .panel-head,.note-title,.doctor-note-head,.clinical-area summary{flex-direction:column;align-items:flex-start}
     .summary-clinical-top{grid-template-columns:1fr}.summary-clinical-actions{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}.summary-clinical-action.is-wide{grid-column:auto}
     .summary-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .integral-clinical-grid,.special-control-grid{grid-template-columns:1fr}.integral-meta-grid{grid-template-columns:1fr 1fr}.record-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:650px){
     .summary-clinical-hero{padding:21px 18px;border-radius:24px}.summary-clinical-patient{align-items:flex-start}.summary-clinical-avatar{width:68px;height:68px;flex-basis:68px;border-radius:21px}.summary-clinical-patient h2{font-size:24px}.summary-clinical-patient p{font-size:11px}
     .summary-clinical-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-clinical-action.is-primary{grid-column:1/-1}
     .summary-dashboard{grid-template-columns:1fr 1fr}.summary-dashboard-card{min-height:112px;padding:14px}.summary-dashboard-card.is-next{grid-column:1/-1}
     .summary-section-nav{top:5px;border-radius:15px}
+    .integral-meta-grid,.physical-grid,.tricopig-grid,.record-grid{grid-template-columns:1fr}.organic-table-head{display:none}.organic-row{grid-template-columns:1fr}.special-control-card{grid-template-columns:1fr}.special-control-card>a{grid-column:auto}
 }
 @media(prefers-reduced-motion:reduce){
     .summary-clinical-hero,.summary-dashboard-card{animation:none}.summary-clinical-action,.summary-dashboard-card{transition:none}
@@ -231,12 +234,14 @@
     </section>
 
     <nav class="summary-section-nav" aria-label="Secciones de la historia clínica">
-        <a href="#resumen-paciente">Datos generales</a>
         <a href="#informacion-paciente">Motivo de consulta</a>
-        <a href="#informacion-paciente">Funciones orgánicas</a>
+        <a href="#evaluacion-integral">Funciones orgánicas</a>
+        <a href="#evaluacion-integral">Examen físico</a>
         <a href="#informacion-paciente">Antecedentes</a>
         <a href="#trabajo-clinico">Diagnóstico</a>
         <a href="#trabajo-clinico">Plan y tratamiento</a>
+        <a href="#controles-especiales">Cámara / Post Quirúrgica</a>
+        <a href="#tricopigmentacion">Tricopigmentación</a>
         <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
     </nav>
 
@@ -245,7 +250,7 @@
             <div>
                 <div class="erp-kpi-label">Información recibida</div>
                 <h3>Formulario completo llenado por el paciente</h3>
-                <p>Datos generales, motivo, antecedentes y respuestas del formulario en una sola lectura.</p>
+                <p>Motivo, antecedentes y respuestas clínicas del formulario en una sola lectura.</p>
             </div>
         </div>
         <div class="panel-body">
@@ -286,6 +291,10 @@
             {% endfor %}
         </div>
     </section>
+
+    {% include "clinica/includes/historial_evaluacion_integral.html" %}
+    {% include "clinica/includes/historial_controles_especiales.html" %}
+    {% include "clinica/includes/historial_tricopigmentacion.html" %}
 
     <section class="sheet-panel" id="trabajo-clinico">
         <div class="panel-head">

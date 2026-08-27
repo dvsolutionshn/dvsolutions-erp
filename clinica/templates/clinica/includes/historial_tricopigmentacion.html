@@ -1,0 +1,39 @@
+<section class="sheet-panel clinical-form-panel" id="tricopigmentacion">
+    <div class="panel-head">
+        <div>
+            <div class="erp-kpi-label">Especialidad capilar</div>
+            <h3>Tricopigmentación</h3>
+            <p>Control de sesiones, pigmentos, zonas tratadas, técnica, evolución e indicaciones.</p>
+        </div>
+    </div>
+    <div class="panel-body">
+        <form method="post" action="#tricopigmentacion" class="tricopig-form">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="guardar_tricopigmentacion">
+            <div class="tricopig-grid">
+                {% for field in tricopigmentacion_form %}
+                <div class="inline-field {% if field.name == 'evaluacion' or field.name == 'procedimiento' or field.name == 'indicaciones' or field.name == 'observaciones' %}is-wide{% endif %}">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+                    {% for error in field.errors %}<span class="inline-error">{{ error }}</span>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="form-actions"><button class="save-clinical-btn" type="submit">Guardar control de tricopigmentación</button></div>
+        </form>
+        <div class="integral-history">
+            <h4>Sesiones registradas</h4>
+            {% for historia in historias_tricopigmentacion %}
+            <details class="integral-record">
+                <summary><strong>{{ historia.fecha_atencion|date:"d/m/Y H:i" }}</strong><span>{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} · {{ historia.get_estado_display }}</span></summary>
+                <div class="integral-record-body">
+                    <div class="record-grid">{% for campo in historia.datos_tricopigmentacion %}<div><span>{{ campo.label }}</span><strong>{{ campo.value }}</strong></div>{% endfor %}</div>
+                    {% if historia.evaluacion_clinica %}<div class="record-wide"><span>Evaluación y evolución</span><strong>{{ historia.evaluacion_clinica|linebreaksbr }}</strong></div>{% endif %}
+                    {% if historia.procedimiento %}<div class="record-wide"><span>Procedimiento realizado</span><strong>{{ historia.procedimiento|linebreaksbr }}</strong></div>{% endif %}
+                    {% if historia.indicaciones %}<div class="record-wide"><span>Indicaciones</span><strong>{{ historia.indicaciones|linebreaksbr }}</strong></div>{% endif %}
+                    {% if historia.observaciones %}<div class="record-wide"><span>Observaciones</span><strong>{{ historia.observaciones|linebreaksbr }}</strong></div>{% endif %}
+                </div>
+            </details>
+            {% empty %}<div class="empty-sheet">Aún no hay controles de tricopigmentación registrados.</div>{% endfor %}
+        </div>
+    </div>
+</section>

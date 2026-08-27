@@ -22,7 +22,7 @@ from crm.models import (
     SesionTerapiaPostQuirurgica,
 )
 from facturacion.models import Cliente, Producto
-from .forms import PreconsultaClinicaPublicaForm
+from .forms import FUNCIONES_ORGANICAS_SISTEMAS, PreconsultaClinicaPublicaForm
 from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
 from .tokens import hash_token_preconsulta
 
@@ -186,6 +186,92 @@ class ClinicaPacienteTests(TestCase):
         historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="capilar")
         self.assertEqual(historia.plan_tratamiento, "Historia actual, diagnostico y plan desde clinica completa.")
         self.assertEqual(historia.creado_por, self.user)
+
+    def test_historial_clinico_guarda_funciones_organicas_y_examen_fisico_estructurados(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-EVAL-001",
+            nombre="Paciente Evaluacion Integral",
+            identidad="1101200800701",
+            fecha_nacimiento="1990-01-01",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Funciones Orgánicas y Examen Físico")
+        self.assertContains(response, "Programa completo de 22 sesiones")
+        self.assertContains(response, "Cuadro completo de 12 sesiones")
+        self.assertContains(response, "Tricopigmentación")
+        self.assertNotContains(response, 'href="#resumen-paciente">Datos generales</a>')
+        self.assertEqual(
+            list(response.context["evaluacion_form"].fields["funcion_cabeza"].choices),
+            [("normal", "Normal"), ("alterada", "Alterada")],
+        )
+
+        datos_evaluacion = {
+            f"evaluacion-funcion_{codigo}": "normal"
+            for codigo, _etiqueta in FUNCIONES_ORGANICAS_SISTEMAS
+        }
+        datos_evaluacion.update({
+            "accion": "guardar_evaluacion_integral",
+            "evaluacion-fecha_atencion": "2026-08-27T10:30",
+            "evaluacion-funciones_generales": "Apetito conservado, micción y sueño normales.",
+            "evaluacion-funcion_cabeza": "normal",
+            "evaluacion-funcion_ojos": "alterada",
+            "evaluacion-funcion_ojos_detalle": "Visión borrosa ocasional.",
+            "evaluacion-examen_peso": "68",
+            "evaluacion-examen_estatura": "165",
+            "evaluacion-examen_imc": "24.98",
+            "evaluacion-examen_ta_sistolica": "120",
+            "evaluacion-examen_ta_diastolica": "80",
+            "evaluacion-examen_saturacion_spo2": "99%",
+            "evaluacion-examen_fisico": "Paciente consciente y orientado.",
+            "evaluacion-estado": "finalizada",
+        })
+        response = self.client.post(url, datos_evaluacion)
+
+        self.assertRedirects(response, url)
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="evaluacion_integral")
+        self.assertEqual(historia.datos_especialidad["funciones_organicas"]["cabeza"]["estado"], "normal")
+        self.assertEqual(historia.datos_especialidad["funciones_organicas"]["ojos"]["estado"], "alterada")
+        self.assertEqual(historia.datos_especialidad["examen_fisico"]["peso"], "68")
+        self.assertEqual(historia.examen_fisico, "Paciente consciente y orientado.")
+        self.assertIn("TA sistólica: 120", historia.signos_vitales)
+
+    def test_historial_clinico_guarda_control_tricopigmentacion(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-TRICO-001",
+            nombre="Paciente Tricopigmentacion",
+            identidad="1101200800702",
+            fecha_nacimiento="1990-01-01",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url, {
+            "accion": "guardar_tricopigmentacion",
+            "tricopigmentacion-fecha_atencion": "2026-08-27T11:00",
+            "tricopigmentacion-numero_sesion": "2",
+            "tricopigmentacion-zona_tratada": "Línea frontal",
+            "tricopigmentacion-pigmento": "Castaño medio",
+            "tricopigmentacion-marca_lote": "Lote TC-2026",
+            "tricopigmentacion-tecnica": "Punto a punto",
+            "tricopigmentacion-aguja_cartucho": "1RL",
+            "tricopigmentacion-evaluacion": "Evolución favorable.",
+            "tricopigmentacion-procedimiento": "Refuerzo de densidad.",
+            "tricopigmentacion-indicaciones": "No mojar por 24 horas.",
+            "tricopigmentacion-proxima_sesion": "2026-09-10",
+            "tricopigmentacion-observaciones": "Sin reacción adversa.",
+            "tricopigmentacion-estado": "finalizada",
+        })
+
+        self.assertRedirects(response, url)
+        historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="tricopigmentacion")
+        self.assertEqual(historia.datos_especialidad["zona_tratada"], "Línea frontal")
+        self.assertEqual(historia.datos_especialidad["proxima_sesion"], "2026-09-10")
+        self.assertEqual(historia.procedimiento, "Refuerzo de densidad.")
 
     def test_vista_clinica_completa_edita_texto_inline(self):
         paciente = Paciente.objects.create(
@@ -722,6 +808,12 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Fotografías / Videos")
         self.assertContains(response, "Cirugía Plástica")
         self.assertContains(response, "Seguimiento Estético / Clínico")
+        self.assertContains(response, "Examen físico")
+        self.assertContains(response, "Tricopigmentación")
+        self.assertContains(response, "Cuadro longitudinal completo de 22 sesiones")
+        self.assertContains(response, "Cuadro clínico completo de 12 sesiones")
+        self.assertNotContains(response, 'class="clinical-side-actions"')
+        self.assertNotContains(response, "Nueva nota clínica")
         self.assertContains(response, "Recordatorios de tratamiento al calendario")
         self.assertNotContains(response, "Evaluacion medica integral")
         self.assertNotContains(response, "Documentos clinicos")
