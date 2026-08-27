@@ -4,7 +4,9 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -88,17 +90,44 @@ def _acciones_habilitadas(empresa):
     ).exists()
 
 
+def _validar_acciones_habilitadas(empresa):
+    if not _acciones_habilitadas(empresa):
+        raise PermissionDenied("Las acciones de Onix no estan habilitadas para esta empresa.")
+
+
 def _validar_acceso_acciones(empresa, usuario):
+    _validar_acciones_habilitadas(empresa)
     if not empresa.tiene_modulo_activo("facturacion"):
         raise ValidationError("La empresa no tiene activo el modulo de facturacion.")
     if empresa.slug in EMPRESAS_FACTURACION_SOLO_CONTADO:
         raise ValidationError(
             "Esta empresa emite facturas al contado automaticamente; ese flujo se habilitara en una etapa posterior de Onix."
         )
-    if not _acciones_habilitadas(empresa):
-        raise PermissionDenied("Las acciones de Onix no estan habilitadas para esta empresa.")
     if not usuario.tiene_permiso_erp("puede_crear_facturas", empresa):
         raise PermissionDenied("El usuario no tiene permiso para crear facturas.")
+
+
+def _validar_acceso_cliente(empresa, usuario):
+    _validar_acciones_habilitadas(empresa)
+    if not empresa.tiene_modulo_activo("facturacion"):
+        raise ValidationError("La empresa no tiene activo el modulo de facturacion.")
+    if not usuario.tiene_permiso_erp("puede_clientes", empresa):
+        raise PermissionDenied("El usuario no tiene permiso para administrar clientes.")
+
+
+def _validar_acceso_producto(empresa, usuario):
+    _validar_acciones_habilitadas(empresa)
+    if not empresa.tiene_modulo_activo("facturacion"):
+        raise ValidationError("La empresa no tiene activo el modulo de facturacion.")
+    if not usuario.tiene_permiso_erp("puede_productos", empresa):
+        raise PermissionDenied("El usuario no tiene permiso para administrar productos o servicios.")
+
+
+def _texto_opcional(valor, *, maximo):
+    texto = str(valor or "").strip()
+    if len(texto) > maximo:
+        raise ValidationError(f"Uno de los datos supera el maximo permitido de {maximo} caracteres.")
+    return texto
 
 
 def _serializar_accion(accion):
@@ -118,6 +147,157 @@ def _serializar_accion(accion):
     if accion.detalle_error:
         datos["error"] = accion.detalle_error
     return datos
+
+
+def preparar_cliente(*, argumentos, empresa, usuario, conversacion):
+    _validar_acceso_cliente(empresa, usuario)
+    nombre = _texto_opcional(argumentos.get("nombre"), maximo=200)
+    if not nombre:
+        raise ValidationError("Falta indicar el nombre del cliente.")
+    rtn = _texto_opcional(argumentos.get("rtn"), maximo=20)
+    correo = _texto_opcional(argumentos.get("correo"), maximo=254)
+    telefono = _texto_opcional(argumentos.get("telefono"), maximo=30)
+    whatsapp = _texto_opcional(argumentos.get("telefono_whatsapp"), maximo=30) or telefono
+    direccion = _texto_opcional(argumentos.get("direccion"), maximo=1000)
+    ciudad = _texto_opcional(argumentos.get("ciudad"), maximo=100)
+    canal = str(argumentos.get("canal_preferido") or "whatsapp").strip().lower()
+    if canal not in {"whatsapp", "correo", "telefono"}:
+        raise ValidationError("El canal preferido debe ser WhatsApp, correo o telefono.")
+    if correo:
+        validate_email(correo)
+    duplicado = Cliente.objects.filter(empresa=empresa, activo=True).filter(
+        Q(nombre__iexact=nombre) | (Q(rtn__iexact=rtn) if rtn else Q(pk__isnull=True))
+    ).first()
+    if duplicado:
+        raise ValidationError(
+            f"Ya existe el cliente {duplicado.nombre} (ID {duplicado.id}). Buscalo y confirma si es el correcto."
+        )
+
+    datos = {
+        "nombre": nombre,
+        "rtn": rtn,
+        "correo": correo,
+        "telefono": telefono,
+        "telefono_whatsapp": whatsapp,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "canal_preferido": canal,
+    }
+    vista_previa = {
+        "title": "Cliente listo para confirmar",
+        "description": "Onix no guardara el cliente hasta que revises y confirmes esta ficha.",
+        "confirmation_label": "Confirmar y crear cliente",
+        "entity": "client",
+        "details": [
+            {"label": "Nombre", "value": nombre},
+            {"label": "RTN / identidad", "value": rtn or "No indicado"},
+            {"label": "Correo", "value": correo or "No indicado"},
+            {"label": "Telefono", "value": telefono or "No indicado"},
+            {"label": "WhatsApp", "value": whatsapp or "No indicado"},
+            {"label": "Direccion", "value": direccion or "No indicada"},
+            {"label": "Ciudad", "value": ciudad or "No indicada"},
+            {"label": "Canal preferido", "value": canal.title()},
+        ],
+    }
+    accion = AccionOnix.objects.create(
+        empresa=empresa,
+        usuario=usuario,
+        conversacion=conversacion,
+        tipo=AccionOnix.TIPO_CREAR_CLIENTE,
+        datos=datos,
+        vista_previa=vista_previa,
+        expira_en=timezone.now() + timedelta(minutes=30),
+    )
+    return {
+        "ok": True,
+        "requires_confirmation": True,
+        "message": "La ficha del cliente esta lista y requiere confirmacion.",
+        "action": _serializar_accion(accion),
+    }
+
+
+def preparar_producto(*, argumentos, empresa, usuario, conversacion):
+    _validar_acceso_producto(empresa, usuario)
+    nombre = _texto_opcional(argumentos.get("nombre"), maximo=200)
+    codigo = _texto_opcional(argumentos.get("codigo"), maximo=50)
+    descripcion = _texto_opcional(argumentos.get("descripcion"), maximo=2000)
+    tipo_item = str(argumentos.get("tipo_item") or "").strip().lower()
+    unidad = str(argumentos.get("unidad_medida") or "").strip().lower()
+    if not nombre:
+        raise ValidationError("Falta indicar el nombre del producto o servicio.")
+    if tipo_item not in dict(Producto.TIPOS_ITEM):
+        raise ValidationError("Indica si se trata de un producto o un servicio.")
+    if unidad not in dict(Producto.UNIDADES_MEDIDA):
+        raise ValidationError("La unidad de medida no es valida.")
+    controla_inventario = bool(argumentos.get("controla_inventario"))
+    if tipo_item == "servicio" and controla_inventario:
+        raise ValidationError("Un servicio no puede controlar inventario.")
+    precio = _decimal(argumentos.get("precio"), "el precio", minimo="0", maximo="9999999999.99", decimales=2)
+    porcentaje = _decimal(
+        argumentos.get("impuesto_porcentaje"),
+        "el porcentaje de impuesto",
+        minimo="0",
+        maximo="100",
+        decimales=2,
+    )
+    impuesto = TipoImpuesto.objects.filter(activo=True, porcentaje=porcentaje).order_by("id").first()
+    if not impuesto:
+        disponibles = ", ".join(
+            str(valor) for valor in TipoImpuesto.objects.filter(activo=True).values_list("porcentaje", flat=True).distinct()
+        )
+        raise ValidationError(
+            f"No existe un impuesto activo de {porcentaje}%. Opciones configuradas: {disponibles or 'ninguna'}."
+        )
+    duplicado = Producto.objects.filter(empresa=empresa, activo=True, eliminado=False).filter(
+        Q(nombre__iexact=nombre) | (Q(codigo__iexact=codigo) if codigo else Q(pk__isnull=True))
+    ).first()
+    if duplicado:
+        raise ValidationError(
+            f"Ya existe {duplicado.nombre} (ID {duplicado.id}). Buscalo y confirma si es el correcto."
+        )
+
+    datos = {
+        "nombre": nombre,
+        "codigo": codigo,
+        "tipo_item": tipo_item,
+        "unidad_medida": unidad,
+        "precio": str(precio.quantize(DOS_DECIMALES)),
+        "impuesto_id": impuesto.id,
+        "impuesto_porcentaje": str(impuesto.porcentaje),
+        "controla_inventario": controla_inventario,
+        "descripcion": descripcion,
+    }
+    vista_previa = {
+        "title": f"{dict(Producto.TIPOS_ITEM)[tipo_item]} listo para confirmar",
+        "description": "Se agregara al catalogo solo despues de tu confirmacion.",
+        "confirmation_label": f"Confirmar y crear {tipo_item}",
+        "entity": "product",
+        "details": [
+            {"label": "Nombre", "value": nombre},
+            {"label": "Codigo / SKU", "value": codigo or "Sin codigo"},
+            {"label": "Tipo", "value": dict(Producto.TIPOS_ITEM)[tipo_item]},
+            {"label": "Unidad", "value": dict(Producto.UNIDADES_MEDIDA)[unidad]},
+            {"label": "Precio", "value": f"HNL {precio.quantize(DOS_DECIMALES)}"},
+            {"label": "Impuesto", "value": f"{impuesto.nombre} · {impuesto.porcentaje}%"},
+            {"label": "Inventario", "value": "Controla existencia; inicia en 0" if controla_inventario else "No controla existencia"},
+            {"label": "Descripcion", "value": descripcion or "Sin descripcion"},
+        ],
+    }
+    accion = AccionOnix.objects.create(
+        empresa=empresa,
+        usuario=usuario,
+        conversacion=conversacion,
+        tipo=AccionOnix.TIPO_CREAR_PRODUCTO,
+        datos=datos,
+        vista_previa=vista_previa,
+        expira_en=timezone.now() + timedelta(minutes=30),
+    )
+    return {
+        "ok": True,
+        "requires_confirmation": True,
+        "message": "La ficha del producto o servicio esta lista y requiere confirmacion.",
+        "action": _serializar_accion(accion),
+    }
 
 
 def preparar_borrador_factura(*, argumentos, empresa, usuario, conversacion):
@@ -513,6 +693,83 @@ def _crear_borrador_desde_accion(accion, empresa, usuario):
     )
 
 
+def _crear_cliente_desde_accion(accion, empresa, usuario):
+    _validar_acceso_cliente(empresa, usuario)
+    datos = accion.datos or {}
+    nombre = datos.get("nombre") or ""
+    rtn = datos.get("rtn") or ""
+    duplicado = Cliente.objects.filter(empresa=empresa, activo=True).filter(
+        Q(nombre__iexact=nombre) | (Q(rtn__iexact=rtn) if rtn else Q(pk__isnull=True))
+    ).first()
+    if duplicado:
+        raise ValidationError(f"El cliente {duplicado.nombre} ya fue creado. No se genero un duplicado.")
+    cliente = Cliente.objects.create(
+        empresa=empresa,
+        nombre=nombre,
+        rtn=rtn or None,
+        correo=datos.get("correo") or None,
+        telefono=datos.get("telefono") or None,
+        telefono_whatsapp=datos.get("telefono_whatsapp") or None,
+        direccion=datos.get("direccion") or None,
+        ciudad=datos.get("ciudad") or None,
+        canal_preferido=datos.get("canal_preferido") or "whatsapp",
+        activo=True,
+    )
+    resultado = {
+        "entity": "client",
+        "id": cliente.id,
+        "name": cliente.nombre,
+        "message": f"Cliente {cliente.nombre} creado correctamente.",
+    }
+    _registrar_resultado(
+        accion,
+        resultado,
+        f"Cliente **{cliente.nombre}** creado correctamente. Ya puedes decirme que continue con la factura.",
+    )
+
+
+def _crear_producto_desde_accion(accion, empresa, usuario):
+    _validar_acceso_producto(empresa, usuario)
+    datos = accion.datos or {}
+    nombre = datos.get("nombre") or ""
+    codigo = datos.get("codigo") or ""
+    duplicado = Producto.objects.filter(empresa=empresa, activo=True, eliminado=False).filter(
+        Q(nombre__iexact=nombre) | (Q(codigo__iexact=codigo) if codigo else Q(pk__isnull=True))
+    ).first()
+    if duplicado:
+        raise ValidationError(f"{duplicado.nombre} ya fue creado. No se genero un duplicado.")
+    impuesto = TipoImpuesto.objects.filter(
+        pk=datos.get("impuesto_id"),
+        activo=True,
+        porcentaje=Decimal(datos.get("impuesto_porcentaje") or "-1"),
+    ).first()
+    if not impuesto:
+        raise ValidationError("La configuracion del impuesto cambio. Prepara el producto nuevamente.")
+    producto = Producto.objects.create(
+        empresa=empresa,
+        nombre=nombre,
+        codigo=codigo or None,
+        tipo_item=datos["tipo_item"],
+        unidad_medida=datos["unidad_medida"],
+        descripcion=datos.get("descripcion") or None,
+        precio=Decimal(datos["precio"]),
+        controla_inventario=bool(datos["controla_inventario"]),
+        impuesto_predeterminado=impuesto,
+        activo=True,
+    )
+    resultado = {
+        "entity": "product",
+        "id": producto.id,
+        "name": producto.nombre,
+        "message": f"{producto.get_tipo_item_display()} {producto.nombre} creado correctamente.",
+    }
+    _registrar_resultado(
+        accion,
+        resultado,
+        f"{producto.get_tipo_item_display()} **{producto.nombre}** creado correctamente. Ya puedes decirme que continue con la factura.",
+    )
+
+
 def _emitir_factura_desde_accion(accion, empresa, usuario):
     factura = (
         Factura.objects.select_for_update()
@@ -563,10 +820,15 @@ def ejecutar_accion(*, accion_id, empresa, usuario):
             accion.save(update_fields=["estado", "detalle_error", "fecha_actualizacion"])
             return _serializar_accion(accion)
 
-        _validar_acceso_acciones(empresa, usuario)
-        if accion.tipo == AccionOnix.TIPO_CREAR_BORRADOR_FACTURA:
+        if accion.tipo == AccionOnix.TIPO_CREAR_CLIENTE:
+            _crear_cliente_desde_accion(accion, empresa, usuario)
+        elif accion.tipo == AccionOnix.TIPO_CREAR_PRODUCTO:
+            _crear_producto_desde_accion(accion, empresa, usuario)
+        elif accion.tipo == AccionOnix.TIPO_CREAR_BORRADOR_FACTURA:
+            _validar_acceso_acciones(empresa, usuario)
             _crear_borrador_desde_accion(accion, empresa, usuario)
         elif accion.tipo == AccionOnix.TIPO_EMITIR_FACTURA:
+            _validar_acceso_acciones(empresa, usuario)
             _emitir_factura_desde_accion(accion, empresa, usuario)
         else:
             raise ValidationError("Onix no reconoce el tipo de accion solicitado.")

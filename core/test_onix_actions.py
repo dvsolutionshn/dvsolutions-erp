@@ -360,6 +360,89 @@ class OnixInvoiceActionTests(TestCase):
         self.assertEqual(resultado["resultados"][0]["cliente"], self.cliente.nombre)
         self.assertEqual(resultado["totales_por_moneda"]["HNL"]["recibido"], "500.00")
 
+    def test_busqueda_tolerante_sugiere_cliente_y_producto_sin_usarlos_automaticamente(self):
+        clientes = _ejecutar_herramienta(
+            "buscar_clientes",
+            {"consulta": "Cliente Mensul", "limite": 5},
+            empresa=self.empresa,
+            usuario=self.usuario,
+        )
+        productos = _ejecutar_herramienta(
+            "buscar_productos",
+            {"consulta": "Servisio mensul", "limite": 5},
+            empresa=self.empresa,
+            usuario=self.usuario,
+        )
+
+        self.assertTrue(clientes["coincidencia_aproximada"])
+        self.assertEqual(clientes["resultados"][0]["id"], self.cliente.id)
+        self.assertGreater(clientes["resultados"][0]["similitud"], 60)
+        self.assertTrue(productos["coincidencia_aproximada"])
+        self.assertEqual(productos["resultados"][0]["id"], self.producto.id)
+
+    def test_onix_crea_cliente_solo_despues_de_confirmar_ficha(self):
+        preparacion = _ejecutar_herramienta(
+            "preparar_cliente",
+            {
+                "nombre": "Nuevo Cliente Onix",
+                "rtn": "08011999007788",
+                "correo": "cliente@onix.test",
+                "telefono": "+50499990000",
+                "telefono_whatsapp": "+50499990000",
+                "direccion": "Colonia Centro",
+                "ciudad": "Tegucigalpa",
+                "canal_preferido": "whatsapp",
+            },
+            empresa=self.empresa,
+            usuario=self.usuario,
+            conversacion=self.conversacion,
+        )
+
+        self.assertTrue(preparacion["requires_confirmation"])
+        self.assertFalse(Cliente.objects.filter(nombre="Nuevo Cliente Onix").exists())
+        self.client.login(username=self.usuario.username, password="pass12345")
+        respuesta = self.client.post(
+            reverse("asistente_accion", args=[self.empresa.slug, preparacion["action"]["id"]]),
+            {"decision": "confirmar"},
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        cliente = Cliente.objects.get(nombre="Nuevo Cliente Onix")
+        self.assertEqual(cliente.rtn, "08011999007788")
+        self.assertEqual(respuesta.json()["action"]["result"]["id"], cliente.id)
+
+    def test_onix_crea_producto_solo_despues_de_confirmar_ficha(self):
+        preparacion = _ejecutar_herramienta(
+            "preparar_producto",
+            {
+                "nombre": "Consultoria Onix",
+                "codigo": "CONS-ONIX",
+                "tipo_item": "servicio",
+                "unidad_medida": "servicio",
+                "precio": "2500.00",
+                "impuesto_porcentaje": "15.00",
+                "controla_inventario": False,
+                "descripcion": "Servicio de consultoria mensual",
+            },
+            empresa=self.empresa,
+            usuario=self.usuario,
+            conversacion=self.conversacion,
+        )
+
+        self.assertTrue(preparacion["requires_confirmation"])
+        self.assertFalse(Producto.objects.filter(codigo="CONS-ONIX").exists())
+        self.client.login(username=self.usuario.username, password="pass12345")
+        respuesta = self.client.post(
+            reverse("asistente_accion", args=[self.empresa.slug, preparacion["action"]["id"]]),
+            {"decision": "confirmar"},
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        producto = Producto.objects.get(codigo="CONS-ONIX")
+        self.assertEqual(producto.precio, 2500)
+        self.assertFalse(producto.controla_inventario)
+        self.assertEqual(respuesta.json()["action"]["result"]["id"], producto.id)
+
     @override_settings(
         ONIX_ENABLED=True,
         OPENAI_API_KEY="test-key",

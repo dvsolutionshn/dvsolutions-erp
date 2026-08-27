@@ -1149,14 +1149,21 @@ def asistente_accion(request, slug, accion_id):
                     },
                     status=400,
                 )
-            mensaje = "Factura creada correctamente como borrador."
+            tipo_accion = (accion or {}).get("type")
+            mensajes_confirmacion = {
+                "crear_cliente": "Cliente creado correctamente.",
+                "crear_producto": "Producto o servicio creado correctamente.",
+                "crear_borrador_factura": "Factura creada correctamente como borrador.",
+                "emitir_factura": "Factura validada y emitida correctamente; el PDF fiscal esta disponible.",
+            }
+            mensaje = mensajes_confirmacion.get(tipo_accion, "Accion completada correctamente.")
         else:
             accion = cancelar_accion(
                 accion_id=accion_id,
                 empresa=empresa,
                 usuario=request.user,
             )
-            mensaje = "La accion fue descartada; no se creo ninguna factura."
+            mensaje = "La accion fue descartada; no se guardo ningun cambio."
     except PermissionDenied as exc:
         return JsonResponse({"error": str(exc)}, status=403)
     except ValidationError as exc:

@@ -1,6 +1,8 @@
 from django.conf import settings
+from django.db.models import Sum
+from django.utils import timezone
 
-from core.models import ConfiguracionOnix, Empresa
+from core.models import ConfiguracionOnix, ConsumoOnix, Empresa
 from core.access import interfaz_clinica_activa, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
 
@@ -23,6 +25,7 @@ def _empresa_actual(request, user):
 def erp_access(request):
     user = getattr(request, "user", None)
     empresa = _empresa_actual(request, user)
+    onix_disponible = bool(empresa and onix_disponible_para_empresa(empresa))
     config_avanzada = None
     if empresa:
         try:
@@ -30,8 +33,10 @@ def erp_access(request):
         except Exception:
             config_avanzada = None
     configuracion_onix = (
-        ConfiguracionOnix.objects.filter(empresa=empresa).only("herramientas_accion_activas").first()
-        if empresa
+        ConfiguracionOnix.objects.filter(empresa=empresa).only(
+            "herramientas_accion_activas", "limite_tokens_mensual"
+        ).first()
+        if onix_disponible
         else None
     )
 
@@ -193,13 +198,37 @@ def erp_access(request):
             or base["modulo_crm"]
         )
     )
+    consumo_onix_mes = 0
+    limite_onix_efectivo = 0
+    if onix_disponible:
+        ahora = timezone.now()
+        inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        consumo_onix_mes = int(
+            ConsumoOnix.objects.filter(empresa=empresa, fecha__gte=inicio_mes).aggregate(
+                total=Sum("tokens_total")
+            )["total"]
+            or 0
+        )
+        limites_onix = []
+        if configuracion_onix and configuracion_onix.limite_tokens_mensual:
+            limites_onix.append(int(configuracion_onix.limite_tokens_mensual))
+        if getattr(settings, "ONIX_TRIAL_MODE", False):
+            limite_prueba = int(getattr(settings, "ONIX_TRIAL_MONTHLY_TOKEN_LIMIT", 0))
+            if limite_prueba:
+                limites_onix.append(limite_prueba)
+        limite_onix_efectivo = min(limites_onix) if limites_onix else 0
+    porcentaje_onix = (
+        min(round((consumo_onix_mes / limite_onix_efectivo) * 100, 1), 100)
+        if limite_onix_efectivo
+        else 0
+    )
     return {
         "erp_access": base,
         "puede_controlar_enlaces_pacientes": puede_controlar_enlaces_pacientes,
         "mostrar_asistente_erp": bool(
             user
             and user.is_authenticated
-            and onix_disponible_para_empresa(empresa)
+            and onix_disponible
         ),
         "onix_ia_activa": bool(
             getattr(settings, "ONIX_ENABLED", False)
@@ -207,6 +236,9 @@ def erp_access(request):
         ),
         "onix_modo_prueba": bool(getattr(settings, "ONIX_TRIAL_MODE", False)),
         "onix_limite_prueba": int(getattr(settings, "ONIX_TRIAL_MONTHLY_TOKEN_LIMIT", 0)),
+        "onix_consumo_mes": consumo_onix_mes,
+        "onix_limite_efectivo": limite_onix_efectivo,
+        "onix_consumo_porcentaje": porcentaje_onix,
         "onix_acciones_activas": bool(
             empresa
             and (

@@ -1645,6 +1645,12 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(payload["assistant_mode"], "ai")
         self.assertEqual(payload["context_label"], "Onix · IA")
         self.assertEqual(payload["usage"]["tokens"], 125)
+        self.assertEqual(payload["usage"]["input_tokens"], 100)
+        self.assertEqual(payload["usage"]["output_tokens"], 25)
+        self.assertEqual(payload["usage"]["cached_tokens"], 10)
+        parametros = openai_client.return_value.responses.create.call_args.kwargs
+        self.assertTrue(parametros["prompt_cache_key"].startswith("onix-"))
+        self.assertEqual(parametros["text"]["verbosity"], "low")
         conversacion = ConversacionOnix.objects.get(empresa=empresa, usuario=usuario)
         self.assertEqual(conversacion.mensajes.count(), 2)
         self.assertEqual(

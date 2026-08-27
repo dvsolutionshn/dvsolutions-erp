@@ -740,9 +740,13 @@ class ConsumoOnix(models.Model):
 
 
 class AccionOnix(models.Model):
+    TIPO_CREAR_CLIENTE = "crear_cliente"
+    TIPO_CREAR_PRODUCTO = "crear_producto"
     TIPO_CREAR_BORRADOR_FACTURA = "crear_borrador_factura"
     TIPO_EMITIR_FACTURA = "emitir_factura"
     TIPOS = (
+        (TIPO_CREAR_CLIENTE, "Crear cliente"),
+        (TIPO_CREAR_PRODUCTO, "Crear producto o servicio"),
         (TIPO_CREAR_BORRADOR_FACTURA, "Crear borrador de factura"),
         (TIPO_EMITIR_FACTURA, "Validar y emitir factura"),
     )

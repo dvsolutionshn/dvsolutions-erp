@@ -500,10 +500,16 @@
             </section>
 
             {% if onix_modo_prueba %}
-            <section class="erp-assistant-rail-card is-trial">
+            <section class="erp-assistant-rail-card is-trial" aria-label="Límite de seguridad: {{ onix_limite_prueba }} tokens por mes">
                 <div class="erp-assistant-rail-kicker">Protección de consumo</div>
-                <h4>Modo de prueba activo</h4>
-                <p>Límite de seguridad: <strong>{{ onix_limite_prueba }} tokens por mes</strong> para la empresa piloto.</p>
+                <div class="erp-onix-consumption-head">
+                    <h4>Uso mensual controlado</h4>
+                    <strong data-onix-usage-percent>{{ onix_consumo_porcentaje }}%</strong>
+                </div>
+                <div class="erp-onix-consumption-track" role="progressbar" aria-label="Consumo mensual de Onix" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ onix_consumo_porcentaje|floatformat:0 }}" data-onix-usage-track>
+                    <span data-onix-usage-bar style="width:{{ onix_consumo_porcentaje|stringformat:'f' }}%"></span>
+                </div>
+                <p><strong data-onix-usage-current>{{ onix_consumo_mes }}</strong> de <strong data-onix-usage-limit>{{ onix_limite_efectivo|default:onix_limite_prueba }}</strong> tokens. Se actualiza después de cada respuesta.</p>
             </section>
             {% endif %}
 
@@ -541,15 +547,18 @@
 
             <form class="erp-assistant-form" data-assistant-form>
                 <input type="hidden" value="{{ asistente_consulta_url }}">
-                <label class="erp-assistant-label" for="assistantQuestion">Escribe una instrucción para Onix</label>
                 <div class="erp-assistant-composer">
-                    <textarea id="assistantQuestion" name="pregunta" rows="2" placeholder="Ejemplo: Onix, prepara una factura para Cliente Demo con 2 unidades del Servicio Mensual"></textarea>
-                    <button type="submit" class="erp-button-primary"><span>Enviar</span><i>&uarr;</i></button>
+                    <span class="erp-assistant-composer-orb" aria-hidden="true"><svg viewBox="0 0 64 64"><use href="#onixAgentIcon"></use></svg></span>
+                    <div class="erp-assistant-input-zone">
+                        <label class="erp-assistant-label" for="assistantQuestion">Dale una instrucción a Onix</label>
+                        <textarea id="assistantQuestion" name="pregunta" rows="1" placeholder="Escribe lo que necesitas: consultar, analizar o preparar una acción..."></textarea>
+                    </div>
+                    <button type="submit" class="erp-button-primary" data-assistant-submit><span>Ejecutar</span><i>&uarr;</i></button>
                 </div>
                 <div class="erp-assistant-actions">
                     <span class="erp-assistant-enter-hint"><kbd>Enter</kbd> enviar <b>·</b> <kbd>Shift + Enter</kbd> nueva línea</span>
-                    <span class="erp-assistant-context">Contexto actual: {{ request.path }}</span>
-                    <span class="erp-assistant-security-note">Datos aislados por empresa y permisos</span>
+                    <span class="erp-assistant-context">Contexto: {{ request.path }}</span>
+                    <span class="erp-assistant-security-note"><i></i> Empresa aislada · permisos activos · confirmación para cambios</span>
                 </div>
             </form>
         </section>
@@ -809,8 +818,15 @@ document.addEventListener("DOMContentLoaded", function(){
     const assistantBody = document.querySelector("[data-assistant-body]");
     const assistantQuestion = assistantForm ? assistantForm.querySelector("textarea[name='pregunta']") : null;
     const assistantUrlInput = assistantForm ? assistantForm.querySelector("input[type='hidden']") : null;
+    const assistantSubmit = assistantForm ? assistantForm.querySelector("[data-assistant-submit]") : null;
     const assistantStatus = document.querySelector("[data-onix-status]");
     const assistantStatusLabels = document.querySelectorAll("[data-onix-status-label]");
+    const assistantUsageCurrent = document.querySelector("[data-onix-usage-current]");
+    const assistantUsageLimit = document.querySelector("[data-onix-usage-limit]");
+    const assistantUsagePercent = document.querySelector("[data-onix-usage-percent]");
+    const assistantUsageTrack = document.querySelector("[data-onix-usage-track]");
+    const assistantUsageBar = document.querySelector("[data-onix-usage-bar]");
+    let assistantBusy = false;
 
     function getCookie(name) {
         const cookieValue = document.cookie
@@ -850,6 +866,42 @@ document.addEventListener("DOMContentLoaded", function(){
         });
     }
 
+    function setAssistantBusy(busy) {
+        assistantBusy = Boolean(busy);
+        if(assistantSubmit){
+            assistantSubmit.disabled = assistantBusy;
+            const label = assistantSubmit.querySelector("span");
+            if(label){
+                label.textContent = assistantBusy ? "Analizando" : "Ejecutar";
+            }
+        }
+        if(assistantQuestion){
+            assistantQuestion.setAttribute("aria-busy", assistantBusy ? "true" : "false");
+        }
+    }
+
+    function resizeAssistantQuestion() {
+        if(!assistantQuestion){
+            return;
+        }
+        assistantQuestion.style.height = "auto";
+        assistantQuestion.style.height = Math.min(Math.max(assistantQuestion.scrollHeight, 29), 150) + "px";
+    }
+
+    function updateAssistantUsage(usage) {
+        if(!usage || typeof usage !== "object" || !usage.monthly_limit){
+            return;
+        }
+        const current = Number(usage.monthly_tokens || 0);
+        const limit = Number(usage.monthly_limit || 0);
+        const percent = limit > 0 ? Math.min((current / limit) * 100, 100) : 0;
+        if(assistantUsageCurrent){ assistantUsageCurrent.textContent = current.toLocaleString(); }
+        if(assistantUsageLimit){ assistantUsageLimit.textContent = limit.toLocaleString(); }
+        if(assistantUsagePercent){ assistantUsagePercent.textContent = percent.toFixed(1) + "%"; }
+        if(assistantUsageBar){ assistantUsageBar.style.width = percent + "%"; }
+        if(assistantUsageTrack){ assistantUsageTrack.setAttribute("aria-valuenow", String(Math.round(percent))); }
+    }
+
     function assistantUsageHtml(usage) {
         if(!usage || typeof usage !== "object"){
             return "";
@@ -859,7 +911,13 @@ document.addEventListener("DOMContentLoaded", function(){
             items.push("Modelo: " + escapeHtml(usage.model));
         }
         if(Number(usage.tokens || 0) > 0){
-            items.push(Number(usage.tokens).toLocaleString() + " tokens");
+            items.push("Esta respuesta: " + Number(usage.tokens).toLocaleString() + " tokens");
+        }
+        if(Number(usage.cached_tokens || 0) > 0){
+            items.push(
+                "Caché reutilizada: " + Number(usage.cached_tokens).toLocaleString()
+                + " (" + Number(usage.cache_percent || 0).toLocaleString() + "%)"
+            );
         }
         if(Number(usage.tool_calls || 0) > 0){
             items.push(Number(usage.tool_calls) + " consulta(s) al ERP");
@@ -882,6 +940,64 @@ document.addEventListener("DOMContentLoaded", function(){
         return '<div class="erp-assistant-activity">' + items.map(item => '<span>' + item + '</span>').join("") + "</div>";
     }
 
+    function assistantInlineHtml(value) {
+        return escapeHtml(value)
+            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+            .replace(/`([^`]+)`/g, "<code>$1</code>");
+    }
+
+    function assistantRichTextHtml(value) {
+        const lines = String(value || "").replace(/\r\n?/g, "\n").split("\n");
+        const output = [];
+        let listType = "";
+        let paragraph = [];
+        const closeList = () => {
+            if(listType){
+                output.push("</" + listType + ">");
+                listType = "";
+            }
+        };
+        const closeParagraph = () => {
+            if(paragraph.length){
+                output.push("<p>" + assistantInlineHtml(paragraph.join(" ")) + "</p>");
+                paragraph = [];
+            }
+        };
+        lines.forEach(rawLine => {
+            const line = rawLine.trim();
+            if(!line){
+                closeParagraph();
+                closeList();
+                return;
+            }
+            const bullet = line.match(/^[-•]\s+(.+)$/);
+            const ordered = line.match(/^\d+[.)]\s+(.+)$/);
+            if(bullet || ordered){
+                closeParagraph();
+                const nextType = ordered ? "ol" : "ul";
+                if(listType !== nextType){
+                    closeList();
+                    listType = nextType;
+                    output.push("<" + listType + ">");
+                }
+                output.push("<li>" + assistantInlineHtml((bullet || ordered)[1]) + "</li>");
+                return;
+            }
+            const heading = line.match(/^#{1,4}\s+(.+)$/);
+            if(heading){
+                closeParagraph();
+                closeList();
+                output.push("<h5>" + assistantInlineHtml(heading[1]) + "</h5>");
+                return;
+            }
+            closeList();
+            paragraph.push(line);
+        });
+        closeParagraph();
+        closeList();
+        return '<div class="erp-assistant-richtext">' + output.join("") + "</div>";
+    }
+
     function assistantMoney(value, currency) {
         const amount = Number(value || 0);
         const safeAmount = Number.isFinite(amount) ? amount : 0;
@@ -891,9 +1007,52 @@ document.addEventListener("DOMContentLoaded", function(){
         });
     }
 
+    function renderAssistantEntityActionCard(action) {
+        const status = action.status || "pendiente";
+        const details = Array.isArray(action.details) ? action.details : [];
+        const detailsHtml = details.map(detail => `
+            <span><small>${escapeHtml(detail.label || "Dato")}</small><strong>${escapeHtml(detail.value || "No indicado")}</strong></span>
+        `).join("");
+        let footer = "";
+        if(status === "pendiente"){
+            footer = `
+                <div class="erp-onix-action-buttons">
+                    <button type="button" class="erp-onix-action-secondary" data-onix-action-decision="cancelar">Descartar</button>
+                    <button type="button" class="erp-onix-action-confirm" data-onix-action-decision="confirmar">${escapeHtml(action.confirmation_label || "Confirmar y crear")}</button>
+                </div>
+                <div class="erp-onix-action-feedback" aria-live="polite">Revisa cada dato. Onix solo guardará al confirmar.</div>
+            `;
+        } else if(status === "ejecutada" && action.result){
+            footer = `
+                <div class="erp-onix-action-result">
+                    <strong>${escapeHtml(action.result.message || "Registro creado correctamente.")}</strong>
+                    <span>ID ${escapeHtml(action.result.id || "")}</span>
+                </div>
+            `;
+        } else if(status === "cancelada"){
+            footer = '<div class="erp-onix-action-result is-cancelled"><strong>Acción descartada</strong><span>No se guardó ningún cambio.</span></div>';
+        } else {
+            footer = '<div class="erp-onix-action-result is-cancelled"><strong>' + escapeHtml(action.error || "Esta acción ya no está disponible.") + '</strong></div>';
+        }
+        return `
+            <article class="erp-onix-action-card is-${escapeHtml(status)} is-entity" data-onix-action-card="${escapeHtml(action.id || "")}" data-onix-action-url="${escapeHtml(action.decision_url || "")}" data-onix-action-type="${escapeHtml(action.type || "")}">
+                <div class="erp-onix-action-head">
+                    <span>Acción preparada · requiere confirmación</span>
+                    <strong>${escapeHtml(action.title || "Registro listo para crear")}</strong>
+                    <p>${escapeHtml(action.description || "Confirma para continuar.")}</p>
+                </div>
+                <div class="erp-onix-action-details">${detailsHtml}</div>
+                ${footer}
+            </article>
+        `;
+    }
+
     function renderAssistantActionCard(action) {
         if(!action || typeof action !== "object"){
             return "";
+        }
+        if(Array.isArray(action.details)){
+            return renderAssistantEntityActionCard(action);
         }
         const status = action.status || "pendiente";
         const client = action.client || {};
@@ -911,7 +1070,7 @@ document.addEventListener("DOMContentLoaded", function(){
             footer = `
                 <div class="erp-onix-action-buttons">
                     <button type="button" class="erp-onix-action-secondary" data-onix-action-decision="cancelar">Descartar</button>
-                    <button type="button" class="erp-onix-action-confirm" data-onix-action-decision="confirmar">Confirmar y crear borrador</button>
+                    <button type="button" class="erp-onix-action-confirm" data-onix-action-decision="confirmar">${escapeHtml(action.confirmation_label || "Confirmar y crear borrador")}</button>
                 </div>
                 <div class="erp-onix-action-feedback" aria-live="polite">Revisa los datos: esta confirmación creará una factura real en estado borrador.</div>
             `;
@@ -929,7 +1088,7 @@ document.addEventListener("DOMContentLoaded", function(){
             footer = '<div class="erp-onix-action-result is-cancelled"><strong>' + escapeHtml(action.error || "Esta acción ya no está disponible.") + '</strong></div>';
         }
         return `
-            <article class="erp-onix-action-card is-${escapeHtml(status)}" data-onix-action-card="${escapeHtml(action.id || "")}" data-onix-action-url="${escapeHtml(action.decision_url || "")}">
+            <article class="erp-onix-action-card is-${escapeHtml(status)}" data-onix-action-card="${escapeHtml(action.id || "")}" data-onix-action-url="${escapeHtml(action.decision_url || "")}" data-onix-action-type="${escapeHtml(action.type || "")}">
                 <div class="erp-onix-action-head">
                     <span>Acción preparada</span>
                     <strong>${escapeHtml(action.title || "Factura en borrador")}</strong>
@@ -990,7 +1149,7 @@ document.addEventListener("DOMContentLoaded", function(){
         wrapper.innerHTML = `
             ${authorHtml}
             ${contextHtml}
-            <p>${escapeHtml(bodyText)}</p>
+            ${kind === "user" ? '<p>' + escapeHtml(bodyText) + '</p>' : assistantRichTextHtml(bodyText)}
             ${stepsHtml}
             ${suggestionsHtml}
             ${actionsHtml}
@@ -1002,10 +1161,11 @@ document.addEventListener("DOMContentLoaded", function(){
     }
 
     function submitAssistantQuestion(questionText) {
-        if(!assistantForm || !assistantQuestion || !assistantUrlInput || !questionText.trim()){
+        if(!assistantForm || !assistantQuestion || !assistantUrlInput || !questionText.trim() || assistantBusy){
             return;
         }
 
+        setAssistantBusy(true);
         setAssistantOpen(true);
         appendAssistantMessage("user", "Tu consulta", questionText.trim(), [], [], "");
         const pendingMessage = appendAssistantMessage(
@@ -1050,6 +1210,7 @@ document.addEventListener("DOMContentLoaded", function(){
                 return;
             }
             setAssistantStatus(data.assistant_mode || "guided");
+            updateAssistantUsage(data.usage || null);
             appendAssistantMessage(
                 "system",
                 data.title || "Asistente ERP",
@@ -1074,6 +1235,10 @@ document.addEventListener("DOMContentLoaded", function(){
                 [],
                 "Asistente"
             );
+        })
+        .finally(() => {
+            setAssistantBusy(false);
+            if(assistantQuestion){ assistantQuestion.focus(); }
         });
     }
 
@@ -1094,6 +1259,7 @@ document.addEventListener("DOMContentLoaded", function(){
         if(actionButton){
             const card = actionButton.closest("[data-onix-action-card]");
             const decision = actionButton.getAttribute("data-onix-action-decision") || "";
+            const actionType = card ? card.getAttribute("data-onix-action-type") : "";
             const actionUrl = card ? card.getAttribute("data-onix-action-url") : "";
             const feedback = card ? card.querySelector(".erp-onix-action-feedback") : null;
             if(!card || !actionUrl || !decision){
@@ -1102,14 +1268,14 @@ document.addEventListener("DOMContentLoaded", function(){
             card.querySelectorAll("button").forEach(button => button.disabled = true);
             if(feedback){
                 feedback.textContent = decision === "confirmar"
-                    ? "Creando el borrador de forma segura..."
+                    ? (actionType === "crear_cliente" ? "Creando el cliente de forma segura..." : actionType === "crear_producto" ? "Creando el producto de forma segura..." : actionType === "emitir_factura" ? "Validando y emitiendo la factura..." : "Creando el borrador de forma segura...")
                     : "Descartando la acción...";
             }
             const actionData = new FormData();
             actionData.append("decision", decision);
             actionData.append(
                 "motivo_auditoria",
-                decision === "confirmar" ? "Factura confirmada por el usuario mediante Onix" : "Accion de Onix descartada por el usuario"
+                decision === "confirmar" ? "Accion confirmada por el usuario mediante Onix" : "Accion de Onix descartada por el usuario"
             );
             fetch(actionUrl, {
                 method: "POST",
@@ -1170,12 +1336,16 @@ document.addEventListener("DOMContentLoaded", function(){
             }
         });
 
+        assistantQuestion.addEventListener("input", resizeAssistantQuestion);
+
         assistantForm.addEventListener("submit", function(event){
             event.preventDefault();
             const question = assistantQuestion.value || "";
             assistantQuestion.value = "";
+            resizeAssistantQuestion();
             submitAssistantQuestion(question);
         });
+        resizeAssistantQuestion();
     }
 });
 </script>
