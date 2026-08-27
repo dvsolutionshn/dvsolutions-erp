@@ -75,12 +75,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   Row(
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 7,
                         height: 7,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: onixCyan,
+                            color: bootstrap.aiActive
+                                ? onixCyan
+                                : const Color(0xFFFFB74D),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -88,7 +90,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          '${bootstrap.companyName} · conectado',
+                          '${bootstrap.assistantStatus} · ${bootstrap.companyName}',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
@@ -139,13 +141,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        '${category.title} sera conectado en la siguiente etapa.',
+                        category.restricted
+                            ? 'Tu usuario no tiene acceso a ${category.title.toLowerCase()}.'
+                            : '${category.title} sera conectado en la siguiente etapa.',
                       ),
                     ),
                   );
                 }
               },
             ),
+            if (!bootstrap.aiActive) const _AssistantModeNotice(),
             if (widget.controller.error != null)
               MaterialBanner(
                 content: Text(widget.controller.error!),
@@ -208,6 +213,33 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+class _AssistantModeNotice extends StatelessWidget {
+  const _AssistantModeNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    color: const Color(0xFFFFF5E6),
+    child: const Row(
+      children: [
+        Icon(Icons.info_outline_rounded, size: 19, color: Color(0xFF9A6200)),
+        SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            'Modo guiado: falta activar la conexion de IA en el servidor.',
+            style: TextStyle(
+              color: Color(0xFF704700),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _CategoryStrip extends StatelessWidget {
   const _CategoryStrip({required this.categories, required this.onSelected});
 
@@ -237,9 +269,9 @@ class _CategoryStrip extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               if (!category.available)
-                const Text(
-                  'Proximamente',
-                  style: TextStyle(fontSize: 9, color: Color(0xFF7C6FE7)),
+                Text(
+                  category.restricted ? 'Sin acceso' : 'Proximamente',
+                  style: const TextStyle(fontSize: 9, color: Color(0xFF7C6FE7)),
                 ),
             ],
           ),

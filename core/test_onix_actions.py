@@ -8,7 +8,8 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from facturacion.models import Cliente, Factura, LineaFactura, Producto, TipoImpuesto
+from crm.models import CitaCliente
+from facturacion.models import Cliente, Factura, LineaFactura, PagoFactura, Producto, TipoImpuesto
 
 from core.models import (
     AccionOnix,
@@ -225,6 +226,68 @@ class OnixInvoiceActionTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(Factura.objects.count(), 0)
+
+    def test_consulta_calendario_devuelve_citas_de_la_empresa_y_excluye_canceladas(self):
+        modulo_agenda = Modulo.objects.create(nombre="Agenda de citas", codigo="agenda_citas")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_agenda, activo=True)
+        mediodia = timezone.localtime().replace(hour=12, minute=0, second=0, microsecond=0)
+        cita_activa = CitaCliente.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            titulo="Consulta de seguimiento",
+            fecha_hora=mediodia,
+            duracion_minutos=45,
+            responsable="Dra. Onix",
+            estado="confirmada",
+        )
+        CitaCliente.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            titulo="Cita cancelada",
+            fecha_hora=mediodia + timedelta(hours=1),
+            estado="cancelada",
+        )
+
+        resultado = _ejecutar_herramienta(
+            "buscar_citas",
+            {"periodo": "hoy", "incluir_canceladas": False, "limite": 20},
+            empresa=self.empresa,
+            usuario=self.usuario,
+        )
+
+        self.assertEqual(resultado["cantidad"], 1)
+        self.assertEqual(resultado["resultados"][0]["id"], cita_activa.id)
+        self.assertEqual(resultado["resultados"][0]["persona"], self.cliente.nombre)
+        self.assertEqual(resultado["resultados"][0]["responsable"], "Dra. Onix")
+
+    def test_consulta_pagos_resume_solo_los_pagos_de_la_empresa(self):
+        resultado_accion = self._preparar()
+        self.client.login(username=self.usuario.username, password="pass12345")
+        confirmar = self.client.post(
+            reverse("asistente_accion", args=[self.empresa.slug, resultado_accion["action"]["id"]]),
+            {"decision": "confirmar"},
+        )
+        factura = Factura.objects.get(pk=confirmar.json()["action"]["result"]["invoice_id"])
+        pago = PagoFactura.objects.create(
+            factura=factura,
+            fecha=timezone.localdate(),
+            monto="500.00",
+            metodo="transferencia",
+            referencia="ONIX-PAGO-001",
+            cajero=self.usuario,
+        )
+
+        resultado = _ejecutar_herramienta(
+            "buscar_pagos",
+            {"periodo": "mes", "consulta": "ONIX-PAGO", "limite": 20},
+            empresa=self.empresa,
+            usuario=self.usuario,
+        )
+
+        self.assertEqual(resultado["cantidad"], 1)
+        self.assertEqual(resultado["resultados"][0]["id"], pago.id)
+        self.assertEqual(resultado["resultados"][0]["cliente"], self.cliente.nombre)
+        self.assertEqual(resultado["totales_por_moneda"]["HNL"]["recibido"], "500.00")
 
     @override_settings(
         ONIX_ENABLED=True,

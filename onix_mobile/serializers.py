@@ -1,4 +1,6 @@
-from core.models import AccionOnix, ConversacionOnix
+from django.conf import settings
+
+from core.models import AccionOnix, ConfiguracionOnix, ConversacionOnix
 
 
 CATEGORIAS_ONIX = (
@@ -150,6 +152,58 @@ def serializar_mensajes(*, empresa, usuario, limite=50):
 
 def construir_bootstrap(*, usuario, empresa):
     nombre = usuario.get_full_name().strip() or usuario.username
+    configuracion = ConfiguracionOnix.objects.filter(empresa=empresa).first()
+    configuracion_activa = configuracion.activo if configuracion else True
+    consultas_activas = configuracion.herramientas_consulta_activas if configuracion else True
+    acciones_configuradas = (
+        configuracion.herramientas_accion_activas
+        if configuracion
+        else empresa.slug == "demo_1"
+    )
+    modelo = (
+        configuracion.modelo
+        if configuracion and configuracion.modelo
+        else getattr(settings, "ONIX_MODEL", "gpt-5.6-luna")
+    )
+    ia_activa = bool(
+        getattr(settings, "ONIX_ENABLED", False)
+        and getattr(settings, "OPENAI_API_KEY", "")
+        and configuracion_activa
+    )
+    facturacion_activa = empresa.tiene_modulo_activo("facturacion")
+    agenda_activa = empresa.tiene_modulo_activo("agenda_citas")
+    puede_ver_facturas = usuario.tiene_permiso_erp("puede_ver_facturas", empresa)
+    puede_clientes = usuario.tiene_permiso_erp("puede_clientes", empresa) or puede_ver_facturas
+    puede_productos = usuario.tiene_permiso_erp("puede_productos", empresa) or usuario.tiene_permiso_erp(
+        "puede_facturas", empresa
+    )
+    puede_cobros = puede_ver_facturas or usuario.tiene_permiso_erp("puede_cxc", empresa)
+    puede_pagos = any(
+        usuario.tiene_permiso_erp(permiso, empresa)
+        for permiso in ("puede_recibos", "puede_cxc", "puede_ver_facturas")
+    )
+    puede_citas = agenda_activa and usuario.tiene_permiso_erp("puede_citas", empresa)
+    puede_preparar_facturas = bool(
+        facturacion_activa
+        and acciones_configuradas
+        and usuario.tiene_permiso_erp("puede_crear_facturas", empresa)
+    )
+    categorias_disponibles = {
+        "resumen": consultas_activas,
+        "facturas": consultas_activas and facturacion_activa and puede_ver_facturas,
+        "cobros": consultas_activas and facturacion_activa and puede_cobros,
+        "clientes": consultas_activas and facturacion_activa and puede_clientes,
+        "productos": consultas_activas and facturacion_activa and puede_productos,
+        "calendario": consultas_activas and puede_citas,
+        "pagos": consultas_activas and facturacion_activa and puede_pagos,
+    }
+    categorias = []
+    for categoria_base in CATEGORIAS_ONIX:
+        categoria = dict(categoria_base)
+        if categoria["id"] in categorias_disponibles:
+            categoria["status"] = "available" if categorias_disponibles[categoria["id"]] else "restricted"
+        categorias.append(categoria)
+
     return {
         "api_version": "v1",
         "user": {
@@ -166,16 +220,21 @@ def construir_bootstrap(*, usuario, empresa):
         },
         "assistant": {
             "name": "Onix",
-            "mode": "chat",
+            "mode": "ai" if ia_activa else "guided",
+            "status": "IA activa" if ia_activa else "Modo guiado",
+            "model": modelo if ia_activa else "",
             "welcome": f"Hola, {nombre}. Soy Onix. Dime que necesitas hacer en {empresa.nombre}.",
         },
         "capabilities": {
             "chat": True,
             "history": True,
-            "invoice_drafts": usuario.tiene_permiso_erp("puede_crear_facturas", empresa),
+            "ai": ia_activa,
+            "query_tools": consultas_activas,
+            "invoice_drafts": puede_preparar_facturas,
+            "calendar": puede_citas,
+            "payments": facturacion_activa and puede_pagos,
             "voice": False,
             "file_uploads": False,
         },
-        "categories": [dict(categoria) for categoria in CATEGORIAS_ONIX],
+        "categories": categorias,
     }
-

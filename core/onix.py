@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -95,6 +96,53 @@ TOOLS = [
         },
         "strict": True,
     },
+    {
+        "type": "function",
+        "name": "buscar_citas",
+        "description": (
+            "Consulta citas de la agenda de la empresa. Permite revisar hoy, manana, "
+            "los proximos siete dias o las proximas citas de los siguientes treinta dias."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "periodo": {
+                    "type": "string",
+                    "enum": ["hoy", "manana", "semana", "proximas"],
+                },
+                "incluir_canceladas": {"type": "boolean"},
+                "limite": {"type": "integer", "minimum": 1, "maximum": 20},
+            },
+            "required": ["periodo", "incluir_canceladas", "limite"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+    {
+        "type": "function",
+        "name": "buscar_pagos",
+        "description": (
+            "Consulta pagos recibidos de facturas de la empresa por periodo, cliente, "
+            "numero de factura o referencia."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "periodo": {
+                    "type": "string",
+                    "enum": ["hoy", "mes", "ultimos_30_dias", "todos"],
+                },
+                "consulta": {
+                    "type": "string",
+                    "description": "Cliente, numero de factura o referencia. Puede ser vacio.",
+                },
+                "limite": {"type": "integer", "minimum": 1, "maximum": 20},
+            },
+            "required": ["periodo", "consulta", "limite"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
 ]
 
 ACTION_TOOLS = [
@@ -178,6 +226,8 @@ TOOL_LABELS = {
     "buscar_productos": "Productos y servicios",
     "buscar_facturas": "Facturas",
     "cuentas_por_cobrar": "Cuentas por cobrar",
+    "buscar_citas": "Calendario",
+    "buscar_pagos": "Pagos recibidos",
     "preparar_factura": "Preparacion de factura",
 }
 
@@ -193,8 +243,15 @@ def _limite(valor, maximo=10):
         return min(5, maximo)
 
 
+def _inicio_dia(fecha):
+    return timezone.make_aware(
+        datetime.combine(fecha, time.min),
+        timezone.get_current_timezone(),
+    )
+
+
 def _ejecutar_herramienta(nombre, argumentos, *, empresa, usuario, conversacion=None):
-    from facturacion.models import Cliente, Factura, Producto
+    from facturacion.models import Cliente, Factura, PagoFactura, Producto
 
     if nombre == "preparar_factura":
         from .onix_actions import preparar_borrador_factura
@@ -318,6 +375,143 @@ def _ejecutar_herramienta(nombre, argumentos, *, empresa, usuario, conversacion=
             "resultados": resultados,
             "cantidad": len(resultados),
             "total_pendiente_en_resultados": str(total_pendiente),
+        }
+
+    if nombre == "buscar_citas":
+        if not empresa.tiene_modulo_activo("agenda_citas"):
+            return {"error": "La empresa no tiene activo el modulo de agenda de citas."}
+        if not _permiso(usuario, empresa, "puede_citas"):
+            return {"error": "El usuario no tiene permiso para consultar citas."}
+
+        from crm.models import CitaCliente
+
+        periodo = argumentos.get("periodo") or "hoy"
+        hoy = timezone.localdate()
+        ahora = timezone.now()
+        if periodo == "manana":
+            fecha_inicio = hoy + timedelta(days=1)
+            inicio = _inicio_dia(fecha_inicio)
+            fin = inicio + timedelta(days=1)
+        elif periodo == "semana":
+            inicio = _inicio_dia(hoy)
+            fin = inicio + timedelta(days=7)
+        elif periodo == "proximas":
+            inicio = ahora
+            fin = ahora + timedelta(days=30)
+        else:
+            periodo = "hoy"
+            inicio = _inicio_dia(hoy)
+            fin = inicio + timedelta(days=1)
+
+        limite = _limite(argumentos.get("limite"), maximo=20)
+        queryset = CitaCliente.objects.filter(
+            empresa=empresa,
+            fecha_hora__gte=inicio,
+            fecha_hora__lt=fin,
+        ).select_related(
+            "cliente",
+            "paciente",
+            "producto",
+            "servicio_clinico",
+            "profesional_salud",
+        )
+        if not argumentos.get("incluir_canceladas", False):
+            queryset = queryset.exclude(estado="cancelada")
+
+        resultados = []
+        for cita in queryset.order_by("fecha_hora", "id")[:limite]:
+            fecha_local = timezone.localtime(cita.fecha_hora)
+            resultados.append(
+                {
+                    "id": cita.id,
+                    "titulo": cita.titulo,
+                    "persona": cita.display_cliente,
+                    "servicio": cita.display_servicio,
+                    "responsable": cita.display_responsable,
+                    "fecha_hora": fecha_local.isoformat(),
+                    "fecha": fecha_local.date().isoformat(),
+                    "hora": fecha_local.strftime("%H:%M"),
+                    "duracion_minutos": cita.duracion_minutos,
+                    "estado": cita.estado,
+                    "pagada": cita.pagada,
+                }
+            )
+        return {
+            "periodo": periodo,
+            "zona_horaria": timezone.get_current_timezone_name(),
+            "resultados": resultados,
+            "cantidad": len(resultados),
+        }
+
+    if nombre == "buscar_pagos":
+        if not empresa.tiene_modulo_activo("facturacion"):
+            return {"error": "La empresa no tiene activo el modulo de facturacion."}
+        if not any(
+            _permiso(usuario, empresa, permiso)
+            for permiso in ("puede_recibos", "puede_cxc", "puede_ver_facturas")
+        ):
+            return {"error": "El usuario no tiene permiso para consultar pagos recibidos."}
+
+        periodo = argumentos.get("periodo") or "mes"
+        hoy = timezone.localdate()
+        queryset = PagoFactura.objects.filter(factura__empresa=empresa).select_related(
+            "factura",
+            "factura__cliente",
+        )
+        if periodo == "hoy":
+            queryset = queryset.filter(fecha=hoy)
+        elif periodo == "ultimos_30_dias":
+            queryset = queryset.filter(fecha__gte=hoy - timedelta(days=29), fecha__lte=hoy)
+        elif periodo == "todos":
+            pass
+        else:
+            periodo = "mes"
+            queryset = queryset.filter(fecha__year=hoy.year, fecha__month=hoy.month)
+
+        consulta = str(argumentos.get("consulta") or "").strip()
+        if consulta:
+            queryset = queryset.filter(
+                Q(factura__numero_factura__icontains=consulta)
+                | Q(factura__cliente__nombre__icontains=consulta)
+                | Q(referencia__icontains=consulta)
+            )
+        limite = _limite(argumentos.get("limite"), maximo=20)
+        resultados = []
+        totales_por_moneda = {}
+        for pago in queryset.order_by("-fecha", "-id")[:limite]:
+            moneda = pago.factura.moneda
+            totales_moneda = totales_por_moneda.setdefault(
+                moneda,
+                {"recibido": Decimal("0"), "aplicado": Decimal("0")},
+            )
+            totales_moneda["recibido"] += pago.monto
+            totales_moneda["aplicado"] += pago.total_aplicado
+            resultados.append(
+                {
+                    "id": pago.id,
+                    "factura_id": pago.factura_id,
+                    "factura": pago.factura.numero_factura or f"Borrador {pago.factura_id}",
+                    "cliente": pago.factura.cliente.nombre,
+                    "fecha": pago.fecha.isoformat(),
+                    "monto_recibido": str(pago.monto),
+                    "retenciones": str(pago.total_retenciones),
+                    "total_aplicado": str(pago.total_aplicado),
+                    "moneda": moneda,
+                    "metodo": pago.get_metodo_display(),
+                    "referencia": pago.referencia or "",
+                }
+            )
+        return {
+            "periodo": periodo,
+            "resultados": resultados,
+            "cantidad": len(resultados),
+            "totales_por_moneda": {
+                moneda: {
+                    "recibido": str(totales["recibido"]),
+                    "aplicado": str(totales["aplicado"]),
+                }
+                for moneda, totales in totales_por_moneda.items()
+            },
         }
 
     return {"error": f"Herramienta no reconocida: {nombre}"}

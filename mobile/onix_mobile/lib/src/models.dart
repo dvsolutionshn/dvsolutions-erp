@@ -25,6 +25,7 @@ class OnixCategory {
   final String prompt;
 
   bool get available => status == 'available';
+  bool get restricted => status == 'restricted';
 }
 
 class OnixBootstrap {
@@ -33,6 +34,9 @@ class OnixBootstrap {
     required this.companyName,
     required this.companySlug,
     required this.welcome,
+    required this.assistantMode,
+    required this.assistantStatus,
+    required this.model,
     required this.categories,
     required this.capabilities,
   });
@@ -50,6 +54,9 @@ class OnixBootstrap {
       companyName: company['name']?.toString() ?? '',
       companySlug: company['slug']?.toString() ?? '',
       welcome: assistant['welcome']?.toString() ?? 'Hola. Soy Onix.',
+      assistantMode: assistant['mode']?.toString() ?? 'guided',
+      assistantStatus: assistant['status']?.toString() ?? 'Modo guiado',
+      model: assistant['model']?.toString() ?? '',
       categories: (json['categories'] as List? ?? const [])
           .whereType<Map>()
           .map((item) => OnixCategory.fromJson(Map<String, dynamic>.from(item)))
@@ -64,8 +71,13 @@ class OnixBootstrap {
   final String companyName;
   final String companySlug;
   final String welcome;
+  final String assistantMode;
+  final String assistantStatus;
+  final String model;
   final List<OnixCategory> categories;
   final Map<String, dynamic> capabilities;
+
+  bool get aiActive => assistantMode == 'ai' && capabilities['ai'] == true;
 }
 
 class OnixAction {

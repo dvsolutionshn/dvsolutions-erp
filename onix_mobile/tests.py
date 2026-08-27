@@ -7,7 +7,15 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import AccionOnix, ConversacionOnix, Empresa, MensajeOnix, Usuario
+from core.models import (
+    AccionOnix,
+    ConversacionOnix,
+    Empresa,
+    EmpresaModulo,
+    MensajeOnix,
+    Modulo,
+    Usuario,
+)
 
 from .models import SesionOnixMovil
 
@@ -67,10 +75,32 @@ class OnixMobileApiTests(TestCase):
         self.assertTrue(payload["token"].startswith("onx_"))
         self.assertEqual(payload["bootstrap"]["company"]["slug"], "demo_1")
         self.assertEqual(payload["bootstrap"]["assistant"]["name"], "Onix")
+        self.assertEqual(payload["bootstrap"]["assistant"]["mode"], "guided")
+        self.assertFalse(payload["bootstrap"]["capabilities"]["ai"])
         self.assertGreaterEqual(len(payload["bootstrap"]["categories"]), 10)
         sesion = SesionOnixMovil.objects.get()
         self.assertNotEqual(sesion.token_hash, payload["token"])
         self.assertEqual(sesion.token_hash, SesionOnixMovil.calcular_hash(payload["token"]))
+
+    @override_settings(ONIX_ENABLED=True, OPENAI_API_KEY="test-key")
+    def test_bootstrap_muestra_ia_y_categorias_segun_modulos_y_permisos(self):
+        facturacion = Modulo.objects.create(nombre="Facturacion", codigo="facturacion")
+        agenda = Modulo.objects.create(nombre="Agenda de citas", codigo="agenda_citas")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=facturacion, activo=True)
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=agenda, activo=True)
+
+        response = self._login()
+
+        self.assertEqual(response.status_code, 200)
+        bootstrap = response.json()["bootstrap"]
+        self.assertEqual(bootstrap["assistant"]["mode"], "ai")
+        self.assertEqual(bootstrap["assistant"]["status"], "IA activa")
+        self.assertTrue(bootstrap["capabilities"]["ai"])
+        self.assertTrue(bootstrap["capabilities"]["calendar"])
+        self.assertTrue(bootstrap["capabilities"]["payments"])
+        categorias = {item["id"]: item["status"] for item in bootstrap["categories"]}
+        self.assertEqual(categorias["calendario"], "available")
+        self.assertEqual(categorias["pagos"], "available")
 
     def test_login_rechaza_credenciales_invalidas_sin_revelar_el_campo_incorrecto(self):
         response = self._login(password="incorrecta")
@@ -225,4 +255,3 @@ class OnixMobileApiTests(TestCase):
         self.assertEqual(salida.status_code, 200)
         self.assertEqual(siguiente.status_code, 401)
         self.assertIsNotNone(SesionOnixMovil.objects.get().revocada_en)
-
