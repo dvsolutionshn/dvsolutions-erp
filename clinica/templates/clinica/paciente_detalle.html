@@ -156,19 +156,21 @@
             <strong>{{ paciente.nombre }}</strong>
             <small>{{ paciente.expediente_codigo }} · {{ paciente.identidad|default:"Sin documento" }}</small>
         </div>
-        <details class="clinical-side-group" open>
+        <details class="clinical-side-group">
             <summary><i>01</i>Historial Clinico</summary>
             <div class="clinical-submenu">
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Motivo de consulta</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#evaluacion-integral">Funciones orgánicas</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#evaluacion-integral">Examen físico</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#informacion-paciente">Antecedentes</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico">Diagnóstico</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico">Plan y tratamiento</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Historia clínica completa</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=motivo_consulta#informacion-paciente">Motivo de consulta</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=funciones_organicas#funciones-organicas">Funciones orgánicas</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=examen_fisico#examen-fisico">Examen físico</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=antecedentes#informacion-paciente">Antecedentes</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=plan_tratamiento#trabajo-clinico">Plan y tratamiento</a>
+                <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>
+                <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=completa">Historia clínica completa</a>
             </div>
         </details>
-        <details class="clinical-side-group" open>
+        <details class="clinical-side-group">
             <summary><i>02</i>Anexos</summary>
             <div class="clinical-submenu">
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'laboratorio' %}">Laboratorio</a>
@@ -186,15 +188,13 @@
         <details class="clinical-side-group">
             <summary><i>03</i>Atención y especialidades</summary>
             <div class="clinical-submenu">
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-cirugia_plastica">Cirugía Plástica</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-medicina_estetica">Medicina Estética</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-capilar">Capilar</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#tricopigmentacion">Tricopigmentación</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=cirugia_plastica#trabajo-clinico">Cirugía Plástica</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=medicina_estetica#trabajo-clinico">Medicina Estética</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=capilar#trabajo-clinico">Capilar</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=tricopigmentacion#tricopigmentacion">Tricopigmentación</a>
                 <a href="#recordatorios-tratamiento">Citas / Recordatorios</a>
-                <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>
-                <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-enfermeria">Enfermería / Tratamientos</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-terapias">Terapias clínicas</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=enfermeria#trabajo-clinico">Enfermería / Tratamientos</a>
+                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=terapias#trabajo-clinico">Terapias clínicas</a>
                 <a href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}">Tratamientos del paciente</a>
                 <a href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}">Seguimiento Estético / Clínico</a>
             </div>
@@ -550,6 +550,19 @@
     rows.addEventListener("input", updateSubmitState);
     rows.addEventListener("change", updateSubmitState);
     updateSubmitState();
+})();
+
+(function(){
+    const groups = Array.from(document.querySelectorAll(".clinical-side-group"));
+    groups.forEach(function(group){
+        group.removeAttribute("open");
+        group.addEventListener("toggle", function(){
+            if(!group.open){ return; }
+            groups.forEach(function(other){
+                if(other !== group){ other.open = false; }
+            });
+        });
+    });
 })();
 
 (function(){

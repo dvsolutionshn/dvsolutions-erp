@@ -1834,11 +1834,22 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    secciones_validas = {
+        "completa", "motivo_consulta", "funciones_organicas", "examen_fisico",
+        "antecedentes", "diagnostico", "plan_tratamiento", "tricopigmentacion",
+        "especialidad",
+    }
+    seccion_activa = (request.GET.get("seccion") or "completa").strip().lower()
+    if seccion_activa not in secciones_validas:
+        seccion_activa = "completa"
+    tipo_enfoque = (request.GET.get("tipo") or "").strip()
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
     puede_eliminar_notas_clinicas = _es_dueno_erp(request.user)
     evaluacion_form = None
+    funciones_form = None
+    examen_form = None
     tricopigmentacion_form = None
     if request.method == "POST" and request.POST.get("accion") == "eliminar_historia":
         if not puede_eliminar_notas_clinicas:
@@ -1877,12 +1888,26 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         else:
             messages.success(request, f"Texto de {historia.get_tipo_display()} actualizado correctamente.")
         return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
-    if request.method == "POST" and request.POST.get("accion") == "guardar_evaluacion_integral":
+    acciones_evaluacion = {
+        "guardar_evaluacion_integral": (None, "evaluacion"),
+        "guardar_funciones_organicas": ("funciones_organicas", "funciones"),
+        "guardar_examen_fisico": ("examen_fisico", "examen"),
+    }
+    accion_evaluacion = acciones_evaluacion.get(request.POST.get("accion")) if request.method == "POST" else None
+    if accion_evaluacion:
+        seccion_formulario, prefijo_formulario = accion_evaluacion
         evaluacion_form = EvaluacionClinicaIntegralForm(
             request.POST,
             empresa=empresa,
-            prefix="evaluacion",
+            prefix=prefijo_formulario,
+            seccion=seccion_formulario,
         )
+        if seccion_formulario == "funciones_organicas":
+            funciones_form = evaluacion_form
+            seccion_activa = "funciones_organicas"
+        elif seccion_formulario == "examen_fisico":
+            examen_form = evaluacion_form
+            seccion_activa = "examen_fisico"
         if evaluacion_form.is_valid():
             datos = evaluacion_form.datos_estructurados()
             examen_resumen = [
@@ -1913,9 +1938,18 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
                 actualizado_por=request.user,
             )
             historia.save()
-            messages.success(request, "Funciones orgánicas y examen físico guardados correctamente.")
-            return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
-        messages.error(request, "Revise los campos de Funciones Orgánicas y Examen Físico.")
+            if seccion_formulario == "funciones_organicas":
+                mensaje = "Funciones orgánicas guardadas correctamente."
+            elif seccion_formulario == "examen_fisico":
+                mensaje = "Examen físico guardado correctamente."
+            else:
+                mensaje = "Funciones orgánicas y examen físico guardados correctamente."
+            messages.success(request, mensaje)
+            destino = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.id])
+            if seccion_formulario:
+                destino += f"?seccion={seccion_formulario}"
+            return redirect(destino)
+        messages.error(request, "Revise los campos de la sección clínica.")
     if request.method == "POST" and request.POST.get("accion") == "guardar_tricopigmentacion":
         tricopigmentacion_form = TricopigmentacionForm(
             request.POST,
@@ -1947,6 +1981,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             request.POST,
             empresa=empresa,
             tipo=tipo_post,
+            seccion=seccion_activa,
             prefix=f"historia_{tipo_post}",
         )
         if form_inline.is_valid():
@@ -1960,7 +1995,12 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             historia.actualizado_por = request.user
             historia.save()
             messages.success(request, f"Nota de {historia.get_tipo_display()} guardada en la historia clinica completa.")
-            return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
+            destino = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.id])
+            if seccion_activa != "completa":
+                destino += f"?seccion={seccion_activa}"
+                if tipo_enfoque:
+                    destino += f"&tipo={tipo_enfoque}"
+            return redirect(destino)
         messages.error(request, f"Revise los campos marcados en {tipos_validos[tipo_post]}.")
     else:
         form_inline = None
@@ -1993,6 +2033,15 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             for codigo, etiqueta in EXAMEN_FISICO_CAMPOS
             if examen.get(codigo)
         ]
+    historias_funciones = [
+        historia for historia in historias_evaluacion
+        if historia.funciones_generales_registradas
+        or any(item["estado"] or item["detalle"] for item in historia.funciones_registradas)
+    ]
+    historias_examen = [
+        historia for historia in historias_evaluacion
+        if historia.examen_fisico or historia.examen_registrado
+    ]
     etiquetas_tricopigmentacion = {
         "numero_sesion": "Número de sesión",
         "zona_tratada": "Zona tratada",
@@ -2049,10 +2098,46 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         }
         for preconsulta in preconsultas
     ]
+    bloques_motivo = [
+        {
+            "preconsulta": bloque["preconsulta"],
+            "secciones": [
+                seccion for seccion in bloque["secciones"]
+                if "Motivo" in seccion.get("titulo", "")
+            ],
+        }
+        for bloque in bloques_preconsulta
+    ]
+    bloques_antecedentes = [
+        {
+            "preconsulta": bloque["preconsulta"],
+            "secciones": [
+                seccion for seccion in bloque["secciones"]
+                if "Motivo" not in seccion.get("titulo", "")
+            ],
+        }
+        for bloque in bloques_preconsulta
+    ]
+    bloques_motivo = [bloque for bloque in bloques_motivo if bloque["secciones"]]
+    bloques_antecedentes = [bloque for bloque in bloques_antecedentes if bloque["secciones"]]
+    if seccion_activa == "motivo_consulta":
+        bloques_preconsulta_enfoque = bloques_motivo
+        informacion_titulo = "Motivo de consulta"
+        informacion_descripcion = "Motivo y procedimientos de interés reportados por el paciente."
+    elif seccion_activa == "antecedentes":
+        bloques_preconsulta_enfoque = bloques_antecedentes
+        informacion_titulo = "Antecedentes"
+        informacion_descripcion = "Antecedentes, alergias, medicamentos, hábitos y riesgos clínicos."
+    else:
+        bloques_preconsulta_enfoque = bloques_preconsulta
+        informacion_titulo = "Formulario clínico recibido"
+        informacion_descripcion = "Motivo, antecedentes y respuestas clínicas del paciente."
     tipos = []
     ahora = timezone.localtime().strftime("%Y-%m-%dT%H:%M")
     for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES:
         if codigo in {"evaluacion_integral", "tricopigmentacion", "camara_hiperbarica", "terapias_postquirurgicas"}:
+            continue
+        if seccion_activa == "especialidad" and tipo_enfoque and codigo != tipo_enfoque:
             continue
         historias_tipo = [historia for historia in historias if historia.tipo == codigo]
         initial_formulario = {"fecha_atencion": ahora}
@@ -2064,6 +2149,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             else HistoriaClinicaEspecialidadForm(
                 empresa=empresa,
                 tipo=codigo,
+                seccion=seccion_activa,
                 prefix=f"historia_{codigo}",
                 initial=initial_formulario,
             )
@@ -2084,6 +2170,26 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             prefix="evaluacion",
             initial=evaluacion_initial,
         )
+    if funciones_form is None:
+        funciones_initial = {"fecha_atencion": ahora}
+        if profesional_usuario:
+            funciones_initial["profesional"] = profesional_usuario
+        funciones_form = EvaluacionClinicaIntegralForm(
+            empresa=empresa,
+            prefix="funciones",
+            seccion="funciones_organicas",
+            initial=funciones_initial,
+        )
+    if examen_form is None:
+        examen_initial = {"fecha_atencion": ahora}
+        if profesional_usuario:
+            examen_initial["profesional"] = profesional_usuario
+        examen_form = EvaluacionClinicaIntegralForm(
+            empresa=empresa,
+            prefix="examen",
+            seccion="examen_fisico",
+            initial=examen_initial,
+        )
     if tricopigmentacion_form is None:
         tricopigmentacion_initial = {"fecha_atencion": ahora}
         if profesional_usuario:
@@ -2096,13 +2202,13 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     evaluacion_funciones_form = [
         {
             "label": etiqueta,
-            "estado": evaluacion_form[f"funcion_{codigo}"],
-            "detalle": evaluacion_form[f"funcion_{codigo}_detalle"],
+            "estado": funciones_form[f"funcion_{codigo}"],
+            "detalle": funciones_form[f"funcion_{codigo}_detalle"],
         }
         for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS
     ]
     evaluacion_examen_form = [
-        evaluacion_form[f"examen_{codigo}"]
+        examen_form[f"examen_{codigo}"]
         for codigo, _etiqueta in EXAMEN_FISICO_CAMPOS
     ]
     programa_camara = (
@@ -2127,8 +2233,19 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "historias": historias,
             "preconsultas": preconsultas,
             "bloques_preconsulta": bloques_preconsulta,
+            "bloques_motivo": bloques_motivo,
+            "bloques_antecedentes": bloques_antecedentes,
+            "bloques_preconsulta_enfoque": bloques_preconsulta_enfoque,
+            "informacion_titulo": informacion_titulo,
+            "informacion_descripcion": informacion_descripcion,
+            "seccion_activa": seccion_activa,
+            "tipo_enfoque": tipo_enfoque,
             "evaluacion_form": evaluacion_form,
+            "funciones_form": funciones_form,
+            "examen_form": examen_form,
             "historias_evaluacion": historias_evaluacion,
+            "historias_funciones": historias_funciones,
+            "historias_examen": historias_examen,
             "funciones_organicas_sistemas": FUNCIONES_ORGANICAS_SISTEMAS,
             "examen_fisico_campos": EXAMEN_FISICO_CAMPOS,
             "evaluacion_funciones_form": evaluacion_funciones_form,

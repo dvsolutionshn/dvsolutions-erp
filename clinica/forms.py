@@ -856,8 +856,9 @@ class EvaluacionClinicaIntegralForm(forms.Form):
     )
     estado = forms.ChoiceField(choices=HistoriaClinicaEspecialidad.ESTADO_CHOICES, initial="borrador")
 
-    def __init__(self, *args, empresa=None, instance=None, **kwargs):
+    def __init__(self, *args, empresa=None, instance=None, seccion=None, **kwargs):
         self.instance = instance
+        self.seccion = seccion
         super().__init__(*args, **kwargs)
         self.fields["profesional"].queryset = (
             ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
@@ -868,20 +869,22 @@ class EvaluacionClinicaIntegralForm(forms.Form):
         campos = OrderedDict()
         campos["profesional"] = self.fields["profesional"]
         campos["fecha_atencion"] = self.fields["fecha_atencion"]
-        campos["funciones_generales"] = self.fields["funciones_generales"]
-        for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS:
-            campos[f"funcion_{codigo}"] = forms.ChoiceField(
-                required=True,
-                label=etiqueta,
-                choices=opciones_revision,
-            )
-            campos[f"funcion_{codigo}_detalle"] = forms.CharField(
-                required=False,
-                label=f"Si hay alteración en {etiqueta.lower()}, explique",
-            )
-        for codigo, etiqueta in EXAMEN_FISICO_CAMPOS:
-            campos[f"examen_{codigo}"] = forms.CharField(required=False, label=etiqueta)
-        campos["examen_fisico"] = self.fields["examen_fisico"]
+        if self.seccion != "examen_fisico":
+            campos["funciones_generales"] = self.fields["funciones_generales"]
+            for codigo, etiqueta in FUNCIONES_ORGANICAS_SISTEMAS:
+                campos[f"funcion_{codigo}"] = forms.ChoiceField(
+                    required=True,
+                    label=etiqueta,
+                    choices=opciones_revision,
+                )
+                campos[f"funcion_{codigo}_detalle"] = forms.CharField(
+                    required=False,
+                    label=f"Si hay alteración en {etiqueta.lower()}, explique",
+                )
+        if self.seccion != "funciones_organicas":
+            for codigo, etiqueta in EXAMEN_FISICO_CAMPOS:
+                campos[f"examen_{codigo}"] = forms.CharField(required=False, label=etiqueta)
+            campos["examen_fisico"] = self.fields["examen_fisico"]
         campos["estado"] = self.fields["estado"]
         self.fields = campos
 
@@ -1026,9 +1029,10 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             "fecha_atencion": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
         }
 
-    def __init__(self, *args, empresa=None, tipo=None, **kwargs):
+    def __init__(self, *args, empresa=None, tipo=None, seccion=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
         self.tipo = tipo or getattr(self.instance, "tipo", None)
+        self.seccion = seccion
         if empresa:
             self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(
                 empresa=empresa,
@@ -1052,7 +1056,11 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                 "rows": 8,
                 "placeholder": "Escriba aqui la nota de bitacora. Se guardara con fecha, hora y usuario.",
             })
-        self.campos_estructurados = FORMULARIOS_ESTRUCTURADOS.get(self.tipo, [])
+        self.campos_estructurados = (
+            []
+            if self.seccion in {"diagnostico", "plan_tratamiento"}
+            else FORMULARIOS_ESTRUCTURADOS.get(self.tipo, [])
+        )
         datos = self.instance.datos_especialidad if self.instance and isinstance(self.instance.datos_especialidad, dict) else {}
         for nombre, etiqueta, opciones, multiple in self.campos_estructurados:
             field_class = forms.MultipleChoiceField if multiple else forms.ChoiceField
@@ -1132,6 +1140,14 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
         ]:
             if nombre in self.fields and self.tipo in FORMULARIOS_ESTRUCTURADOS:
                 self.fields[nombre].widget.attrs.setdefault("rows", 3)
+        if self.seccion in {"diagnostico", "plan_tratamiento"}:
+            campo_clinico = "diagnostico" if self.seccion == "diagnostico" else "plan_tratamiento"
+            orden = ["profesional", "fecha_atencion", campo_clinico, "estado"]
+            self.fields = OrderedDict(
+                (nombre, self.fields[nombre])
+                for nombre in orden
+                if nombre in self.fields
+            )
 
     def save(self, commit=True):
         historia = super().save(commit=False)

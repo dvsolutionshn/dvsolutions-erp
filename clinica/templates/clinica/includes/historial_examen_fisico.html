@@ -1,0 +1,45 @@
+<section class="sheet-panel clinical-form-panel" id="examen-fisico">
+    <div class="panel-head">
+        <div>
+            <div class="erp-kpi-label">Historial clínico</div>
+            <h3>Examen Físico</h3>
+            <p>Mediciones y hallazgos clínicos del paciente.</p>
+        </div>
+    </div>
+    <div class="panel-body">
+        <form method="post" action="?seccion=examen_fisico#examen-fisico" class="integral-form">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="guardar_examen_fisico">
+            <div class="integral-meta-grid">
+                <div class="inline-field"><label for="{{ examen_form.profesional.id_for_label }}">{{ examen_form.profesional.label }}</label>{{ examen_form.profesional }}{{ examen_form.profesional.errors }}</div>
+                <div class="inline-field"><label for="{{ examen_form.fecha_atencion.id_for_label }}">{{ examen_form.fecha_atencion.label }}</label>{{ examen_form.fecha_atencion }}{{ examen_form.fecha_atencion.errors }}</div>
+                <div class="inline-field"><label for="{{ examen_form.estado.id_for_label }}">{{ examen_form.estado.label }}</label>{{ examen_form.estado }}{{ examen_form.estado.errors }}</div>
+            </div>
+            <section class="integral-box integral-box-single">
+                <div class="physical-grid">
+                    {% for field in evaluacion_examen_form %}
+                    <div class="inline-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>
+                    {% endfor %}
+                </div>
+                <div class="integral-general-field">
+                    <label for="{{ examen_form.examen_fisico.id_for_label }}">{{ examen_form.examen_fisico.label }}</label>
+                    {{ examen_form.examen_fisico }}
+                    {{ examen_form.examen_fisico.errors }}
+                </div>
+            </section>
+            <div class="form-actions"><button class="save-clinical-btn" type="submit">Guardar examen físico</button></div>
+        </form>
+        <div class="integral-history">
+            <h4>Exámenes físicos registrados</h4>
+            {% for historia in historias_examen %}
+            <details class="integral-record">
+                <summary><strong>{{ historia.fecha_atencion|date:"d/m/Y H:i" }}</strong><span>{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} · {{ historia.get_estado_display }}</span></summary>
+                <div class="integral-record-body">
+                    <div class="record-grid physical-record">{% for campo in historia.examen_registrado %}<div><span>{{ campo.label }}</span><strong>{{ campo.value }}</strong></div>{% endfor %}</div>
+                    {% if historia.examen_fisico %}<div class="record-wide"><span>Examen físico</span><strong>{{ historia.examen_fisico|linebreaksbr }}</strong></div>{% endif %}
+                </div>
+            </details>
+            {% empty %}<div class="empty-sheet">Aún no hay exámenes físicos registrados.</div>{% endfor %}
+        </div>
+    </div>
+</section>

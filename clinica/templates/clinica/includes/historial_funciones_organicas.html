@@ -1,0 +1,55 @@
+<section class="sheet-panel clinical-form-panel" id="funciones-organicas">
+    <div class="panel-head">
+        <div>
+            <div class="erp-kpi-label">Historial clínico</div>
+            <h3>Funciones Orgánicas</h3>
+            <p>Órganos, aparatos y sistemas (Sistema Nervioso Central).</p>
+        </div>
+    </div>
+    <div class="panel-body">
+        <form method="post" action="?seccion=funciones_organicas#funciones-organicas" class="integral-form">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="guardar_funciones_organicas">
+            <div class="integral-meta-grid">
+                <div class="inline-field"><label for="{{ funciones_form.profesional.id_for_label }}">{{ funciones_form.profesional.label }}</label>{{ funciones_form.profesional }}{{ funciones_form.profesional.errors }}</div>
+                <div class="inline-field"><label for="{{ funciones_form.fecha_atencion.id_for_label }}">{{ funciones_form.fecha_atencion.label }}</label>{{ funciones_form.fecha_atencion }}{{ funciones_form.fecha_atencion.errors }}</div>
+                <div class="inline-field"><label for="{{ funciones_form.estado.id_for_label }}">{{ funciones_form.estado.label }}</label>{{ funciones_form.estado }}{{ funciones_form.estado.errors }}</div>
+            </div>
+            <section class="integral-box integral-box-single">
+                <div class="integral-general-field">
+                    <label for="{{ funciones_form.funciones_generales.id_for_label }}">{{ funciones_form.funciones_generales.label }}</label>
+                    {{ funciones_form.funciones_generales }}
+                    {{ funciones_form.funciones_generales.errors }}
+                </div>
+                <div class="organic-table" role="group" aria-label="Funciones orgánicas">
+                    <div class="organic-table-head"><span>Sistema</span><span>Selección</span><span>Si hay alteración, explique</span></div>
+                    {% for row in evaluacion_funciones_form %}
+                    <div class="organic-row">
+                        <label for="{{ row.estado.id_for_label }}">{{ row.label }}</label>
+                        {{ row.estado }}
+                        {{ row.detalle }}
+                        {{ row.estado.errors }}{{ row.detalle.errors }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            <div class="form-actions"><button class="save-clinical-btn" type="submit">Guardar funciones orgánicas</button></div>
+        </form>
+        <div class="integral-history">
+            <h4>Funciones orgánicas registradas</h4>
+            {% for historia in historias_funciones %}
+            <details class="integral-record">
+                <summary><strong>{{ historia.fecha_atencion|date:"d/m/Y H:i" }}</strong><span>{% if historia.profesional %}{{ historia.profesional.nombre }}{% else %}Profesional no indicado{% endif %} · {{ historia.get_estado_display }}</span></summary>
+                <div class="integral-record-body">
+                    {% if historia.funciones_generales_registradas %}<div class="record-wide"><span>Funciones generales</span><strong>{{ historia.funciones_generales_registradas }}</strong></div>{% endif %}
+                    <div class="record-grid">
+                        {% for funcion in historia.funciones_registradas %}
+                        {% if funcion.estado or funcion.detalle %}<div><span>{{ funcion.label }}</span><strong>{{ funcion.estado|default:"No indicado"|title }}{% if funcion.detalle %} · {{ funcion.detalle }}{% endif %}</strong></div>{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </details>
+            {% empty %}<div class="empty-sheet">Aún no hay funciones orgánicas registradas.</div>{% endfor %}
+        </div>
+    </div>
+</section>

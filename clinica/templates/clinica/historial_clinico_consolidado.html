@@ -234,27 +234,30 @@
     </section>
 
     <nav class="summary-section-nav" aria-label="Secciones de la historia clínica">
-        <a href="#informacion-paciente">Motivo de consulta</a>
-        <a href="#evaluacion-integral">Funciones orgánicas</a>
-        <a href="#evaluacion-integral">Examen físico</a>
-        <a href="#informacion-paciente">Antecedentes</a>
-        <a href="#trabajo-clinico">Diagnóstico</a>
-        <a href="#trabajo-clinico">Plan y tratamiento</a>
-        <a href="#controles-especiales">Cámara / Post Quirúrgica</a>
-        <a href="#tricopigmentacion">Tricopigmentación</a>
+        <a href="?seccion=motivo_consulta#informacion-paciente">Motivo de consulta</a>
+        <a href="?seccion=funciones_organicas#funciones-organicas">Funciones orgánicas</a>
+        <a href="?seccion=examen_fisico#examen-fisico">Examen físico</a>
+        <a href="?seccion=antecedentes#informacion-paciente">Antecedentes</a>
+        <a href="?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>
+        <a href="?seccion=plan_tratamiento#trabajo-clinico">Plan y tratamiento</a>
+        <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>
+        <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
+        <a href="?seccion=tricopigmentacion#tricopigmentacion">Tricopigmentación</a>
+        <a href="?seccion=completa">Historia completa</a>
         <a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
     </nav>
 
+    {% if seccion_activa == "completa" or seccion_activa == "motivo_consulta" or seccion_activa == "antecedentes" %}
     <section class="sheet-panel" id="informacion-paciente">
         <div class="panel-head">
             <div>
                 <div class="erp-kpi-label">Información recibida</div>
-                <h3>Formulario completo llenado por el paciente</h3>
-                <p>Motivo, antecedentes y respuestas clínicas del formulario en una sola lectura.</p>
+                <h3>{{ informacion_titulo }}</h3>
+                <p>{{ informacion_descripcion }}</p>
             </div>
         </div>
         <div class="panel-body">
-            {% for bloque in bloques_preconsulta %}
+            {% for bloque in bloques_preconsulta_enfoque %}
             <article class="single-note">
                 <div class="note-title">
                     <div>
@@ -291,17 +294,35 @@
             {% endfor %}
         </div>
     </section>
+    {% endif %}
 
-    {% include "clinica/includes/historial_evaluacion_integral.html" %}
+    {% if seccion_activa == "completa" or seccion_activa == "funciones_organicas" %}
+    {% include "clinica/includes/historial_funciones_organicas.html" %}
+    {% endif %}
+    {% if seccion_activa == "completa" or seccion_activa == "examen_fisico" %}
+    {% include "clinica/includes/historial_examen_fisico.html" %}
+    {% endif %}
+    {% if seccion_activa == "completa" %}
     {% include "clinica/includes/historial_controles_especiales.html" %}
+    {% endif %}
+    {% if seccion_activa == "completa" or seccion_activa == "tricopigmentacion" %}
     {% include "clinica/includes/historial_tricopigmentacion.html" %}
+    {% endif %}
 
+    {% if seccion_activa == "completa" or seccion_activa == "diagnostico" or seccion_activa == "plan_tratamiento" or seccion_activa == "especialidad" %}
     <section class="sheet-panel" id="trabajo-clinico">
         <div class="panel-head">
             <div>
                 <div class="erp-kpi-label">Trabajo de la doctora</div>
-                <h3>Cuadros clínicos para escribir sin salir de esta pantalla</h3>
-                <p>Abra el área que necesita, marque las opciones del formulario y escriba la historia de enfermedad actual, diagnóstico y plan.</p>
+                {% if seccion_activa == "diagnostico" %}
+                <h3>Diagnóstico</h3><p>Consulte o registre únicamente el diagnóstico por área clínica.</p>
+                {% elif seccion_activa == "plan_tratamiento" %}
+                <h3>Plan y tratamiento</h3><p>Consulte o registre únicamente el plan terapéutico por área clínica.</p>
+                {% elif seccion_activa == "especialidad" %}
+                <h3>{{ tipos.0.nombre|default:"Atención por especialidad" }}</h3><p>Formulario clínico correspondiente a esta especialidad.</p>
+                {% else %}
+                <h3>Cuadros clínicos para escribir sin salir de esta pantalla</h3><p>Abra el área que necesita y guarde su atención clínica.</p>
+                {% endif %}
             </div>
         </div>
         <div class="panel-body">
@@ -338,7 +359,7 @@
                             {% endfor %}
                         </div>
                         <div class="form-actions">
-                            <button class="save-clinical-btn" type="submit">Guardar historia clínica de {{ tipo.nombre }}</button>
+                            <button class="save-clinical-btn" type="submit">{% if seccion_activa == "diagnostico" %}Guardar diagnóstico{% elif seccion_activa == "plan_tratamiento" %}Guardar plan y tratamiento{% else %}Guardar historia clínica de {{ tipo.nombre }}{% endif %}</button>
                         </div>
                     </form>
 
@@ -401,6 +422,7 @@
             {% endfor %}
         </div>
     </section>
+    {% endif %}
 </section>
 <script>
 document.addEventListener("DOMContentLoaded", function () {

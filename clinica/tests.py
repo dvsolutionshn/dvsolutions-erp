@@ -200,7 +200,8 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Funciones Orgánicas y Examen Físico")
+        self.assertContains(response, "Funciones Orgánicas")
+        self.assertContains(response, "Examen Físico")
         self.assertContains(response, "Programa completo de 22 sesiones")
         self.assertContains(response, "Cuadro completo de 12 sesiones")
         self.assertContains(response, "Tricopigmentación")
@@ -272,6 +273,111 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.datos_especialidad["zona_tratada"], "Línea frontal")
         self.assertEqual(historia.datos_especialidad["proxima_sesion"], "2026-09-10")
         self.assertEqual(historia.procedimiento, "Refuerzo de densidad.")
+
+    def test_historial_clinico_muestra_una_sola_seccion_por_navegacion(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-FOCO-001",
+            nombre="Paciente Navegacion Enfocada",
+            identidad="1101200800703",
+            fecha_nacimiento="1990-01-01",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+
+        funciones = self.client.get(f"{url}?seccion=funciones_organicas")
+        self.assertEqual(funciones.status_code, 200)
+        self.assertContains(funciones, 'id="funciones-organicas"')
+        self.assertNotContains(funciones, 'id="examen-fisico"')
+        self.assertNotContains(funciones, 'id="informacion-paciente"')
+        self.assertNotContains(funciones, 'id="trabajo-clinico"')
+        self.assertNotContains(funciones, 'id="tricopigmentacion"')
+
+        examen = self.client.get(f"{url}?seccion=examen_fisico")
+        self.assertEqual(examen.status_code, 200)
+        self.assertContains(examen, 'id="examen-fisico"')
+        self.assertNotContains(examen, 'id="funciones-organicas"')
+        self.assertNotContains(examen, 'id="informacion-paciente"')
+        self.assertNotContains(examen, 'id="trabajo-clinico"')
+
+        diagnostico = self.client.get(f"{url}?seccion=diagnostico")
+        self.assertEqual(diagnostico.status_code, 200)
+        self.assertContains(diagnostico, 'id="trabajo-clinico"')
+        self.assertContains(diagnostico, 'name="historia_capilar-diagnostico"')
+        self.assertNotContains(diagnostico, 'name="historia_capilar-plan_tratamiento"')
+        self.assertNotContains(diagnostico, 'id="funciones-organicas"')
+        self.assertNotContains(diagnostico, 'id="examen-fisico"')
+
+    def test_menu_expediente_inicia_cerrado_y_enlaza_secciones_independientes(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-MENU-001",
+            nombre="Paciente Menu Acordeon",
+            identidad="1101200800704",
+            fecha_nacimiento="1990-01-01",
+        )
+        url = reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, '<details class="clinical-side-group" open>')
+        self.assertContains(response, "?seccion=funciones_organicas#funciones-organicas")
+        self.assertContains(response, "?seccion=examen_fisico#examen-fisico")
+        self.assertContains(response, "?seccion=diagnostico#trabajo-clinico")
+        self.assertContains(response, "Cámara Hiperbárica")
+        self.assertContains(response, "Terapias Post Quirúrgicas")
+        self.assertContains(response, 'group.addEventListener("toggle"')
+
+    def test_funciones_y_examen_guardan_registros_independientes(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-SEP-001",
+            nombre="Paciente Secciones Separadas",
+            identidad="1101200800705",
+            fecha_nacimiento="1990-01-01",
+        )
+        url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
+        datos_funciones = {
+            f"funciones-funcion_{codigo}": "normal"
+            for codigo, _etiqueta in FUNCIONES_ORGANICAS_SISTEMAS
+        }
+        datos_funciones.update({
+            "accion": "guardar_funciones_organicas",
+            "funciones-fecha_atencion": "2026-08-27T12:00",
+            "funciones-funciones_generales": "Funciones conservadas.",
+            "funciones-funcion_respiratorio": "alterada",
+            "funciones-funcion_respiratorio_detalle": "Tos ocasional.",
+            "funciones-estado": "finalizada",
+        })
+
+        response = self.client.post(f"{url}?seccion=funciones_organicas", datos_funciones)
+
+        self.assertRedirects(response, f"{url}?seccion=funciones_organicas")
+        funciones = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="evaluacion_integral")
+        self.assertEqual(funciones.datos_especialidad["funciones_organicas"]["respiratorio"]["estado"], "alterada")
+        self.assertFalse(any(funciones.datos_especialidad["examen_fisico"].values()))
+        self.assertEqual(funciones.examen_fisico, "")
+
+        response = self.client.post(f"{url}?seccion=examen_fisico", {
+            "accion": "guardar_examen_fisico",
+            "examen-fecha_atencion": "2026-08-27T12:30",
+            "examen-examen_peso": "70",
+            "examen-examen_estatura": "168",
+            "examen-examen_fisico": "Sin hallazgos patológicos.",
+            "examen-estado": "finalizada",
+        })
+
+        self.assertRedirects(response, f"{url}?seccion=examen_fisico")
+        examen = HistoriaClinicaEspecialidad.objects.filter(
+            paciente=paciente,
+            tipo="evaluacion_integral",
+        ).order_by("-id").first()
+        self.assertEqual(examen.datos_especialidad["examen_fisico"]["peso"], "70")
+        self.assertFalse(any(
+            item["estado"] or item["detalle"]
+            for item in examen.datos_especialidad["funciones_organicas"].values()
+        ))
+        self.assertEqual(examen.examen_fisico, "Sin hallazgos patológicos.")
 
     def test_vista_clinica_completa_edita_texto_inline(self):
         paciente = Paciente.objects.create(
