@@ -85,6 +85,7 @@
     {% url 'tecnicentro_ordenes' empresa.slug as tecnicentro_ordenes_url %}
     {% url 'tecnicentro_configuracion' empresa.slug as tecnicentro_configuracion_url %}
     {% url 'asistente_consulta' empresa.slug as asistente_consulta_url %}
+    {% url 'asistente_historial' empresa.slug as asistente_historial_url %}
     {% url 'empresa_respaldo' empresa.slug as empresa_respaldo_url %}
     {% url 'auditoria_empresa' empresa.slug as auditoria_empresa_url %}
     {% url 'usuarios_clinicos' empresa.slug as usuarios_clinicos_url %}
@@ -453,7 +454,7 @@
     </span>
 </button>
 
-<aside class="erp-assistant-panel" id="erpAssistantPanel" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Centro de operaciones de Onix">
+<aside class="erp-assistant-panel" id="erpAssistantPanel" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Centro de operaciones de Onix" data-assistant-history-url="{{ asistente_historial_url }}">
     <header class="erp-assistant-head">
         <div class="erp-assistant-profile">
             <span class="erp-assistant-avatar is-large" aria-hidden="true">
@@ -499,6 +500,19 @@
                 </div>
             </section>
 
+            <section class="erp-assistant-rail-card is-history">
+                <div class="erp-onix-history-head">
+                    <div>
+                        <div class="erp-assistant-rail-kicker">Memoria de conversaciones</div>
+                        <h4>Historial por día</h4>
+                    </div>
+                    <button type="button" data-onix-history-refresh aria-label="Actualizar historial">↻</button>
+                </div>
+                <div class="erp-onix-history-days" data-onix-history-days>
+                    <span>Abre Onix para cargar tus consultas anteriores.</span>
+                </div>
+            </section>
+
             {% if onix_modo_prueba %}
             <section class="erp-assistant-rail-card is-trial" aria-label="Límite de seguridad: {{ onix_limite_prueba }} tokens por mes">
                 <div class="erp-assistant-rail-kicker">Protección de consumo</div>
@@ -527,7 +541,7 @@
             <div class="erp-assistant-conversation-head">
                 <div>
                     <div class="erp-assistant-kicker">Centro de conversación y actividad</div>
-                    <h4>¿Qué quieres que revise?</h4>
+                    <h4 data-onix-conversation-title>¿Qué quieres que revise?</h4>
                 </div>
                 <div class="erp-assistant-operation-strip" aria-label="Proceso de Onix">
                     <span><i>1</i>Comprende</span><b></b><span><i>2</i>Consulta el ERP</span><b></b><span><i>3</i>Confirma acciones</span>
@@ -821,12 +835,18 @@ document.addEventListener("DOMContentLoaded", function(){
     const assistantSubmit = assistantForm ? assistantForm.querySelector("[data-assistant-submit]") : null;
     const assistantStatus = document.querySelector("[data-onix-status]");
     const assistantStatusLabels = document.querySelectorAll("[data-onix-status-label]");
+    const assistantConversationTitle = document.querySelector("[data-onix-conversation-title]");
+    const assistantHistoryDays = document.querySelector("[data-onix-history-days]");
+    const assistantHistoryRefresh = document.querySelector("[data-onix-history-refresh]");
+    const assistantHistoryUrl = assistantPanel ? assistantPanel.getAttribute("data-assistant-history-url") : "";
     const assistantUsageCurrent = document.querySelector("[data-onix-usage-current]");
     const assistantUsageLimit = document.querySelector("[data-onix-usage-limit]");
     const assistantUsagePercent = document.querySelector("[data-onix-usage-percent]");
     const assistantUsageTrack = document.querySelector("[data-onix-usage-track]");
     const assistantUsageBar = document.querySelector("[data-onix-usage-bar]");
     let assistantBusy = false;
+    let assistantHistoryLoaded = false;
+    let assistantHistoryDate = "";
 
     function getCookie(name) {
         const cookieValue = document.cookie
@@ -998,6 +1018,92 @@ document.addEventListener("DOMContentLoaded", function(){
         return '<div class="erp-assistant-richtext">' + output.join("") + "</div>";
     }
 
+    function localDateIso() {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+    }
+
+    function renderAssistantHistoryDays(days, selectedDate) {
+        if(!assistantHistoryDays){
+            return;
+        }
+        if(!Array.isArray(days) || !days.length){
+            assistantHistoryDays.innerHTML = '<span>Aún no tienes conversaciones guardadas.</span>';
+            return;
+        }
+        const today = localDateIso();
+        assistantHistoryDays.innerHTML = days.map(day => {
+            const label = day.date === today ? "Hoy" : (day.label || day.date);
+            const activeClass = day.date === selectedDate ? " is-active" : "";
+            const messageCount = Number(day.count || 0);
+            const messageLabel = messageCount === 1 ? "mensaje" : "mensajes";
+            return '<button type="button" class="erp-onix-history-day' + activeClass + '" data-onix-history-date="' + escapeHtml(day.date) + '"><strong>' + escapeHtml(label) + '</strong><small>' + messageCount.toLocaleString() + ' ' + messageLabel + '</small></button>';
+        }).join("");
+    }
+
+    function renderAssistantHistory(data) {
+        if(!assistantBody){
+            return;
+        }
+        assistantHistoryDate = data.selected_date || "";
+        assistantBody.innerHTML = "";
+        if(assistantConversationTitle){
+            const selectedDay = Array.isArray(data.days) ? data.days.find(day => day.date === assistantHistoryDate) : null;
+            assistantConversationTitle.textContent = assistantHistoryDate === localDateIso()
+                ? "Conversación de hoy"
+                : "Conversación del " + (selectedDay ? selectedDay.label : assistantHistoryDate);
+        }
+        if(!Array.isArray(data.messages) || !data.messages.length){
+            appendAssistantMessage("system", "Onix", "No encontré mensajes guardados para este día.", [], [], "Historial");
+            return;
+        }
+        data.messages.forEach(message => {
+            const isUser = message.role === "usuario";
+            appendAssistantMessage(
+                isUser ? "user" : "system",
+                isUser ? "Tú" : "Onix",
+                message.content || "",
+                [],
+                [],
+                message.time || "",
+                message.usage || null,
+                []
+            );
+        });
+        if(data.has_more){
+            appendAssistantMessage("system", "Onix", "Este día tiene más de 250 mensajes. Estoy mostrando los más recientes.", [], [], "Historial parcial");
+        }
+    }
+
+    function loadAssistantHistory(dateValue, showMessages) {
+        if(!assistantHistoryUrl || !assistantHistoryDays){
+            return Promise.resolve();
+        }
+        assistantHistoryDays.classList.add("is-loading");
+        const url = new URL(assistantHistoryUrl, window.location.origin);
+        if(dateValue){
+            url.searchParams.set("fecha", dateValue);
+        }
+        return fetch(url.toString(), {credentials: "same-origin"})
+            .then(response => response.json().then(data => ({ok: response.ok, data})))
+            .then(({ok, data}) => {
+                if(!ok){
+                    throw new Error(data.error || "No fue posible cargar el historial.");
+                }
+                assistantHistoryLoaded = true;
+                renderAssistantHistoryDays(data.days || [], showMessages ? data.selected_date : assistantHistoryDate);
+                if(showMessages){
+                    renderAssistantHistory(data);
+                    renderAssistantHistoryDays(data.days || [], data.selected_date);
+                }
+            })
+            .catch(error => {
+                assistantHistoryDays.innerHTML = '<span>' + escapeHtml(error.message || "No fue posible cargar el historial.") + '</span>';
+            })
+            .finally(() => assistantHistoryDays.classList.remove("is-loading"));
+    }
+
     function assistantMoney(value, currency) {
         const amount = Number(value || 0);
         const safeAmount = Number.isFinite(amount) ? amount : 0;
@@ -1165,6 +1271,14 @@ document.addEventListener("DOMContentLoaded", function(){
             return;
         }
 
+        if(assistantHistoryDate){
+            assistantBody.innerHTML = "";
+            assistantHistoryDate = "";
+            if(assistantConversationTitle){ assistantConversationTitle.textContent = "Nueva consulta de hoy"; }
+            if(assistantHistoryDays){
+                assistantHistoryDays.querySelectorAll(".is-active").forEach(day => day.classList.remove("is-active"));
+            }
+        }
         setAssistantBusy(true);
         setAssistantOpen(true);
         appendAssistantMessage("user", "Tu consulta", questionText.trim(), [], [], "");
@@ -1221,6 +1335,7 @@ document.addEventListener("DOMContentLoaded", function(){
                 data.usage || null,
                 data.actions || []
             );
+            loadAssistantHistory("", false);
         })
         .catch(() => {
             setAssistantStatus("offline");
@@ -1244,7 +1359,17 @@ document.addEventListener("DOMContentLoaded", function(){
 
     if(assistantToggle && assistantPanel){
         assistantToggle.addEventListener("click", function(){
-            setAssistantOpen(!assistantPanel.classList.contains("is-open"));
+            const willOpen = !assistantPanel.classList.contains("is-open");
+            setAssistantOpen(willOpen);
+            if(willOpen && !assistantHistoryLoaded){
+                loadAssistantHistory("", false);
+            }
+        });
+    }
+
+    if(assistantHistoryRefresh){
+        assistantHistoryRefresh.addEventListener("click", function(){
+            loadAssistantHistory(assistantHistoryDate, Boolean(assistantHistoryDate));
         });
     }
 
@@ -1314,6 +1439,15 @@ document.addEventListener("DOMContentLoaded", function(){
                     feedback.classList.add("is-error");
                 }
             });
+            return;
+        }
+
+        const historyButton = event.target.closest("[data-onix-history-date]");
+        if(historyButton){
+            const historyDate = historyButton.getAttribute("data-onix-history-date") || "";
+            if(historyDate){
+                loadAssistantHistory(historyDate, true);
+            }
             return;
         }
 

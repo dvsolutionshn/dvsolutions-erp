@@ -443,6 +443,50 @@ class OnixInvoiceActionTests(TestCase):
         self.assertFalse(producto.controla_inventario)
         self.assertEqual(respuesta.json()["action"]["result"]["id"], producto.id)
 
+    def test_historial_onix_agrupa_por_dia_y_solo_muestra_mensajes_del_usuario(self):
+        mensaje_hoy = MensajeOnix.objects.create(
+            conversacion=self.conversacion,
+            rol=MensajeOnix.ROL_USUARIO,
+            contenido="Consulta privada de hoy",
+            pagina="/demo_1/dashboard/",
+        )
+        mensaje_ayer = MensajeOnix.objects.create(
+            conversacion=self.conversacion,
+            rol=MensajeOnix.ROL_ASISTENTE,
+            contenido="Respuesta privada de ayer",
+            pagina="/demo_1/dashboard/",
+        )
+        fecha_ayer = timezone.now() - timedelta(days=1)
+        MensajeOnix.objects.filter(pk=mensaje_ayer.pk).update(fecha=fecha_ayer)
+
+        otro_usuario = Usuario.objects.create_user(
+            username="historial_ajeno",
+            password="pass12345",
+            empresa=self.empresa,
+            es_administrador_empresa=True,
+        )
+        conversacion_ajena = ConversacionOnix.objects.create(empresa=self.empresa, usuario=otro_usuario)
+        MensajeOnix.objects.create(
+            conversacion=conversacion_ajena,
+            rol=MensajeOnix.ROL_USUARIO,
+            contenido="Mensaje que no debe mostrarse",
+        )
+
+        self.client.login(username=self.usuario.username, password="pass12345")
+        respuesta_hoy = self.client.get(reverse("asistente_historial", args=[self.empresa.slug]))
+        respuesta_ayer = self.client.get(
+            reverse("asistente_historial", args=[self.empresa.slug]),
+            {"fecha": timezone.localtime(fecha_ayer).date().isoformat()},
+        )
+
+        self.assertEqual(respuesta_hoy.status_code, 200)
+        payload_hoy = respuesta_hoy.json()
+        self.assertEqual(len(payload_hoy["days"]), 2)
+        self.assertEqual(payload_hoy["messages"][0]["content"], mensaje_hoy.contenido)
+        self.assertNotIn("Mensaje que no debe mostrarse", json.dumps(payload_hoy))
+        self.assertEqual(respuesta_ayer.status_code, 200)
+        self.assertEqual(respuesta_ayer.json()["messages"][0]["content"], mensaje_ayer.contenido)
+
     @override_settings(
         ONIX_ENABLED=True,
         OPENAI_API_KEY="test-key",

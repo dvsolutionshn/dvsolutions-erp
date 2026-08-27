@@ -894,6 +894,97 @@ body::after{
     font-size:9px;
 }
 
+.erp-onix-history-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+}
+
+.erp-onix-history-head h4{
+    margin-bottom:10px;
+}
+
+.erp-onix-history-head > button{
+    display:grid;
+    place-items:center;
+    width:31px;
+    height:31px;
+    flex:0 0 31px;
+    border:1px solid rgba(126, 222, 231, .2);
+    border-radius:10px;
+    color:#9cebf0;
+    background:rgba(75, 203, 211, .08);
+    cursor:pointer;
+    font:inherit;
+    font-size:16px;
+    transition:.2s ease;
+}
+
+.erp-onix-history-head > button:hover{
+    border-color:rgba(126, 222, 231, .42);
+    background:rgba(75, 203, 211, .16);
+    transform:rotate(20deg);
+}
+
+.erp-onix-history-days{
+    display:grid;
+    gap:7px;
+    max-height:220px;
+    overflow:auto;
+    scrollbar-width:thin;
+}
+
+.erp-onix-history-days > span{
+    color:rgba(220, 235, 245, .62);
+    font-size:10px;
+    line-height:1.5;
+}
+
+.erp-onix-history-days.is-loading{
+    opacity:.55;
+    pointer-events:none;
+}
+
+.erp-onix-history-day{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    width:100%;
+    padding:9px 10px;
+    border:1px solid rgba(149, 205, 226, .12);
+    border-radius:11px;
+    color:#e7f8fb;
+    background:rgba(255,255,255,.045);
+    cursor:pointer;
+    font:inherit;
+    text-align:left;
+    transition:.2s ease;
+}
+
+.erp-onix-history-day:hover,
+.erp-onix-history-day.is-active{
+    border-color:rgba(103, 225, 232, .34);
+    background:linear-gradient(135deg, rgba(52, 201, 208, .14), rgba(114, 91, 210, .1));
+}
+
+.erp-onix-history-day strong,
+.erp-onix-history-day small{
+    display:block;
+}
+
+.erp-onix-history-day strong{
+    color:#f3fcff;
+    font-size:10px;
+}
+
+.erp-onix-history-day small{
+    color:rgba(201, 227, 239, .58);
+    font-size:8px;
+    white-space:nowrap;
+}
+
 .erp-assistant-conversation{
     min-width:0;
     min-height:0;

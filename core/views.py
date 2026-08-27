@@ -13,6 +13,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import OperationalError, transaction
 from django.db.models import Count, Prefetch, Q
+from django.db.models.functions import TruncDate
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -20,7 +21,7 @@ from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from .assistant import responder_consulta
 from .access import interfaz_clinica_activa
@@ -39,7 +40,7 @@ from .forms import (
     UsuarioControlCreateForm,
     UsuarioControlUpdateForm,
 )
-from .models import Empresa
+from .models import Empresa, MensajeOnix
 from .models import EmpresaModulo
 from .models import (
     ConfiguracionAvanzadaEmpresa,
@@ -1109,6 +1110,89 @@ def asistente_consulta(request, slug=None):
             empresa=empresa,
             usuario=request.user,
         )
+    )
+
+
+@login_required
+@require_GET
+def asistente_historial(request, slug=None):
+    empresa = _resolver_empresa_request(request, slug)
+
+    if not request.user.is_superuser and not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"error": "No autorizado para consultar esta empresa."}, status=403)
+
+    from .onix_access import onix_disponible_para_empresa
+
+    if not onix_disponible_para_empresa(empresa):
+        return JsonResponse(
+            {"error": "Onix esta disponible solamente para las empresas piloto autorizadas."},
+            status=403,
+        )
+
+    mensajes_usuario = MensajeOnix.objects.filter(
+        conversacion__empresa=empresa,
+        conversacion__usuario=request.user,
+    )
+    zona_horaria = timezone.get_current_timezone()
+    dias_query = list(
+        mensajes_usuario.annotate(dia=TruncDate("fecha", tzinfo=zona_horaria))
+        .values("dia")
+        .annotate(cantidad=Count("id"))
+        .order_by("-dia")[:60]
+    )
+    dias = [
+        {
+            "date": item["dia"].isoformat(),
+            "label": item["dia"].strftime("%d/%m/%Y"),
+            "count": item["cantidad"],
+        }
+        for item in dias_query
+        if item["dia"]
+    ]
+
+    fecha_solicitada = parse_date((request.GET.get("fecha") or "").strip())
+    if request.GET.get("fecha") and not fecha_solicitada:
+        return JsonResponse({"error": "La fecha del historial no es valida."}, status=400)
+    if not fecha_solicitada and dias_query:
+        fecha_solicitada = dias_query[0]["dia"]
+
+    mensajes = []
+    hay_mas = False
+    if fecha_solicitada:
+        consulta_dia = mensajes_usuario.filter(fecha__date=fecha_solicitada).order_by("-fecha", "-id")
+        hay_mas = consulta_dia.count() > 250
+        registros = list(consulta_dia[:250])
+        registros.reverse()
+        for mensaje in registros:
+            fecha_local = timezone.localtime(mensaje.fecha)
+            metadatos = mensaje.metadatos or {}
+            uso = None
+            if mensaje.rol == MensajeOnix.ROL_ASISTENTE and metadatos.get("tokens"):
+                uso = {
+                    "model": metadatos.get("modelo") or "",
+                    "tokens": metadatos.get("tokens") or 0,
+                    "estimated_cost_usd": metadatos.get("costo_estimado_usd") or "0",
+                    "tool_calls": metadatos.get("llamadas_herramientas") or 0,
+                    "tools": metadatos.get("herramientas") or [],
+                }
+            mensajes.append(
+                {
+                    "id": mensaje.id,
+                    "role": mensaje.rol,
+                    "content": mensaje.contenido,
+                    "time": fecha_local.strftime("%I:%M %p").lower(),
+                    "page": mensaje.pagina,
+                    "usage": uso,
+                }
+            )
+
+    return JsonResponse(
+        {
+            "days": dias,
+            "selected_date": fecha_solicitada.isoformat() if fecha_solicitada else "",
+            "messages": mensajes,
+            "has_more": hay_mas,
+        }
     )
 
 
