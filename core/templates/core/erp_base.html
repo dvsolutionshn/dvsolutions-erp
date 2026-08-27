@@ -131,6 +131,10 @@
             <div class="erp-nav-group-title">Navegacion</div>
             <nav class="erp-nav">
                 {% if erp_access.interfaz_clinica %}
+                <a class="erp-nav-link {% if request.path == dashboard_url %}is-active{% endif %}" href="{{ dashboard_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Panel Principal</span>
+                </a>
                 {% if erp_access.pacientes %}
                 <a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}">
                     <span class="erp-nav-bullet"></span>

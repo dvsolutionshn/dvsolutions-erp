@@ -897,6 +897,7 @@ class SuperAdminControlTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Centro de atencion clinica")
+        self.assertContains(response, "<span>Panel Principal</span>", html=True)
         self.assertContains(response, "Pacientes")
         self.assertContains(response, "Inventario")
         self.assertContains(response, "Facturación")
@@ -987,6 +988,7 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CRM y Marketing")
         self.assertNotContains(response, "Contabilidad")
+        self.assertNotContains(response, "Configuración reutilizable")
 
     def test_usuario_puede_tener_rol_diferente_por_empresa(self):
         empresa_principal = Empresa.objects.create(
