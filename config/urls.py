@@ -9,6 +9,7 @@ if settings.ENABLE_DJANGO_ADMIN:
     urlpatterns.append(path(settings.DJANGO_ADMIN_PATH, admin.site.urls))
 
 urlpatterns += [
+    path('api/onix/mobile/v1/', include('onix_mobile.urls')),
     path('formularios/clinica/', include('clinica.public_urls')),
     path('confirmacion/', include('crm.public_urls')),
     path('<slug:empresa_slug>/tecnicentro/', include('tecnicentro.public_urls')),

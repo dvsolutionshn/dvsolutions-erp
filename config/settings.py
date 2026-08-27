@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'crm',
     'clinica',
     'tecnicentro',
+    'onix_mobile',
     'django.contrib.humanize',
 ]
 
@@ -227,6 +228,11 @@ ONIX_MAX_TOOL_ROUNDS = int(os.environ.get("ONIX_MAX_TOOL_ROUNDS", "4"))
 ONIX_INPUT_PRICE_PER_MTOK = os.environ.get("ONIX_INPUT_PRICE_PER_MTOK", "0.20")
 ONIX_CACHED_INPUT_PRICE_PER_MTOK = os.environ.get("ONIX_CACHED_INPUT_PRICE_PER_MTOK", "0.02")
 ONIX_OUTPUT_PRICE_PER_MTOK = os.environ.get("ONIX_OUTPUT_PRICE_PER_MTOK", "1.20")
+ONIX_MOBILE_TOKEN_DAYS = int(os.environ.get("ONIX_MOBILE_TOKEN_DAYS", "30"))
+ONIX_MOBILE_MAX_SESSIONS_PER_USER = int(os.environ.get("ONIX_MOBILE_MAX_SESSIONS_PER_USER", "5"))
+ONIX_MOBILE_LOGIN_MAX_ATTEMPTS = int(os.environ.get("ONIX_MOBILE_LOGIN_MAX_ATTEMPTS", "5"))
+ONIX_MOBILE_LOGIN_WINDOW_SECONDS = int(os.environ.get("ONIX_MOBILE_LOGIN_WINDOW_SECONDS", "900"))
+ONIX_MOBILE_MAX_BODY_BYTES = int(os.environ.get("ONIX_MOBILE_MAX_BODY_BYTES", "65536"))
 
 
 # Cache
