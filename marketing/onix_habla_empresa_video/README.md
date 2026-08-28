@@ -10,7 +10,8 @@ Comercial cinematográfico de 86 segundos basado en la interfaz real de ONIX den
 - Cierre con análisis integral y prioridades del día.
 - Capturas reales del ERP en 16:9 y 9:16.
 - Música cinematográfica y efectos de interfaz.
-- Versiones principales sin narración y versiones alternativas con voces en español de Honduras.
+- Versiones con conversación dinámica en español de Honduras, música con mayor presencia y ducking automático bajo las voces.
+- Versiones cinematográficas alternativas sin narración.
 
 ## Renderizar
 

@@ -74,24 +74,24 @@ SCENES = [
 
 
 VOICE_SEGMENTS = [
-    (0.4, "Habla con tu empresa.", "es-HN-CarlosNeural", "+4%"),
-    (4.75, "Buenos días, Onix. ¿Cómo está mi empresa hoy?", "es-HN-CarlosNeural", "+8%"),
-    (9.05, "Las ventas subieron doce por ciento. Hay trescientos veintisiete mil lempiras pendientes y cuatro clientes vencidos.", "es-HN-KarlaNeural", "+12%"),
-    (16.6, "¿Quiénes me deben desde dos mil veinticuatro y a quién debería cobrar primero?", "es-HN-CarlosNeural", "+12%"),
-    (20.75, "Grupo Empresarial X debe noventa y cuatro mil lempiras.", "es-HN-KarlaNeural", "+12%"),
-    (25.7, "No busques el dato. Pregúntalo.", "es-HN-CarlosNeural", "+2%"),
-    (29.2, "¿Cómo vamos frente a dos mil veinticinco?", "es-HN-CarlosNeural", "+8%"),
-    (32.45, "Las ventas crecieron dieciocho punto cuatro por ciento y los gastos, once punto dos.", "es-HN-KarlaNeural", "+12%"),
-    (38.55, "¿Qué productos necesito comprar?", "es-HN-CarlosNeural", "+8%"),
-    (41.05, "Hay siete productos con poca existencia. Tres necesitan atención inmediata.", "es-HN-KarlaNeural", "+12%"),
-    (47.2, "¿Cuánto gastamos en planilla este mes y por qué aumentó?", "es-HN-CarlosNeural", "+10%"),
-    (50.7, "Fueron doscientos ochenta y cuatro mil. Subió por contrataciones, horas extra y prestaciones.", "es-HN-KarlaNeural", "+15%"),
-    (57.3, "¿Qué oportunidades tenemos pendientes?", "es-HN-CarlosNeural", "+8%"),
-    (60.05, "Hay ocho oportunidades por uno punto seis millones. Dos necesitan seguimiento.", "es-HN-KarlaNeural", "+12%"),
-    (66.15, "No recorras módulo por módulo. Onix los conecta.", "es-HN-CarlosNeural", "+5%"),
-    (70.5, "Onix, analiza todo y dime qué necesita mi atención.", "es-HN-CarlosNeural", "+8%"),
-    (74.45, "Hoy, cobra vencidos, repón productos y sigue oportunidades.", "es-HN-KarlaNeural", "+15%"),
-    (80.0, "Onix convierte tus datos en respuestas. Habla con tu empresa.", "es-HN-CarlosNeural", "+10%"),
+    (0.4, "Habla con tu empresa.", "es-HN-CarlosNeural", "+18%", "+1Hz", "+10%"),
+    (4.75, "Buenos días, Onix, ¿cómo está mi empresa hoy?", "es-HN-CarlosNeural", "+20%", "+0Hz", "+8%"),
+    (9.05, "Tus ventas subieron un doce por ciento, pero hay trescientos veintisiete mil lempiras pendientes y cuatro clientes vencidos.", "es-HN-KarlaNeural", "+24%", "+2Hz", "+12%"),
+    (16.6, "¿Quién me debe desde dos mil veinticuatro? ¿A quién cobro primero?", "es-HN-CarlosNeural", "+24%", "+0Hz", "+8%"),
+    (20.75, "Prioriza Grupo Empresarial X: debe noventa y cuatro mil.", "es-HN-KarlaNeural", "+26%", "+2Hz", "+12%"),
+    (25.7, "No busques el dato. Pregúntalo.", "es-HN-CarlosNeural", "+18%", "+1Hz", "+10%"),
+    (29.2, "¿Cómo vamos frente a dos mil veinticinco?", "es-HN-CarlosNeural", "+20%", "+0Hz", "+8%"),
+    (32.45, "Las ventas crecieron dieciocho punto cuatro por ciento, y los gastos, once punto dos.", "es-HN-KarlaNeural", "+25%", "+2Hz", "+12%"),
+    (38.55, "¿Qué productos necesito comprar?", "es-HN-CarlosNeural", "+20%", "+0Hz", "+8%"),
+    (41.05, "Hay siete productos con poca existencia; tres necesitan atención inmediata.", "es-HN-KarlaNeural", "+25%", "+2Hz", "+12%"),
+    (47.2, "¿Cuánto gastamos en planilla este mes, y por qué aumentó?", "es-HN-CarlosNeural", "+22%", "+0Hz", "+8%"),
+    (50.7, "Fueron doscientos ochenta y cuatro mil; aumentó por contrataciones, horas extra y prestaciones.", "es-HN-KarlaNeural", "+26%", "+2Hz", "+12%"),
+    (57.3, "¿Qué oportunidades tenemos pendientes?", "es-HN-CarlosNeural", "+20%", "+0Hz", "+8%"),
+    (60.05, "Hay ocho oportunidades por uno punto seis millones, y dos necesitan seguimiento esta semana.", "es-HN-KarlaNeural", "+25%", "+2Hz", "+12%"),
+    (66.15, "No recorras módulo por módulo. Onix los conecta.", "es-HN-CarlosNeural", "+18%", "+1Hz", "+10%"),
+    (70.5, "Onix, analiza todo y dime qué necesita mi atención.", "es-HN-CarlosNeural", "+21%", "+0Hz", "+8%"),
+    (74.45, "Tus prioridades: cobrar vencidos, reponer productos y seguir oportunidades.", "es-HN-KarlaNeural", "+26%", "+2Hz", "+12%"),
+    (80.2, "Onix convierte tus datos en respuestas. Habla con tu empresa.", "es-HN-CarlosNeural", "+20%", "+1Hz", "+10%"),
 ]
 
 
@@ -769,10 +769,10 @@ def frame(spec: VideoSpec, sec: float):
 
 async def create_voiceovers(force=False):
     results = []
-    for index, (start, text, voice, rate) in enumerate(VOICE_SEGMENTS):
+    for index, (start, text, voice, rate, pitch, volume) in enumerate(VOICE_SEGMENTS):
         path = AUDIO / f"voice_{index:02d}.mp3"
         if force or not path.exists():
-            communicator = edge_tts.Communicate(text, voice, rate=rate, pitch="-2Hz", volume="+8%")
+            communicator = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch, volume=volume)
             await communicator.save(str(path))
         results.append((start, path))
     return results
@@ -783,6 +783,7 @@ def create_music(path: Path):
     total = int(DURATION * sample_rate)
     timeline = np.arange(total, dtype=np.float64) / sample_rate
     music = np.zeros(total, dtype=np.float64)
+    rng = np.random.default_rng(2026)
     chords = [(65.41, 98.00, 130.81), (73.42, 110.00, 146.83), (82.41, 123.47, 164.81), (55.00, 82.41, 110.00)]
     beat = 0.75
     for index in range(int(math.ceil(DURATION / beat))):
@@ -793,12 +794,17 @@ def create_music(path: Path):
         env = np.minimum(lt / 0.16, 1) * np.minimum((beat - lt) / 0.22, 1)
         pad = sum(np.sin(2 * np.pi * f * lt) for f in chord) / len(chord)
         pulse = np.sin(2 * np.pi * chord[0] * 2 * lt) * (0.55 + 0.45 * np.sin(2 * np.pi * 2 * lt))
-        music[start:end] += (pad * 0.105 + pulse * 0.025) * env
+        energy = 0.76 + 0.34 * (index * beat / DURATION)
+        music[start:end] += (pad * 0.105 + pulse * 0.025) * env * energy
         if index % 2 == 0:
             hit_end = min(end, start + int(0.14 * sample_rate))
             ht = np.arange(hit_end - start) / sample_rate
             music[start:hit_end] += np.sin(2 * np.pi * (65 - 28 * ht) * ht) * np.exp(-24 * ht) * 0.14
-    rng = np.random.default_rng(2026)
+        if index % 2 == 1:
+            tick_end = min(end, start + int(0.08 * sample_rate))
+            tt = np.arange(tick_end - start) / sample_rate
+            tick = rng.normal(0, 1, tick_end - start)
+            music[start:tick_end] += tick * np.exp(-48 * tt) * 0.009 * energy
     for moment in [0, 4.5, 14.5, 24.5, 29, 38, 47, 57, 65, 69.5, 79.5]:
         start = int(moment * sample_rate)
         end = min(total, start + int(0.85 * sample_rate))
@@ -811,6 +817,15 @@ def create_music(path: Path):
         end = min(total, start + int(0.18 * sample_rate))
         t = np.arange(end - start) / sample_rate
         music[start:end] += np.sin(2 * np.pi * (880 + 240 * t) * t) * np.exp(-19 * t) * 0.055
+    for moment in [4.5, 24.5, 65.0, 79.5]:
+        start = max(0, int((moment - 0.85) * sample_rate))
+        end = min(total, int(moment * sample_rate))
+        t = np.arange(end - start) / sample_rate
+        progress = t / max(t[-1], 0.001)
+        phase = 2 * np.pi * (190 * t + 620 * t * progress)
+        riser = np.sin(phase) * progress**2 * 0.025
+        noise = rng.normal(0, 1, end - start) * progress**3 * 0.008
+        music[start:end] += riser + noise
     fade = int(1.5 * sample_rate)
     music[:fade] *= np.linspace(0, 1, fade)
     music[-fade:] *= np.linspace(1, 0, fade)
@@ -826,14 +841,29 @@ def mux(ffmpeg: Path, silent: Path, voices, music: Path, final: Path):
     command = [str(ffmpeg), "-y", "-i", str(silent), "-i", str(music)]
     for _, path in voices:
         command.extend(["-i", str(path)])
-    filters = ["[1:a]volume=0.22[music]"]
+    filters = [
+        "[1:a]aresample=48000,highpass=f=35,bass=g=2:f=90,treble=g=1.5:f=5000,volume=1.85[musicbase]"
+    ]
     labels = []
     for input_index, (start, _) in enumerate(voices, start=2):
         delay = int(start * 1000)
         label = f"v{input_index}"
-        filters.append(f"[{input_index}:a]adelay={delay}|{delay},volume=1.36[{label}]")
+        filters.append(f"[{input_index}:a]aresample=48000,adelay={delay}|{delay},volume=1.18[{label}]")
         labels.append(f"[{label}]")
-    filters.append(f"[music]{''.join(labels)}amix=inputs={1 + len(labels)}:duration=longest:normalize=0,alimiter=limit=0.96[outa]")
+    filters.append(
+        f"{''.join(labels)}amix=inputs={len(labels)}:duration=longest:normalize=0,"
+        "highpass=f=80,equalizer=f=3000:t=q:w=1.1:g=2,"
+        "acompressor=threshold=0.10:ratio=2.5:attack=8:release=90:makeup=1.2,"
+        f"alimiter=limit=0.90,apad=whole_dur={DURATION},asplit=2[voicekey][voiceout]"
+    )
+    filters.append(
+        "[musicbase][voicekey]sidechaincompress=threshold=0.025:ratio=7:"
+        "attack=25:release=380:makeup=1[ducked]"
+    )
+    filters.append(
+        "[ducked][voiceout]amix=inputs=2:duration=longest:normalize=0,"
+        "volume=1.32,alimiter=limit=0.96[outa]"
+    )
     command.extend([
         "-filter_complex", ";".join(filters),
         "-map", "0:v:0", "-map", "[outa]",
@@ -928,7 +958,7 @@ def main():
         return
 
     music = AUDIO / "onix_habla_empresa_cinematic.wav"
-    if not music.exists():
+    if args.audio_only or not music.exists():
         create_music(music)
     voices = [] if args.music_only else asyncio.run(create_voiceovers(force=args.audio_only))
     for spec in selected:
