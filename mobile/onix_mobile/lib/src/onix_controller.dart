@@ -16,6 +16,8 @@ class OnixController extends ChangeNotifier {
   bool initializing = true;
   bool authenticating = false;
   bool sending = false;
+  bool loadingConnections = false;
+  OnixConnections? connections;
   String? error;
 
   bool get authenticated => bootstrap != null;
@@ -106,6 +108,77 @@ class OnixController extends ChangeNotifier {
       return false;
     } finally {
       sending = false;
+      notifyListeners();
+    }
+  }
+
+  Future<OnixConnections?> loadConnections() async {
+    loadingConnections = true;
+    error = null;
+    notifyListeners();
+    try {
+      connections = await _api.connections();
+      return connections;
+    } on OnixApiException catch (exception) {
+      error = exception.message;
+      if (exception.unauthorized) bootstrap = null;
+      return null;
+    } finally {
+      loadingConnections = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> savePersonalProfile({
+    required String whatsapp,
+    required bool whatsappOptIn,
+    required String timezone,
+    required String reminderChannel,
+  }) async {
+    loadingConnections = true;
+    error = null;
+    notifyListeners();
+    try {
+      connections = await _api.updatePersonalProfile(
+        whatsapp: whatsapp,
+        whatsappOptIn: whatsappOptIn,
+        timezone: timezone,
+        reminderChannel: reminderChannel,
+      );
+      return true;
+    } on OnixApiException catch (exception) {
+      error = exception.message;
+      return false;
+    } finally {
+      loadingConnections = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Uri?> startGoogleConnection() async {
+    error = null;
+    notifyListeners();
+    try {
+      return await _api.startGoogleConnection();
+    } on OnixApiException catch (exception) {
+      error = exception.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> disconnectConnection(String provider) async {
+    loadingConnections = true;
+    error = null;
+    notifyListeners();
+    try {
+      connections = await _api.disconnectConnection(provider);
+      return true;
+    } on OnixApiException catch (exception) {
+      error = exception.message;
+      return false;
+    } finally {
+      loadingConnections = false;
       notifyListeners();
     }
   }

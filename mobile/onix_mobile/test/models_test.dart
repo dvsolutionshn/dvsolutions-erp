@@ -71,4 +71,33 @@ void main() {
     expect(action.invoiceStatus, 'emitida');
     expect(action.pdfAvailable, isTrue);
   });
+
+  test('interpreta el perfil y las conexiones externas de Onix', () {
+    final connections = OnixConnections.fromJson({
+      'profile': {
+        'email': 'persona@example.com',
+        'whatsapp': '+50499991234',
+        'whatsapp_verified': false,
+        'whatsapp_opt_in': true,
+        'timezone': 'America/Tegucigalpa',
+        'reminder_channel': 'whatsapp',
+      },
+      'services': [
+        {
+          'id': 'google_calendar',
+          'title': 'Google Calendar',
+          'description': 'Calendario personal',
+          'status': 'conectada',
+          'account': 'persona@gmail.com',
+          'configured': true,
+          'action': 'oauth',
+        },
+      ],
+    });
+
+    expect(connections.profile.whatsappOptIn, isTrue);
+    expect(connections.profile.reminderChannel, 'whatsapp');
+    expect(connections.services.single.connected, isTrue);
+    expect(connections.services.single.account, 'persona@gmail.com');
+  });
 }

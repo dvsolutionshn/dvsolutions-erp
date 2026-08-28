@@ -233,6 +233,20 @@ ONIX_MOBILE_MAX_SESSIONS_PER_USER = int(os.environ.get("ONIX_MOBILE_MAX_SESSIONS
 ONIX_MOBILE_LOGIN_MAX_ATTEMPTS = int(os.environ.get("ONIX_MOBILE_LOGIN_MAX_ATTEMPTS", "5"))
 ONIX_MOBILE_LOGIN_WINDOW_SECONDS = int(os.environ.get("ONIX_MOBILE_LOGIN_WINDOW_SECONDS", "900"))
 ONIX_MOBILE_MAX_BODY_BYTES = int(os.environ.get("ONIX_MOBILE_MAX_BODY_BYTES", "65536"))
+ONIX_CONNECTION_ENCRYPTION_KEY = os.environ.get("ONIX_CONNECTION_ENCRYPTION_KEY", "").strip()
+ONIX_GOOGLE_CLIENT_ID = os.environ.get("ONIX_GOOGLE_CLIENT_ID", "").strip()
+ONIX_GOOGLE_CLIENT_SECRET = os.environ.get("ONIX_GOOGLE_CLIENT_SECRET", "").strip()
+ONIX_GOOGLE_REDIRECT_URI = os.environ.get("ONIX_GOOGLE_REDIRECT_URI", "").strip()
+ONIX_GOOGLE_SCOPES = env_list(
+    "ONIX_GOOGLE_SCOPES",
+    [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/calendar.events",
+    ],
+)
+ONIX_WHATSAPP_ENABLED = env_bool("ONIX_WHATSAPP_ENABLED", False)
 
 
 # Cache

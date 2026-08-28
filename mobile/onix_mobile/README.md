@@ -22,10 +22,16 @@ Aplicacion Flutter de Onix para iOS y Android. La app permite iniciar sesion con
 - Vista previa, confirmacion y descarte de borradores de factura.
 - Validacion y emision fiscal confirmable con asignacion de CAI, inventario y asiento contable.
 - Descarga autenticada y apertura del PDF de cada factura desde la aplicacion.
+- Pantalla `Mis conexiones` para registrar WhatsApp y administrar servicios personales.
+- Vinculacion segura de Google Calendar mediante OAuth 2.0, con tokens cifrados y revocables.
+- Estado visible del correo, WhatsApp, Google Calendar y calendario del iPhone.
 - Categorias visibles para las siguientes etapas: gastos, bancos e inquilinos.
 
 ## Siguientes etapas del agente financiero completo
 
+- Verificacion del numero y envio de recordatorios por WhatsApp Cloud API.
+- Lectura y escritura del calendario del iPhone mediante permiso nativo de EventKit.
+- Uso de eventos de Google Calendar como herramientas de consulta y accion de Onix.
 - Envio de facturas por correo y WhatsApp desde Onix, reutilizando las integraciones del ERP.
 - Registro de pagos, gastos y recordatorios mediante acciones confirmables.
 - Facturacion mensual recurrente y reglas por cliente o contrato.

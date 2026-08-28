@@ -180,3 +180,87 @@ class OnixLoginResult {
   final String token;
   final OnixBootstrap bootstrap;
 }
+
+class OnixPersonalProfile {
+  const OnixPersonalProfile({
+    required this.email,
+    required this.whatsapp,
+    required this.whatsappVerified,
+    required this.whatsappOptIn,
+    required this.timezone,
+    required this.reminderChannel,
+  });
+
+  factory OnixPersonalProfile.fromJson(Map<String, dynamic> json) =>
+      OnixPersonalProfile(
+        email: json['email']?.toString() ?? '',
+        whatsapp: json['whatsapp']?.toString() ?? '',
+        whatsappVerified: json['whatsapp_verified'] == true,
+        whatsappOptIn: json['whatsapp_opt_in'] == true,
+        timezone: json['timezone']?.toString() ?? 'America/Tegucigalpa',
+        reminderChannel: json['reminder_channel']?.toString() ?? 'app',
+      );
+
+  final String email;
+  final String whatsapp;
+  final bool whatsappVerified;
+  final bool whatsappOptIn;
+  final String timezone;
+  final String reminderChannel;
+}
+
+class OnixExternalConnection {
+  const OnixExternalConnection({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.status,
+    required this.account,
+    required this.configured,
+    required this.action,
+  });
+
+  factory OnixExternalConnection.fromJson(Map<String, dynamic> json) =>
+      OnixExternalConnection(
+        id: json['id']?.toString() ?? '',
+        title: json['title']?.toString() ?? '',
+        description: json['description']?.toString() ?? '',
+        status: json['status']?.toString() ?? 'no_conectada',
+        account: json['account']?.toString() ?? '',
+        configured: json['configured'] == true,
+        action: json['action']?.toString() ?? '',
+      );
+
+  final String id;
+  final String title;
+  final String description;
+  final String status;
+  final String account;
+  final bool configured;
+  final String action;
+
+  bool get connected => status == 'conectada';
+  bool get pending => status == 'pendiente';
+}
+
+class OnixConnections {
+  const OnixConnections({required this.profile, required this.services});
+
+  factory OnixConnections.fromJson(
+    Map<String, dynamic> json,
+  ) => OnixConnections(
+    profile: OnixPersonalProfile.fromJson(
+      Map<String, dynamic>.from(json['profile'] as Map? ?? const {}),
+    ),
+    services: (json['services'] as List? ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) =>
+              OnixExternalConnection.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList(),
+  );
+
+  final OnixPersonalProfile profile;
+  final List<OnixExternalConnection> services;
+}

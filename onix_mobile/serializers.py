@@ -2,6 +2,9 @@ from django.conf import settings
 
 from core.models import AccionOnix, ConfiguracionOnix, ConversacionOnix
 
+from .integrations import google_configurado
+from .models import ConexionOnixExterna, PerfilOnixPersonal
+
 
 CATEGORIAS_ONIX = (
     {
@@ -150,6 +153,84 @@ def serializar_mensajes(*, empresa, usuario, limite=50):
     ]
 
 
+def serializar_conexiones(*, empresa, usuario):
+    perfil, _ = PerfilOnixPersonal.objects.get_or_create(usuario=usuario)
+    conexiones = {
+        conexion.proveedor: conexion
+        for conexion in ConexionOnixExterna.objects.filter(empresa=empresa, usuario=usuario)
+    }
+
+    def conexion(proveedor):
+        item = conexiones.get(proveedor)
+        return {
+            "status": item.estado if item else "no_conectada",
+            "account": item.cuenta_externa if item else "",
+            "account_name": item.nombre_cuenta if item else "",
+            "scopes": item.permisos if item else [],
+            "sync_enabled": item.sincronizacion_activa if item else False,
+            "last_sync_at": item.ultima_sincronizacion.isoformat() if item and item.ultima_sincronizacion else None,
+            "last_error": item.ultimo_error if item else "",
+        }
+
+    google = conexion(ConexionOnixExterna.GOOGLE_CALENDAR)
+    google.update(
+        {
+            "id": ConexionOnixExterna.GOOGLE_CALENDAR,
+            "title": "Google Calendar",
+            "description": "Consulta y administra tus eventos autorizados de Google.",
+            "configured": google_configurado(),
+            "action": "oauth",
+        }
+    )
+    whatsapp_status = (
+        "conectada"
+        if perfil.whatsapp_verificado_en
+        else "pendiente"
+        if perfil.telefono_whatsapp
+        else "no_conectada"
+    )
+    return {
+        "profile": {
+            "email": usuario.email or "",
+            "email_registered": bool(usuario.email),
+            "whatsapp": perfil.telefono_whatsapp,
+            "whatsapp_verified": bool(perfil.whatsapp_verificado_en),
+            "whatsapp_opt_in": perfil.acepta_notificaciones_whatsapp,
+            "timezone": perfil.zona_horaria,
+            "reminder_channel": perfil.canal_recordatorio,
+        },
+        "services": [
+            {
+                "id": "email",
+                "title": "Correo de acceso",
+                "description": "Correo utilizado para ingresar y recibir avisos de seguridad.",
+                "status": "conectada" if usuario.email else "no_conectada",
+                "account": usuario.email or "",
+                "configured": True,
+                "action": "profile",
+            },
+            {
+                "id": ConexionOnixExterna.WHATSAPP,
+                "title": "WhatsApp",
+                "description": "Recibe recordatorios y conversa con Onix desde tu numero verificado.",
+                "status": whatsapp_status,
+                "account": perfil.telefono_whatsapp,
+                "configured": bool(getattr(settings, "ONIX_WHATSAPP_ENABLED", False)),
+                "action": "profile",
+            },
+            google,
+            {
+                "id": ConexionOnixExterna.APPLE_CALENDAR,
+                "title": "Calendario de iPhone",
+                "description": "El acceso se autoriza directamente desde tu iPhone.",
+                **conexion(ConexionOnixExterna.APPLE_CALENDAR),
+                "configured": True,
+                "action": "device_permission",
+            },
+        ],
+    }
+
+
 def construir_bootstrap(*, usuario, empresa):
     nombre = usuario.get_full_name().strip() or usuario.username
     configuracion = ConfiguracionOnix.objects.filter(empresa=empresa).first()
@@ -240,6 +321,8 @@ def construir_bootstrap(*, usuario, empresa):
             "payments": facturacion_activa and puede_pagos,
             "voice": False,
             "file_uploads": False,
+            "external_connections": True,
         },
+        "connections_url": "/api/onix/mobile/v1/connections/",
         "categories": categorias,
     }

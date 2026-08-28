@@ -1,11 +1,14 @@
 import hashlib
 import json
 import logging
+import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
+from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -16,8 +19,20 @@ from core.onix_access import onix_disponible_para_empresa
 from core.onix_actions import cancelar_accion, ejecutar_accion
 
 from .authentication import autenticar_token_movil
-from .models import SesionOnixMovil
-from .serializers import construir_bootstrap, serializar_accion, serializar_mensajes
+from .integrations import construir_autorizacion_google, intercambiar_codigo_google
+from .models import (
+    ConexionOnixExterna,
+    PerfilOnixPersonal,
+    SesionOnixMovil,
+    SolicitudOAuthOnix,
+)
+from .serializers import (
+    construir_bootstrap,
+    serializar_accion,
+    serializar_conexiones,
+    serializar_mensajes,
+)
+from .security import validar_cifrado_conexiones
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +84,39 @@ def _solo_metodo(request, metodo):
         respuesta["Allow"] = metodo
         return respuesta
     return None
+
+
+def _normalizar_whatsapp(valor):
+    texto = str(valor or "").strip()
+    if not texto:
+        return ""
+    digitos = re.sub(r"\D", "", texto)
+    if digitos.startswith("00"):
+        digitos = digitos[2:]
+    if not texto.startswith("+") and len(digitos) == 8:
+        digitos = "504" + digitos
+    if not 8 <= len(digitos) <= 15:
+        raise ValidationError("Escribe el WhatsApp con codigo de pais, por ejemplo +504 9999-9999.")
+    return "+" + digitos
+
+
+def _oauth_html(titulo, mensaje, *, status=200):
+    response = HttpResponse(
+        "<!doctype html><html lang='es'><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>ONIX</title><body style='margin:0;background:#071525;color:#f7fbff;"
+        "font-family:system-ui;display:grid;place-items:center;min-height:100vh'>"
+        "<main style='max-width:520px;padding:40px;text-align:center'>"
+        "<div style='font-size:14px;letter-spacing:5px;color:#41dbde'>ONIX</div>"
+        f"<h1>{titulo}</h1><p style='color:#b8cfe1;line-height:1.6'>{mensaje}</p>"
+        "<p style='margin-top:28px'>Ya puedes cerrar esta ventana y volver a la aplicacion.</p>"
+        "</main></body></html>",
+        status=status,
+        content_type="text/html; charset=utf-8",
+    )
+    response["Cache-Control"] = "no-store"
+    response["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'"
+    return response
 
 
 @csrf_exempt
@@ -152,6 +200,160 @@ def bootstrap(request):
         {
             "ok": True,
             "bootstrap": construir_bootstrap(usuario=request.user, empresa=request.empresa),
+        }
+    )
+
+
+@csrf_exempt
+@autenticar_token_movil
+def connections(request):
+    error_metodo = _solo_metodo(request, "GET")
+    if error_metodo:
+        return error_metodo
+    return JsonResponse(
+        {
+            "ok": True,
+            "connections": serializar_conexiones(empresa=request.empresa, usuario=request.user),
+        }
+    )
+
+
+@csrf_exempt
+@autenticar_token_movil
+def personal_profile(request):
+    error_metodo = _solo_metodo(request, "POST")
+    if error_metodo:
+        return error_metodo
+    try:
+        datos = _leer_json(request)
+        whatsapp = _normalizar_whatsapp(datos.get("whatsapp"))
+        zona_horaria = str(datos.get("timezone") or "America/Tegucigalpa").strip()
+        ZoneInfo(zona_horaria)
+        canal = str(datos.get("reminder_channel") or PerfilOnixPersonal.CANAL_APP).strip()
+        canales = {valor for valor, _ in PerfilOnixPersonal.CANALES}
+        if canal not in canales:
+            raise ValidationError("Selecciona un canal de recordatorio valido.")
+        opt_in = datos.get("whatsapp_opt_in") is True
+        if opt_in and not whatsapp:
+            raise ValidationError("Registra tu numero antes de activar avisos por WhatsApp.")
+        if canal == PerfilOnixPersonal.CANAL_WHATSAPP and not opt_in:
+            raise ValidationError("Activa los avisos por WhatsApp antes de usarlo como canal principal.")
+    except ZoneInfoNotFoundError:
+        return _json_error("La zona horaria indicada no es valida.")
+    except ValidationError as exc:
+        return _json_error(" ".join(exc.messages))
+
+    perfil, _ = PerfilOnixPersonal.objects.get_or_create(usuario=request.user)
+    if perfil.telefono_whatsapp != whatsapp:
+        perfil.whatsapp_verificado_en = None
+    perfil.telefono_whatsapp = whatsapp
+    perfil.acepta_notificaciones_whatsapp = opt_in
+    perfil.zona_horaria = zona_horaria
+    perfil.canal_recordatorio = canal
+    perfil.save()
+    return JsonResponse(
+        {
+            "ok": True,
+            "connections": serializar_conexiones(empresa=request.empresa, usuario=request.user),
+        }
+    )
+
+
+@csrf_exempt
+@autenticar_token_movil
+def google_connection_start(request):
+    error_metodo = _solo_metodo(request, "POST")
+    if error_metodo:
+        return error_metodo
+    try:
+        validar_cifrado_conexiones()
+        estado, _ = SolicitudOAuthOnix.emitir(
+            usuario=request.user,
+            empresa=request.empresa,
+            proveedor=ConexionOnixExterna.GOOGLE_CALENDAR,
+        )
+        url = construir_autorizacion_google(estado)
+    except ImproperlyConfigured:
+        return _json_error(
+            "El servidor todavia no puede proteger conexiones externas.",
+            status=503,
+            codigo="connection_security_not_configured",
+        )
+    except ValidationError as exc:
+        SolicitudOAuthOnix.objects.filter(estado_hash=SolicitudOAuthOnix.calcular_hash(estado)).delete()
+        return _json_error(" ".join(exc.messages), status=503, codigo="google_not_configured")
+    ConexionOnixExterna.objects.update_or_create(
+        usuario=request.user,
+        empresa=request.empresa,
+        proveedor=ConexionOnixExterna.GOOGLE_CALENDAR,
+        defaults={"estado": ConexionOnixExterna.PENDIENTE, "ultimo_error": ""},
+    )
+    return JsonResponse({"ok": True, "authorization_url": url, "expires_in": 600})
+
+
+def google_connection_callback(request):
+    if request.method != "GET":
+        return _oauth_html("Solicitud no valida", "Este enlace solo puede abrirse desde Google.", status=405)
+    estado = str(request.GET.get("state") or "")
+    codigo = str(request.GET.get("code") or "")
+    error = str(request.GET.get("error") or "")
+    solicitud = SolicitudOAuthOnix.consumir(estado, ConexionOnixExterna.GOOGLE_CALENDAR) if estado else None
+    if not solicitud:
+        return _oauth_html("Enlace vencido", "Vuelve a ONIX e inicia nuevamente la conexion.", status=400)
+    if error or not codigo:
+        return _oauth_html("Conexion cancelada", "Google no autorizo el acceso al calendario.", status=400)
+    try:
+        datos = intercambiar_codigo_google(codigo)
+        with transaction.atomic():
+            conexion, _ = ConexionOnixExterna.objects.select_for_update().get_or_create(
+                usuario=solicitud.usuario,
+                empresa=solicitud.empresa,
+                proveedor=ConexionOnixExterna.GOOGLE_CALENDAR,
+            )
+            conexion.guardar_tokens(
+                acceso=datos["access_token"],
+                refresco=datos["refresh_token"],
+            )
+            conexion.estado = ConexionOnixExterna.CONECTADA
+            conexion.cuenta_externa = datos["email"]
+            conexion.nombre_cuenta = datos["name"]
+            conexion.permisos = datos["scope"]
+            conexion.token_expira_en = datos["expires_at"]
+            conexion.sincronizacion_activa = True
+            conexion.ultimo_error = ""
+            conexion.metadatos = {"subject": datos["subject"]}
+            conexion.save()
+    except (ImproperlyConfigured, ValidationError):
+        logger.exception("Google OAuth fallo para la solicitud %s", solicitud.id)
+        ConexionOnixExterna.objects.filter(
+            usuario=solicitud.usuario,
+            empresa=solicitud.empresa,
+            proveedor=ConexionOnixExterna.GOOGLE_CALENDAR,
+        ).update(estado=ConexionOnixExterna.ERROR, ultimo_error="Google no completo la autorizacion.")
+        return _oauth_html("No pudimos conectar Google", "Intenta nuevamente desde ONIX.", status=502)
+    return _oauth_html("Google Calendar conectado", "ONIX ya puede trabajar con el calendario que autorizaste.")
+
+
+@csrf_exempt
+@autenticar_token_movil
+def disconnect_connection(request, proveedor):
+    error_metodo = _solo_metodo(request, "POST")
+    if error_metodo:
+        return error_metodo
+    permitidos = {valor for valor, _ in ConexionOnixExterna.PROVEEDORES}
+    if proveedor not in permitidos:
+        return _json_error("La conexion indicada no existe.", status=404, codigo="connection_not_found")
+    conexion = ConexionOnixExterna.objects.filter(
+        usuario=request.user,
+        empresa=request.empresa,
+        proveedor=proveedor,
+    ).first()
+    if conexion:
+        conexion.revocar()
+    return JsonResponse(
+        {
+            "ok": True,
+            "connections": serializar_conexiones(empresa=request.empresa, usuario=request.user),
         }
     )
 

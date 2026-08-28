@@ -40,9 +40,31 @@ ONIX_MAX_TOOL_ROUNDS=4
 ONIX_INPUT_PRICE_PER_MTOK=0.20
 ONIX_CACHED_INPUT_PRICE_PER_MTOK=0.02
 ONIX_OUTPUT_PRICE_PER_MTOK=1.20
+ONIX_CONNECTION_ENCRYPTION_KEY=generar-clave-fernet-independiente
+ONIX_GOOGLE_CLIENT_ID=cliente-oauth-web-de-google
+ONIX_GOOGLE_CLIENT_SECRET=secreto-oauth-de-google
+ONIX_GOOGLE_REDIRECT_URI=https://dvsolutionshn.com/api/onix/mobile/v1/connections/google/callback/
+ONIX_GOOGLE_SCOPES=openid,email,profile,https://www.googleapis.com/auth/calendar.events
+ONIX_WHATSAPP_ENABLED=false
 ```
 
 Nunca guardar la clave real en Git. Reiniciar Gunicorn despues de cambiar variables.
+
+Generar la clave independiente para cifrar conexiones externas:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+La clave debe conservarse estable: cambiarla invalida los tokens OAuth guardados. Para Google
+Calendar se crea un cliente OAuth de tipo aplicacion web, se activa Google Calendar API y se
+registra exactamente la URL de `ONIX_GOOGLE_REDIRECT_URI`. La pantalla de consentimiento debe
+publicarse antes de ofrecer la conexion a usuarios externos. ONIX solicita identidad basica y
+permiso para administrar eventos; no solicita acceso al contenido de Gmail.
+
+`ONIX_WHATSAPP_ENABLED` debe permanecer desactivado hasta configurar WhatsApp Cloud API, el
+numero empresarial, el webhook y las plantillas de recordatorio aprobadas. Registrar el numero
+personal en ONIX no conecta una sesion de WhatsApp Web ni guarda contrasenas.
 
 `ONIX_ALLOWED_COMPANY_SLUGS` controla donde aparece y donde acepta consultas Onix. Durante
 el piloto debe permanecer en `demo_1`. Para habilitar varias empresas se separan sus slugs

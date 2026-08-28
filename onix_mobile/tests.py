@@ -1,5 +1,6 @@
 from datetime import timedelta
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 from django.core.cache import cache
 from django.test import TestCase
@@ -18,7 +19,7 @@ from core.models import (
 )
 from facturacion.models import Cliente, Factura
 
-from .models import SesionOnixMovil
+from .models import ConexionOnixExterna, PerfilOnixPersonal, SesionOnixMovil, SolicitudOAuthOnix
 
 
 @override_settings(
@@ -26,6 +27,7 @@ from .models import SesionOnixMovil
     ONIX_ALLOWED_COMPANY_SLUGS=["demo_1"],
     ONIX_MOBILE_TOKEN_DAYS=30,
     ONIX_MOBILE_LOGIN_MAX_ATTEMPTS=5,
+    ONIX_CONNECTION_ENCRYPTION_KEY="VXz_sMKZWREYswmeI4uDGryhpjFPz7PK_fFjjZjj0FY=",
 )
 class OnixMobileApiTests(TestCase):
     password = "ClaveSegura123!"
@@ -131,6 +133,167 @@ class OnixMobileApiTests(TestCase):
         self.assertEqual(sin_token.status_code, 401)
         self.assertEqual(con_token.status_code, 200)
         self.assertEqual(con_token.json()["bootstrap"]["user"]["username"], self.usuario.username)
+
+    def test_conexiones_registra_whatsapp_normalizado_y_preferencias(self):
+        token = self._token()
+        response = self.client.post(
+            reverse("onix_mobile:personal_profile"),
+            {
+                "whatsapp": "9999-1234",
+                "whatsapp_opt_in": True,
+                "timezone": "America/Tegucigalpa",
+                "reminder_channel": "whatsapp",
+            },
+            content_type="application/json",
+            **self._authorization(token),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        perfil = PerfilOnixPersonal.objects.get(usuario=self.usuario)
+        self.assertEqual(perfil.telefono_whatsapp, "+50499991234")
+        self.assertTrue(perfil.acepta_notificaciones_whatsapp)
+        self.assertEqual(perfil.canal_recordatorio, "whatsapp")
+        servicios = {item["id"]: item for item in response.json()["connections"]["services"]}
+        self.assertEqual(servicios["whatsapp"]["status"], "pendiente")
+        self.assertEqual(servicios["email"]["account"], self.usuario.email)
+
+    def test_conexiones_rechaza_opt_in_sin_numero(self):
+        response = self.client.post(
+            reverse("onix_mobile:personal_profile"),
+            {
+                "whatsapp": "",
+                "whatsapp_opt_in": True,
+                "timezone": "America/Tegucigalpa",
+                "reminder_channel": "app",
+            },
+            content_type="application/json",
+            **self._authorization(),
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("numero", response.json()["error"])
+
+    def test_google_start_informa_cuando_faltan_credenciales(self):
+        response = self.client.post(
+            reverse("onix_mobile:google_connection_start"),
+            {},
+            content_type="application/json",
+            **self._authorization(),
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["code"], "google_not_configured")
+        self.assertFalse(SolicitudOAuthOnix.objects.exists())
+
+    @override_settings(
+        DEBUG=False,
+        ONIX_CONNECTION_ENCRYPTION_KEY="",
+        ONIX_GOOGLE_CLIENT_ID="google-client-test",
+        ONIX_GOOGLE_CLIENT_SECRET="google-secret-test",
+    )
+    def test_google_start_exige_cifrado_de_tokens_en_produccion(self):
+        response = self.client.post(
+            reverse("onix_mobile:google_connection_start"),
+            {},
+            content_type="application/json",
+            **self._authorization(),
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["code"], "connection_security_not_configured")
+        self.assertFalse(SolicitudOAuthOnix.objects.exists())
+
+    @override_settings(
+        ONIX_GOOGLE_CLIENT_ID="google-client-test",
+        ONIX_GOOGLE_CLIENT_SECRET="google-secret-test",
+        ONIX_GOOGLE_REDIRECT_URI="https://erp.test/api/onix/mobile/v1/connections/google/callback/",
+    )
+    def test_google_start_crea_estado_de_un_solo_uso_y_url_segura(self):
+        response = self.client.post(
+            reverse("onix_mobile:google_connection_start"),
+            {},
+            content_type="application/json",
+            **self._authorization(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        query = parse_qs(urlparse(response.json()["authorization_url"]).query)
+        self.assertEqual(query["client_id"], ["google-client-test"])
+        self.assertEqual(query["redirect_uri"], ["https://erp.test/api/onix/mobile/v1/connections/google/callback/"])
+        self.assertIn("https://www.googleapis.com/auth/calendar.events", query["scope"][0])
+        solicitud = SolicitudOAuthOnix.objects.get()
+        self.assertNotEqual(solicitud.estado_hash, query["state"][0])
+        self.assertEqual(
+            solicitud.estado_hash,
+            SolicitudOAuthOnix.calcular_hash(query["state"][0]),
+        )
+
+    @override_settings(
+        ONIX_GOOGLE_CLIENT_ID="google-client-test",
+        ONIX_GOOGLE_CLIENT_SECRET="google-secret-test",
+        ONIX_GOOGLE_REDIRECT_URI="https://erp.test/api/onix/mobile/v1/connections/google/callback/",
+    )
+    @patch("onix_mobile.views.intercambiar_codigo_google")
+    def test_callback_google_cifra_tokens_y_conecta_solo_usuario_correcto(self, intercambiar):
+        estado, solicitud = SolicitudOAuthOnix.emitir(
+            usuario=self.usuario,
+            empresa=self.empresa,
+            proveedor=ConexionOnixExterna.GOOGLE_CALENDAR,
+        )
+        intercambiar.return_value = {
+            "access_token": "access-secreto-google",
+            "refresh_token": "refresh-secreto-google",
+            "expires_at": timezone.now() + timedelta(hours=1),
+            "scope": ["openid", "https://www.googleapis.com/auth/calendar.events"],
+            "email": "onix.calendar@example.com",
+            "name": "Cuenta Calendario",
+            "subject": "google-subject-123",
+        }
+
+        response = self.client.get(
+            reverse("onix_mobile:google_connection_callback"),
+            {"state": estado, "code": "codigo-google"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        conexion = ConexionOnixExterna.objects.get(usuario=self.usuario, empresa=self.empresa)
+        self.assertEqual(conexion.estado, ConexionOnixExterna.CONECTADA)
+        self.assertEqual(conexion.cuenta_externa, "onix.calendar@example.com")
+        self.assertNotIn("access-secreto-google", conexion.token_acceso_cifrado)
+        self.assertNotIn("refresh-secreto-google", conexion.token_refresco_cifrado)
+        self.assertEqual(conexion.token_acceso(), "access-secreto-google")
+        self.assertEqual(conexion.token_refresco(), "refresh-secreto-google")
+        solicitud.refresh_from_db()
+        self.assertIsNotNone(solicitud.consumida_en)
+        segunda = self.client.get(
+            reverse("onix_mobile:google_connection_callback"),
+            {"state": estado, "code": "codigo-repetido"},
+        )
+        self.assertEqual(segunda.status_code, 400)
+        intercambiar.assert_called_once_with("codigo-google")
+
+    def test_desconectar_google_elimina_tokens_sin_afectar_otra_empresa(self):
+        conexion = ConexionOnixExterna.objects.create(
+            usuario=self.usuario,
+            empresa=self.empresa,
+            proveedor=ConexionOnixExterna.GOOGLE_CALENDAR,
+            estado=ConexionOnixExterna.CONECTADA,
+        )
+        conexion.guardar_tokens(acceso="access", refresco="refresh")
+        conexion.save()
+
+        response = self.client.post(
+            reverse("onix_mobile:disconnect_connection", args=["google_calendar"]),
+            {},
+            content_type="application/json",
+            **self._authorization(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        conexion.refresh_from_db()
+        self.assertEqual(conexion.estado, ConexionOnixExterna.REVOCADA)
+        self.assertEqual(conexion.token_acceso_cifrado, "")
+        self.assertEqual(conexion.token_refresco_cifrado, "")
 
     def test_token_vencido_no_autoriza(self):
         token = self._token()

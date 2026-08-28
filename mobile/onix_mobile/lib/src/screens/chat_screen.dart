@@ -5,6 +5,7 @@ import '../models.dart';
 import '../onix_controller.dart';
 import '../theme.dart';
 import '../widgets/onix_markdown.dart';
+import 'connections_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, required this.controller});
@@ -108,10 +109,26 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           PopupMenuButton<String>(
-            onSelected: (value) {
+            onSelected: (value) async {
+              if (value == 'connections') {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        ConnectionsScreen(controller: widget.controller),
+                  ),
+                );
+              }
               if (value == 'logout') widget.controller.logout();
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'connections',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.hub_rounded),
+                  title: Text('Mis conexiones'),
+                ),
+              ),
               PopupMenuItem(
                 value: 'logout',
                 child: ListTile(

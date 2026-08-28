@@ -92,6 +92,61 @@ class OnixApi {
         .toList();
   }
 
+  Future<OnixConnections> connections() async {
+    final payload = await _request('connections/');
+    return OnixConnections.fromJson(
+      Map<String, dynamic>.from(payload['connections'] as Map? ?? const {}),
+    );
+  }
+
+  Future<OnixConnections> updatePersonalProfile({
+    required String whatsapp,
+    required bool whatsappOptIn,
+    required String timezone,
+    required String reminderChannel,
+  }) async {
+    final payload = await _request(
+      'connections/profile/',
+      method: 'POST',
+      body: {
+        'whatsapp': whatsapp,
+        'whatsapp_opt_in': whatsappOptIn,
+        'timezone': timezone,
+        'reminder_channel': reminderChannel,
+      },
+    );
+    return OnixConnections.fromJson(
+      Map<String, dynamic>.from(payload['connections'] as Map? ?? const {}),
+    );
+  }
+
+  Future<Uri> startGoogleConnection() async {
+    final payload = await _request(
+      'connections/google/start/',
+      method: 'POST',
+      body: const {},
+    );
+    final url = payload['authorization_url']?.toString() ?? '';
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) {
+      throw const OnixApiException(
+        'El servidor no entrego un enlace valido para Google.',
+      );
+    }
+    return uri;
+  }
+
+  Future<OnixConnections> disconnectConnection(String provider) async {
+    final payload = await _request(
+      'connections/$provider/disconnect/',
+      method: 'POST',
+      body: const {},
+    );
+    return OnixConnections.fromJson(
+      Map<String, dynamic>.from(payload['connections'] as Map? ?? const {}),
+    );
+  }
+
   Future<OnixMessage> send(String question) async {
     final payload = await _request(
       'chat/',
