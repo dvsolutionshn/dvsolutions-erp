@@ -843,6 +843,22 @@ def mux(ffmpeg: Path, silent: Path, voices, music: Path, final: Path):
     subprocess.run(command, check=True)
 
 
+def mux_music_only(ffmpeg: Path, silent: Path, music: Path, final: Path):
+    """Crea la mezcla cinematografica principal sin narracion."""
+    command = [
+        str(ffmpeg), "-y",
+        "-i", str(silent),
+        "-i", str(music),
+        "-filter_complex",
+        "[1:a]highpass=f=35,bass=g=2:f=90,treble=g=1.2:f=5000,"
+        "volume=2.4,alimiter=limit=0.96[outa]",
+        "-map", "0:v:0", "-map", "[outa]",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "256k",
+        "-t", str(DURATION), "-movflags", "+faststart", str(final),
+    ]
+    subprocess.run(command, check=True)
+
+
 def render_spec(spec: VideoSpec, voices, music: Path):
     import imageio_ffmpeg
 
@@ -897,29 +913,37 @@ def main():
     parser.add_argument("--format", choices=["16x9", "9x16", "all"], default="all")
     parser.add_argument("--preview-only", action="store_true")
     parser.add_argument("--audio-only", action="store_true", help="Regenera voces y mezcla el audio sobre los videos silenciosos existentes")
+    parser.add_argument("--music-only", action="store_true", help="Crea la version cinematografica sin narracion")
     args = parser.parse_args()
 
+    if args.audio_only and args.music_only:
+        parser.error("--audio-only y --music-only no pueden usarse al mismo tiempo")
+
     selected = list(SPECS.values()) if args.format == "all" else [SPECS[args.format]]
-    if not args.audio_only:
+    if not args.audio_only and not args.music_only:
         for spec in selected:
             preview = create_previews(spec)
             print(f"Storyboard {spec.key}: {preview}")
     if args.preview_only:
         return
 
-    voices = asyncio.run(create_voiceovers(force=args.audio_only))
     music = AUDIO / "onix_habla_empresa_cinematic.wav"
     if not music.exists():
         create_music(music)
+    voices = [] if args.music_only else asyncio.run(create_voiceovers(force=args.audio_only))
     for spec in selected:
-        if args.audio_only:
+        if args.audio_only or args.music_only:
             import imageio_ffmpeg
 
             silent = OUTPUT / f"ONIX-Habla-Con-Tu-Empresa-{spec.key}-silent.mp4"
-            final = OUTPUT / f"ONIX-Habla-Con-Tu-Empresa-{spec.key}.mp4"
             if not silent.exists():
                 raise FileNotFoundError(f"No existe el video silencioso requerido: {silent}")
-            mux(Path(imageio_ffmpeg.get_ffmpeg_exe()), silent, voices, music, final)
+            if args.music_only:
+                final = OUTPUT / f"ONIX-Habla-Con-Tu-Empresa-Cinematico-Sin-Voz-{spec.key}.mp4"
+                mux_music_only(Path(imageio_ffmpeg.get_ffmpeg_exe()), silent, music, final)
+            else:
+                final = OUTPUT / f"ONIX-Habla-Con-Tu-Empresa-{spec.key}.mp4"
+                mux(Path(imageio_ffmpeg.get_ffmpeg_exe()), silent, voices, music, final)
         else:
             final = render_spec(spec, voices, music)
         print(f"Video final {spec.key}: {final}")
