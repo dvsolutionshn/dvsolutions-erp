@@ -74,24 +74,24 @@ SCENES = [
 
 
 VOICE_SEGMENTS = [
-    (0.4, "Habla con tu empresa.", "es-HN-CarlosNeural", "+8%"),
-    (4.8, "Buenos días, Onix. ¿Cómo está mi empresa hoy?", "es-HN-CarlosNeural", "+18%"),
-    (8.7, "Ventas: más doce por ciento. Cuentas por cobrar: trescientos veintisiete mil lempiras.", "es-HN-KarlaNeural", "+42%"),
-    (14.8, "¿Quiénes me deben desde dos mil veinticuatro? ¿Y a quién debería cobrar primero?", "es-HN-CarlosNeural", "+24%"),
-    (19.4, "Prioriza Grupo Empresarial X: noventa y cuatro mil quinientos lempiras vencidos.", "es-HN-KarlaNeural", "+42%"),
-    (24.8, "No busques el dato. Pregúntalo.", "es-HN-CarlosNeural", "+8%"),
-    (29.3, "¿Cómo vamos comparados con dos mil veinticinco?", "es-HN-CarlosNeural", "+22%"),
-    (32.1, "Ventas: más dieciocho punto cuatro. Gastos: más once punto dos por ciento.", "es-HN-KarlaNeural", "+42%"),
-    (38.3, "¿Qué productos necesito comprar?", "es-HN-CarlosNeural", "+20%"),
-    (40.6, "Hay siete productos con existencia baja. Estos tres requieren atención inmediata.", "es-HN-KarlaNeural", "+28%"),
-    (47.3, "¿Cuánto gastamos en planilla este mes y por qué aumentó?", "es-HN-CarlosNeural", "+25%"),
-    (50.3, "Planilla: doscientos ochenta y cuatro mil. Subió por contrataciones, horas extra y prestaciones.", "es-HN-KarlaNeural", "+42%"),
-    (57.3, "¿Qué oportunidades tenemos pendientes?", "es-HN-CarlosNeural", "+18%"),
-    (59.9, "Ocho oportunidades por uno punto seis millones. Dos requieren seguimiento.", "es-HN-KarlaNeural", "+42%"),
-    (65.3, "No recorras módulo por módulo. Onix los conecta.", "es-HN-CarlosNeural", "+12%"),
-    (69.8, "Onix, analiza todo y dime qué necesita mi atención.", "es-HN-CarlosNeural", "+20%"),
-    (73.4, "Prioridades: cobrar vencidos, reponer productos, seguir oportunidades y revisar gastos. Rentabilidad sobre dos mil veinticinco.", "es-HN-KarlaNeural", "+44%"),
-    (80.85, "Tu empresa tiene miles de datos. Onix los convierte en respuestas. Habla con tu empresa.", "es-HN-CarlosNeural", "+36%"),
+    (0.4, "Habla con tu empresa.", "es-HN-CarlosNeural", "+4%"),
+    (4.75, "Buenos días, Onix. ¿Cómo está mi empresa hoy?", "es-HN-CarlosNeural", "+8%"),
+    (9.05, "Las ventas subieron doce por ciento. Hay trescientos veintisiete mil lempiras pendientes y cuatro clientes vencidos.", "es-HN-KarlaNeural", "+12%"),
+    (16.6, "¿Quiénes me deben desde dos mil veinticuatro y a quién debería cobrar primero?", "es-HN-CarlosNeural", "+12%"),
+    (20.75, "Grupo Empresarial X debe noventa y cuatro mil lempiras.", "es-HN-KarlaNeural", "+12%"),
+    (25.7, "No busques el dato. Pregúntalo.", "es-HN-CarlosNeural", "+2%"),
+    (29.2, "¿Cómo vamos frente a dos mil veinticinco?", "es-HN-CarlosNeural", "+8%"),
+    (32.45, "Las ventas crecieron dieciocho punto cuatro por ciento y los gastos, once punto dos.", "es-HN-KarlaNeural", "+12%"),
+    (38.55, "¿Qué productos necesito comprar?", "es-HN-CarlosNeural", "+8%"),
+    (41.05, "Hay siete productos con poca existencia. Tres necesitan atención inmediata.", "es-HN-KarlaNeural", "+12%"),
+    (47.2, "¿Cuánto gastamos en planilla este mes y por qué aumentó?", "es-HN-CarlosNeural", "+10%"),
+    (50.7, "Fueron doscientos ochenta y cuatro mil. Subió por contrataciones, horas extra y prestaciones.", "es-HN-KarlaNeural", "+15%"),
+    (57.3, "¿Qué oportunidades tenemos pendientes?", "es-HN-CarlosNeural", "+8%"),
+    (60.05, "Hay ocho oportunidades por uno punto seis millones. Dos necesitan seguimiento.", "es-HN-KarlaNeural", "+12%"),
+    (66.15, "No recorras módulo por módulo. Onix los conecta.", "es-HN-CarlosNeural", "+5%"),
+    (70.5, "Onix, analiza todo y dime qué necesita mi atención.", "es-HN-CarlosNeural", "+8%"),
+    (74.45, "Hoy, cobra vencidos, repón productos y sigue oportunidades.", "es-HN-KarlaNeural", "+15%"),
+    (80.0, "Onix convierte tus datos en respuestas. Habla con tu empresa.", "es-HN-CarlosNeural", "+10%"),
 ]
 
 
@@ -767,11 +767,11 @@ def frame(spec: VideoSpec, sec: float):
     return scene_closing(spec, DURATION - 79.5, sec).convert("RGB")
 
 
-async def create_voiceovers():
+async def create_voiceovers(force=False):
     results = []
     for index, (start, text, voice, rate) in enumerate(VOICE_SEGMENTS):
         path = AUDIO / f"voice_{index:02d}.mp3"
-        if not path.exists():
+        if force or not path.exists():
             communicator = edge_tts.Communicate(text, voice, rate=rate, pitch="-2Hz", volume="+8%")
             await communicator.save(str(path))
         results.append((start, path))
@@ -896,21 +896,32 @@ def main():
     parser = argparse.ArgumentParser(description="Render comercial cinematográfico ONIX: Habla con tu empresa")
     parser.add_argument("--format", choices=["16x9", "9x16", "all"], default="all")
     parser.add_argument("--preview-only", action="store_true")
+    parser.add_argument("--audio-only", action="store_true", help="Regenera voces y mezcla el audio sobre los videos silenciosos existentes")
     args = parser.parse_args()
 
     selected = list(SPECS.values()) if args.format == "all" else [SPECS[args.format]]
-    for spec in selected:
-        preview = create_previews(spec)
-        print(f"Storyboard {spec.key}: {preview}")
+    if not args.audio_only:
+        for spec in selected:
+            preview = create_previews(spec)
+            print(f"Storyboard {spec.key}: {preview}")
     if args.preview_only:
         return
 
-    voices = asyncio.run(create_voiceovers())
+    voices = asyncio.run(create_voiceovers(force=args.audio_only))
     music = AUDIO / "onix_habla_empresa_cinematic.wav"
     if not music.exists():
         create_music(music)
     for spec in selected:
-        final = render_spec(spec, voices, music)
+        if args.audio_only:
+            import imageio_ffmpeg
+
+            silent = OUTPUT / f"ONIX-Habla-Con-Tu-Empresa-{spec.key}-silent.mp4"
+            final = OUTPUT / f"ONIX-Habla-Con-Tu-Empresa-{spec.key}.mp4"
+            if not silent.exists():
+                raise FileNotFoundError(f"No existe el video silencioso requerido: {silent}")
+            mux(Path(imageio_ffmpeg.get_ffmpeg_exe()), silent, voices, music, final)
+        else:
+            final = render_spec(spec, voices, music)
         print(f"Video final {spec.key}: {final}")
 
 

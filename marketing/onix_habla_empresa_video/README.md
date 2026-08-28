@@ -25,3 +25,9 @@ Solo storyboards y fotogramas de control:
 ```
 
 Los archivos terminados quedan en `marketing/onix_habla_empresa_video/output/`.
+
+Para regenerar únicamente las voces y remezclar el audio, conservando la animación:
+
+```powershell
+.\venv\Scripts\python.exe marketing\onix_habla_empresa_video\render_onix_habla_empresa.py --format all --audio-only
+```
