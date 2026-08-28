@@ -1,0 +1,5 @@
+__pycache__/
+output/
+assets/onix-*.png
+!assets/onix-real-interface-16x9.png
+!assets/onix-real-interface-9x16.png
