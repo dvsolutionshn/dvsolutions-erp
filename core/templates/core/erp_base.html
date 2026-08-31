@@ -160,8 +160,32 @@
                     <span>Agenda</span>
                 </a>
                 {% endif %}
+                {% if erp_access.modulo_rrhh %}
+                <a class="erp-nav-link {% if '/dashboard/rrhh/' in request.path %}is-active{% endif %}" href="{{ rrhh_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Recursos Humanos</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_crm %}
+                <a class="erp-nav-link {% if '/dashboard/crm/' in request.path %}is-active{% endif %}" href="{{ crm_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>CRM y Marketing</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_contabilidad %}
+                <a class="erp-nav-link {% if '/dashboard/contabilidad/' in request.path %}is-active{% endif %}" href="{{ contabilidad_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Contabilidad</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_tecnicentro %}
+                <a class="erp-nav-link {% if '/dashboard/tecnicentro/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Tecnicentro</span>
+                </a>
+                {% endif %}
                 {% if erp_access.configuracion_producto_clinico %}
-                <a class="erp-nav-link {% if request.path == clinica_configuracion_url or '/dashboard/usuarios-clinicos/' in request.path or '/dashboard/crm/' in request.path %}is-active{% endif %}" href="{{ clinica_configuracion_url }}">
+                <a class="erp-nav-link {% if request.path == clinica_configuracion_url or '/dashboard/usuarios-clinicos/' in request.path %}is-active{% endif %}" href="{{ clinica_configuracion_url }}">
                     <span class="erp-nav-bullet"></span>
                     <span>Configuración</span>
                 </a>

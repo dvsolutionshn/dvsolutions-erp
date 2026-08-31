@@ -66,6 +66,15 @@
             {% if erp_access.modulo_crm %}
             <a class="clinical-config-card" href="{% url 'crm_dashboard' empresa.slug %}"><i class="clinical-config-icon">M</i><span><strong>CRM y Marketing</strong><span>Campañas, comunicaciones y seguimiento comercial habilitado.</span></span></a>
             {% endif %}
+            {% if erp_access.modulo_rrhh %}
+            <a class="clinical-config-card" href="{% url 'rrhh_dashboard' empresa.slug %}"><i class="clinical-config-icon">RH</i><span><strong>Recursos Humanos</strong><span>Empleados, planillas, vacaciones y administración del equipo.</span></span></a>
+            {% endif %}
+            {% if erp_access.modulo_contabilidad %}
+            <a class="clinical-config-card" href="{% url 'contabilidad_dashboard' empresa.slug %}"><i class="clinical-config-icon">C</i><span><strong>Contabilidad</strong><span>Operación contable y reportes habilitados para la empresa.</span></span></a>
+            {% endif %}
+            {% if erp_access.modulo_tecnicentro %}
+            <a class="clinical-config-card" href="{% url 'tecnicentro_dashboard' empresa.slug %}"><i class="clinical-config-icon">T</i><span><strong>Tecnicentro</strong><span>Recepción, diagnóstico y operación del taller habilitado.</span></span></a>
+            {% endif %}
         </div>
     </section>
 </main>

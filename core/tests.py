@@ -878,7 +878,9 @@ class SuperAdminControlTests(TestCase):
             Modulo.objects.create(nombre="Clinica Medica", codigo="clinica_medica"),
             Modulo.objects.create(nombre="Agenda de Citas", codigo="agenda_citas"),
             Modulo.objects.create(nombre="Contabilidad", codigo="contabilidad"),
-            Modulo.objects.create(nombre="Recursos Humanos", codigo="rrhh"),
+            Modulo.objects.get_or_create(
+                codigo="rrhh", defaults={"nombre": "Recursos Humanos"}
+            )[0],
             Modulo.objects.create(nombre="CRM y Marketing", codigo="crm_marketing"),
         ]
         for modulo in modulos:
@@ -925,7 +927,9 @@ class SuperAdminControlTests(TestCase):
             self.modulo,
             Modulo.objects.create(nombre="Clinica Medica", codigo="clinica_medica"),
             Modulo.objects.create(nombre="Contabilidad", codigo="contabilidad"),
-            Modulo.objects.create(nombre="Recursos Humanos", codigo="rrhh"),
+            Modulo.objects.get_or_create(
+                codigo="rrhh", defaults={"nombre": "Recursos Humanos"}
+            )[0],
             Modulo.objects.create(nombre="CRM y Marketing", codigo="crm_marketing"),
         ]
         for modulo in modulos:
@@ -957,12 +961,15 @@ class SuperAdminControlTests(TestCase):
             tipo_solucion="clinica",
         )
         crm = Modulo.objects.create(nombre="CRM y Marketing", codigo="crm_marketing")
+        rrhh, _ = Modulo.objects.get_or_create(
+            codigo="rrhh", defaults={"nombre": "Recursos Humanos"}
+        )
         contabilidad = Modulo.objects.create(nombre="Contabilidad", codigo="contabilidad")
         clinica = Modulo.objects.create(nombre="Clínica Médica", codigo="clinica_medica")
-        for modulo in [self.modulo, clinica, crm, contabilidad]:
+        for modulo in [self.modulo, clinica, crm, rrhh, contabilidad]:
             EmpresaModulo.objects.create(empresa=empresa, modulo=modulo, activo=True)
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-        configuracion.modulos_adicionales_visibles_clinica.add(crm)
+        configuracion.modulos_adicionales_visibles_clinica.add(crm, rrhh)
         empresa.marcar_prueba()
         empresa.save(update_fields=["estado_licencia", "fecha_inicio_plan", "fecha_vencimiento_plan"])
         usuario = Usuario.objects.create_user(
@@ -978,8 +985,12 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["erp_access"]["interfaz_clinica"])
         self.assertTrue(response.context["erp_access"]["modulo_crm"])
+        self.assertTrue(response.context["erp_access"]["modulo_rrhh"])
         self.assertFalse(response.context["erp_access"]["modulo_contabilidad"])
-        self.assertNotContains(response, "CRM y Marketing")
+        self.assertContains(response, "CRM y Marketing")
+        self.assertContains(response, reverse("crm_dashboard", args=[empresa.slug]))
+        self.assertContains(response, "Recursos Humanos")
+        self.assertContains(response, reverse("rrhh_dashboard", args=[empresa.slug]))
         self.assertNotContains(response, "Contabilidad")
         self.assertTrue(empresa.tiene_modulo_activo("contabilidad"))
 
@@ -987,6 +998,7 @@ class SuperAdminControlTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CRM y Marketing")
+        self.assertContains(response, "Recursos Humanos")
         self.assertNotContains(response, "Contabilidad")
         self.assertNotContains(response, "Configuración reutilizable")
 

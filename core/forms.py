@@ -66,7 +66,7 @@ class EmpresaControlForm(forms.ModelForm):
         ).order_by("nombre"),
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        label="Modulos adicionales visibles en la interfaz clinica",
+        label="Modulos visibles en la interfaz clinica",
         help_text=(
             "Solo controla su visibilidad en la navegacion clinica. Los modulos, permisos y rutas "
             "permanecen intactos."
@@ -147,7 +147,7 @@ class EmpresaControlForm(forms.ModelForm):
             "activa": ("Empresa activa", "Si la desactivas, toda la empresa queda fuera de operacion aunque tenga plan."),
             "permite_cai_historico": ("Permitir correccion fiscal historica", "Activalo solo cuando necesites ajustes especiales de CAI, facturacion historica o correcciones fiscales ya emitidas."),
             "permite_plantilla_factura_independiente": ("Permitir plantilla de factura independiente", "Activalo solo cuando quieras habilitar un PDF de factura exclusivo para esta empresa, con una presentacion separada del estilo general del ERP."),
-            "modulos_adicionales_visibles_clinica": ("Modulos adicionales visibles en la interfaz clinica", "No activa ni desactiva funciones; solo permite mostrar accesos ERP adicionales dentro del perfil clinico."),
+            "modulos_adicionales_visibles_clinica": ("Modulos visibles en la interfaz clinica", "No activa ni desactiva funciones; solo permite mostrar en el perfil clinico los modulos que tambien esten habilitados para la empresa."),
         }
         for field_name, (label, help_text) in textos.items():
             if field_name in self.fields:

@@ -437,12 +437,16 @@
     <div>
         <div class="erp-doctor-eyebrow">Centro de atencion clinica</div>
         <h3>Todo lo necesario para atender, en un espacio claro.</h3>
-        <p>Acceda directamente a pacientes, inventario, facturación, agenda y configuración con una experiencia centrada en el trabajo clínico diario.</p>
+        <p>Acceda directamente a las áreas clínicas y a los módulos habilitados para esta empresa, con una experiencia centrada en el trabajo diario.</p>
         <div class="erp-doctor-actions">
             {% if erp_access.pacientes %}<a class="erp-doctor-action" href="{% url 'clinica_pacientes' empresa.slug %}"><i><img src="{% static 'core/img/modules/customers.svg' %}" alt=""></i><span><strong>Pacientes</strong><span>Buscar, abrir expediente o registrar un paciente.</span></span></a>{% endif %}
             {% if erp_access.inventario %}<a class="erp-doctor-action" href="{% url 'inventario_facturacion' empresa.slug %}"><i><img src="{% static 'core/img/modules/inventory.svg' %}" alt=""></i><span><strong>Inventario</strong><span>Lotes, vencimientos, transferencias y existencias.</span></span></a>{% endif %}
             {% if erp_access.modulo_facturacion %}<a class="erp-doctor-action" href="{% url 'facturacion_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/receipts.svg' %}" alt=""></i><span><strong>Facturación</strong><span>Acceder a todas las funciones de facturación permitidas.</span></span></a>{% endif %}
             {% if erp_access.modulo_citas %}<a class="erp-doctor-action" href="{% url 'agenda_citas' empresa.slug %}"><i><img src="{% static 'core/img/modules/appointments.svg' %}" alt=""></i><span><strong>Agenda</strong><span>Ver citas y organizar la jornada de atención.</span></span></a>{% endif %}
+            {% if erp_access.modulo_rrhh %}<a class="erp-doctor-action" href="{% url 'rrhh_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/hr.svg' %}" alt=""></i><span><strong>Recursos Humanos</strong><span>Empleados, planillas, vacaciones y gestión del equipo.</span></span></a>{% endif %}
+            {% if erp_access.modulo_crm %}<a class="erp-doctor-action" href="{% url 'crm_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/crm.svg' %}" alt=""></i><span><strong>CRM y Marketing</strong><span>Campañas, comunicaciones y seguimiento comercial.</span></span></a>{% endif %}
+            {% if erp_access.modulo_contabilidad %}<a class="erp-doctor-action" href="{% url 'contabilidad_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/accounting.svg' %}" alt=""></i><span><strong>Contabilidad</strong><span>Operación contable y reportes autorizados.</span></span></a>{% endif %}
+            {% if erp_access.modulo_tecnicentro %}<a class="erp-doctor-action" href="{% url 'tecnicentro_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/tecnicentro.svg' %}" alt=""></i><span><strong>Tecnicentro</strong><span>Recepción, diagnóstico y operación del taller.</span></span></a>{% endif %}
             {% if erp_access.configuracion_producto_clinico %}<a class="erp-doctor-action" href="{% url 'clinica_configuracion' empresa.slug %}"><i><img src="{% static 'core/img/modules/settings.svg' %}" alt=""></i><span><strong>Configuración</strong><span>Servicios, usuarios, permisos e integraciones.</span></span></a>{% endif %}
         </div>
     </div>
@@ -455,6 +459,9 @@
             {% if erp_access.inventario %}<li>Inventario clínico</li>{% endif %}
             {% if erp_access.modulo_facturacion %}<li>Facturación completa</li>{% endif %}
             {% if erp_access.modulo_citas %}<li>Agenda y recordatorios</li>{% endif %}
+            {% if erp_access.modulo_rrhh %}<li>Recursos Humanos</li>{% endif %}
+            {% if erp_access.modulo_crm %}<li>CRM y Marketing</li>{% endif %}
+            {% if erp_access.modulo_contabilidad %}<li>Contabilidad</li>{% endif %}
             <li>Configuración por permisos</li>
         </ul>
         </div>
