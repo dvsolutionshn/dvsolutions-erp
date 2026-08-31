@@ -2512,6 +2512,30 @@ class FacturacionTests(TestCase):
         self.assertNotContains(response, "Panel Principal")
         self.assertNotContains(response, "DV Solutions ERP")
 
+    def test_registrar_pago_modal_permite_iframe_del_mismo_origen(self):
+        factura = self.crear_factura_con_linea()
+
+        response = self.client.get(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]) + "?modal=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["X-Frame-Options"], "SAMEORIGIN")
+
+    def test_registrar_pago_sin_sesion_redirige_al_acceso_sin_bloquear_iframe(self):
+        factura = self.crear_factura_con_linea()
+        self.client.logout()
+        pago_url = reverse("registrar_pago", args=[self.empresa.slug, factura.id]) + "?modal=1"
+
+        response = self.client.get(pago_url)
+
+        self.assertRedirects(
+            response,
+            f"/acceso/?next={pago_url.replace('?', '%3F').replace('=', '%3D')}",
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(response.headers["X-Frame-Options"], "SAMEORIGIN")
+
     def test_editar_ultimo_pago_actualiza_recibo_y_asiento(self):
         modulo_contabilidad, _ = Modulo.objects.get_or_create(
             codigo="contabilidad",

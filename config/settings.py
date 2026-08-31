@@ -182,6 +182,10 @@ AUTH_USER_MODEL = 'core.Usuario'
 AUTHENTICATION_BACKENDS = [
     "core.auth_backends.EmailOrUsernameBackend",
 ]
+# Las vistas protegidas que pierden la sesion deben volver al acceso publico
+# del ERP. Django usa /accounts/login/ por defecto, pero esa ruta no existe en
+# esta aplicacion.
+LOGIN_URL = "/acceso/"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # MEDIA FILES (logos, uploads, etc)
@@ -277,4 +281,7 @@ SECURE_REFERRER_POLICY = os.environ.get("SECURE_REFERRER_POLICY", "strict-origin
 SECURE_CROSS_ORIGIN_OPENER_POLICY = os.environ.get("SECURE_CROSS_ORIGIN_OPENER_POLICY", "same-origin")
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("DATA_UPLOAD_MAX_MEMORY_SIZE", str(10 * 1024 * 1024)))
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_SIZE", str(10 * 1024 * 1024)))
-X_FRAME_OPTIONS = "DENY"
+# El ERP usa iframes del mismo dominio para flujos internos como registrar y
+# editar pagos. SAMEORIGIN mantiene bloqueado el embedding desde sitios externos
+# y coincide con el encabezado configurado en nginx.
+X_FRAME_OPTIONS = "SAMEORIGIN"
