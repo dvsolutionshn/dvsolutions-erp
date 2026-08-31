@@ -25,6 +25,12 @@ class ConfiguracionRRHHEmpresa(models.Model):
     hora_extra_feriado_factor = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("2.00"))
     dias_base_mes = models.PositiveIntegerField(default=30)
     activa = models.BooleanField(default=True)
+    editores_planilla = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="empresas_donde_edita_planillas",
+        help_text="Usuarios autorizados por Daniel Varela para corregir planillas abiertas.",
+    )
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -205,6 +211,14 @@ class DetallePlanilla(models.Model):
     total_deducciones = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     neto_pagar = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     observacion = models.TextField(blank=True, null=True)
+    editado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="detalles_planilla_editados",
+    )
+    fecha_ultima_edicion = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("periodo", "empleado")

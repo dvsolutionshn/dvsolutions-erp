@@ -1,0 +1,32 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Editores de planilla - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Seguridad de nómina{% endblock %}
+{% block header_title %}Personas autorizadas para editar planillas{% endblock %}
+{% block header_description %}Solo tu cuenta puede administrar esta lista. Los demás usuarios mantienen acceso de solo lectura hasta que los autorices.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-action-link" href="{% url 'planillas_rrhh' empresa.slug %}">Volver a planillas</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-form-card">
+    <form method="post" class="erp-form-shell">
+        {% csrf_token %}
+        <div class="erp-soft-panel">
+            <strong>dannyvarela25@gmail.com</strong>
+            <p class="erp-card-muted" style="margin-bottom:0;">Propietario con autorización permanente.</p>
+        </div>
+        <div class="erp-field">
+            <label>{{ form.editores_planilla.label }}</label>
+            {{ form.editores_planilla }}
+            {% if form.editores_planilla.help_text %}<div class="erp-field-help">{{ form.editores_planilla.help_text }}</div>{% endif %}
+            {% for error in form.editores_planilla.errors %}<div class="erp-field-help" style="color:#9f1239;">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="erp-form-actions">
+            <a class="erp-btn-secondary" href="{% url 'planillas_rrhh' empresa.slug %}">Cancelar</a>
+            <button class="erp-btn" type="submit">Guardar autorizaciones</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

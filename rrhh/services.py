@@ -137,15 +137,19 @@ def calcular_detalle_planilla(
 
 def recalcular_detalle_planilla(detalle):
     config = configuracion_rrhh(detalle.periodo.empresa)
-    detalle.monto_horas_extra = q2(
-        (Decimal(detalle.horas_extra_diurnas or 0) * detalle.empleado.salario_hora * config.hora_extra_diurna_factor)
-        + (Decimal(detalle.horas_extra_nocturnas or 0) * detalle.empleado.salario_hora * config.hora_extra_nocturna_factor)
-        + (Decimal(detalle.horas_extra_feriado or 0) * detalle.empleado.salario_hora * config.hora_extra_feriado_factor)
+    detalle.dias_pagados = max(Decimal(detalle.dias_pagados or 0), Decimal("0.00"))
+    detalle.salario_base = q2(detalle.salario_base)
+    salario_diario_aplicado = (
+        detalle.salario_base / detalle.dias_pagados
+        if detalle.dias_pagados
+        else Decimal("0.00")
     )
-    detalle.dias_pagados = Decimal(detalle.dias_pagados or 0)
-    if detalle.dias_pagados < 0:
-        detalle.dias_pagados = Decimal("0.00")
-    detalle.salario_base = q2((detalle.empleado.salario_mensual / Decimal(str(config.dias_base_mes))) * detalle.dias_pagados)
+    salario_hora_aplicado = salario_diario_aplicado / Decimal("8.00")
+    detalle.monto_horas_extra = q2(
+        (Decimal(detalle.horas_extra_diurnas or 0) * salario_hora_aplicado * config.hora_extra_diurna_factor)
+        + (Decimal(detalle.horas_extra_nocturnas or 0) * salario_hora_aplicado * config.hora_extra_nocturna_factor)
+        + (Decimal(detalle.horas_extra_feriado or 0) * salario_hora_aplicado * config.hora_extra_feriado_factor)
+    )
     detalle.bonos = q2(detalle.bonos)
     detalle.comisiones = q2(detalle.comisiones)
     detalle.decimo_tercero = q2(detalle.decimo_tercero)

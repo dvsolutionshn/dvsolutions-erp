@@ -1,6 +1,35 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 from .models import ConfiguracionRRHHEmpresa, DetallePlanilla, Empleado, MovimientoPlanilla, PeriodoPlanilla, VacacionEmpleado
+
+
+class EditoresPlanillaForm(forms.ModelForm):
+    class Meta:
+        model = ConfiguracionRRHHEmpresa
+        fields = ["editores_planilla"]
+        widgets = {"editores_planilla": forms.CheckboxSelectMultiple}
+        labels = {"editores_planilla": "Personas autorizadas para editar planillas"}
+        help_texts = {
+            "editores_planilla": (
+                "Daniel Varela siempre conserva el permiso. Marca aquí únicamente a las personas adicionales."
+            )
+        }
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        Usuario = get_user_model()
+        if empresa:
+            self.fields["editores_planilla"].queryset = (
+                Usuario.objects.filter(is_active=True)
+                .filter(Q(empresa=empresa) | Q(empresas_acceso=empresa))
+                .exclude(Q(email__iexact="dannyvarela25@gmail.com") | Q(username__iexact="dannyvarela25"))
+                .distinct()
+                .order_by("first_name", "last_name", "email", "username")
+            )
+        else:
+            self.fields["editores_planilla"].queryset = Usuario.objects.none()
 
 
 class ConfiguracionRRHHEmpresaForm(forms.ModelForm):
@@ -148,6 +177,9 @@ class DetallePlanillaForm(forms.ModelForm):
                 field.widget.attrs.update({"step": "0.01", "min": "0"})
         self.fields["monto_horas_extra"].widget.attrs.update({"readonly": "readonly"})
         self.fields["monto_horas_extra"].help_text = "Se recalcula al guardar según las horas indicadas y los factores configurados."
+        self.fields["salario_base"].help_text = (
+            "Esta corrección aplica solo a esta planilla. Actualiza también el expediente del empleado si el nuevo sueldo debe usarse en períodos futuros."
+        )
 
 
 class VacacionEmpleadoForm(forms.ModelForm):

@@ -13,6 +13,7 @@ urlpatterns = [
     path("empleados/<int:empleado_id>/eliminar/", views.eliminar_empleado_rrhh, name="eliminar_empleado_rrhh"),
     path("planillas/", views.planillas_rrhh, name="planillas_rrhh"),
     path("planillas/crear/", views.crear_periodo_planilla, name="crear_periodo_planilla"),
+    path("planillas/editores/", views.configurar_editores_planilla, name="configurar_editores_planilla"),
     path("planillas/<int:periodo_id>/", views.ver_planilla, name="ver_planilla"),
     path("planillas/<int:periodo_id>/eliminar/", views.eliminar_planilla_rrhh, name="eliminar_planilla_rrhh"),
     path("planillas/<int:periodo_id>/generar/", views.generar_planilla_view, name="generar_planilla"),

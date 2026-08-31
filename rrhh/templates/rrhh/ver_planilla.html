@@ -64,6 +64,9 @@
                 <span class="erp-badge {% if periodo.estado == 'cerrada' %}info{% elif periodo.estado == 'pagada' %}success{% else %}warning{% endif %}">3. Cerrar y contabilizar</span>
                 <span class="erp-badge {% if periodo.estado == 'pagada' %}success{% else %}warning{% endif %}">4. Pagar</span>
             </div>
+            {% if puede_editar_planillas and periodo.estado != "cerrada" and periodo.estado != "pagada" %}
+            <p class="erp-card-muted" style="margin:10px 0 0;">Tu usuario está autorizado para corregir los valores de cada colaborador. Cada cambio registrará quién lo realizó.</p>
+            {% endif %}
         </div>
 
         {% if periodo.estado == "borrador" or periodo.estado == "calculada" %}
@@ -173,6 +176,9 @@
                         <td class="erp-doc-cell">
                             <div class="erp-doc-title">{{ detalle.empleado.nombre_completo }}</div>
                             <div class="erp-doc-subtext">{{ detalle.empleado.puesto|default:"Sin puesto" }} · {{ detalle.empleado.departamento|default:"Sin área" }}</div>
+                            {% if detalle.editado_por %}
+                            <div class="erp-doc-subtext">Corregido por {{ detalle.editado_por.get_full_name|default:detalle.editado_por.email|default:detalle.editado_por.username }} · {{ detalle.fecha_ultima_edicion|date:"d/m/Y H:i" }}</div>
+                            {% endif %}
                         </td>
                         <td class="erp-doc-cell">
                             <div class="erp-doc-title">{{ detalle.empleado.banco|default:"No definido" }}</div>
@@ -183,6 +189,7 @@
                         <td class="amount">L. {{ detalle.total_deducciones|floatformat:2|intcomma }}</td>
                         <td class="amount"><strong>L. {{ detalle.neto_pagar|floatformat:2|intcomma }}</strong></td>
                         <td class="erp-doc-cell">
+                            <div class="erp-doc-subtext">Sueldo base: L. {{ detalle.salario_base|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">Extras: L. {{ detalle.monto_horas_extra|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">Bonos: L. {{ detalle.bonos|floatformat:2|intcomma }}</div>
                             <div class="erp-doc-subtext">Comisiones: L. {{ detalle.comisiones|floatformat:2|intcomma }}</div>
@@ -199,8 +206,10 @@
                             <div class="erp-actions-cluster">
                                 {% if periodo.estado == "cerrada" or periodo.estado == "pagada" %}
                                 <span class="erp-pill-link disabled">Edición bloqueada</span>
-                                {% else %}
+                                {% elif puede_editar_planillas %}
                                 <a class="erp-pill-link" href="{% url 'editar_detalle_planilla' empresa.slug detalle.id %}">Editar</a>
+                                {% else %}
+                                <span class="erp-pill-link disabled">Solo lectura</span>
                                 {% endif %}
                                 <a class="erp-pill-link" href="{% url 'voucher_planilla_pdf' empresa.slug detalle.id %}">PDF</a>
                                 <a class="erp-pill-link" href="{% url 'enviar_voucher_email' empresa.slug detalle.id %}">Correo</a>

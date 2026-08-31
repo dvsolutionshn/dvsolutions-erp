@@ -4,7 +4,7 @@
 {% block title %}Editar detalle de planilla - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Planilla{% endblock %}
 {% block header_title %}Editar {{ detalle.empleado.nombre_completo }}{% endblock %}
-{% block header_description %}Ajusta valores por empleado: préstamos, deducciones, bonos, comisiones, horas extras y observaciones.{% endblock %}
+{% block header_description %}Corrige el salario base y los demás valores de esta planilla. El cambio queda registrado con tu usuario.{% endblock %}
 
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'ver_planilla' empresa.slug periodo.id %}">Volver a Planilla</a>
@@ -40,7 +40,7 @@
         <div class="erp-card-header">
             <div>
                 <h3>Devengados</h3>
-                <p>El monto de horas extras se recalcula automáticamente al guardar.</p>
+                <p>El salario base indicado se conserva y las horas extras se recalculan usando ese valor.</p>
             </div>
         </div>
         <div class="erp-form-grid three">

@@ -18,7 +18,7 @@ class PeriodoPlanillaAdmin(admin.ModelAdmin):
 
 @admin.register(DetallePlanilla)
 class DetallePlanillaAdmin(admin.ModelAdmin):
-    list_display = ("periodo", "empleado", "total_devengado", "total_deducciones", "neto_pagar")
+    list_display = ("periodo", "empleado", "total_devengado", "total_deducciones", "neto_pagar", "editado_por", "fecha_ultima_edicion")
     list_filter = ("periodo__empresa", "periodo")
     search_fields = ("empleado__nombres", "empleado__apellidos")
 

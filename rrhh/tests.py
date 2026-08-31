@@ -10,7 +10,7 @@ from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
 from crm.models import ConfiguracionCRM
 from contabilidad.models import AsientoContable, CuentaContable, CuentaFinanciera
 
-from .models import DetallePlanilla, Empleado, MovimientoPlanilla, PeriodoPlanilla
+from .models import ConfiguracionRRHHEmpresa, DetallePlanilla, Empleado, MovimientoPlanilla, PeriodoPlanilla
 from .services import generar_planilla
 
 
@@ -323,12 +323,19 @@ class RRHHTests(TestCase):
         generar_planilla(periodo)
         detalle = DetallePlanilla.objects.get(periodo=periodo, empleado=empleado)
 
-        self.client.login(username="rrhh", password="pass12345")
+        dueno = Usuario.objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass12345",
+            empresa=self.empresa,
+            rol_sistema=self.rol,
+        )
+        self.client.force_login(dueno)
         response = self.client.post(
             reverse("editar_detalle_planilla", args=[self.empresa.slug, detalle.id]),
             {
                 "dias_pagados": "30.00",
-                "salario_base": "12000.00",
+                "salario_base": "13500.00",
                 "horas_extra_diurnas": "2.00",
                 "horas_extra_nocturnas": "0.00",
                 "horas_extra_feriado": "0.00",
@@ -348,12 +355,57 @@ class RRHHTests(TestCase):
 
         self.assertRedirects(response, reverse("ver_planilla", args=[self.empresa.slug, periodo.id]))
         detalle.refresh_from_db()
+        self.assertEqual(detalle.salario_base, Decimal("13500.00"))
         self.assertEqual(detalle.prestamos, Decimal("300.00"))
         self.assertEqual(detalle.otras_deducciones, Decimal("100.00"))
         self.assertEqual(detalle.bonos, Decimal("500.00"))
         self.assertGreater(detalle.monto_horas_extra, Decimal("0.00"))
         self.assertEqual(detalle.total_deducciones, Decimal("877.58"))
-        self.assertGreater(detalle.neto_pagar, Decimal("11800.00"))
+        self.assertGreater(detalle.neto_pagar, Decimal("13300.00"))
+        self.assertEqual(detalle.editado_por, dueno)
+        self.assertIsNotNone(detalle.fecha_ultima_edicion)
+
+    def test_usuario_normal_no_puede_editar_planilla_por_url_directa(self):
+        empleado = Empleado.objects.create(
+            empresa=self.empresa,
+            codigo="EMP-SEG-1",
+            nombres="Sin",
+            apellidos="Permiso",
+            fecha_ingreso=date(2026, 1, 1),
+            salario_mensual=Decimal("10000.00"),
+        )
+        periodo = PeriodoPlanilla.objects.create(
+            empresa=self.empresa,
+            nombre="Planilla protegida",
+            fecha_inicio=date(2026, 1, 1),
+            fecha_fin=date(2026, 1, 30),
+            fecha_pago=date(2026, 1, 30),
+        )
+        detalle = DetallePlanilla.objects.create(periodo=periodo, empleado=empleado, salario_base=Decimal("10000.00"))
+
+        self.client.force_login(self.usuario)
+        response = self.client.get(reverse("editar_detalle_planilla", args=[self.empresa.slug, detalle.id]))
+
+        self.assertRedirects(response, reverse("planillas_rrhh", args=[self.empresa.slug]))
+
+    def test_dueno_puede_autorizar_otro_editor_de_planilla(self):
+        dueno = Usuario.objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass12345",
+            empresa=self.empresa,
+            rol_sistema=self.rol,
+        )
+        self.client.force_login(dueno)
+
+        response = self.client.post(
+            reverse("configurar_editores_planilla", args=[self.empresa.slug]),
+            {"editores_planilla": [self.usuario.id]},
+        )
+
+        self.assertRedirects(response, reverse("planillas_rrhh", args=[self.empresa.slug]))
+        config = ConfiguracionRRHHEmpresa.objects.get(empresa=self.empresa)
+        self.assertTrue(config.editores_planilla.filter(pk=self.usuario.pk).exists())
 
     def test_no_permite_editar_detalle_de_planilla_cerrada(self):
         empleado = Empleado.objects.create(
@@ -376,6 +428,8 @@ class RRHHTests(TestCase):
         )
         detalle = DetallePlanilla.objects.create(periodo=periodo, empleado=empleado, salario_base=Decimal("10000.00"))
 
+        config, _ = ConfiguracionRRHHEmpresa.objects.get_or_create(empresa=self.empresa)
+        config.editores_planilla.add(self.usuario)
         self.client.login(username="rrhh", password="pass12345")
         response = self.client.get(reverse("editar_detalle_planilla", args=[self.empresa.slug, detalle.id]))
 

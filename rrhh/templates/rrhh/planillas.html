@@ -5,7 +5,10 @@
 {% block header_kicker %}Nómina{% endblock %}
 {% block header_title %}Planillas{% endblock %}
 {% block header_description %}Períodos de pago, cálculo de deducciones, vouchers y seguimiento de cierre.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'crear_periodo_planilla' empresa.slug %}">Nueva planilla</a>{% endblock %}
+{% block topbar_actions %}
+{% if puede_borrar_rrhh %}<a class="erp-action-link" href="{% url 'configurar_editores_planilla' empresa.slug %}">Autorizar editores</a>{% endif %}
+<a class="erp-action-link" href="{% url 'crear_periodo_planilla' empresa.slug %}">Nueva planilla</a>
+{% endblock %}
 
 {% block content %}
 <section class="erp-list-shell">
@@ -60,7 +63,7 @@
                         <td class="amount">L. {{ periodo.total_neto|floatformat:2|intcomma }}</td>
                         <td>
                             <div class="erp-actions-cluster">
-                                <a class="erp-pill-link" href="{% url 'ver_planilla' empresa.slug periodo.id %}">Abrir planilla</a>
+                                <a class="erp-pill-link" href="{% url 'ver_planilla' empresa.slug periodo.id %}">{% if puede_editar_planillas and periodo.estado != 'cerrada' and periodo.estado != 'pagada' %}Revisar y editar{% else %}Abrir planilla{% endif %}</a>
                                 {% if puede_borrar_rrhh %}
                                 <a class="erp-pill-link" style="color:#b42318;border-color:#fecdd3;background:#fff5f5;" href="{% url 'eliminar_planilla_rrhh' empresa.slug periodo.id %}">Eliminar</a>
                                 {% endif %}

@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from weasyprint import HTML
 
@@ -21,12 +22,13 @@ from crm.services import WhatsAppAPIError, enviar_mensaje_whatsapp_texto
 from .forms import (
     ConfiguracionRRHHEmpresaForm,
     DetallePlanillaForm,
+    EditoresPlanillaForm,
     EmpleadoForm,
     MovimientoPlanillaForm,
     PeriodoPlanillaForm,
     VacacionEmpleadoForm,
 )
-from .models import DetallePlanilla, Empleado, MovimientoPlanilla, PeriodoPlanilla, VacacionEmpleado
+from .models import ConfiguracionRRHHEmpresa, DetallePlanilla, Empleado, MovimientoPlanilla, PeriodoPlanilla, VacacionEmpleado
 from .services import configuracion_rrhh, generar_planilla, recalcular_detalle_planilla, dias_pagables_empleado
 
 
@@ -42,6 +44,17 @@ def _puede_borrar_rrhh(request):
     email = (getattr(request.user, "email", "") or "").strip().lower()
     username = (getattr(request.user, "username", "") or "").strip().lower()
     return email == "dannyvarela25@gmail.com" or username == "dannyvarela25"
+
+
+def _puede_editar_planillas(request, empresa):
+    if _puede_borrar_rrhh(request):
+        return True
+    if not getattr(request.user, "pk", None):
+        return False
+    return ConfiguracionRRHHEmpresa.objects.filter(
+        empresa=empresa,
+        editores_planilla=request.user,
+    ).exists()
 
 
 def _bloquear_si_no_es_dueno_rrhh(request, empresa):
@@ -184,10 +197,30 @@ def planillas_rrhh(request, empresa_slug):
         "empresa": empresa,
         "periodos": periodos,
         "puede_borrar_rrhh": _puede_borrar_rrhh(request),
+        "puede_editar_planillas": _puede_editar_planillas(request, empresa),
         "resumen_planillas": {
             "total": periodos.count(),
             "abiertas": periodos.exclude(estado__in=["cerrada", "pagada"]).count(),
         },
+    })
+
+
+@login_required
+def configurar_editores_planilla(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not _puede_borrar_rrhh(request):
+        messages.error(request, "Solo Daniel Varela puede autorizar editores de planilla.")
+        return redirect("planillas_rrhh", empresa_slug=empresa.slug)
+
+    config = configuracion_rrhh(empresa)
+    form = EditoresPlanillaForm(request.POST or None, instance=config, empresa=empresa)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Las personas autorizadas para editar planillas se actualizaron correctamente.")
+        return redirect("planillas_rrhh", empresa_slug=empresa.slug)
+    return render(request, "rrhh/editores_planilla_form.html", {
+        "empresa": empresa,
+        "form": form,
     })
 
 
@@ -210,7 +243,7 @@ def ver_planilla(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
     periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
     config_crm = _configuracion_crm(empresa)
-    detalles = periodo.detalles.select_related("empleado")
+    detalles = periodo.detalles.select_related("empleado", "editado_por")
     detalles_por_empleado = {detalle.empleado_id: detalle for detalle in detalles}
     empleados = Empleado.objects.filter(
         empresa=empresa,
@@ -237,6 +270,7 @@ def ver_planilla(request, empresa_slug, periodo_id):
         "cuentas_financieras": CuentaFinanciera.objects.filter(empresa=empresa, activa=True).select_related("cuenta_contable"),
         "metodos_pago_planilla": PeriodoPlanilla.METODO_PAGO_CHOICES,
         "puede_borrar_rrhh": _puede_borrar_rrhh(request),
+        "puede_editar_planillas": _puede_editar_planillas(request, empresa),
         "asiento_cierre": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="cierre").first(),
         "asiento_pago": AsientoContable.objects.filter(empresa=empresa, documento_tipo="planilla", documento_id=periodo.id, evento="pago").first(),
     })
@@ -352,6 +386,9 @@ def pagar_planilla(request, empresa_slug, periodo_id):
 @login_required
 def editar_detalle_planilla(request, empresa_slug, detalle_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    if not _puede_editar_planillas(request, empresa):
+        messages.error(request, "Tu usuario no está autorizado para editar planillas.")
+        return redirect("planillas_rrhh", empresa_slug=empresa.slug)
     detalle = get_object_or_404(
         DetallePlanilla.objects.select_related("periodo", "empleado"),
         id=detalle_id,
@@ -365,6 +402,8 @@ def editar_detalle_planilla(request, empresa_slug, detalle_id):
     if request.method == "POST" and form.is_valid():
         detalle = form.save(commit=False)
         recalcular_detalle_planilla(detalle)
+        detalle.editado_por = request.user
+        detalle.fecha_ultima_edicion = timezone.now()
         detalle.save()
         messages.success(request, f"Detalle de {detalle.empleado.nombre_completo} actualizado correctamente.")
         return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=detalle.periodo_id)
