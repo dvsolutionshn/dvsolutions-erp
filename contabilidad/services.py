@@ -452,6 +452,7 @@ def registrar_asiento_documento(
     origen_modulo,
     creado_por=None,
     lineas=None,
+    actualizar_borrador=False,
 ):
     if not lineas:
         return None
@@ -462,7 +463,7 @@ def registrar_asiento_documento(
         documento_id=documento_id,
         evento=evento,
     ).first()
-    if asiento_existente:
+    if asiento_existente and not (actualizar_borrador and asiento_existente.estado == "borrador"):
         return asiento_existente
 
     lineas_normalizadas = []
@@ -485,18 +486,36 @@ def registrar_asiento_documento(
 
     try:
         with transaction.atomic():
-            asiento = AsientoContable.objects.create(
-                empresa=empresa,
-                fecha=fecha,
-                descripcion=descripcion,
-                referencia=referencia,
-                origen_modulo=origen_modulo,
-                documento_tipo=documento_tipo,
-                documento_id=documento_id,
-                evento=evento,
-                creado_por=creado_por,
-                estado="borrador",
-            )
+            if asiento_existente:
+                asiento = AsientoContable.objects.select_for_update().get(pk=asiento_existente.pk)
+                if asiento.estado != "borrador":
+                    return asiento
+                asiento.lineas.all().delete()
+                asiento.fecha = fecha
+                asiento.descripcion = descripcion
+                asiento.referencia = referencia
+                asiento.origen_modulo = origen_modulo
+                asiento.creado_por = creado_por
+                asiento.save(update_fields=[
+                    "fecha",
+                    "descripcion",
+                    "referencia",
+                    "origen_modulo",
+                    "creado_por",
+                ])
+            else:
+                asiento = AsientoContable.objects.create(
+                    empresa=empresa,
+                    fecha=fecha,
+                    descripcion=descripcion,
+                    referencia=referencia,
+                    origen_modulo=origen_modulo,
+                    documento_tipo=documento_tipo,
+                    documento_id=documento_id,
+                    evento=evento,
+                    creado_por=creado_por,
+                    estado="borrador",
+                )
 
             for linea in lineas_normalizadas:
                 cuenta = linea["cuenta"]
@@ -828,6 +847,7 @@ def registrar_asiento_planilla_cerrada(periodo):
         empresa=periodo.empresa, documento_tipo="planilla", documento_id=periodo.id,
         evento="cierre", fecha=periodo.fecha_fin, descripcion=f"Devengo planilla {periodo.nombre}",
         referencia=periodo.nombre, origen_modulo="rrhh", creado_por=periodo.creado_por, lineas=lineas,
+        actualizar_borrador=True,
     )
 
 

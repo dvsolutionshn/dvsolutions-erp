@@ -435,6 +435,87 @@ class RRHHTests(TestCase):
 
         self.assertRedirects(response, reverse("ver_planilla", args=[self.empresa.slug, periodo.id]))
 
+    def test_solo_dueno_puede_reabrir_planilla_y_reutiliza_asiento_de_cierre(self):
+        empleado = Empleado.objects.create(
+            empresa=self.empresa,
+            codigo="EMP-REABRIR-1",
+            nombres="Planilla",
+            apellidos="Reabierta",
+            fecha_ingreso=date(2026, 1, 1),
+            salario_mensual=Decimal("10000.00"),
+        )
+        periodo = PeriodoPlanilla.objects.create(
+            empresa=self.empresa,
+            nombre="Planilla para reabrir",
+            fecha_inicio=date(2026, 8, 1),
+            fecha_fin=date(2026, 8, 30),
+            fecha_pago=date(2026, 8, 30),
+            estado="calculada",
+            creado_por=self.usuario,
+        )
+        DetallePlanilla.objects.create(
+            periodo=periodo,
+            empleado=empleado,
+            salario_base=Decimal("10000.00"),
+            total_devengado=Decimal("10000.00"),
+            total_deducciones=Decimal("0.00"),
+            neto_pagar=Decimal("10000.00"),
+        )
+        self.client.force_login(self.usuario)
+        self.client.post(reverse("cerrar_planilla", args=[self.empresa.slug, periodo.id]))
+        periodo.refresh_from_db()
+        self.assertEqual(periodo.estado, "cerrada")
+        asiento = AsientoContable.objects.get(
+            empresa=self.empresa,
+            documento_tipo="planilla",
+            documento_id=periodo.id,
+            evento="cierre",
+        )
+        numero_asiento = asiento.numero
+
+        response = self.client.post(reverse("reabrir_planilla", args=[self.empresa.slug, periodo.id]))
+        self.assertRedirects(response, reverse("ver_planilla", args=[self.empresa.slug, periodo.id]))
+        periodo.refresh_from_db()
+        self.assertEqual(periodo.estado, "cerrada")
+        asiento.refresh_from_db()
+        self.assertEqual(asiento.estado, "contabilizado")
+
+        dueno = Usuario.objects.create_user(
+            username="dannyvarela25",
+            email="dannyvarela25@gmail.com",
+            password="pass12345",
+            empresa=self.empresa,
+            rol_sistema=self.rol,
+        )
+        self.client.force_login(dueno)
+        response = self.client.post(reverse("reabrir_planilla", args=[self.empresa.slug, periodo.id]))
+
+        self.assertRedirects(response, reverse("ver_planilla", args=[self.empresa.slug, periodo.id]))
+        periodo.refresh_from_db()
+        asiento.refresh_from_db()
+        self.assertEqual(periodo.estado, "calculada")
+        self.assertEqual(asiento.estado, "borrador")
+        self.assertEqual(asiento.evento, "cierre")
+
+        detalle = periodo.detalles.get()
+        detalle.salario_base = Decimal("12000.00")
+        detalle.total_devengado = Decimal("12000.00")
+        detalle.neto_pagar = Decimal("12000.00")
+        detalle.save(update_fields=["salario_base", "total_devengado", "neto_pagar"])
+
+        self.client.post(reverse("cerrar_planilla", args=[self.empresa.slug, periodo.id]))
+        nuevo_asiento = AsientoContable.objects.get(
+            empresa=self.empresa,
+            documento_tipo="planilla",
+            documento_id=periodo.id,
+            evento="cierre",
+        )
+        self.assertEqual(nuevo_asiento.id, asiento.id)
+        self.assertEqual(nuevo_asiento.numero, numero_asiento)
+        self.assertEqual(nuevo_asiento.estado, "contabilizado")
+        self.assertEqual(nuevo_asiento.total_debe, Decimal("12000.00"))
+        self.assertEqual(nuevo_asiento.total_haber, Decimal("12000.00"))
+
     def test_whatsapp_incluye_resumen_detallado_del_voucher(self):
         empleado = Empleado.objects.create(
             empresa=self.empresa,

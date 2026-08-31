@@ -119,6 +119,12 @@
             </form>
             {% endif %}
             {% if periodo.estado == "cerrada" %}
+            {% if puede_borrar_rrhh %}
+            <form method="post" action="{% url 'reabrir_planilla' empresa.slug periodo.id %}" onsubmit="return confirm('¿Reabrir esta planilla? El asiento de cierre pasará a borrador y deberás volver a cerrar la planilla después de corregirla.');">
+                {% csrf_token %}
+                <button class="erp-btn-secondary" type="submit">Reabrir para corregir</button>
+            </form>
+            {% endif %}
             <form method="post" action="{% url 'pagar_planilla' empresa.slug periodo.id %}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 {% csrf_token %}
                 <select name="metodo_pago" required>
@@ -139,7 +145,7 @@
 
         {% if asiento_cierre or asiento_pago %}
         <div class="erp-soft-panel" style="margin-top:14px;">
-            {% if asiento_cierre %}<span class="erp-badge success">Devengo {{ asiento_cierre.numero }}</span>{% endif %}
+            {% if asiento_cierre %}<span class="erp-badge {% if asiento_cierre.estado == 'contabilizado' %}success{% else %}warning{% endif %}">{% if asiento_cierre.estado == 'contabilizado' %}Devengo{% else %}Devengo en revisión{% endif %} {{ asiento_cierre.numero }}</span>{% endif %}
             {% if asiento_pago %}<span class="erp-badge success">Pago {{ asiento_pago.numero }}</span>{% endif %}
         </div>
         {% endif %}

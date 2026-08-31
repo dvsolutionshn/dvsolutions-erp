@@ -352,6 +352,59 @@ def cerrar_planilla(request, empresa_slug, periodo_id):
 
 @login_required
 @require_POST
+def reabrir_planilla(request, empresa_slug, periodo_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not _puede_borrar_rrhh(request):
+        messages.error(request, "Solo Daniel Varela puede reabrir una planilla cerrada.")
+        return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo_id)
+
+    try:
+        with transaction.atomic():
+            periodo = get_object_or_404(
+                PeriodoPlanilla.objects.select_for_update(),
+                id=periodo_id,
+                empresa=empresa,
+            )
+            if periodo.estado == "pagada":
+                messages.error(request, "Una planilla pagada no puede reabrirse sin revertir primero el pago.")
+                return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
+            if periodo.estado != "cerrada":
+                messages.info(request, "La planilla no está cerrada; no necesita reabrirse.")
+                return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
+
+            asiento_pago = AsientoContable.objects.filter(
+                empresa=empresa,
+                documento_tipo="planilla",
+                documento_id=periodo.id,
+                evento="pago",
+                estado="contabilizado",
+            ).exists()
+            if asiento_pago:
+                messages.error(request, "La planilla tiene un asiento de pago y no puede reabrirse como una planilla solamente cerrada.")
+                return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo.id)
+
+            asiento_cierre = AsientoContable.objects.select_for_update().filter(
+                empresa=empresa,
+                documento_tipo="planilla",
+                documento_id=periodo.id,
+                evento="cierre",
+            ).first()
+            if asiento_cierre:
+                asiento_cierre.estado = "borrador"
+                asiento_cierre.descripcion = f"Devengo planilla {periodo.nombre} (reabierto para corrección)"[:255]
+                asiento_cierre.save(update_fields=["estado", "descripcion"])
+
+            periodo.estado = "calculada"
+            periodo.save(update_fields=["estado"])
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+    else:
+        messages.success(request, "Planilla reabierta. Ya puedes corregirla y volver a cerrarla cuando esté revisada.")
+    return redirect("ver_planilla", empresa_slug=empresa.slug, periodo_id=periodo_id)
+
+
+@login_required
+@require_POST
 def pagar_planilla(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
     periodo = get_object_or_404(PeriodoPlanilla, id=periodo_id, empresa=empresa)
