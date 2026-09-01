@@ -1697,6 +1697,14 @@ class ClinicaPacienteTests(TestCase):
             args=[self.empresa.slug, paciente.id, "terapias_postquirurgicas"],
         )
 
+        formulario_directo = self.client.get(url, {"sesion": 4})
+        self.assertEqual(formulario_directo.status_code, 200)
+        self.assertTemplateUsed(formulario_directo, "crm/terapias_postquirurgicas.html")
+        self.assertContains(formulario_directo, "Signos vitales")
+        self.assertContains(formulario_directo, "Protocolo / máquinas")
+        self.assertContains(formulario_directo, "Terapia manual / cuidados")
+        self.assertContains(formulario_directo, "data-tpq-form", html=False)
+
         response = self.client.post(
             url,
             {
@@ -1722,6 +1730,27 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.context["tablero_sesiones_terapia"][3]["registro"], sesion)
         self.assertEqual(historia.context["tablero_sesiones_terapia"][4]["registro"], sesion)
         self.assertContains(historia, "Registrar sesión sin cita")
+
+    def test_camara_directa_reutiliza_el_mismo_formulario_de_agenda(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-HBO-DIRECTA",
+            nombre="Paciente Cámara Directa",
+        )
+        url = reverse(
+            "clinica_registrar_control_especial",
+            args=[self.empresa.slug, paciente.id, "camara_hiperbarica"],
+        )
+
+        response = self.client.get(url, {"sesion": 8})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "crm/camara_hiperbarica.html")
+        self.assertContains(response, "Checklist antes de la sesión")
+        self.assertContains(response, "Parámetros de la sesión y evolución")
+        self.assertContains(response, "Nota de enfermería")
+        self.assertContains(response, "data-hbo-form", html=False)
+        self.assertContains(response, 'value="8"', html=False)
 
     def test_medicina_estetica_guarda_formulario_estructurado(self):
         paciente = Paciente.objects.create(

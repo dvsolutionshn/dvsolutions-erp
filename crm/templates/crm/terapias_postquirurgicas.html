@@ -1,10 +1,10 @@
 {% extends "core/erp_base.html" %}
 
 {% block title %}Terapias Post Quirúrgicas - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Atención postoperatoria{% endblock %}
+{% block header_kicker %}{% if modo_directo_historial %}Expediente {{ paciente_directo.expediente_codigo }}{% else %}Atención postoperatoria{% endif %}{% endblock %}
 {% block header_title %}Terapias Post Quirúrgicas{% endblock %}
-{% block header_description %}Registro clínico independiente de 12 sesiones, integrado al expediente del paciente.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'agenda_citas' empresa.slug %}">Calendario de citas</a>{% endblock %}
+{% block header_description %}{% if modo_directo_historial %}Atención directa desde el historial clínico con el mismo formulario utilizado en agenda.{% else %}Registro clínico independiente de 12 sesiones, integrado al expediente del paciente.{% endif %}{% endblock %}
+{% block topbar_actions %}{% if modo_directo_historial %}<a class="erp-action-link" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente_directo.id 'terapias_postquirurgicas' %}{% if programa_terapia %}?programa={{ programa_terapia.id }}{% endif %}">Volver al cuadro clínico</a>{% else %}<a class="erp-action-link" href="{% url 'agenda_citas' empresa.slug %}">Calendario de citas</a>{% endif %}{% endblock %}
 
 {% block content %}
 <style>
@@ -13,6 +13,7 @@
 </style>
 
 <div class="tpq-page">
+  {% if not modo_directo_historial %}
   <section class="tpq-nav">
     <div><a class="tpq-btn" href="?fecha={{ fecha_anterior|date:'Y-m-d' }}">‹ Anterior</a><a class="tpq-btn" href="?fecha={% now 'Y-m-d' %}">Hoy</a><a class="tpq-btn" href="?fecha={{ fecha_siguiente|date:'Y-m-d' }}">Siguiente ›</a></div>
     <strong class="tpq-date">{{ fecha_seleccionada|date:"l, d/m/Y" }}</strong>
@@ -24,15 +25,16 @@
       {% for cita in citas_terapias_post %}<a class="tpq-patient {% if cita_control_terapia.id == cita.id %}is-active{% endif %}" href="?fecha={{ fecha_seleccionada|date:'Y-m-d' }}&control_terapia={{ cita.id }}#documento-terapia"><span class="tpq-time">{{ cita.fecha_hora|date:"h:i A" }}</span><span><strong>{{ cita.paciente.nombre }}</strong><small class="tpq-muted">{{ cita.display_servicio }} · {{ cita.display_profesional }}</small></span><span class="tpq-badge">{% if cita.control_terapia_postquirurgica.estado == 'finalizada' %}Finalizada{% elif cita.control_terapia_postquirurgica %}Borrador{% else %}Atender{% endif %}</span></a>{% empty %}<div class="tpq-empty">No hay pacientes con citas de terapia para esta fecha.</div>{% endfor %}
     </div>
   </section>
+  {% endif %}
 
-  {% if cita_control_terapia %}<section class="tpq-document" id="documento-terapia">
+  {% if sesion_terapia_form and programa_terapia_form %}<section class="tpq-document" id="documento-terapia">
     <header class="tpq-doc-head"><h2>Registro de Terapias Postoperatorias</h2><span class="tpq-muted">Complete una sesión por atención. Las sesiones finalizadas quedan bloqueadas.</span></header>
-    <div class="tpq-patient-data"><div><span class="tpq-label">Paciente</span><strong class="tpq-value">{{ cita_control_terapia.paciente.nombre }}</strong></div><div><span class="tpq-label">Edad</span><strong class="tpq-value">{{ cita_control_terapia.paciente.edad|default:"—" }}</strong></div><div><span class="tpq-label">Expediente</span><strong class="tpq-value">{{ cita_control_terapia.paciente.expediente_codigo }}</strong></div><div><span class="tpq-label">Profesional</span><strong class="tpq-value">{{ cita_control_terapia.display_profesional }}</strong></div></div>
+    {% if modo_directo_historial %}<div class="tpq-patient-data"><div><span class="tpq-label">Paciente</span><strong class="tpq-value">{{ paciente_directo.nombre }}</strong></div><div><span class="tpq-label">Edad</span><strong class="tpq-value">{{ paciente_directo.edad|default:"—" }}</strong></div><div><span class="tpq-label">Expediente</span><strong class="tpq-value">{{ paciente_directo.expediente_codigo }}</strong></div><div><span class="tpq-label">Origen</span><strong class="tpq-value">Registro directo · Sin cita</strong></div></div>{% else %}<div class="tpq-patient-data"><div><span class="tpq-label">Paciente</span><strong class="tpq-value">{{ cita_control_terapia.paciente.nombre }}</strong></div><div><span class="tpq-label">Edad</span><strong class="tpq-value">{{ cita_control_terapia.paciente.edad|default:"—" }}</strong></div><div><span class="tpq-label">Expediente</span><strong class="tpq-value">{{ cita_control_terapia.paciente.expediente_codigo }}</strong></div><div><span class="tpq-label">Profesional</span><strong class="tpq-value">{{ cita_control_terapia.display_profesional }}</strong></div></div>{% endif %}
     <div class="tpq-progress"><div class="tpq-progress-head"><strong>Programa de 12 sesiones</strong><span>{{ sesiones_terapia_completadas }} finalizadas</span></div><div class="tpq-session-grid">{% for item in tablero_sesiones_terapia %}<span class="tpq-session {% if item.registro.estado == 'finalizada' %}is-done{% elif item.actual %}is-current{% endif %}">{{ item.numero }}</span>{% endfor %}</div></div>
 
     {% if errores_terapia_post %}<div class="tpq-alert"><strong>Faltan datos para finalizar la sesión.</strong><ul>{% for error in errores_terapia_post %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
     {% if sesion_terapia.bloqueada %}<div class="tpq-locked">Esta sesión fue finalizada y forma parte permanente del expediente clínico.</div>{% else %}
-    <form method="post" action="{% url 'agenda_terapias_postquirurgicas_guardar' empresa.slug cita_control_terapia.id %}" novalidate data-tpq-form>{% csrf_token %}<input type="hidden" name="programa_id" value="{{ programa_terapia.id|default:'' }}">
+    <form method="post" {% if not modo_directo_historial %}action="{% url 'agenda_terapias_postquirurgicas_guardar' empresa.slug cita_control_terapia.id %}"{% endif %} novalidate data-tpq-form>{% csrf_token %}<input type="hidden" name="programa_id" value="{{ programa_terapia.id|default:'' }}">{% if modo_directo_historial and sesion_terapia %}<input type="hidden" name="sesion_id" value="{{ sesion_terapia.id }}">{% endif %}
       <div class="tpq-program"><div class="tpq-field {% if programa_terapia_form.cirugia.errors %}has-error{% endif %}"><label>{{ programa_terapia_form.cirugia.label }}</label>{{ programa_terapia_form.cirugia }}{% for e in programa_terapia_form.cirugia.errors %}<span class="tpq-error">{{ e }}</span>{% endfor %}</div><div class="tpq-field {% if programa_terapia_form.fecha_cirugia.errors %}has-error{% endif %}"><label>{{ programa_terapia_form.fecha_cirugia.label }}</label>{{ programa_terapia_form.fecha_cirugia }}{% for e in programa_terapia_form.fecha_cirugia.errors %}<span class="tpq-error">{{ e }}</span>{% endfor %}</div></div>
       <div class="tpq-sheet"><h3 class="tpq-sheet-title">Sesión {{ sesion_terapia_form.numero_sesion.value|default:"nueva" }}</h3><div class="tpq-grid">
         <div class="tpq-card"><span class="tpq-group-title">Sesión, fecha y hora</span><div class="tpq-fields"><div class="tpq-field {% if sesion_terapia_form.numero_sesion.errors %}has-error{% endif %}"><label>Sesión</label>{{ sesion_terapia_form.numero_sesion }}{% for e in sesion_terapia_form.numero_sesion.errors %}<span class="tpq-error">{{ e }}</span>{% endfor %}</div><div class="tpq-field {% if sesion_terapia_form.numero_sesion_adicional.errors %}has-error{% endif %}"><label>Segunda sesión (opcional)</label>{{ sesion_terapia_form.numero_sesion_adicional }}{% for e in sesion_terapia_form.numero_sesion_adicional.errors %}<span class="tpq-error">{{ e }}</span>{% endfor %}</div><div class="tpq-field {% if sesion_terapia_form.hora_inicio.errors %}has-error{% endif %}"><label>Hora inicio</label>{{ sesion_terapia_form.hora_inicio }}{% for e in sesion_terapia_form.hora_inicio.errors %}<span class="tpq-error">{{ e }}</span>{% endfor %}</div><div class="tpq-field {% if sesion_terapia_form.hora_finalizacion.errors %}has-error{% endif %}"><label>Hora final</label>{{ sesion_terapia_form.hora_finalizacion }}{% for e in sesion_terapia_form.hora_finalizacion.errors %}<span class="tpq-error">{{ e }}</span>{% endfor %}</div></div></div>

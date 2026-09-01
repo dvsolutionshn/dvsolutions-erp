@@ -2415,22 +2415,64 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
                 destino = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.id, tipo])
                 return redirect(f"{destino}?programa={programa_guardado.id}")
 
-    return render(
-        request,
-        "clinica/registro_control_especial.html",
-        {
-            "empresa": empresa,
-            "paciente": paciente,
-            "tipo": tipo,
-            "tipo_nombre": config["nombre"],
-            "maximo_sesiones": config["maximo"],
-            "programas": programas,
-            "programa": programa,
-            "programa_form": programa_form,
-            "sesion": sesion,
-            "sesion_form": sesion_form,
-        },
+    historial = list(programa.sesiones.select_related("cita") if programa else [])
+    por_numero = {
+        numero: registro
+        for registro in historial
+        for numero in (registro.numero_sesion, registro.numero_sesion_adicional)
+        if numero
+    }
+    numero_actual = None if sesion and sesion.bloqueada else (
+        sesion.numero_sesion if sesion else inicial.get("numero_sesion")
     )
+    tablero = [
+        {"numero": numero, "registro": por_numero.get(numero), "actual": numero == numero_actual}
+        for numero in range(1, config["maximo"] + 1)
+    ]
+    completadas = sum(
+        len([numero for numero in (registro.numero_sesion, registro.numero_sesion_adicional) if numero])
+        for registro in historial if registro.estado == "finalizada"
+    )
+    errores = []
+    if request.method == "POST":
+        for formulario in (programa_form, sesion_form):
+            for campo, lista in formulario.errors.items():
+                etiqueta = formulario.fields[campo].label if campo in formulario.fields else "Formulario"
+                errores.extend(f"{etiqueta}: {mensaje}" for mensaje in lista)
+
+    contexto = {
+        "empresa": empresa,
+        "paciente_directo": paciente,
+        "tipo": tipo,
+        "modo_directo_historial": True,
+        "programa_id_directo": programa.id if programa else "",
+        "sesion_id_directo": sesion.id if sesion else "",
+        "numero_sesion_desde_cita": None,
+    }
+    if tipo == "camara_hiperbarica":
+        contexto.update({
+            "programa_camara": programa,
+            "programa_camara_form": programa_form,
+            "sesion_camara": sesion,
+            "sesion_camara_form": sesion_form,
+            "historial_camara": historial,
+            "tablero_sesiones_camara": tablero,
+            "sesiones_camara_completadas": completadas,
+            "errores_control_camara": errores,
+        })
+        return render(request, "crm/camara_hiperbarica.html", contexto)
+
+    contexto.update({
+        "programa_terapia": programa,
+        "programa_terapia_form": programa_form,
+        "sesion_terapia": sesion,
+        "sesion_terapia_form": sesion_form,
+        "historial_terapias_post": historial,
+        "tablero_sesiones_terapia": tablero,
+        "sesiones_terapia_completadas": completadas,
+        "errores_terapia_post": errores,
+    })
+    return render(request, "crm/terapias_postquirurgicas.html", contexto)
 
 
 @login_required
