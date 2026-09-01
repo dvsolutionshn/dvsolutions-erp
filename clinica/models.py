@@ -501,7 +501,7 @@ class HistoriaClinicaEspecialidad(models.Model):
         ("capilar", "Capilar"),
         ("tricopigmentacion", "Tricopigmentacion"),
         ("cirugia_plastica", "Cirugia plastica y reconstructiva"),
-        ("medicina_estetica", "Tratamiento Estetico / Piel"),
+        ("medicina_estetica", "Medicina Estética"),
         ("enfermeria", "Enfermeria"),
         ("terapias", "Terapias"),
         ("camara_hiperbarica", "Camara hiperbarica"),

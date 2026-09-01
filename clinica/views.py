@@ -31,9 +31,7 @@ from .forms import (
     ALERGIAS_GENERALES_CHOICES,
     CONSUMO_RIESGO_CHOICES,
     DECISION_CIRUGIA_CHOICES,
-    DIETA_CHOICES,
     DROGAS_RECREATIVAS_CHOICES,
-    EJERCICIO_CHOICES,
     FRECUENCIA_CHOICES,
     MEDICAMENTOS_HABITUALES_CHOICES,
     MEDICAMENTOS_ACTUALES_CHOICES,
@@ -41,6 +39,7 @@ from .forms import (
     PROCEDIMIENTOS_GENERALES_CHOICES,
     RIESGO_TROMBOEMBOLICO_CHOICES,
     PSICOLOGICA_CHOICES,
+    PSICOLOGICA_HISTORICA_CHOICES,
     SI_NO_CHOICES,
     CitaClinicaForm,
     DocumentoClinicoPacienteForm,
@@ -359,7 +358,7 @@ def _resumen_preconsulta(preconsulta):
         "expectativas_realistas": _etiquetas_seleccion(general.get("expectativas_realistas"), SI_NO_CHOICES),
         "busca_perfeccion": _etiquetas_seleccion(general.get("busca_perfeccion"), SI_NO_CHOICES),
         "multiples_cirugias_insatisfaccion": _etiquetas_seleccion(general.get("multiples_cirugias_insatisfaccion"), SI_NO_CHOICES),
-        "evaluacion_psicologica": _etiquetas_seleccion(general.get("evaluacion_psicologica"), PSICOLOGICA_CHOICES),
+        "evaluacion_psicologica": _etiquetas_seleccion(general.get("evaluacion_psicologica"), PSICOLOGICA_HISTORICA_CHOICES),
     }
 
 
@@ -400,9 +399,25 @@ def _secciones_preconsulta(preconsulta):
             ],
         },
         {
-            "titulo": "2. Antecedentes, alergias y medicamentos",
+            "titulo": "2. Funciones orgánicas",
+            "descripcion": "Estado reportado para cada función orgánica.",
+            "campos": [
+                _campo_lectura_preconsulta(general, "Apetito", "funcion_apetito", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Sueño", "funcion_sueno", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Sed", "funcion_sed", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Micción", "funcion_miccion", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Evacuaciones", "funcion_evacuaciones", PreconsultaClinicaPublicaForm.FUNCION_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle histórico de funciones", "funciones_detalle_historico"),
+            ],
+        },
+        {
+            "titulo": "3. Antecedentes, alergias y medicamentos",
             "descripcion": "Condiciones, alergias y tratamientos reportados.",
             "campos": [
+                _campo_lectura_preconsulta(general, "Condiciones diagnosticadas", "diagnostico_medico", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle de condiciones diagnosticadas", "diagnostico_medico_detalle"),
+                _campo_lectura_preconsulta(general, "Alergias y medicamentos habituales", "alergias_medicamentos", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle de alergias y medicamentos", "alergias_medicamentos_detalle"),
                 {"label": "Antecedentes personales", "value": _etiquetas_seleccion(preconsulta.antecedentes_personales, ANTECEDENTES_PERSONALES_CHOICES), "type": "chips"},
                 _campo_lectura_preconsulta(general, "Detalle de antecedentes", "antecedentes_personales_detalle"),
                 {"label": "Alergias marcadas", "value": _valor_preconsulta(general, "alergias_seleccion", ALERGIAS_GENERALES_CHOICES), "type": "chips"},
@@ -413,11 +428,12 @@ def _secciones_preconsulta(preconsulta):
                 {"label": "Medicamentos actuales", "value": _valor_preconsulta(general, "medicamentos_actuales_seleccion", MEDICAMENTOS_ACTUALES_CHOICES), "type": "chips"},
                 _campo_lectura_preconsulta(general, "Detalle medicamentos actuales", "medicamentos_actuales_otros"),
                 _campo_lectura_preconsulta(general, "Antecedentes infecciosos", "antecedentes_infecciosos"),
+                {"label": "Antecedentes infecciosos", "value": preconsulta.antecedentes_infecciosos, "type": "texto"},
                 _campo_lectura_preconsulta(general, "Hospitalizaciones o cirugías previas", "antecedentes_hospitalarios_detalle"),
             ],
         },
         {
-            "titulo": "3. Hábitos y estilo de vida",
+            "titulo": "4. Hábitos y estilo de vida",
             "descripcion": "Datos no patológicos y riesgos de consumo.",
             "campos": [
                 _campo_lectura_preconsulta(general, "Operado anteriormente", "quirurgicos_operado", SI_NO_CHOICES, "chips"),
@@ -427,14 +443,18 @@ def _secciones_preconsulta(preconsulta):
                 _campo_lectura_preconsulta(general, "Drogas recreativas", "drogas_recreativas", SI_NO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Tipo de drogas", "drogas_recreativas_tipos", DROGAS_RECREATIVAS_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle consumo", "drogas_recreativas_detalle"),
-                _campo_lectura_preconsulta(general, "Hábitos de riesgo", "consumo_riesgo", CONSUMO_RIESGO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Hábitos de riesgo históricos", "consumo_riesgo_historico", CONSUMO_RIESGO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle histórico de consumo", "consumo_riesgo_detalle_historico"),
+                _campo_lectura_preconsulta(general, "Hábitos de riesgo", "consumo_riesgo", [*CONSUMO_RIESGO_CHOICES, *SI_NO_CHOICES], "chips"),
                 _campo_lectura_preconsulta(general, "Detalle hábitos", "consumo_riesgo_detalle"),
+                _campo_lectura_preconsulta(general, "Dieta histórica", "dieta_historico"),
+                _campo_lectura_preconsulta(general, "Ejercicio histórico", "ejercicio_historico"),
                 _campo_lectura_preconsulta(general, "Dieta", "dieta"),
                 _campo_lectura_preconsulta(general, "Ejercicio", "ejercicio"),
             ],
         },
         {
-            "titulo": "4. Familiares, ginecología y riesgos",
+            "titulo": "5. Familiares, ginecología y riesgos",
             "descripcion": "Antecedentes familiares y datos ginecológicos cuando aplican.",
             "campos": [
                 {"label": "Antecedentes familiares", "value": _etiquetas_seleccion(preconsulta.antecedentes_familiares, ANTECEDENTES_FAMILIARES_CHOICES), "type": "chips"},
@@ -454,11 +474,13 @@ def _secciones_preconsulta(preconsulta):
             ],
         },
         {
-            "titulo": "5. Evaluación psicológica y consentimiento",
+            "titulo": "6. Evaluación psicológica y consentimiento",
             "descripcion": "Expectativas y elementos emocionales declarados.",
             "campos": [
-                _campo_lectura_preconsulta(general, "Evaluación psicológica", "evaluacion_psicologica", PSICOLOGICA_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Evaluación psicológica", "evaluacion_psicologica", PSICOLOGICA_HISTORICA_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle emocional", "evaluacion_psicologica_detalle"),
+                _campo_lectura_preconsulta(general, "Evaluación psicológica histórica", "evaluacion_psicologica_historica", PSICOLOGICA_HISTORICA_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle emocional histórico", "evaluacion_psicologica_detalle_historico"),
                 _campo_lectura_preconsulta(general, "Quién tomó la decisión de operarse", "decision_cirugia", DECISION_CIRUGIA_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Otra decisión", "decision_cirugia_otros"),
                 _campo_lectura_preconsulta(general, "Expectativas realistas", "expectativas_realistas", SI_NO_CHOICES, "chips"),
@@ -486,21 +508,19 @@ def _actualizar_paciente_desde_preconsulta(paciente, form):
     paciente.telefono = form.cleaned_data.get("telefono")
     paciente.whatsapp = form.cleaned_data.get("telefono")
     paciente.prefijo_telefono = form.cleaned_data.get("telefono_codigo_area") or paciente.prefijo_telefono or "504"
-    alergias = (form.cleaned_data.get("alergias") or "").strip()
-    paciente.alergias = alergias
-    paciente.es_alergico = bool(alergias)
-    antecedentes = _etiquetas_seleccion(
-        form.cleaned_data.get("antecedentes_personales"),
-        ANTECEDENTES_PERSONALES_CHOICES,
-    )
-    detalle_antecedentes = (form.cleaned_data.get("antecedentes_personales_detalle") or "").strip()
-    paciente.antecedentes_medicos = "; ".join(antecedentes + ([detalle_antecedentes] if detalle_antecedentes else []))
-    medicamentos = _etiquetas_seleccion(
-        form.cleaned_data.get("medicamentos_habituales"),
-        MEDICAMENTOS_HABITUALES_CHOICES,
-    )
-    detalle_medicamentos = (form.cleaned_data.get("medicamentos_habituales_detalle") or "").strip()
-    paciente.medicamentos_actuales = "; ".join(medicamentos + ([detalle_medicamentos] if detalle_medicamentos else []))
+    diagnostico_medico = form.cleaned_data.get("diagnostico_medico")
+    if diagnostico_medico:
+        paciente.antecedentes_medicos = (
+            (form.cleaned_data.get("diagnostico_medico_detalle") or "").strip()
+            if diagnostico_medico == "si" else ""
+        )
+    alergias_medicamentos = form.cleaned_data.get("alergias_medicamentos")
+    if alergias_medicamentos:
+        detalle = (form.cleaned_data.get("alergias_medicamentos_detalle") or "").strip()
+        tiene_registros = alergias_medicamentos == "si"
+        paciente.alergias = detalle if tiene_registros else ""
+        paciente.es_alergico = tiene_registros
+        paciente.medicamentos_actuales = detalle if tiene_registros else ""
     paciente.save()
     _sincronizar_cliente_facturacion_paciente(paciente)
 

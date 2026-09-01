@@ -79,35 +79,30 @@ class ClinicaPacienteTests(TestCase):
             "motivo_categoria": ["no_aplica"],
             "procedimientos_interes": [],
             "procedimientos_interes_otros": "No aplica",
-            "funciones_organicas": "normal",
-            "funciones_detalle": "No aplica",
-            "antecedentes_personales": ["no_aplica"],
-            "antecedentes_personales_detalle": "No aplica",
-            "alergias_seleccion": ["ninguna"],
-            "alergias_otras": "No aplica",
-            "alergias": "No aplica",
-            "medicamentos_habituales": ["no_aplica"],
-            "medicamentos_habituales_detalle": "No aplica",
-            "medicamentos_actuales_seleccion": ["ninguno"],
-            "medicamentos_actuales_otros": "No aplica",
+            "funcion_apetito": "normal",
+            "funcion_sueno": "normal",
+            "funcion_sed": "normal",
+            "funcion_miccion": "normal",
+            "funcion_evacuaciones": "normal",
+            "diagnostico_medico": "no",
+            "diagnostico_medico_detalle": "",
+            "alergias_medicamentos": "no",
+            "alergias_medicamentos_detalle": "",
             "antecedentes_infecciosos": "No aplica",
             "antecedentes_hospitalarios": ["no"],
             "antecedentes_hospitalarios_detalle": "No aplica",
             "quirurgicos_operado": ["no"],
             "quirurgicos_detalle": "No aplica",
-            "consumo_riesgo": ["ninguno"],
-            "consumo_riesgo_detalle": "No aplica",
-            "dieta": ["balanceada"],
-            "ejercicio": ["ocasional"],
+            "consumo_riesgo": ["no"],
+            "consumo_riesgo_detalle": "",
+            "dieta": ["no"],
+            "ejercicio": ["si"],
             "antecedentes_familiares": ["no_aplica"],
             "antecedentes_familiares_detalle": "No aplica",
             "riesgo_tromboembolico": ["ninguno"],
             "riesgo_tromboembolico_otros": "No aplica",
             "evaluacion_psicologica": ["ninguna"],
-            "evaluacion_psicologica_detalle": "No aplica",
-            "expectativas_realistas": ["si"],
-            "busca_perfeccion": ["no"],
-            "multiples_cirugias_insatisfaccion": ["no"],
+            "evaluacion_psicologica_detalle": "",
             "motivo_consulta": "Registro general",
             "consentimiento_datos": "on",
             "foto_perfil": self._foto_prueba(),
@@ -872,7 +867,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertRedirects(response, reverse("clinica_servicios", args=[self.empresa.slug]))
         self.assertTrue(ServicioClinico.objects.filter(id=servicio.id).exists())
 
-    def test_crear_paciente_alergico_y_mostrar_alerta_en_lista(self):
+    def test_crear_paciente_basico_no_inventa_alerta_alergica(self):
         response = self.client.get(reverse("clinica_crear_paciente", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Formulario de historia clinica")
@@ -889,15 +884,14 @@ class ClinicaPacienteTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         paciente = Paciente.objects.get(empresa=self.empresa, identidad="0801199912345")
-        self.assertTrue(paciente.es_alergico)
-        self.assertEqual(paciente.alergias, "Penicilina")
+        self.assertFalse(paciente.es_alergico)
+        self.assertIsNone(paciente.alergias)
         self.assertIsNotNone(paciente.cliente)
         self.assertTrue(Cliente.objects.filter(empresa=self.empresa, rtn="0801199912345").exists())
         self.assertEqual(PreconsultaClinica.objects.filter(paciente=paciente, estado="completada").count(), 1)
 
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Alergico")
         self.assertContains(response, "Ver")
 
         response = self.client.get(reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]))
@@ -1426,7 +1420,7 @@ class ClinicaPacienteTests(TestCase):
             reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id])
         )
         self.assertEqual(selector.status_code, 200)
-        for nombre in ["Capilar", "Cirugia plastica y reconstructiva", "Tratamiento Estetico / Piel", "Enfermeria", "Terapias", "Camara hiperbarica"]:
+        for nombre in ["Capilar", "Cirugia plastica y reconstructiva", "Medicina Estética", "Enfermeria", "Terapias", "Camara hiperbarica"]:
             self.assertContains(selector, nombre)
 
         crear_url = reverse(
@@ -1747,7 +1741,7 @@ class ClinicaPacienteTests(TestCase):
         for nombre in [
             "Capilar",
             "Cirugia plastica y reconstructiva",
-            "Tratamiento Estetico / Piel",
+            "Medicina Estética",
             "Enfermeria",
             "Terapias",
             "Camara hiperbarica",
@@ -1787,7 +1781,7 @@ class ClinicaPacienteTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Tratamiento Estetico / Piel")
+        self.assertContains(response, "Medicina Estética")
 
     def test_formulario_general_masculino_limpia_campos_ginecologicos(self):
         paciente = Paciente.objects.create(
@@ -1824,8 +1818,13 @@ class ClinicaPacienteTests(TestCase):
                 "motivo_consulta": "Valoracion",
                 "procedimientos_interes": ["aumento_mamario", "braquioplastia"],
                 "procedimientos_interes_otros": "No aplica",
-                "funciones_organicas": "normal",
-                "funciones_detalle": "No aplica",
+                "funcion_apetito": "normal",
+                "funcion_sueno": "normal",
+                "funcion_sed": "normal",
+                "funcion_miccion": "normal",
+                "funcion_evacuaciones": "normal",
+                "diagnostico_medico": "no",
+                "alergias_medicamentos": "no",
                 "antecedentes_hospitalarios": ["no"],
                 "antecedentes_personales": ["no_aplica"],
                 "antecedentes_personales_detalle": "No aplica",
@@ -1840,10 +1839,10 @@ class ClinicaPacienteTests(TestCase):
                 "antecedentes_hospitalarios_detalle": "No aplica",
                 "quirurgicos_operado": ["no"],
                 "quirurgicos_detalle": "No aplica",
-                "consumo_riesgo": ["ninguno"],
-                "consumo_riesgo_detalle": "No aplica",
-                "dieta": ["balanceada"],
-                "ejercicio": ["ocasional"],
+                "consumo_riesgo": ["no"],
+                "consumo_riesgo_detalle": "",
+                "dieta": ["no"],
+                "ejercicio": ["si"],
                 "antecedentes_familiares": ["no_aplica"],
                 "antecedentes_familiares_detalle": "No aplica",
                 "riesgo_tromboembolico": ["ninguno"],
@@ -1870,6 +1869,110 @@ class ClinicaPacienteTests(TestCase):
         self.assertNotIn("gine_gestas", datos)
         self.assertNotIn("gine_embarazada", datos)
         self.assertNotIn("gine_mamografia_fecha", datos)
+
+    def test_formulario_actualizado_preserva_campos_historicos_al_editar(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-HIST",
+            primer_nombre="Ana",
+            primer_apellido="Historica",
+            nombre="Ana Historica",
+            identidad="0801199200099",
+            fecha_nacimiento="1992-05-10",
+            sexo="femenino",
+            estado_civil="soltero",
+            whatsapp="99990099",
+        )
+        preconsulta = PreconsultaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            token_hash="historia-compatible-token",
+            token_preview="historia",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=5),
+            antecedentes_personales=["asma"],
+            antecedentes_personales_detalle="Asma desde la infancia",
+            medicamentos_habituales=["anticonceptivos"],
+            medicamentos_habituales_detalle="Uso diario",
+            datos_generales={
+                "formulario_general_pendiente_doctor": True,
+                "formulario_general": {
+                    "medicamentos_actuales_seleccion": ["anticonceptivos"],
+                    "expectativas_realistas": ["si"],
+                    "busca_perfeccion": ["no"],
+                },
+            },
+        )
+        data = self._datos_formulario_general(
+            identidad=paciente.identidad,
+            nombres="Ana",
+            apellidos="Historica",
+            sexo="femenino",
+            diagnostico_medico="si",
+            diagnostico_medico_detalle="Asma controlada",
+            alergias_medicamentos="no",
+            consumo_riesgo=["si"],
+            consumo_riesgo_detalle="Tabaco",
+            evaluacion_psicologica=["otros"],
+            evaluacion_psicologica_detalle="Estrés situacional",
+        )
+
+        response = self.client.post(
+            reverse("clinica_completar_historia_clinica_paciente", args=[self.empresa.slug, paciente.id]),
+            data,
+        )
+
+        self.assertRedirects(response, reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]))
+        preconsulta.refresh_from_db()
+        self.assertEqual(preconsulta.antecedentes_personales, ["asma"])
+        self.assertEqual(preconsulta.medicamentos_habituales, ["anticonceptivos"])
+        general = preconsulta.datos_generales["formulario_general"]
+        self.assertEqual(general["medicamentos_actuales_seleccion"], ["anticonceptivos"])
+        self.assertEqual(general["expectativas_realistas"], ["si"])
+        self.assertEqual(general["diagnostico_medico_detalle"], "Asma controlada")
+        self.assertEqual(general["consumo_riesgo_detalle"], "Tabaco")
+        self.assertEqual(general["evaluacion_psicologica_detalle"], "Estrés situacional")
+
+        detalle = self.client.get(
+            reverse("clinica_preconsulta_detalle", args=[self.empresa.slug, paciente.id, preconsulta.id])
+        )
+        self.assertContains(detalle, "Asma controlada")
+        self.assertContains(detalle, "Expectativas realistas")
+
+    def test_formulario_renderiza_nuevos_pasos_y_opciones_sin_campos_retirados(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-WIZARD",
+            nombre="Paciente Wizard",
+            identidad="0801199200088",
+            sexo="femenino",
+        )
+        preconsulta = PreconsultaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            token_hash="wizard-compatible-token",
+            token_preview="wizard",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=5),
+        )
+
+        response = self.client.get(
+            reverse("clinica_completar_historia_clinica_paciente", args=[self.empresa.slug, paciente.id])
+        )
+
+        self.assertContains(response, "Paso 9 de 9")
+        self.assertContains(response, "data-conditional-gine")
+        self.assertContains(response, "Historia / Riesgo Ginecológico")
+        self.assertContains(response, "Condiciones diagnosticadas por un médico")
+        self.assertContains(response, "Alergias y medicamentos de uso habitual")
+        self.assertContains(response, "¿Hace dieta?")
+        self.assertContains(response, "Indique qué consume")
+        self.assertContains(response, "Medicina Estética")
+        self.assertContains(response, "Cirugía Corporal")
+        self.assertNotContains(response, "Medicamentos actuales")
+        self.assertNotContains(response, "Expectativas realistas")
+        self.assertNotContains(response, "Busca perfeccion absoluta")
+        self.assertNotContains(response, "Ha tenido multiples cirugias por insatisfaccion")
+        self.assertNotContains(response, 'value="enfermeria"')
+        self.assertNotContains(response, 'value="tratamientos"')
 
     def test_preconsulta_publica_se_genera_completa_y_actualiza_expediente(self):
         paciente = Paciente.objects.create(
@@ -1904,7 +2007,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Lea esto antes de empezar")
         self.assertContains(response, "contacte al admin DV Solutions")
         self.assertContains(response, "Laura")
-        self.assertContains(response, "Paso 8 de 8")
+        self.assertContains(response, "Paso 9 de 9")
         self.assertContains(response, "No aplica / no estoy seguro todavia")
         self.assertContains(response, "Braquioplastia (brazos: retirar flacidez o exceso de piel)")
 
@@ -1914,9 +2017,11 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "TikTok")
         self.assertContains(response, "YouTube")
         self.assertContains(response, "Referencia")
-        self.assertContains(response, "Cocaina")
-        self.assertContains(response, "Marihuana")
-        self.assertContains(response, "Crack")
+        self.assertNotContains(response, "Cocaina")
+        self.assertNotContains(response, "Marihuana")
+        self.assertNotContains(response, "Crack")
+        self.assertNotContains(response, "Medicamentos actuales")
+        self.assertNotContains(response, "Expectativas realistas")
         self.assertNotContains(response, "Estado de salud actual")
         self.assertNotContains(response, "Otras sustancias o drogas")
         self.assertNotContains(response, "Otro medicamento")
@@ -1953,16 +2058,19 @@ class ClinicaPacienteTests(TestCase):
                 "historia_tiempo_preocupacion": "2 anos",
                 "historia_tratamientos_previos": "Mesoterapia capilar",
                 "historia_expectativas": "Resultado natural",
-                "funciones_organicas": "normal",
-                "funciones_detalle": "No aplica",
+                "funcion_apetito": "normal",
+                "funcion_sueno": "normal",
+                "funcion_sed": "normal",
+                "funcion_miccion": "alterada",
+                "funcion_evacuaciones": "normal",
                 "revision_sistemas": "normal",
                 "revision_sistemas_detalle": "",
                 "antecedentes_hospitalarios": ["si"],
                 "antecedentes_hospitalarios_detalle": "Apendicectomia en 2018",
-                "antecedentes_personales": ["asma", "hipertension"],
-                "antecedentes_personales_detalle": "Asma controlada",
-                "medicamentos_habituales": ["anticonceptivos"],
-                "medicamentos_habituales_detalle": "Uso diario",
+                "diagnostico_medico": "si",
+                "diagnostico_medico_detalle": "Asma controlada e hipertensión",
+                "alergias_medicamentos": "si",
+                "alergias_medicamentos_detalle": "Alergia a penicilina; anticonceptivos de uso diario",
                 "antecedentes_familiares": ["diabetes"],
                 "antecedentes_familiares_detalle": "Madre",
                 "alergias_seleccion": ["medicamentos", "latex"],
@@ -1976,8 +2084,8 @@ class ClinicaPacienteTests(TestCase):
                 "drogas_recreativas": ["si"],
                 "drogas_recreativas_tipos": ["marihuana"],
                 "drogas_recreativas_detalle": "Uso ocasional historico",
-                "consumo_riesgo": ["no_aplica"],
-                "consumo_riesgo_detalle": "No aplica",
+                "consumo_riesgo": ["no"],
+                "consumo_riesgo_detalle": "",
                 "riesgo_tromboembolico": ["ninguno"],
                 "riesgo_tromboembolico_otros": "No aplica",
                 "gine_menarca": "12",
@@ -1990,19 +2098,16 @@ class ClinicaPacienteTests(TestCase):
                 "gine_lactancia": ["no"],
                 "gine_mamografia": ["no"],
                 "decision_cirugia": ["usted"],
-                "expectativas_realistas": ["si"],
-                "busca_perfeccion": ["no"],
-                "multiples_cirugias_insatisfaccion": ["no"],
                 "evaluacion_psicologica": ["ninguna"],
-                "evaluacion_psicologica_detalle": "No aplica",
+                "evaluacion_psicologica_detalle": "",
                 "examen_peso": "64",
                 "examen_talla": "165",
                 "examen_imc": "23.5",
                 "examen_pa": "120/80",
                 "examen_fc": "72",
                 "examen_sato2": "98",
-                "dieta": ["balanceada"],
-                "ejercicio": ["3_4_semana"],
+                "dieta": ["si"],
+                "ejercicio": ["si"],
                 "habitos": "No fuma",
                 "alergias": "Penicilina",
                 "antecedentes_infecciosos": "COVID-19 en 2022",
@@ -2015,20 +2120,19 @@ class ClinicaPacienteTests(TestCase):
         preconsulta.refresh_from_db()
         paciente.refresh_from_db()
         self.assertEqual(preconsulta.estado, "completada")
-        self.assertEqual(preconsulta.antecedentes_personales, ["asma", "hipertension"])
+        self.assertEqual(preconsulta.funciones_organicas, "alterada")
+        self.assertEqual(preconsulta.funciones_detalle, "Micción")
         formulario_general = preconsulta.datos_generales["formulario_general"]
         self.assertEqual(formulario_general["motivo_categoria"], ["cirugia_facial"])
         self.assertEqual(formulario_general["procedimientos_interes"], ["rinoplastia"])
-        self.assertEqual(formulario_general["alergias_seleccion"], ["medicamentos", "latex"])
-        self.assertEqual(formulario_general["medicamentos_actuales_seleccion"], ["anticonceptivos", "multivitaminicos"])
-        self.assertEqual(formulario_general["drogas_recreativas"], ["si"])
-        self.assertEqual(formulario_general["drogas_recreativas_tipos"], ["marihuana"])
+        self.assertEqual(formulario_general["diagnostico_medico"], "si")
+        self.assertEqual(formulario_general["alergias_medicamentos"], "si")
         self.assertEqual(formulario_general["examen_peso"], "64")
         self.assertEqual(formulario_general["examen_sato2"], "98")
         self.assertEqual(paciente.nombre, "Laura Maria Perez Lopez")
         self.assertEqual(paciente.correo, "laura@example.com")
         self.assertTrue(paciente.es_alergico)
-        self.assertIn("Asma bronquial", paciente.antecedentes_medicos)
+        self.assertIn("Asma controlada", paciente.antecedentes_medicos)
 
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
@@ -2427,5 +2531,5 @@ class ClinicaPacienteTests(TestCase):
         self.assertTrue(preconsulta.datos_generales["formulario_general_pendiente_doctor"])
         self.assertEqual(preconsulta.datos_generales["formulario_general"]["pendiente_doctor_desde_paso"], 4)
         self.assertEqual(preconsulta.datos_generales["formulario_general"]["motivo_categoria"], ["no_aplica"])
-        self.assertIn("No aplica", paciente.antecedentes_medicos)
-        self.assertEqual(paciente.alergias, "No aplica")
+        self.assertIsNone(paciente.antecedentes_medicos)
+        self.assertIsNone(paciente.alergias)
