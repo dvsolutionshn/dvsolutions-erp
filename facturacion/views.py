@@ -5404,34 +5404,90 @@ def kardex_inventario(request, empresa_slug):
         controla_inventario=True
     ).order_by('nombre')
 
-    movimientos = MovimientoInventario.objects.filter(
+    movimientos_generales = MovimientoInventario.objects.filter(
         empresa=empresa
     ).select_related('producto', 'bodega', 'factura', 'nota_credito', 'compra_documento')
+    movimientos_lotes = MovimientoLoteBodega.objects.filter(
+        empresa=empresa,
+        tipo__in=['traslado_salida', 'traslado_entrada', 'regalia'],
+    ).select_related('lote', 'lote__producto', 'bodega', 'usuario')
 
     if producto_id:
         try:
-            movimientos = movimientos.filter(producto_id=int(producto_id))
+            producto_id_int = int(producto_id)
+            movimientos_generales = movimientos_generales.filter(producto_id=producto_id_int)
+            movimientos_lotes = movimientos_lotes.filter(lote__producto_id=producto_id_int)
         except (TypeError, ValueError):
             producto_id = ""
 
     if tipo:
-        movimientos = movimientos.filter(tipo=tipo)
+        movimientos_generales = movimientos_generales.filter(tipo=tipo)
+        movimientos_lotes = movimientos_lotes.filter(tipo=tipo)
 
     if fecha_desde:
-        movimientos = movimientos.filter(fecha__date__gte=fecha_desde)
+        movimientos_generales = movimientos_generales.filter(fecha__date__gte=fecha_desde)
+        movimientos_lotes = movimientos_lotes.filter(fecha__date__gte=fecha_desde)
 
     if fecha_hasta:
-        movimientos = movimientos.filter(fecha__date__lte=fecha_hasta)
+        movimientos_generales = movimientos_generales.filter(fecha__date__lte=fecha_hasta)
+        movimientos_lotes = movimientos_lotes.filter(fecha__date__lte=fecha_hasta)
+
+    movimientos_generales = list(movimientos_generales)
+    referencias_regalia_registradas = {
+        (movimiento.producto_id, movimiento.bodega_id, movimiento.referencia)
+        for movimiento in movimientos_generales
+        if movimiento.tipo == 'regalia' and movimiento.referencia
+    }
+
+    movimientos = []
+    for movimiento in movimientos_generales:
+        movimiento.producto_kardex = movimiento.producto
+        movimiento.lote_kardex = None
+        movimientos.append(movimiento)
+
+    for movimiento in movimientos_lotes:
+        clave_regalia = (
+            movimiento.lote.producto_id,
+            movimiento.bodega_id,
+            movimiento.referencia,
+        )
+        if (
+            movimiento.tipo == 'regalia'
+            and movimiento.referencia
+            and clave_regalia in referencias_regalia_registradas
+        ):
+            continue
+        movimiento.producto_kardex = movimiento.lote.producto
+        movimiento.lote_kardex = movimiento.lote
+        movimientos.append(movimiento)
+
+    movimientos.sort(key=lambda movimiento: (movimiento.fecha, movimiento.id), reverse=True)
 
     resumen = {
-        "total_movimientos": movimientos.count(),
-        "entradas": movimientos.filter(
-            tipo__in=['entrada', 'entrada_compra', 'ajuste_entrada', 'devolucion_nota_credito', 'reversion_factura']
-        ).count(),
-        "salidas": movimientos.filter(
-            tipo__in=['salida_factura', 'ajuste_salida', 'reversion_nota_credito']
-        ).count(),
+        "total_movimientos": len(movimientos),
+        "entradas": sum(
+            movimiento.tipo in [
+                'entrada', 'entrada_compra', 'ajuste_entrada', 'devolucion_nota_credito',
+                'reversion_factura', 'traslado_entrada',
+            ]
+            for movimiento in movimientos
+        ),
+        "salidas": sum(
+            movimiento.tipo in [
+                'salida_factura', 'ajuste_salida', 'reversion_nota_credito', 'regalia',
+                'traslado_salida',
+            ]
+            for movimiento in movimientos
+        ),
     }
+
+    tipos_movimiento = list(MovimientoInventario.TIPOS)
+    tipos_existentes = {valor for valor, _etiqueta in tipos_movimiento}
+    tipos_movimiento.extend(
+        (valor, etiqueta)
+        for valor, etiqueta in MovimientoLoteBodega.TIPOS
+        if valor in {'traslado_salida', 'traslado_entrada'} and valor not in tipos_existentes
+    )
 
     return render(request, "facturacion/kardex_premium.html", {
         "empresa": empresa,
@@ -5442,7 +5498,7 @@ def kardex_inventario(request, empresa_slug):
         "tipo": tipo,
         "fecha_desde": fecha_desde,
         "fecha_hasta": fecha_hasta,
-        "tipos_movimiento": MovimientoInventario.TIPOS,
+        "tipos_movimiento": tipos_movimiento,
     })
 
 

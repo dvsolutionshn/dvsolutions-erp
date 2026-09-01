@@ -4,7 +4,7 @@
 {% block title %}Kardex - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Operacion Logistica{% endblock %}
 {% block header_title %}Kardex de Inventario{% endblock %}
-{% block header_description %}Consulta cronologica de entradas, salidas, devoluciones y ajustes con filtro operativo.{% endblock %}
+{% block header_description %}Consulta cronologica de entradas, salidas, transferencias, regalias y ajustes con filtro operativo.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'inventario_facturacion' empresa.slug %}">Volver a Inventario</a>
 {% endblock %}
@@ -87,7 +87,12 @@
             {% for movimiento in movimientos %}
                 <tr>
                     <td>{{ movimiento.fecha|date:"d/m/Y H:i" }}</td>
-                    <td>{{ movimiento.producto.nombre }}</td>
+                    <td>
+                        {{ movimiento.producto_kardex.nombre }}
+                        {% if movimiento.lote_kardex %}
+                        <div class="erp-card-muted">Lote {{ movimiento.lote_kardex.numero_lote }}</div>
+                        {% endif %}
+                    </td>
                     <td>{{ movimiento.bodega.nombre|default:"General" }}</td>
                     <td>{{ movimiento.get_tipo_display }}</td>
                     <td class="amount">{{ movimiento.cantidad|floatformat:2|intcomma }}</td>

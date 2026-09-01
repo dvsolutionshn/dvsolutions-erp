@@ -4734,6 +4734,112 @@ class FacturacionTests(TestCase):
         self.assertContains(response, self.producto.nombre)
         self.assertContains(response, "Carga inicial")
 
+    def test_kardex_recupera_transferencias_historicas_desde_movimientos_por_lote(self):
+        origen = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega Origen Historica",
+            tipo="otra",
+        )
+        destino = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega Destino Historica",
+            tipo="otra",
+        )
+        lote = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=self.producto,
+            numero_lote="HIST-TRAS-1",
+        )
+        fecha_historica = timezone.now() - timedelta(days=30)
+        referencia = "Rapido Origen -> Destino"
+        MovimientoLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=origen,
+            lote=lote,
+            tipo="traslado_salida",
+            cantidad=Decimal("2.00"),
+            existencia_anterior=Decimal("5.00"),
+            existencia_resultante=Decimal("3.00"),
+            referencia=referencia,
+            fecha=fecha_historica,
+        )
+        MovimientoLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=destino,
+            lote=lote,
+            tipo="traslado_entrada",
+            cantidad=Decimal("2.00"),
+            existencia_anterior=Decimal("1.00"),
+            existencia_resultante=Decimal("3.00"),
+            referencia=referencia,
+            fecha=fecha_historica,
+        )
+
+        response = self.client.get(reverse("kardex_inventario", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Traslado salida")
+        self.assertContains(response, "Traslado entrada")
+        self.assertContains(response, "HIST-TRAS-1", count=2)
+        self.assertContains(response, fecha_historica.strftime("%d/%m/%Y"), count=2)
+        self.assertEqual(response.context["resumen"]["entradas"], 1)
+        self.assertEqual(response.context["resumen"]["salidas"], 1)
+
+    def test_kardex_recupera_regalias_historicas_y_evitar_duplicar_las_actuales(self):
+        bodega = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Bodega Regalias",
+            tipo="otra",
+        )
+        lote = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=self.producto,
+            numero_lote="HIST-REG-1",
+        )
+        fecha_historica = timezone.now() - timedelta(days=20)
+        MovimientoLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=bodega,
+            lote=lote,
+            tipo="regalia",
+            cantidad=Decimal("1.00"),
+            existencia_anterior=Decimal("4.00"),
+            existencia_resultante=Decimal("3.00"),
+            referencia="Regalia historica sin kardex",
+            fecha=fecha_historica,
+        )
+        MovimientoLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=bodega,
+            lote=lote,
+            tipo="regalia",
+            cantidad=Decimal("1.00"),
+            existencia_anterior=Decimal("3.00"),
+            existencia_resultante=Decimal("2.00"),
+            referencia="Regalia actual duplicada",
+        )
+        MovimientoInventario.objects.create(
+            empresa=self.empresa,
+            producto=self.producto,
+            bodega=bodega,
+            tipo="regalia",
+            cantidad=Decimal("1.00"),
+            existencia_anterior=Decimal("3.00"),
+            existencia_resultante=Decimal("2.00"),
+            referencia="Regalia actual duplicada",
+        )
+
+        response = self.client.get(
+            reverse("kardex_inventario", args=[self.empresa.slug]),
+            {"tipo": "regalia"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["movimientos"]), 2)
+        self.assertContains(response, "Regalia historica sin kardex")
+        self.assertContains(response, "Regalia actual duplicada", count=1)
+        self.assertEqual(response.context["resumen"]["salidas"], 2)
+
     def test_ajuste_manual_inventario_actualiza_existencias(self):
         response = self.client.post(
             reverse("ajustar_inventario", args=[self.empresa.slug]),
