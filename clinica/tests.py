@@ -1715,8 +1715,6 @@ class ClinicaPacienteTests(TestCase):
                 "estado": "borrador",
                 "estetica_motivo": ["arrugas", "manchas_faciales"],
                 "estetica_motivo_otros": "Poros dilatados",
-                "estetica_objetivo_principal": ["verse_mas_joven", "calidad_piel"],
-                "estetica_objetivo_principal_otros": "Mantener un resultado natural",
                 "estetica_plan_recomendado": ["toxina", "hydrafacial"],
             },
         )
@@ -1729,24 +1727,62 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(historia.tipo, "medicina_estetica")
         self.assertEqual(historia.datos_especialidad["estetica_motivo"], ["arrugas", "manchas_faciales"])
         self.assertEqual(historia.datos_especialidad["estetica_motivo_otros"], "Poros dilatados")
-        self.assertEqual(
-            historia.datos_especialidad["estetica_objetivo_principal"],
-            ["verse_mas_joven", "calidad_piel"],
-        )
-        self.assertEqual(
-            historia.datos_especialidad["estetica_objetivo_principal_otros"],
-            "Mantener un resultado natural",
-        )
         self.assertEqual(historia.datos_especialidad["estetica_plan_recomendado"], ["toxina", "hydrafacial"])
 
-        response = self.client.get(
-            reverse("clinica_editar_historia_especialidad", args=[self.empresa.slug, paciente.id, historia.id])
+        respuestas_retiradas = {
+            "estetica_objetivo_principal": ["verse_mas_joven", "calidad_piel"],
+            "estetica_objetivo_principal_otros": "Mantener un resultado natural",
+            "estetica_tiempo": "1_3_anos",
+            "estetica_ultimo_tratamiento": "3_6_meses",
+            "estetica_cirugias": ["rinoplastia"],
+            "estetica_satisfaccion": "4",
+            "estetica_areas_cuerpo": ["brazos", "flancos"],
+            "estetica_medicamentos_adelgazar": ["ozempic"],
+            "estetica_bariatrica": "manga",
+            "estetica_ejercicio": "3_4",
+        }
+        historia.datos_especialidad.update(respuestas_retiradas)
+        historia.save(update_fields=["datos_especialidad"])
+        editar_url = reverse(
+            "clinica_editar_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, historia.id],
         )
+        response = self.client.get(editar_url)
         self.assertContains(response, "Motivo de consulta (puede marcar más de una opción)")
         self.assertContains(response, "Hiperhidrosis (sudoración excesiva)")
         self.assertContains(response, "Rejuvenecimiento íntimo femenino")
-        self.assertContains(response, "Objetivo principal del paciente")
-        self.assertContains(response, "Mantener resultados previos")
+        for pregunta_retirada in [
+            "Objetivo principal del paciente",
+            "¿Cuanto tiempo tiene esta preocupacion?",
+            "¿Cuando fue su ultimo tratamiento?",
+            "Antecedentes quirurgicos esteticos",
+            "Satisfaccion personal - apariencia facial",
+            "Evaluacion corporal - Areas que desea mejorar",
+            "Medicamentos para adelgazar",
+            "Cirugia bariatrica",
+            "Actividad fisica",
+        ]:
+            self.assertNotContains(response, pregunta_retirada)
+        for campo in respuestas_retiradas:
+            self.assertNotContains(response, f'name="{campo}"')
+
+        response = self.client.post(
+            editar_url,
+            {
+                "fecha_atencion": "2026-06-17T11:30",
+                "estetica_motivo": ["arrugas"],
+                "estetica_plan_recomendado": ["toxina"],
+                "plan_tratamiento": "Plan facial actualizado",
+                "estado": "borrador",
+            },
+        )
+        self.assertRedirects(
+            response,
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id]),
+        )
+        historia.refresh_from_db()
+        for campo, valor in respuestas_retiradas.items():
+            self.assertEqual(historia.datos_especialidad[campo], valor)
 
     def test_enfermeria_guarda_bitacora_simple(self):
         paciente = Paciente.objects.create(

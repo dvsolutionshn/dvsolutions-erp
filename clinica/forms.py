@@ -685,36 +685,15 @@ MEDICINA_ESTETICA_FORMULARIO = [
         ("alopecia", "Alopecia / caída del cabello"),
         ("rejuvenecimiento_intimo", "Rejuvenecimiento íntimo femenino"),
     ], True),
-    ("estetica_objetivo_principal", "Objetivo principal del paciente", [
-        ("verse_mas_joven", "Verse más joven"),
-        ("calidad_piel", "Mejorar la calidad de la piel"),
-        ("armonizar_rostro", "Armonizar el rostro"),
-        ("mejorar_autoestima", "Mejorar la autoestima"),
-        ("prevenir_envejecimiento", "Prevenir el envejecimiento"),
-        ("corregir_preocupacion", "Corregir una preocupación específica"),
-        ("mantener_resultados", "Mantener resultados previos"),
-    ], True),
-    ("estetica_tiempo", "¿Cuanto tiempo tiene esta preocupacion?", [("menos_6_meses", "Menos de 6 meses"), ("6_12_meses", "6 meses a 1 año"), ("1_3_anos", "1 a 3 años")], False),
     ("estetica_tratamientos_previos", "Antecedentes de tratamientos esteticos", [
         ("botox", "Botox"), ("acido_hialuronico", "Acido hialuronico"), ("bioestimuladores", "Bioestimuladores de colageno"), ("hilos", "Hilos tensores"), ("prp_facial", "PRP facial"), ("prp_capilar", "PRP capilar"), ("mesoterapia_facial", "Mesoterapia facial"), ("mesoterapia_corporal", "Mesoterapia corporal"), ("mesoterapia_capilar", "Mesoterapia capilar"), ("dermapen", "Dermapen"), ("microneedling", "Microneedling"), ("peelings", "Peelings quimicos"), ("hydrafacial", "Hydrafacial"), ("radiofrecuencia", "Radiofrecuencia"), ("rf_microagujas", "Radiofrecuencia con microagujas"), ("ipl", "IPL"), ("laser_co2", "Laser CO2"), ("hollywood_peel", "Hollywood Peel"), ("depilacion_laser", "Depilacion laser"), ("criolipolisis", "Criolipolisis"), ("exilis", "Exilis"), ("hifem", "HIFEM / Emsculpt"), ("sueroterapia", "Sueroterapia intravenosa"), ("trasplante_capilar", "Trasplante capilar"),
-    ], True),
-    ("estetica_ultimo_tratamiento", "¿Cuando fue su ultimo tratamiento?", [("menos_1_mes", "Menos de 1 mes"), ("1_3_meses", "1 a 3 meses"), ("3_6_meses", "3 a 6 meses"), ("mas_6_meses", "Mas de 6 meses"), ("mas_1_ano", "Mas de 1 año")], False),
-    ("estetica_cirugias", "Antecedentes quirurgicos esteticos", [
-        ("liposuccion", "Liposuccion"), ("abdominoplastia", "Abdominoplastia"), ("lipoabdominoplastia", "Lipoabdominoplastia"), ("aumento_mamario", "Aumento mamario"), ("levantamiento_mamario", "Levantamiento mamario"), ("reduccion_mamaria", "Reduccion mamaria"), ("rinoplastia", "Rinoplastia"), ("blefaroplastia", "Blefaroplastia"), ("otoplastia", "Otoplastia"), ("lifting_facial", "Lifting facial"), ("trasplante_capilar", "Trasplante capilar"),
     ], True),
     ("estetica_cuidado_piel", "Habitos de cuidado de la piel", [
         ("protector_solar", "Utiliza protector solar diariamente"), ("productos_piel", "Utiliza productos para cuidado de la piel"), ("lavado_1", "Lava rostro 1 vez al dia"), ("lavado_2", "Lava rostro 2 veces al dia"), ("lavado_3", "Lava rostro 3 o mas veces al dia"), ("sol_frecuente", "Se expone frecuentemente al sol"),
     ], True),
-    ("estetica_satisfaccion", "Satisfaccion personal - apariencia facial", [("1", "1 Muy insatisfecho"), ("2", "2 Insatisfecho"), ("3", "3 Regular"), ("4", "4 Satisfecho"), ("5", "5 Muy satisfecho")], False),
-    ("estetica_areas_cuerpo", "Evaluacion corporal - Areas que desea mejorar", [
-        ("papada", "Papada"), ("brazos", "Brazos"), ("flancos", "Flancos"), ("espalda_inferior", "Espalda inferior"), ("muslos_internos", "Muslos internos"), ("muslos_externos", "Muslos externos"), ("rodillas", "Rodillas"), ("gluteos", "Gluteos"), ("piernas", "Piernas"), ("pantorrillas", "Pantorrillas"),
-    ], True),
     ("estetica_preocupacion_corporal", "Principal preocupacion corporal", [
         ("grasa_localizada", "Grasa localizada"), ("flacidez", "Flacidez"), ("celulitis", "Celulitis"), ("estrias", "Estrias"), ("sobrepeso", "Sobrepeso"), ("retencion_liquidos", "Retencion de liquidos"), ("fibrosis", "Fibrosis postquirurgica"), ("cicatrices", "Cicatrices"), ("asimetria", "Asimetrias corporales"), ("postoperatorio", "Recuperacion postoperatoria"),
     ], True),
-    ("estetica_medicamentos_adelgazar", "Medicamentos para adelgazar", [("ozempic", "Ozempic"), ("mounjaro", "Mounjaro"), ("saxenda", "Saxenda"), ("metformina", "Metformina"), ("fentermina", "Fentermina")], True),
-    ("estetica_bariatrica", "Cirugia bariatrica", [("no", "No"), ("manga", "Manga gastrica"), ("bypass", "Bypass gastrico"), ("balon", "Balon gastrico")], False),
-    ("estetica_ejercicio", "Actividad fisica", [("nunca", "Nunca"), ("1_2", "1-2 veces por semana"), ("3_4", "3-4 veces por semana"), ("5_mas", "5 o mas veces por semana")], False),
     ("estetica_intima_femenina", "Zona intima femenina - motivo de consulta", [
         ("rejuvenecimiento_vaginal", "Rejuvenecimiento vaginal"), ("flacidez_postparto", "Flacidez vaginal postparto"), ("incontinencia", "Incontinencia urinaria leve"), ("sequedad", "Sequedad vaginal"), ("sensibilidad", "Disminucion de sensibilidad sexual"), ("oscurecimiento", "Oscurecimiento intimo"), ("labios_menores", "Hipertrofia de labios menores"), ("labios_mayores", "Perdida de volumen de labios mayores"), ("asimetria", "Asimetria genital"),
     ], True),
@@ -1053,7 +1032,7 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             )
             self.fields[f"{nombre}_otros"] = forms.CharField(
                 required=False,
-                label="Otro:" if nombre in {"estetica_motivo", "estetica_objetivo_principal"} else "Otros / detalle",
+                label="Otro:" if nombre == "estetica_motivo" else "Otros / detalle",
                 widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Detalle si aplica."}),
                 initial=datos.get(f"{nombre}_otros", ""),
             )
