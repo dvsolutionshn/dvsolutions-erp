@@ -1492,6 +1492,94 @@ class ClinicaPacienteTests(TestCase):
         self.assertIn("Caida de cabello actualizada", historia.plan_tratamiento)
         self.assertEqual(historia.actualizado_por, self.user)
 
+    def test_formulario_capilar_oculta_preguntas_retiradas_y_conserva_historial(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-CAP-LEGACY",
+            primer_nombre="Carla",
+            primer_apellido="Mendez",
+            nombre="Carla Mendez",
+            identidad="0801199500888",
+        )
+        respuestas_retiradas = {
+            "capilar_inicio": "1_3_anos",
+            "capilar_estado_actual": "empeorando",
+            "capilar_sintomas": ["picazon", "caspa"],
+            "capilar_habitos": ["alcohol_ocasional"],
+            "capilar_mujeres": ["cambios_hormonales"],
+            "capilar_estres": ["estres_6_meses"],
+            "capilar_expectativas": ["recuperar_densidad"],
+        }
+        historia = HistoriaClinicaEspecialidad.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="capilar",
+            fecha_atencion=timezone.now(),
+            plan_tratamiento="Plan capilar anterior",
+            datos_especialidad={
+                **respuestas_retiradas,
+                "capilar_motivo": ["caida_excesiva", "entradas"],
+            },
+            estado="borrador",
+            creado_por=self.user,
+            actualizado_por=self.user,
+        )
+        editar_url = reverse(
+            "clinica_editar_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, historia.id],
+        )
+
+        response = self.client.get(editar_url)
+
+        self.assertEqual(response.status_code, 200)
+        for opcion_visible in [
+            "Caida excesiva del cabello",
+            "Adelgazamiento del cabello",
+            "Perdida de densidad",
+            "Perdida de cejas",
+            "Perdida de barba",
+            "Picazon del cuero cabelludo",
+            "Exceso de grasa",
+        ]:
+            self.assertContains(response, opcion_visible)
+        for opcion_retirada in [
+            "Entradas pronunciadas",
+            "Alopecia en coronilla",
+            "Alopecia difusa",
+            "Alopecia femenina",
+            "Alopecia masculina",
+            "Caspa",
+            "Desea trasplante capilar",
+            "Seguimiento de tratamiento capilar",
+        ]:
+            self.assertNotContains(response, opcion_retirada)
+        for campo in respuestas_retiradas:
+            self.assertNotContains(response, f'name="{campo}"')
+            self.assertNotContains(response, f'name="{campo}_otros"')
+        self.assertContains(response, 'name="capilar_tipo_caida"')
+
+        response = self.client.post(
+            editar_url,
+            {
+                "fecha_atencion": "2026-08-31T10:00",
+                "capilar_motivo": ["cejas"],
+                "plan_tratamiento": "Plan capilar actualizado",
+                "estado": "borrador",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id]),
+        )
+        historia.refresh_from_db()
+        for campo, valor in respuestas_retiradas.items():
+            self.assertEqual(historia.datos_especialidad[campo], valor)
+        self.assertEqual(
+            historia.datos_especialidad["capilar_motivo"],
+            ["cejas", "entradas"],
+        )
+
     def test_historia_camara_muestra_cuadro_longitudinal_de_22_sesiones(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,

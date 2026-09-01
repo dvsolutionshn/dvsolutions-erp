@@ -631,24 +631,13 @@ class PlantillaRecetaForm(BaseClinicaForm):
 CAPILAR_FORMULARIO = [
     ("capilar_motivo", "Motivo de consulta - ¿Que le preocupa principalmente?", [
         ("caida_excesiva", "Caida excesiva del cabello"), ("adelgazamiento", "Adelgazamiento del cabello"),
-        ("entradas", "Entradas pronunciadas"), ("perdida_densidad", "Perdida de densidad"),
-        ("coronilla", "Alopecia en coronilla"), ("difusa", "Alopecia difusa"),
-        ("alopecia_femenina", "Alopecia femenina"), ("alopecia_masculina", "Alopecia masculina"),
-        ("cejas", "Perdida de cejas"), ("barba", "Perdida de barba"), ("caspa", "Caspa"),
-        ("picazon", "Picazon del cuero cabelludo"), ("grasa", "Exceso de grasa"),
-        ("trasplante", "Desea trasplante capilar"), ("seguimiento", "Seguimiento de tratamiento capilar"),
+        ("perdida_densidad", "Perdida de densidad"), ("cejas", "Perdida de cejas"),
+        ("barba", "Perdida de barba"), ("picazon", "Picazon del cuero cabelludo"),
+        ("grasa", "Exceso de grasa"),
     ], True),
-    ("capilar_inicio", "Historia de la caida - ¿Cuando inicio?", [
-        ("menos_3_meses", "Menos de 3 meses"), ("3_6_meses", "3 a 6 meses"),
-        ("6_12_meses", "6 meses a 1 año"), ("1_3_anos", "1 a 3 años"), ("mas_3_anos", "Mas de 3 años"),
-    ], False),
     ("capilar_tipo_caida", "La caida es", [("gradual", "Gradual"), ("repentina", "Repentina"), ("intermitente", "Intermitente"), ("constante", "Constante")], False),
-    ("capilar_estado_actual", "Actualmente considera que", [("estable", "Esta estable"), ("empeorando", "Esta empeorando"), ("mejorando", "Esta mejorando")], False),
     ("capilar_familiares", "Antecedentes familiares - ¿Tiene familiares con alopecia?", [
         ("padre", "Padre"), ("madre", "Madre"), ("abuelo_paterno", "Abuelo paterno"), ("abuelo_materno", "Abuelo materno"), ("hermanos", "Hermanos"), ("ninguno", "Ninguno"),
-    ], True),
-    ("capilar_sintomas", "Sintomas del cuero cabelludo", [
-        ("picazon", "Picazon"), ("ardor", "Ardor"), ("dolor", "Dolor"), ("caspa", "Caspa"), ("descamacion", "Descamacion"), ("grasa", "Exceso de grasa"), ("enrojecimiento", "Enrojecimiento"), ("sensibilidad", "Sensibilidad"), ("ninguno", "Ninguno"),
     ], True),
     ("capilar_areas", "Areas afectadas", [
         ("entradas", "Entradas"), ("linea_frontal", "Linea frontal"), ("temporal", "Region temporal"), ("coronilla", "Coronilla"), ("superior", "Parte superior"), ("todo", "Todo el cuero cabelludo"), ("cejas", "Cejas"), ("barba", "Barba"),
@@ -661,16 +650,6 @@ CAPILAR_FORMULARIO = [
     ], True),
     ("capilar_medicamentos", "Medicamentos actuales", [
         ("anticonceptivos", "Anticonceptivos"), ("hormonas", "Hormonas"), ("finasteride", "Finasteride"), ("dutasteride", "Dutasteride"), ("minoxidil_oral", "Minoxidil oral"), ("minoxidil_topico", "Minoxidil topico"), ("multivitaminicos", "Multivitaminicos"), ("ozempic", "Ozempic"), ("mounjaro", "Mounjaro"), ("ninguno", "Ninguno"),
-    ], True),
-    ("capilar_habitos", "Habitos", [("fuma", "Fuma"), ("vapea", "Vapea"), ("alcohol_nunca", "Alcohol: nunca"), ("alcohol_ocasional", "Alcohol: ocasional"), ("alcohol_frecuente", "Alcohol: frecuente")], True),
-    ("capilar_mujeres", "Mujeres - ¿Ha presentado recientemente?", [
-        ("embarazo", "Embarazo"), ("parto", "Parto"), ("lactancia", "Lactancia"), ("menopausia", "Menopausia"), ("sop", "SOP"), ("cambios_hormonales", "Cambios hormonales"), ("ninguno", "Ninguno"),
-    ], True),
-    ("capilar_estres", "Estres y estilo de vida", [
-        ("estres_6_meses", "Estres importante en ultimos 6 meses"), ("cirugia_reciente", "Cirugia reciente"), ("enfermedad_grave", "Enfermedad grave"), ("covid", "COVID"), ("perdida_peso", "Perdida importante de peso"), ("dieta_estricta", "Dieta estricta"), ("ninguna", "Ninguna"),
-    ], True),
-    ("capilar_expectativas", "Expectativas - ¿Que espera lograr?", [
-        ("detener_caida", "Detener la caida"), ("recuperar_densidad", "Recuperar densidad"), ("mejorar_calidad", "Mejorar calidad del cabello"), ("restaurar_entradas", "Restaurar entradas"), ("restaurar_coronilla", "Restaurar coronilla"), ("trasplante", "Trasplante capilar"), ("autoestima", "Mejorar autoestima"),
     ], True),
 ]
 
@@ -1152,19 +1131,51 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
     def save(self, commit=True):
         historia = super().save(commit=False)
         if self.campos_estructurados:
-            datos = {}
+            datos_existentes = (
+                self.instance.datos_especialidad
+                if self.instance and isinstance(self.instance.datos_especialidad, dict)
+                else {}
+            )
+            # Las preguntas u opciones retiradas dejan de mostrarse, pero sus
+            # respuestas permanecen intactas al editar un registro historico.
+            datos = dict(datos_existentes)
             resumen = []
             for nombre, etiqueta, opciones, multiple in self.campos_estructurados:
                 valor = self.cleaned_data.get(nombre)
                 otros = self.cleaned_data.get(f"{nombre}_otros")
+                etiquetas = dict(opciones)
+                valor_resumen = valor
+                if multiple:
+                    seleccion = list(valor or [])
+                    valor_anterior = datos_existentes.get(nombre) or []
+                    if not isinstance(valor_anterior, (list, tuple)):
+                        valor_anterior = [valor_anterior]
+                    valores_retirados = [
+                        item
+                        for item in valor_anterior
+                        if item not in etiquetas
+                    ]
+                    valor = list(dict.fromkeys([*seleccion, *valores_retirados]))
+                elif not valor and datos_existentes.get(nombre) not in (None, "", []):
+                    valor_anterior = datos_existentes[nombre]
+                    if valor_anterior not in etiquetas:
+                        valor = valor_anterior
                 if valor not in (None, "", []):
                     datos[nombre] = valor
-                    etiquetas = dict(opciones)
+                else:
+                    datos.pop(nombre, None)
+                if valor_resumen not in (None, "", []):
                     seleccion = valor if isinstance(valor, list) else [valor]
-                    resumen.append(f"{etiqueta}: " + ", ".join(etiquetas.get(item, item) for item in seleccion))
+                    resumen.append(f"{etiqueta}: " + ", ".join(
+                        etiquetas.get(item, item)
+                        for item in seleccion
+                        if item in etiquetas
+                    ))
                 if otros:
                     datos[f"{nombre}_otros"] = otros
                     resumen.append(f"{etiqueta} - otros/detalle: {otros}")
+                else:
+                    datos.pop(f"{nombre}_otros", None)
             historia.datos_especialidad = datos
             if not historia.evaluacion_clinica:
                 historia.evaluacion_clinica = "\n".join(resumen[:12])
