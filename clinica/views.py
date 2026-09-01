@@ -85,12 +85,20 @@ from .models import (
     asegurar_profesionales_agenda_base,
 )
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
-from crm.forms import PacienteRapidoCitaForm
+from crm.forms import (
+    PacienteRapidoCitaForm,
+    ProgramaCamaraHiperbaricaForm,
+    ProgramaTerapiaPostQuirurgicaForm,
+    SesionCamaraHiperbaricaForm,
+    SesionTerapiaPostQuirurgicaForm,
+)
 from crm.models import (
     ConfiguracionCRM,
     OpcionServicioAgenda,
     ProgramaCamaraHiperbarica,
     ProgramaTerapiaPostQuirurgica,
+    SesionCamaraHiperbarica,
+    SesionTerapiaPostQuirurgica,
 )
 from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
 
@@ -2280,6 +2288,151 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     )
 
 
+def _conflicto_control_especial(modelo, programa, numeros, sesion=None):
+    numeros = {numero for numero in numeros if numero}
+    if not programa or not numeros:
+        return None
+    consulta = modelo.objects.filter(programa=programa).filter(
+        Q(numero_sesion__in=numeros) | Q(numero_sesion_adicional__in=numeros)
+    )
+    if sesion:
+        consulta = consulta.exclude(pk=sesion.pk)
+    return consulta.first()
+
+
+@login_required
+def registrar_control_especial_desde_historial(request, empresa_slug, paciente_id, tipo):
+    """Registra cámara o terapia directamente en el expediente, sin exigir cita."""
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_interfaz_clinica(empresa)
+    if not request.user.puede_acceder_empresa(empresa):
+        raise PermissionDenied("No tiene acceso a esta empresa.")
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    configuraciones = {
+        "camara_hiperbarica": {
+            "nombre": "Cámara Hiperbárica",
+            "maximo": 22,
+            "programa_modelo": ProgramaCamaraHiperbarica,
+            "sesion_modelo": SesionCamaraHiperbarica,
+            "programa_form": ProgramaCamaraHiperbaricaForm,
+            "sesion_form": SesionCamaraHiperbaricaForm,
+        },
+        "terapias_postquirurgicas": {
+            "nombre": "Terapias Post Quirúrgicas",
+            "maximo": 12,
+            "programa_modelo": ProgramaTerapiaPostQuirurgica,
+            "sesion_modelo": SesionTerapiaPostQuirurgica,
+            "programa_form": ProgramaTerapiaPostQuirurgicaForm,
+            "sesion_form": SesionTerapiaPostQuirurgicaForm,
+        },
+    }
+    config = configuraciones.get(tipo)
+    if not config:
+        raise Http404("Control clínico no válido.")
+
+    ProgramaModelo = config["programa_modelo"]
+    SesionModelo = config["sesion_modelo"]
+    programas = ProgramaModelo.objects.filter(empresa=empresa, paciente=paciente).order_by(
+        "-activo", "-fecha_creacion", "-id"
+    )
+    programa_id = (request.POST.get("programa_id") or request.GET.get("programa") or "").strip()
+    programa = programas.filter(id=programa_id).first() if programa_id else programas.first()
+    sesion_id = (request.POST.get("sesion_id") or "").strip()
+    sesion = SesionModelo.objects.filter(id=sesion_id, empresa=empresa, paciente=paciente).first() if sesion_id else None
+    numero_get = (request.GET.get("sesion") or "").strip()
+    if not sesion and numero_get.isdigit() and programa:
+        numero = int(numero_get)
+        sesion = programa.sesiones.filter(
+            Q(numero_sesion=numero) | Q(numero_sesion_adicional=numero)
+        ).first()
+    if sesion:
+        programa = sesion.programa
+
+    finalizar = request.method == "POST" and request.POST.get("accion") == "finalizar"
+    inicial = {}
+    if not sesion and numero_get.isdigit() and 1 <= int(numero_get) <= config["maximo"]:
+        inicial["numero_sesion"] = int(numero_get)
+    programa_form = config["programa_form"](request.POST or None, instance=programa)
+    sesion_form = config["sesion_form"](
+        request.POST or None,
+        instance=sesion,
+        initial=inicial,
+        finalizar=finalizar,
+        bloqueada=bool(sesion and sesion.bloqueada),
+    )
+
+    if request.method == "POST":
+        if sesion and sesion.bloqueada:
+            messages.warning(request, "La sesión finalizada está bloqueada y no puede modificarse.")
+        else:
+            programa_valido = programa_form.is_valid()
+            sesion_valida = sesion_form.is_valid()
+            if programa_valido and sesion_valida:
+                programa_actual = programa or ProgramaModelo.objects.filter(
+                    empresa=empresa, paciente=paciente, activo=True
+                ).first()
+                conflicto = _conflicto_control_especial(
+                    SesionModelo,
+                    programa_actual,
+                    (
+                        sesion_form.cleaned_data["numero_sesion"],
+                        sesion_form.cleaned_data.get("numero_sesion_adicional"),
+                    ),
+                    sesion,
+                )
+                if conflicto:
+                    sesion_form.add_error(
+                        "numero_sesion_adicional",
+                        "Una de las sesiones seleccionadas ya está registrada en este programa.",
+                    )
+                    sesion_valida = False
+            if programa_valido and sesion_valida:
+                with transaction.atomic():
+                    programa_guardado = programa_form.save(commit=False)
+                    programa_guardado.empresa = empresa
+                    programa_guardado.paciente = paciente
+                    if not programa_guardado.pk:
+                        programa_guardado.creado_por = request.user
+                    programa_guardado.actualizado_por = request.user
+                    programa_guardado.save()
+                    sesion_guardada = sesion_form.save(commit=False)
+                    sesion_guardada.programa = programa_guardado
+                    sesion_guardada.empresa = empresa
+                    sesion_guardada.paciente = paciente
+                    sesion_guardada.cita = None
+                    sesion_guardada.estado = "finalizada" if finalizar else "borrador"
+                    if not sesion_guardada.pk:
+                        sesion_guardada.creado_por = request.user
+                    sesion_guardada.actualizado_por = request.user
+                    sesion_guardada.save()
+                numeros = [sesion_guardada.numero_sesion]
+                if sesion_guardada.numero_sesion_adicional:
+                    numeros.append(sesion_guardada.numero_sesion_adicional)
+                messages.success(
+                    request,
+                    f"Registro de sesión {' y '.join(map(str, numeros))} guardado correctamente.",
+                )
+                destino = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.id, tipo])
+                return redirect(f"{destino}?programa={programa_guardado.id}")
+
+    return render(
+        request,
+        "clinica/registro_control_especial.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "tipo": tipo,
+            "tipo_nombre": config["nombre"],
+            "maximo_sesiones": config["maximo"],
+            "programas": programas,
+            "programa": programa,
+            "programa_form": programa_form,
+            "sesion": sesion,
+            "sesion_form": sesion_form,
+        },
+    )
+
+
 @login_required
 def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     empresa = _empresa_desde_slug(empresa_slug)
@@ -2312,7 +2465,12 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             programa = programas[0]
 
         sesiones = list(programa.sesiones.all()) if programa else []
-        sesiones_por_numero = {sesion.numero_sesion: sesion for sesion in sesiones}
+        sesiones_por_numero = {
+            numero: sesion
+            for sesion in sesiones
+            for numero in (sesion.numero_sesion, sesion.numero_sesion_adicional)
+            if numero
+        }
         tablero_sesiones = []
         for numero in range(1, 23):
             sesion = sesiones_por_numero.get(numero)
@@ -2323,6 +2481,11 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                     reverse("agenda_camara_hiperbarica", args=[empresa.slug])
                     + f"?fecha={fecha_cita}&control_camara={sesion.cita_id}#documento-camara"
                 )
+            else:
+                abrir_url = reverse(
+                    "clinica_registrar_control_especial",
+                    args=[empresa.slug, paciente.id, "camara_hiperbarica"],
+                ) + f"?sesion={numero}" + (f"&programa={programa.id}" if programa else "")
             tablero_sesiones.append(
                 {
                     "numero": numero,
@@ -2342,8 +2505,14 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                 "programas_camara": programas,
                 "programa_camara": programa,
                 "tablero_sesiones_camara": tablero_sesiones,
-                "sesiones_finalizadas": sum(1 for sesion in sesiones if sesion.estado == "finalizada"),
-                "sesiones_borrador": sum(1 for sesion in sesiones if sesion.estado == "borrador"),
+                "sesiones_finalizadas": sum(
+                    len([numero for numero in (sesion.numero_sesion, sesion.numero_sesion_adicional) if numero])
+                    for sesion in sesiones if sesion.estado == "finalizada"
+                ),
+                "sesiones_borrador": sum(
+                    len([numero for numero in (sesion.numero_sesion, sesion.numero_sesion_adicional) if numero])
+                    for sesion in sesiones if sesion.estado == "borrador"
+                ),
             },
         )
     if tipo == "terapias_postquirurgicas":
@@ -2356,7 +2525,12 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         programa = next((item for item in programas if str(item.id) == programa_id), None) if programa_id else None
         programa = programa or (programas[0] if programas else None)
         sesiones = list(programa.sesiones.all()) if programa else []
-        por_numero = {sesion.numero_sesion: sesion for sesion in sesiones}
+        por_numero = {
+            numero: sesion
+            for sesion in sesiones
+            for numero in (sesion.numero_sesion, sesion.numero_sesion_adicional)
+            if numero
+        }
         tablero = []
         for numero in range(1, 13):
             sesion = por_numero.get(numero)
@@ -2367,6 +2541,11 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                     reverse("agenda_terapias_postquirurgicas", args=[empresa.slug])
                     + f"?fecha={fecha}&control_terapia={sesion.cita_id}#documento-terapia"
                 )
+            else:
+                abrir_url = reverse(
+                    "clinica_registrar_control_especial",
+                    args=[empresa.slug, paciente.id, "terapias_postquirurgicas"],
+                ) + f"?sesion={numero}" + (f"&programa={programa.id}" if programa else "")
             tablero.append({"numero": numero, "registro": sesion, "abrir_url": abrir_url})
         return render(
             request,
@@ -2375,8 +2554,14 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                 "empresa": empresa, "paciente": paciente, "tipo": tipo,
                 "tipo_nombre": tipos_validos[tipo], "programas_terapia": programas,
                 "programa_terapia": programa, "tablero_sesiones_terapia": tablero,
-                "sesiones_finalizadas": sum(item.estado == "finalizada" for item in sesiones),
-                "sesiones_borrador": sum(item.estado == "borrador" for item in sesiones),
+                "sesiones_finalizadas": sum(
+                    len([numero for numero in (item.numero_sesion, item.numero_sesion_adicional) if numero])
+                    for item in sesiones if item.estado == "finalizada"
+                ),
+                "sesiones_borrador": sum(
+                    len([numero for numero in (item.numero_sesion, item.numero_sesion_adicional) if numero])
+                    for item in sesiones if item.estado == "borrador"
+                ),
             },
         )
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}

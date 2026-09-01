@@ -162,6 +162,7 @@ class SesionCamaraHiperbaricaForm(forms.ModelForm):
         model = SesionCamaraHiperbarica
         fields = [
             "numero_sesion",
+            "numero_sesion_adicional",
             "estado_general_estable",
             "sin_fiebre",
             "sin_dificultad_respiratoria",
@@ -189,6 +190,7 @@ class SesionCamaraHiperbaricaForm(forms.ModelForm):
         ]
         widgets = {
             "numero_sesion": forms.NumberInput(attrs={"min": 1, "max": 22}),
+            "numero_sesion_adicional": forms.NumberInput(attrs={"min": 1, "max": 22}),
             "observaciones_previas": forms.Textarea(attrs={"rows": 3}),
             "evolucion_evento_adverso": forms.Textarea(attrs={"rows": 3}),
             "nota_enfermeria": forms.Textarea(attrs={"rows": 4}),
@@ -196,6 +198,7 @@ class SesionCamaraHiperbaricaForm(forms.ModelForm):
         }
         labels = {
             "numero_sesion": "Número de sesión",
+            "numero_sesion_adicional": "Segunda sesión (opcional)",
             "observaciones_previas": "Observaciones del control previo",
             "firma_control_previo": "Nombre y firma del personal que autoriza",
             "presion_arterial_antes": "Presión arterial antes",
@@ -270,7 +273,7 @@ class SesionTerapiaPostQuirurgicaForm(forms.ModelForm):
     class Meta:
         model = SesionTerapiaPostQuirurgica
         fields = [
-            "numero_sesion", "hora_inicio", "hora_finalizacion", "presion_arterial",
+            "numero_sesion", "numero_sesion_adicional", "hora_inicio", "hora_finalizacion", "presion_arterial",
             "frecuencia_cardiaca", "frecuencia_respiratoria", "saturacion_oxigeno",
             "temperatura", "escala_dolor", "estado_paciente", "equipos_utilizados",
             "minutos_area", "cuidados_realizados", "cuidado_otro", "nota_enfermeria",
@@ -278,13 +281,14 @@ class SesionTerapiaPostQuirurgicaForm(forms.ModelForm):
         ]
         widgets = {
             "numero_sesion": forms.NumberInput(attrs={"min": 1, "max": 12}),
+            "numero_sesion_adicional": forms.NumberInput(attrs={"min": 1, "max": 12}),
             "hora_inicio": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
             "hora_finalizacion": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
             "escala_dolor": forms.NumberInput(attrs={"min": 0, "max": 10}),
             "nota_enfermeria": forms.Textarea(attrs={"rows": 4}),
         }
         labels = {
-            "numero_sesion": "Sesión", "hora_inicio": "Hora inicio", "hora_finalizacion": "Hora final",
+            "numero_sesion": "Sesión", "numero_sesion_adicional": "Segunda sesión (opcional)", "hora_inicio": "Hora inicio", "hora_finalizacion": "Hora final",
             "presion_arterial": "PA", "frecuencia_cardiaca": "FC", "frecuencia_respiratoria": "FR",
             "saturacion_oxigeno": "SpO₂", "temperatura": "Temperatura", "escala_dolor": "Dolor /10",
             "minutos_area": "Minutos / área", "cuidado_otro": "Otro cuidado",

@@ -423,6 +423,7 @@ class SesionCamaraHiperbarica(models.Model):
         related_name="control_camara_hiperbarica",
     )
     numero_sesion = models.PositiveSmallIntegerField()
+    numero_sesion_adicional = models.PositiveSmallIntegerField(blank=True, null=True)
     fecha_sesion = models.DateTimeField(default=timezone.now, editable=False)
 
     estado_general_estable = models.CharField(max_length=2, choices=RESPUESTA_CHOICES, blank=True)
@@ -480,13 +481,26 @@ class SesionCamaraHiperbarica(models.Model):
                 condition=models.Q(numero_sesion__gte=1, numero_sesion__lte=22),
                 name="crm_camara_numero_sesion_1_22",
             ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(numero_sesion_adicional__isnull=True)
+                    | (
+                        models.Q(numero_sesion_adicional__gte=1, numero_sesion_adicional__lte=22)
+                        & ~models.Q(numero_sesion_adicional=models.F("numero_sesion"))
+                    )
+                ),
+                name="crm_camara_sesion_adicional_valida",
+            ),
         ]
         indexes = [models.Index(fields=["empresa", "paciente", "estado"])]
         verbose_name = "Sesión de cámara hiperbárica"
         verbose_name_plural = "Sesiones de cámara hiperbárica"
 
     def __str__(self):
-        return f"{self.paciente.nombre} · Sesión {self.numero_sesion}"
+        numeros = str(self.numero_sesion)
+        if self.numero_sesion_adicional:
+            numeros += f" y {self.numero_sesion_adicional}"
+        return f"{self.paciente.nombre} · Sesión {numeros}"
 
     @property
     def bloqueada(self):
@@ -499,6 +513,11 @@ class SesionCamaraHiperbarica(models.Model):
         errores = {}
         if not 1 <= (self.numero_sesion or 0) <= 22:
             errores["numero_sesion"] = "La sesión debe estar comprendida entre 1 y 22."
+        if self.numero_sesion_adicional is not None:
+            if not 1 <= self.numero_sesion_adicional <= 22:
+                errores["numero_sesion_adicional"] = "La segunda sesión debe estar comprendida entre 1 y 22."
+            elif self.numero_sesion_adicional == self.numero_sesion:
+                errores["numero_sesion_adicional"] = "Seleccione una sesión diferente de la primera."
         if self.programa_id:
             if self.programa.empresa_id != self.empresa_id or self.programa.paciente_id != self.paciente_id:
                 errores["programa"] = "El programa no corresponde a esta empresa y paciente."
@@ -600,6 +619,7 @@ class SesionTerapiaPostQuirurgica(models.Model):
         related_name="control_terapia_postquirurgica",
     )
     numero_sesion = models.PositiveSmallIntegerField()
+    numero_sesion_adicional = models.PositiveSmallIntegerField(blank=True, null=True)
     fecha_sesion = models.DateTimeField(default=timezone.now, editable=False)
     hora_inicio = models.TimeField(blank=True, null=True)
     hora_finalizacion = models.TimeField(blank=True, null=True)
@@ -645,13 +665,26 @@ class SesionTerapiaPostQuirurgica(models.Model):
                 condition=models.Q(numero_sesion__gte=1, numero_sesion__lte=12),
                 name="crm_terapia_post_sesion_1_12",
             ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(numero_sesion_adicional__isnull=True)
+                    | (
+                        models.Q(numero_sesion_adicional__gte=1, numero_sesion_adicional__lte=12)
+                        & ~models.Q(numero_sesion_adicional=models.F("numero_sesion"))
+                    )
+                ),
+                name="crm_terapia_post_sesion_adicional_valida",
+            ),
         ]
         indexes = [models.Index(fields=["empresa", "paciente", "estado"])]
         verbose_name = "Sesión de terapia post quirúrgica"
         verbose_name_plural = "Sesiones de terapia post quirúrgica"
 
     def __str__(self):
-        return f"{self.paciente.nombre} · Terapia post quirúrgica {self.numero_sesion}"
+        numeros = str(self.numero_sesion)
+        if self.numero_sesion_adicional:
+            numeros += f" y {self.numero_sesion_adicional}"
+        return f"{self.paciente.nombre} · Terapia post quirúrgica {numeros}"
 
     @property
     def bloqueada(self):
@@ -681,6 +714,11 @@ class SesionTerapiaPostQuirurgica(models.Model):
         errores = {}
         if not 1 <= (self.numero_sesion or 0) <= 12:
             errores["numero_sesion"] = "La sesión debe estar comprendida entre 1 y 12."
+        if self.numero_sesion_adicional is not None:
+            if not 1 <= self.numero_sesion_adicional <= 12:
+                errores["numero_sesion_adicional"] = "La segunda sesión debe estar comprendida entre 1 y 12."
+            elif self.numero_sesion_adicional == self.numero_sesion:
+                errores["numero_sesion_adicional"] = "Seleccione una sesión diferente de la primera."
         if self.escala_dolor is not None and self.escala_dolor > 10:
             errores["escala_dolor"] = "La escala de dolor debe estar entre 0 y 10."
         if self.programa_id:

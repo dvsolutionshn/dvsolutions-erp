@@ -2255,6 +2255,31 @@ class CRMTests(TestCase):
         self.assertEqual(sesion.numero_sesion, 6)
         self.assertEqual(sesion.estado, "finalizada")
 
+    def test_control_camara_una_linea_puede_cubrir_dos_sesiones(self):
+        cita = self._crear_cita_camara_para_control(sesion_servicio=6)
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_camara_hiperbarica_guardar", args=[self.empresa.slug, cita.id])
+
+        response = self.client.post(
+            url,
+            {
+                **self._datos_validos_control_camara(),
+                "numero_sesion_adicional": "7",
+                "accion": "finalizar",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        sesion = SesionCamaraHiperbarica.objects.get(cita=cita)
+        self.assertEqual((sesion.numero_sesion, sesion.numero_sesion_adicional), (6, 7))
+        response = self.client.get(
+            reverse("agenda_camara_hiperbarica", args=[self.empresa.slug]),
+            {"fecha": timezone.localtime(cita.fecha_hora).date(), "control_camara": cita.id},
+        )
+        self.assertEqual(response.context["tablero_sesiones_camara"][5]["registro"], sesion)
+        self.assertEqual(response.context["tablero_sesiones_camara"][6]["registro"], sesion)
+        self.assertEqual(response.context["sesiones_camara_completadas"], 2)
+
     def test_control_camara_con_error_conserva_datos_y_marca_pendientes(self):
         cita = self._crear_cita_camara_para_control(sesion_servicio=4)
         self.client.login(username="crmuser", password="pass12345")

@@ -76,6 +76,19 @@ EMPRESAS_AGENDA_CENTRAL_HOSPITAL_MIA = frozenset({
 })
 
 
+def _conflicto_numero_sesion(modelo, programa, numeros, sesion=None):
+    """Busca cualquier registro que ya ocupe una de las sesiones solicitadas."""
+    numeros = {numero for numero in numeros if numero}
+    if not programa or not numeros:
+        return None
+    consulta = modelo.objects.filter(programa=programa).filter(
+        Q(numero_sesion__in=numeros) | Q(numero_sesion_adicional__in=numeros)
+    )
+    if sesion:
+        consulta = consulta.exclude(pk=sesion.pk)
+    return consulta.order_by("numero_sesion").first()
+
+
 def _normalizar_texto_agenda(valor):
     texto = unicodedata.normalize("NFKD", valor or "")
     return "".join(caracter for caracter in texto if not unicodedata.combining(caracter)).lower()
@@ -223,7 +236,12 @@ def _contexto_terapias_postquirurgicas(empresa, request, fecha_seleccionada, *, 
         ).first()
         if programa:
             historial = list(programa.sesiones.select_related("cita", "creado_por", "actualizado_por"))
-        usados = {item.numero_sesion for item in historial}
+        usados = {
+            numero
+            for item in historial
+            for numero in (item.numero_sesion, item.numero_sesion_adicional)
+            if numero
+        }
         numero_desde_cita = cita_control.sesion_servicio if 1 <= (cita_control.sesion_servicio or 0) <= 12 else None
         sugerido = numero_desde_cita
         if sugerido in usados and (not sesion or sesion.numero_sesion != sugerido):
@@ -236,7 +254,12 @@ def _contexto_terapias_postquirurgicas(empresa, request, fecha_seleccionada, *, 
             initial={"numero_sesion": sesion.numero_sesion if sesion else sugerido},
             bloqueada=bool(sesion and sesion.bloqueada),
         )
-    por_numero = {item.numero_sesion: item for item in historial}
+    por_numero = {
+        numero: item
+        for item in historial
+        for numero in (item.numero_sesion, item.numero_sesion_adicional)
+        if numero
+    }
     return {
         "citas_terapias_post": citas,
         "cita_control_terapia": cita_control,
@@ -250,7 +273,10 @@ def _contexto_terapias_postquirurgicas(empresa, request, fecha_seleccionada, *, 
             {"numero": numero, "registro": por_numero.get(numero), "actual": numero == numero_actual}
             for numero in range(1, 13)
         ],
-        "sesiones_terapia_completadas": sum(item.estado == "finalizada" for item in historial),
+        "sesiones_terapia_completadas": sum(
+            len([numero for numero in (item.numero_sesion, item.numero_sesion_adicional) if numero])
+            for item in historial if item.estado == "finalizada"
+        ),
     }
 
 
@@ -305,7 +331,12 @@ def _contexto_control_camara_hyperbarica(
             historial = list(
                 programa.sesiones.select_related("cita", "creado_por", "actualizado_por").order_by("numero_sesion")
             )
-        numeros_usados = {registro.numero_sesion for registro in historial}
+        numeros_usados = {
+            numero
+            for registro in historial
+            for numero in (registro.numero_sesion, registro.numero_sesion_adicional)
+            if numero
+        }
         sugerido = cita_control.sesion_servicio if 1 <= (cita_control.sesion_servicio or 0) <= 22 else None
         if sugerido in numeros_usados and (not sesion or sesion.numero_sesion != sugerido):
             sugerido = None
@@ -329,6 +360,12 @@ def _contexto_control_camara_hyperbarica(
     if cita_control and not (sesion and sesion.estado == "finalizada"):
         numero_actual = sesion.numero_sesion if sesion else (numero_desde_cita or sugerido)
 
+    por_numero = {
+        numero: item
+        for item in historial
+        for numero in (item.numero_sesion, item.numero_sesion_adicional)
+        if numero
+    }
     contexto = {
         "citas_camara_hiperbarica": citas_camara,
         "cita_control_camara": cita_control,
@@ -341,12 +378,15 @@ def _contexto_control_camara_hyperbarica(
         "tablero_sesiones_camara": [
             {
                 "numero": numero,
-                "registro": next((item for item in historial if item.numero_sesion == numero), None),
+                "registro": por_numero.get(numero),
                 "actual": numero == numero_actual,
             }
             for numero in range(1, 23)
         ],
-        "sesiones_camara_completadas": sum(1 for item in historial if item.estado == "finalizada"),
+        "sesiones_camara_completadas": sum(
+            len([numero for numero in (item.numero_sesion, item.numero_sesion_adicional) if numero])
+            for item in historial if item.estado == "finalizada"
+        ),
     }
     return contexto
 
@@ -1277,22 +1317,23 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
     formularios_validos = programa_valido and sesion_valida
     if formularios_validos:
         numero_sesion = sesion_form.cleaned_data["numero_sesion"]
+        numero_adicional = sesion_form.cleaned_data.get("numero_sesion_adicional")
         programa_para_duplicado = programa or ProgramaCamaraHiperbarica.objects.filter(
             empresa=empresa,
             paciente=cita.paciente,
             activo=True,
         ).first()
         if programa_para_duplicado:
-            duplicada = SesionCamaraHiperbarica.objects.filter(
-                programa=programa_para_duplicado,
-                numero_sesion=numero_sesion,
+            duplicada = _conflicto_numero_sesion(
+                SesionCamaraHiperbarica,
+                programa_para_duplicado,
+                (numero_sesion, numero_adicional),
+                sesion,
             )
-            if sesion:
-                duplicada = duplicada.exclude(pk=sesion.pk)
-            if duplicada.exists():
+            if duplicada:
                 sesion_form.add_error(
-                    "numero_sesion",
-                    f"La sesión {numero_sesion} ya está registrada en este programa.",
+                    "numero_sesion_adicional" if duplicada.numero_sesion in {numero_adicional} or duplicada.numero_sesion_adicional in {numero_adicional} else "numero_sesion",
+                    "Una de las sesiones seleccionadas ya está registrada en este programa.",
                 )
                 formularios_validos = False
 
@@ -1336,21 +1377,20 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
             )
             if borrador_form.is_valid():
                 numero_borrador = borrador_form.cleaned_data["numero_sesion"]
+                numero_adicional_borrador = borrador_form.cleaned_data.get("numero_sesion_adicional")
                 programa_para_duplicado = programa or ProgramaCamaraHiperbarica.objects.filter(
                     empresa=empresa,
                     paciente=cita.paciente,
                     activo=True,
                 ).first()
-                duplicada = SesionCamaraHiperbarica.objects.none()
-                if programa_para_duplicado:
-                    duplicada = SesionCamaraHiperbarica.objects.filter(
-                        programa=programa_para_duplicado,
-                        numero_sesion=numero_borrador,
-                    )
-                    if sesion:
-                        duplicada = duplicada.exclude(pk=sesion.pk)
+                duplicada = _conflicto_numero_sesion(
+                    SesionCamaraHiperbarica,
+                    programa_para_duplicado,
+                    (numero_borrador, numero_adicional_borrador),
+                    sesion,
+                )
 
-                if not duplicada.exists():
+                if not duplicada:
                     with transaction.atomic():
                         programa_guardado = programa_form.save(commit=False)
                         programa_guardado.empresa = empresa
@@ -1495,13 +1535,17 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
             empresa=empresa, paciente=cita.paciente, activo=True
         ).first()
         if programa_actual:
-            duplicada = SesionTerapiaPostQuirurgica.objects.filter(
-                programa=programa_actual, numero_sesion=sesion_form.cleaned_data["numero_sesion"]
+            duplicada = _conflicto_numero_sesion(
+                SesionTerapiaPostQuirurgica,
+                programa_actual,
+                (
+                    sesion_form.cleaned_data["numero_sesion"],
+                    sesion_form.cleaned_data.get("numero_sesion_adicional"),
+                ),
+                sesion,
             )
-            if sesion:
-                duplicada = duplicada.exclude(pk=sesion.pk)
-            if duplicada.exists():
-                sesion_form.add_error("numero_sesion", "Esta sesión ya está registrada en el programa.")
+            if duplicada:
+                sesion_form.add_error("numero_sesion_adicional", "Una de las sesiones seleccionadas ya está registrada en el programa.")
                 validos = False
 
     def guardar(programa_limpio, sesion_limpia, estado):
@@ -1541,14 +1585,16 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
             programa_actual = programa or ProgramaTerapiaPostQuirurgica.objects.filter(
                 empresa=empresa, paciente=cita.paciente, activo=True
             ).first()
-            duplicada = SesionTerapiaPostQuirurgica.objects.none()
-            if programa_actual:
-                duplicada = SesionTerapiaPostQuirurgica.objects.filter(
-                    programa=programa_actual, numero_sesion=borrador_form.cleaned_data["numero_sesion"]
-                )
-                if sesion:
-                    duplicada = duplicada.exclude(pk=sesion.pk)
-            if not duplicada.exists():
+            duplicada = _conflicto_numero_sesion(
+                SesionTerapiaPostQuirurgica,
+                programa_actual,
+                (
+                    borrador_form.cleaned_data["numero_sesion"],
+                    borrador_form.cleaned_data.get("numero_sesion_adicional"),
+                ),
+                sesion,
+            )
+            if not duplicada:
                 programa, sesion = guardar(programa_form, borrador_form, "borrador")
                 borrador_guardado = True
     errores = []

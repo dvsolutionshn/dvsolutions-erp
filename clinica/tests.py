@@ -1686,6 +1686,43 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(len(response.context["tablero_sesiones_terapia"]), 12)
         self.assertEqual(response.context["sesiones_finalizadas"], 1)
 
+    def test_registra_terapia_directamente_desde_historial_sin_cita_y_para_dos_sesiones(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-TPQ-DIRECTA",
+            nombre="Paciente Sin Cita",
+        )
+        url = reverse(
+            "clinica_registrar_control_especial",
+            args=[self.empresa.slug, paciente.id, "terapias_postquirurgicas"],
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "cirugia": "Liposucción",
+                "fecha_cirugia": "2026-08-20",
+                "numero_sesion": "4",
+                "numero_sesion_adicional": "5",
+                "nota_enfermeria": "Ingreso directo a terapia.",
+                "accion": "borrador",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        sesion = SesionTerapiaPostQuirurgica.objects.get(paciente=paciente)
+        self.assertIsNone(sesion.cita_id)
+        self.assertEqual((sesion.numero_sesion, sesion.numero_sesion_adicional), (4, 5))
+        historia = self.client.get(
+            reverse(
+                "clinica_crear_historia_especialidad",
+                args=[self.empresa.slug, paciente.id, "terapias_postquirurgicas"],
+            )
+        )
+        self.assertEqual(historia.context["tablero_sesiones_terapia"][3]["registro"], sesion)
+        self.assertEqual(historia.context["tablero_sesiones_terapia"][4]["registro"], sesion)
+        self.assertContains(historia, "Registrar sesión sin cita")
+
     def test_medicina_estetica_guarda_formulario_estructurado(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
