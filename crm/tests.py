@@ -1,4 +1,5 @@
 ﻿from datetime import date, datetime, timedelta
+from decimal import Decimal
 import os
 from pathlib import Path
 import tempfile
@@ -12,7 +13,7 @@ from django.utils import timezone
 from unittest.mock import patch
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
-from facturacion.models import Cliente
+from facturacion.models import CAI, Cliente, Factura
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
 from .forms import CitaClienteForm
@@ -95,6 +96,7 @@ class CRMTests(TestCase):
         self.assertEqual(response_app.status_code, 200)
         self.assertTemplateUsed(response_app, "crm/agenda_mobile.html")
         self.assertContains(response_app, 'class="mobile-home mobile-app-screen active"')
+        self.assertNotContains(response_app, 'id="facturas-app"')
 
     def test_luque_sin_modulo_citas_programa_directamente_en_hospital_mia(self):
         self.empresa.tipo_solucion = "clinica"
@@ -609,7 +611,7 @@ class CRMTests(TestCase):
         self.assertContains(response, 'id="quickInvoiceDate"')
         self.assertContains(response, 'fecha:quickInvoiceDate.value')
         self.assertContains(response, "Ver Facturas")
-        self.assertContains(response, reverse("facturas_dashboard", args=[self.empresa.slug]))
+        self.assertContains(response, 'href="#facturas-app"')
         medical_response = self.client.get(
             reverse("agenda_mobile", args=[medical_spa.slug]),
             {"fecha": "2026-06-30"},
@@ -681,6 +683,72 @@ class CRMTests(TestCase):
         self.assertEqual(service_worker.status_code, 200)
         self.assertContains(service_worker, "notificationclick")
         self.assertEqual(cita.empresa, self.empresa)
+
+    def test_app_muestra_facturas_resumidas_de_empresa_y_enlace_directo_al_pdf(self):
+        modulo_facturacion, _ = Modulo.objects.get_or_create(
+            codigo="facturacion",
+            defaults={"nombre": "Facturación", "es_comercial": True},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_facturacion, activo=True)
+        self.rol.puede_ver_facturas = True
+        self.rol.save(update_fields=["puede_ver_facturas"])
+        cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Paciente Factura Móvil",
+            rtn="0801199900555",
+        )
+        CAI.objects.create(
+            empresa=self.empresa,
+            numero_cai="CAI-APP-FACTURAS",
+            uso_documento="factura",
+            establecimiento="001",
+            punto_emision="001",
+            tipo_documento="01",
+            rango_inicial=1,
+            rango_final=100,
+            correlativo_actual=0,
+            fecha_activacion=timezone.localdate() - timedelta(days=1),
+            fecha_limite=timezone.localdate() + timedelta(days=30),
+        )
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=cliente,
+            estado="emitida",
+            fecha_emision=timezone.localdate(),
+            total=Decimal("432.10"),
+            total_lempiras=Decimal("432.10"),
+        )
+        otra_empresa = Empresa.objects.create(
+            nombre="Empresa Factura Externa",
+            slug="factura-externa-app",
+            rtn="0801199911222",
+        )
+        cliente_externo = Cliente.objects.create(
+            empresa=otra_empresa,
+            nombre="Cliente No Visible",
+        )
+        Factura.objects.create(
+            empresa=otra_empresa,
+            cliente=cliente_externo,
+            estado="borrador",
+            fecha_emision=timezone.localdate(),
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-app-open="facturas-app"')
+        self.assertContains(response, 'id="facturas-app"')
+        self.assertContains(response, "#0001")
+        self.assertContains(response, cliente.nombre)
+        self.assertContains(response, "432.10")
+        self.assertContains(
+            response,
+            reverse("descargar_factura_pdf", args=[self.empresa.slug, factura.id]),
+        )
+        self.assertNotContains(response, cliente_externo.nombre)
+        self.assertEqual(len(response.context["facturas_app"]), 1)
 
     def test_app_movil_y_archivos_de_instalacion_exigen_sesion_y_permiso(self):
         app_url = reverse("agenda_mobile", args=[self.empresa.slug])

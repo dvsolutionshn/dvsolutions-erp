@@ -22,7 +22,7 @@ from core.access import interfaz_clinica_activa
 from core.models import Empresa
 from contabilidad.models import CuentaFinanciera
 from contabilidad.services import asegurar_cuentas_financieras_base_honduras
-from facturacion.models import BodegaInventario, Cliente, PagoFactura, Producto, TipoImpuesto
+from facturacion.models import BodegaInventario, Cliente, Factura, PagoFactura, Producto, TipoImpuesto
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 
 from .forms import (
@@ -1958,6 +1958,31 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["metodos_pago_app"] = PagoFactura.METODOS
     contexto["fecha_factura_hoy_app"] = timezone.localdate().isoformat()
+    puede_ver_facturas_app = bool(
+        empresa.tiene_modulo_activo("facturacion")
+        and request.user.tiene_permiso_erp("puede_ver_facturas", empresa)
+    )
+    facturas_app_qs = (
+        Factura.objects.filter(empresa=empresa)
+        .select_related("cliente")
+        .order_by("-fecha_emision", "-id")
+        if puede_ver_facturas_app
+        else Factura.objects.none()
+    )
+    contexto["facturas_app"] = [
+        {
+            "id": factura.id,
+            "numero_resumido": (
+                "".join(caracter for caracter in (factura.numero_factura or "") if caracter.isdigit())[-4:]
+                or "S/N"
+            ),
+            "cliente": factura.cliente.nombre,
+            "total": factura.total,
+            "moneda": factura.moneda,
+            "pdf_url": reverse("descargar_factura_pdf", args=[empresa.slug, factura.id]),
+        }
+        for factura in facturas_app_qs
+    ]
     contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
     response = render(request, "crm/agenda_mobile.html", contexto)
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
