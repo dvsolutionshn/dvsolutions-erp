@@ -534,6 +534,13 @@ class CRMTests(TestCase):
         )
 
     def test_app_movil_agenda_es_instalable_y_usa_los_mismos_datos(self):
+        modulo_facturacion, _ = Modulo.objects.get_or_create(
+            codigo="facturacion",
+            defaults={"nombre": "Facturación", "es_comercial": True},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_facturacion, activo=True)
+        self.rol.puede_ver_facturas = True
+        self.rol.save(update_fields=["puede_ver_facturas"])
         medical_spa = Empresa.objects.create(
             nombre="Mia Medical spa",
             slug="medical_spa",
@@ -598,6 +605,11 @@ class CRMTests(TestCase):
         self.assertContains(response, "Crear producto sin salir de la factura")
         self.assertContains(response, "Comentario para esta línea de la factura")
         self.assertContains(response, "data-send-invoice-whatsapp")
+        self.assertContains(response, "Fecha de factura")
+        self.assertContains(response, 'id="quickInvoiceDate"')
+        self.assertContains(response, 'fecha:quickInvoiceDate.value')
+        self.assertContains(response, "Ver Facturas")
+        self.assertContains(response, reverse("facturas_dashboard", args=[self.empresa.slug]))
         medical_response = self.client.get(
             reverse("agenda_mobile", args=[medical_spa.slug]),
             {"fecha": "2026-06-30"},

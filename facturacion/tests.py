@@ -1441,6 +1441,68 @@ class FacturacionTests(TestCase):
             reverse("pos_enviar_factura_whatsapp", args=[self.empresa.slug, factura.id]),
         )
 
+    @patch("facturacion.views.registrar_asiento_pago_cliente")
+    @patch("facturacion.views.registrar_asiento_factura_emitida")
+    @patch("facturacion.views._registrar_salida_factura")
+    def test_app_pos_guarda_fecha_anterior_como_fecha_real_de_factura(self, _salida, _asiento, _pago):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+        cuenta_contable = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110198",
+            nombre="Caja Fecha App",
+            tipo="activo",
+        )
+        cuenta_financiera = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Caja Fecha App",
+            tipo="caja",
+            cuenta_contable=cuenta_contable,
+        )
+        self.producto.impuesto_predeterminado = self.impuesto
+        self.producto.controla_inventario = False
+        self.producto.save()
+        fecha_factura = timezone.localdate() - timedelta(days=2)
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {
+                "payload": json.dumps({
+                    "fecha": fecha_factura.isoformat(),
+                    "cliente_id": self.cliente.id,
+                    "metodo": "efectivo",
+                    "cuenta_financiera": cuenta_financiera.id,
+                    "monto_recibido": "115.00",
+                    "items": [{
+                        "producto_id": self.producto.id,
+                        "cantidad": "1",
+                        "precio_unitario": "100.00",
+                    }],
+                })
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        factura = Factura.objects.get(id=response.json()["factura_id"])
+        self.assertEqual(factura.fecha_emision, fecha_factura)
+        self.assertEqual(factura.fecha_vencimiento, fecha_factura)
+        self.assertEqual(factura.pagos_facturacion.get().fecha, fecha_factura)
+
+    def test_punto_venta_rechaza_fecha_de_factura_invalida_sin_usar_fecha_actual(self):
+        modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
+
+        response = self.client.post(
+            reverse("punto_venta", args=[self.empresa.slug]),
+            {"payload": json.dumps({"fecha": "fecha-invalida"})},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("fecha de factura valida", response.json()["error"])
+        self.assertFalse(Factura.objects.filter(empresa=self.empresa).exists())
+
     def test_punto_venta_ajax_rechaza_efectivo_insuficiente_sin_crear_factura(self):
         modulo_pos, _ = Modulo.objects.get_or_create(nombre="Punto de Venta", codigo="punto_venta")
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_pos, activo=True)
@@ -1911,6 +1973,31 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, factura.cliente.nombre)
+
+    def test_facturas_dashboard_no_mezcla_facturas_de_otra_empresa(self):
+        factura_local = self.crear_factura_con_linea()
+        otra_empresa = Empresa.objects.create(
+            nombre="Empresa Aislada",
+            slug="empresa-aislada-facturas",
+            rtn="08011999120001",
+        )
+        cliente_externo = Cliente.objects.create(
+            empresa=otra_empresa,
+            nombre="Cliente Solo Otra Empresa",
+        )
+        Factura.objects.create(
+            empresa=otra_empresa,
+            cliente=cliente_externo,
+            estado="borrador",
+            fecha_emision=date.today(),
+        )
+
+        response = self.client.get(reverse("facturas_dashboard", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, factura_local.cliente.nombre)
+        self.assertNotContains(response, cliente_externo.nombre)
+        self.assertTrue(all(factura.empresa_id == self.empresa.id for factura in response.context["facturas"]))
 
     def test_rol_limitado_bloquea_clientes(self):
         rol_limitado = RolSistema.objects.create(

@@ -50,6 +50,7 @@
   .premium-module-hero{position:relative;overflow:hidden;padding:18px;border-radius:25px;background:linear-gradient(140deg,#102f47 0%,#17616c 68%,#1a928a 100%);color:#fff;box-shadow:0 20px 46px rgba(18,50,74,.2)}
   .premium-module-hero:after{content:"";position:absolute;right:-48px;top:-54px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(238,133,171,.38),transparent 68%)}
   .premium-module-hero small{position:relative;z-index:1;display:block;font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;opacity:.72}.premium-module-hero h2{position:relative;z-index:1;margin:5px 0 0;font-size:24px;line-height:1.1}.premium-module-hero p{position:relative;z-index:1;max-width:450px;margin:7px 0 0;font-size:10px;line-height:1.5;opacity:.78}
+  .quick-invoice-history{position:relative;z-index:1;display:inline-grid;place-items:center;width:max-content;min-height:38px;margin-top:12px;border:1px solid rgba(255,255,255,.28);border-radius:13px;background:rgba(255,255,255,.13);color:#fff;padding:0 13px;text-decoration:none;font-size:9px;font-weight:900;backdrop-filter:blur(8px)}
   .premium-progress{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:16px}.premium-progress span{min-height:30px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.16);border-radius:11px;background:rgba(255,255,255,.08);font-size:8px;font-weight:900}.premium-progress span:first-child{background:#fff;color:#155466}
   .premium-invoice-shell{display:grid;gap:12px}.premium-invoice-shell .quick-invoice-body{padding:0}.premium-invoice-shell .quick-step{padding:14px;border-color:#d5e5ed;border-radius:22px;background:rgba(255,255,255,.94);box-shadow:0 13px 30px rgba(18,50,74,.065)}
   .premium-invoice-shell .quick-step-title{justify-content:space-between}.premium-invoice-shell .quick-step-title .step-copy{display:flex;align-items:center;gap:9px}.premium-invoice-shell .quick-step-title small{color:var(--muted);font-size:8px;font-weight:800}.premium-invoice-shell .quick-input,.premium-invoice-shell .quick-select{min-height:49px;border-color:#bfd2dd;border-radius:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
@@ -259,6 +260,7 @@
           <small>Caja móvil · {{ empresa.nombre }}</small>
           <h2>Facturación rápida</h2>
           <p>Cobra con un flujo corto, comprueba el total y genera el documento fiscal completo sin salir de la app.</p>
+          {% if erp_access.facturas %}<a class="quick-invoice-history" href="{% url 'facturas_dashboard' empresa.slug %}">Ver Facturas</a>{% endif %}
           <div class="premium-progress" aria-label="Pasos de facturación"><span>1 · Paciente</span><span>2 · Conceptos</span><span>3 · Pago</span></div>
         </header>
         <form class="quick-invoice-body" id="quickInvoiceForm" method="post" action="{% url 'punto_venta' empresa.slug %}">
@@ -287,6 +289,7 @@
           <section class="quick-step" data-quick-step="payment">
             <div class="quick-step-title"><span class="step-copy"><b>3</b><span>Pago y confirmación</span></span><small>Revisa antes de emitir</small></div>
             <div class="premium-payment-grid">
+              <div class="premium-payment-card wide"><label for="quickInvoiceDate">Fecha de factura</label><input class="quick-input" id="quickInvoiceDate" type="date" value="{{ fecha_factura_hoy_app }}" required></div>
               <div class="premium-payment-card"><label for="quickPaymentMethod">Método de pago</label><select class="quick-select" id="quickPaymentMethod">{% for codigo, etiqueta in metodos_pago_app %}<option value="{{ codigo }}">{{ etiqueta }}</option>{% endfor %}</select></div>
               <div class="premium-payment-card"><label for="quickAccount">Caja o banco</label><select class="quick-select" id="quickAccount"><option value="">Seleccione cuenta</option>{% for cuenta in cuentas_app_payload %}<option value="{{ cuenta.id }}" data-tipo="{{ cuenta.tipo }}">{{ cuenta.nombre }}</option>{% endfor %}</select></div>
               <div class="premium-payment-card wide"><label for="quickReference">Referencia</label><input class="quick-input" id="quickReference" type="text" placeholder="Voucher, transferencia u observación opcional"></div>
@@ -310,6 +313,7 @@
             <small>Facturación rápida</small>
             <h2>Cobrar desde el teléfono</h2>
             <p>Selecciona cliente, agrega productos o servicios y genera la factura fiscal con su PDF completo.</p>
+            {% if erp_access.facturas %}<a href="{% url 'facturas_dashboard' empresa.slug %}">Ver Facturas</a>{% endif %}
           </div>
           <button class="app-panel-close" type="button" data-app-close>← Inicio</button>
         </div>
@@ -331,6 +335,8 @@
           </div>
           <div class="quick-step">
             <div class="quick-step-title"><b>3</b><span>Pago</span></div>
+            <label for="quickInvoiceDate">Fecha de factura</label>
+            <input class="quick-input" id="quickInvoiceDate" type="date" value="{{ fecha_factura_hoy_app }}" required>
             <select class="quick-select" id="quickPaymentMethod">
               {% for codigo, etiqueta in metodos_pago_app %}
               <option value="{{ codigo }}">{{ etiqueta }}</option>
@@ -689,7 +695,6 @@
   const appPanels=Array.from(document.querySelectorAll(".app-panel"));
   const appScreens=Array.from(document.querySelectorAll(".mobile-app-screen"));
   const moneyFormatter=new Intl.NumberFormat("es-HN",{style:"currency",currency:"HNL"});
-  const todayISO=()=>new Date().toISOString().slice(0,10);
   const parseJsonScript=id=>{
     try{return JSON.parse(document.getElementById(id)?.textContent||"[]")}catch(error){return []}
   };
@@ -1088,6 +1093,7 @@
   const quickPaymentMethod=document.getElementById("quickPaymentMethod");
   const quickAccount=document.getElementById("quickAccount");
   const quickReference=document.getElementById("quickReference");
+  const quickInvoiceDate=document.getElementById("quickInvoiceDate");
   const quickTotal=document.getElementById("quickTotal");
   const quickSubtotal=document.getElementById("quickSubtotal");
   const quickTaxes=document.getElementById("quickTaxes");
@@ -1350,9 +1356,10 @@
     if(!quickClient){setQuickStatus("Selecciona el cliente o paciente antes de facturar.",true);return}
     if(!items.length){setQuickStatus("Agrega al menos un producto o servicio.",true);return}
     if(!quickAccount?.value){setQuickStatus("Selecciona la caja o banco donde ingresó el pago.",true);return}
+    if(!quickInvoiceDate?.value){setQuickStatus("Selecciona la fecha de la factura.",true);quickInvoiceDate?.focus();return}
     if(quickCartCount&&!window.confirm(`Se generará una factura por ${moneyFormatter.format(total)} para ${quickClient.nombre}. ¿Desea continuar?`))return;
     const payload={
-      fecha:todayISO(),
+      fecha:quickInvoiceDate.value,
       cliente_id:quickClient.id,
       metodo:quickPaymentMethod?.value||"efectivo",
       cuenta_financiera:quickAccount.value,

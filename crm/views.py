@@ -1957,6 +1957,7 @@ def agenda_mobile(request, empresa_slug):
         for cuenta in cuentas_app_qs
     ]
     contexto["metodos_pago_app"] = PagoFactura.METODOS
+    contexto["fecha_factura_hoy_app"] = timezone.localdate().isoformat()
     contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
     response = render(request, "crm/agenda_mobile.html", contexto)
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"

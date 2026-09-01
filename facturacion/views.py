@@ -507,9 +507,12 @@ def punto_venta(request, empresa_slug):
         pagos_mixtos_payload = payload.get("pagos_mixtos") or []
         usa_pago_mixto_pos = bool(payload.get("usa_pago_mixto") and pagos_mixtos_payload)
         cliente_id = payload.get("cliente_id")
-        fecha_venta = _parsear_fecha_latam(payload.get("fecha")) or timezone.localdate()
+        fecha_venta_raw = (payload.get("fecha") or "").strip()
+        fecha_venta = _parsear_fecha_latam(fecha_venta_raw) if fecha_venta_raw else timezone.localdate()
 
         try:
+            if fecha_venta_raw and not fecha_venta:
+                raise ValidationError("Selecciona una fecha de factura valida.")
             if not usa_pago_mixto_pos and metodo not in dict(PagoFactura.METODOS):
                 raise ValidationError("Selecciona un metodo de pago valido.")
             if not impuesto_default and any(not p.impuesto_predeterminado_id for p in productos_qs):
