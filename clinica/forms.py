@@ -1916,6 +1916,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         if self.empresa and Paciente.objects.filter(
             empresa=self.empresa,
             identidad=identidad,
+            activo=True,
         ).exclude(pk=getattr(self.paciente, "pk", None)).exists():
             raise forms.ValidationError("Este numero de identidad ya pertenece a otro expediente.")
         return identidad

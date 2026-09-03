@@ -533,7 +533,7 @@ def _actualizar_paciente_desde_preconsulta(paciente, form):
     _sincronizar_cliente_facturacion_paciente(paciente)
 
 
-def _actualizar_paciente_basico_desde_preconsulta(paciente, form):
+def _actualizar_paciente_basico_desde_preconsulta(paciente, form, *, identidad_anterior=None):
     campos_directos = [
         "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
         "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "direccion",
@@ -545,7 +545,10 @@ def _actualizar_paciente_basico_desde_preconsulta(paciente, form):
     paciente.whatsapp = form.cleaned_data.get("telefono")
     paciente.prefijo_telefono = form.cleaned_data.get("telefono_codigo_area") or paciente.prefijo_telefono or "504"
     paciente.save()
-    _sincronizar_cliente_facturacion_paciente(paciente)
+    _sincronizar_cliente_facturacion_paciente(
+        paciente,
+        identidad_anterior=identidad_anterior,
+    )
 
 
 def _crear_paciente_desde_formulario_general(
@@ -629,9 +632,47 @@ def _proximo_codigo_expediente(empresa):
     return f"{prefijo}-{siguiente:05d}"
 
 
-def _sincronizar_cliente_facturacion_paciente(paciente):
+@transaction.atomic
+def _sincronizar_cliente_facturacion_paciente(paciente, *, identidad_anterior=None):
     cliente = paciente.cliente if paciente.cliente_id and paciente.cliente.empresa_id == paciente.empresa_id else None
     identidad = (paciente.identidad or "").strip()
+    identidad_anterior = (identidad_anterior or "").strip()
+
+    # Los expedientes eliminados se conservan como inactivos por auditoria,
+    # pero no deben reservar para siempre una identidad corregida. Cuando el
+    # perfil comercial asociado tambien esta inactivo, liberamos el documento
+    # en todas sus copias compartidas antes de asignarlo al paciente vigente.
+    perfiles_inactivos = set()
+    if identidad:
+        titulares_inactivos = Paciente.objects.filter(
+            empresa=paciente.empresa,
+            identidad__iexact=identidad,
+            activo=False,
+        ).exclude(pk=paciente.pk).filter(
+            Q(cliente__isnull=True) | Q(cliente__activo=False)
+        )
+        perfiles_inactivos.update(
+            titulares_inactivos.values_list("cliente__perfil_compartido_id", flat=True)
+        )
+        titulares_inactivos.update(identidad=None)
+    perfiles_inactivos.discard(None)
+    if perfiles_inactivos:
+        Paciente.objects.filter(
+            cliente__perfil_compartido_id__in=perfiles_inactivos,
+            identidad__iexact=identidad,
+            activo=False,
+        ).update(identidad=None)
+        Cliente.objects.filter(
+            perfil_compartido_id__in=perfiles_inactivos,
+            rtn__iexact=identidad,
+            activo=False,
+        ).update(rtn=None)
+
+    if not cliente and identidad_anterior and identidad_anterior.casefold() != identidad.casefold():
+        cliente = Cliente.objects.filter(
+            empresa=paciente.empresa,
+            rtn__iexact=identidad_anterior,
+        ).first()
     if not cliente and identidad:
         cliente = Cliente.objects.filter(empresa=paciente.empresa, rtn__iexact=identidad).first()
     if not cliente and paciente.nombre:
@@ -969,6 +1010,7 @@ def crear_paciente(request, empresa_slug):
 def editar_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    identidad_anterior = (paciente.identidad or "").strip()
     if interfaz_clinica_activa(empresa):
         preconsulta = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
         if preconsulta is None:
@@ -1021,7 +1063,11 @@ def editar_paciente(request, empresa_slug, paciente_id):
                     preconsulta.creada_por = preconsulta.creada_por or request.user
                     preconsulta.save()
 
-                    _actualizar_paciente_basico_desde_preconsulta(paciente, form)
+                    _actualizar_paciente_basico_desde_preconsulta(
+                        paciente,
+                        form,
+                        identidad_anterior=identidad_anterior,
+                    )
                     foto_nueva = paciente.foto_perfil.name if paciente.foto_perfil else ""
                     if form.cleaned_data.get("foto_perfil"):
                         paciente.foto_perfil = form.cleaned_data.get("foto_perfil")
@@ -1074,7 +1120,10 @@ def editar_paciente(request, empresa_slug, paciente_id):
     form = PacienteForm(request.POST or None, request.FILES or None, empresa=empresa, instance=paciente)
     if request.method == "POST" and form.is_valid():
         paciente = form.save()
-        _sincronizar_cliente_facturacion_paciente(paciente)
+        _sincronizar_cliente_facturacion_paciente(
+            paciente,
+            identidad_anterior=identidad_anterior,
+        )
         foto_nueva = paciente.foto_perfil.name if paciente.foto_perfil else ""
         if foto_nueva and foto_nueva != foto_anterior:
             PacienteFotoEvolucion.objects.create(

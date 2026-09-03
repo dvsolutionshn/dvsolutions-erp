@@ -621,6 +621,81 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(paciente.whatsapp, "50498887777")
         self.assertEqual(paciente.correo, "nuevo@example.com")
 
+    def test_editar_paciente_libera_identidad_de_perfil_inactivo(self):
+        identidad_anterior = "0801199413996"
+        identidad_correcta = "0801199413997"
+        cliente_anterior = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Paciente Identidad Anterior",
+            rtn=identidad_anterior,
+        )
+        cliente_correcto = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Perfil Correcto",
+            rtn=identidad_correcta,
+        )
+        cliente_correcto.activo = False
+        cliente_correcto.save(update_fields=["activo"])
+        paciente = Paciente.objects.get(cliente=cliente_anterior)
+        paciente.primer_nombre = "Paciente"
+        paciente.primer_apellido = "Identidad"
+        paciente.fecha_nacimiento = "1994-01-13"
+        paciente.sexo = "masculino"
+        paciente.estado_civil = "soltero"
+        paciente.whatsapp = "99990000"
+        paciente.telefono = "99990000"
+        paciente.save()
+
+        response = self.client.post(
+            reverse("clinica_editar_paciente", args=[self.empresa.slug, paciente.id]),
+            self._datos_formulario_general(
+                nombres="Paciente",
+                apellidos="Identidad",
+                identidad=identidad_correcta,
+            ),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]),
+        )
+        paciente.refresh_from_db()
+        cliente_anterior.refresh_from_db()
+        cliente_correcto.refresh_from_db()
+        self.assertEqual(paciente.identidad, identidad_correcta)
+        self.assertEqual(paciente.cliente_id, cliente_anterior.id)
+        self.assertEqual(cliente_anterior.rtn, identidad_correcta)
+        self.assertFalse(cliente_correcto.rtn)
+        self.assertFalse(Paciente.objects.filter(
+            empresa=self.empresa,
+            identidad=identidad_anterior,
+            activo=True,
+        ).exists())
+
+    def test_nuevo_paciente_reutiliza_identidad_de_expediente_inactivo(self):
+        identidad = "0801199413996"
+        paciente_inactivo = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-INACTIVO-ID",
+            nombre="Paciente Inactivo",
+            identidad=identidad,
+            activo=False,
+        )
+
+        response = self.client.post(
+            reverse("clinica_crear_paciente", args=[self.empresa.slug]),
+            self._datos_formulario_general(identidad=identidad),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        paciente_inactivo.refresh_from_db()
+        self.assertFalse(paciente_inactivo.identidad)
+        self.assertEqual(Paciente.objects.filter(
+            empresa=self.empresa,
+            identidad=identidad,
+            activo=True,
+        ).count(), 1)
+
     def test_nueva_cita_clinica_usa_control_unificado_am_pm(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa, expediente_codigo="HM-CITA", nombre="Paciente Cita"
