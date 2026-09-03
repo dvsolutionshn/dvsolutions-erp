@@ -762,8 +762,6 @@ class CitaClienteForm(forms.ModelForm):
     def _rango_bloqueado_cita(self, cita):
         inicio = cita.fecha_hora
         if self.cirugia_extendida_activa and cita.cirugia_fin_estimada:
-            if self._servicio_es_cirugia(cita.servicio_clinico):
-                return inicio, cita.cirugia_fin_estimada + timedelta(hours=1)
             return inicio, cita.cirugia_fin_estimada
         minutos = cita.duracion_minutos or getattr(cita.servicio_clinico, "duracion_minutos", None) or 30
         return inicio, inicio + timedelta(minutes=minutos)
@@ -949,7 +947,7 @@ class CitaClienteForm(forms.ModelForm):
             if not periodo_fin:
                 self.add_error("cirugia_periodo_fin", "Selecciona AM o PM.")
             if fin_estimada and fin_estimada > inicio:
-                fin_bloque = fin_estimada + timedelta(hours=1)
+                fin_bloque = fin_estimada
         else:
             cleaned_data["cirugia_detalle"] = ""
             cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada

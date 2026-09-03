@@ -719,8 +719,7 @@ def _sincronizar_cita_clinica(cita):
         if cita.cirugia_fin_estimada:
             detalle_cirugia = (
                 f"{detalle_cirugia}\nFin estimado: "
-                f"{timezone.localtime(cita.cirugia_fin_estimada):%d/%m/%Y %I:%M %p} "
-                "(incluye bloqueo de recuperacion de 1 hora)."
+                f"{timezone.localtime(cita.cirugia_fin_estimada):%d/%m/%Y %I:%M %p}."
             )
     observaciones = "\n".join(parte for parte in [detalle_cirugia, cita.observacion or ""] if parte).strip()
     # ``CitaClinica.motivo`` es un CharField de 220 caracteres. Las

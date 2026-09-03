@@ -1533,7 +1533,6 @@ class CRMTests(TestCase):
             duracion_minutos=30,
         )
         dra_candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra Candy Luque")
-        dr_luis = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dr Luis Gonzales")
 
         form = CitaClienteForm({
             "paciente": paciente.id,
@@ -1558,28 +1557,34 @@ class CRMTests(TestCase):
         cita.empresa = self.empresa
         cita.save()
 
-        mismo_profesional = CitaClienteForm({
+        mismo_profesional_al_finalizar = CitaClienteForm({
             "paciente": paciente_2.id,
             "servicio_clinico": consulta.id,
             "profesional_salud": dra_candy.id,
             "fecha_cita": "2026-08-10",
-            "hora_cita": "06:30",
+            "hora_cita": "06:00",
             "periodo_cita": "PM",
             "estado": "pendiente",
         }, empresa=self.empresa)
-        otro_profesional = CitaClienteForm({
+        mismo_profesional_antes_de_finalizar = CitaClienteForm({
             "paciente": paciente_2.id,
             "servicio_clinico": consulta.id,
-            "profesional_salud": dr_luis.id,
+            "profesional_salud": dra_candy.id,
             "fecha_cita": "2026-08-10",
-            "hora_cita": "06:30",
+            "hora_cita": "05:30",
             "periodo_cita": "PM",
             "estado": "pendiente",
         }, empresa=self.empresa)
 
-        self.assertFalse(mismo_profesional.is_valid())
-        self.assertIn("bloqueado de 01:00 PM a 07:00 PM", mismo_profesional.errors.as_text())
-        self.assertTrue(otro_profesional.is_valid(), otro_profesional.errors.as_text())
+        self.assertTrue(
+            mismo_profesional_al_finalizar.is_valid(),
+            mismo_profesional_al_finalizar.errors.as_text(),
+        )
+        self.assertFalse(mismo_profesional_antes_de_finalizar.is_valid())
+        self.assertIn(
+            "bloqueado de 01:00 PM a 06:00 PM",
+            mismo_profesional_antes_de_finalizar.errors.as_text(),
+        )
 
     def test_hospital_mia_consulta_puede_bloquear_rango_con_hora_final(self):
         self.empresa.tipo_solucion = "clinica"
