@@ -2922,6 +2922,16 @@ def generar_enlace_registro_paciente(request, empresa_slug):
         f"Hola. {empresa.nombre} le comparte su formulario seguro para crear su expediente como paciente nuevo. "
         f"Complete la informacion y adjunte su fotografia en este enlace: {enlace_publico}"
     )
+    whatsapp_url = f"https://api.whatsapp.com/send?text={mensaje}"
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse(
+            {
+                "ok": True,
+                "enlace_publico": enlace_publico,
+                "whatsapp_url": whatsapp_url,
+                "fecha_expiracion": invitacion.fecha_expiracion.isoformat(),
+            }
+        )
     return render(
         request,
         "clinica/registro_paciente_enlace.html",
@@ -2929,7 +2939,7 @@ def generar_enlace_registro_paciente(request, empresa_slug):
             "empresa": empresa,
             "invitacion": invitacion,
             "enlace_publico": enlace_publico,
-            "whatsapp_url": f"https://api.whatsapp.com/send?text={mensaje}",
+            "whatsapp_url": whatsapp_url,
         },
     )
 

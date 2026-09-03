@@ -2604,6 +2604,23 @@ class ClinicaPacienteTests(TestCase):
         self.assertIsNotNone(invitacion.fecha_ultimo_intento)
         self.assertIsNone(invitacion.paciente)
 
+    def test_generar_enlace_paciente_nuevo_ajax_devuelve_link_para_copiar(self):
+        response = self.client.post(
+            reverse("clinica_generar_enlace_registro_paciente", args=[self.empresa.slug]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_ACCEPT="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("fecha_expiracion", data)
+        self.assertIn("api.whatsapp.com", data["whatsapp_url"])
+        token_raw = data["enlace_publico"].rstrip("/").rsplit("/", 1)[-1]
+        invitacion = InvitacionRegistroPaciente.objects.get()
+        self.assertEqual(invitacion.token_hash, hash_token_preconsulta(token_raw))
+        self.assertNotEqual(invitacion.token_hash, token_raw)
+
     def test_enlace_paciente_nuevo_crea_expediente_cliente_preconsulta_y_foto(self):
         response = self.client.get(reverse("clinica_pacientes", args=[self.empresa.slug]))
         self.assertContains(response, "Enlace para paciente nuevo")

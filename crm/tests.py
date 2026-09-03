@@ -97,6 +97,30 @@ class CRMTests(TestCase):
         self.assertTemplateUsed(response_app, "crm/agenda_mobile.html")
         self.assertContains(response_app, 'class="mobile-home mobile-app-screen active"')
         self.assertNotContains(response_app, 'id="facturas-app"')
+        self.assertNotContains(response_app, 'id="patientInviteForm"')
+
+    def test_app_pacientes_permite_generar_y_copiar_enlace_con_permiso(self):
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica",
+            defaults={"nombre": "Clínica Médica", "es_comercial": True},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_clinica, activo=True)
+        self.rol.puede_clinica = True
+        self.rol.puede_pacientes = True
+        self.rol.save(update_fields=["puede_clinica", "puede_pacientes"])
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="patientInviteForm"')
+        self.assertContains(
+            response,
+            reverse("clinica_generar_enlace_registro_paciente", args=[self.empresa.slug]),
+        )
+        self.assertContains(response, "Generar y copiar link de paciente nuevo")
+        self.assertContains(response, "navigator.clipboard")
+        self.assertContains(response, 'document.execCommand("copy")')
 
     def test_luque_sin_modulo_citas_programa_directamente_en_hospital_mia(self):
         self.empresa.tipo_solucion = "clinica"
