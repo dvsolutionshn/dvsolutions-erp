@@ -17,7 +17,7 @@ class LoginClinicoPremiumTests(SimpleTestCase):
                 request = RequestFactory().get("/" + slug + "/")
                 with patch("core.views._resolver_empresa_request", return_value=empresa), patch("core.views._es_perfil_clinico", return_value=True), patch("core.views._flash_session_expired_message"), patch("core.views.render", return_value=HttpResponse()) as render:
                     empresa_login(request, slug)
-                expected = "core/login_hospital_mia.html" if slug == "otra_clinica" else "core/login_clinico_premium.html"
+                expected = "core/login_corporativo.html" if slug == "otra_clinica" else "core/login_clinico_premium.html"
                 self.assertEqual(render.call_args.args[1], expected)
 
     def test_formulario_renderiza_sin_next_y_escapa_usuario(self):
