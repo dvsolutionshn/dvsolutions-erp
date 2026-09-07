@@ -1,0 +1,43 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inicia sesión | {{ empresa.nombre }}</title>
+    <link rel="stylesheet" href="{% static 'core/clinical-login.css' %}">
+</head>
+<body>
+<main class="login-layout">
+    <section class="institution" aria-labelledby="brand-title">
+        <div class="identity"><img src="{% static 'core/img/clinical-group-logo.jpg' %}" alt="Logo Sistema Clínico"><div><strong>Sistema Clínico</strong><span>Cuidando hoy un mejor mañana</span></div></div>
+        <div class="institution-copy">
+            <h1 id="brand-title">Una plataforma,<br>cuatro visiones de bienestar</h1>
+            <p>Tecnología, personas y salud en un mismo lugar.<br>Soluciones clínicas para un cuidado integral.</p>
+            {% include 'core/login_clinico_marcas.html' %}
+            <p class="promise">Misma confianza. Más posibilidades.</p>
+        </div>
+        <footer><span>Salud · Estética · Bienestar · Personas</span><span>Tecnología que potencia<br>el cuidado humano</span></footer>
+    </section>
+    <section class="access" aria-labelledby="login-title">
+        <div class="language" lang="es">Español</div>
+        <div class="login-card">
+            <header><span class="eyebrow">BIENVENIDO</span><h2 id="login-title">Inicia sesión</h2><p>Accede al Sistema Clínico</p><span class="current-company">{{ empresa.nombre }}</span></header>
+            {% if messages %}<div class="messages" role="alert">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>{% endif %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% firstof request.POST.next request.GET.next '' %}">
+                <label for="id_username">Correo electrónico</label>
+                <input id="id_username" name="username" type="text" inputmode="email" autocomplete="username" placeholder="tu@correo.com" value="{{ request.POST.username|default:'' }}" required>
+                <label for="id_password">Contraseña</label>
+                <div class="password-field"><input id="id_password" name="password" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" required><button type="button" data-password-toggle aria-controls="id_password" aria-pressed="false" aria-label="Mostrar contraseña"><span data-password-toggle-label>Mostrar</span></button></div>
+                <div class="form-options"><label class="remember"><input type="checkbox" name="remember" {% if request.POST.remember %}checked{% endif %}>Recordarme</label><a href="{% url 'solicitar_recuperacion' empresa.slug %}">¿Olvidó su contraseña?</a></div>
+                <button class="submit" type="submit">Iniciar sesión <span aria-hidden="true">→</span></button>
+            </form>
+            <div class="group-footer"><p>Una sola interfaz clínica para todas nuestras unidades</p>{% include 'core/login_clinico_marcas.html' %}<div class="motto">SALUD CON PROPÓSITO, SIEMPRE</div></div>
+        </div>
+    </section>
+</main>
+<script src="{% static 'core/password-toggle.js' %}"></script>
+</body>
+</html>

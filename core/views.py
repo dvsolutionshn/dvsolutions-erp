@@ -659,9 +659,11 @@ def empresa_login(request, slug=None):
     if empresa.tipo_solucion == "tecnicentro":
         return redirect("tecnicentro_login", empresa_slug=empresa.slug)
     es_perfil_clinico = _es_perfil_clinico(empresa)
-    # Todas las empresas comparten la experiencia premium; Tecnicentro conserva
-    # su acceso Garage OS independiente definido arriba.
-    template_name = "core/login_hospital_mia.html"
+    # Identificadores del grupo clinico; otras empresas conservan su plantilla.
+    login_clinico_premium = empresa.slug in {
+        "hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos",
+    }
+    template_name = "core/login_clinico_premium.html" if login_clinico_premium else "core/login_hospital_mia.html"
     _flash_session_expired_message(request)
     throttle_scope = f"empresa:{empresa.slug}"
 
@@ -683,6 +685,8 @@ def empresa_login(request, slug=None):
             if user.puede_acceder_empresa(empresa):
                 _clear_login_failures(throttle_scope, request)
                 login(request, user)
+                if login_clinico_premium:
+                    request.session.set_expiry(None if request.POST.get("remember") == "on" else 0)
                 siguiente = (request.POST.get("next") or request.GET.get("next") or "").strip()
                 if siguiente and url_has_allowed_host_and_scheme(
                     siguiente,
