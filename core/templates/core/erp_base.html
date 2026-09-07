@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{% static 'core/erp.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="{% if erp_access.interfaz_clinica %}clinical-product-ui{% endif %}">
+<body class="{% block body_class %}{% if erp_access.interfaz_clinica %}clinical-product-ui{% endif %}{% endblock %}">
 {% if empresa %}
     {% url 'dashboard' empresa.slug as dashboard_url %}
     {% url 'facturacion_dashboard' empresa.slug as facturacion_url %}
@@ -110,6 +110,7 @@
     </div>
     <div class="erp-mobile-backdrop" data-mobile-menu-close></div>
     <aside class="erp-sidebar">
+        {% block sidebar_content %}
         <div class="erp-mobile-drawer-head">
             <div>
                 <span>{% if erp_access.interfaz_clinica %}Menu Clinico{% else %}Menu ERP{% endif %}</span>
@@ -397,6 +398,7 @@
             </div>
             {% endif %}
         </div>
+        {% endblock %}
     </aside>
 
     <div class="erp-main">

@@ -1,0 +1,64 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+{% block title %}Panel principal | {{ empresa.nombre }}{% endblock %}
+{% block body_class %}demo-dashboard{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/demo-dashboard.css' %}">
+{% endblock %}
+{% block header_kicker %}<span class="demo-breadcrumb">Inicio <span>/</span> Panel principal</span>{% endblock %}
+{% block header_title %}Panel principal{% endblock %}
+{% block header_description %}{% endblock %}
+{% block topbar_actions %}
+<label class="demo-search"><i data-lucide="search" aria-hidden="true"></i><span class="demo-sr-only">Buscar módulo</span><input type="search" id="demo-search" placeholder="Buscar módulo" autocomplete="off" aria-controls="demo-modules"></label>
+<span class="demo-user" title="{{ request.user.username }}"><i data-lucide="circle-user-round" aria-hidden="true"></i><span>{{ request.user.username }}</span></span>
+{% endblock %}
+{% block sidebar_content %}
+<div class="erp-mobile-drawer-head"><strong>Menú</strong><button class="erp-mobile-close" type="button" data-mobile-menu-close aria-label="Cerrar menú">&times;</button></div>
+<a class="demo-company" href="{% url 'dashboard' empresa.slug %}">
+    {% if empresa.logo %}<img src="{{ empresa.logo.url }}" alt="Logo de {{ empresa.nombre }}">{% else %}<span class="demo-monogram" aria-hidden="true">{{ empresa.nombre|slice:':1' }}</span>{% endif %}
+    <strong>{{ empresa.nombre }}</strong>
+</a>
+<nav class="demo-navigation" aria-label="Navegación principal">
+    <a class="is-current" href="{% url 'dashboard' empresa.slug %}" aria-current="page"><i data-lucide="house" aria-hidden="true"></i>Panel principal</a>
+    {% for module in demo_modules %}<a href="{{ module.url }}"><i data-lucide="{{ module.icon }}" aria-hidden="true"></i>{{ module.title }}</a>{% endfor %}
+    {% for link in demo_admin_links %}<a href="{{ link.url }}"><i data-lucide="{{ link.icon }}" aria-hidden="true"></i>{{ link.title }}</a>{% endfor %}
+</nav>
+<div class="demo-sidebar-footer">
+    <div class="demo-account"><i data-lucide="circle-user-round" aria-hidden="true"></i><span>{{ request.user.username }}</span></div>
+    <a class="demo-logout" href="{% url 'cerrar_sesion' empresa.slug %}"><i data-lucide="log-out" aria-hidden="true"></i>Cerrar sesión</a>
+    <div class="demo-provider"><img src="{% static 'core/images/dv-solutions-control-logo.webp' %}" alt="DV Solutions"><span>Tecnología de DV Solutions</span></div>
+</div>
+{% endblock %}
+{% block content %}
+<section class="demo-banner" aria-labelledby="demo-title">
+    <img src="{% static 'core/img/demo-dashboard/building.png' %}" alt="" fetchpriority="high">
+    <div><h1 id="demo-title">{{ empresa.nombre }}</h1><h2>Panel principal</h2><p>{{ demo_modules|length }} módulo{{ demo_modules|length|pluralize }} disponible{{ demo_modules|length|pluralize }}</p></div>
+    <span class="demo-banner-note"><i data-lucide="circle-check" aria-hidden="true"></i>Tu empresa, conectada.</span>
+</section>
+<div class="demo-workspace">
+    <nav class="demo-actions" aria-label="Acciones rápidas">
+        {% if erp_access.modulo_facturacion and erp_access.crear_facturas %}<a class="demo-button primary" href="{% url 'crear_factura' empresa.slug %}"><i data-lucide="plus" aria-hidden="true"></i>Nueva factura</a>{% endif %}
+        {% if erp_access.recibos %}<a class="demo-button" href="{% url 'recibos_dashboard' empresa.slug %}"><i data-lucide="receipt" aria-hidden="true"></i>Ver recibos</a>{% endif %}
+        {% if erp_access.reportes %}<a class="demo-button neutral" href="{% url 'reportes_facturacion' empresa.slug %}"><i data-lucide="chart-no-axes-column" aria-hidden="true"></i>Ver reportes</a>{% endif %}
+    </nav>
+    <section aria-labelledby="demo-workspace-title">
+        <div class="demo-section-head"><h2 id="demo-workspace-title">Tu espacio de trabajo</h2><div class="demo-view-toggle" role="group" aria-label="Vista de módulos"><button type="button" data-demo-view="grid" aria-label="Vista de tarjetas" aria-pressed="true" title="Vista de tarjetas"><i data-lucide="layout-grid" aria-hidden="true"></i></button><button type="button" data-demo-view="list" aria-label="Vista de lista" aria-pressed="false" title="Vista de lista"><i data-lucide="list" aria-hidden="true"></i></button></div></div>
+        <div id="demo-modules" class="demo-modules">
+        {% for module in demo_modules %}
+            <article class="demo-module" data-demo-module data-search="{{ module.title }} {{ module.category }} {{ module.description }}">
+                <img class="demo-module-image" src="{% static module.image %}" alt="" {% if forloop.counter > 3 %}loading="lazy"{% endif %}>
+                <div class="demo-module-content"><span class="demo-category">{{ module.category }}</span><h3>{{ module.title }}</h3><p>{{ module.description }}</p><div class="demo-module-footer"><span class="demo-active">Activo</span><a href="{{ module.url }}" aria-label="Abrir {{ module.title }}">Abrir módulo<i data-lucide="arrow-right" aria-hidden="true"></i></a></div></div>
+            </article>
+        {% empty %}<p class="demo-empty">No tienes módulos disponibles para esta empresa.</p>{% endfor %}
+        </div>
+        <p class="demo-empty" id="demo-search-empty" role="status" hidden>No se encontraron módulos.</p>
+    </section>
+    {% if demo_shortcuts %}<nav class="demo-shortcuts" aria-label="Accesos frecuentes"><h2>Accesos frecuentes</h2>{% for link in demo_shortcuts %}<a href="{{ link.url }}"><i data-lucide="{{ link.icon }}" aria-hidden="true"></i>{{ link.title }}</a>{% endfor %}</nav>{% endif %}
+    {% if demo_solutions %}<details class="demo-solutions"><summary><i data-lucide="blocks" aria-hidden="true"></i>Más soluciones para tu empresa<span>{{ demo_solutions|length }} disponibles</span><i data-lucide="chevron-down" aria-hidden="true"></i></summary><div class="demo-solutions-list">{% for solution in demo_solutions %}<div><i data-lucide="{{ solution.icon }}" aria-hidden="true"></i><strong>{{ solution.title }}</strong><span>No habilitado</span></div>{% endfor %}</div><a class="demo-contact" href="mailto:dosolutionshn@gmail.com">Solicitar información<i data-lucide="arrow-up-right" aria-hidden="true"></i></a></details>{% endif %}
+    <div class="demo-mobile-provider"><img src="{% static 'core/images/dv-solutions-control-logo.webp' %}" alt="DV Solutions"><span>Tecnología de DV Solutions</span></div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'core/lucide-0.468.0.min.js' %}"></script>
+<script src="{% static 'core/demo-dashboard.js' %}"></script>
+{% endblock %}

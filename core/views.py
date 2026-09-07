@@ -960,6 +960,14 @@ def dashboard(request, slug=None):
             codigo__in={"clinica_medica", "agenda_citas", "facturacion", "punto_venta", *adicionales}
         )
 
+    if empresa.slug == "demo_1":
+        from .demo_dashboard import dashboard_context
+
+        return render(request, "core/dashboard_demo.html", {
+            "empresa": empresa,
+            **dashboard_context(request, empresa, modulos_activos),
+        })
+
     return render(request, 'core/dashboard_premium.html', {
         'empresa': empresa,
         'modulos': modulos_activos
