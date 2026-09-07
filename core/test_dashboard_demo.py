@@ -1,10 +1,30 @@
 from datetime import timedelta
+from hashlib import sha256
+from pathlib import Path
 
-from django.test import TestCase
+from django.contrib.staticfiles import finders
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, Usuario
+from core.demo_dashboard import MODULES
+
+
+class DashboardDemoImageTests(SimpleTestCase):
+    def test_cada_modulo_y_portada_tienen_una_imagen_distinta(self):
+        images = [module[-1] for module in MODULES] + ["building"]
+        self.assertEqual(len(images), len(set(images)))
+        digests = set()
+        for image in images:
+            with self.subTest(image=image):
+                path = finders.find(f"core/img/demo-dashboard/{image}.png")
+                self.assertIsNotNone(path, f"Missing image: {image}")
+                content = Path(path).read_bytes()
+                self.assertTrue(content.startswith(b"\x89PNG\r\n\x1a\n"))
+                digest = sha256(content).hexdigest()
+                self.assertNotIn(digest, digests, f"Repeated image: {image}")
+                digests.add(digest)
 
 
 class DashboardDemoTests(TestCase):

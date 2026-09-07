@@ -8,13 +8,13 @@ MODULES = (
     ("contabilidad", "modulo_contabilidad", "Contabilidad", "Finanzas", "Gestiona asientos, libros y estados financieros.", "contabilidad_dashboard", "calculator", "accounting"),
     ("facturacion", "modulo_facturacion", "Facturación", "Operación", "Facturas, clientes y productos conectados en un mismo lugar.", "facturacion_dashboard", "file-text", "billing"),
     ("recibos", "recibos", "Recibos", "Cobranza", "Consulta comprobantes de pago y su trazabilidad.", "recibos_dashboard", "receipt", "receipts"),
-    ("cotizaciones", "cotizaciones", "Cotizaciones", "Comercial", "Prepara propuestas y conviértelas en ventas.", "cotizaciones_dashboard", "clipboard-list", "billing"),
-    ("punto_venta", "modulo_pos", "Punto de Venta", "Venta directa", "Tu caja, inventario y ventas en una sola operación.", "punto_venta", "shopping-bag", "receipts"),
-    ("rrhh", "modulo_rrhh", "Recursos Humanos", "Talento", "Gestiona personal, planillas y vacaciones.", "rrhh_dashboard", "users", "building"),
-    ("crm_marketing", "modulo_crm", "CRM y Marketing", "Clientes", "Organiza campañas y seguimiento comercial.", "crm_dashboard", "messages-square", "building"),
-    ("agenda_citas", "modulo_citas", "Citas", "Agenda", "Coordina horarios, servicios y citas de tus clientes.", "agenda_citas", "calendar-days", "billing"),
-    ("clinica_medica", "modulo_clinica", "Clínica Médica", "Salud", "Pacientes, tratamientos y expedientes clínicos.", "clinica_dashboard", "heart-pulse", "building"),
-    ("tecnicentro", "modulo_tecnicentro", "Tecnicentro", "Taller", "Recepción, diagnóstico y órdenes de trabajo.", "tecnicentro_dashboard", "wrench", "building"),
+    ("cotizaciones", "cotizaciones", "Cotizaciones", "Comercial", "Prepara propuestas y conviértelas en ventas.", "cotizaciones_dashboard", "clipboard-list", "quotes"),
+    ("punto_venta", "modulo_pos", "Punto de Venta", "Venta directa", "Tu caja, inventario y ventas en una sola operación.", "punto_venta", "shopping-bag", "pos"),
+    ("rrhh", "modulo_rrhh", "Recursos Humanos", "Talento", "Gestiona personal, planillas y vacaciones.", "rrhh_dashboard", "users", "hr"),
+    ("crm_marketing", "modulo_crm", "CRM y Marketing", "Clientes", "Organiza campañas y seguimiento comercial.", "crm_dashboard", "messages-square", "crm"),
+    ("agenda_citas", "modulo_citas", "Citas", "Agenda", "Coordina horarios, servicios y citas de tus clientes.", "agenda_citas", "calendar-days", "appointments"),
+    ("clinica_medica", "modulo_clinica", "Clínica Médica", "Salud", "Pacientes, tratamientos y expedientes clínicos.", "clinica_dashboard", "heart-pulse", "clinic"),
+    ("tecnicentro", "modulo_tecnicentro", "Tecnicentro", "Taller", "Recepción, diagnóstico y órdenes de trabajo.", "tecnicentro_dashboard", "wrench", "workshop"),
 )
 
 
