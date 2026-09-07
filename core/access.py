@@ -157,6 +157,8 @@ def permiso_facturacion_accion(path_suffix):
         return "puede_exportar_reportes"
 
     if first.isdigit():
+        if len(parts) > 1 and parts[1] == "cambiar-fecha":
+            return "puede_cambiar_fecha_factura"
         if len(parts) > 1 and parts[1] == "corregir-numero":
             return "puede_editar_facturas"
         if len(parts) > 1 and parts[1] == "editar":

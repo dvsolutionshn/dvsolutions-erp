@@ -49,6 +49,7 @@ class RolSistema(models.Model):
     puede_contabilidad = models.BooleanField(default=False)
     puede_crear_facturas = models.BooleanField(default=False)
     puede_editar_facturas = models.BooleanField(default=False)
+    puede_cambiar_fecha_factura = models.BooleanField(default=False)
     puede_anular_facturas = models.BooleanField(default=False)
     puede_eliminar_borradores = models.BooleanField(default=False)
     puede_eliminar_facturas = models.BooleanField(default=False)
@@ -126,6 +127,7 @@ class RolSistema(models.Model):
                 "puede_cxp",
                 "puede_crear_facturas",
                 "puede_editar_facturas",
+                "puede_cambiar_fecha_factura",
                 "puede_anular_facturas",
                 "puede_registrar_pagos_clientes",
                 "puede_crear_clientes",

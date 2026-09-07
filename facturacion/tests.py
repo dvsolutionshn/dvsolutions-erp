@@ -3225,6 +3225,7 @@ class FacturacionTests(TestCase):
             nombre="Facturacion Segura",
             codigo="facturacion-segura",
             puede_facturas=True,
+            puede_ver_facturas=True,
             puede_crear_facturas=True,
             puede_editar_facturas=True,
         )
@@ -6716,7 +6717,7 @@ class FacturacionTests(TestCase):
         self.assertEqual(inventario.existencias, Decimal("1.00"))
         self.assertFalse(MovimientoInventario.objects.filter(producto=self.producto, tipo="salida_factura").exists())
 
-    def test_no_permite_editar_factura_emitida_con_pagos(self):
+    def test_permiso_editar_permite_abrir_factura_emitida_con_pagos(self):
         factura = self.crear_factura_con_linea(estado="emitida")
         PagoFactura.objects.create(
             factura=factura,
@@ -6730,12 +6731,8 @@ class FacturacionTests(TestCase):
             follow=True,
         )
 
-        self.assertRedirects(
-            response,
-            reverse("ver_factura", args=[self.empresa.slug, factura.id]),
-        )
-        self.assertContains(response, "No se puede editar esta factura emitida")
-        self.assertContains(response, "pagos registrados")
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "facturacion/crear_factura_premium.html")
 
     def test_correccion_historica_permite_cambiar_producto_en_factura_pagada_y_reconstruye_inventario(self):
         configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)

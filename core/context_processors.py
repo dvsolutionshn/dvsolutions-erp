@@ -119,6 +119,7 @@ def erp_access(request):
         "cxp": facturacion_activa and permiso("puede_cxp"),
         "crear_facturas": permiso("puede_crear_facturas"),
         "editar_facturas": permiso("puede_editar_facturas"),
+        "cambiar_fecha_factura": permiso("puede_cambiar_fecha_factura"),
         "anular_facturas": permiso("puede_anular_facturas"),
         "eliminar_borradores": permiso("puede_eliminar_borradores"),
         "eliminar_facturas": permiso("puede_eliminar_facturas"),

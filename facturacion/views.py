@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.forms import modelform_factory, inlineformset_factory
 from django.http import Http404, HttpResponse
 from django.http import JsonResponse
@@ -2911,7 +2911,81 @@ def _validar_stock_disponible_para_lineas(lineas):
         )
 
 
-def _factura_bloqueada_para_edicion(factura):
+@login_required
+@transaction.atomic
+def cambiar_fecha_factura(request, empresa_slug, factura_id):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _autorizar_cambio_factura(request, empresa, "puede_cambiar_fecha_factura")
+    factura = get_object_or_404(Factura.objects.select_for_update(), pk=factura_id, empresa=empresa)
+    if factura.estado == 'anulada':
+        raise PermissionDenied("No se puede modificar una factura anulada.")
+    anterior = _estado_auditoria_factura(factura)
+    # Formulario limitado: ningún otro campo enviado por URL/POST se puede guardar.
+    form = forms.Form(request.POST if request.method == 'POST' else None, initial={
+        'fecha_emision': factura.fecha_emision,
+    })
+    form.fields['fecha_emision'] = forms.DateField(label='Fecha de factura')
+    configurar_campo_fecha(form.fields['fecha_emision'])
+    form.fields['motivo_auditoria'] = forms.CharField(
+        label='Motivo de la modificación', min_length=8, max_length=500,
+        widget=forms.Textarea(attrs={'rows': 3}),
+    )
+    if request.method == 'POST' and form.is_valid():
+        try:
+            with transaction.atomic():
+                factura.fecha_emision = form.cleaned_data['fecha_emision']
+                factura.save()  # Conserva full_clean y las validaciones fiscales/CAI.
+                if factura.estado == 'emitida':
+                    AsientoContable.objects.filter(
+                        empresa=empresa, documento_tipo='factura',
+                        documento_id=factura.pk, evento='emision',
+                    ).delete()
+                    registrar_asiento_factura_emitida(factura)
+                _auditar_cambio_factura(request, factura, anterior, 'cambiar_fecha', form.cleaned_data['motivo_auditoria'])
+            messages.success(request, 'Fecha de factura actualizada.')
+            return redirect('ver_factura', empresa_slug=empresa.slug, factura_id=factura.pk)
+        except (ValidationError, ValueError) as exc:
+            form.add_error(None, '; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc))
+    return render(request, 'facturacion/cambiar_fecha_factura.html', {
+        'empresa': empresa, 'factura': factura, 'form': form,
+    })
+
+
+def _autorizar_cambio_factura(request, empresa, permiso):
+    if not request.user.puede_acceder_empresa(empresa) or not request.user.tiene_permiso_erp(permiso, empresa):
+        raise PermissionDenied("No tiene permiso para modificar facturas de esta empresa.")
+
+
+def _estado_auditoria_factura(factura):
+    from core.audit_signals import _snapshot
+    return {
+        **_snapshot(factura),
+        "lineas": [{"id": linea.pk, **_snapshot(linea)} for linea in factura.lineas.order_by("pk")],
+    }
+
+
+def _auditar_cambio_factura(request, factura, anterior, accion, motivo):
+    # Obligatorio: si falla este registro, la transacción completa se revierte.
+    from core.audit_signals import _changes
+    nuevo = _estado_auditoria_factura(factura)
+    RegistroAuditoria.objects.create(
+        empresa=factura.empresa, usuario=request.user, accion="modificar",
+        modulo="Facturacion", app_label="facturacion", modelo="factura",
+        objeto_id=str(factura.pk), objeto_representacion=str(factura)[:300],
+        motivo=motivo, ruta=request.path[:500], metodo_http=request.method,
+        cambios={
+            **_changes(anterior, nuevo),
+            "accion_factura": {"anterior": None, "nuevo": accion},
+            "factura": {"anterior": anterior, "nuevo": nuevo},
+        },
+    )
+
+
+def _factura_bloqueada_para_edicion(factura, usuario=None):
+    if factura.estado == 'anulada':
+        return True
+    if usuario and usuario.tiene_permiso_erp("puede_editar_facturas", factura.empresa):
+        return factura.tiene_notas_credito_activas
     if factura.estado != 'emitida':
         return False
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(factura.empresa)
@@ -7239,13 +7313,17 @@ def corregir_numero_factura(request, empresa_slug, factura_id):
 
 
 @login_required
+@transaction.atomic
 def editar_factura(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    _autorizar_cambio_factura(request, empresa, "puede_editar_facturas")
+    factura = get_object_or_404(Factura.objects.select_for_update(), id=factura_id, empresa=empresa)
+    anterior = _estado_auditoria_factura(factura)
+    fecha_original = factura.fecha_emision
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
 
-    if _factura_bloqueada_para_edicion(factura):
+    if _factura_bloqueada_para_edicion(factura, request.user):
         messages.error(
             request,
             f"No se puede editar esta factura emitida. {factura.motivo_bloqueo_edicion}"
@@ -7332,6 +7410,7 @@ def editar_factura(request, empresa_slug, factura_id):
 
     def preparar_factura_form(form, numero_prefijo="", numero_sufijo=""):
         configurar_campo_fecha(form.fields['fecha_emision'])
+        form.fields['fecha_emision'].disabled = not request.user.tiene_permiso_erp('puede_cambiar_fecha_factura', empresa)
         configurar_campo_fecha(form.fields['fecha_vencimiento'])
         form.fields['fecha_vencimiento'].required = False
         if 'tipo_cambio' in form.fields:
@@ -7349,6 +7428,8 @@ def editar_factura(request, empresa_slug, factura_id):
                 label=form.fields['tipo_cambio'].label,
             )
         if 'estado' in form.fields:
+            if factura.estado == 'emitida':
+                form.fields['estado'].disabled = True
             if _empresa_factura_solo_contado(empresa):
                 form.fields['estado'].choices = [('emitida', 'Emitida')]
                 form.fields['estado'].initial = 'emitida'
@@ -7390,6 +7471,7 @@ def editar_factura(request, empresa_slug, factura_id):
         form.fields['motivo_auditoria'] = forms.CharField(
             required=True,
             min_length=8,
+            max_length=500,
             label='Motivo de la modificacion',
             help_text='Explica brevemente por que se modifica esta factura. Quedara en la bitacora permanente.',
             widget=forms.Textarea(attrs={
@@ -7401,6 +7483,10 @@ def editar_factura(request, empresa_slug, factura_id):
 
     if request.method == "POST":
         estado_original = factura.estado
+        if not request.user.tiene_permiso_erp("puede_cambiar_fecha_factura", empresa):
+            fecha_solicitada = request.POST.get("fecha_emision")
+            if fecha_solicitada and _parsear_fecha_latam(fecha_solicitada) != fecha_original:
+                raise PermissionDenied("No tiene permiso para cambiar la fecha de factura.")
 
         post_data = preparar_post_factura(request.POST)
         prefijo_manual, sufijo_manual = obtener_prefijo_manual(
@@ -7494,6 +7580,8 @@ def editar_factura(request, empresa_slug, factura_id):
                             origen_modulo='facturacion',
                             creado_por=factura.vendedor,
                         )
+
+                    _auditar_cambio_factura(request, factura, anterior, "editar", form.cleaned_data['motivo_auditoria'])
 
                 messages.success(request, "Factura actualizada correctamente.")
                 return redirect("facturas_dashboard", empresa_slug=empresa.slug)
@@ -8223,6 +8311,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
 def anular_factura(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _autorizar_cambio_factura(request, empresa, "puede_anular_facturas")
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     motivo = (request.POST.get("motivo") or "").strip()
 
@@ -8230,12 +8319,15 @@ def anular_factura(request, empresa_slug, factura_id):
         messages.info(request, "La factura ya estaba anulada.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
-    if len(motivo) < 5:
+    if not 5 <= len(motivo) <= 500:
         messages.error(request, "Explica el motivo de la anulacion con al menos 5 caracteres.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
     with transaction.atomic():
         factura = Factura.objects.select_for_update().get(id=factura.id, empresa=empresa)
+        if factura.estado == 'anulada':
+            return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        anterior = _estado_auditoria_factura(factura)
         if factura.estado == 'emitida':
             _revertir_salida_factura(factura)
             for pago in factura.pagos_facturacion.all():
@@ -8276,6 +8368,7 @@ def anular_factura(request, empresa_slug, factura_id):
         factura.total = Decimal('0.00')
         factura.total_lempiras = Decimal('0.00')
         factura.save(update_fields=['estado', 'estado_pago', 'subtotal', 'impuesto', 'total', 'total_lempiras'])
+        _auditar_cambio_factura(request, factura, anterior, "anular", motivo)
     messages.success(request, "Factura anulada correctamente y registrada en la bitacora.")
 
     return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)

@@ -629,6 +629,7 @@ class RolSistemaForm(forms.ModelForm):
             "puede_contabilidad": ("Puede entrar a contabilidad", ""),
             "puede_crear_facturas": ("Puede crear facturas", ""),
             "puede_editar_facturas": ("Puede editar facturas", ""),
+            "puede_cambiar_fecha_factura": ("Puede cambiar fecha de factura", "Autoriza corregir la fecha de emisión de facturas existentes."),
             "puede_anular_facturas": ("Puede anular facturas", ""),
             "puede_eliminar_borradores": ("Puede eliminar borradores", "Permite borrar únicamente documentos que todavía no han sido emitidos."),
             "puede_eliminar_facturas": ("Puede eliminar facturas emitidas", "Permiso crítico para correcciones históricas. No debe asignarse al personal de facturación normal."),

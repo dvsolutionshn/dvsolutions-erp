@@ -165,10 +165,21 @@
                         <td class="actions">
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'ver_factura' empresa.slug factura.id %}">Ver</a>
-                                {% if erp_access.editar_facturas and factura.puede_editar_emitida %}
+                                {% if erp_access.editar_facturas and factura.estado != "anulada" and not factura.tiene_notas_credito_activas %}
                                 <a class="erp-pill-link" href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
-                                {% elif erp_access.editar_facturas %}
-                                <span class="erp-pill-btn muted" title="{{ factura.motivo_bloqueo_edicion }}">Edicion bloqueada</span>
+                                {% endif %}
+                                {% if erp_access.anular_facturas and factura.estado != "anulada" %}
+                                <details>
+                                    <summary class="erp-pill-btn">Anular factura</summary>
+                                    <form method="post" action="{% url 'anular_factura' empresa.slug factura.id %}">
+                                        {% csrf_token %}
+                                        <label>Motivo de anulación <textarea name="motivo" minlength="5" maxlength="500" required></textarea></label>
+                                        <button type="submit" class="erp-btn-danger">Confirmar anulación</button>
+                                    </form>
+                                </details>
+                                {% endif %}
+                                {% if erp_access.cambiar_fecha_factura and factura.estado != "anulada" %}
+                                <a class="erp-pill-link" href="{% url 'cambiar_fecha_factura' empresa.slug factura.id %}">Cambiar fecha</a>
                                 {% endif %}
                                 {% if erp_access.editar_facturas and permite_gestion_fiscal_historica and factura.estado == "emitida" %}
                                 <a class="erp-pill-link" href="{% url 'corregir_numero_factura' empresa.slug factura.id %}">Corregir numero</a>
