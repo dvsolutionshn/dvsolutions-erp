@@ -9,6 +9,12 @@
   const skip = document.querySelector('#skip');
   const save = document.querySelector('#save');
   const dialog = document.querySelector('#supplier-dialog');
+  const book = JSON.parse(document.querySelector('#initial-book').textContent);
+  const records = new Map();
+  let editing = null;
+  let bookState = book.estado_libro;
+  const amountNames = ['exento','base_15','base_18','isv_15','isv_18','total'];
+  const allowed = action => form.dataset[action] === 'true';
   let creatingSupplier = false, newSupplierName = '';
   let suggestions = [], selected = 0, searchVersion = 0, duplicateVersion = 0;
   let timer, duplicateTimer, busy = false, duplicate = false, saved = 0;
@@ -24,14 +30,14 @@
     return data;
   }
   function showDuplicate(data) {
-    duplicate = Boolean(data); skip.hidden = !duplicate; save.disabled = duplicate;
+    duplicate = Boolean(data); skip.hidden = !duplicate; syncControls();
     message.textContent = data ? `FACTURA YA REGISTRADA\nFecha: ${data.fecha} · Proveedor: ${data.proveedor} · Nº factura: ${data.numero} · Total: L ${data.total} · Estado: ${data.estado}` : '';
   }
   async function checkDuplicate() {
     const version = ++duplicateVersion, key = identity();
     if (!field('proveedor').value || !field('numero_factura').value) return;
     try {
-      const data = await api({accion:'duplicado', proveedor:field('proveedor').value, numero_factura:field('numero_factura').value});
+      const data = await api({accion:'duplicado', proveedor:field('proveedor').value, numero_factura:field('numero_factura').value, registro_id:editing?.id || ''});
       if (version !== duplicateVersion || key !== identity() || busy) return;
       if (data.errores) { message.textContent = Object.values(data.errores).flat().join(' '); return; }
       showDuplicate(data.duplicada);
@@ -160,7 +166,7 @@
     try {
       const exento = cents(field('exento').value), b15 = cents(field('base_15').value), b18 = cents(field('base_18').value);
       const t15 = tax(b15, 15n), t18 = tax(b18, 18n);
-      for (const [name, value] of Object.entries({isv_15:t15,isv_18:t18,total:exento+b15+b18+t15+t18})) document.getElementById(name).textContent = money(value);
+      for (const [name, value] of Object.entries({isv_15:t15,isv_18:t18,total:exento+b15+b18+t15+t18+cents(editing?.exonerado || '')})) document.getElementById(name).textContent = money(value);
       return true;
     } catch(error) {
       for (const name of ['isv_15','isv_18','total']) document.getElementById(name).textContent = '—';
@@ -171,9 +177,10 @@
   for (const name of ['exento','base_15','base_18']) field(name).addEventListener('input', calculate);
   function nextRow() {
     ++searchVersion; ++duplicateVersion; clearTimeout(timer); clearTimeout(duplicateTimer);
-    form.reset(); suggestions = []; closeOptions(); showDuplicate(null);
+    editing = null; form.reset(); suggestions = []; closeOptions(); showDuplicate(null);
     form.querySelectorAll('[aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
-    calculate(); field('fecha_documento').focus();
+    document.querySelectorAll('.is-editing').forEach(row => row.classList.remove('is-editing'));
+    calculate(); syncControls(); field('fecha_documento').focus();
   }
   skip.addEventListener('click', () => {if (!busy) nextRow();});
   form.addEventListener('keydown', event => {
@@ -186,10 +193,11 @@
   });
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (busy || duplicate || !calculate()) return;
-    if (!field('proveedor').value) { message.textContent = 'Selecciona un proveedor de las sugerencias.'; supplier.focus(); return; }
+    if (busy || duplicate || !(editing ? allowed('edit') : allowed('create') && bookState === 'en_proceso') || !calculate()) return;
+    if (!field('proveedor').value && !(editing && !editing.proveedor_id && supplier.value === editing.proveedor)) { message.textContent = 'Selecciona un proveedor de las sugerencias.'; supplier.focus(); return; }
     busy = true; ++duplicateVersion; save.disabled = true; closeOptions();
     const body = new FormData(form);
+    if (editing) {body.set('accion','editar'); body.set('registro_id',editing.id); body.set('version',editing.version);}
     const inputs = [...form.querySelectorAll('input:not([type=hidden])')];
     inputs.forEach(input => {input.readOnly = true; input.removeAttribute('aria-invalid');});
     status.textContent = 'Guardando…';
@@ -201,11 +209,100 @@
         message.textContent = Object.entries(data.errores).map(([name, errors]) => `${labels[name] ? labels[name] + ': ' : ''}${errors.join(' ')}`).join('\n');
         for (const name of Object.keys(data.errores)) field(name)?.setAttribute('aria-invalid','true');
       } else {
-        saved++; nextRow();
+        applyBook(data); saved++; nextRow();
         status.textContent = `${saved} guardada(s) · Última: ${data.registro.numero} · L ${data.registro.total}`;
       }
       if (!data.registro) status.textContent = 'Fila pendiente';
     } catch(error) { message.textContent = error.message; status.textContent = 'Sin confirmar. Reintenta guardar.'; }
-    finally { busy = false; inputs.forEach(input => {input.readOnly = false;}); save.disabled = duplicate; }
+    finally { busy = false; inputs.forEach(input => {input.readOnly = false;}); syncControls(); }
   });
+
+  function syncControls() {
+    const editable = editing ? allowed('edit') : allowed('create') && bookState === 'en_proceso';
+    document.querySelector('#capture-row').hidden = !editable;
+    save.disabled = busy || duplicate || !editable;
+    save.textContent = editing ? 'Guardar cambios · ENTER' : 'Guardar · ENTER';
+    document.querySelector('#cancel-edit').hidden = !editable;
+    document.querySelector('#cancel-edit').textContent = editing ? 'Cancelar edición' : 'Limpiar fila';
+    document.querySelector('#book-state').textContent = bookState === 'finalizado' ? 'Finalizado' : 'En proceso';
+    const toggle = document.querySelector('#book-toggle');
+    if (toggle) {toggle.textContent = bookState === 'finalizado' ? 'Reabrir libro' : 'Finalizar libro'; toggle.disabled = busy;}
+  }
+  function upsert(record) {
+    records.set(record.id,record);
+    let row = document.getElementById(`book-row-${record.id}`);
+    if (!row) {row = document.createElement('tr'); row.id = `book-row-${record.id}`; document.querySelector('#saved-rows').append(row);}
+    row.classList.toggle('is-void',record.estado_codigo === 'anulada');
+    row.replaceChildren();
+    for (const key of ['fecha','proveedor','numero',...amountNames]) {
+      const td = document.createElement('td'); td.textContent = record[key];
+      if (amountNames.includes(key)) td.style.textAlign = 'right';
+      if (key === 'numero') {
+        const actions = document.createElement('div'); actions.className = 'row-actions';
+        if (record.estado_codigo === 'anulada') {actions.textContent = 'Anulada';}
+        else for (const [permission,label,action] of [['edit','Editar','edit'],['void','Anular','void']]) {
+          if (!allowed(permission)) continue;
+          const button = document.createElement('button'); button.type = 'button'; button.tabIndex = -1;
+          button.textContent = label; button.dataset.action = action; button.dataset.id = record.id;
+          actions.append(button);
+        }
+        td.append(actions);
+        if (cents(record.exonerado || '0') > 0n) {
+          const note = document.createElement('small'); note.textContent = `Incluye exonerado: ${record.exonerado}`; td.append(note);
+        }
+      }
+      row.append(td);
+    }
+  }
+  function applyBook(data) {
+    if (data.registro) upsert(data.registro);
+    if (data.registros) {
+      records.clear(); document.querySelector('#saved-rows').replaceChildren(); data.registros.forEach(upsert);
+    }
+    if (data.resumen) {
+      for (const key of amountNames) document.getElementById(`sum-${key}`).textContent = data.resumen[key];
+      document.querySelector('#book-count').textContent = `${data.resumen.documentos} facturas activas`;
+    }
+    bookState = data.estado_libro || bookState; syncControls();
+  }
+  const hasDraft = () => ['fecha_documento','numero_factura','exento','base_15','base_18'].some(name => field(name).value) || supplier.value;
+  document.querySelector('#cancel-edit').addEventListener('click', () => {if (!busy) nextRow();});
+  async function mutateBook(values) {
+    if (busy) return;
+    busy = true; syncControls();
+    const body = new FormData(); body.set('csrfmiddlewaretoken',field('csrfmiddlewaretoken').value);
+    for (const [key,value] of Object.entries(values)) body.set(key,value);
+    try {
+      const data = await api(null,{method:'POST',body});
+      if (data.errores) {message.textContent = Object.values(data.errores).flat().join(' '); return;}
+      applyBook(data); message.textContent = ''; status.textContent = 'Libro actualizado.';
+    } catch(error) {message.textContent = error.message;}
+    finally {busy = false; syncControls();}
+  }
+  document.querySelector('#saved-rows').addEventListener('click', event => {
+    const button = event.target.closest('button[data-action]'); if (!button || busy) return;
+    const record = records.get(Number(button.dataset.id)); if (!record) return;
+    if (hasDraft() || editing) {message.textContent = 'Termina o cancela la fila activa antes de cambiar otra factura.'; return;}
+    if (button.dataset.action === 'void') {
+      mutateBook({accion:'anular',registro_id:record.id,version:record.version}); return;
+    }
+    editing = record;
+    supplier.value = record.proveedor; field('proveedor').value = record.proveedor_id || '';
+    field('fecha_documento').value = record.fecha; field('numero_factura').value = record.numero;
+    for (const key of ['exento','base_15','base_18']) field(key).value = record[key];
+    showDuplicate(null); calculate(); syncControls();
+    document.getElementById(`book-row-${record.id}`).classList.add('is-editing');
+    field('fecha_documento').focus();
+    status.textContent = `Editando ${record.numero}`;
+  });
+  document.querySelector('#book-toggle')?.addEventListener('click', () => {
+    if (hasDraft() || editing) {message.textContent = 'Termina o cancela la fila activa antes de cambiar el estado del libro.'; return;}
+    mutateBook({accion:'estado',estado:bookState === 'finalizado' ? 'en_proceso' : 'finalizado'});
+  });
+  document.querySelector('#book-refresh').addEventListener('click', async () => {
+    if (busy) return;
+    try {applyBook(await api({accion:'cuadro'})); status.textContent = 'Cuadro actualizado.';}
+    catch(error) {message.textContent = error.message;}
+  });
+  applyBook(book);
 })();

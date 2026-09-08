@@ -922,6 +922,27 @@ class CompraInventario(models.Model):
         return self.saldo_pendiente > 0 and self.fecha_control_cxp < timezone.now().date()
 
 
+class LibroCompraMensual(models.Model):
+    """Cabecera; los documentos se relacionan por empresa + periodo_anio/mes existentes."""
+    ESTADOS = (('en_proceso', 'En proceso'), ('finalizado', 'Finalizado'))
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
+    anio = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(9999)])
+    mes = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(12)])
+    estado = models.CharField(max_length=15, choices=ESTADOS, default='en_proceso')
+    actualizado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['empresa', 'anio', 'mes'], name='unique_libro_compra_mes')]
+
+    @property
+    def registros(self):
+        return RegistroCompraFiscal.objects.filter(empresa=self.empresa, periodo_anio=self.anio, periodo_mes=self.mes)
+
+    def __str__(self):
+        return f'{self.empresa_id} / {self.anio} / {self.mes}'
+
+
 class RegistroCompraFiscal(models.Model):
     ESTADOS = (
         ('registrada', 'Registrada'),

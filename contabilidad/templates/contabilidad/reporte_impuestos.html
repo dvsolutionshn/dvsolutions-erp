@@ -16,7 +16,7 @@
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title">Filtros</h3>
-            <p class="erp-card-muted">Consulta el periodo fiscal por fecha de emision del documento.</p>
+            <p class="erp-card-muted">{% if empresa.slug == 'demo_1' %}Ventas por fecha de emisión. Compras por el mes y año del libro, aunque la factura tenga fecha anterior; se incluyen completos los meses del rango.{% else %}Consulta el periodo fiscal por fecha de emision del documento.{% endif %}</p>
         </div>
     </div>
     <form method="get" class="erp-filters">

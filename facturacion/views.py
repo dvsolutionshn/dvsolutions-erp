@@ -32,7 +32,7 @@ import io
 import tempfile
 import zipfile
 from pathlib import Path
-from .captura_rapida import calcular_importes
+from .captura_rapida import calcular_importes, captura_rapida
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
@@ -4499,6 +4499,8 @@ def compras_dashboard(request, empresa_slug):
 
 @login_required
 def libro_compras_fiscal(request, empresa_slug):
+    if empresa_slug == 'demo_1':
+        return captura_rapida(request, empresa_slug)
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     registros_activos = RegistroCompraFiscal.objects.filter(empresa=empresa).exclude(estado="anulada")
     periodos = (
@@ -4543,6 +4545,8 @@ def libro_compras_fiscal(request, empresa_slug):
 
 @login_required
 def libro_compras_fiscal_detalle(request, empresa_slug, anio, mes):
+    if empresa_slug == 'demo_1':
+        return redirect('captura_rapida_compras_periodo', empresa_slug=empresa_slug, anio=anio, mes=mes)
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     q = request.GET.get("q", "").strip()
     registros = RegistroCompraFiscal.objects.filter(

@@ -109,8 +109,7 @@ def permiso_facturacion_accion(path_suffix):
 
     first = parts[0]
 
-    if first == 'libro-compras' and len(parts) > 1 and parts[1] == 'captura-rapida':
-        return 'puede_crear_compras'
+    # La captura mensual permite consulta; cada POST comprueba su permiso en la vista.
 
     if first == "crear":
         return "puede_crear_facturas"

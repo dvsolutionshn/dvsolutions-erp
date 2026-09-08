@@ -1774,7 +1774,19 @@ def _reporte_impuestos_data(empresa, fecha_inicio="", fecha_fin=""):
 
     facturas = _aplicar_filtros_fecha_documentos(facturas, "fecha_emision", fecha_inicio, fecha_fin)
     notas_credito = _aplicar_filtros_fecha_documentos(notas_credito, "fecha_emision", fecha_inicio, fecha_fin)
-    compras = _aplicar_filtros_fecha_documentos(compras, "fecha_documento", fecha_inicio, fecha_fin)
+    if empresa.slug == 'demo_1':
+        # El crédito de compras se agrupa por el libro donde fue incorporado.
+        for valor, inferior in ((fecha_inicio, True), (fecha_fin, False)):
+            if not valor:
+                continue
+            fecha = parse_date(str(valor))
+            if fecha:
+                comparador = 'gte' if inferior else 'lte'
+                estricto = 'gt' if inferior else 'lt'
+                compras = compras.filter(Q(**{f'periodo_anio__{estricto}': fecha.year}) |
+                    Q(periodo_anio=fecha.year, **{f'periodo_mes__{comparador}': fecha.month}))
+    else:
+        compras = _aplicar_filtros_fecha_documentos(compras, "fecha_documento", fecha_inicio, fecha_fin)
 
     ventas = _resumen_fiscal_documentos(facturas)
     creditos = _resumen_fiscal_documentos(notas_credito)

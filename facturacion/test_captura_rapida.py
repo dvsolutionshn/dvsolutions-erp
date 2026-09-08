@@ -32,7 +32,7 @@ class CapturaRapidaTests(TestCase):
 
     def setUp(self):
         self.client.force_login(self.user)
-        self.url = reverse('captura_rapida_compras', args=['demo_1'])
+        self.url = reverse('captura_rapida_compras_periodo', args=['demo_1',2026,9])
         self.data = dict(fecha_documento='070926', proveedor=self.proveedor.pk,
                          numero_factura='000001010000000085', exento='', base_15='100.10', base_18='200.25')
 
@@ -89,7 +89,7 @@ class CapturaRapidaTests(TestCase):
         self.assertEqual(response.status_code, 201, response.content)
         registro = RegistroCompraFiscal.objects.get()
         self.assertEqual(registro.fecha_documento, date(2026,8,5))
-        self.assertEqual((registro.periodo_anio,registro.periodo_mes),(2026,8))
+        self.assertEqual((registro.periodo_anio,registro.periodo_mes),(2026,9))
 
     def test_correlativo_variable_sin_rellenar(self):
         for numero, esperado in [('0040120158956348','004-012-01-58956348'), ('000001011','000-001-01-1')]:
@@ -172,7 +172,7 @@ class CapturaRapidaTests(TestCase):
 
     def test_enlaces_solo_piloto_y_pantalla_tradicional(self):
         for nombre in ['compras_dashboard','libro_compras_fiscal']:
-            self.assertContains(self.client.get(reverse(nombre,args=['demo_1'])), self.url)
+            self.assertContains(self.client.get(reverse(nombre,args=['demo_1'])), reverse('captura_rapida_compras',args=['demo_1']) if nombre == 'compras_dashboard' else self.url)
             self.assertNotContains(self.client.get(reverse(nombre,args=['otra'])), 'Captura Rápida')
         self.assertContains(self.client.get(self.url), 'capture-form')
         self.assertEqual(self.client.get(reverse('crear_compra',args=['demo_1'])).status_code, 200)
@@ -189,7 +189,8 @@ class CapturaRapidaTests(TestCase):
         self.assertEqual(RegistroCompraFiscal.objects.get().creado_por, usuario)
         rol.puede_crear_compras = False
         rol.save()
-        self.assertIn(self.client.get(self.url, {'accion':'proveedores'}).status_code, (302,403))
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        self.assertEqual(self.client.post(self.url, self.data).status_code, 403)
 
     def test_crear_proveedor_nombre_y_rtn_sin_duplicar(self):
         datos = {'accion':'crear_proveedor', 'nombre':'Papelería nueva', 'rtn':'0801-2020-123456'}
@@ -245,9 +246,9 @@ class CapturaRapidaBrowserTests(StaticLiveServerTestCase):
         result = subprocess.run(['node', str(Path(__file__).parent / 'browser_tests/captura_rapida.cjs')],
                                 env=env, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(RegistroCompraFiscal.objects.count(), 5)
+        self.assertEqual(RegistroCompraFiscal.objects.count(), 6)
         nuevo = Proveedor.objects.get(empresa=self.empresa, rtn='08012020123456')
         self.assertEqual(nuevo.nombre, 'Papelería nueva')
         self.assertEqual(RegistroCompraFiscal.objects.filter(proveedor=nuevo).count(), 1)
-        self.assertEqual(RegistroCompraFiscal.objects.filter(periodo_mes=8, periodo_anio=2026).count(), 1)
-        self.assertEqual(RegistroCompraFiscal.objects.filter(periodo_mes=7, periodo_anio=2026).count(), 1)
+        self.assertEqual(RegistroCompraFiscal.objects.filter(periodo_mes=9, periodo_anio=2026).count(), 4)
+        self.assertEqual(RegistroCompraFiscal.objects.filter(periodo_mes=7, periodo_anio=2026).count(), 0)

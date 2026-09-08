@@ -2,13 +2,21 @@
 {% load static %}
 {% block title %}Captura Rápida de Compras{% endblock %}
 {% block header_kicker %}Compras · demo_1{% endblock %}
-{% block header_title %}Captura Rápida de Compras{% endblock %}
-{% block header_description %}Una factura, un registro fiscal. Captura consecutiva con teclado.{% endblock %}
-{% block topbar_actions %}<a class="erp-action-link" href="{% url 'libro_compras_fiscal' empresa.slug %}">Libro de Compras</a>{% endblock %}
+{% block header_title %}Libro de Compras · {{ nombre_mes }} {{ anio }}{% endblock %}
+{% block header_description %}La fecha de la factura puede ser anterior. Se guardará dentro de este libro mensual.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'libro_compras_fiscal' empresa.slug %}?anio={{ anio }}">Cambiar libro</a>{% endblock %}
 {% block extra_head %}
 <style>
 .capture-sheet{padding:16px;background:var(--erp-surface,#fff);border:1px solid #cbd5e1;border-radius:12px}
 .capture-scroll{overflow-x:auto;padding-bottom:6px}
+.capture-scroll{max-height:65vh;overflow:auto}
+.capture-table thead{position:sticky;top:0;z-index:2}
+.capture-table tfoot{position:sticky;bottom:0;background:#e0ebff;font-weight:700;color:#172033}
+#saved-rows td{padding:10px 5px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+#saved-rows tr.is-void{color:#64748b;background:#f1f5f9}
+#saved-rows tr.is-editing{outline:2px solid #2563eb;background:#eff6ff}
+.row-actions{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.row-actions button{font-size:11px;padding:2px 6px;cursor:pointer}
 .capture-table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:900px;font-size:13px}
 .capture-table th{padding:9px 5px;text-align:left;background:#edf2f7;color:#334155}
 .capture-table td{padding:4px;border:1px solid #d8e2ed;vertical-align:top}
@@ -36,8 +44,13 @@
 {% endblock %}
 {% block content %}
 <section class="capture-sheet">
+<div class="capture-footer" style="margin-bottom:12px">
+<strong id="book-state"></strong><span id="book-count"></span>
+{% if permisos.editar %}<button id="book-toggle" type="button">Finalizar libro</button>{% endif %}
+<button type="button" id="book-refresh">Actualizar cuadro</button>
+</div>
 <p class="capture-help">TAB avanza · SHIFT + TAB retrocede · ↑ ↓ elige proveedor · ENTER en Base 18% guarda · ESC omite duplicada. Fecha día/mes/año: 5/8/26, 05/08/2026 o 050826.</p>
-<form id="capture-form" data-create-supplier="{{ puede_crear_proveedor|yesno:'true,false' }}" autocomplete="off" action="{% url 'captura_rapida_compras' empresa.slug %}" method="post">
+<form id="capture-form" data-create="{{ permisos.crear|yesno:'true,false' }}" data-edit="{{ permisos.editar|yesno:'true,false' }}" data-void="{{ permisos.anular|yesno:'true,false' }}" data-create-supplier="{{ puede_crear_proveedor|yesno:'true,false' }}" autocomplete="off" action="{% url 'captura_rapida_compras_periodo' empresa.slug anio mes %}" method="post">
 {% csrf_token %}
 <div class="capture-scroll">
 <table class="capture-table">
@@ -52,10 +65,13 @@
 <td><input name="base_18" aria-label="Base 18%" inputmode="decimal" placeholder="0.00"></td>
 <td><output id="isv_15">0.00</output></td><td><output id="isv_18">0.00</output></td><td><output id="total">0.00</output></td>
 </tr><tr><td colspan="9"><div id="row-message" role="alert" aria-live="assertive"></div></td></tr></tbody>
+<tbody id="saved-rows"></tbody>
+<tfoot><tr><td colspan="3">TOTALES</td><td id="sum-exento"></td><td id="sum-base_15"></td><td id="sum-base_18"></td><td id="sum-isv_15"></td><td id="sum-isv_18"></td><td id="sum-total"></td></tr></tfoot>
 </table>
 </div>
-<div class="capture-footer"><button type="submit" id="save">Guardar · ENTER</button><button type="button" id="skip" hidden>Omitir y siguiente · ESC</button><span id="capture-status" role="status" aria-live="polite">Lista para capturar</span></div>
+<div class="capture-footer"><button type="submit" id="save">Guardar · ENTER</button><button type="button" id="cancel-edit" hidden>Cancelar edición</button><button type="button" id="skip" hidden>Omitir y siguiente · ESC</button><span id="capture-status" role="status" aria-live="polite">Lista para capturar</span></div>
 </form>
+{{ cuadro|json_script:"initial-book" }}
 {% if puede_crear_proveedor %}
 <dialog id="supplier-dialog" aria-labelledby="supplier-dialog-title">
 <form id="supplier-create-form" autocomplete="off">
