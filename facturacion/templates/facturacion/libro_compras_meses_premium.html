@@ -7,6 +7,7 @@
 {% block header_description %}Administra los libros mensuales de compras, importa desde Excel y controla el ISV acreditable sin duplicar facturas entre periodos.{% endblock %}
 
 {% block topbar_actions %}
+{% if empresa.slug == 'demo_1' and erp_access.crear_compras %}<a class="erp-action-link" href="{% url 'captura_rapida_compras' empresa.slug %}">Captura Rápida de Compras</a>{% endif %}
 <a class="erp-action-link" href="{% url 'crear_registro_compra_fiscal' empresa.slug %}">Crear Libro de Compras Nuevo</a>
 <a class="erp-action-link" href="{% url 'clasificaciones_compras_fiscales' empresa.slug %}">Clasificaciones</a>
 <a class="erp-action-link" href="{% url 'compras_dashboard' empresa.slug %}">Compras Inventario</a>

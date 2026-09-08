@@ -933,6 +933,11 @@ class RegistroCompraFiscal(models.Model):
     proveedor_nombre = models.CharField(max_length=200)
     proveedor_rtn = models.CharField(max_length=20, blank=True, null=True)
     numero_factura = models.CharField(max_length=120)
+    # La captura rapida completa estos campos sin reescribir el historial.
+    numero_factura_normalizado = models.CharField(max_length=120, null=True, blank=True)
+    identidad_captura = models.CharField(max_length=40, null=True, blank=True, editable=False)
+    creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='compras_fiscales_capturadas')
     cai = models.CharField(max_length=80, blank=True, null=True)
     clasificacion_contable = models.ForeignKey(
         'contabilidad.ClasificacionCompraFiscal',
@@ -962,6 +967,10 @@ class RegistroCompraFiscal(models.Model):
         indexes = [
             models.Index(fields=['empresa', 'numero_factura']),
             models.Index(fields=['empresa', 'periodo_anio', 'periodo_mes']),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['empresa', 'identidad_captura', 'numero_factura_normalizado'],
+                                    name='unique_compra_captura_rapida'),
         ]
 
     def clean(self):

@@ -32,6 +32,7 @@ import io
 import tempfile
 import zipfile
 from pathlib import Path
+from .captura_rapida import calcular_importes
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
@@ -4676,9 +4677,8 @@ def crear_registro_compra_fiscal(request, empresa_slug):
             exento = _decimal_desde_fila(fila["exento"])
             base_15 = _decimal_desde_fila(fila["base_15"])
             base_18 = _decimal_desde_fila(fila["base_18"])
-            isv_15 = _centavos(base_15 * Decimal("0.15"))
-            isv_18 = _centavos(base_18 * Decimal("0.18"))
-            total = _centavos(exento + base_15 + base_18 + isv_15 + isv_18)
+            importes = calcular_importes(exento, base_15, base_18)
+            isv_15, isv_18, total = importes['isv_15'], importes['isv_18'], importes['total']
             fila.update({"isv_15": isv_15, "isv_18": isv_18, "total": total})
             filas.append(fila)
 

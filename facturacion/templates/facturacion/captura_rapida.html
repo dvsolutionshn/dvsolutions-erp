@@ -1,0 +1,57 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+{% block title %}Captura Rápida de Compras{% endblock %}
+{% block header_kicker %}Compras · demo_1{% endblock %}
+{% block header_title %}Captura Rápida de Compras{% endblock %}
+{% block header_description %}Una factura, un registro fiscal. Captura consecutiva con teclado.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% url 'libro_compras_fiscal' empresa.slug %}">Libro de Compras</a>{% endblock %}
+{% block extra_head %}
+<style>
+.capture-sheet{padding:16px;background:var(--erp-surface,#fff);border:1px solid #cbd5e1;border-radius:12px}
+.capture-scroll{overflow-x:auto;padding-bottom:6px}
+.capture-table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:900px;font-size:13px}
+.capture-table th{padding:9px 5px;text-align:left;background:#edf2f7;color:#334155}
+.capture-table td{padding:4px;border:1px solid #d8e2ed;vertical-align:top}
+.capture-table input{width:100%;min-width:0;box-sizing:border-box;padding:9px 4px;border:1px solid transparent;background:white;color:#172033;border-radius:3px;font:inherit}
+.capture-table input:focus{outline:2px solid #2563eb;background:#fff}
+.capture-table input[aria-invalid=true]{border-color:#b91c1c}
+.capture-table output{display:block;padding:10px 2px;text-align:right;font-variant-numeric:tabular-nums;color:#172033}
+#capture-row{background:#eff6ff;box-shadow:inset 3px 0 #2563eb}
+.capture-provider{position:relative}
+#supplier-options{position:fixed;width:290px;max-height:215px;overflow:auto;z-index:200;background:white;color:#172033;box-shadow:0 8px 20px #0003;border-radius:6px}
+#supplier-options [role=option]{padding:10px;cursor:pointer}
+#supplier-options [aria-selected=true]{background:#dbeafe}
+#row-message{color:#b91c1c;white-space:pre-line;padding:8px 4px;min-height:20px}
+.capture-footer{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.capture-footer button{padding:9px 16px;cursor:pointer;border:1px solid #cbd5e1;border-radius:6px;background:white}
+#save{background:#1d4ed8;border-color:#1d4ed8;color:white}
+#save:disabled{opacity:.5;cursor:default}
+#capture-status{color:#166534}
+.capture-help{font-size:13px;color:#526179;margin:0 0 14px}
+</style>
+{% endblock %}
+{% block content %}
+<section class="capture-sheet">
+<p class="capture-help">TAB avanza · SHIFT + TAB retrocede · ↑ ↓ elige proveedor · ENTER en Base 18% guarda · ESC omite duplicada. Fecha: 070926 o 07/09/2026.</p>
+<form id="capture-form" autocomplete="off" action="{% url 'captura_rapida_compras' empresa.slug %}" method="post">
+{% csrf_token %}
+<div class="capture-scroll">
+<table class="capture-table">
+<colgroup><col style="width:11%"><col style="width:19%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%"></colgroup>
+<thead><tr><th>Fecha</th><th>Proveedor</th><th>Nº Factura</th><th>Exenta</th><th>Base 15%</th><th>Base 18%</th><th>ISV 15%</th><th>ISV 18%</th><th>Total</th></tr></thead>
+<tbody><tr id="capture-row">
+<td><input name="fecha_documento" aria-label="Fecha" placeholder="DDMMAA" required autofocus></td>
+<td class="capture-provider"><input id="supplier" aria-label="Proveedor" role="combobox" aria-autocomplete="list" aria-controls="supplier-options" aria-expanded="false" required><input type="hidden" name="proveedor"><div id="supplier-options" role="listbox" hidden></div></td>
+<td><input name="numero_factura" aria-label="Número de factura" maxlength="120" required></td>
+<td><input name="exento" aria-label="Exenta" inputmode="decimal" placeholder="0.00"></td>
+<td><input name="base_15" aria-label="Base 15%" inputmode="decimal" placeholder="0.00"></td>
+<td><input name="base_18" aria-label="Base 18%" inputmode="decimal" placeholder="0.00"></td>
+<td><output id="isv_15">0.00</output></td><td><output id="isv_18">0.00</output></td><td><output id="total">0.00</output></td>
+</tr><tr><td colspan="9"><div id="row-message" role="alert" aria-live="assertive"></div></td></tr></tbody>
+</table>
+</div>
+<div class="capture-footer"><button type="submit" id="save">Guardar · ENTER</button><button type="button" id="skip" hidden>Omitir y siguiente · ESC</button><span id="capture-status" role="status" aria-live="polite">Lista para capturar</span></div>
+</form>
+</section>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'facturacion/captura_rapida.js' %}" defer></script>{% endblock %}

@@ -6,6 +6,7 @@
 {% block header_title %}Compras{% endblock %}
 {% block header_description %}Documentos de compra enlazados con inventario y cuentas por pagar para una trazabilidad mas clara y mejor conectada con el resto del ERP.{% endblock %}
 {% block topbar_actions %}
+{% if empresa.slug == 'demo_1' and erp_access.crear_compras %}<a class="erp-action-link" href="{% url 'captura_rapida_compras' empresa.slug %}">Captura Rápida de Compras</a>{% endif %}
 <a class="erp-action-link" href="{% url 'reporte_cxp' empresa.slug %}">Ver CxP</a>
 <a class="erp-action-link" href="{% url 'libro_compras_fiscal' empresa.slug %}">Libro Compras</a>
 <a class="erp-action-link" href="{% url 'crear_compra' empresa.slug %}">Nueva Compra</a>

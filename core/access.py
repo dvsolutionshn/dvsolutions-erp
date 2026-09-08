@@ -109,6 +109,9 @@ def permiso_facturacion_accion(path_suffix):
 
     first = parts[0]
 
+    if first == 'libro-compras' and len(parts) > 1 and parts[1] == 'captura-rapida':
+        return 'puede_crear_compras'
+
     if first == "crear":
         return "puede_crear_facturas"
     if first == "clientes":

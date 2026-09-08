@@ -1,7 +1,9 @@
 from django.urls import path
 from . import views
+from .captura_rapida import captura_rapida
 
 urlpatterns = [
+    path('libro-compras/captura-rapida/', captura_rapida, name='captura_rapida_compras'),
 
     path('', views.facturacion_dashboard, name='facturacion_dashboard'),
     path('configuracion/', views.configuracion_facturacion, name='configuracion_facturacion'),
