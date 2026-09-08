@@ -139,7 +139,10 @@
   });
   field('fecha_documento').addEventListener('blur', () => {
     const input = field('fecha_documento');
+    input.value = input.value.trim();
     if (/^[0-9]{6}$/.test(input.value)) input.value = `${input.value.slice(0,2)}/${input.value.slice(2,4)}/20${input.value.slice(4)}`;
+    const short = input.value.match(/^([0-9]{1,2})([/-])([0-9]{1,2})\2([0-9]{2}|[0-9]{4})$/);
+    if (short) input.value = `${short[1].padStart(2,'0')}/${short[3].padStart(2,'0')}/${short[4].length === 2 ? '20' + short[4] : short[4]}`;
   });
   // Aritmética decimal exacta: centavos enteros, redondeo HALF_EVEN de Decimal.
   function cents(value) {

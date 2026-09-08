@@ -72,13 +72,24 @@ class CapturaRapidaTests(TestCase):
     def test_fechas_explicitas_y_meses_anteriores(self):
         for valor, esperada in [('070926', date(2026,9,7)), ('250826', date(2026,8,25)),
                                 ('180726', date(2026,7,18)), ('2024-02-29', date(2024,2,29)),
-                                ('25/08/2026', date(2026,8,25)), ('18-07-2026', date(2026,7,18))]:
+                                ('25/08/2026', date(2026,8,25)), ('18-07-2026', date(2026,7,18)),
+                                ('5/8/26', date(2026,8,5)), ('05/08/26', date(2026,8,5)),
+                                ('5-8-26', date(2026,8,5)), ('5/8/2026', date(2026,8,5)),
+                                ('29/2/24', date(2024,2,29)), ('1/1/69', date(2069,1,1))]:
             with self.subTest(valor=valor):
                 form = CapturaForm({**self.data, 'fecha_documento':valor}, empresa=self.empresa)
                 self.assertTrue(form.is_valid(), form.errors)
                 self.assertEqual(form.cleaned_data['fecha_documento'], esperada)
-        for valor in ['310226', '290225', '000926', '071326', '07/09', '']:
+        for valor in ['310226', '290225', '000926', '071326', '07/09', '',
+                      '31/2/26', '29/2/25', '5/13/26', '0/8/26', '5/8-26']:
             self.assertEqual(self.client.post(self.url, {**self.data, 'fecha_documento':valor}).status_code, 400)
+
+    def test_guardar_fecha_corta_sin_depender_del_navegador(self):
+        response = self.client.post(self.url, {**self.data, 'fecha_documento':'5/8/26'})
+        self.assertEqual(response.status_code, 201, response.content)
+        registro = RegistroCompraFiscal.objects.get()
+        self.assertEqual(registro.fecha_documento, date(2026,8,5))
+        self.assertEqual((registro.periodo_anio,registro.periodo_mes),(2026,8))
 
     def test_correlativo_variable_sin_rellenar(self):
         for numero, esperado in [('0040120158956348','004-012-01-58956348'), ('000001011','000-001-01-1')]:

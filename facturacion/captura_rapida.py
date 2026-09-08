@@ -101,12 +101,15 @@ class CapturaForm(IdentidadForm):
         # Año explícito 20YY; jamás se infiere el mes de trabajo.
         if re.fullmatch(r'[0-9]{6}', valor):
             valor = f'{valor[:2]}/{valor[2:4]}/20{valor[4:]}'
+        corta = re.fullmatch(r'([0-9]{1,2})([/\-])([0-9]{1,2})\2([0-9]{2})', valor)
+        if corta:
+            valor = f'{corta[1]}/{corta[3]}/20{corta[4]}'
         for formato in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
             try:
                 return datetime.strptime(valor, formato).date()
             except ValueError:
                 pass
-        raise forms.ValidationError('Fecha inválida. Usa DDMMAA o DD/MM/AAAA.')
+        raise forms.ValidationError('Fecha inválida. Usa día/mes/año, por ejemplo 5/8/26, 05/08/2026 o 050826.')
 
     def clean(self):
         datos = super().clean()

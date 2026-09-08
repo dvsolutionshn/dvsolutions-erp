@@ -36,7 +36,7 @@
 {% endblock %}
 {% block content %}
 <section class="capture-sheet">
-<p class="capture-help">TAB avanza · SHIFT + TAB retrocede · ↑ ↓ elige proveedor · ENTER en Base 18% guarda · ESC omite duplicada. Fecha: 070926 o 07/09/2026.</p>
+<p class="capture-help">TAB avanza · SHIFT + TAB retrocede · ↑ ↓ elige proveedor · ENTER en Base 18% guarda · ESC omite duplicada. Fecha día/mes/año: 5/8/26, 05/08/2026 o 050826.</p>
 <form id="capture-form" data-create-supplier="{{ puede_crear_proveedor|yesno:'true,false' }}" autocomplete="off" action="{% url 'captura_rapida_compras' empresa.slug %}" method="post">
 {% csrf_token %}
 <div class="capture-scroll">
@@ -44,7 +44,7 @@
 <colgroup><col style="width:11%"><col style="width:19%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%"></colgroup>
 <thead><tr><th>Fecha</th><th>Proveedor</th><th>Nº Factura</th><th>Exenta</th><th>Base 15%</th><th>Base 18%</th><th>ISV 15%</th><th>ISV 18%</th><th>Total</th></tr></thead>
 <tbody><tr id="capture-row">
-<td><input name="fecha_documento" aria-label="Fecha" placeholder="DDMMAA" required autofocus></td>
+<td><input name="fecha_documento" aria-label="Fecha" placeholder="5/8/26" required autofocus></td>
 <td class="capture-provider"><input id="supplier" aria-label="Proveedor" role="combobox" aria-autocomplete="list" aria-controls="supplier-options" aria-expanded="false" required><input type="hidden" name="proveedor"><div id="supplier-options" role="listbox" hidden></div></td>
 <td><input name="numero_factura" aria-label="Número de factura" maxlength="120" required></td>
 <td><input name="exento" aria-label="Exenta" inputmode="decimal" placeholder="0.00"></td>
