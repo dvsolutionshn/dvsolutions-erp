@@ -47,6 +47,49 @@ class IdentidadForm(forms.Form):
         return formateado
 
 
+class ProveedorCapturaForm(forms.ModelForm):
+    class Meta:
+        model = Proveedor
+        fields = ('nombre', 'rtn')
+
+    def clean_rtn(self):
+        rtn = numero_normalizado(self.cleaned_data.get('rtn') or '').replace(' ', '')
+        if not re.fullmatch(r'[0-9]{1,20}', rtn):
+            raise forms.ValidationError('Ingresa el RTN del proveedor usando solo dígitos.')
+        return rtn
+
+
+def crear_proveedor_captura(request, empresa):
+    form = ProveedorCapturaForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errores': form.errors}, status=400)
+    try:
+        with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            existentes = list(Proveedor.objects.filter(empresa=empresa).annotate(
+                rtn_normalizado=Replace(sin_guiones('rtn'), Value(' '), Value(''))
+            ).filter(rtn_normalizado=form.cleaned_data['rtn']).order_by('-activo', 'pk')[:2])
+            if existentes:
+                if not existentes[0].activo:
+                    return JsonResponse({'error': 'Este RTN pertenece a un proveedor inactivo. Revisa su ficha en Proveedores.'}, status=409)
+                if len(existentes) > 1 and existentes[1].activo:
+                    return JsonResponse({'error': 'Hay varios proveedores con ese RTN. Selecciona el correcto en el buscador.'}, status=409)
+                proveedor, creado = existentes[0], False
+            else:
+                proveedor = form.save(commit=False)
+                proveedor.empresa = empresa
+                proveedor.save()
+                creado = True
+    except forms.ValidationError as exc:
+        return JsonResponse({'errores': {'__all__': exc.messages}}, status=400)
+    except OperationalError as exc:
+        if 'locked' not in str(exc).lower():
+            raise
+        return JsonResponse({'error': 'Hay otro guardado en curso. Reintenta; los datos se conservan.'}, status=503)
+    return JsonResponse({'proveedor': {'id': proveedor.pk, 'nombre': proveedor.nombre, 'rtn': proveedor.rtn},
+                         'creado': creado}, status=201 if creado else 200)
+
+
 class CapturaForm(IdentidadForm):
     fecha_documento = forms.CharField()
     exento = forms.DecimalField(max_digits=14, decimal_places=2, min_value=0, required=False)
@@ -137,6 +180,12 @@ def captura_rapida(request, empresa_slug):
             (usuario.tiene_permiso_erp('puede_compras', empresa) and
              usuario.tiene_permiso_erp('puede_crear_compras', empresa))):
         return JsonResponse({'error': 'No tienes permiso para crear compras.'}, status=403)
+    puede_crear_proveedor = (usuario.is_superuser or usuario.es_administrador_empresa or
+                            usuario.tiene_permiso_erp('puede_crear_proveedores', empresa))
+    if request.method == 'POST' and request.POST.get('accion') == 'crear_proveedor':
+        if not puede_crear_proveedor:
+            return JsonResponse({'error': 'No tienes permiso para crear proveedores.'}, status=403)
+        return crear_proveedor_captura(request, empresa)
     if request.method == 'GET':
         accion = request.GET.get('accion')
         if accion == 'proveedores':
@@ -158,7 +207,8 @@ def captura_rapida(request, empresa_slug):
                 return JsonResponse({'errores': form.errors}, status=400)
             return JsonResponse({'duplicada': buscar_duplicada(empresa, form.cleaned_data['proveedor'],
                                                                form.cleaned_data['numero_factura'])})
-        return render(request, 'facturacion/captura_rapida.html', {'empresa': empresa})
+        return render(request, 'facturacion/captura_rapida.html', {
+            'empresa': empresa, 'puede_crear_proveedor': puede_crear_proveedor})
     form = CapturaForm(request.POST, empresa=empresa)
     if not form.is_valid():
         return JsonResponse({'errores': form.errors}, status=400)

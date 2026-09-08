@@ -180,6 +180,45 @@ class CapturaRapidaTests(TestCase):
         rol.save()
         self.assertIn(self.client.get(self.url, {'accion':'proveedores'}).status_code, (302,403))
 
+    def test_crear_proveedor_nombre_y_rtn_sin_duplicar(self):
+        datos = {'accion':'crear_proveedor', 'nombre':'Papelería nueva', 'rtn':'0801-2020-123456'}
+        response = self.client.post(self.url, datos)
+        self.assertEqual(response.status_code, 201, response.content)
+        proveedor = Proveedor.objects.get(pk=response.json()['proveedor']['id'])
+        self.assertEqual(proveedor.empresa, self.empresa)
+        self.assertEqual(proveedor.rtn, '08012020123456')
+        repetido = self.client.post(self.url, {**datos,'nombre':'Otro nombre'})
+        self.assertEqual(repetido.status_code, 200)
+        self.assertEqual(repetido.json()['proveedor']['id'], proveedor.pk)
+        proveedor.refresh_from_db()
+        self.assertEqual(proveedor.nombre, 'Papelería nueva')
+        self.assertEqual(Proveedor.objects.filter(empresa=self.empresa, rtn=proveedor.rtn).count(), 1)
+        self.assertFalse(RegistroCompraFiscal.objects.exists())
+
+    def test_rtn_obligatorio_proveedor_inactivo_y_aislamiento(self):
+        datos = {'accion':'crear_proveedor','nombre':'Nuevo','rtn':'08012020123456'}
+        for cambios in [{'rtn':''},{'rtn':'abc'},{'nombre':''}]:
+            self.assertEqual(self.client.post(self.url,{**datos,**cambios}).status_code,400)
+        Proveedor.objects.create(empresa=self.otra,nombre='Ajeno mismo RTN',rtn=datos['rtn'])
+        self.assertEqual(self.client.post(self.url,datos).status_code,201)
+        Proveedor.objects.filter(empresa=self.empresa,rtn=datos['rtn']).update(activo=False)
+        self.assertEqual(self.client.post(self.url,datos).status_code,409)
+        self.assertEqual(self.client.post(reverse('captura_rapida_compras',args=['otra']),datos).status_code,404)
+
+    def test_crear_proveedor_requiere_permiso_proveedores(self):
+        self.empresa.estado_licencia = 'activa'
+        self.empresa.save()
+        rol = RolSistema.objects.create(nombre='Compras',codigo='compras',puede_compras=True,puede_crear_compras=True)
+        usuario = get_user_model().objects.create_user(username='comprador',empresa=self.empresa,rol_sistema=rol)
+        self.client.force_login(usuario)
+        datos = {'accion':'crear_proveedor','nombre':'Nuevo','rtn':'08012020123456'}
+        self.assertEqual(self.client.post(self.url,datos).status_code,403)
+        self.assertNotContains(self.client.get(self.url),'id="supplier-dialog"')
+        rol.puede_crear_proveedores = True
+        rol.save()
+        self.assertEqual(self.client.post(self.url,datos).status_code,201)
+        self.assertContains(self.client.get(self.url),'id="supplier-dialog"')
+
 
 @skipUnless(os.environ.get('PLAYWRIGHT_MODULE'), 'Configura PLAYWRIGHT_MODULE para probar navegador real.')
 class CapturaRapidaBrowserTests(StaticLiveServerTestCase):
@@ -195,6 +234,9 @@ class CapturaRapidaBrowserTests(StaticLiveServerTestCase):
         result = subprocess.run(['node', str(Path(__file__).parent / 'browser_tests/captura_rapida.cjs')],
                                 env=env, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(RegistroCompraFiscal.objects.count(), 4)
+        self.assertEqual(RegistroCompraFiscal.objects.count(), 5)
+        nuevo = Proveedor.objects.get(empresa=self.empresa, rtn='08012020123456')
+        self.assertEqual(nuevo.nombre, 'Papelería nueva')
+        self.assertEqual(RegistroCompraFiscal.objects.filter(proveedor=nuevo).count(), 1)
         self.assertEqual(RegistroCompraFiscal.objects.filter(periodo_mes=8, periodo_anio=2026).count(), 1)
         self.assertEqual(RegistroCompraFiscal.objects.filter(periodo_mes=7, periodo_anio=2026).count(), 1)

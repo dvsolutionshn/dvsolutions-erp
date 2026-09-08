@@ -8,6 +8,8 @@
   const status = document.querySelector('#capture-status');
   const skip = document.querySelector('#skip');
   const save = document.querySelector('#save');
+  const dialog = document.querySelector('#supplier-dialog');
+  let creatingSupplier = false, newSupplierName = '';
   let suggestions = [], selected = 0, searchVersion = 0, duplicateVersion = 0;
   let timer, duplicateTimer, busy = false, duplicate = false, saved = 0;
   const identity = () => `${field('proveedor').value}|${field('numero_factura').value}`;
@@ -42,6 +44,15 @@
   function choose() {
     const item = suggestions[selected];
     if (!item) return;
+    if (item.create) {
+      newSupplierName = item.nombre;
+      ++searchVersion; closeOptions();
+      document.querySelector('#supplier-new-name').textContent = newSupplierName;
+      document.querySelector('#supplier-create-form').reset();
+      document.querySelector('#supplier-error').textContent = '';
+      dialog.showModal(); document.querySelector('#supplier-rtn').focus();
+      return;
+    }
     supplier.value = item.nombre; field('proveedor').value = item.id;
     ++searchVersion; closeOptions(); changedIdentity();
   }
@@ -54,8 +65,8 @@
       const option = document.createElement('div');
       option.id = `supplier-${item.id}`; option.role = 'option';
       option.setAttribute('aria-selected', String(index === selected));
-      option.textContent = `${item.nombre}${item.rtn ? ' · ' + item.rtn : ''}`;
-      option.addEventListener('mousedown', event => {event.preventDefault(); selected = index; choose(); field('numero_factura').focus();});
+      option.textContent = item.create ? `+ Crear «${item.nombre}» · ingresar RTN` : `${item.nombre}${item.rtn ? ' · ' + item.rtn : ''}`;
+      option.addEventListener('mousedown', event => {event.preventDefault(); selected = index; choose(); if (!dialog?.open) field('numero_factura').focus();});
       options.append(option);
     });
     options.hidden = !suggestions.length;
@@ -70,7 +81,11 @@
     try {
       const data = await api({accion:'proveedores', q:query});
       if (version !== searchVersion || document.activeElement !== supplier) return;
-      suggestions = data.proveedores; selected = 0; renderOptions();
+      suggestions = data.proveedores;
+      if (dialog && query.trim() && !suggestions.some(item => item.nombre.toLocaleLowerCase() === query.trim().toLocaleLowerCase())) {
+        suggestions.push({id:'create',nombre:query.trim(),create:true});
+      }
+      selected = 0; renderOptions();
     } catch(error) { if (version === searchVersion) message.textContent = error.message; }
   }
   supplier.addEventListener('input', () => {
@@ -84,13 +99,38 @@
     if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && suggestions.length) {
       event.preventDefault(); selected = (selected + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length; renderOptions();
     } else if ((event.key === 'Tab' && !event.shiftKey || event.key === 'Enter') && !options.hidden) {
-      choose(); if (event.key === 'Enter') {event.preventDefault(); field('numero_factura').focus();}
+      event.preventDefault(); choose(); if (!dialog?.open) field('numero_factura').focus();
     } else if ((event.key === 'Tab' && !event.shiftKey || event.key === 'Enter') && !field('proveedor').value && supplier.value.trim()) {
       event.preventDefault(); clearTimeout(timer); await search();
-      if (suggestions.length) {choose(); field('numero_factura').focus();}
+      if (suggestions.length) {choose(); if (!dialog?.open) field('numero_factura').focus();}
       else message.textContent = 'No se encontraron proveedores. Revisa la búsqueda.';
     } else if (event.key === 'Escape') closeOptions();
   });
+  if (dialog) {
+    const createForm = document.querySelector('#supplier-create-form');
+    const rtn = document.querySelector('#supplier-rtn');
+    const createSave = document.querySelector('#supplier-create-save');
+    const cancel = document.querySelector('#supplier-create-cancel');
+    cancel.addEventListener('click', () => { if (!creatingSupplier) { dialog.close(); supplier.focus(); } });
+    dialog.addEventListener('cancel', event => { if (creatingSupplier) event.preventDefault(); });
+    createForm.addEventListener('submit', async event => {
+      event.preventDefault(); if (creatingSupplier) return;
+      creatingSupplier = true; createSave.disabled = true; cancel.disabled = true; rtn.readOnly = true;
+      const errorBox = document.querySelector('#supplier-error'); errorBox.textContent = '';
+      const body = new FormData();
+      body.set('csrfmiddlewaretoken',field('csrfmiddlewaretoken').value);
+      body.set('accion','crear_proveedor'); body.set('nombre',newSupplierName); body.set('rtn',rtn.value);
+      try {
+        const data = await api(null, {method:'POST',body});
+        if (data.errores) {errorBox.textContent = Object.values(data.errores).flat().join(' '); return;}
+        supplier.value = data.proveedor.nombre; field('proveedor').value = data.proveedor.id;
+        ++searchVersion; suggestions = []; closeOptions(); dialog.close(); changedIdentity();
+        status.textContent = data.creado ? 'Proveedor creado. Continúa con la factura.' : 'RTN ya registrado: proveedor existente seleccionado.';
+        field('numero_factura').focus();
+      } catch (error) {errorBox.textContent = error.message;}
+      finally {creatingSupplier = false; createSave.disabled = false; cancel.disabled = false; rtn.readOnly = false;}
+    });
+  }
   field('numero_factura').addEventListener('input', changedIdentity);
   field('numero_factura').addEventListener('blur', () => {
     const input = field('numero_factura'), n = input.value.trim();

@@ -28,12 +28,16 @@
 #save:disabled{opacity:.5;cursor:default}
 #capture-status{color:#166534}
 .capture-help{font-size:13px;color:#526179;margin:0 0 14px}
+#supplier-dialog{border:1px solid #cbd5e1;border-radius:12px;padding:22px;width:min(380px,90vw);color:#172033;background:white}
+#supplier-dialog::backdrop{background:#0f172a66}
+#supplier-dialog input{box-sizing:border-box;width:100%;padding:10px;margin:8px 0 14px}
+#supplier-error{color:#b91c1c}
 </style>
 {% endblock %}
 {% block content %}
 <section class="capture-sheet">
 <p class="capture-help">TAB avanza · SHIFT + TAB retrocede · ↑ ↓ elige proveedor · ENTER en Base 18% guarda · ESC omite duplicada. Fecha: 070926 o 07/09/2026.</p>
-<form id="capture-form" autocomplete="off" action="{% url 'captura_rapida_compras' empresa.slug %}" method="post">
+<form id="capture-form" data-create-supplier="{{ puede_crear_proveedor|yesno:'true,false' }}" autocomplete="off" action="{% url 'captura_rapida_compras' empresa.slug %}" method="post">
 {% csrf_token %}
 <div class="capture-scroll">
 <table class="capture-table">
@@ -52,6 +56,18 @@
 </div>
 <div class="capture-footer"><button type="submit" id="save">Guardar · ENTER</button><button type="button" id="skip" hidden>Omitir y siguiente · ESC</button><span id="capture-status" role="status" aria-live="polite">Lista para capturar</span></div>
 </form>
+{% if puede_crear_proveedor %}
+<dialog id="supplier-dialog" aria-labelledby="supplier-dialog-title">
+<form id="supplier-create-form" autocomplete="off">
+<h3 id="supplier-dialog-title">Crear proveedor</h3>
+<p id="supplier-new-name"></p>
+<label for="supplier-rtn">RTN del proveedor</label>
+<input id="supplier-rtn" name="rtn" inputmode="numeric" maxlength="20" required>
+<p id="supplier-error" role="alert"></p>
+<div class="capture-footer"><button type="submit" id="supplier-create-save">Guardar y continuar · ENTER</button><button type="button" id="supplier-create-cancel">Cancelar · ESC</button></div>
+</form>
+</dialog>
+{% endif %}
 </section>
 {% endblock %}
 {% block extra_js %}<script src="{% static 'facturacion/captura_rapida.js' %}" defer></script>{% endblock %}

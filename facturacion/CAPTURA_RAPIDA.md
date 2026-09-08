@@ -10,6 +10,8 @@ Requiere acceso a la empresa, licencia y módulo de facturación habilitados, y 
 
 Flujo: Fecha → TAB → Proveedor → TAB → Factura → TAB → Exenta → TAB → Base 15% → TAB → Base 18% → ENTER. Las flechas seleccionan proveedores; TAB o ENTER acepta. SHIFT+TAB retrocede. ESC o el botón Omitir descarta una duplicada y devuelve el foco a Fecha.
 
+Si el proveedor no está creado, escribir su nombre y elegir **Crear «nombre» · ingresar RTN**. El nombre se toma de la búsqueda; solo se pide el RTN. ENTER lo guarda, lo selecciona y devuelve el foco a Nº Factura sin borrar los datos de la fila. ESC cancela el alta. Requiere además el permiso existente `puede_crear_proveedores`. Si el RTN ya existe en la empresa, se selecciona ese proveedor sin duplicarlo ni cambiar su nombre. Los proveedores inactivos o RTN con varios proveedores activos requieren revisión en el catálogo. Esta ampliación no necesita migraciones.
+
 Las fechas compactas usan DDMMAA, con año 20AA. También se admite DD/MM/AAAA, DD-MM-AAAA y AAAA-MM-DD. Se conserva el mes explícito. Se ejecuta `RegistroCompraFiscal.save()` y su validación existente; el registro fiscal actual no impone una restricción adicional de mes corriente ni cierre contable.
 
 ## Fuente única e integración
