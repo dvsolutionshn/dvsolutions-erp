@@ -1774,10 +1774,30 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "antecedentes_infecciosos": "Enfermedades infecciosas previas, incluido COVID-19",
         }
 
-    def __init__(self, *args, paciente=None, empresa=None, modo_basico_paciente_nuevo=False, **kwargs):
+    CAMPOS_PASOS_INICIALES = {
+        "nombres", "apellidos", "primer_nombre", "segundo_nombre",
+        "primer_apellido", "segundo_apellido", "identidad", "fecha_nacimiento",
+        "sexo", "estado_civil", "correo", "telefono_codigo_area", "telefono",
+        "direccion", "lugar_nacimiento", "ocupacion", "lugar_trabajo",
+        "informante", "informante_detalle", "contacto_emergencia_completo",
+        "contacto_emergencia", "telefono_emergencia", "referido_por",
+        "referido_por_detalle", "motivo_categoria", "procedimientos_interes",
+        "procedimientos_interes_otros",
+    }
+
+    def __init__(
+        self,
+        *args,
+        paciente=None,
+        empresa=None,
+        modo_basico_paciente_nuevo=False,
+        omitir_pasos_iniciales=False,
+        **kwargs,
+    ):
         self.paciente = paciente
         self.empresa = empresa or getattr(paciente, "empresa", None)
         self.modo_basico_paciente_nuevo = modo_basico_paciente_nuevo
+        self.omitir_pasos_iniciales = omitir_pasos_iniciales
         super().__init__(*args, **kwargs)
         self._valores_modelo_historicos = {
             campo: getattr(self.instance, campo, "")
@@ -1788,7 +1808,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             self.fields["foto_perfil"].help_text = (
                 "Opcional. Si la camara o la foto falla, puede enviar el formulario y la fotografia se completa en recepcion."
             )
-        if paciente and not self.is_bound:
+        if paciente and (not self.is_bound or self.omitir_pasos_iniciales):
             for campo in [
                 "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
                 "identidad", "fecha_nacimiento", "sexo", "estado_civil", "correo", "direccion",
@@ -1815,10 +1835,21 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "inputmode": "tel",
             "placeholder": "Ejemplo: 9999-9999",
         })
-        formulario_general = {}
-        if self.instance and isinstance(self.instance.datos_generales, dict):
-            formulario_general = self.instance.datos_generales.get("formulario_general", {}) or {}
-        if formulario_general and not self.is_bound:
+        datos_generales = (
+            self.instance.datos_generales
+            if self.instance and isinstance(self.instance.datos_generales, dict)
+            else {}
+        )
+        formulario_general = datos_generales.get("formulario_general", {}) or {}
+        if datos_generales and (not self.is_bound or self.omitir_pasos_iniciales):
+            for campo, valor in datos_generales.items():
+                if (
+                    campo in self.fields
+                    and campo != "formulario_general"
+                    and self.fields[campo].initial in (None, "", [])
+                ):
+                    self.fields[campo].initial = valor
+        if formulario_general and (not self.is_bound or self.omitir_pasos_iniciales):
             for campo, valor in formulario_general.items():
                 if campo in self.fields:
                     if campo == "motivo_categoria" and isinstance(valor, str):
@@ -1908,9 +1939,16 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             self.fields["foto_perfil"].required = False
             self.fields["consentimiento_datos"].required = False
             self.fields["motivo_categoria"].required = True
+        if self.omitir_pasos_iniciales:
+            for campo in self.CAMPOS_PASOS_INICIALES:
+                if campo in self.fields:
+                    self.fields[campo].required = False
+                    self.fields[campo].disabled = True
 
     def clean_identidad(self):
         identidad = (self.cleaned_data.get("identidad") or "").strip()
+        if self.omitir_pasos_iniciales and not identidad:
+            return (getattr(self.paciente, "identidad", None) or "").strip()
         if not identidad.isdigit():
             raise forms.ValidationError("Utilice solamente numeros, sin espacios ni guiones.")
         if self.empresa and Paciente.objects.filter(

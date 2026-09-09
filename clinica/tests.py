@@ -2247,7 +2247,30 @@ class ClinicaPacienteTests(TestCase):
             primer_apellido="Perez",
             nombre="Laura Perez",
             identidad="0801199600001",
+            fecha_nacimiento="1996-04-10",
+            sexo="femenino",
+            estado_civil="soltero",
+            correo="laura@example.com",
+            telefono="99990001",
             whatsapp="99990001",
+        )
+        PreconsultaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="general",
+            token_hash="pasos-iniciales-completados",
+            token_preview="iniciales",
+            estado="completada",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=30),
+            fecha_completada=timezone.now(),
+            datos_generales={
+                "referido_por": "instagram",
+                "formulario_general": {
+                    "motivo_categoria": ["cirugia_facial"],
+                    "procedimientos_interes": ["rinoplastia"],
+                    "procedimientos_interes_otros": "Revision de cicatriz previa",
+                },
+            },
         )
         generar_url = reverse(
             "clinica_generar_enlace_preconsulta",
@@ -2258,9 +2281,13 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         enlace = response.context["enlace_publico"]
         token_raw = enlace.rstrip("/").rsplit("/", 1)[-1]
-        preconsulta = PreconsultaClinica.objects.get(paciente=paciente)
+        preconsulta = PreconsultaClinica.objects.get(paciente=paciente, estado="pendiente")
         self.assertEqual(preconsulta.token_hash, hash_token_preconsulta(token_raw))
         self.assertNotEqual(preconsulta.token_hash, token_raw)
+        self.assertEqual(
+            preconsulta.datos_generales["formulario_general"]["motivo_categoria"],
+            ["cirugia_facial"],
+        )
         self.assertContains(response, "Enviar directo por WhatsApp")
         self.assertContains(response, "Abrir WhatsApp manual")
 
@@ -2268,20 +2295,21 @@ class ClinicaPacienteTests(TestCase):
         publica_url = reverse("clinica_preconsulta_publica", args=[token_raw])
         response = self.client.get(publica_url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Preparemos su consulta")
+        self.assertContains(response, "Continúe desde el paso 4")
         self.assertContains(response, "Lea esto antes de empezar")
         self.assertContains(response, "contacte al admin DV Solutions")
-        self.assertContains(response, "Laura")
+        self.assertNotContains(response, "Datos generales")
+        self.assertNotContains(response, "Datos generales de contacto")
+        self.assertNotContains(response, "Motivo y procedimiento de interés")
+        self.assertNotContains(response, 'name="nombres"')
+        self.assertNotContains(response, 'name="telefono"')
+        self.assertNotContains(response, 'data-step="0"')
+        self.assertNotContains(response, 'data-step="1"')
+        self.assertNotContains(response, 'data-step="2"')
+        self.assertContains(response, "Paso 4 de 9")
         self.assertContains(response, "Paso 9 de 9")
-        self.assertContains(response, "No aplica / no estoy seguro todavia")
-        self.assertContains(response, "Braquioplastia (brazos: retirar flacidez o exceso de piel)")
-
-        self.assertContains(response, "Musloplastia (piernas/muslos: retirar flacidez o exceso de piel)")
-        self.assertContains(response, "Gluteoplastia (gluteos: mejorar forma o volumen)")
-        self.assertContains(response, "Facebook")
-        self.assertContains(response, "TikTok")
-        self.assertContains(response, "YouTube")
-        self.assertContains(response, "Referencia")
+        self.assertNotContains(response, "Braquioplastia (brazos: retirar flacidez o exceso de piel)")
+        self.assertNotContains(response, "Facebook")
         self.assertNotContains(response, "Cocaina")
         self.assertNotContains(response, "Marihuana")
         self.assertNotContains(response, "Crack")
@@ -2294,31 +2322,9 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.post(
             publica_url,
             {
-                "nombres": "Laura Maria",
-                "apellidos": "Perez Lopez",
-                "primer_nombre": "Laura Maria",
-                "segundo_nombre": "",
-                "primer_apellido": "Perez",
-                "segundo_apellido": "Lopez",
-                "identidad": "0801199600001",
-                "fecha_nacimiento": "1996-04-10",
-                "sexo": "femenino",
-                "estado_civil": "soltero",
-                "correo": "laura@example.com",
-                "telefono_codigo_area": "504",
-                "telefono": "99990001",
-                "lugar_nacimiento": "Tegucigalpa",
-                "ocupacion": "Administradora",
-                "lugar_trabajo": "Empresa privada",
-                "redes_sociales": "@laura",
-                "informante": "yo_mismo",
-                "contacto_emergencia": "Maria Perez",
-                "telefono_emergencia": "99990002",
-                "referido_por": "instagram",
-                "motivo_categoria": ["cirugia_facial"],
+                "nombres": "Nombre alterado",
+                "identidad": "0000000000000",
                 "motivo_consulta": "Valoracion de cirugia facial",
-                "procedimientos_interes": ["rinoplastia"],
-                "procedimientos_interes_otros": "Revision de cicatriz previa",
                 "historia_mejorar": "Perfil facial y densidad capilar",
                 "historia_tiempo_preocupacion": "2 anos",
                 "historia_tratamientos_previos": "Mesoterapia capilar",
@@ -2394,7 +2400,8 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(formulario_general["alergias_medicamentos"], "si")
         self.assertEqual(formulario_general["examen_peso"], "64")
         self.assertEqual(formulario_general["examen_sato2"], "98")
-        self.assertEqual(paciente.nombre, "Laura Maria Perez Lopez")
+        self.assertEqual(paciente.nombre, "Laura Perez")
+        self.assertEqual(paciente.identidad, "0801199600001")
         self.assertEqual(paciente.correo, "laura@example.com")
         self.assertTrue(paciente.es_alergico)
         self.assertIn("Asma controlada", paciente.antecedentes_medicos)

@@ -1,6 +1,7 @@
 import logging
 import re
 import unicodedata
+from copy import deepcopy
 from datetime import datetime
 from urllib.parse import quote
 
@@ -2799,6 +2800,29 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
     tipos_validos = dict(PreconsultaClinica.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Tipo de formulario de historia clinica no valido.")
+    ultima_historia_general = (
+        paciente.preconsultas.filter(tipo="general", estado="completada")
+        .order_by("-fecha_completada", "-fecha_creacion", "-id")
+        .first()
+    )
+    datos_pasos_iniciales = {}
+    if ultima_historia_general and isinstance(ultima_historia_general.datos_generales, dict):
+        datos_previos = ultima_historia_general.datos_generales
+        campos_generales = PreconsultaClinicaPublicaForm.CAMPOS_PASOS_INICIALES - {
+            "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros",
+        }
+        datos_pasos_iniciales = {
+            campo: deepcopy(datos_previos[campo])
+            for campo in campos_generales
+            if campo in datos_previos
+        }
+        formulario_previo = datos_previos.get("formulario_general", {})
+        if isinstance(formulario_previo, dict):
+            datos_pasos_iniciales["formulario_general"] = {
+                campo: deepcopy(formulario_previo[campo])
+                for campo in ["motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros"]
+                if campo in formulario_previo
+            }
     paciente.preconsultas.filter(estado="pendiente", tipo=tipo).update(estado="revocada")
     token_raw, token_hash, token_preview = generar_token_preconsulta()
     preconsulta = PreconsultaClinica.objects.create(
@@ -2808,6 +2832,7 @@ def generar_enlace_preconsulta(request, empresa_slug, paciente_id, tipo="general
         token_hash=token_hash,
         token_preview=token_preview,
         fecha_expiracion=timezone.now() + timezone.timedelta(days=7),
+        datos_generales=datos_pasos_iniciales,
         creada_por=request.user,
     )
     enlace_publico = request.build_absolute_uri(
@@ -3072,6 +3097,7 @@ def preconsulta_publica(request, token):
         instance=preconsulta,
         paciente=preconsulta.paciente,
         empresa=preconsulta.empresa,
+        omitir_pasos_iniciales=True,
     )
     if request.method == "POST" and form.is_valid():
         try:
@@ -3102,7 +3128,13 @@ def preconsulta_publica(request, token):
     return render(
         request,
         "clinica/preconsulta_publica.html",
-        {"form": form, "preconsulta": preconsulta, "paciente": preconsulta.paciente},
+        {
+            "form": form,
+            "preconsulta": preconsulta,
+            "paciente": preconsulta.paciente,
+            "omitir_pasos_iniciales": True,
+            "paso_numero_inicial": 4,
+        },
     )
 
 

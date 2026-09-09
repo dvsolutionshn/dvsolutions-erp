@@ -18,7 +18,7 @@
     <header class="public-brand"><div class="brand-mark">{% if preconsulta.empresa.logo %}<div class="brand-symbol"><img src="{{ preconsulta.empresa.logo.url }}" alt="Logo {{ preconsulta.empresa.nombre }}"></div>{% else %}<div class="brand-symbol is-fallback">{{ preconsulta.empresa.nombre|slice:":3"|upper }}</div>{% endif %}<div><strong>{{ preconsulta.empresa.nombre }}</strong><span>Formulario de historia clinica</span></div></div><div class="secure-note">{% if registro_interno %}Registro interno - Sesion protegida{% else %}Enlace privado - Uso medico{% endif %}</div></header>
     <form method="post" enctype="multipart/form-data" class="public-card" id="preconsultaForm" novalidate>
         {% csrf_token %}
-        <div class="public-head"><h1>Formulario de historia clinica</h1><p>{% if modo_edicion_paciente %}Actualice los datos generales del paciente usando el mismo formulario oficial del enlace y del registro de paciente nuevo.{% elif modo_doctor_completar_historia %}Complete las preguntas clinicas pendientes del expediente del paciente. Esta parte queda para uso del doctor y personal autorizado.{% elif registro_interno and flujo_paciente_nuevo_corto %}Complete los datos basicos del paciente con el mismo formulario oficial del enlace. El resto de la historia clinica quedara pendiente para la doctora.{% elif registro_interno %}Complete el mismo formulario general que recibe el paciente por enlace. Al guardar se creara el expediente y quedara registrada la historia clinica general.{% elif flujo_paciente_nuevo_corto %}Complete sus datos basicos para crear el expediente. El resto de la historia clinica sera completado por la doctora durante su atencion.{% else %}Preparemos su consulta con una historia clínica ordenada y fácil de entender. Puede seleccionar una o varias respuestas por pregunta y agregar detalles cuando lo necesite.{% endif %}</p><p class="privacy">Este formulario es privado y confidencial. La información será revisada solamente por el doctor y el personal autorizado para su atención médica.</p></div>
+        <div class="public-head"><h1>Formulario de historia clinica</h1><p>{% if modo_edicion_paciente %}Actualice los datos generales del paciente usando el mismo formulario oficial del enlace y del registro de paciente nuevo.{% elif modo_doctor_completar_historia %}Complete las preguntas clinicas pendientes del expediente del paciente. Esta parte queda para uso del doctor y personal autorizado.{% elif registro_interno and flujo_paciente_nuevo_corto %}Complete los datos basicos del paciente con el mismo formulario oficial del enlace. El resto de la historia clinica quedara pendiente para la doctora.{% elif registro_interno %}Complete el mismo formulario general que recibe el paciente por enlace. Al guardar se creara el expediente y quedara registrada la historia clinica general.{% elif flujo_paciente_nuevo_corto %}Complete sus datos basicos para crear el expediente. El resto de la historia clinica sera completado por la doctora durante su atencion.{% elif omitir_pasos_iniciales %}Sus datos generales, contacto y motivo de consulta ya forman parte de su expediente. Continúe desde el paso 4 para completar su historia clínica.{% else %}Preparemos su consulta con una historia clínica ordenada y fácil de entender. Puede seleccionar una o varias respuestas por pregunta y agregar detalles cuando lo necesite.{% endif %}</p><p class="privacy">Este formulario es privado y confidencial. La información será revisada solamente por el doctor y el personal autorizado para su atención médica.</p></div>
         <div class="patient-guide">
             <div class="guide-title">Lea esto antes de empezar</div>
             <ol>
@@ -29,7 +29,7 @@
             </ol>
             <div class="support-note"><strong>Ayuda rápida:</strong> si corrige lo marcado y aun así no puede enviar, contacte al admin DV Solutions para revisar el caso.</div>
         </div>
-        <div class="progress" style="grid-template-columns:repeat({% if flujo_paciente_nuevo_corto %}3{% else %}9{% endif %},1fr);"><span class="active"></span><span></span><span></span>{% if not flujo_paciente_nuevo_corto %}<span></span><span></span><span></span><span></span><span></span><span></span>{% endif %}</div>
+        <div class="progress" style="grid-template-columns:repeat({% if flujo_paciente_nuevo_corto %}3{% elif omitir_pasos_iniciales %}6{% else %}9{% endif %},1fr);">{% if omitir_pasos_iniciales %}<span class="active"></span><span></span><span></span><span></span><span></span><span></span>{% else %}<span class="active"></span><span></span><span></span>{% if not flujo_paciente_nuevo_corto %}<span></span><span></span><span></span><span></span><span></span><span></span>{% endif %}{% endif %}</div>
         <div class="missing-summary" id="missingSummary" hidden>
             <strong>Faltan datos por completar</strong>
             <p>Marcamos en rojo las preguntas pendientes. Puede tocar una de la lista para ir directo a completarla.</p>
@@ -37,6 +37,9 @@
         </div>
         {% if form.errors %}<div class="error-summary"><strong>No pudimos enviar todavía.</strong><p>Revise los campos marcados en rojo. La información que ya escribió se mantiene en pantalla para que no tenga que comenzar desde cero.</p>{% if form.non_field_errors %}<ul>{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}<p>Si el error parece técnico o continúa después de corregir lo marcado, contacte al admin DV Solutions.</p></div>{% endif %}
 
+        {% if omitir_pasos_iniciales %}
+        <div hidden aria-hidden="true">{{ form.sexo }}{{ form.motivo_categoria }}</div>
+        {% else %}
         <section class="form-step active" data-step="0">
             <div class="step-kicker" data-step-number>Paso 1 de {% if flujo_paciente_nuevo_corto %}3{% else %}9{% endif %}</div><h2>Datos generales</h2><p class="step-copy">Iniciemos con su identificación y datos personales básicos. Esto ayuda a abrir correctamente su expediente clínico.</p>
             <div class="field-grid">
@@ -110,9 +113,10 @@
             </div>
             <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button>{% if flujo_paciente_nuevo_corto %}<button class="btn-primary" type="submit">{% if modo_edicion_paciente %}Actualizar paciente{% else %}Crear expediente{% endif %}</button>{% else %}<button class="btn-primary next-step" type="button">Continuar</button>{% endif %}</div>
         </section>
+        {% endif %}
 
         {% if not flujo_paciente_nuevo_corto %}
-        <section class="form-step" data-step="3">
+        <section class="form-step{% if omitir_pasos_iniciales %} active{% endif %}" data-step="3">
             <div class="step-kicker" data-step-number>Paso 4 de 9</div><h2>Funciones orgánicas generales</h2><p class="step-copy">Marque si cada función está normal o alterada.</p>
             <div class="field-grid">
                 {% for field in form %}{% if field.name == 'funcion_apetito' or field.name == 'funcion_sueno' or field.name == 'funcion_sed' or field.name == 'funcion_miccion' or field.name == 'funcion_evacuaciones' %}<div class="field radio-row"><span class="group-label">{{ field.label }}</span>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
@@ -157,7 +161,7 @@
                 <div class="field wide check-grid"><span class="group-label">{{ form.riesgo_tromboembolico.label }}</span><div class="field-help">Importante para valorar seguridad quirúrgica, especialmente en mujeres y cirugías mayores.</div>{{ form.riesgo_tromboembolico }}</div>
                 <div class="field wide"><label for="{{ form.riesgo_tromboembolico_otros.id_for_label }}">Otros:</label>{{ form.riesgo_tromboembolico_otros }}</div>
             </div>
-            <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
+            <div class="step-actions">{% if omitir_pasos_iniciales %}<span></span>{% else %}<button class="btn-secondary prev-step" type="button">Atrás</button>{% endif %}<button class="btn-primary next-step" type="button">Continuar</button></div>
         </section>
 
         <section class="form-step" data-step="7" data-conditional-gine>
@@ -208,6 +212,7 @@
 <script>
 (function(){
     const form=document.getElementById("preconsultaForm"),steps=[...document.querySelectorAll(".form-step")],bars=[...document.querySelectorAll(".progress span")];let current=Number("{{ inicio_paso|default:0 }}")||0;
+    const stepNumberOffset=Math.max(0,(Number("{{ paso_numero_inicial|default:1 }}")||1)-1);
     const activityUrl="{{ registro_actividad_url|default:''|escapejs }}";
     let activityTimer=null,lastTrackedStep=0;
     function trackActivity(step=current+1,immediate=false){
@@ -257,7 +262,7 @@
     const saveDraftSoon=(()=>{let timer=null;return()=>{clearTimeout(timer);timer=setTimeout(saveDraft,180);};})();
     function refreshChecks(){document.querySelectorAll(".check-grid label,.radio-row label").forEach(label=>{const input=label.querySelector("input");label.classList.toggle("is-selected",!!input&&input.checked);});}
     function visibleSteps(){return steps.filter(step=>!step.hidden);}
-    function updateStepNumbers(){const visibles=visibleSteps();bars.forEach((bar,index)=>bar.hidden=index>=visibles.length);document.querySelector(".progress").style.gridTemplateColumns=`repeat(${visibles.length},1fr)`;visibles.forEach((step,index)=>{const label=step.querySelector("[data-step-number]");if(label)label.textContent=`Paso ${index+1} de ${visibles.length}`;});}
+    function updateStepNumbers(){const visibles=visibleSteps();bars.forEach((bar,index)=>bar.hidden=index>=visibles.length);document.querySelector(".progress").style.gridTemplateColumns=`repeat(${visibles.length},1fr)`;visibles.forEach((step,index)=>{const label=step.querySelector("[data-step-number]");if(label)label.textContent=`Paso ${index+1+stepNumberOffset} de ${visibles.length+stepNumberOffset}`;});}
     function toggleGineFields(){const sexo=form.querySelector('[name="sexo"]');const mostrar=sexo&&sexo.value==="femenino";const gineStep=form.querySelector("[data-conditional-gine]");if(gineStep)gineStep.hidden=!mostrar;document.querySelectorAll(".gine-field").forEach(field=>{field.hidden=!mostrar;field.querySelectorAll("input,select,textarea").forEach(input=>{input.disabled=!mostrar;if(!mostrar){if(input.type==="checkbox"||input.type==="radio"){input.checked=false;}else{input.value="";}}});});updateStepNumbers();refreshChecks();}
     function toggleReferral(){const field=form.querySelector('[name="referido_por"]');const show=field&&field.value==="referencia";document.querySelectorAll(".referral-detail").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
     function toggleInformante(){const field=form.querySelector('[name="informante"]');const show=field&&field.value&&field.value!=="yo_mismo";document.querySelectorAll(".informante-detail").forEach(panel=>{panel.hidden=!show;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!show;if(!show){input.value="";}});});}
