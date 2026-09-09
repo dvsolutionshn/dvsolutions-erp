@@ -425,8 +425,14 @@ def _secciones_preconsulta(preconsulta):
             "campos": [
                 _campo_lectura_preconsulta(general, "Condiciones diagnosticadas", "diagnostico_medico", SI_NO_CHOICES, "chips"),
                 _campo_lectura_preconsulta(general, "Detalle de condiciones diagnosticadas", "diagnostico_medico_detalle"),
-                _campo_lectura_preconsulta(general, "Alergias y medicamentos habituales", "alergias_medicamentos", SI_NO_CHOICES, "chips"),
-                _campo_lectura_preconsulta(general, "Detalle de alergias y medicamentos", "alergias_medicamentos_detalle"),
+                _campo_lectura_preconsulta(general, "Tiene alergias", "alergias_respuesta", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle de alergias", "alergias_detalle"),
+                _campo_lectura_preconsulta(general, "Usa medicamentos habitualmente", "medicamentos_respuesta", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle de medicamentos habituales", "medicamentos_detalle"),
+                _campo_lectura_preconsulta(general, "Alergias y medicamentos (respuesta histórica)", "alergias_medicamentos", SI_NO_CHOICES, "chips"),
+                _campo_lectura_preconsulta(general, "Detalle combinado histórico", "alergias_medicamentos_detalle"),
+                _campo_lectura_preconsulta(general, "Detalle histórico de alergias", "alergias_detalle_historico"),
+                _campo_lectura_preconsulta(general, "Detalle histórico de medicamentos", "medicamentos_detalle_historico"),
                 {"label": "Antecedentes personales", "value": _etiquetas_seleccion(preconsulta.antecedentes_personales, ANTECEDENTES_PERSONALES_CHOICES), "type": "chips"},
                 _campo_lectura_preconsulta(general, "Detalle de antecedentes", "antecedentes_personales_detalle"),
                 {"label": "Alergias marcadas", "value": _valor_preconsulta(general, "alergias_seleccion", ALERGIAS_GENERALES_CHOICES), "type": "chips"},
@@ -523,13 +529,20 @@ def _actualizar_paciente_desde_preconsulta(paciente, form):
             (form.cleaned_data.get("diagnostico_medico_detalle") or "").strip()
             if diagnostico_medico == "si" else ""
         )
-    alergias_medicamentos = form.cleaned_data.get("alergias_medicamentos")
-    if alergias_medicamentos:
-        detalle = (form.cleaned_data.get("alergias_medicamentos_detalle") or "").strip()
-        tiene_registros = alergias_medicamentos == "si"
-        paciente.alergias = detalle if tiene_registros else ""
-        paciente.es_alergico = tiene_registros
-        paciente.medicamentos_actuales = detalle if tiene_registros else ""
+    alergias_respuesta = form.cleaned_data.get("alergias_respuesta")
+    if alergias_respuesta:
+        tiene_alergias = alergias_respuesta == "si"
+        paciente.alergias = (
+            (form.cleaned_data.get("alergias_detalle") or "").strip()
+            if tiene_alergias else ""
+        )
+        paciente.es_alergico = tiene_alergias
+    medicamentos_respuesta = form.cleaned_data.get("medicamentos_respuesta")
+    if medicamentos_respuesta:
+        paciente.medicamentos_actuales = (
+            (form.cleaned_data.get("medicamentos_detalle") or "").strip()
+            if medicamentos_respuesta == "si" else ""
+        )
     paciente.save()
     _sincronizar_cliente_facturacion_paciente(paciente)
 

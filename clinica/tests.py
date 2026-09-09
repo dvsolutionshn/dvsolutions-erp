@@ -86,8 +86,10 @@ class ClinicaPacienteTests(TestCase):
             "funcion_evacuaciones": "normal",
             "diagnostico_medico": "no",
             "diagnostico_medico_detalle": "",
-            "alergias_medicamentos": "no",
-            "alergias_medicamentos_detalle": "",
+            "alergias_respuesta": "no",
+            "alergias_detalle": "",
+            "medicamentos_respuesta": "no",
+            "medicamentos_detalle": "",
             "antecedentes_infecciosos": "No aplica",
             "antecedentes_hospitalarios": ["no"],
             "antecedentes_hospitalarios_detalle": "No aplica",
@@ -2089,7 +2091,8 @@ class ClinicaPacienteTests(TestCase):
                 "funcion_miccion": "normal",
                 "funcion_evacuaciones": "normal",
                 "diagnostico_medico": "no",
-                "alergias_medicamentos": "no",
+                "alergias_respuesta": "no",
+                "medicamentos_respuesta": "no",
                 "antecedentes_hospitalarios": ["no"],
                 "antecedentes_personales": ["no_aplica"],
                 "antecedentes_personales_detalle": "No aplica",
@@ -2174,7 +2177,9 @@ class ClinicaPacienteTests(TestCase):
             sexo="femenino",
             diagnostico_medico="si",
             diagnostico_medico_detalle="Asma controlada",
-            alergias_medicamentos="no",
+            alergias_respuesta="no",
+            medicamentos_respuesta="si",
+            medicamentos_detalle="Anticonceptivos de uso diario",
             consumo_riesgo=["si"],
             consumo_riesgo_detalle="Tabaco",
             evaluacion_psicologica=["otros"],
@@ -2194,6 +2199,10 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(general["medicamentos_actuales_seleccion"], ["anticonceptivos"])
         self.assertEqual(general["expectativas_realistas"], ["si"])
         self.assertEqual(general["diagnostico_medico_detalle"], "Asma controlada")
+        self.assertEqual(general["alergias_respuesta"], "no")
+        self.assertEqual(general["medicamentos_respuesta"], "si")
+        self.assertEqual(general["medicamentos_detalle"], "Anticonceptivos de uso diario")
+        self.assertEqual(general["medicamentos_detalle_historico"], "Uso diario")
         self.assertEqual(general["consumo_riesgo_detalle"], "Tabaco")
         self.assertEqual(general["evaluacion_psicologica_detalle"], "Estrés situacional")
 
@@ -2227,7 +2236,9 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "data-conditional-gine")
         self.assertContains(response, "Historia / Riesgo Ginecológico")
         self.assertContains(response, "Condiciones diagnosticadas por un médico")
-        self.assertContains(response, "Alergias y medicamentos de uso habitual")
+        self.assertContains(response, "¿Tiene alergias?")
+        self.assertContains(response, "¿Usa medicamentos de forma habitual?")
+        self.assertNotContains(response, "Alergias y medicamentos de uso habitual")
         self.assertContains(response, "¿Hace dieta?")
         self.assertContains(response, "Indique qué consume")
         self.assertContains(response, "Medicina Estética")
@@ -2238,6 +2249,40 @@ class ClinicaPacienteTests(TestCase):
         self.assertNotContains(response, "Ha tenido multiples cirugias por insatisfaccion")
         self.assertNotContains(response, 'value="enfermeria"')
         self.assertNotContains(response, 'value="tratamientos"')
+
+    def test_alergias_y_medicamentos_validan_sus_detalles_por_separado(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-ALER-MED",
+            nombre="Ana Mejia",
+            identidad="0801199912345",
+            sexo="masculino",
+        )
+        form_alergia_incompleta = PreconsultaClinicaPublicaForm(
+            data=self._datos_formulario_general(
+                alergias_respuesta="si",
+                alergias_detalle="",
+                medicamentos_respuesta="no",
+                medicamentos_detalle="",
+            ),
+            paciente=paciente,
+        )
+        self.assertFalse(form_alergia_incompleta.is_valid())
+        self.assertIn("alergias_detalle", form_alergia_incompleta.errors)
+        self.assertNotIn("medicamentos_detalle", form_alergia_incompleta.errors)
+
+        form_medicamento_incompleto = PreconsultaClinicaPublicaForm(
+            data=self._datos_formulario_general(
+                alergias_respuesta="no",
+                alergias_detalle="",
+                medicamentos_respuesta="si",
+                medicamentos_detalle="",
+            ),
+            paciente=paciente,
+        )
+        self.assertFalse(form_medicamento_incompleto.is_valid())
+        self.assertNotIn("alergias_detalle", form_medicamento_incompleto.errors)
+        self.assertIn("medicamentos_detalle", form_medicamento_incompleto.errors)
 
     def test_preconsulta_publica_se_genera_completa_y_actualiza_expediente(self):
         paciente = Paciente.objects.create(
@@ -2340,8 +2385,10 @@ class ClinicaPacienteTests(TestCase):
                 "antecedentes_hospitalarios_detalle": "Apendicectomia en 2018",
                 "diagnostico_medico": "si",
                 "diagnostico_medico_detalle": "Asma controlada e hipertensión",
-                "alergias_medicamentos": "si",
-                "alergias_medicamentos_detalle": "Alergia a penicilina; anticonceptivos de uso diario",
+                "alergias_respuesta": "si",
+                "alergias_detalle": "Alergia a penicilina",
+                "medicamentos_respuesta": "si",
+                "medicamentos_detalle": "Anticonceptivos de uso diario",
                 "antecedentes_familiares": ["diabetes"],
                 "antecedentes_familiares_detalle": "Madre",
                 "alergias_seleccion": ["medicamentos", "latex"],
@@ -2397,13 +2444,20 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(formulario_general["motivo_categoria"], ["cirugia_facial"])
         self.assertEqual(formulario_general["procedimientos_interes"], ["rinoplastia"])
         self.assertEqual(formulario_general["diagnostico_medico"], "si")
-        self.assertEqual(formulario_general["alergias_medicamentos"], "si")
+        self.assertEqual(formulario_general["alergias_respuesta"], "si")
+        self.assertEqual(formulario_general["alergias_detalle"], "Alergia a penicilina")
+        self.assertEqual(formulario_general["medicamentos_respuesta"], "si")
+        self.assertEqual(formulario_general["medicamentos_detalle"], "Anticonceptivos de uso diario")
         self.assertEqual(formulario_general["examen_peso"], "64")
         self.assertEqual(formulario_general["examen_sato2"], "98")
         self.assertEqual(paciente.nombre, "Laura Perez")
         self.assertEqual(paciente.identidad, "0801199600001")
         self.assertEqual(paciente.correo, "laura@example.com")
         self.assertTrue(paciente.es_alergico)
+        self.assertEqual(paciente.alergias, "Alergia a penicilina")
+        self.assertEqual(paciente.medicamentos_actuales, "Anticonceptivos de uso diario")
+        self.assertEqual(preconsulta.alergias, "Alergia a penicilina")
+        self.assertEqual(preconsulta.medicamentos_habituales_detalle, "Anticonceptivos de uso diario")
         self.assertIn("Asma controlada", paciente.antecedentes_medicos)
 
         response = self.client.get(publica_url)

@@ -129,8 +129,10 @@
             <div class="field-grid">
                 <div class="field wide radio-row"><span class="group-label">{{ form.diagnostico_medico.label }}</span>{{ form.diagnostico_medico }}</div>
                 <div class="field wide diagnostico-medico-detail no-apply-ready"><label for="{{ form.diagnostico_medico_detalle.id_for_label }}">{{ form.diagnostico_medico_detalle.label }}</label>{{ form.diagnostico_medico_detalle }}{% for error in form.diagnostico_medico_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
-                <div class="field wide radio-row"><span class="group-label">{{ form.alergias_medicamentos.label }}</span>{{ form.alergias_medicamentos }}</div>
-                <div class="field wide alergias-medicamentos-detail no-apply-ready"><label for="{{ form.alergias_medicamentos_detalle.id_for_label }}">{{ form.alergias_medicamentos_detalle.label }}</label>{{ form.alergias_medicamentos_detalle }}{% for error in form.alergias_medicamentos_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                <div class="field wide radio-row"><span class="group-label">{{ form.alergias_respuesta.label }}</span>{{ form.alergias_respuesta }}</div>
+                <div class="field wide alergias-detail no-apply-ready"><label for="{{ form.alergias_detalle.id_for_label }}">{{ form.alergias_detalle.label }}</label>{{ form.alergias_detalle }}{% for error in form.alergias_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+                <div class="field wide radio-row"><span class="group-label">{{ form.medicamentos_respuesta.label }}</span>{{ form.medicamentos_respuesta }}</div>
+                <div class="field wide medicamentos-detail no-apply-ready"><label for="{{ form.medicamentos_detalle.id_for_label }}">{{ form.medicamentos_detalle.label }}</label>{{ form.medicamentos_detalle }}{% for error in form.medicamentos_detalle.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
                 <div class="field wide"><label for="{{ form.antecedentes_infecciosos.id_for_label }}">{{ form.antecedentes_infecciosos.label }}</label>{{ form.antecedentes_infecciosos }}</div>
             </div>
             <div class="step-actions"><button class="btn-secondary prev-step" type="button">Atrás</button><button class="btn-primary next-step" type="button">Continuar</button></div>
@@ -324,7 +326,8 @@
         const showQuirurgicos=selectedValue("quirurgicos_operado","si");
         document.querySelectorAll(".quirurgicos-detail").forEach(panel=>{panel.hidden=!showQuirurgicos;panel.querySelectorAll("input,textarea,select").forEach(input=>{input.disabled=!showQuirurgicos;if(!showQuirurgicos){input.value="";}});});
         toggleDetail(".diagnostico-medico-detail",selectedValue("diagnostico_medico","si"));
-        toggleDetail(".alergias-medicamentos-detail",selectedValue("alergias_medicamentos","si"));
+        toggleDetail(".alergias-detail",selectedValue("alergias_respuesta","si"));
+        toggleDetail(".medicamentos-detail",selectedValue("medicamentos_respuesta","si"));
         toggleDetail(".consumo-riesgo-detail",selectedValue("consumo_riesgo","si"));
         toggleDetail(".evaluacion-otros-detail",selectedValue("evaluacion_psicologica","otros"));
     }
@@ -436,7 +439,7 @@
         if(selectedValue("quirurgicos_operado","si")&&inScope(quirurgicosDetalle)&&!(quirurgicosDetalle.value||"").trim()){
             addRecord(records,seen,quirurgicosDetalle,"Detalle de cirugias previas, plasticas u otras","Complete el detalle porque marco Si.");
         }
-        [["diagnostico_medico","diagnostico_medico_detalle","Detalle de condiciones diagnosticadas"],["alergias_medicamentos","alergias_medicamentos_detalle","Detalle de alergias y medicamentos"],["consumo_riesgo","consumo_riesgo_detalle","Indique qué consume"]].forEach(([respuesta,detalle,etiqueta])=>{
+        [["diagnostico_medico","diagnostico_medico_detalle","Detalle de condiciones diagnosticadas"],["alergias_respuesta","alergias_detalle","Detalle de alergias"],["medicamentos_respuesta","medicamentos_detalle","Detalle de medicamentos habituales"],["consumo_riesgo","consumo_riesgo_detalle","Indique qué consume"]].forEach(([respuesta,detalle,etiqueta])=>{
             const control=form.querySelector(`[name="${detalle}"]`);
             if(selectedValue(respuesta,"si")&&inScope(control)&&!(control.value||"").trim())addRecord(records,seen,control,etiqueta,"Complete el detalle porque marcó Sí.");
         });
@@ -552,7 +555,7 @@
     document.querySelectorAll(".prev-step").forEach(button=>button.addEventListener("click",()=>{saveDraft();const visibles=visibleSteps(),pos=visibles.indexOf(steps[current]);show(steps.indexOf(visibles[Math.max(pos-1,0)]));}));
     form.addEventListener("submit",event=>{saveDraft();if(!validScope(form,{showSummary:true})){event.preventDefault();event.stopPropagation();}});
     document.addEventListener("input",event=>{if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
-    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"],[name="diagnostico_medico"],[name="alergias_medicamentos"],[name="consumo_riesgo"],[name="evaluacion_psicologica"]'))toggleConditionalDetails();if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
+    document.addEventListener("change",event=>{if(event.target.matches(".check-grid input,.radio-row input,.procedure-options input")){normalizeSingleAnswer(event.target);normalizeNoAplicaGroup(event.target);refreshChecks();}if(event.target.matches("[data-no-apply-for]"))updateNoApply(event.target);if(event.target.matches('[name="sexo"]')){toggleGineFields();toggleMamografiaFecha();}if(event.target.matches('[name="referido_por"]'))toggleReferral();if(event.target.matches('[name="informante"]'))toggleInformante();if(event.target.matches('[name="motivo_categoria"]')){normalizeMotivoNoAplica(event.target);normalizeNoAplicaGroup(event.target);toggleProcedureGroups();}if(event.target.matches('[name="gine_mamografia"]'))toggleMamografiaFecha();if(event.target.matches('[name="antecedentes_hospitalarios"],[name="quirurgicos_operado"],[name="diagnostico_medico"],[name="alergias_respuesta"],[name="medicamentos_respuesta"],[name="consumo_riesgo"],[name="evaluacion_psicologica"]'))toggleConditionalDetails();if(event.target.closest("#preconsultaForm")){saveDraftSoon();trackActivity(current+1);collectMissing(steps[current]);}});
     document.getElementById("missingModalClose")?.addEventListener("click",closeMissingModal);
     document.getElementById("missingModal")?.addEventListener("click",event=>{if(event.target.id==="missingModal")closeMissingModal();});
     window.addEventListener("error",()=>showTechnicalSupport("Sus respuestas siguen guardadas en este navegador. Si el problema continúa, contacte al admin DV Solutions."));

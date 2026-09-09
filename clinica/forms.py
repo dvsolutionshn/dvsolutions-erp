@@ -1585,15 +1585,26 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         label="Detalle de las condiciones diagnosticadas",
         widget=forms.Textarea(attrs={"rows": 3}),
     )
-    alergias_medicamentos = forms.ChoiceField(
+    alergias_respuesta = forms.ChoiceField(
         required=True,
         choices=SI_NO_CHOICES,
         widget=forms.RadioSelect,
-        label="Alergias y medicamentos de uso habitual",
+        label="¿Tiene alergias?",
     )
-    alergias_medicamentos_detalle = forms.CharField(
+    alergias_detalle = forms.CharField(
         required=False,
-        label="Detalle de alergias y medicamentos de uso habitual",
+        label="¿Cuáles alergias?",
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    medicamentos_respuesta = forms.ChoiceField(
+        required=True,
+        choices=SI_NO_CHOICES,
+        widget=forms.RadioSelect,
+        label="¿Usa medicamentos de forma habitual?",
+    )
+    medicamentos_detalle = forms.CharField(
+        required=False,
+        label="¿Cuáles medicamentos usa habitualmente?",
         widget=forms.Textarea(attrs={"rows": 3}),
     )
     antecedentes_familiares = forms.MultipleChoiceField(
@@ -1735,7 +1746,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "revision_sistemas",
             "revision_sistemas_detalle", "antecedentes_hospitalarios",
             "antecedentes_hospitalarios_detalle", "diagnostico_medico", "diagnostico_medico_detalle",
-            "alergias_medicamentos", "alergias_medicamentos_detalle", "antecedentes_familiares",
+            "alergias_respuesta", "alergias_detalle", "medicamentos_respuesta", "medicamentos_detalle",
+            "antecedentes_familiares",
             "antecedentes_familiares_detalle", "dieta", "ejercicio", "habitos",
             "antecedentes_infecciosos", "historia_mejorar", "historia_tiempo_preocupacion",
             "historia_tratamientos_previos", "historia_expectativas",
@@ -1801,7 +1813,10 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self._valores_modelo_historicos = {
             campo: getattr(self.instance, campo, "")
-            for campo in ["funciones_organicas", "funciones_detalle", "dieta", "ejercicio"]
+            for campo in [
+                "funciones_organicas", "funciones_detalle", "dieta", "ejercicio",
+                "alergias", "medicamentos_habituales_detalle",
+            ]
         }
         if paciente is None:
             self.fields["foto_perfil"].required = False
@@ -1862,22 +1877,38 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                     self.fields[campo].initial = estado_funciones if estado_funciones in {"normal", "alterada"} else "normal"
 
             antecedentes_previos = self.instance.antecedentes_personales if self.instance else []
-            medicamentos_previos = self.instance.medicamentos_habituales if self.instance else []
             if not formulario_general.get("diagnostico_medico"):
                 self.fields["diagnostico_medico"].initial = "si" if antecedentes_previos and antecedentes_previos != ["no_aplica"] else "no"
             if not formulario_general.get("diagnostico_medico_detalle") and self.instance:
                 self.fields["diagnostico_medico_detalle"].initial = self.instance.antecedentes_personales_detalle
-            if not formulario_general.get("alergias_medicamentos"):
+            respuesta_combinada = formulario_general.get("alergias_medicamentos")
+            detalle_combinado = formulario_general.get("alergias_medicamentos_detalle", "")
+            alergias_detalle = (
+                formulario_general.get("alergias_detalle")
+                or (self.instance.alergias if self.instance else "")
+                or (getattr(self.paciente, "alergias", "") if self.paciente else "")
+                or detalle_combinado
+            )
+            medicamentos_detalle = (
+                formulario_general.get("medicamentos_detalle")
+                or (self.instance.medicamentos_habituales_detalle if self.instance else "")
+                or (getattr(self.paciente, "medicamentos_actuales", "") if self.paciente else "")
+                or detalle_combinado
+            )
+            for respuesta, detalle, valor_detalle in [
+                ("alergias_respuesta", "alergias_detalle", alergias_detalle),
+                ("medicamentos_respuesta", "medicamentos_detalle", medicamentos_detalle),
+            ]:
                 tiene_detalle = bool(
-                    (self.instance and self.instance.alergias and self.instance.alergias.strip().lower() not in {"no aplica", "ninguna"})
-                    or (medicamentos_previos and medicamentos_previos != ["no_aplica"])
+                    valor_detalle
+                    and str(valor_detalle).strip().lower() not in {"no", "no aplica", "ninguna", "ninguno"}
                 )
-                self.fields["alergias_medicamentos"].initial = "si" if tiene_detalle else "no"
-            if not formulario_general.get("alergias_medicamentos_detalle") and self.instance:
-                detalles = [self.instance.alergias, self.instance.medicamentos_habituales_detalle]
-                self.fields["alergias_medicamentos_detalle"].initial = "\n".join(
-                    detalle for detalle in detalles if detalle and detalle.strip().lower() not in {"no aplica", "ninguna"}
+                self.fields[respuesta].initial = (
+                    formulario_general.get(respuesta)
+                    or ("si" if tiene_detalle else respuesta_combinada)
+                    or "no"
                 )
+                self.fields[detalle].initial = valor_detalle if tiene_detalle else ""
 
             valores_si_no = {
                 "consumo_riesgo": formulario_general.get("consumo_riesgo"),
@@ -1914,7 +1945,7 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 self.fields[campo].required = False
         for campo in [
             "funciones_organicas", "funciones_detalle", "procedimientos_interes_otros",
-            "diagnostico_medico_detalle", "alergias_medicamentos_detalle",
+            "diagnostico_medico_detalle", "alergias_detalle", "medicamentos_detalle",
             "antecedentes_infecciosos", "antecedentes_hospitalarios_detalle",
             "quirurgicos_detalle", "consumo_riesgo_detalle",
             "antecedentes_familiares_detalle", "riesgo_tromboembolico_otros",
@@ -2018,7 +2049,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
 
         for respuesta, detalle, mensaje in [
             ("diagnostico_medico", "diagnostico_medico_detalle", "Detalle las condiciones diagnosticadas por un médico."),
-            ("alergias_medicamentos", "alergias_medicamentos_detalle", "Detalle las alergias y los medicamentos de uso habitual."),
+            ("alergias_respuesta", "alergias_detalle", "Detalle cuáles alergias tiene."),
+            ("medicamentos_respuesta", "medicamentos_detalle", "Detalle cuáles medicamentos usa habitualmente."),
         ]:
             if cleaned_data.get(respuesta) == "si":
                 if not (cleaned_data.get(detalle) or "").strip():
@@ -2161,7 +2193,8 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros", "historia_mejorar",
             "historia_tiempo_preocupacion", "historia_tratamientos_previos", "historia_expectativas",
             "funcion_apetito", "funcion_sueno", "funcion_sed", "funcion_miccion", "funcion_evacuaciones",
-            "diagnostico_medico", "diagnostico_medico_detalle", "alergias_medicamentos", "alergias_medicamentos_detalle",
+            "diagnostico_medico", "diagnostico_medico_detalle", "alergias_respuesta", "alergias_detalle",
+            "medicamentos_respuesta", "medicamentos_detalle",
             "quirurgicos_operado", "quirurgicos_detalle",
             "consumo_riesgo", "consumo_riesgo_detalle", "riesgo_tromboembolico", "riesgo_tromboembolico_otros", "gine_menarca", "gine_gestas",
             "gine_partos", "gine_cesareas", "gine_abortos", "gine_ultima_menstruacion",
@@ -2174,6 +2207,18 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
         if not isinstance(formulario_previo, dict):
             formulario_previo = {}
         formulario_actualizado = dict(formulario_previo)
+        for campo_modelo, campo_nuevo, campo_historico in [
+            ("alergias", "alergias_detalle", "alergias_detalle_historico"),
+            (
+                "medicamentos_habituales_detalle",
+                "medicamentos_detalle",
+                "medicamentos_detalle_historico",
+            ),
+        ]:
+            valor_historico = self._valores_modelo_historicos.get(campo_modelo, "")
+            valor_nuevo = (self.cleaned_data.get(campo_nuevo) or "").strip()
+            if valor_historico and valor_historico.strip() != valor_nuevo:
+                formulario_actualizado.setdefault(campo_historico, valor_historico)
         for campo in ["funciones_organicas", "funciones_detalle", "dieta", "ejercicio"]:
             valor_historico = self._valores_modelo_historicos.get(campo)
             if valor_historico and valor_historico != self.cleaned_data.get(campo):
@@ -2207,6 +2252,24 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
             if datos["formulario_general"].get(campo):
                 datos["formulario_general"][campo] = datos["formulario_general"][campo].isoformat()
         return datos
+
+    def save(self, commit=True):
+        preconsulta = super().save(commit=False)
+        if not self.modo_basico_paciente_nuevo:
+            preconsulta.alergias = (
+                (self.cleaned_data.get("alergias_detalle") or "").strip()
+                if self.cleaned_data.get("alergias_respuesta") == "si"
+                else ""
+            )
+            preconsulta.medicamentos_habituales_detalle = (
+                (self.cleaned_data.get("medicamentos_detalle") or "").strip()
+                if self.cleaned_data.get("medicamentos_respuesta") == "si"
+                else ""
+            )
+        if commit:
+            preconsulta.save()
+            self.save_m2m()
+        return preconsulta
 
 
 class MedicamentoPrescritoForm(BaseClinicaForm):
