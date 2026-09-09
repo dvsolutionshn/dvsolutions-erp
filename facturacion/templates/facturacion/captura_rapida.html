@@ -1,11 +1,11 @@
-{% extends "core/erp_base.html" %}
+{% extends "facturacion/compras_base.html" %}
 {% load static %}
 {% block title %}Captura Rápida de Compras{% endblock %}
 {% block header_kicker %}Compras · {{ empresa.nombre }}{% if cliente %} · Cliente activo: {{ cliente.nombre }}{% endif %}{% endblock %}
 {% block header_title %}Libro de Compras · {{ nombre_mes }} {{ anio }}{% endblock %}
 {% block header_description %}La fecha de la factura puede ser anterior. Se guardará dentro de este libro mensual.{% endblock %}
 {% block topbar_actions %}<a class="erp-action-link" href="{% if cliente %}{% url 'libros_cliente_contable' empresa.slug cliente.pk %}{% else %}{% url 'libro_compras_fiscal' empresa.slug %}{% endif %}?anio={{ anio }}">Cambiar libro</a>{% endblock %}
-{% block extra_head %}
+{% block extra_head %}{{ block.super }}
 <style>
 .capture-sheet{padding:16px;background:var(--erp-surface,#fff);border:1px solid #cbd5e1;border-radius:12px}
 .capture-scroll{overflow-x:auto;padding-bottom:6px}
@@ -42,7 +42,7 @@
 #supplier-error{color:#b91c1c}
 </style>
 {% endblock %}
-{% block content %}
+{% block compras_content %}
 {% if cliente %}{% include "facturacion/_cliente_contable_nav.html" %}{% endif %}
 <section class="capture-sheet">
 <div class="capture-footer" style="margin-bottom:12px">

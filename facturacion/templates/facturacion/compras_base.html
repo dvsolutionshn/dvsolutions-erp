@@ -1,0 +1,4 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'facturacion/compras.css' %}">{% endblock %}
+{% block content %}<div class="purchase-module">{% block compras_content %}{% endblock %}</div>{% endblock %}

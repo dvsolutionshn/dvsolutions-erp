@@ -15,9 +15,17 @@ const assert = require('node:assert/strict');
       await page.getByRole('heading',{name:'Cliente activo: '+nombre,exact:true}).waitFor();
       await page.locator('[name=anio]').fill('2026');
       await page.getByRole('button',{name:'Abrir año',exact:true}).click();
+      if (process.env.CAPTURA_SCREENSHOT && nombre === 'Nordic') await page.screenshot({path:process.env.CAPTURA_SCREENSHOT.replace('.png','-panel.png'),fullPage:true,animations:'disabled'});
       await page.getByRole('link',{name:'Abrir libros 2026',exact:true}).click();
       await page.locator('[name=anio]').fill('2026');
       await page.getByRole('button',{name:'Ver meses'}).click();
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('.purchase-filter')).display === 'flex');
+      if (process.env.CAPTURA_SCREENSHOT && nombre === 'Nordic') {
+        await page.screenshot({path:process.env.CAPTURA_SCREENSHOT.replace('.png','-meses.png'),fullPage:true,animations:'disabled'});
+        await page.setViewportSize({width:390,height:844});
+        await page.screenshot({path:process.env.CAPTURA_SCREENSHOT.replace('.png','-movil.png'),fullPage:true,animations:'disabled'});
+        await page.setViewportSize({width:1440,height:1000});
+      }
       await page.getByRole('link',{name:'Abrir Agosto',exact:true}).click();
       assert.match(await page.locator('body').textContent(),new RegExp('Cliente activo: '+nombre));
     };

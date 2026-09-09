@@ -1,14 +1,14 @@
-{% extends "core/erp_base.html" %}
+{% extends "facturacion/compras_base.html" %}
 {% block title %}Clientes Contables{% endblock %}
 {% block header_title %}Libros de Compras · Clientes Contables{% endblock %}
 {% block header_description %}Selecciona el cliente para consultar proveedores, libros mensuales y acumulados.{% endblock %}
-{% block content %}
+{% block compras_content %}
 <section class="erp-card">
 <p><a href="{% url 'libros_compras_propias' empresa.slug %}">Consultar compras propias de {{ empresa.nombre }}</a></p>
 {% if administrar %}<p><a class="erp-action-link" href="{% url 'crear_cliente_contable' empresa.slug %}">Crear cliente contable</a></p>
 <p>Para cambiar los datos o usuarios de Gecko, Molac, Nordic u otro cliente, usa <strong>Editar / asignar usuarios</strong> en su fila.</p>
 {% else %}<p>La edición de clientes y la asignación de usuarios requieren una cuenta administradora de la empresa.</p>{% endif %}
-<table class="erp-table" style="width:100%">
+<div class="purchase-table-wrap"><table class="erp-table" style="width:100%">
 <thead><tr><th>Cliente</th><th>Razón social</th><th>RTN</th><th>Estado</th>{% if administrar %}<th>Usuarios asignados</th>{% endif %}<th>Acciones</th></tr></thead>
 <tbody>{% for cliente in clientes %}<tr>
 <td><a href="{% url 'panel_cliente_contable' empresa.slug cliente.pk %}" style="font-weight:700;text-decoration:underline">{{ cliente.nombre }}</a></td><td>{{ cliente.razon_social|default:'—' }}</td><td>{{ cliente.rtn|default:'—' }}</td><td>{{ cliente.activo|yesno:'Activo,Inactivo' }}</td>
@@ -17,5 +17,5 @@
 <div style="margin-top:8px"><a href="{% url 'libros_cliente_contable' empresa.slug cliente.pk %}">Abrir libros</a> · <a href="{% url 'acumulado_cliente_contable' empresa.slug cliente.pk %}">Acumulado anual</a></div>
 {% if administrar %}<div style="margin-top:8px"><a class="erp-action-link" href="{% url 'editar_cliente_contable' empresa.slug cliente.pk %}">Editar / asignar usuarios</a></div>{% endif %}</td>
 </tr>{% empty %}<tr><td colspan="{% if administrar %}6{% else %}5{% endif %}">No tienes clientes contables asignados. Solicita la asignación al administrador.</td></tr>{% endfor %}</tbody>
-</table></section>
+</table></div></section>
 {% endblock %}

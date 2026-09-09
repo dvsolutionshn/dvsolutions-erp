@@ -1,22 +1,22 @@
-{% extends "core/erp_base.html" %}
+{% extends "facturacion/compras_base.html" %}
 {% block title %}{{ cliente.nombre }} · Compras{% endblock %}
 {% block header_title %}Cliente activo: {{ cliente.nombre }}{% endblock %}
 {% block header_description %}Selecciona el año para trabajar en sus libros y consultar sus acumulados.{% endblock %}
-{% block content %}
+{% block compras_content %}
 <section class="erp-card">
 <p><a href="{% url 'clientes_contables' empresa.slug %}">← Todos los clientes</a></p>
 {% if not cliente.activo %}<p>Cliente inactivo · Solo consulta</p>{% endif %}
-<form method="get" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-<label for="client-year">Año de trabajo</label>
-<input id="client-year" name="anio" type="number" min="1" max="9999" required value="{{ anio }}" style="padding:10px;width:120px">
+<form method="get" class="purchase-filter">
+<div class="purchase-field"><label for="client-year">Año de trabajo</label>
+<input id="client-year" name="anio" type="number" min="1" max="9999" required value="{{ anio }}" ></div>
 <button class="erp-action-link">Abrir año</button>
 </form>
 {% if error_anio %}<p role="alert">{{ error_anio }}</p>{% endif %}
-<nav style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px" aria-label="Años del cliente">
+<nav class="purchase-years" aria-label="Años del cliente">
 {% for disponible in anios %}<a class="erp-action-link" href="?anio={{ disponible }}" {% if disponible == anio %}aria-current="page"{% endif %}>{{ disponible }}</a>{% endfor %}
 </nav>
 </section>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin-top:20px">
+<div class="purchase-cards">
 <section class="erp-card"><h2>Libros de Compras {{ anio }}</h2><p>Abre enero a diciembre para capturar y consultar las facturas de {{ cliente.nombre }}.</p>
 <a class="erp-action-link" href="{% url 'libros_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Abrir libros {{ anio }}</a></section>
 <section class="erp-card"><h2>Acumulados {{ anio }}</h2><p>Consulta los importes registrados por mes y el total del año de {{ cliente.nombre }}.</p>

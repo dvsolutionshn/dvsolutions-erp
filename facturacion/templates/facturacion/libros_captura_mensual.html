@@ -1,18 +1,18 @@
-{% extends "core/erp_base.html" %}
+{% extends "facturacion/compras_base.html" %}
 {% block title %}Libros de Compras · {{ anio }}{% endblock %}
 {% block header_title %}{% if acumulado %}Acumulado anual de Compras{% else %}Libros de Compras{% endif %}{% endblock %}
 {% block header_description %}Selecciona el año y abre el libro mensual para consultar sus facturas o continuar la captura.{% endblock %}
-{% block content %}
+{% block compras_content %}
 {% if cliente %}{% include "facturacion/_cliente_contable_nav.html" %}{% endif %}
 <section class="erp-card">
-<form method="get" class="erp-filters"><label for="book-year">Año del libro</label>
-<input id="book-year" type="number" name="anio" value="{{ anio }}" min="1" max="9999" required>
+<form method="get" class="purchase-filter"><div class="purchase-field"><label for="book-year">Año del libro</label>
+<input id="book-year" type="number" name="anio" value="{{ anio }}" min="1" max="9999" required></div>
 <button type="submit" class="erp-action-link">Ver meses</button></form>
-<div style="overflow-x:auto;margin-top:16px">
-<table class="erp-table" style="width:100%;font-variant-numeric:tabular-nums">
+<div class="purchase-table-wrap">
+<table class="erp-table purchase-months" style="width:100%;font-variant-numeric:tabular-nums">
 <thead><tr><th>Mes {{ anio }}</th><th>Estado</th><th>Facturas</th><th>Exentas</th><th>Base 15%</th><th>Base 18%</th><th>ISV 15%</th><th>ISV 18%</th><th>Total</th><th></th></tr></thead>
 <tbody>{% for libro in meses %}<tr>
-<td>{{ libro.nombre }}</td><td>{% if libro.estado == 'finalizado' %}Finalizado{% else %}En proceso{% endif %}</td>
+<td>{{ libro.nombre }}</td><td><span class="purchase-status {% if libro.estado == 'finalizado' %}is-finished{% endif %}">{% if libro.estado == 'finalizado' %}Finalizado{% else %}En proceso{% endif %}</span></td>
 <td>{{ libro.resumen.documentos }}</td><td>{{ libro.resumen.exento|floatformat:2 }}</td>
 <td>{{ libro.resumen.base_15|floatformat:2 }}</td><td>{{ libro.resumen.base_18|floatformat:2 }}</td>
 <td>{{ libro.resumen.isv_15|floatformat:2 }}</td><td>{{ libro.resumen.isv_18|floatformat:2 }}</td><td>{{ libro.resumen.total|floatformat:2 }}</td>

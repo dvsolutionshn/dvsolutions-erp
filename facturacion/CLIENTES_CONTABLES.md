@@ -49,6 +49,8 @@ Las cuentas y clasificaciones contables actuales pertenecen a la empresa ERP, si
 
 El acumulado definitivo por cuentas queda pendiente del modelo que proporcionará el usuario. El panel conserva el resumen mensual actual; no se crean clasificaciones ni reglas contables provisionales.
 
+La presentación del módulo usa `compras_base.html` y `facturacion/static/facturacion/compras.css`: selector de año compacto, botones consistentes, estados visuales y tablas desplazables en pantallas pequeñas. Estos estilos están limitados al contenedor del módulo y requieren `collectstatic` al desplegar.
+
 ## Archivos
 
 - `facturacion/models.py`: relaciones, validaciones y restricciones.

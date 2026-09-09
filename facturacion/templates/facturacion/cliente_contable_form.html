@@ -1,9 +1,9 @@
-{% extends "core/erp_base.html" %}
+{% extends "facturacion/compras_base.html" %}
 {% block title %}Administrar cliente contable{% endblock %}
 {% block header_title %}{% if cliente %}Cliente activo: {{ cliente.nombre }}{% else %}Crear cliente contable{% endif %}{% endblock %}
-{% block content %}<section class="erp-card">
+{% block compras_content %}<section class="erp-card">
 <p><a href="{% url 'clientes_contables' empresa.slug %}">Volver a clientes</a></p>
-<form method="post">{% csrf_token %}
+<form method="post" class="purchase-form">{% csrf_token %}
 {{ form.non_field_errors }}
 {% for campo in form %}{% if campo.name != 'usuarios' %}<p>{{ campo.label_tag }} {{ campo }} {{ campo.errors }}</p>{% endif %}{% endfor %}
 <fieldset style="margin:20px 0;padding:16px;border:1px solid #cbd5e1;border-radius:8px">

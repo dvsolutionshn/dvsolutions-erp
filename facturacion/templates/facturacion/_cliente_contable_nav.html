@@ -1,7 +1,7 @@
 <section class="erp-card" style="margin-bottom:16px;border-left:4px solid #2563eb">
 <strong>Cliente activo: {{ cliente.nombre }}</strong>
 {% if not cliente.activo %}<span> · Inactivo · Solo consulta</span>{% endif %}
-<nav style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px">
+<nav class="purchase-nav">
 <a href="{% url 'clientes_contables' empresa.slug %}">Cambiar cliente</a>
 <a href="{% url 'panel_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Inicio del cliente</a>
 <a href="{% url 'libros_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Libros mensuales</a>
