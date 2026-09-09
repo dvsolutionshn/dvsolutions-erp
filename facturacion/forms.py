@@ -688,7 +688,7 @@ class RegistroCompraFiscalForm(forms.ModelForm):
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
         if empresa:
-            self.fields['proveedor'].queryset = Proveedor.objects.filter(empresa=empresa, activo=True).order_by('nombre')
+            self.fields['proveedor'].queryset = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by('nombre')
         self.fields['proveedor'].required = False
         self.fields['proveedor_nombre'].help_text = 'Nombre fiscal del proveedor como aparece en la factura.'
         self.fields['numero_factura'].help_text = 'El sistema valida este numero contra meses anteriores para evitar duplicados.'

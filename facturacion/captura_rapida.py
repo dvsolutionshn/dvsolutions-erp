@@ -1,4 +1,4 @@
-"""Captura de documentos sobre el libro fiscal existente (piloto demo_1)."""
+"""Captura fiscal existente: demo_1 y clientes contables de dubon_asociados."""
 import re
 import hashlib
 import json
@@ -11,7 +11,8 @@ from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Count, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce, Replace, Trim
 from django.http import Http404, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
+from .clientes_contables import cliente_autorizado
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -35,14 +36,14 @@ class IdentidadForm(forms.Form):
     proveedor = forms.ModelChoiceField(queryset=Proveedor.objects.none())
     numero_factura = forms.CharField(max_length=120)
 
-    def __init__(self, *args, empresa, registro=None, **kwargs):
+    def __init__(self, *args, empresa, registro=None, cliente_contable=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.registro = registro
         disponibles = Q(activo=True)
         if registro:
             disponibles |= Q(pk=registro.proveedor_id)
             self.fields['proveedor'].required = bool(registro.proveedor_id)
-        self.fields['proveedor'].queryset = Proveedor.objects.filter(disponibles, empresa=empresa)
+        self.fields['proveedor'].queryset = Proveedor.objects.filter(disponibles, empresa=empresa, cliente_contable=cliente_contable)
 
     def clean_numero_factura(self):
         numero = self.cleaned_data['numero_factura']
@@ -69,14 +70,14 @@ class ProveedorCapturaForm(forms.ModelForm):
         return rtn
 
 
-def crear_proveedor_captura(request, empresa):
-    form = ProveedorCapturaForm(request.POST)
+def crear_proveedor_captura(request, empresa, cliente_contable=None):
+    form = ProveedorCapturaForm(request.POST, instance=Proveedor(empresa=empresa, cliente_contable=cliente_contable))
     if not form.is_valid():
         return JsonResponse({'errores': form.errors}, status=400)
     try:
         with transaction.atomic():
             Empresa.objects.select_for_update().get(pk=empresa.pk)
-            existentes = list(Proveedor.objects.filter(empresa=empresa).annotate(
+            existentes = list(Proveedor.objects.filter(cliente_contable=cliente_contable, empresa=empresa).annotate(
                 rtn_normalizado=Replace(sin_guiones('rtn'), Value(' '), Value(''))
             ).filter(rtn_normalizado=form.cleaned_data['rtn']).order_by('-activo', 'pk')[:2])
             if existentes:
@@ -139,7 +140,7 @@ def sin_guiones(campo):
     return Replace(Trim(campo), Value('-'), Value(''))
 
 
-def buscar_duplicada(empresa, proveedor, numero, excluir=None):
+def buscar_duplicada(empresa, proveedor, numero, excluir=None, cliente_contable=None):
     """Incluye todo el historial fiscal y de inventario, incluso anulaciones.
 
     El fallback SQL permite consultar registros antiguos sin modificarlos.
@@ -152,7 +153,7 @@ def buscar_duplicada(empresa, proveedor, numero, excluir=None):
         identidad |= Q(rtn_normalizado=rtn) | Q(rtn_proveedor_normalizado=rtn)
     identidad |= (Q(proveedor__isnull=True) & (Q(proveedor_rtn='') | Q(proveedor_rtn__isnull=True))
                   & Q(proveedor_nombre__iexact=proveedor.nombre.strip()))
-    fiscal = (RegistroCompraFiscal.objects.filter(empresa=empresa).exclude(pk=excluir)
+    fiscal = (RegistroCompraFiscal.objects.filter(cliente_contable=cliente_contable, empresa=empresa).exclude(pk=excluir)
               .annotate(numero_comparable=sin_guiones('numero_factura'),
                         rtn_proveedor_normalizado=Replace(sin_guiones('proveedor__rtn'), Value(' '), Value('')),
                         rtn_normalizado=Replace(sin_guiones('proveedor_rtn'), Value(' '), Value('')))
@@ -160,6 +161,8 @@ def buscar_duplicada(empresa, proveedor, numero, excluir=None):
                                        Q(numero_comparable=normalizado)).first())
     if fiscal:
         return serializar(fiscal)
+    if cliente_contable is not None:
+        return None
     identidad = Q(proveedor_id=proveedor.pk) if proveedor.pk else Q(pk__in=[])
     if rtn:
         identidad |= Q(rtn_normalizado=rtn)
@@ -197,28 +200,28 @@ def resumen_libro(registros):
             for clave, valor in resumen.items()}
 
 
-def selector_libros(request, empresa):
+def selector_libros(request, empresa, cliente_contable=None, acumulado=False):
     try:
         anio = int(request.GET.get('anio') or timezone.localdate().year)
         if not 1 <= anio <= 9999:
             raise ValueError
     except ValueError:
         return JsonResponse({'error': 'Selecciona un año válido.'}, status=400)
-    registros = RegistroCompraFiscal.objects.filter(empresa=empresa, periodo_anio=anio)
+    registros = RegistroCompraFiscal.objects.filter(cliente_contable=cliente_contable, empresa=empresa, periodo_anio=anio)
     acumulados = {fila['periodo_mes']: fila for fila in registros.exclude(estado='anulada')
                   .values('periodo_mes').annotate(documentos=Count('pk'), **{c: Sum(c) for c in MONTOS_LIBRO})}
-    estados = dict(LibroCompraMensual.objects.filter(empresa=empresa, anio=anio).values_list('mes','estado'))
+    estados = dict(LibroCompraMensual.objects.filter(cliente_contable=cliente_contable, empresa=empresa, anio=anio).values_list('mes','estado'))
     meses = [dict(mes=i, nombre=nombre, estado=estados.get(i, 'en_proceso'),
                   resumen=acumulados.get(i, dict(documentos=0, **{c: Decimal('0.00') for c in MONTOS_LIBRO})))
              for i, nombre in enumerate(MESES, 1)]
     return render(request, 'facturacion/libros_captura_mensual.html', {
-        'empresa': empresa, 'anio': anio, 'meses': meses, 'resumen': resumen_libro(registros)})
+        'empresa': empresa, 'cliente': cliente_contable, 'acumulado': acumulado, 'anio': anio, 'meses': meses, 'resumen': resumen_libro(registros)})
 
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def captura_rapida(request, empresa_slug, anio=None, mes=None):
-    if empresa_slug != 'demo_1':
+def captura_rapida(request, empresa_slug, anio=None, mes=None, cliente_id=None, acumulado=False):
+    if empresa_slug not in ('demo_1', 'dubon_asociados') or (empresa_slug == 'demo_1' and cliente_id is not None):
         raise Http404
     if anio is not None and not (1 <= anio <= 9999 and 1 <= mes <= 12):
         raise Http404
@@ -230,46 +233,58 @@ def captura_rapida(request, empresa_slug, anio=None, mes=None):
         return usuario.is_superuser or usuario.es_administrador_empresa or usuario.tiene_permiso_erp(permiso, empresa)
     if not puede('puede_compras'):
         return JsonResponse({'error': 'No tienes permiso para consultar compras.'}, status=403)
+    if empresa_slug == 'dubon_asociados' and cliente_id is None:
+        if request.method == 'POST':
+            return JsonResponse({'error': 'Selecciona un cliente contable.'}, status=400)
+        return redirect('clientes_contables', empresa_slug=empresa_slug)
+    cliente_contable = cliente_autorizado(request, empresa, cliente_id) if cliente_id is not None else None
+    if cliente_contable and not cliente_contable.activo and request.method == 'POST':
+        return JsonResponse({'error': 'El cliente está inactivo.'}, status=403)
     permisos = dict(crear=puede('puede_crear_compras'), editar=puede('puede_editar_compras'),
                     anular=puede('puede_anular_compras'))
+    if cliente_contable and not cliente_contable.activo:
+        permisos = dict.fromkeys(permisos, False)
     puede_crear_proveedor = puede('puede_crear_proveedores') and permisos['crear']
     accion = request.POST.get('accion', 'guardar') if request.method == 'POST' else request.GET.get('accion')
     if request.method == 'POST' and accion == 'crear_proveedor':
         if not puede_crear_proveedor:
             return JsonResponse({'error': 'No tienes permiso para crear proveedores.'}, status=403)
-        return crear_proveedor_captura(request, empresa)
+        return crear_proveedor_captura(request, empresa, cliente_contable)
     if request.method == 'GET':
         accion = request.GET.get('accion')
         if accion == 'proveedores':
             # Subconsultas independientes evitan multiplicar ambas colecciones de compras.
-            fiscales = (RegistroCompraFiscal.objects.filter(empresa=empresa, proveedor_id=OuterRef('pk'))
+            fiscales = (RegistroCompraFiscal.objects.filter(cliente_contable=cliente_contable, empresa=empresa, proveedor_id=OuterRef('pk'))
                         .order_by().values('proveedor_id').annotate(n=Count('pk')).values('n'))
-            inventario = (CompraInventario.objects.filter(empresa=empresa, proveedor_id=OuterRef('pk'))
-                          .order_by().values('proveedor_id').annotate(n=Count('pk')).values('n'))
-            proveedores = (Proveedor.objects.filter(empresa=empresa, activo=True)
+            frecuencia = Coalesce(Subquery(fiscales), 0)
+            if cliente_contable is None:
+                inventario = (CompraInventario.objects.filter(empresa=empresa, proveedor_id=OuterRef('pk'))
+                              .order_by().values('proveedor_id').annotate(n=Count('pk')).values('n'))
+                frecuencia += Coalesce(Subquery(inventario), 0)
+            proveedores = (Proveedor.objects.filter(cliente_contable=cliente_contable, empresa=empresa, activo=True)
                            .filter(Q(nombre__icontains=request.GET.get('q', '').strip()) |
                                    Q(rtn__icontains=request.GET.get('q', '').strip()))
-                           .annotate(frecuencia=Coalesce(Subquery(fiscales), 0) + Coalesce(Subquery(inventario), 0))
+                           .annotate(frecuencia=frecuencia)
                            .order_by('-frecuencia', 'nombre', 'pk')[:15])
             return JsonResponse({'proveedores': [dict(id=p.pk, nombre=p.nombre, rtn=p.rtn or '')
                                                 for p in proveedores]})
         if accion == 'duplicado':
-            form = IdentidadForm(request.GET, empresa=empresa)
+            form = IdentidadForm(request.GET, empresa=empresa, cliente_contable=cliente_contable)
             if not form.is_valid():
                 return JsonResponse({'errores': form.errors}, status=400)
             return JsonResponse({'duplicada': buscar_duplicada(empresa, form.cleaned_data['proveedor'],
-                                                               form.cleaned_data['numero_factura'],
+                                                               form.cleaned_data['numero_factura'], cliente_contable=cliente_contable,
                                                                excluir=request.GET.get('registro_id') if str(request.GET.get('registro_id','')).isdigit() else None)})
         if anio is None:
-            return selector_libros(request, empresa)
-        registros = RegistroCompraFiscal.objects.filter(empresa=empresa, periodo_anio=anio, periodo_mes=mes).order_by('pk')
-        libro = LibroCompraMensual.objects.filter(empresa=empresa, anio=anio, mes=mes).first()
+            return selector_libros(request, empresa, cliente_contable, acumulado)
+        registros = RegistroCompraFiscal.objects.filter(cliente_contable=cliente_contable, empresa=empresa, periodo_anio=anio, periodo_mes=mes).order_by('pk')
+        libro = LibroCompraMensual.objects.filter(cliente_contable=cliente_contable, empresa=empresa, anio=anio, mes=mes).first()
         cuadro = {'registros': [serializar(r) for r in registros], 'resumen': resumen_libro(registros),
                   'estado_libro': libro.estado if libro else 'en_proceso'}
         if accion == 'cuadro':
             return JsonResponse(cuadro)
         return render(request, 'facturacion/captura_rapida.html', {
-            'empresa': empresa, 'puede_crear_proveedor': puede_crear_proveedor, 'permisos': permisos,
+            'empresa': empresa, 'cliente': cliente_contable, 'puede_crear_proveedor': puede_crear_proveedor, 'permisos': permisos,
             'anio': anio, 'mes': mes, 'nombre_mes': MESES[mes-1], 'cuadro': cuadro})
     if anio is None:
         return JsonResponse({'error': 'Selecciona el año y mes del Libro de Compras antes de capturar.'}, status=400)
@@ -286,40 +301,44 @@ def captura_rapida(request, empresa_slug, anio=None, mes=None):
                 raise ValueError
         except ValueError:
             return JsonResponse({'error': 'Selecciona una factura válida.'}, status=400)
-    registros = RegistroCompraFiscal.objects.filter(empresa=empresa, periodo_anio=anio, periodo_mes=mes)
+    registros = RegistroCompraFiscal.objects.filter(cliente_contable=cliente_contable, empresa=empresa, periodo_anio=anio, periodo_mes=mes)
     original = get_object_or_404(registros, pk=registro_id) if registro_id else None
-    form = CapturaForm(request.POST, empresa=empresa, registro=original) if accion in ('guardar','editar') else None
+    form = CapturaForm(request.POST, empresa=empresa, registro=original, cliente_contable=cliente_contable) if accion in ('guardar','editar') else None
     if form and not form.is_valid():
         return JsonResponse({'errores': form.errors}, status=400)
     datos = form.cleaned_data if form else {}
     proveedor = datos.pop('proveedor', None)
     if form and not proveedor and original:
-        proveedor = Proveedor(empresa=empresa, nombre=original.proveedor_nombre, rtn=original.proveedor_rtn)
+        proveedor = Proveedor(empresa=empresa, cliente_contable=cliente_contable, nombre=original.proveedor_nombre, rtn=original.proveedor_rtn)
     registro = None
     try:
         with transaction.atomic():
             Empresa.objects.select_for_update().get(pk=empresa.pk)
-            libro, _ = LibroCompraMensual.objects.get_or_create(empresa=empresa, anio=anio, mes=mes)
+            libro, _ = LibroCompraMensual.objects.get_or_create(empresa=empresa, cliente_contable=cliente_contable, anio=anio, mes=mes)
             if accion == 'estado':
                 libro.estado = request.POST['estado']
             else:
                 if accion == 'guardar' and libro.estado == 'finalizado':
+                    transaction.set_rollback(True)
                     return JsonResponse({'error': 'Este libro está finalizado. Reábrelo para continuar capturando.'}, status=409)
                 if registro_id:
                     registro = get_object_or_404(registros.select_for_update(), pk=registro_id)
                     if request.POST.get('version') != serializar(registro)['version']:
+                        transaction.set_rollback(True)
                         return JsonResponse({'error': 'La factura cambió en otra sesión. Actualiza el cuadro antes de editarla.'}, status=409)
                     if registro.estado == 'anulada':
+                        transaction.set_rollback(True)
                         return JsonResponse({'error': 'Esta factura ya está anulada.'}, status=409)
                 if accion == 'anular':
                     registro.estado = 'anulada'
                     registro.save(update_fields=['estado'])
                 else:
-                    duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id)
+                    duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id, cliente_contable=cliente_contable)
                     if duplicada:
+                        transaction.set_rollback(True)
                         return JsonResponse({'duplicada': duplicada}, status=409)
                     if registro is None:
-                        registro = RegistroCompraFiscal(empresa=empresa, creado_por=usuario, origen_importacion='Captura rápida')
+                        registro = RegistroCompraFiscal(empresa=empresa, cliente_contable=cliente_contable, creado_por=usuario, origen_importacion='Captura rápida')
                     for campo, valor in datos.items():
                         setattr(registro, campo, valor)
                     # Preserva los importes exonerados históricos, no capturados en las nueve columnas.
@@ -335,7 +354,7 @@ def captura_rapida(request, empresa_slug, anio=None, mes=None):
             libro.actualizado_por = usuario
             libro.save()
     except (IntegrityError, forms.ValidationError) as exc:
-        duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id) if proveedor else None
+        duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id, cliente_contable=cliente_contable) if proveedor else None
         if duplicada:
             return JsonResponse({'duplicada': duplicada}, status=409)
         if isinstance(exc, forms.ValidationError):

@@ -1,0 +1,9 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Administrar cliente contable{% endblock %}
+{% block header_title %}{% if cliente %}Cliente activo: {{ cliente.nombre }}{% else %}Crear cliente contable{% endif %}{% endblock %}
+{% block content %}<section class="erp-card">
+<p><a href="{% url 'clientes_contables' empresa.slug %}">Volver a clientes</a></p>
+<form method="post">{% csrf_token %}{{ form.as_p }}
+<p>Los usuarios asignados conservan los permisos de su rol. Los administradores autorizados pueden consultar todos los clientes.</p>
+<button type="submit" class="erp-action-link">Guardar cliente y asignaciones</button></form>
+</section>{% endblock %}

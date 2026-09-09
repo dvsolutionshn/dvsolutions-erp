@@ -527,6 +527,31 @@ class PerfilFarmaceuticoProducto(models.Model):
         return f"Perfil farmaceutico - {self.producto.nombre}"
 
 
+class ClienteContable(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='clientes_contables')
+    nombre = models.CharField(max_length=200)
+    razon_social = models.CharField(max_length=200, blank=True)
+    rtn = models.CharField(max_length=20, blank=True)
+    activo = models.BooleanField(default=True)
+    usuarios = models.ManyToManyField(Usuario, blank=True, related_name='clientes_contables_asignados')
+
+    class Meta:
+        ordering = ['nombre', 'pk']
+        constraints = [models.UniqueConstraint(fields=['empresa', 'nombre'], name='unique_cliente_contable_nombre')]
+
+    def clean(self):
+        super().clean()
+        if self.empresa_id and self.empresa.slug != 'dubon_asociados':
+            raise ValidationError('Los clientes contables están habilitados solo en dubon_asociados.')
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
+
 class Proveedor(models.Model):
     CONDICIONES_PAGO = (
         ('contado', 'Contado'),
@@ -537,6 +562,8 @@ class Proveedor(models.Model):
 
     nombre = models.CharField(max_length=200)
     rtn = models.CharField(max_length=20, blank=True, null=True)
+    cliente_contable = models.ForeignKey(ClienteContable, null=True, blank=True, on_delete=models.PROTECT,
+                                         related_name='proveedores')
     contacto = models.CharField(max_length=150, blank=True, null=True)
     telefono = models.CharField(max_length=50, blank=True, null=True)
     correo = models.EmailField(blank=True, null=True)
@@ -557,6 +584,10 @@ class Proveedor(models.Model):
 
     def clean(self):
         super().clean()
+        if self.cliente_contable_id and self.cliente_contable.empresa_id != self.empresa_id:
+            raise ValidationError({'cliente_contable': 'El cliente contable debe pertenecer a la empresa del proveedor.'})
+        if self.cliente_contable_id and self.cuenta_contable_id:
+            raise ValidationError({'cuenta_contable': 'No se comparten cuentas de la administradora con clientes contables.'})
         if self.condicion_pago == 'contado':
             self.dias_credito = 0
 
@@ -926,6 +957,8 @@ class LibroCompraMensual(models.Model):
     """Cabecera; los documentos se relacionan por empresa + periodo_anio/mes existentes."""
     ESTADOS = (('en_proceso', 'En proceso'), ('finalizado', 'Finalizado'))
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
+    cliente_contable = models.ForeignKey(ClienteContable, null=True, blank=True, on_delete=models.PROTECT,
+                                         related_name='libros_compras')
     anio = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(9999)])
     mes = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(12)])
     estado = models.CharField(max_length=15, choices=ESTADOS, default='en_proceso')
@@ -933,11 +966,20 @@ class LibroCompraMensual(models.Model):
     actualizado_en = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['empresa', 'anio', 'mes'], name='unique_libro_compra_mes')]
+        constraints = [
+            models.UniqueConstraint(fields=['empresa', 'anio', 'mes'], condition=models.Q(cliente_contable__isnull=True), name='unique_libro_compra_mes'),
+            models.UniqueConstraint(fields=['empresa', 'cliente_contable', 'anio', 'mes'], name='unique_libro_cliente_mes'),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.cliente_contable_id and self.cliente_contable.empresa_id != self.empresa_id:
+            raise ValidationError('El cliente contable no pertenece a esta empresa.')
 
     @property
     def registros(self):
-        return RegistroCompraFiscal.objects.filter(empresa=self.empresa, periodo_anio=self.anio, periodo_mes=self.mes)
+        return RegistroCompraFiscal.objects.filter(empresa=self.empresa, cliente_contable_id=self.cliente_contable_id,
+                                                   periodo_anio=self.anio, periodo_mes=self.mes)
 
     def __str__(self):
         return f'{self.empresa_id} / {self.anio} / {self.mes}'
@@ -950,6 +992,8 @@ class RegistroCompraFiscal(models.Model):
     )
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
+    cliente_contable = models.ForeignKey(ClienteContable, null=True, blank=True, on_delete=models.PROTECT,
+                                         related_name='compras_fiscales')
     proveedor = models.ForeignKey('Proveedor', on_delete=models.SET_NULL, null=True, blank=True)
     proveedor_nombre = models.CharField(max_length=200)
     proveedor_rtn = models.CharField(max_length=20, blank=True, null=True)
@@ -991,11 +1035,21 @@ class RegistroCompraFiscal(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(fields=['empresa', 'identidad_captura', 'numero_factura_normalizado'],
+                                    condition=models.Q(cliente_contable__isnull=True),
                                     name='unique_compra_captura_rapida'),
+            models.UniqueConstraint(fields=['empresa', 'cliente_contable', 'identidad_captura', 'numero_factura_normalizado'],
+                                    name='unique_compra_cliente_captura'),
         ]
 
     def clean(self):
         super().clean()
+        if self.cliente_contable_id and self.cliente_contable.empresa_id != self.empresa_id:
+            raise ValidationError('El cliente contable no pertenece a esta empresa.')
+        if self.proveedor_id and (self.proveedor.empresa_id != self.empresa_id or
+                                   self.proveedor.cliente_contable_id != self.cliente_contable_id):
+            raise ValidationError({'proveedor': 'El proveedor debe pertenecer a la misma empresa y cliente contable.'})
+        if self.cliente_contable_id and self.clasificacion_contable_id:
+            raise ValidationError('No se comparten clasificaciones de la administradora con clientes contables.')
         if self.fecha_documento:
             self.periodo_anio = self.periodo_anio or self.fecha_documento.year
             self.periodo_mes = self.periodo_mes or self.fecha_documento.month
@@ -1020,6 +1074,7 @@ class RegistroCompraFiscal(models.Model):
             return None
         queryset = RegistroCompraFiscal.objects.filter(
             empresa=self.empresa,
+            cliente_contable_id=self.cliente_contable_id,
             numero_factura__iexact=self.numero_factura.strip(),
         ).exclude(estado='anulada')
         if self.pk:

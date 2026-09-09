@@ -103,7 +103,7 @@ def importar_libro_compras_desde_excel(empresa, archivo, periodo_anio, periodo_m
         if total == MONTO_CERO:
             total = subtotal + isv_15 + isv_18
 
-        proveedor = Proveedor.objects.filter(empresa=empresa, nombre__iexact=proveedor_nombre).first()
+        proveedor = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, nombre__iexact=proveedor_nombre).first()
         registro = RegistroCompraFiscal(
             empresa=empresa,
             proveedor=proveedor,

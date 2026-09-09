@@ -1767,7 +1767,7 @@ def _reporte_impuestos_data(empresa, fecha_inicio="", fecha_fin=""):
         empresa=empresa,
         estado="emitida",
     ).select_related("cliente", "factura_origen").prefetch_related("lineas__impuesto").order_by("fecha_emision", "numero_nota", "id")
-    compras = RegistroCompraFiscal.objects.filter(
+    compras = RegistroCompraFiscal.objects.filter(cliente_contable__isnull=True,
         empresa=empresa,
         estado="registrada",
     ).select_related("proveedor").order_by("fecha_documento", "numero_factura", "id")

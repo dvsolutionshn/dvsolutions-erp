@@ -1,0 +1,12 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Proveedores del cliente{% endblock %}
+{% block header_title %}Proveedores · {{ cliente.nombre }}{% endblock %}
+{% block content %}
+{% include "facturacion/_cliente_contable_nav.html" %}
+<section class="erp-card">
+<form method="get"><label>Buscar proveedor <input name="q" value="{{ q }}"></label><button>Buscar</button></form>
+<table class="erp-table" style="width:100%"><thead><tr><th>Nombre</th><th>RTN</th><th>Estado</th><th></th></tr></thead>
+<tbody>{% for proveedor in proveedores %}<tr><td>{{ proveedor.nombre }}</td><td>{{ proveedor.rtn }}</td><td>{{ proveedor.activo|yesno:'Activo,Inactivo' }}</td><td>{% if puede_editar %}<a href="{% url 'editar_proveedor_cliente_contable' empresa.slug cliente.pk proveedor.pk %}">Editar</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="4">Sin proveedores.</td></tr>{% endfor %}</tbody></table>
+{% if puede_guardar %}<h2>{% if form.instance.pk %}Editar proveedor{% else %}Crear proveedor{% endif %}</h2>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button class="erp-action-link">Guardar proveedor</button></form>{% endif %}
+</section>{% endblock %}

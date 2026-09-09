@@ -1,0 +1,83 @@
+const {chromium} = require(process.env.PLAYWRIGHT_MODULE);
+const assert = require('node:assert/strict');
+(async () => {
+  const browser = await chromium.launch({headless:true, executablePath:process.env.CHROME_EXECUTABLE});
+  try {
+    const context = await browser.newContext({viewport:{width:1440,height:1000}});
+    const base = process.env.CAPTURA_TEST_URL;
+    await context.addCookies([{name:'sessionid',value:process.env.CAPTURA_TEST_SESSION,url:base}]);
+    const page = await context.newPage();
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    const clientes = base + '/dubon_asociados/dashboard/facturacion/libro-compras/clientes/';
+    await page.goto(clientes);
+    const abrir = async nombre => {
+      await page.getByRole('row').filter({has:page.getByRole('cell',{name:nombre,exact:true})}).getByRole('link',{name:'Abrir libros'}).click();
+      await page.locator('[name=anio]').fill('2026');
+      await page.getByRole('button',{name:'Ver meses'}).click();
+      await page.getByRole('link',{name:'Abrir Agosto',exact:true}).click();
+      assert.match(await page.locator('body').textContent(),new RegExp('Cliente activo: '+nombre));
+    };
+    await abrir('Nordic');
+    const nordicUrl = page.url();
+    const date = page.locator('[name=fecha_documento]');
+    const capturar = async () => {
+      await date.fill('25/7/26'); await page.keyboard.press('Tab');
+      await page.keyboard.type('Larach'); await page.getByRole('option').first().waitFor();
+      await page.keyboard.press('Tab'); await page.keyboard.type('0040120158956348');
+      await page.keyboard.press('Tab'); await page.keyboard.type('10');
+      await page.keyboard.press('Tab'); await page.keyboard.type('100');
+      await page.keyboard.press('Tab'); await page.keyboard.type('200');
+      await page.keyboard.press('Shift+Tab');
+      assert.equal(await page.locator(':focus').getAttribute('name'),'base_15');
+      await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
+      await page.waitForFunction(() => document.querySelectorAll('#saved-rows tr').length === 1);
+      assert.equal(await page.locator('#sum-total').textContent(),'361.00');
+      assert.equal(await page.locator(':focus').getAttribute('name'),'fecha_documento');
+      assert.match(await page.locator('#saved-rows').textContent(),/25\/07\/2026/);
+    };
+    await capturar();
+    assert.equal(page.url(),nordicUrl);
+    assert.match(await page.locator('#saved-rows').textContent(),/Larach Nordic/);
+    await page.getByRole('link',{name:'Cambiar cliente'}).click();
+    await abrir('Molac');
+    const molacUrl = page.url();
+    assert.equal(await page.locator('#saved-rows tr').count(),0);
+    await capturar(); // Igual RTN y número: permitido en el otro cliente.
+    assert.match(await page.locator('#saved-rows').textContent(),/Larach Molac/);
+    await page.goto(nordicUrl);
+    assert.equal(await page.locator('#saved-rows tr').count(),1);
+    await page.getByRole('button',{name:'Editar',exact:true}).click();
+    await page.locator('[name=exento]').fill('20');
+    await page.locator('[name=base_18]').focus(); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('#sum-total').textContent === '371.00');
+    if (process.env.CAPTURA_SCREENSHOT) await page.screenshot({path:process.env.CAPTURA_SCREENSHOT,fullPage:true,animations:'disabled'});
+    await page.getByRole('link',{name:'Acumulado anual',exact:true}).click();
+    assert.equal(await page.getByRole('link',{name:/^Abrir /}).count(),12);
+    assert.match(await page.locator('tfoot').textContent(),/371[,.]00/);
+    assert.match(await page.getByRole('row').filter({has:page.getByRole('cell',{name:'Julio',exact:true})}).textContent(),/0[,.]00/);
+    if (process.env.CAPTURA_SCREENSHOT) await page.screenshot({path:process.env.CAPTURA_SCREENSHOT.replace('.png','-anual.png'),fullPage:true,animations:'disabled'});
+    await page.goto(nordicUrl.replace('/2026/8/','/2026/9/'));
+    await date.fill('050826'); await page.keyboard.press('Tab');
+    await page.keyboard.type('Larach'); await page.getByRole('option').first().waitFor();
+    await page.keyboard.press('Tab'); await page.keyboard.type('0040120158956348'); await page.keyboard.press('Tab');
+    await page.waitForFunction(() => document.querySelector('#row-message').textContent.includes('FACTURA YA REGISTRADA'));
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator(':focus').getAttribute('name'),'fecha_documento');
+    await page.goto(nordicUrl);
+    await page.getByRole('button',{name:'Anular',exact:true}).click();
+    await page.waitForFunction(() => document.querySelector('#sum-total').textContent === '0.00');
+    await page.getByRole('link',{name:'Acumulado anual',exact:true}).click();
+    assert.match(await page.locator('tfoot').textContent(),/0[,.]00/);
+    await page.goto(molacUrl);
+    assert.equal(await page.locator('#sum-total').textContent(),'361.00');
+    // El usuario asignado ve Nordic y Gecko, pero tampoco por URL accede a Molac.
+    await context.addCookies([{name:'sessionid',value:process.env.CLIENTES_USER_SESSION,url:base}]);
+    await page.goto(clientes);
+    assert.equal(await page.getByRole('cell',{name:'Molac',exact:true}).count(),0);
+    assert.equal((await page.goto(molacUrl)).status(),404);
+    await page.goto(nordicUrl);
+    assert.equal(await page.locator('#saved-rows tr').count(),1);
+    assert.deepEqual(errors,[]);
+    console.log('PASS: clientes, teclado, períodos, edición, anulación, acumulados, duplicados y acceso por asignación.');
+  } finally { await browser.close(); }
+})().catch(error => {console.error(error); process.exit(1);});

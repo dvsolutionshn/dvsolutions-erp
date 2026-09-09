@@ -1,8 +1,19 @@
 from django.urls import path
 from . import views
 from .captura_rapida import captura_rapida
+from .clientes_contables import clientes_contables, editar_cliente_contable, proveedores_cliente
 
 urlpatterns = [
+    path('libro-compras/propias/', views.libro_compras_fiscal, {'compras_propias': True}, name='libros_compras_propias'),
+    path('libro-compras/clientes/', clientes_contables, name='clientes_contables'),
+    path('libro-compras/clientes/crear/', editar_cliente_contable, name='crear_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/editar/', editar_cliente_contable, name='editar_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/libros/', captura_rapida, name='libros_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/acumulado/', captura_rapida, {'acumulado': True}, name='acumulado_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/libros/<int:anio>/<int:mes>/', captura_rapida, name='captura_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/proveedores/', proveedores_cliente, name='proveedores_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/proveedores/<int:proveedor_id>/editar/', proveedores_cliente, name='editar_proveedor_cliente_contable'),
+
     path('libro-compras/captura-rapida/', captura_rapida, name='captura_rapida_compras'),
     path('libro-compras/captura-rapida/<int:anio>/<int:mes>/', captura_rapida, name='captura_rapida_compras_periodo'),
 
@@ -118,7 +129,7 @@ urlpatterns = [
     path('<int:factura_id>/pdf/notas-extensas/vista-previa/', views.vista_previa_factura_pdf_notas_extensas, name='vista_previa_factura_pdf_notas_extensas'),
     path('<int:factura_id>/pdf/independiente/vista-previa/', views.vista_previa_factura_pdf_independiente, name='vista_previa_factura_pdf_independiente'),
 
-    # 🔥 NUEVO
+    # ðŸ”¥ NUEVO
     path('<int:factura_id>/pago/', views.registrar_pago, name='registrar_pago'),
     path('<int:factura_id>/pago/<int:pago_id>/editar/', views.editar_pago_factura, name='editar_pago_factura'),
     path('<int:factura_id>/anular/', views.anular_factura, name='anular_factura'),

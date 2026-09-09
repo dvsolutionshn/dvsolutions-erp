@@ -1,0 +1,17 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Clientes Contables{% endblock %}
+{% block header_title %}Libros de Compras · Clientes Contables{% endblock %}
+{% block header_description %}Selecciona el cliente para consultar proveedores, libros mensuales y acumulados.{% endblock %}
+{% block content %}
+<section class="erp-card">
+<p><a href="{% url 'libros_compras_propias' empresa.slug %}">Consultar compras propias de {{ empresa.nombre }}</a></p>
+{% if administrar %}<p><a class="erp-action-link" href="{% url 'crear_cliente_contable' empresa.slug %}">Crear cliente contable</a></p>{% endif %}
+<table class="erp-table" style="width:100%">
+<thead><tr><th>Cliente</th><th>Razón social</th><th>RTN</th><th>Estado</th><th>Acciones</th></tr></thead>
+<tbody>{% for cliente in clientes %}<tr>
+<td>{{ cliente.nombre }}</td><td>{{ cliente.razon_social|default:'—' }}</td><td>{{ cliente.rtn|default:'—' }}</td><td>{{ cliente.activo|yesno:'Activo,Inactivo' }}</td>
+<td><a href="{% url 'libros_cliente_contable' empresa.slug cliente.pk %}">Abrir libros</a> · <a href="{% url 'acumulado_cliente_contable' empresa.slug cliente.pk %}">Acumulado anual</a>
+{% if administrar %} · <a href="{% url 'editar_cliente_contable' empresa.slug cliente.pk %}">Editar / asignar usuarios</a>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="5">No tienes clientes contables asignados. Solicita la asignación al administrador.</td></tr>{% endfor %}</tbody>
+</table></section>
+{% endblock %}

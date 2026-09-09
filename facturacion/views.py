@@ -232,7 +232,7 @@ def _datos_comision_pago(payload, empresa, base_comision, factura=None):
         raise ValidationError("El porcentaje de comision debe estar entre 0 y 100.")
     if porcentaje == 0:
         return None, Decimal("0.00"), Decimal("0.00")
-    proveedor = Proveedor.objects.filter(empresa=empresa, activo=True, id=proveedor_id).first()
+    proveedor = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True, id=proveedor_id).first()
     if not proveedor:
         raise ValidationError("Selecciona el proveedor al que se pagara la comision.")
     base = _base_comision_pago(factura, base_comision)
@@ -3246,7 +3246,7 @@ def proveedores_facturacion(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     q = request.GET.get("q", "").strip()
     estado = request.GET.get("estado", "").strip()
-    proveedores = Proveedor.objects.filter(empresa=empresa).order_by('nombre')
+    proveedores = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa).order_by('nombre')
 
     if q:
         proveedores = proveedores.filter(
@@ -3279,7 +3279,7 @@ def proveedores_facturacion(request, empresa_slug):
 @login_required
 def ver_proveedor(request, empresa_slug, proveedor_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    proveedor = get_object_or_404(Proveedor, id=proveedor_id, empresa=empresa)
+    proveedor = get_object_or_404(Proveedor, cliente_contable__isnull=True, id=proveedor_id, empresa=empresa)
     compras = (
         CompraInventario.objects.filter(empresa=empresa, proveedor=proveedor)
         .prefetch_related('lineas', 'pagos_compra')
@@ -3343,7 +3343,7 @@ def crear_proveedor(request, empresa_slug):
 @login_required
 def editar_proveedor(request, empresa_slug, proveedor_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    proveedor = get_object_or_404(Proveedor, id=proveedor_id, empresa=empresa)
+    proveedor = get_object_or_404(Proveedor, cliente_contable__isnull=True, id=proveedor_id, empresa=empresa)
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -3679,7 +3679,7 @@ def crear_lote_inventario(request, empresa_slug):
 
     bodegas = _asegurar_bodegas_farmaceuticas(empresa)
     productos = Producto.objects.filter(empresa=empresa, activo=True, controla_inventario=True).order_by("nombre")
-    proveedores = Proveedor.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+    proveedores = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
     producto_preseleccionado = productos.filter(id=request.GET.get("producto")).first()
     next_url = request.POST.get("next") or request.GET.get("next") or ""
     if request.method == "POST":
@@ -4498,11 +4498,13 @@ def compras_dashboard(request, empresa_slug):
 
 
 @login_required
-def libro_compras_fiscal(request, empresa_slug):
-    if empresa_slug == 'demo_1':
+def libro_compras_fiscal(request, empresa_slug, compras_propias=False):
+    if compras_propias and empresa_slug != 'dubon_asociados':
+        raise Http404
+    if empresa_slug in ('demo_1', 'dubon_asociados') and not compras_propias:
         return captura_rapida(request, empresa_slug)
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    registros_activos = RegistroCompraFiscal.objects.filter(empresa=empresa).exclude(estado="anulada")
+    registros_activos = RegistroCompraFiscal.objects.filter(cliente_contable__isnull=True, empresa=empresa).exclude(estado="anulada")
     periodos = (
         registros_activos.values("periodo_anio", "periodo_mes")
         .annotate(
@@ -4549,7 +4551,7 @@ def libro_compras_fiscal_detalle(request, empresa_slug, anio, mes):
         return redirect('captura_rapida_compras_periodo', empresa_slug=empresa_slug, anio=anio, mes=mes)
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     q = request.GET.get("q", "").strip()
-    registros = RegistroCompraFiscal.objects.filter(
+    registros = RegistroCompraFiscal.objects.filter(cliente_contable__isnull=True,
         empresa=empresa,
         periodo_anio=anio,
         periodo_mes=mes,
@@ -4755,7 +4757,7 @@ def crear_registro_compra_fiscal(request, empresa_slug):
 @require_POST
 def anular_registro_compra_fiscal(request, empresa_slug, registro_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    registro = get_object_or_404(RegistroCompraFiscal, id=registro_id, empresa=empresa)
+    registro = get_object_or_404(RegistroCompraFiscal, cliente_contable__isnull=True, id=registro_id, empresa=empresa)
     registro.estado = "anulada"
     registro.save(update_fields=["estado"])
     messages.success(request, "Registro fiscal anulado correctamente.")
@@ -4766,7 +4768,7 @@ def anular_registro_compra_fiscal(request, empresa_slug, registro_id):
 def crear_compra(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     estados_disponibles = [estado for estado in CompraInventario.ESTADOS if estado[0] != 'anulada']
-    proveedores_qs = Proveedor.objects.filter(empresa=empresa, activo=True).order_by('nombre')
+    proveedores_qs = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by('nombre')
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
 
     CompraForm = modelform_factory(
@@ -4948,7 +4950,7 @@ def editar_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     compra = get_object_or_404(CompraInventario, id=compra_id, empresa=empresa)
     estados_disponibles = [estado for estado in CompraInventario.ESTADOS if estado[0] != 'anulada']
-    proveedores_qs = Proveedor.objects.filter(empresa=empresa, activo=True).order_by('nombre')
+    proveedores_qs = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by('nombre')
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
 
     if compra.estado == 'anulada':
@@ -7659,7 +7661,7 @@ def registrar_pago(request, empresa_slug, factura_id):
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
     cuentas_tarjeta = tarjetas if tarjetas.exists() else cuentas_financieras
-    proveedores_comision = Proveedor.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+    proveedores_comision = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
 
     def _contexto_pago(form_data=None):
         return {
@@ -8039,7 +8041,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
     cuentas_tarjeta = tarjetas if tarjetas.exists() else cuentas_financieras
-    proveedores_comision = Proveedor.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+    proveedores_comision = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
 
     def _form_data_base():
         data = {
@@ -9721,7 +9723,7 @@ def reporte_cxp(request, empresa_slug):
     if proveedor_id:
         try:
             proveedor_id_int = int(proveedor_id)
-            proveedor_seleccionado = get_object_or_404(Proveedor, id=proveedor_id_int, empresa=empresa)
+            proveedor_seleccionado = get_object_or_404(Proveedor, cliente_contable__isnull=True, id=proveedor_id_int, empresa=empresa)
             proveedor_nombre_seleccionado = proveedor_seleccionado.nombre
             compras_pendientes_proveedor = [
                 compra for compra in compras.filter(proveedor_id=proveedor_id_int)
@@ -9792,7 +9794,7 @@ def reporte_cxp(request, empresa_slug):
         "compras_pendientes_proveedor": compras_pendientes_proveedor,
         "comisiones_pendientes_proveedor": comisiones_pendientes_proveedor,
         "q": q,
-        "proveedores_sugeridos": Proveedor.objects.filter(empresa=empresa).values_list('nombre', flat=True).distinct(),
+        "proveedores_sugeridos": Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa).values_list('nombre', flat=True).distinct(),
     })
 
 
