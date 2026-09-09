@@ -157,6 +157,29 @@ class ClientesContablesTests(TestCase):
         self.assertEqual(self.client.post(self.url,self.data).status_code,403)
         self.assertFalse(self.client.get(self.url).context['permisos']['crear'])
 
+    def test_editar_clientes_existentes_y_cambiar_asignaciones(self):
+        registro = self.guardar()
+        self.client.force_login(self.admin)
+        lista = reverse('clientes_contables', args=[self.empresa.slug])
+        for cliente in (self.nordic, self.molac, self.gecko):
+            editar = self.ruta('editar_cliente_contable', cliente)
+            self.assertContains(self.client.get(lista), editar)
+            self.assertContains(self.client.get(self.ruta('libros_cliente_contable', cliente)), editar)
+            pantalla = self.client.get(editar)
+            self.assertEqual(pantalla.status_code, 200)
+            self.assertEqual(set(pantalla.context['form']['usuarios'].value()), set(cliente.usuarios.values_list('pk', flat=True)))
+            respuesta = self.client.post(editar, {'nombre':cliente.nombre, 'activo':'on', 'usuarios':[self.usuario.pk]}, follow=True)
+            self.assertContains(respuesta, f'Cliente {cliente.nombre}: datos y usuarios asignados guardados correctamente.')
+            self.assertEqual(list(cliente.usuarios.all()), [self.usuario])
+        self.assertEqual(ClienteContable.objects.count(), 3)
+        self.assertTrue(RegistroCompraFiscal.objects.filter(pk=registro['id'], cliente_contable=self.nordic).exists())
+        self.client.post(self.ruta('editar_cliente_contable'), {'nombre':'Nordic', 'activo':'on'})
+        self.assertFalse(self.nordic.usuarios.exists())
+        self.client.force_login(self.usuario)
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.assertEqual(self.client.get(self.ruta('libros_cliente_contable', self.molac)).status_code, 200)
+        self.assertNotContains(self.client.get(self.ruta('libros_cliente_contable', self.molac)), 'Editar / asignar usuarios')
+
     def test_permisos_de_rol_se_conservan(self):
         self.rol.puede_crear_compras=False;self.rol.puede_editar_compras=False;self.rol.save()
         self.assertEqual(self.client.get(self.url).status_code,200)

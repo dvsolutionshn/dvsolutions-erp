@@ -1,5 +1,6 @@
 """Contexto explícito y administración de clientes contables de Dubón."""
 from django import forms
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -64,7 +65,7 @@ def clientes_contables(request, empresa_slug):
     if request.method != 'GET':
         raise PermissionDenied
     return render(request, 'facturacion/clientes_contables.html', {
-        'empresa': empresa, 'clientes': clientes_visibles(request.user, empresa), 'administrar': es_admin(request.user)})
+        'empresa': empresa, 'clientes': clientes_visibles(request.user, empresa).prefetch_related('usuarios'), 'administrar': es_admin(request.user)})
 
 
 @login_required
@@ -79,7 +80,8 @@ def editar_cliente_contable(request, empresa_slug, cliente_id=None):
         with transaction.atomic():
             Empresa.objects.select_for_update().get(pk=empresa.pk)
             if form.is_valid():
-                form.save()
+                guardado = form.save()
+                messages.success(request, f'Cliente {guardado.nombre}: datos y usuarios asignados guardados correctamente.')
                 return redirect('clientes_contables', empresa_slug=empresa_slug)
     return render(request, 'facturacion/cliente_contable_form.html', {'empresa': empresa, 'form': form, 'cliente': cliente})
 

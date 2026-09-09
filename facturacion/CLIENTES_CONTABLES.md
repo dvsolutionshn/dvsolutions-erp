@@ -13,6 +13,8 @@ La fecha `25/7/26` o `250726` en el libro Agosto 2026 permanece en agosto. Se co
 
 **Crear clientes y asignar usuarios:** un administrador autorizado abre **Crear cliente contable** o **Editar / asignar usuarios**, completa nombre, razón social, RTN y estado, marca los usuarios y guarda. Puede asignar el mismo usuario a varios clientes. Solo aparecen usuarios activos con acceso a Dubón. La asignación no otorga permisos nuevos: siguen aplicándose los permisos de compras y proveedores del rol. Los administradores con acceso a la empresa pueden consultar todos los clientes.
 
+El botón **Editar / asignar usuarios** está en la fila de cada cliente y en la navegación de sus libros, acumulados y proveedores. La lista muestra las asignaciones actuales al administrador. Al editar se muestran marcados los usuarios existentes; desmarcar uno retira su acceso sin alterar las facturas. Se confirma el guardado con un mensaje. Si el botón no aparece, revisar que la cuenta tenga `es_administrador_empresa` o sea superusuario, además del acceso a Dubón.
+
 **Proveedores:** desde el cliente, abrir **Proveedores del cliente** para crear o editar nombre, RTN y estado. También pueden crearse durante la captura. Un RTN puede existir en distintos clientes; no se reutiliza automáticamente el proveedor de otro cliente. Se conservan los datos históricos de la factura al editar el catálogo.
 
 **Inactivos:** los usuarios normales dejan de ver el cliente; los administradores pueden consultarlo, sin guardar cambios en sus libros ni proveedores hasta reactivarlo.

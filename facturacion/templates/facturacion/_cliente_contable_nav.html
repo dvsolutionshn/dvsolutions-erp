@@ -6,4 +6,7 @@
 <a href="{% url 'libros_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Libros mensuales</a>
 <a href="{% url 'acumulado_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Acumulado anual</a>
 <a href="{% url 'proveedores_cliente_contable' empresa.slug cliente.pk %}">Proveedores del cliente</a>
+{% if user.is_superuser or user.es_administrador_empresa %}
+<a class="erp-action-link" href="{% url 'editar_cliente_contable' empresa.slug cliente.pk %}">Editar / asignar usuarios</a>
+{% endif %}
 </nav></section>

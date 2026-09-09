@@ -3,7 +3,15 @@
 {% block header_title %}{% if cliente %}Cliente activo: {{ cliente.nombre }}{% else %}Crear cliente contable{% endif %}{% endblock %}
 {% block content %}<section class="erp-card">
 <p><a href="{% url 'clientes_contables' empresa.slug %}">Volver a clientes</a></p>
-<form method="post">{% csrf_token %}{{ form.as_p }}
+<form method="post">{% csrf_token %}
+{{ form.non_field_errors }}
+{% for campo in form %}{% if campo.name != 'usuarios' %}<p>{{ campo.label_tag }} {{ campo }} {{ campo.errors }}</p>{% endif %}{% endfor %}
+<fieldset style="margin:20px 0;padding:16px;border:1px solid #cbd5e1;border-radius:8px">
+<legend><strong>Usuarios asignados{% if cliente %} a {{ cliente.nombre }}{% endif %}</strong></legend>
+<p>Marca uno o varios usuarios. Desmarca un usuario para quitarle el acceso a este cliente.</p>
+{{ form.usuarios.errors }}
+{% if form.usuarios.field.queryset %}{{ form.usuarios }}{% else %}<p>No hay usuarios activos con acceso a {{ empresa.nombre }}. Primero crea el usuario o habilita su acceso a esta empresa.</p>{% endif %}
+</fieldset>
 <p>Los usuarios asignados conservan los permisos de su rol. Los administradores autorizados pueden consultar todos los clientes.</p>
 <button type="submit" class="erp-action-link">Guardar cliente y asignaciones</button></form>
 </section>{% endblock %}
