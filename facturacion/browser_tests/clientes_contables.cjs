@@ -11,7 +11,11 @@ const assert = require('node:assert/strict');
     const clientes = base + '/dubon_asociados/dashboard/facturacion/libro-compras/clientes/';
     await page.goto(clientes);
     const abrir = async nombre => {
-      await page.getByRole('row').filter({has:page.getByRole('cell',{name:nombre,exact:true})}).getByRole('link',{name:'Abrir libros'}).click();
+      await page.getByRole('link',{name:nombre,exact:true}).click();
+      await page.getByRole('heading',{name:'Cliente activo: '+nombre,exact:true}).waitFor();
+      await page.locator('[name=anio]').fill('2026');
+      await page.getByRole('button',{name:'Abrir año',exact:true}).click();
+      await page.getByRole('link',{name:'Abrir libros 2026',exact:true}).click();
       await page.locator('[name=anio]').fill('2026');
       await page.getByRole('button',{name:'Ver meses'}).click();
       await page.getByRole('link',{name:'Abrir Agosto',exact:true}).click();

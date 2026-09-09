@@ -157,6 +157,22 @@ class ClientesContablesTests(TestCase):
         self.assertEqual(self.client.post(self.url,self.data).status_code,403)
         self.assertFalse(self.client.get(self.url).context['permisos']['crear'])
 
+    def test_panel_cliente_navegacion_anio_y_aislamiento(self):
+        self.guardar()
+        panel = self.ruta('panel_cliente_contable')
+        lista = self.client.get(reverse('clientes_contables', args=[self.empresa.slug]))
+        self.assertContains(lista, panel)
+        response = self.client.get(panel, {'anio':2026})
+        self.assertContains(response, 'Cliente activo: Nordic')
+        self.assertContains(response, self.ruta('libros_cliente_contable')+'?anio=2026')
+        self.assertContains(response, self.ruta('acumulado_cliente_contable')+'?anio=2026')
+        self.assertIn(2026, response.context['anios'])
+        self.assertEqual(self.client.get(panel, {'anio':2024}).context['anio'],2024)
+        self.assertEqual(self.client.get(panel, {'anio':'incorrecto'}).status_code,400)
+        self.assertEqual(self.client.get(self.ruta('panel_cliente_contable',self.molac)).status_code,404)
+        self.assertEqual(self.client.post(panel, {}).status_code,405)
+        self.assertEqual(RegistroCompraFiscal.objects.count(),1)
+
     def test_editar_clientes_existentes_y_cambiar_asignaciones(self):
         registro = self.guardar()
         self.client.force_login(self.admin)

@@ -3,6 +3,7 @@
 {% if not cliente.activo %}<span> · Inactivo · Solo consulta</span>{% endif %}
 <nav style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px">
 <a href="{% url 'clientes_contables' empresa.slug %}">Cambiar cliente</a>
+<a href="{% url 'panel_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Inicio del cliente</a>
 <a href="{% url 'libros_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Libros mensuales</a>
 <a href="{% url 'acumulado_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Acumulado anual</a>
 <a href="{% url 'proveedores_cliente_contable' empresa.slug cliente.pk %}">Proveedores del cliente</a>

@@ -8,9 +8,10 @@ from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
+from django.utils import timezone
 
 from core.models import Empresa, Usuario
-from .models import ClienteContable, Proveedor
+from .models import ClienteContable, Proveedor, LibroCompraMensual, RegistroCompraFiscal
 
 
 def es_admin(usuario):
@@ -36,6 +37,27 @@ def clientes_visibles(usuario, empresa):
 def cliente_autorizado(request, empresa, cliente_id):
     # No confiar en sesiones ni parámetros POST para establecer el contexto.
     return get_object_or_404(clientes_visibles(request.user, empresa), pk=cliente_id)
+
+
+@login_required
+@require_http_methods(['GET'])
+def panel_cliente_contable(request, empresa_slug, cliente_id):
+    empresa = empresa_contable(request, empresa_slug)
+    cliente = cliente_autorizado(request, empresa, cliente_id)
+    actual = timezone.localdate().year
+    try:
+        anio = int(request.GET.get('anio') or actual)
+        if not 1 <= anio <= 9999:
+            raise ValueError
+    except ValueError:
+        return render(request, 'facturacion/panel_cliente_contable.html', {
+            'empresa':empresa, 'cliente':cliente, 'anio':actual, 'error_anio':'Selecciona un año entre 1 y 9999.'}, status=400)
+    anios = set(RegistroCompraFiscal.objects.filter(empresa=empresa, cliente_contable=cliente)
+                .values_list('periodo_anio', flat=True))
+    anios.update(LibroCompraMensual.objects.filter(empresa=empresa, cliente_contable=cliente).values_list('anio', flat=True))
+    anios.update((actual, anio))
+    return render(request, 'facturacion/panel_cliente_contable.html', {
+        'empresa':empresa, 'cliente':cliente, 'anio':anio, 'anios':sorted((a for a in anios if a), reverse=True)})
 
 
 class ClienteContableForm(forms.ModelForm):

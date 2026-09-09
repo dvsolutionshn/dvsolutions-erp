@@ -5,7 +5,7 @@ Disponible únicamente en `dubon_asociados`. Conserva la captura mensual de `dem
 ## Acceso y uso
 
 1. Entrar a **Dubón → Facturación → Libro Compras**.
-2. Elegir cliente, año y **Abrir** en el mes correspondiente.
+2. Hacer clic en el nombre del cliente o en **Entrar al cliente**. En su panel, seleccionar el año y **Abrir libros**; luego **Abrir** en el mes correspondiente. Desde el mismo panel se accede al resumen acumulado anual y a proveedores.
 3. Capturar con TAB / SHIFT+TAB y ENTER al terminar Base 18%. La fila guardada aparece en el mismo cuadro, sin recargar.
 4. Usar **Acumulado anual** para consultar los doce meses y TOTAL AÑO. Se calcula directamente desde las facturas; las anuladas no suman.
 
@@ -26,6 +26,7 @@ Prefijo: `/dubon_asociados/dashboard/facturacion/libro-compras/`.
 | Ruta relativa | Pantalla |
 | --- | --- |
 | `clientes/` | Selección de cliente |
+| `clientes/<cliente_id>/?anio=2026` | Panel del cliente: libros, resumen acumulado y proveedores |
 | `clientes/crear/` | Alta y asignaciones |
 | `clientes/<cliente_id>/editar/` | Datos, estado y usuarios |
 | `clientes/<cliente_id>/proveedores/` | Catálogo y alta de proveedores |
@@ -45,6 +46,8 @@ Todas las operaciones de cliente resuelven empresa y asignación en backend. Man
 Los registros anteriores conservan `cliente_contable=NULL`: no se reasignan ni se modifican sus importes, fechas o proveedores. Existe una sola factura en RegistroCompraFiscal; LibroCompraMensual es una cabecera y el acumulado es una consulta. El guardado bloquea la empresa y mantiene la restricción única en base de datos para impedir reenvíos duplicados.
 
 Las cuentas y clasificaciones contables actuales pertenecen a la empresa ERP, sin dimensión cliente. Por eso no se comparten con los clientes ni se suman sus compras al reporte de impuestos propio de Dubón. El reporte por cliente es su acumulado anual. No se introducen asientos ni una contabilidad paralela.
+
+El acumulado definitivo por cuentas queda pendiente del modelo que proporcionará el usuario. El panel conserva el resumen mensual actual; no se crean clasificaciones ni reglas contables provisionales.
 
 ## Archivos
 

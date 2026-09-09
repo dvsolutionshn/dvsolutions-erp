@@ -1,12 +1,13 @@
 from django.urls import path
 from . import views
 from .captura_rapida import captura_rapida
-from .clientes_contables import clientes_contables, editar_cliente_contable, proveedores_cliente
+from .clientes_contables import clientes_contables, editar_cliente_contable, proveedores_cliente, panel_cliente_contable
 
 urlpatterns = [
     path('libro-compras/propias/', views.libro_compras_fiscal, {'compras_propias': True}, name='libros_compras_propias'),
     path('libro-compras/clientes/', clientes_contables, name='clientes_contables'),
     path('libro-compras/clientes/crear/', editar_cliente_contable, name='crear_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/', panel_cliente_contable, name='panel_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/editar/', editar_cliente_contable, name='editar_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/libros/', captura_rapida, name='libros_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/acumulado/', captura_rapida, {'acumulado': True}, name='acumulado_cliente_contable'),
