@@ -47,7 +47,7 @@ class DashboardDemoTests(TestCase):
         self.assertContains(response, "3 módulos disponibles")
         self.assertContains(response, reverse("crear_factura", args=["demo_1"]))
         self.assertContains(response, "demo-dashboard.css")
-        self.assertContains(response, "dv-solutions-control-logo.webp")
+        self.assertContains(response, "dv-solutions-oficial.png")
         self.assertContains(response, reverse("empresa_respaldo", args=["demo_1"]))
 
     def test_otras_empresas_y_clinicas_conservan_plantilla(self):

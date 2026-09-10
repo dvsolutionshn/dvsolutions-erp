@@ -1,7 +1,10 @@
+from hashlib import sha256
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch, Mock
 
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.contrib.staticfiles import finders
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase
@@ -16,9 +19,19 @@ class LoginCorporativoTests(SimpleTestCase):
             request = RequestFactory().get("/empresa/?next=/empresa/dashboard/")
             html = render_to_string("core/login_corporativo.html", {"empresa": empresa, "request": request})
             self.assertIn("Mi Empresa &amp; Asociados", html)
-            self.assertIn("core/img/dv-solutions-brand.png", html)
+            self.assertIn("core/images/dv-solutions-oficial.png", html)
             self.assertIn('value="/empresa/dashboard/"', html)
             self.assertEqual("/media/logo-empresa.png" in html, bool(logo))
+            self.assertNotIn('class="company-logo"', html)
+            if logo:
+                self.assertEqual(html.count('/media/logo-empresa.png'), 1)
+                self.assertLess(html.index('class="access-logo"'), html.index('class="welcome"'))
+
+    def test_logo_oficial_es_la_imagen_entregada(self):
+        path = finders.find("core/images/dv-solutions-oficial.png")
+        self.assertIsNotNone(path)
+        self.assertEqual(sha256(Path(path).read_bytes()).hexdigest(),
+                         "88cf552e962d439c3f77d98fe7cb9994c2bf20ecff694729985403e97ccde926")
 
     def test_tecnicentro_conserva_acceso_especializado(self):
         empresa = SimpleNamespace(slug="garage-demo", tipo_solucion="tecnicentro")

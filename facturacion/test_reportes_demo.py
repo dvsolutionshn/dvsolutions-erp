@@ -53,7 +53,7 @@ class ReportesDemoTests(TestCase):
         self.assertEqual(response.context["totales"]["total"], Decimal("2990.00"))
         self.assertEqual(response.context["total_saldo"], Decimal("2990.00"))
         self.assertEqual(len(response.context["facturas"]), 3)
-        self.assertContains(response, "dv-solutions-control-logo.webp")
+        self.assertContains(response, "dv-solutions-oficial.png")
         self.assertNotContains(response, self.foreign.nombre)
 
     def test_tendencia_incluye_periodos_historicos_seleccionados(self):

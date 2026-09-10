@@ -85,7 +85,7 @@
     {% elif report_view == "externo" %}
         {% if configuracion_power_bi.activo and configuracion_power_bi.mostrar_en_reportes and configuracion_power_bi.url_embed %}<section class="report-external"><div class="report-section-head"><div><h2>{{ configuracion_power_bi.titulo_panel|default:"Panel externo" }}</h2>{% if configuracion_power_bi.descripcion_panel %}<p>{{ configuracion_power_bi.descripcion_panel }}</p>{% endif %}</div></div><iframe src="{{ configuracion_power_bi.url_embed }}" title="{{ configuracion_power_bi.titulo_panel|default:'Panel externo' }}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="height:{{ configuracion_power_bi.alto_iframe }}px"></iframe></section>{% else %}<div class="report-empty"><h2>Panel externo no configurado</h2></div>{% endif %}
     {% endif %}
-    <footer class="report-footer"><span>{{ empresa.nombre }} · Reportes de facturación</span><img src="{% static 'core/images/dv-solutions-control-logo.webp' %}" alt="DV Solutions"></footer>
+    <footer class="report-footer"><span>{{ empresa.nombre }} · Reportes de facturación</span><img src="{% static 'core/images/dv-solutions-oficial.png' %}" alt="DV Solutions"></footer>
 </div>
 {% endblock %}
 {% block extra_js %}{{ block.super }}<script src="{% static 'facturacion/reportes-demo.js' %}"></script>{% endblock %}

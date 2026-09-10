@@ -5,14 +5,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Inicia sesión | {{ empresa.nombre }}</title>
-    <link rel="stylesheet" href="{% static 'core/corporate-login.css' %}">
+    <link rel="stylesheet" href="{% static 'core/corporate-login.css' %}?v=20260910-branding">
 </head>
 <body>
 <main class="corporate-login">
     <section class="company-stage" aria-labelledby="company-title">
         <img class="office-photo" src="{% static 'core/img/corporate-office.png' %}" alt="" fetchpriority="high">
         <div class="company-identity">
-            {% if empresa.logo %}<img class="company-logo" src="{{ empresa.logo.url }}" alt="Logo de {{ empresa.nombre }}">{% endif %}
             <h1 id="company-title">{{ empresa.nombre }}</h1>
             <p>Tu empresa,<br><span>conectada.</span></p>
         </div>
@@ -45,7 +44,7 @@
                 <button class="submit" type="submit">Iniciar sesión</button>
             </form>
             <footer class="provider">
-                <img src="{% static 'core/img/dv-solutions-brand.png' %}" alt="DV Solutions — Crecimiento y agilidad en la nube" width="2816" height="1536">
+                <img src="{% static 'core/images/dv-solutions-oficial.png' %}" alt="DV Solutions — Crecimiento y agilidad en la nube" width="2816" height="1359">
                 <p>Tecnología de <strong>DV Solutions</strong></p>
             </footer>
         </div>

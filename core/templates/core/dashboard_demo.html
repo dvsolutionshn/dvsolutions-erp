@@ -26,7 +26,7 @@
     </section>
     {% if demo_shortcuts %}<nav class="demo-shortcuts" aria-label="Accesos frecuentes"><h2>Accesos frecuentes</h2>{% for link in demo_shortcuts %}<a href="{{ link.url }}"><i data-lucide="{{ link.icon }}" aria-hidden="true"></i>{{ link.title }}</a>{% endfor %}</nav>{% endif %}
     {% if demo_solutions %}<details class="demo-solutions"><summary><i data-lucide="blocks" aria-hidden="true"></i>Más soluciones para tu empresa<span>{{ demo_solutions|length }} disponibles</span><i data-lucide="chevron-down" aria-hidden="true"></i></summary><div class="demo-solutions-list">{% for solution in demo_solutions %}<div><i data-lucide="{{ solution.icon }}" aria-hidden="true"></i><strong>{{ solution.title }}</strong><span>No habilitado</span></div>{% endfor %}</div><a class="demo-contact" href="mailto:dosolutionshn@gmail.com">Solicitar información<i data-lucide="arrow-up-right" aria-hidden="true"></i></a></details>{% endif %}
-    <div class="demo-mobile-provider"><img src="{% static 'core/images/dv-solutions-control-logo.webp' %}" alt="DV Solutions"><span>Tecnología de DV Solutions</span></div>
+    <div class="demo-mobile-provider"><img src="{% static 'core/images/dv-solutions-oficial.png' %}" alt="DV Solutions"><span>Tecnología de DV Solutions</span></div>
 </div>
 {% endblock %}
 {% block extra_js %}
