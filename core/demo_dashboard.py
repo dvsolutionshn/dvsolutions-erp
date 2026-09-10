@@ -29,6 +29,7 @@ def dashboard_context(request, empresa, modulos):
     for code, permission, title, category, description, route, icon, image in MODULES:
         if code in enabled and access.get(permission):
             cards.append({
+                "code": code,
                 "title": title, "category": category, "description": description,
                 "url": reverse(route, args=[empresa.slug]), "icon": icon,
                 "image": f"core/img/demo-dashboard/{image}.png",

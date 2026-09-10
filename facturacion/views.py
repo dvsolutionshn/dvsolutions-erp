@@ -1387,6 +1387,10 @@ def _resumen_detallado(subtotal_neto, resumen_fiscal):
 def _filtrar_facturas_reporte(empresa, params):
     facturas = Factura.objects.filter(empresa=empresa).select_related("cliente").prefetch_related("lineas", "lineas__impuesto")
 
+    if empresa.slug == "demo_1":
+        from .reportes_demo import filter_invoices
+        return filter_invoices(empresa, params, facturas)
+
     cliente_id = (params.get("cliente") or "").strip()
     estado_pago = (params.get("estado_pago") or "").strip()
     fecha_desde = (params.get("fecha_desde") or "").strip()
@@ -8855,7 +8859,7 @@ def reportes_facturacion(request, empresa_slug):
     clientes = Cliente.objects.filter(empresa=empresa)
     bi_interno = _construir_bi_interno_facturacion(facturas)
 
-    return render(request, "facturacion/reportes_premium.html", {
+    contexto = {
         "empresa": empresa,
         "clientes": clientes,
         "facturas": facturas,
@@ -8871,7 +8875,12 @@ def reportes_facturacion(request, empresa_slug):
         "bi_interno": bi_interno,
         "configuracion_power_bi": configuracion_power_bi,
         "puede_configurar_power_bi": _puede_configurar_power_bi(request.user),
-    })
+    }
+    if empresa.slug == "demo_1":
+        from .reportes_demo import report_context
+        contexto.update(report_context(request, empresa, facturas, totales, total_saldo, bi_interno))
+        return render(request, "facturacion/reportes_demo.html", contexto)
+    return render(request, "facturacion/reportes_premium.html", contexto)
 
 
 @login_required

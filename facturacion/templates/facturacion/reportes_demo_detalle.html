@@ -1,0 +1,17 @@
+{% load humanize %}
+{% with r=f.resumen_fiscal %}
+<div class="report-detail-heading"><strong>Composición del documento</strong><span>Moneda original: {{ f.moneda }}{% if f.moneda == 'USD' %} · Tasa registrada: {{ f.reporte_tasa_cambio|floatformat:4 }}{% endif %}</span></div>
+<dl class="report-detail-grid">
+    <div><dt>Base 15%</dt><dd>{{ f.reporte_simbolo }} {{ r.base_15|floatformat:2|intcomma }}</dd></div>
+    <div><dt>ISV 15%</dt><dd>{{ f.reporte_simbolo }} {{ r.isv_15|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Base 18%</dt><dd>{{ f.reporte_simbolo }} {{ r.base_18|floatformat:2|intcomma }}</dd></div>
+    <div><dt>ISV 18%</dt><dd>{{ f.reporte_simbolo }} {{ r.isv_18|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Exento</dt><dd>{{ f.reporte_simbolo }} {{ r.base_exento|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Exonerado</dt><dd>{{ f.reporte_simbolo }} {{ r.base_exonerado|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Descuento</dt><dd>{{ f.reporte_simbolo }} {{ r.descuento_total|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Total ajustado original</dt><dd>{{ f.reporte_simbolo }} {{ f.total_documento_ajustado|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Saldo original</dt><dd>{{ f.reporte_simbolo }} {{ f.saldo_pendiente|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Subtotal HNL</dt><dd>L. {{ f.reporte_subtotal_hnl|floatformat:2|intcomma }}</dd></div>
+    <div><dt>Impuesto HNL</dt><dd>L. {{ f.reporte_impuesto_hnl|floatformat:2|intcomma }}</dd></div>
+</dl>
+{% endwith %}
