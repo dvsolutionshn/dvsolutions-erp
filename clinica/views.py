@@ -2417,6 +2417,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "examen_fisico_campos": EXAMEN_FISICO_CAMPOS,
             "evaluacion_funciones_form": evaluacion_funciones_form,
             "evaluacion_examen_form": evaluacion_examen_form,
+            "alopecia_hamilton_grados": ALOPECIA_HAMILTON_NORWOOD_GRADOS,
+            "alopecia_ludwig_grados": ALOPECIA_LUDWIG_GRADOS,
             "tricopigmentacion_form": tricopigmentacion_form,
             "historias_tricopigmentacion": historias_tricopigmentacion,
             "programa_camara": programa_camara,

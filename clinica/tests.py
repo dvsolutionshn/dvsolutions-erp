@@ -296,8 +296,10 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(pagina.status_code, 200)
         self.assertContains(
             pagina,
-            "/static/clinica/clasificacion-alopecia-hamilton-norwood-ludwig.png",
+            "/static/clinica/alopecia-hamilton-norwood-i.png",
         )
+        self.assertContains(pagina, "/static/clinica/alopecia-ludwig-iii.png")
+        self.assertContains(pagina, "> Marcar</span>", count=11)
 
         response = self.client.post(url, {
             "tipo_historia": "capilar",
@@ -1812,8 +1814,10 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "III Vertex")
         self.assertContains(
             response,
-            "/static/clinica/clasificacion-alopecia-hamilton-norwood-ludwig.png",
+            "/static/clinica/alopecia-hamilton-norwood-i.png",
         )
+        self.assertContains(response, "/static/clinica/alopecia-ludwig-iii.png")
+        self.assertContains(response, "> Marcar</span>", count=11)
         self.assertContains(response, 'data-scale="ludwig" hidden')
         self.assertEqual(
             len(list(response.context["form"].fields["alopecia_grado"].choices)),

@@ -784,20 +784,20 @@ FORMULARIOS_ESTRUCTURADOS = {
 BITACORA_TIPOS = {"enfermeria", "terapias", "camara_hiperbarica"}
 
 ALOPECIA_HAMILTON_NORWOOD_GRADOS = [
-    {"value": "I", "label": "I", "descripcion": "Mínima recesión", "visual": "hn-1"},
-    {"value": "II", "label": "II", "descripcion": "Recesión leve", "visual": "hn-2"},
-    {"value": "III", "label": "III", "descripcion": "Recesión frontal", "visual": "hn-3"},
-    {"value": "III_VERTEX", "label": "III Vertex", "descripcion": "Compromiso de vértex", "visual": "hn-3v"},
-    {"value": "IV", "label": "IV", "descripcion": "Pérdida frontal y vértex", "visual": "hn-4"},
-    {"value": "V", "label": "V", "descripcion": "Pérdida extensa frontal y vértex", "visual": "hn-5"},
-    {"value": "VI", "label": "VI", "descripcion": "Pérdida avanzada", "visual": "hn-6"},
-    {"value": "VII", "label": "VII", "descripcion": "Pérdida muy avanzada", "visual": "hn-7"},
+    {"value": "I", "label": "I", "descripcion": "Mínima recesión", "imagen": "clinica/alopecia-hamilton-norwood-i.png"},
+    {"value": "II", "label": "II", "descripcion": "Recesión leve", "imagen": "clinica/alopecia-hamilton-norwood-ii.png"},
+    {"value": "III", "label": "III", "descripcion": "Recesión frontal", "imagen": "clinica/alopecia-hamilton-norwood-iii.png"},
+    {"value": "III_VERTEX", "label": "III Vertex", "descripcion": "Compromiso de vértex", "imagen": "clinica/alopecia-hamilton-norwood-iii-vertex.png"},
+    {"value": "IV", "label": "IV", "descripcion": "Pérdida frontal y vértex", "imagen": "clinica/alopecia-hamilton-norwood-iv.png"},
+    {"value": "V", "label": "V", "descripcion": "Pérdida extensa frontal y vértex", "imagen": "clinica/alopecia-hamilton-norwood-v.png"},
+    {"value": "VI", "label": "VI", "descripcion": "Pérdida avanzada", "imagen": "clinica/alopecia-hamilton-norwood-vi.png"},
+    {"value": "VII", "label": "VII", "descripcion": "Pérdida muy avanzada", "imagen": "clinica/alopecia-hamilton-norwood-vii.png"},
 ]
 
 ALOPECIA_LUDWIG_GRADOS = [
-    {"value": "I", "label": "I", "descripcion": "Aclaramiento leve", "visual": "lw-1"},
-    {"value": "II", "label": "II", "descripcion": "Aclaramiento moderado", "visual": "lw-2"},
-    {"value": "III", "label": "III", "descripcion": "Aclaramiento severo", "visual": "lw-3"},
+    {"value": "I", "label": "I", "descripcion": "Aclaramiento leve", "imagen": "clinica/alopecia-ludwig-i.png"},
+    {"value": "II", "label": "II", "descripcion": "Aclaramiento moderado", "imagen": "clinica/alopecia-ludwig-ii.png"},
+    {"value": "III", "label": "III", "descripcion": "Aclaramiento severo", "imagen": "clinica/alopecia-ludwig-iii.png"},
 ]
 
 
