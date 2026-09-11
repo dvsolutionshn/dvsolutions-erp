@@ -292,6 +292,13 @@ class ClinicaPacienteTests(TestCase):
         )
         url = reverse("clinica_historial_clinico_consolidado", args=[self.empresa.slug, paciente.id])
 
+        pagina = self.client.get(url)
+        self.assertEqual(pagina.status_code, 200)
+        self.assertContains(
+            pagina,
+            "/static/clinica/clasificacion-alopecia-hamilton-norwood-ludwig.png",
+        )
+
         response = self.client.post(url, {
             "tipo_historia": "capilar",
             "historia_capilar-fecha_atencion": "2026-07-28T09:30",
