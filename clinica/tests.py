@@ -305,6 +305,10 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(pagina, "Patrón clínico")
         contenido = pagina.content.decode()
         self.assertLess(
+            contenido.index('<label for="id_historia_capilar-profesional">Profesional</label>'),
+            contenido.index("<h5>Hallazgos tricológicos</h5>"),
+        )
+        self.assertLess(
             contenido.index("<h5>Hallazgos tricológicos</h5>"),
             contenido.index("<h5>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h5>"),
         )
@@ -1840,6 +1844,11 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Hallazgos tricológicos")
         self.assertContains(response, "Área donante disminuida")
         self.assertContains(response, "Efluvio telógeno")
+        contenido = response.content.decode()
+        self.assertLess(
+            contenido.index('<label for="id_profesional">Profesional</label>'),
+            contenido.index("<h3>Hallazgos tricológicos</h3>"),
+        )
         self.assertContains(response, 'data-scale="ludwig" hidden')
         self.assertEqual(
             len(list(response.context["form"].fields["alopecia_grado"].choices)),
