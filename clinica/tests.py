@@ -23,7 +23,7 @@ from crm.models import (
 )
 from facturacion.models import Cliente, Producto
 from .forms import FUNCIONES_ORGANICAS_SISTEMAS, PreconsultaClinicaPublicaForm
-from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
+from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlanTratamientoPaciente, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -161,6 +161,126 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "años")
         self.assertNotContains(response, "Ã")
         self.assertNotContains(response, "Â")
+
+    def test_plan_tratamiento_crea_bitacora_independiente_sin_sobrescribir(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-PLAN-001",
+            nombre="Paciente Plan Clinico",
+            identidad="1101200800901",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            usuario=self.user,
+            nombre="Dra. Candy Luque",
+            especialidad="Cirugía plástica",
+        )
+        url = reverse(
+            "clinica_planes_tratamiento_paciente",
+            args=[self.empresa.slug, paciente.id],
+        )
+
+        primer_response = self.client.post(
+            url,
+            {"texto": "Paciente inicia curaciones cada ocho horas."},
+        )
+        segundo_response = self.client.post(
+            url,
+            {"texto": "Continuar curaciones y control en siete días."},
+        )
+
+        self.assertRedirects(primer_response, url)
+        self.assertRedirects(segundo_response, url)
+        planes = list(PlanTratamientoPaciente.objects.filter(paciente=paciente))
+        self.assertEqual(len(planes), 2)
+        self.assertEqual(planes[0].texto, "Continuar curaciones y control en siete días.")
+        self.assertEqual(planes[1].texto, "Paciente inicia curaciones cada ocho horas.")
+        self.assertEqual(planes[0].empresa, self.empresa)
+        self.assertEqual(planes[0].creado_por, self.user)
+        self.assertEqual(planes[0].profesional, profesional)
+        self.assertEqual(planes[0].profesional_nombre, "Dra. Candy Luque")
+        self.assertTrue(planes[0].fecha_creacion)
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nuevo Plan")
+        self.assertContains(response, "Historial de planes")
+        self.assertContains(response, "Dra. Candy Luque")
+        self.assertLess(
+            response.content.find(b"Continuar curaciones"),
+            response.content.find(b"Paciente inicia curaciones"),
+        )
+
+    def test_plan_tratamiento_respeta_lectura_y_permiso_de_escritura(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-PLAN-READ",
+            nombre="Paciente Lectura Plan",
+            identidad="1101200800902",
+        )
+        PlanTratamientoPaciente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            texto="Plan visible para enfermería.",
+            creado_por=self.user,
+        )
+        rol_lectura = RolSistema.objects.create(
+            nombre="Lectura pacientes",
+            codigo="clinica-plan-lectura-test",
+            activo=True,
+            puede_clinica=True,
+            puede_pacientes=True,
+            puede_expediente_clinico=False,
+        )
+        usuario_lectura = get_user_model().objects.create_user(
+            username="enfermeria_lectura_plan",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=rol_lectura,
+        )
+        self.client.force_login(usuario_lectura)
+        url = reverse(
+            "clinica_planes_tratamiento_paciente",
+            args=[self.empresa.slug, paciente.id],
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Plan visible para enfermería.")
+        self.assertContains(response, "Puede consultar el historial")
+        self.assertNotContains(response, "Guardar nuevo plan")
+
+        response = self.client.post(url, {"texto": "Intento no autorizado"})
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            PlanTratamientoPaciente.objects.filter(texto="Intento no autorizado").exists()
+        )
+
+    def test_expediente_muestra_accesos_separados_a_plan_y_especialidades(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-PLAN-MENU",
+            nombre="Paciente Menu Plan",
+            identidad="1101200800903",
+        )
+        response = self.client.get(
+            reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id])
+        )
+        plan_url = reverse(
+            "clinica_planes_tratamiento_paciente",
+            args=[self.empresa.slug, paciente.id],
+        )
+        especialidades_url = reverse(
+            "clinica_historias_especialidad",
+            args=[self.empresa.slug, paciente.id],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{plan_url}"')
+        self.assertContains(response, f'href="{especialidades_url}"')
+        self.assertContains(response, "Plan y Tratamiento")
+        self.assertContains(response, "Especialidades")
 
     def test_vista_clinica_completa_guarda_nota_inline_por_area(self):
         paciente = Paciente.objects.create(

@@ -32,6 +32,7 @@ urlpatterns = [
     path("pacientes/<int:paciente_id>/documentos/incapacidades/<int:documento_id>/imprimir/", views.imprimir_incapacidad_paciente, name="clinica_incapacidad_imprimir"),
     path("pacientes/<int:paciente_id>/consentimientos/", views.consentimientos_paciente, name="clinica_consentimientos_paciente"),
     path("pacientes/<int:paciente_id>/consentimientos/subir/", views.subir_consentimiento_paciente, name="clinica_subir_consentimiento_paciente"),
+    path("pacientes/<int:paciente_id>/planes-tratamiento/", views.planes_tratamiento_paciente, name="clinica_planes_tratamiento_paciente"),
     path("pacientes/<int:paciente_id>/historias/", views.historias_especialidad, name="clinica_historias_especialidad"),
     path("pacientes/<int:paciente_id>/historias/consolidado/", views.historial_clinico_consolidado, name="clinica_historial_clinico_consolidado"),
     path("pacientes/<int:paciente_id>/historia-clinica/completar/", views.completar_historia_clinica_paciente, name="clinica_completar_historia_clinica_paciente"),

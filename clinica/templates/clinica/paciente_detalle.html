@@ -164,7 +164,7 @@
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=examen_fisico#examen-fisico">Examen físico</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=antecedentes#informacion-paciente">Antecedentes</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>
-                <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=plan_tratamiento#trabajo-clinico">Plan y tratamiento</a>
+                <a href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}">Plan y tratamiento</a>
                 <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>
                 <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=completa">Historia clínica completa</a>
@@ -188,6 +188,7 @@
         <details class="clinical-side-group">
             <summary><i>03</i>Atención y especialidades</summary>
             <div class="clinical-submenu">
+                <a href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Especialidades</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=cirugia_plastica#trabajo-clinico">Cirugía Plástica</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=medicina_estetica#trabajo-clinico">Medicina Estética</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=capilar#trabajo-clinico">Capilar</a>
@@ -215,8 +216,9 @@
             </div>
             <div class="clinical-quick-grid">
                 <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><strong>Historial Clínico</strong><span>Consulta, funciones orgánicas, examen físico, antecedentes, diagnóstico y plan.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}"><strong>Plan y Tratamiento</strong><span>Indicaciones clínicas e historial de planes del paciente.</span></a>
                 <a class="clinical-quick-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><strong>Anexos</strong><span>Laboratorio, radiografías, documentos, consentimientos, recetas y archivos visuales.</span></a>
-                <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#trabajo-clinico"><strong>Atención y especialidades</strong><span>Cirugía, estética, capilar, terapias, cámara hiperbárica y enfermería.</span></a>
+                <a class="clinical-quick-card" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><strong>Especialidades</strong><span>Cirugía, estética, capilar, terapias, cámara hiperbárica y enfermería.</span></a>
                 <a class="clinical-quick-card" href="#recordatorios-tratamiento"><strong>Citas / Recordatorios</strong><span>Agenda y seguimiento estético o clínico conectado al calendario.</span></a>
                 <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}"><strong>Cámara Hiperbárica</strong><span>Cuadro longitudinal completo de 22 sesiones.</span></a>
                 <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}"><strong>Terapias Post Quirúrgicas</strong><span>Cuadro clínico completo de 12 sesiones.</span></a>

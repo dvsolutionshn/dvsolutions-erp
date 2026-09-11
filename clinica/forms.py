@@ -16,6 +16,7 @@ from .models import (
     MedicamentoPrescrito,
     Paciente,
     PacienteFotoEvolucion,
+    PlanTratamientoPaciente,
     PreconsultaClinica,
     ProfesionalSalud,
     RecetaMedica,
@@ -328,6 +329,30 @@ class TratamientoPacienteForm(BaseClinicaForm):
             self.fields["profesional"].queryset = ProfesionalSalud.objects.none()
         self.fields["servicio"].required = False
         self.fields["profesional"].required = False
+
+
+class PlanTratamientoPacienteForm(BaseClinicaForm):
+    class Meta:
+        model = PlanTratamientoPaciente
+        fields = ["texto"]
+        labels = {"texto": "Plan actual"}
+        widgets = {
+            "texto": forms.Textarea(
+                attrs={
+                    "rows": 8,
+                    "placeholder": (
+                        "Escriba indicaciones, tratamientos, cuidados o instrucciones "
+                        "para el equipo clínico."
+                    ),
+                }
+            ),
+        }
+
+    def clean_texto(self):
+        texto = (self.cleaned_data.get("texto") or "").strip()
+        if not texto:
+            raise forms.ValidationError("Escriba el plan antes de guardarlo.")
+        return texto
 
 
 class ExpedienteEventoForm(BaseClinicaForm):

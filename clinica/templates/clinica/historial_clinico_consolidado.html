@@ -239,7 +239,8 @@
         <a href="?seccion=examen_fisico#examen-fisico">Examen físico</a>
         <a href="?seccion=antecedentes#informacion-paciente">Antecedentes</a>
         <a href="?seccion=diagnostico#trabajo-clinico">Diagnóstico</a>
-        <a href="?seccion=plan_tratamiento#trabajo-clinico">Plan y tratamiento</a>
+        <a href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}">Plan y tratamiento</a>
+        <a href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Especialidades</a>
         <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}">Cámara Hiperbárica</a>
         <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
         <a href="?seccion=tricopigmentacion#tricopigmentacion">Tricopigmentación</a>

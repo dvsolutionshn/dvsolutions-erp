@@ -53,6 +53,7 @@ from .forms import (
     IncapacidadClinicaForm,
     PacienteForm,
     PacienteFotoEvolucionForm,
+    PlanTratamientoPacienteForm,
     PlanConsentimientoPDFForm,
     PreconsultaClinicaPublicaForm,
     ProfesionalSaludForm,
@@ -1916,6 +1917,50 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "historias": historias,
             "tipos": tipos,
             "preconsultas": preconsultas,
+        },
+    )
+
+
+@login_required
+def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_interfaz_clinica(empresa)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    puede_crear_plan = request.user.tiene_permiso_erp(
+        "puede_expediente_clinico",
+        empresa,
+    )
+    form = PlanTratamientoPacienteForm(request.POST or None) if puede_crear_plan else None
+    if request.method == "POST":
+        if not puede_crear_plan:
+            raise PermissionDenied("No tiene permiso para registrar planes clínicos.")
+        if form.is_valid():
+            plan = form.save(commit=False)
+            plan.empresa = empresa
+            plan.paciente = paciente
+            plan.profesional = _profesional_predeterminado_usuario(empresa, request.user)
+            plan.creado_por = request.user
+            plan.save()
+            messages.success(request, "Nuevo plan guardado en el expediente.")
+            return redirect(
+                "clinica_planes_tratamiento_paciente",
+                empresa_slug=empresa.slug,
+                paciente_id=paciente.id,
+            )
+        messages.error(request, "Revise el plan antes de guardarlo.")
+    planes = paciente.planes_tratamiento.select_related(
+        "profesional",
+        "creado_por",
+    ).order_by("-fecha_creacion", "-id")
+    return render(
+        request,
+        "clinica/planes_tratamiento_paciente.html",
+        {
+            "empresa": empresa,
+            "paciente": paciente,
+            "planes": planes,
+            "form": form,
+            "puede_crear_plan": puede_crear_plan,
         },
     )
 

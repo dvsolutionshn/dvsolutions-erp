@@ -6,6 +6,7 @@
 {% block header_description %}Una sola hoja de trabajo para revisar formularios, leer notas y continuar alimentando cada área clínica sin perderse entre pantallas.{% endblock %}
 
 {% block topbar_actions %}
+<a class="erp-btn" href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}">Plan y Tratamiento</a>
 <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clínica completa</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
 {% endblock %}

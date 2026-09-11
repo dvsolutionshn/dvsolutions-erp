@@ -460,6 +460,69 @@ class TratamientoPaciente(models.Model):
         return f"{self.paciente.nombre} - {self.nombre}"
 
 
+class PlanTratamientoPaciente(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="planes_tratamiento_pacientes",
+    )
+    paciente = models.ForeignKey(
+        Paciente,
+        on_delete=models.CASCADE,
+        related_name="planes_tratamiento",
+    )
+    texto = models.TextField()
+    profesional = models.ForeignKey(
+        ProfesionalSalud,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planes_tratamiento_creados",
+    )
+    profesional_nombre = models.CharField(max_length=180, blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planes_tratamiento_clinico_creados",
+    )
+    autor_nombre = models.CharField(max_length=180, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "paciente", "fecha_creacion"]),
+        ]
+        verbose_name = "Plan y tratamiento del paciente"
+        verbose_name_plural = "Planes y tratamientos del paciente"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} - {self.fecha_creacion:%d/%m/%Y %H:%M}"
+
+    def save(self, *args, **kwargs):
+        if self.profesional_id and not self.profesional_nombre:
+            self.profesional_nombre = self.profesional.nombre
+        if self.creado_por_id and not self.autor_nombre:
+            self.autor_nombre = (
+                self.creado_por.get_full_name().strip()
+                or self.creado_por.username
+            )
+        super().save(*args, **kwargs)
+
+    @property
+    def responsable_display(self):
+        return (
+            self.profesional_nombre
+            or (self.profesional.nombre if self.profesional_id else "")
+            or self.autor_nombre
+            or (self.creado_por.get_full_name().strip() if self.creado_por_id else "")
+            or (self.creado_por.username if self.creado_por_id else "")
+            or "Usuario no disponible"
+        )
+
+
 class ExpedienteEvento(models.Model):
     TIPO_CHOICES = [
         ("consulta", "Consulta"),

@@ -1,0 +1,90 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Plan y tratamiento - {{ paciente.nombre }}{% endblock %}
+{% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
+{% block header_title %}Plan y Tratamiento{% endblock %}
+{% block header_description %}Indicaciones clínicas ordenadas cronológicamente, sin sobrescribir planes anteriores.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Especialidades</a>
+<a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.plan-shell{max-width:1040px;margin:0 auto;display:grid;gap:18px}
+.plan-patient{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:20px 22px;border:1px solid #cfe0f3;border-radius:22px;background:linear-gradient(135deg,#fff,#f3fbff 55%,#eefbf8);box-shadow:0 16px 38px rgba(16,35,56,.07)}
+.plan-patient h3{margin:4px 0;color:#102338;font-size:24px}.plan-patient p{margin:0;color:var(--muted)}
+.plan-badge{padding:8px 11px;border-radius:999px;background:#e8f6f2;color:#087466;font-size:12px;font-weight:900;white-space:nowrap}
+.plan-card{border:1px solid #d5e3f1;border-radius:22px;background:#fff;box-shadow:0 16px 38px rgba(16,35,56,.06);overflow:hidden}
+.plan-card-head{padding:18px 20px;border-bottom:1px solid #e3edf6;background:linear-gradient(135deg,#fbfdff,#f7fcfb)}
+.plan-card-head h3{margin:0 0 5px;color:#102338}.plan-card-head p{margin:0;color:var(--muted);line-height:1.5}
+.plan-card-body{padding:20px}.plan-form label{display:block;margin-bottom:8px;color:#243f5c;font-weight:900}
+.plan-form textarea{width:100%;min-height:190px;resize:vertical;border:1px solid #bcd0e4;border-radius:16px;padding:14px 15px;color:#172f48;background:#fff;font:inherit;line-height:1.6;outline:none}
+.plan-form textarea:focus{border-color:#1769d2;box-shadow:0 0 0 3px rgba(23,105,210,.12)}
+.plan-form-actions{display:flex;justify-content:flex-end;margin-top:14px}.plan-error{display:block;margin-top:7px;color:#b42318;font-size:12px;font-weight:800}
+.plan-readonly{padding:14px 16px;border:1px solid #cfe0f3;border-radius:15px;background:#f7fbff;color:#526b82;line-height:1.55}
+.plan-history{display:grid;gap:12px}.plan-entry{border:1px solid #dbe8f5;border-radius:18px;background:#fbfdff;padding:17px 18px}
+.plan-entry-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:11px;margin-bottom:12px;border-bottom:1px solid #e5eef7}
+.plan-entry-head strong{display:block;color:#102338}.plan-entry-meta{margin-top:4px;color:var(--muted);font-size:12px}
+.plan-entry-time{color:#174f9f;font-size:12px;font-weight:900;white-space:nowrap}.plan-entry-text{color:#1f3449;line-height:1.7;overflow-wrap:anywhere}
+.plan-empty{padding:22px;border:1px dashed #bfd0e1;border-radius:17px;background:#f8fbfe;color:var(--muted);text-align:center}
+@media(max-width:720px){.plan-patient,.plan-entry-head{align-items:flex-start;flex-direction:column}.plan-entry-time{white-space:normal}.plan-card-body{padding:16px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="plan-shell">
+    <section class="plan-patient">
+        <div>
+            <div class="erp-kpi-label">Paciente</div>
+            <h3>{{ paciente.nombre }}</h3>
+            <p>{{ paciente.identidad|default:"Sin documento" }} · {{ paciente.edad|default:"-" }} años · {{ paciente.expediente_codigo }}</p>
+        </div>
+        <span class="plan-badge">{{ planes|length }} plan{{ planes|length|pluralize:"es" }}</span>
+    </section>
+
+    <section class="plan-card">
+        <div class="plan-card-head">
+            <h3>Nuevo Plan</h3>
+            <p>Registre nuevas indicaciones o instrucciones. Cada envío crea una entrada independiente con fecha, hora y responsable.</p>
+        </div>
+        <div class="plan-card-body">
+            {% if puede_crear_plan %}
+            <form class="plan-form" method="post">
+                {% csrf_token %}
+                <label for="{{ form.texto.id_for_label }}">{{ form.texto.label }}</label>
+                {{ form.texto }}
+                {% for error in form.texto.errors %}<span class="plan-error">{{ error }}</span>{% endfor %}
+                <div class="plan-form-actions"><button class="erp-btn" type="submit">Guardar nuevo plan</button></div>
+            </form>
+            {% else %}
+            <div class="plan-readonly">Puede consultar el historial. Para registrar un nuevo plan se requiere el permiso de gestión de expedientes clínicos.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="plan-card">
+        <div class="plan-card-head">
+            <h3>Historial de planes</h3>
+            <p>Del más reciente al más antiguo. Los planes guardados permanecen como parte del expediente.</p>
+        </div>
+        <div class="plan-card-body plan-history">
+            {% for plan in planes %}
+            <article class="plan-entry">
+                <div class="plan-entry-head">
+                    <div>
+                        <strong>{{ plan.responsable_display }}</strong>
+                        <div class="plan-entry-meta">Registrado por {{ plan.autor_nombre|default:"Usuario no disponible" }}</div>
+                    </div>
+                    <time class="plan-entry-time" datetime="{{ plan.fecha_creacion|date:'c' }}">{{ plan.fecha_creacion|date:"d/m/Y H:i" }}</time>
+                </div>
+                <div class="plan-entry-text">{{ plan.texto|linebreaksbr }}</div>
+            </article>
+            {% empty %}
+            <div class="plan-empty">Aún no hay planes registrados para este paciente.</div>
+            {% endfor %}
+        </div>
+    </section>
+</section>
+{% endblock %}
