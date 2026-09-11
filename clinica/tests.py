@@ -300,10 +300,22 @@ class ClinicaPacienteTests(TestCase):
         )
         self.assertContains(pagina, "/static/clinica/alopecia-ludwig-iii.png")
         self.assertContains(pagina, "> Marcar</span>", count=11)
+        self.assertContains(pagina, "Hallazgos tricológicos")
+        self.assertContains(pagina, "Hair pull test positivo")
+        self.assertContains(pagina, "Patrón clínico")
+        contenido = pagina.content.decode()
+        self.assertLess(
+            contenido.index("<h5>Hallazgos tricológicos</h5>"),
+            contenido.index("<h5>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h5>"),
+        )
 
         response = self.client.post(url, {
             "tipo_historia": "capilar",
             "historia_capilar-fecha_atencion": "2026-07-28T09:30",
+            "historia_capilar-capilar_hallazgos_tricologicos": ["caida_activa", "miniaturizacion_folicular"],
+            "historia_capilar-capilar_distribucion_tricologica": ["frontal", "vertice"],
+            "historia_capilar-capilar_patron_clinico": ["otro"],
+            "historia_capilar-capilar_patron_clinico_otros": "Patrón mixto",
             "historia_capilar-plan_tratamiento": "Historia actual, diagnostico y plan desde clinica completa.",
             "historia_capilar-estado": "borrador",
         })
@@ -312,6 +324,13 @@ class ClinicaPacienteTests(TestCase):
         historia = HistoriaClinicaEspecialidad.objects.get(paciente=paciente, tipo="capilar")
         self.assertEqual(historia.plan_tratamiento, "Historia actual, diagnostico y plan desde clinica completa.")
         self.assertEqual(historia.creado_por, self.user)
+        self.assertEqual(
+            historia.datos_especialidad["capilar_hallazgos_tricologicos"],
+            ["caida_activa", "miniaturizacion_folicular"],
+        )
+        self.assertEqual(historia.datos_especialidad["capilar_distribucion_tricologica"], ["frontal", "vertice"])
+        self.assertEqual(historia.datos_especialidad["capilar_patron_clinico"], ["otro"])
+        self.assertEqual(historia.datos_especialidad["capilar_patron_clinico_otros"], "Patrón mixto")
 
     def test_historial_clinico_guarda_funciones_organicas_y_examen_fisico_estructurados(self):
         paciente = Paciente.objects.create(
@@ -1818,6 +1837,9 @@ class ClinicaPacienteTests(TestCase):
         )
         self.assertContains(response, "/static/clinica/alopecia-ludwig-iii.png")
         self.assertContains(response, "> Marcar</span>", count=11)
+        self.assertContains(response, "Hallazgos tricológicos")
+        self.assertContains(response, "Área donante disminuida")
+        self.assertContains(response, "Efluvio telógeno")
         self.assertContains(response, 'data-scale="ludwig" hidden')
         self.assertEqual(
             len(list(response.context["form"].fields["alopecia_grado"].choices)),
@@ -1828,6 +1850,9 @@ class ClinicaPacienteTests(TestCase):
             crear_url,
             {
                 "fecha_atencion": "2026-09-08T09:15",
+                "capilar_hallazgos_tricologicos": ["caida_activa", "disminucion_densidad"],
+                "capilar_distribucion_tricologica": ["frontal", "frontotemporal"],
+                "capilar_patron_clinico": ["androgenetico"],
                 "alopecia_escala": "hamilton_norwood",
                 "alopecia_grado": "III_VERTEX",
                 "plan_tratamiento": "Evaluación capilar inicial.",
@@ -1845,6 +1870,14 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(primera.creado_por, self.user)
         self.assertEqual(primera.empresa, self.empresa)
         self.assertEqual(primera.historia.tipo, "capilar")
+        self.assertEqual(
+            primera.historia.datos_especialidad["capilar_hallazgos_tricologicos"],
+            ["caida_activa", "disminucion_densidad"],
+        )
+        self.assertEqual(
+            primera.historia.datos_especialidad["capilar_patron_clinico"],
+            ["androgenetico"],
+        )
 
         response = self.client.post(
             crear_url,
@@ -1904,6 +1937,21 @@ class ClinicaPacienteTests(TestCase):
         )
         self.assertContains(response, "Hamilton-Norwood")
         self.assertContains(response, "Ludwig")
+
+        otro_sin_detalle = self.client.post(
+            url_manual,
+            {
+                "fecha_atencion": "2026-09-10T11:45",
+                "capilar_patron_clinico": ["otro"],
+                "alopecia_escala": "ludwig",
+                "alopecia_grado": "II",
+                "plan_tratamiento": "Validación de patrón clínico.",
+                "estado": "borrador",
+            },
+        )
+        self.assertEqual(otro_sin_detalle.status_code, 200)
+        self.assertContains(otro_sin_detalle, "Especifique el otro patrón clínico")
+        self.assertFalse(ClasificacionAlopecia.objects.filter(paciente=paciente_sin_sexo).exists())
 
         invalido = self.client.post(
             url_manual,

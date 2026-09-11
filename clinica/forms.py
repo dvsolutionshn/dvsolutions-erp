@@ -655,6 +655,34 @@ class PlantillaRecetaForm(BaseClinicaForm):
 
 
 CAPILAR_FORMULARIO = [
+    ("capilar_hallazgos_tricologicos", "Hallazgos tricológicos", [
+        ("caida_activa", "Caída capilar activa"),
+        ("hair_pull_positivo", "Hair pull test positivo"),
+        ("disminucion_densidad", "Disminución de densidad capilar"),
+        ("miniaturizacion_folicular", "Miniaturización folicular"),
+        ("variacion_grosor", "Variación en el grosor del cabello"),
+        ("finos_quebradizos", "Cabellos finos / quebradizos"),
+        ("recrecimiento_corto", "Cabellos cortos en recrecimiento"),
+        ("seborrea_descamacion", "Seborrea / descamación"),
+        ("eritema_irritacion", "Eritema o irritación del cuero cabelludo"),
+        ("foliculitis", "Foliculitis"),
+        ("alopecia_cicatricial", "Signos de alopecia cicatricial"),
+        ("donante_adecuada", "Área donante adecuada"),
+        ("donante_disminuida", "Área donante disminuida"),
+    ], True),
+    ("capilar_distribucion_tricologica", "Distribución", [
+        ("frontal", "Frontal"),
+        ("frontotemporal", "Frontotemporal"),
+        ("vertice", "Vértice"),
+        ("central", "Central"),
+        ("difusa", "Difusa"),
+    ], True),
+    ("capilar_patron_clinico", "Patrón clínico", [
+        ("androgenetico", "Androgenético"),
+        ("efluvio_telogeno", "Efluvio telógeno"),
+        ("areata", "Areata"),
+        ("otro", "Otro"),
+    ], True),
     ("capilar_motivo", "Motivo de consulta - ¿Que le preocupa principalmente?", [
         ("caida_excesiva", "Caida excesiva del cabello"), ("adelgazamiento", "Adelgazamiento del cabello"),
         ("perdida_densidad", "Perdida de densidad"), ("cejas", "Perdida de cejas"),
@@ -1194,6 +1222,16 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        if self.tipo == "capilar" and "capilar_patron_clinico" in self.fields:
+            patrones = cleaned_data.get("capilar_patron_clinico") or []
+            detalle_otro = (cleaned_data.get("capilar_patron_clinico_otros") or "").strip()
+            if "otro" in patrones and not detalle_otro:
+                self.add_error(
+                    "capilar_patron_clinico_otros",
+                    "Especifique el otro patrón clínico.",
+                )
+            elif "otro" not in patrones:
+                cleaned_data["capilar_patron_clinico_otros"] = ""
         if not self.muestra_clasificacion_alopecia:
             return cleaned_data
         escala = cleaned_data.get("alopecia_escala")
