@@ -1803,6 +1803,10 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Clasificación de Alopecia")
         self.assertContains(response, "Hamilton-Norwood")
         self.assertContains(response, "III Vertex")
+        self.assertContains(
+            response,
+            "/static/clinica/clasificacion-alopecia-hamilton-norwood-ludwig.png",
+        )
         self.assertContains(response, 'data-scale="ludwig" hidden')
         self.assertEqual(
             len(list(response.context["form"].fields["alopecia_grado"].choices)),
