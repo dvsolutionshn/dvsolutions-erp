@@ -523,6 +523,102 @@ class PlanTratamientoPaciente(models.Model):
         )
 
 
+class ClasificacionAlopecia(models.Model):
+    ESCALA_HAMILTON_NORWOOD = "hamilton_norwood"
+    ESCALA_LUDWIG = "ludwig"
+    ESCALA_CHOICES = [
+        (ESCALA_HAMILTON_NORWOOD, "Hamilton-Norwood"),
+        (ESCALA_LUDWIG, "Ludwig"),
+    ]
+    GRADOS_HAMILTON_NORWOOD = ["I", "II", "III", "III_VERTEX", "IV", "V", "VI", "VII"]
+    GRADOS_LUDWIG = ["I", "II", "III"]
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="clasificaciones_alopecia",
+    )
+    paciente = models.ForeignKey(
+        Paciente,
+        on_delete=models.CASCADE,
+        related_name="clasificaciones_alopecia",
+    )
+    historia = models.ForeignKey(
+        "HistoriaClinicaEspecialidad",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clasificaciones_alopecia",
+    )
+    escala = models.CharField(max_length=30, choices=ESCALA_CHOICES)
+    grado = models.CharField(max_length=20)
+    fecha = models.DateTimeField(default=timezone.now, db_index=True)
+    profesional = models.ForeignKey(
+        ProfesionalSalud,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clasificaciones_alopecia",
+    )
+    profesional_nombre = models.CharField(max_length=180, blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clasificaciones_alopecia_creadas",
+    )
+    autor_nombre = models.CharField(max_length=180, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "paciente", "fecha"]),
+            models.Index(fields=["escala", "grado"]),
+        ]
+        verbose_name = "Clasificación de alopecia"
+        verbose_name_plural = "Clasificaciones de alopecia"
+
+    def __str__(self):
+        return f"{self.paciente.nombre} - {self.get_escala_display()} {self.grado_display}"
+
+    def clean(self):
+        super().clean()
+        grados_validos = {
+            self.ESCALA_HAMILTON_NORWOOD: self.GRADOS_HAMILTON_NORWOOD,
+            self.ESCALA_LUDWIG: self.GRADOS_LUDWIG,
+        }
+        if self.escala and self.grado not in grados_validos.get(self.escala, []):
+            raise ValidationError({"grado": "El grado no corresponde a la escala seleccionada."})
+
+    def save(self, *args, **kwargs):
+        if self.profesional_id and not self.profesional_nombre:
+            self.profesional_nombre = self.profesional.nombre
+        if self.creado_por_id and not self.autor_nombre:
+            self.autor_nombre = (
+                self.creado_por.get_full_name().strip()
+                or self.creado_por.username
+            )
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def grado_display(self):
+        return "III Vertex" if self.grado == "III_VERTEX" else self.grado
+
+    @property
+    def responsable_display(self):
+        return (
+            self.profesional_nombre
+            or (self.profesional.nombre if self.profesional_id else "")
+            or self.autor_nombre
+            or (self.creado_por.get_full_name().strip() if self.creado_por_id else "")
+            or (self.creado_por.username if self.creado_por_id else "")
+            or "Usuario no disponible"
+        )
+
+
 class ExpedienteEvento(models.Model):
     TIPO_CHOICES = [
         ("consulta", "Consulta"),

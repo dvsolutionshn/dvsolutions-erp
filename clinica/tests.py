@@ -23,7 +23,7 @@ from crm.models import (
 )
 from facturacion.models import Cliente, Producto
 from .forms import FUNCIONES_ORGANICAS_SISTEMAS, PreconsultaClinicaPublicaForm
-from .models import CitaClinica, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlanTratamientoPaciente, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
+from .models import CitaClinica, ClasificacionAlopecia, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlanTratamientoPaciente, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -1776,6 +1776,133 @@ class ClinicaPacienteTests(TestCase):
             historia.datos_especialidad["capilar_motivo"],
             ["cejas", "entradas"],
         )
+
+    def test_formulario_capilar_guarda_clasificaciones_alopecia_sin_sobrescribir(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-CAP-ALOPECIA",
+            primer_nombre="Mario",
+            primer_apellido="Pineda",
+            nombre="Mario Pineda",
+            identidad="0801198500889",
+            sexo="masculino",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            usuario=self.user,
+            nombre="Dra. Candy Luque",
+            especialidad="Capilar",
+        )
+        crear_url = reverse(
+            "clinica_crear_historia_especialidad",
+            args=[self.empresa.slug, paciente.id, "capilar"],
+        )
+
+        response = self.client.get(crear_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Clasificación de Alopecia")
+        self.assertContains(response, "Hamilton-Norwood")
+        self.assertContains(response, "III Vertex")
+        self.assertContains(response, 'data-scale="ludwig" hidden')
+        self.assertEqual(
+            len(list(response.context["form"].fields["alopecia_grado"].choices)),
+            8,
+        )
+
+        response = self.client.post(
+            crear_url,
+            {
+                "fecha_atencion": "2026-09-08T09:15",
+                "alopecia_escala": "hamilton_norwood",
+                "alopecia_grado": "III_VERTEX",
+                "plan_tratamiento": "Evaluación capilar inicial.",
+                "estado": "borrador",
+            },
+        )
+        self.assertRedirects(
+            response,
+            reverse("clinica_historias_especialidad", args=[self.empresa.slug, paciente.id]),
+        )
+        primera = ClasificacionAlopecia.objects.get(paciente=paciente)
+        self.assertEqual(primera.escala, "hamilton_norwood")
+        self.assertEqual(primera.grado, "III_VERTEX")
+        self.assertEqual(primera.profesional, profesional)
+        self.assertEqual(primera.creado_por, self.user)
+        self.assertEqual(primera.empresa, self.empresa)
+        self.assertEqual(primera.historia.tipo, "capilar")
+
+        response = self.client.post(
+            crear_url,
+            {
+                "fecha_atencion": "2026-09-10T11:30",
+                "alopecia_escala": "hamilton_norwood",
+                "alopecia_grado": "IV",
+                "plan_tratamiento": "Control de evolución capilar.",
+                "estado": "borrador",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        clasificaciones = list(ClasificacionAlopecia.objects.filter(paciente=paciente))
+        self.assertEqual(len(clasificaciones), 2)
+        self.assertEqual(clasificaciones[0].grado, "IV")
+        self.assertEqual(clasificaciones[1].grado, "III_VERTEX")
+
+        historial = self.client.get(crear_url)
+        self.assertContains(historial, "Historial de clasificación")
+        self.assertContains(historial, "08/09/2026 09:15")
+        self.assertContains(historial, "10/09/2026 11:30")
+        self.assertContains(historial, "Dra. Candy Luque")
+
+    def test_formulario_capilar_prioriza_ludwig_y_permite_escala_manual_sin_sexo(self):
+        paciente_mujer = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-CAP-LUDWIG",
+            nombre="Paciente Ludwig",
+            identidad="0801198500890",
+            sexo="femenino",
+        )
+        url_mujer = reverse(
+            "clinica_crear_historia_especialidad",
+            args=[self.empresa.slug, paciente_mujer.id, "capilar"],
+        )
+        response = self.client.get(url_mujer)
+        self.assertContains(response, "Escala sugerida por sexo registrado")
+        self.assertContains(response, 'value="ludwig"')
+        self.assertContains(response, 'data-scale="hamilton_norwood" hidden')
+        self.assertNotContains(response, 'class="alopecia-scale-options"')
+
+        paciente_sin_sexo = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-CAP-MANUAL",
+            nombre="Paciente Escala Manual",
+            identidad="0801198500891",
+            sexo="no_indicado",
+        )
+        url_manual = reverse(
+            "clinica_crear_historia_especialidad",
+            args=[self.empresa.slug, paciente_sin_sexo.id, "capilar"],
+        )
+        response = self.client.get(url_manual)
+        self.assertEqual(
+            len(list(response.context["form"].fields["alopecia_escala"].choices)),
+            2,
+        )
+        self.assertContains(response, "Hamilton-Norwood")
+        self.assertContains(response, "Ludwig")
+
+        invalido = self.client.post(
+            url_manual,
+            {
+                "fecha_atencion": "2026-09-10T12:00",
+                "alopecia_escala": "ludwig",
+                "alopecia_grado": "VII",
+                "plan_tratamiento": "Prueba de validación.",
+                "estado": "borrador",
+            },
+        )
+        self.assertEqual(invalido.status_code, 200)
+        self.assertContains(invalido, "El grado no corresponde a la escala seleccionada")
+        self.assertFalse(ClasificacionAlopecia.objects.filter(paciente=paciente_sin_sexo).exists())
 
     def test_historia_camara_muestra_cuadro_longitudinal_de_22_sesiones(self):
         paciente = Paciente.objects.create(

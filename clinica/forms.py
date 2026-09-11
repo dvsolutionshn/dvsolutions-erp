@@ -8,6 +8,7 @@ from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normal
 
 from .models import (
     CitaClinica,
+    ClasificacionAlopecia,
     ConsentimientoClinico,
     DocumentoClinicoPaciente,
     ExamenPaciente,
@@ -782,6 +783,23 @@ FORMULARIOS_ESTRUCTURADOS = {
 
 BITACORA_TIPOS = {"enfermeria", "terapias", "camara_hiperbarica"}
 
+ALOPECIA_HAMILTON_NORWOOD_GRADOS = [
+    {"value": "I", "label": "I", "descripcion": "Mínima recesión", "visual": "hn-1"},
+    {"value": "II", "label": "II", "descripcion": "Recesión leve", "visual": "hn-2"},
+    {"value": "III", "label": "III", "descripcion": "Recesión frontal", "visual": "hn-3"},
+    {"value": "III_VERTEX", "label": "III Vertex", "descripcion": "Compromiso de vértex", "visual": "hn-3v"},
+    {"value": "IV", "label": "IV", "descripcion": "Pérdida frontal y vértex", "visual": "hn-4"},
+    {"value": "V", "label": "V", "descripcion": "Pérdida extensa frontal y vértex", "visual": "hn-5"},
+    {"value": "VI", "label": "VI", "descripcion": "Pérdida avanzada", "visual": "hn-6"},
+    {"value": "VII", "label": "VII", "descripcion": "Pérdida muy avanzada", "visual": "hn-7"},
+]
+
+ALOPECIA_LUDWIG_GRADOS = [
+    {"value": "I", "label": "I", "descripcion": "Aclaramiento leve", "visual": "lw-1"},
+    {"value": "II", "label": "II", "descripcion": "Aclaramiento moderado", "visual": "lw-2"},
+    {"value": "III", "label": "III", "descripcion": "Aclaramiento severo", "visual": "lw-3"},
+]
+
 
 FUNCIONES_ORGANICAS_SISTEMAS = [
     ("cabeza", "Cabeza"),
@@ -1012,10 +1030,11 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             "fecha_atencion": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
         }
 
-    def __init__(self, *args, empresa=None, tipo=None, seccion=None, **kwargs):
+    def __init__(self, *args, empresa=None, tipo=None, seccion=None, paciente=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
         self.tipo = tipo or getattr(self.instance, "tipo", None)
         self.seccion = seccion
+        self.paciente = paciente or getattr(self.instance, "paciente", None)
         if empresa:
             self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(
                 empresa=empresa,
@@ -1045,6 +1064,45 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             else FORMULARIOS_ESTRUCTURADOS.get(self.tipo, [])
         )
         datos = self.instance.datos_especialidad if self.instance and isinstance(self.instance.datos_especialidad, dict) else {}
+        self.muestra_clasificacion_alopecia = self.tipo == "capilar" and self.seccion not in {"diagnostico", "plan_tratamiento"}
+        clasificacion_previa = None
+        if self.muestra_clasificacion_alopecia and self.instance and self.instance.pk:
+            clasificacion_previa = self.instance.clasificaciones_alopecia.order_by("-fecha", "-id").first()
+        if self.muestra_clasificacion_alopecia:
+            sexo = getattr(self.paciente, "sexo", "") or ""
+            escala_inicial = clasificacion_previa.escala if clasificacion_previa else ""
+            if not escala_inicial and sexo == "masculino":
+                escala_inicial = ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD
+            elif not escala_inicial and sexo == "femenino":
+                escala_inicial = ClasificacionAlopecia.ESCALA_LUDWIG
+            escala_widget = (
+                forms.HiddenInput()
+                if sexo in {"masculino", "femenino"}
+                else forms.RadioSelect(attrs={"class": "alopecia-scale-options"})
+            )
+            self.fields["alopecia_escala"] = forms.ChoiceField(
+                required=False,
+                label="Escala utilizada",
+                choices=ClasificacionAlopecia.ESCALA_CHOICES,
+                widget=escala_widget,
+                initial=escala_inicial,
+            )
+            if escala_inicial == ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD:
+                grados = ClasificacionAlopecia.GRADOS_HAMILTON_NORWOOD
+            elif escala_inicial == ClasificacionAlopecia.ESCALA_LUDWIG:
+                grados = ClasificacionAlopecia.GRADOS_LUDWIG
+            else:
+                grados = list(dict.fromkeys([
+                    *ClasificacionAlopecia.GRADOS_HAMILTON_NORWOOD,
+                    *ClasificacionAlopecia.GRADOS_LUDWIG,
+                ]))
+            self.fields["alopecia_grado"] = forms.ChoiceField(
+                required=False,
+                label="Grado actual",
+                choices=[(grado, "III Vertex" if grado == "III_VERTEX" else grado) for grado in grados],
+                widget=forms.RadioSelect(attrs={"class": "alopecia-grade-options"}),
+                initial=clasificacion_previa.grado if clasificacion_previa else "",
+            )
         for nombre, etiqueta, opciones, multiple in self.campos_estructurados:
             field_class = forms.MultipleChoiceField if multiple else forms.ChoiceField
             choices = opciones if multiple else [("", "Seleccione una opcion"), *opciones]
@@ -1077,6 +1135,8 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                     "placeholder": "Escriba aquí la historia de la enfermedad actual, hallazgos relevantes, diagnóstico, conducta médica, plan de tratamiento, indicaciones y seguimiento.",
                 })
             orden = ["profesional", "fecha_atencion"]
+            if self.muestra_clasificacion_alopecia:
+                orden.extend(["alopecia_escala", "alopecia_grado"])
             for nombre, *_resto in self.campos_estructurados:
                 orden.extend([nombre, f"{nombre}_otros"])
             orden.extend(["plan_tratamiento", "estado"])
@@ -1131,6 +1191,34 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                 for nombre in orden
                 if nombre in self.fields
             )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self.muestra_clasificacion_alopecia:
+            return cleaned_data
+        escala = cleaned_data.get("alopecia_escala")
+        grado = cleaned_data.get("alopecia_grado")
+        if escala and not grado:
+            self.add_error("alopecia_grado", "Seleccione el grado actual de alopecia.")
+        elif grado and not escala:
+            self.add_error("alopecia_escala", "Seleccione la escala utilizada.")
+        if escala and grado:
+            permitidos = {
+                ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD: ClasificacionAlopecia.GRADOS_HAMILTON_NORWOOD,
+                ClasificacionAlopecia.ESCALA_LUDWIG: ClasificacionAlopecia.GRADOS_LUDWIG,
+            }
+            if grado not in permitidos.get(escala, []):
+                self.add_error("alopecia_grado", "El grado no corresponde a la escala seleccionada.")
+        return cleaned_data
+
+    def clasificacion_alopecia_limpia(self):
+        if not self.muestra_clasificacion_alopecia:
+            return None
+        escala = self.cleaned_data.get("alopecia_escala")
+        grado = self.cleaned_data.get("alopecia_grado")
+        if not escala or not grado:
+            return None
+        return {"escala": escala, "grado": grado}
 
     def save(self, commit=True):
         historia = super().save(commit=False)

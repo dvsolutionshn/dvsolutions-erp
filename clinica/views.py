@@ -29,6 +29,8 @@ from facturacion.models import Cliente, Producto
 from .forms import (
     ANTECEDENTES_FAMILIARES_CHOICES,
     ANTECEDENTES_PERSONALES_CHOICES,
+    ALOPECIA_HAMILTON_NORWOOD_GRADOS,
+    ALOPECIA_LUDWIG_GRADOS,
     ALERGIAS_GENERALES_CHOICES,
     CONSUMO_RIESGO_CHOICES,
     DECISION_CIRUGIA_CHOICES,
@@ -65,6 +67,7 @@ from .forms import (
 )
 from .models import (
     CitaClinica,
+    ClasificacionAlopecia,
     ConsentimientoClinico,
     DocumentoClinicoPaciente,
     ExamenPaciente,
@@ -137,6 +140,31 @@ def _profesional_predeterminado_usuario(empresa, usuario):
         if fallback_principal:
             return fallback_principal
     return None
+
+
+def _guardar_clasificacion_alopecia(historia, form, usuario):
+    if historia.tipo != "capilar":
+        return None
+    datos = form.clasificacion_alopecia_limpia()
+    if not datos:
+        return None
+    existente = ClasificacionAlopecia.objects.filter(
+        historia=historia,
+        escala=datos["escala"],
+        grado=datos["grado"],
+    ).first()
+    if existente:
+        return existente
+    return ClasificacionAlopecia.objects.create(
+        empresa=historia.empresa,
+        paciente=historia.paciente,
+        historia=historia,
+        escala=datos["escala"],
+        grado=datos["grado"],
+        fecha=historia.fecha_atencion,
+        profesional=historia.profesional,
+        creado_por=usuario,
+    )
 
 
 def _es_dueno_erp(usuario):
@@ -2118,6 +2146,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             empresa=empresa,
             tipo=tipo_post,
             seccion=seccion_activa,
+            paciente=paciente,
             prefix=f"historia_{tipo_post}",
         )
         if form_inline.is_valid():
@@ -2130,6 +2159,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             historia.creado_por = request.user
             historia.actualizado_por = request.user
             historia.save()
+            _guardar_clasificacion_alopecia(historia, form_inline, request.user)
             messages.success(request, f"Nota de {historia.get_tipo_display()} guardada en la historia clinica completa.")
             destino = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.id])
             if seccion_activa != "completa":
@@ -2286,6 +2316,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
                 empresa=empresa,
                 tipo=codigo,
                 seccion=seccion_activa,
+                paciente=paciente,
                 prefix=f"historia_{codigo}",
                 initial=initial_formulario,
             )
@@ -2745,6 +2776,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         request.POST or None,
         empresa=empresa,
         tipo=tipo,
+        paciente=paciente,
         initial=initial,
     )
     if request.method == "POST" and form.is_valid():
@@ -2757,6 +2789,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         historia.creado_por = request.user
         historia.actualizado_por = request.user
         historia.save()
+        _guardar_clasificacion_alopecia(historia, form, request.user)
         messages.success(request, f"Historia de {historia.get_tipo_display()} guardada correctamente.")
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     historias_previas = (
@@ -2764,6 +2797,11 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         .exclude(plan_tratamiento="")
         .select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")[:12]
+    )
+    clasificaciones_alopecia = (
+        paciente.clasificaciones_alopecia.select_related("profesional", "creado_por")[:20]
+        if tipo == "capilar"
+        else []
     )
     return render(
         request,
@@ -2779,6 +2817,9 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             "tipo": tipo,
             "preconsultas_tipo": preconsultas_tipo,
             "historias_previas": historias_previas,
+            "clasificaciones_alopecia": clasificaciones_alopecia,
+            "alopecia_hamilton_grados": ALOPECIA_HAMILTON_NORWOOD_GRADOS,
+            "alopecia_ludwig_grados": ALOPECIA_LUDWIG_GRADOS,
         },
     )
 
@@ -2802,6 +2843,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         request.POST or None,
         empresa=empresa,
         tipo=historia.tipo,
+        paciente=paciente,
         instance=historia,
     )
     if bloqueada:
@@ -2817,6 +2859,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         historia = form.save(commit=False)
         historia.actualizado_por = request.user
         historia.save()
+        _guardar_clasificacion_alopecia(historia, form, request.user)
         messages.success(request, "Historia clinica actualizada correctamente.")
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     historias_previas = (
@@ -2824,6 +2867,11 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         .exclude(plan_tratamiento="")
         .select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")[:12]
+    )
+    clasificaciones_alopecia = (
+        paciente.clasificaciones_alopecia.select_related("profesional", "creado_por")[:20]
+        if historia.tipo == "capilar"
+        else []
     )
     return render(
         request,
@@ -2845,6 +2893,9 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
             "preconsultas_tipo": preconsultas_tipo,
             "bloqueada": bloqueada,
             "historias_previas": historias_previas,
+            "clasificaciones_alopecia": clasificaciones_alopecia,
+            "alopecia_hamilton_grados": ALOPECIA_HAMILTON_NORWOOD_GRADOS,
+            "alopecia_ludwig_grados": ALOPECIA_LUDWIG_GRADOS,
         },
     )
 
