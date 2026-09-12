@@ -16,7 +16,12 @@
 #saved-rows tr.is-void{color:#64748b;background:#f1f5f9}
 #saved-rows tr.is-editing{outline:2px solid #2563eb;background:#eff6ff}
 .row-actions{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
-.row-actions button{font-size:11px;padding:2px 6px;cursor:pointer}
+.capture-sheet .row-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:4px 10px;border:1px solid #b9d7db;border-radius:7px;background:#edf8f8;color:#086d70;font:inherit;font-size:12px;font-weight:600;line-height:1.2;cursor:pointer;transition:background .15s,border-color .15s}
+.capture-sheet .row-actions button:hover{background:#d9eeee;border-color:#14888a}
+.capture-sheet .row-actions button[data-action=void]{background:#fff1f2;border-color:#e9b5bd;color:#a72635}
+.capture-sheet .row-actions button[data-action=void]:hover{background:#ffe1e5;border-color:#c85b6a}
+.capture-sheet .row-actions button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.capture-table tfoot td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
 .capture-table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:900px;font-size:13px}
 .capture-table th{padding:9px 5px;text-align:left;background:#edf2f7;color:#334155}
 .capture-table td{padding:4px;border:1px solid #d8e2ed;vertical-align:top}

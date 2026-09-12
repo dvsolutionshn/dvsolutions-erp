@@ -31,7 +31,7 @@
   }
   function showDuplicate(data) {
     duplicate = Boolean(data); skip.hidden = !duplicate; syncControls();
-    message.textContent = data ? `FACTURA YA REGISTRADA\nFecha: ${data.fecha} · Proveedor: ${data.proveedor} · Nº factura: ${data.numero} · Total: L ${data.total} · Estado: ${data.estado}` : '';
+    message.textContent = data ? `FACTURA YA REGISTRADA\nFecha: ${data.fecha} · Proveedor: ${data.proveedor} · Nº factura: ${data.numero} · Total: L ${money(cents(String(data.total)))} · Estado: ${data.estado}` : '';
   }
   async function checkDuplicate() {
     const version = ++duplicateVersion, key = identity();
@@ -161,7 +161,7 @@
     const value = base * rate, quotient = value / 100n, rest = value % 100n;
     return quotient + (rest > 50n || rest === 50n && quotient % 2n === 1n ? 1n : 0n);
   }
-  const money = value => `${value / 100n}.${String(value % 100n).padStart(2,'0')}`;
+  const money = value => `${String(value / 100n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${String(value % 100n).padStart(2,'0')}`;
   function calculate() {
     try {
       const exento = cents(field('exento').value), b15 = cents(field('base_15').value), b18 = cents(field('base_18').value);
@@ -210,7 +210,7 @@
         for (const name of Object.keys(data.errores)) field(name)?.setAttribute('aria-invalid','true');
       } else {
         applyBook(data); saved++; nextRow();
-        status.textContent = `${saved} guardada(s) · Última: ${data.registro.numero} · L ${data.registro.total}`;
+        status.textContent = `${saved} guardada(s) · Última: ${data.registro.numero} · L ${money(cents(data.registro.total))}`;
       }
       if (!data.registro) status.textContent = 'Fila pendiente';
     } catch(error) { message.textContent = error.message; status.textContent = 'Sin confirmar. Reintenta guardar.'; }
@@ -236,7 +236,7 @@
     row.classList.toggle('is-void',record.estado_codigo === 'anulada');
     row.replaceChildren();
     for (const key of ['fecha','proveedor','numero',...amountNames]) {
-      const td = document.createElement('td'); td.textContent = record[key];
+      const td = document.createElement('td'); td.textContent = amountNames.includes(key) ? money(cents(record[key])) : record[key];
       if (key === 'numero' && !record.numero) td.textContent = 'Sin número / ilegible';
       if (amountNames.includes(key)) td.style.textAlign = 'right';
       if (key === 'numero') {
@@ -250,7 +250,7 @@
         }
         td.append(actions);
         if (cents(record.exonerado || '0') > 0n) {
-          const note = document.createElement('small'); note.textContent = `Incluye exonerado: ${record.exonerado}`; td.append(note);
+          const note = document.createElement('small'); note.textContent = `Incluye exonerado: ${money(cents(record.exonerado))}`; td.append(note);
         }
       }
       row.append(td);
@@ -262,7 +262,7 @@
       records.clear(); document.querySelector('#saved-rows').replaceChildren(); data.registros.forEach(upsert);
     }
     if (data.resumen) {
-      for (const key of amountNames) document.getElementById(`sum-${key}`).textContent = data.resumen[key];
+      for (const key of amountNames) document.getElementById(`sum-${key}`).textContent = money(cents(data.resumen[key]));
       document.querySelector('#book-count').textContent = `${data.resumen.documentos} facturas activas`;
     }
     bookState = data.estado_libro || bookState; syncControls();
