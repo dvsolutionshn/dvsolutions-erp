@@ -1,4 +1,5 @@
 {% extends "facturacion/compras_base.html" %}
+{% load custom_filters %}
 {% block title %}Importar compras · {{ cliente.nombre }}{% endblock %}
 {% block header_title %}Importar Excel · {{ cliente.nombre }} · {{ mes }}/{{ anio }}{% endblock %}
 {% block header_description %}Revisa el archivo y selecciona las filas antes de guardar compras en este libro.{% endblock %}
@@ -6,6 +7,7 @@
 .import-preview input:not([type=checkbox]){box-sizing:border-box;width:125px;min-height:36px;padding:7px;border:1px solid #bacbd7;border-radius:6px;font:inherit;background:white;color:#173042}
 .import-preview input[name^=numero_]{width:185px}.import-preview input[name^=proveedor_]{width:170px}
 .import-error{color:#a72635}.import-note{color:#72520f}.import-preview td{vertical-align:top!important;padding:8px!important}.import-preview .import-detail td{padding:4px 12px 12px!important;background:#f6f9fc}.import-preview details{font-size:12px;line-height:1.6}.import-preview summary{cursor:pointer;color:#325973}.import-preview ul{padding-left:16px;margin:4px 0}.import-review{padding:16px;background:#edf5fa;border-radius:8px;margin:18px 0;line-height:1.6}.import-scroll{max-height:65vh;overflow:auto}.import-preview thead{position:sticky;top:0;z-index:1}.import-preview .amount{white-space:nowrap;text-align:right}
+.import-preview tr:target{outline:3px solid #d88b13;scroll-margin-top:60px}.import-diagnostics{max-height:240px;overflow:auto}.import-diagnostics li{margin:6px 0}.import-diagnostics a{color:#087a8a;text-decoration:underline;font-weight:700}
 </style>{% endblock %}
 {% block compras_content %}
 {% include "facturacion/_cliente_contable_nav.html" %}
@@ -21,29 +23,31 @@
 {% for nota in lote.notas %}<p class="import-note">{{ nota }}</p>{% endfor %}
 <p>Corrige fechas, proveedor, RTN o referencia si hace falta. Las referencias cortas se conservan. Un número vacío se registra como «Sin número / número ilegible». Las fechas de otros meses permanecen en este libro.</p>
 <form method="post" id="import-review-form">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}">
-<div class="import-review"><strong>Total Excel:</strong> {{ lote.total_excel|default_if_none:'No disponible' }} · <strong>Total de filas válidas seleccionadas:</strong> <span id="import-top-total">{{ total|floatformat:2 }}</span> · <strong>Diferencia:</strong> <span id="import-top-difference">{{ diferencia|default_if_none:'No disponible' }}</span>
+<div class="import-review"><strong>Total Excel:</strong> {{ lote.total_excel|compra_importe }} · <strong>Total de filas válidas seleccionadas:</strong> <span id="import-top-total">{{ total|compra_importe }}</span> · <strong>Diferencia:</strong> <span id="import-top-difference">{{ diferencia|compra_importe }}</span>
 <br>El cálculo usa dos decimales por factura. La diferencia también incluye filas excluidas, incompletas o duplicadas; no se reparte ni se ajustan facturas para cuadrar el total.</div>
+<div id="import-errors" class="import-review" role="alert" hidden><strong>Filas seleccionadas con errores</strong><ul class="import-diagnostics"></ul><small>Los números corresponden a las filas del Excel. Pulsa una fila para corregirla o desmarcarla.</small></div>
 <button class="erp-action-link" name="accion" value="revisar" formnovalidate>Actualizar vista previa</button>
 <div class="purchase-table-wrap import-scroll"><table class="erp-table import-preview"><thead><tr><th>Incluir</th><th>Fila</th><th>Fecha</th><th>Proveedor</th><th>RTN</th><th>Nº factura</th><th>Total calculado</th><th>Total Excel</th><th>Diferencia</th></tr></thead>
-<tbody>{% for fila in filas %}<tr data-import-row data-valid="{% if not fila.errores and not fila.duplicada %}1{% else %}0{% endif %}" data-exento="{{ fila.exento }}" data-base_15="{{ fila.base_15 }}" data-base_18="{{ fila.base_18 }}" data-isv_15="{{ fila.isv_15 }}" data-isv_18="{{ fila.isv_18 }}" data-total="{{ fila.total }}">
+<tbody>{% for fila in filas %}<tr id="import-row-{{ fila.fila }}" data-import-row data-row="{{ fila.fila }}" data-original="{{ fila.total_excel|default_if_none:'' }}" data-errors="{{ fila.errores|join:' · ' }}" data-duplicate="{% if fila.duplicada %}1{% else %}0{% endif %}" data-valid="{% if not fila.errores and not fila.duplicada %}1{% else %}0{% endif %}" data-exento="{{ fila.exento }}" data-base_15="{{ fila.base_15 }}" data-base_18="{{ fila.base_18 }}" data-isv_15="{{ fila.isv_15 }}" data-isv_18="{{ fila.isv_18 }}" data-total="{{ fila.total }}">
 <td><input type="checkbox" name="filas" value="{{ fila.fila }}" aria-label="Incluir fila {{ fila.fila }}" {% if fila.seleccionada and not fila.duplicada %}checked{% endif %}></td><td>{{ fila.fila }}</td>
 <td><input name="fecha_{{ fila.fila }}" value="{{ fila.fecha }}" aria-label="Fecha fila {{ fila.fila }}"></td>
 <td><input name="proveedor_{{ fila.fila }}" value="{{ fila.proveedor }}" maxlength="200" aria-label="Proveedor fila {{ fila.fila }}"></td>
 <td><input name="rtn_{{ fila.fila }}" value="{{ fila.rtn }}" maxlength="20" aria-label="RTN fila {{ fila.fila }}"></td>
 <td><input name="numero_{{ fila.fila }}" value="{{ fila.numero }}" maxlength="120" placeholder="Sin número / ilegible" aria-label="Factura fila {{ fila.fila }}"></td>
-<td class="amount">{{ fila.total }}</td><td class="amount">{{ fila.total_excel|default_if_none:'—' }}</td><td class="amount">{{ fila.diferencia|default_if_none:'—' }}</td>
+<td class="amount">{{ fila.total|compra_importe }}</td><td class="amount">{{ fila.total_excel|compra_importe }}</td><td class="amount">{{ fila.diferencia|compra_importe }}</td>
 </tr><tr class="import-detail"><td colspan="9">
 {% if fila.duplicada %}<strong class="import-error">FACTURA YA REGISTRADA</strong> · {{ fila.duplicada }}{% endif %}
 {% if fila.errores %}<div class="import-error" role="alert">{{ fila.errores|join:' · ' }}</div>{% endif %}
 <details {% if fila.avisos %}open{% endif %}><summary>Bases e impuestos{% if fila.avisos %} · {{ fila.avisos|length }} aviso(s){% endif %}</summary>
-<span>Exenta: {{ fila.exento }} · Base 15%: {{ fila.base_15 }} · Base 18%: {{ fila.base_18 }} · ISV 15%: {{ fila.isv_15 }} · ISV 18%: {{ fila.isv_18 }}</span>
+<span>Exenta: {{ fila.exento|compra_importe }} · Base 15%: {{ fila.base_15|compra_importe }} · Base 18%: {{ fila.base_18|compra_importe }} · ISV 15%: {{ fila.isv_15|compra_importe }} · ISV 18%: {{ fila.isv_18|compra_importe }}</span>
 <ul>{% for aviso in fila.avisos %}<li class="import-note">{{ aviso }}</li>{% endfor %}</ul></details>
 </td></tr>{% endfor %}</tbody></table></div>
 <div class="import-review" id="import-totals" aria-live="polite" data-excel="{{ lote.total_excel|default_if_none:'' }}">
 <strong>TOTALES A IMPORTAR</strong>
 <div class="purchase-table-wrap"><table class="erp-table"><thead><tr><th>Exentas</th><th>Base 15%</th><th>Base 18%</th><th>ISV 15%</th><th>ISV 18%</th><th>Total general</th></tr></thead>
-<tbody><tr>{% for campo, importe in totales.items %}<td data-sum="{{ campo }}" style="font-weight:700;white-space:nowrap">{{ importe|floatformat:2 }}</td>{% endfor %}</tr></tbody></table></div>
-<p><strong>Total del Excel:</strong> {{ lote.total_excel|default_if_none:'No disponible' }} · <strong>Diferencia:</strong> <span data-difference>{{ diferencia|default_if_none:'No disponible' }}</span></p>
+<tbody><tr>{% for campo, importe in totales.items %}<td data-sum="{{ campo }}" style="font-weight:700;white-space:nowrap">{{ importe|compra_importe }}</td>{% endfor %}</tr></tbody></table></div>
+<p><strong>Total del Excel:</strong> {{ lote.total_excel|compra_importe }} · <strong>Diferencia:</strong> <span data-difference>{{ diferencia|compra_importe }}</span></p>
+<details open><summary><strong>¿Por qué existe la diferencia?</strong></summary><ul id="import-reasons" class="import-diagnostics"></ul></details>
 <small>Se suman las filas seleccionadas válidas, excluyendo duplicadas. Al marcar o desmarcar una fila los totales cambian inmediatamente. Después de corregir datos, pulsa Actualizar vista previa para validarlos nuevamente.</small>
 </div>
 <p><label><input type="checkbox" name="revisado" required> Revisé el cliente/sucursal, período, fechas e importes y acepto las diferencias y advertencias de las filas seleccionadas.</label></p>
@@ -66,6 +70,45 @@
     summary.querySelector('[data-difference]').textContent = difference;
     document.getElementById('import-top-total').textContent = money(sums.total);
     document.getElementById('import-top-difference').textContent = difference;
+    const reasons = document.getElementById('import-reasons');
+    const errors = document.querySelector('#import-errors ul');
+    reasons.replaceChildren(); errors.replaceChildren();
+    function item(list, row, message) {
+      const li = document.createElement('li');
+      if (row) {
+        const link = document.createElement('a');
+        link.href = '#import-row-' + row.dataset.row;
+        link.textContent = 'Fila ' + row.dataset.row;
+        li.append(link, ': ');
+      }
+      li.append(document.createTextNode(message)); list.append(li);
+    }
+    let originalSum = 0n, complete = true;
+    document.querySelectorAll('[data-import-row]').forEach(row => {
+      const selected = row.querySelector('input[type=checkbox]').checked;
+      const included = selected && row.dataset.valid === '1';
+      if (selected && row.dataset.errors && row.dataset.duplicate !== '1') item(errors, row, row.dataset.errors);
+      if (!row.dataset.original) {
+        complete = false;
+        item(reasons, row, 'No hay un total Excel válido para comparar; no se puede atribuir toda la diferencia.');
+        return;
+      }
+      const original = cents(row.dataset.original); originalSum += original;
+      const impact = included ? cents(row.dataset.total) - original : -original;
+      if (impact !== 0n) {
+        const cause = included
+          ? 'Diferencia de cálculo respecto al Excel (bases/impuestos o redondeo). Calculado: ' + money(cents(row.dataset.total)) + '; Excel: ' + money(original)
+          : row.dataset.duplicate === '1' ? 'Factura duplicada, omitida'
+          : !selected ? 'Fila desmarcada, excluida' : 'Fila con errores, excluida: ' + row.dataset.errors;
+        item(reasons, row, cause + '. Efecto en la diferencia: ' + money(impact) + '.');
+      }
+    });
+    document.getElementById('import-errors').hidden = !errors.children.length;
+    if (complete && summary.dataset.excel) {
+      const residual = originalSum - cents(summary.dataset.excel);
+      if (residual !== 0n) item(reasons, null, 'La suma de los totales de las filas del Excel (' + money(originalSum) + ') no coincide con su total general (' + money(cents(summary.dataset.excel)) + '). Efecto: ' + money(residual) + '. Revisa el rango de la fórmula TOTAL o los decimales del archivo.');
+    } else if (!summary.dataset.excel) item(reasons, null, 'El archivo no tiene un total general disponible para conciliar.');
+    if (!reasons.children.length) item(reasons, null, 'Sin diferencias: las filas seleccionadas coinciden con el total del Excel.');
   }
   document.querySelectorAll('.import-preview input[type=checkbox]').forEach(input => input.addEventListener('change', updateTotals));
   updateTotals();

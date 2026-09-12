@@ -97,6 +97,8 @@ def leer_excel(contenido, nombre):
                 if col and formulas_row[col-1].data_type == 'f' and datos[k] is None:
                     fila['errores_origen'].append(f'{k}: fórmula sin valor guardado. Abre, recalcula y guarda el Excel.')
             try:
+                # Conservar el total de origen incluso si las bases no son válidas.
+                fila['total_excel'] = str(importe(datos['total'])) if datos['total'] is not None else None
                 subtotal = importe(datos['subtotal'])
                 isv15, isv18 = importe(datos['isv_15']), importe(datos['isv_18'])
                 if columnas['base_15'] or columnas['base_18'] or columnas['exento']:
@@ -275,8 +277,9 @@ def importar_cliente(request, empresa_slug, cliente_id, anio, mes):
                             raise PermissionDenied
                         filas = revisar(lote,empresa,cliente,request.user,post)
                         elegidas = [f for f in filas if f['seleccionada'] and not f['duplicada']]
-                        if any(f['errores'] for f in elegidas):
-                            raise ValueError('Corrige o desmarca las filas con errores. No se guardó ninguna compra.')
+                        problematicas = [str(f['fila']) for f in elegidas if f['errores']]
+                        if problematicas:
+                            raise ValueError('Corrige o desmarca las filas con errores: ' + ', '.join(problematicas) + '. No se guardó ninguna compra.')
                         if not elegidas:
                             raise ValueError('No hay filas nuevas seleccionadas para importar.')
                         libro, _ = LibroCompraMensual.objects.get_or_create(empresa=empresa,cliente_contable=cliente,anio=anio,mes=mes)

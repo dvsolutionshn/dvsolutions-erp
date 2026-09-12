@@ -20,7 +20,7 @@ from .importacion_clientes import leer_excel
 from .models import Proveedor, RegistroCompraFiscal, LibroCompraMensual
 
 
-def excel(filas=None, formula=False, mixto=False):
+def excel(filas=None, formula=False, mixto=False, total_general=None):
     libro=Workbook(); hoja=libro.active; hoja.title='COMPRAS'
     hoja['D5']='NORDIC SPS'; hoja['B6']='Libro Enero 2026'
     for col,valor in enumerate(['Fecha','beneficiario','No. De factura','Subtotal','ISV 15%',0.18,'Total'],2):
@@ -32,7 +32,7 @@ def excel(filas=None, formula=False, mixto=False):
         for col,valor in enumerate(fila,2): hoja.cell(numero,col,valor)
     if formula: hoja['F11']='=E11*0.15'
     if mixto: hoja['G11']=18
-    n=len(filas)+11;hoja.cell(n,2,'TOTAL');hoja.cell(n,8,sum(f[-1] or 0 for f in filas))
+    n=len(filas)+11;hoja.cell(n,2,'TOTAL');hoja.cell(n,8,total_general if total_general is not None else sum(f[-1] or 0 for f in filas))
     destino=BytesIO();libro.save(destino);return destino.getvalue()
 
 
@@ -219,7 +219,10 @@ class ImportacionClientesBrowserTests(StaticLiveServerTestCase):
                 (datetime(2026,1,2),'Proveedor histórico',None,50,7.5,0,57.5),
                 (datetime(2026,1,3),self.proveedor.nombre,'0000010112345678',100,15,0,115),
                 (None,None,None,5,.75,0,5.75)]))
-            env={**os.environ,'IMPORT_TEST_URL':self.live_server_url+reverse('captura_cliente_contable',args=[self.empresa.slug,self.nordic.pk,2026,1]),
+            diagnostico=Path(temporal)/'Diagnostico.xlsx'
+            diagnostico.write_bytes(excel([(datetime(2026,1,5),'Proveedor prueba','888',1000,150,0,1149.99),
+                (datetime(2026,1,6),'Proveedor prueba','889',-1,0,0,2)],total_general=1152))
+            env={**os.environ,'IMPORT_DIAGNOSTIC_FILE':str(diagnostico),'IMPORT_TEST_URL':self.live_server_url+reverse('captura_cliente_contable',args=[self.empresa.slug,self.nordic.pk,2026,1]),
                  'IMPORT_TEST_FILE':str(archivo),'IMPORT_TEST_SESSION':self.client.cookies['sessionid'].value}
             result=subprocess.run(['node',str(Path(__file__).parent/'browser_tests/importacion_clientes.cjs')],env=env,capture_output=True,text=True,timeout=120)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

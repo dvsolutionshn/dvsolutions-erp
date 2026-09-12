@@ -8,6 +8,8 @@ Disponible en `dubon_asociados`, dentro de los libros de clientes contables. Usa
 2. Seleccionar el `.xlsx` y pulsar **Revisar archivo**. Se lee COMPRAS o, si no existe, la primera hoja. No se guarda ninguna compra durante la vista previa.
 3. Verificar el encabezado del archivo frente al cliente/sucursal y el período de destino. La importación no identifica ni crea sucursales automáticamente.
 4. Corregir fechas, proveedor, RTN o referencia cuando corresponda. Desmarcar las filas que no se deban importar. Pulsar **Actualizar vista previa** para revisar nuevamente los resultados y totales.
+Las filas seleccionadas con errores se enumeran en un resumen con enlaces a la fila original del Excel. Los importes se muestran con coma de miles y punto decimal. Al pie, el desglose explica el efecto de cada fila excluida, duplicada o con diferencias de cálculo y cualquier diferencia entre la suma de las filas del Excel y su total general. Si faltan valores de origen, se indica que no es posible atribuir toda la diferencia.
+
 5. Revisar las advertencias y marcar la confirmación; pulsar **Confirmar importación**. Las filas seleccionadas con errores impiden guardar el lote completo. Las duplicadas se omiten.
 6. Las compras aparecen en el cuadro mensual y alimentan el resumen anual existente. El acumulado definitivo por cuentas sigue pendiente del formato que proporcionará el usuario.
 
