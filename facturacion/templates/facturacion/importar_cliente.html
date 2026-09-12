@@ -1,0 +1,59 @@
+{% extends "facturacion/compras_base.html" %}
+{% block title %}Importar compras · {{ cliente.nombre }}{% endblock %}
+{% block header_title %}Importar Excel · {{ cliente.nombre }} · {{ mes }}/{{ anio }}{% endblock %}
+{% block header_description %}Revisa el archivo y selecciona las filas antes de guardar compras en este libro.{% endblock %}
+{% block extra_head %}{{ block.super }}<style>
+.import-preview input:not([type=checkbox]){box-sizing:border-box;width:125px;min-height:36px;padding:7px;border:1px solid #bacbd7;border-radius:6px;font:inherit;background:white;color:#173042}
+.import-preview input[name^=numero_]{width:185px}.import-preview input[name^=proveedor_]{width:170px}
+.import-error{color:#a72635}.import-note{color:#72520f}.import-preview td{vertical-align:top!important;padding:8px!important}.import-preview .import-detail td{padding:4px 12px 12px!important;background:#f6f9fc}.import-preview details{font-size:12px;line-height:1.6}.import-preview summary{cursor:pointer;color:#325973}.import-preview ul{padding-left:16px;margin:4px 0}.import-review{padding:16px;background:#edf5fa;border-radius:8px;margin:18px 0;line-height:1.6}.import-scroll{max-height:65vh;overflow:auto}.import-preview thead{position:sticky;top:0;z-index:1}.import-preview .amount{white-space:nowrap;text-align:right}
+</style>{% endblock %}
+{% block compras_content %}
+{% include "facturacion/_cliente_contable_nav.html" %}
+<section class="erp-card">
+<p><a href="{% url 'captura_cliente_contable' empresa.slug cliente.pk anio mes %}">← Volver al libro {{ mes }}/{{ anio }}</a></p>
+{% if error %}<p class="import-error" role="alert">{{ error }}</p>{% endif %}
+{% if not lote %}
+<form method="post" enctype="multipart/form-data" class="purchase-form">{% csrf_token %}{{ form.as_p }}<button class="erp-action-link">Revisar archivo</button></form>
+<p>Se leerá la hoja COMPRAS, o la primera hoja si no existe. Hasta 1000 filas y 5 MB. El archivo original se conserva.</p>
+{% else %}
+<h2>{{ lote.archivo }}</h2><p>Encabezado del archivo: <strong>{{ lote.titulo }}</strong></p>
+<p>Destino: <strong>{{ cliente.nombre }} · {{ mes }}/{{ anio }}</strong>. Comprueba la sucursal indicada en el Excel.</p>
+{% for nota in lote.notas %}<p class="import-note">{{ nota }}</p>{% endfor %}
+<p>Corrige fechas, proveedor, RTN o referencia si hace falta. Las referencias cortas se conservan. Un número vacío se registra como «Sin número / número ilegible». Las fechas de otros meses permanecen en este libro.</p>
+<form method="post" id="import-review-form">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}">
+<div class="import-review"><strong>Total Excel:</strong> {{ lote.total_excel|default_if_none:'No disponible' }} · <strong>Total de filas válidas seleccionadas:</strong> {{ total|floatformat:2 }} · <strong>Diferencia:</strong> {{ diferencia|default_if_none:'No disponible' }}
+<br>El cálculo usa dos decimales por factura. La diferencia también incluye filas excluidas, incompletas o duplicadas; no se reparte ni se ajustan facturas para cuadrar el total.</div>
+<button class="erp-action-link" name="accion" value="revisar" formnovalidate>Actualizar vista previa</button>
+<div class="purchase-table-wrap import-scroll"><table class="erp-table import-preview"><thead><tr><th>Incluir</th><th>Fila</th><th>Fecha</th><th>Proveedor</th><th>RTN</th><th>Nº factura</th><th>Total calculado</th><th>Total Excel</th><th>Diferencia</th></tr></thead>
+<tbody>{% for fila in filas %}<tr data-import-row>
+<td><input type="checkbox" name="filas" value="{{ fila.fila }}" aria-label="Incluir fila {{ fila.fila }}" {% if fila.seleccionada and not fila.duplicada %}checked{% endif %}></td><td>{{ fila.fila }}</td>
+<td><input name="fecha_{{ fila.fila }}" value="{{ fila.fecha }}" aria-label="Fecha fila {{ fila.fila }}"></td>
+<td><input name="proveedor_{{ fila.fila }}" value="{{ fila.proveedor }}" maxlength="200" aria-label="Proveedor fila {{ fila.fila }}"></td>
+<td><input name="rtn_{{ fila.fila }}" value="{{ fila.rtn }}" maxlength="20" aria-label="RTN fila {{ fila.fila }}"></td>
+<td><input name="numero_{{ fila.fila }}" value="{{ fila.numero }}" maxlength="120" placeholder="Sin número / ilegible" aria-label="Factura fila {{ fila.fila }}"></td>
+<td class="amount">{{ fila.total }}</td><td class="amount">{{ fila.total_excel|default_if_none:'—' }}</td><td class="amount">{{ fila.diferencia|default_if_none:'—' }}</td>
+</tr><tr class="import-detail"><td colspan="9">
+{% if fila.duplicada %}<strong class="import-error">FACTURA YA REGISTRADA</strong> · {{ fila.duplicada }}{% endif %}
+{% if fila.errores %}<div class="import-error" role="alert">{{ fila.errores|join:' · ' }}</div>{% endif %}
+<details {% if fila.avisos %}open{% endif %}><summary>Bases e impuestos{% if fila.avisos %} · {{ fila.avisos|length }} aviso(s){% endif %}</summary>
+<span>Exenta: {{ fila.exento }} · Base 15%: {{ fila.base_15 }} · Base 18%: {{ fila.base_18 }} · ISV 15%: {{ fila.isv_15 }} · ISV 18%: {{ fila.isv_18 }}</span>
+<ul>{% for aviso in fila.avisos %}<li class="import-note">{{ aviso }}</li>{% endfor %}</ul></details>
+</td></tr>{% endfor %}</tbody></table></div>
+<p><label><input type="checkbox" name="revisado" required> Revisé el cliente/sucursal, período, fechas e importes y acepto las diferencias y advertencias de las filas seleccionadas.</label></p>
+<button class="erp-action-link" name="accion" value="confirmar">Confirmar importación</button>
+<p><a href="">Cargar otro archivo</a> · Vista previa válida durante una hora. Guardar no modifica compras existentes.</p>
+</form>
+<script>
+document.getElementById('import-review-form').addEventListener('submit', function () {
+  const datos = {seleccionadas: []};
+  this.querySelectorAll('.import-preview input').forEach(input => {
+    if (input.type === 'checkbox') { if (input.checked) datos.seleccionadas.push(input.value); }
+    else datos[input.name] = input.value;
+    input.removeAttribute('name');
+  });
+  const payload = document.createElement('input');
+  payload.type = 'hidden'; payload.name = 'ediciones'; payload.value = JSON.stringify(datos);
+  this.appendChild(payload);
+});
+</script>{% endif %}
+</section>{% endblock %}

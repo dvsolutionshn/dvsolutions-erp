@@ -1,0 +1,41 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
+const assert=require('node:assert/strict');
+(async()=>{
+  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE});
+  try {
+    const context=await browser.newContext({viewport:{width:1600,height:1000}});
+    const url=process.env.IMPORT_TEST_URL;
+    await context.addCookies([{name:'sessionid',value:process.env.IMPORT_TEST_SESSION,url}]);
+    const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(url);
+    await page.getByRole('link',{name:'Importar Excel',exact:true}).click();
+    const importar=page.url();
+    await page.locator('[name=archivo]').setInputFiles(process.env.IMPORT_TEST_FILE);
+    await page.getByRole('button',{name:'Revisar archivo',exact:true}).click();
+    await page.locator('.import-preview').waitFor();
+    assert.equal(await page.locator('.import-preview [data-import-row]').count(),4);
+    assert.match(await page.locator('body').textContent(),/Fecha posterior/);
+    assert.equal(await page.locator('[name=numero_11]').inputValue(),'6368');
+    await page.locator('[name=fecha_11]').fill('25/12/25');
+    await page.getByRole('checkbox',{name:'Incluir fila 14',exact:true}).uncheck();
+    await page.getByRole('button',{name:'Actualizar vista previa',exact:true}).click();
+    assert.match(await page.locator('.import-review').textContent(),/287[,.]50/);
+    if(process.env.IMPORT_SCREENSHOT)await page.screenshot({path:process.env.IMPORT_SCREENSHOT,fullPage:true,animations:'disabled'});
+    await page.locator('[name=revisado]').check();
+    await page.getByRole('button',{name:'Confirmar importación',exact:true}).click();
+    await page.waitForURL(url);
+    await page.waitForFunction(()=>document.querySelectorAll('#saved-rows tr').length===3);
+    assert.equal(await page.locator('#sum-total').textContent(),'287.50');
+    const sinNumero=page.locator('#saved-rows tr').filter({hasText:'Sin número / ilegible'});
+    await sinNumero.getByRole('button',{name:'Editar',exact:true}).click();
+    await page.locator('[name=exento]').fill('5');
+    await page.locator('[name=base_18]').focus();await page.keyboard.press('Enter');
+    await page.waitForFunction(()=>document.querySelector('#sum-total').textContent==='292.50');
+    await page.goto(importar);
+    await page.locator('[name=archivo]').setInputFiles(process.env.IMPORT_TEST_FILE);
+    await page.getByRole('button',{name:'Revisar archivo',exact:true}).click();
+    assert.equal(await page.getByText('FACTURA YA REGISTRADA',{exact:true}).count(),3);
+    assert.deepEqual(errors,[]);
+    console.log('PASS: cargar, revisar, corregir fecha, excluir fila, importar, editar sin número y detectar reimportación.');
+  } finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});

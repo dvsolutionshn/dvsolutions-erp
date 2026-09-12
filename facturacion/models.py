@@ -997,7 +997,8 @@ class RegistroCompraFiscal(models.Model):
     proveedor = models.ForeignKey('Proveedor', on_delete=models.SET_NULL, null=True, blank=True)
     proveedor_nombre = models.CharField(max_length=200)
     proveedor_rtn = models.CharField(max_length=20, blank=True, null=True)
-    numero_factura = models.CharField(max_length=120)
+    numero_factura = models.CharField(max_length=120, blank=True)
+    clave_importacion = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
     # La captura rapida completa estos campos sin reescribir el historial.
     numero_factura_normalizado = models.CharField(max_length=120, null=True, blank=True)
     identidad_captura = models.CharField(max_length=40, null=True, blank=True, editable=False)
@@ -1050,6 +1051,8 @@ class RegistroCompraFiscal(models.Model):
             raise ValidationError({'proveedor': 'El proveedor debe pertenecer a la misma empresa y cliente contable.'})
         if self.cliente_contable_id and self.clasificacion_contable_id:
             raise ValidationError('No se comparten clasificaciones de la administradora con clientes contables.')
+        if not self.numero_factura and not (self.cliente_contable_id and self.clave_importacion):
+            raise ValidationError({'numero_factura': 'El número es obligatorio fuera de una importación histórica.'})
         if self.fecha_documento:
             self.periodo_anio = self.periodo_anio or self.fecha_documento.year
             self.periodo_mes = self.periodo_mes or self.fecha_documento.month

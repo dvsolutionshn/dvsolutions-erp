@@ -49,6 +49,7 @@
 <strong id="book-state"></strong><span id="book-count"></span>
 {% if permisos.editar %}<button id="book-toggle" type="button">Finalizar libro</button>{% endif %}
 <button type="button" id="book-refresh">Actualizar cuadro</button>
+{% if cliente and permisos.crear %}<a class="erp-action-link" href="{% url 'importar_compras_cliente' empresa.slug cliente.pk anio mes %}">Importar Excel</a>{% endif %}
 </div>
 <p class="capture-help">TAB avanza · SHIFT + TAB retrocede · ↑ ↓ elige proveedor · ENTER en Base 18% guarda · ESC omite duplicada. Fecha día/mes/año: 5/8/26, 05/08/2026 o 050826.</p>
 <form id="capture-form" data-create="{{ permisos.crear|yesno:'true,false' }}" data-edit="{{ permisos.editar|yesno:'true,false' }}" data-void="{{ permisos.anular|yesno:'true,false' }}" data-create-supplier="{{ puede_crear_proveedor|yesno:'true,false' }}" autocomplete="off" action="{% if cliente %}{% url 'captura_cliente_contable' empresa.slug cliente.pk anio mes %}{% else %}{% url 'captura_rapida_compras_periodo' empresa.slug anio mes %}{% endif %}" method="post">

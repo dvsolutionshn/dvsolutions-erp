@@ -691,6 +691,7 @@ class RegistroCompraFiscalForm(forms.ModelForm):
             self.fields['proveedor'].queryset = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by('nombre')
         self.fields['proveedor'].required = False
         self.fields['proveedor_nombre'].help_text = 'Nombre fiscal del proveedor como aparece en la factura.'
+        self.fields['numero_factura'].required = True
         self.fields['numero_factura'].help_text = 'El sistema valida este numero contra meses anteriores para evitar duplicados.'
         self.fields['exento'].label = 'Subtotal exento'
         self.fields['base_15'].label = 'Subtotal 15%'

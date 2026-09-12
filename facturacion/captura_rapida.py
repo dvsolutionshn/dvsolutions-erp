@@ -43,10 +43,11 @@ class IdentidadForm(forms.Form):
         if registro:
             disponibles |= Q(pk=registro.proveedor_id)
             self.fields['proveedor'].required = bool(registro.proveedor_id)
+            self.fields['numero_factura'].required = bool(registro.numero_factura)
         self.fields['proveedor'].queryset = Proveedor.objects.filter(disponibles, empresa=empresa, cliente_contable=cliente_contable)
 
     def clean_numero_factura(self):
-        numero = self.cleaned_data['numero_factura']
+        numero = self.cleaned_data.get('numero_factura', '')
         if self.registro and numero == self.registro.numero_factura:
             return numero
         if not re.fullmatch(r'(?:[0-9]{9,}|[0-9]{3}-[0-9]{3}-[0-9]{2}-[0-9]+)', numero):
@@ -333,7 +334,7 @@ def captura_rapida(request, empresa_slug, anio=None, mes=None, cliente_id=None, 
                     registro.estado = 'anulada'
                     registro.save(update_fields=['estado'])
                 else:
-                    duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id, cliente_contable=cliente_contable)
+                    duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id, cliente_contable=cliente_contable) if datos['numero_factura'] else None
                     if duplicada:
                         transaction.set_rollback(True)
                         return JsonResponse({'duplicada': duplicada}, status=409)
@@ -346,15 +347,17 @@ def captura_rapida(request, empresa_slug, anio=None, mes=None, cliente_id=None, 
                     registro.total += registro.exonerado
                     registro.proveedor = proveedor if proveedor.pk else None
                     registro.proveedor_nombre, registro.proveedor_rtn = proveedor.nombre, proveedor.rtn
-                    registro.numero_factura_normalizado = numero_normalizado(datos['numero_factura'])
+                    registro.numero_factura_normalizado = numero_normalizado(datos['numero_factura']) or None
                     rtn = numero_normalizado(proveedor.rtn or '').replace(' ', '')
                     registro.identidad_captura = f'rtn:{rtn}' if rtn else (f'proveedor:{proveedor.pk}' if proveedor.pk else None)
+                    if not registro.numero_factura_normalizado:
+                        registro.identidad_captura = None
                     registro.periodo_anio, registro.periodo_mes = anio, mes
                     registro.save()
             libro.actualizado_por = usuario
             libro.save()
     except (IntegrityError, forms.ValidationError) as exc:
-        duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id, cliente_contable=cliente_contable) if proveedor else None
+        duplicada = buscar_duplicada(empresa, proveedor, datos['numero_factura'], excluir=registro_id, cliente_contable=cliente_contable) if proveedor and datos.get('numero_factura') else None
         if duplicada:
             return JsonResponse({'duplicada': duplicada}, status=409)
         if isinstance(exc, forms.ValidationError):

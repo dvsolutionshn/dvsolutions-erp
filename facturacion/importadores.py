@@ -50,7 +50,7 @@ def _detectar_encabezado(sheet):
     for row in range(1, min(sheet.max_row, 40) + 1):
         valores = [sheet.cell(row, col).value for col in range(1, sheet.max_column + 1)]
         normalizados = [_normalizar_header(valor) for valor in valores]
-        if "fecha" in normalizados and any("beneficiario" in valor for valor in normalizados):
+        if "fecha" in normalizados and any("beneficiario" in valor or valor == "proveedor" for valor in normalizados):
             return row, normalizados
     raise ValueError("No se encontro la fila de encabezados del libro de compras.")
 

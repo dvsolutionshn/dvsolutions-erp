@@ -218,6 +218,7 @@
   });
 
   function syncControls() {
+    field('numero_factura').required = !editing || Boolean(editing.numero);
     const editable = editing ? allowed('edit') : allowed('create') && bookState === 'en_proceso';
     document.querySelector('#capture-row').hidden = !editable;
     save.disabled = busy || duplicate || !editable;
@@ -236,6 +237,7 @@
     row.replaceChildren();
     for (const key of ['fecha','proveedor','numero',...amountNames]) {
       const td = document.createElement('td'); td.textContent = record[key];
+      if (key === 'numero' && !record.numero) td.textContent = 'Sin número / ilegible';
       if (amountNames.includes(key)) td.style.textAlign = 'right';
       if (key === 'numero') {
         const actions = document.createElement('div'); actions.className = 'row-actions';
