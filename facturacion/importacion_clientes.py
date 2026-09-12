@@ -17,11 +17,12 @@ from django.db import transaction, IntegrityError, OperationalError
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from openpyxl import load_workbook
 
 from core.models import Empresa
-from .captura_rapida import CapturaForm, buscar_duplicada, calcular_importes, numero_normalizado
+from .captura_rapida import CapturaForm, buscar_duplicada, calcular_importes, numero_normalizado, serializar, MESES
 from .clientes_contables import empresa_contable, cliente_autorizado
 from .importadores import _detectar_encabezado, _indice, _normalizar_texto
 from .models import LibroCompraMensual, Proveedor, RegistroCompraFiscal
@@ -141,7 +142,7 @@ def clave_fila(lote, fila):
 def revisar(lote, empresa, cliente, usuario, post=None):
     proveedores = list(Proveedor.objects.filter(empresa=empresa, cliente_contable=cliente).order_by('pk'))
     existentes = RegistroCompraFiscal.objects.filter(empresa=empresa, cliente_contable=cliente)
-    revisadas, vistos, vistos_sin_numero = [], set(), set()
+    revisadas, vistos, vistos_sin_numero = [], {}, set()
     for original in lote['filas']:
         fila = {**original, 'errores':list(original['errores_origen']), 'avisos':[], 'duplicada':None, 'obj_proveedor':None}
         n = fila['fila']
@@ -193,12 +194,21 @@ def revisar(lote, empresa, cliente, usuario, post=None):
         if not proveedor.rtn:
             fila['avisos'].append('Proveedor sin RTN: podrás completarlo en su ficha.')
         clave = clave_fila(lote,fila)
-        if existentes.filter(clave_importacion=clave).exists():
+        importada = existentes.filter(clave_importacion=clave).first()
+        duplicada = None
+        if importada:
             fila['duplicada'] = 'Esta fila del archivo ya fue importada.'
+            duplicada = serializar(importada)
         elif fila['numero'] and not fila['errores']:
             duplicada = buscar_duplicada(empresa,proveedor,fila['numero'],cliente_contable=cliente)
-            if duplicada:
-                fila['duplicada'] = f"{duplicada['fecha']} · {duplicada['proveedor']} · {duplicada['numero']} · {duplicada['total']} · {duplicada['estado']}"
+        if duplicada:
+            periodo = f"{MESES[duplicada['periodo_mes']-1]} {duplicada['periodo_anio']}"
+            fila['duplicada'] = ((fila['duplicada'] + ' ') if fila['duplicada'] else '') + (
+                f"Registrada en el Libro de {periodo} · Registro #{duplicada['id']} · "
+                f"Fecha de factura: {duplicada['fecha']} · Proveedor: {duplicada['proveedor']} · "
+                f"Nº factura: {duplicada['numero'] or 'Sin número'} · Total: {Decimal(duplicada['total']):,.2f} · Estado: {duplicada['estado']}")
+            fila['duplicada_url'] = reverse('captura_cliente_contable', args=[empresa.slug, cliente.pk,
+                duplicada['periodo_anio'], duplicada['periodo_mes']]) + f"#book-row-{duplicada['id']}"
         if not fila['numero']:
             fila['avisos'].append('Sin número / número ilegible: la detección de duplicados será aproximada.')
             if not fila['errores'] and existentes.filter(fecha_documento=fila['fecha_obj'],total=Decimal(fila['total'])).filter(
@@ -212,8 +222,10 @@ def revisar(lote, empresa, cliente, usuario, post=None):
         identidad = (f'p:{proveedor.pk}' if proveedor.pk else (rtn or nombre),numero_normalizado(fila['numero']))
         if fila['seleccionada'] and fila['numero'] and not fila['errores'] and not fila['duplicada']:
             if identidad in vistos:
-                fila['duplicada'] = 'Número repetido para el mismo proveedor dentro del archivo.'
-            vistos.add(identidad)
+                fila['duplicada'] = f'Número repetido para el mismo proveedor en la fila {vistos[identidad]} de este archivo.'
+                fila['duplicada_url'] = f'#import-row-{vistos[identidad]}'
+            else:
+                vistos[identidad] = n
         if fila.get('diferencia') not in (None,'0.00') or fila.get('impuestos_distintos'):
             fila['avisos'].append('Hay diferencias de cálculo/redondeo respecto al Excel. Revisa los importes.')
         revisadas.append(fila)

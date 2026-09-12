@@ -307,4 +307,7 @@
     catch(error) {message.textContent = error.message;}
   });
   applyBook(book);
+  if (/^#book-row-\d+$/.test(location.hash)) {
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({block:'center'});
+  }
 })();

@@ -40,6 +40,7 @@
 <td class="amount">{{ fila.total|compra_importe }}</td><td class="amount">{{ fila.total_excel|compra_importe }}</td><td class="amount">{{ fila.diferencia|compra_importe }}</td>
 </tr><tr class="import-detail"><td colspan="9">
 {% if fila.duplicada %}<strong class="import-error">FACTURA YA REGISTRADA</strong> · {{ fila.duplicada }}{% endif %}
+{% if fila.duplicada_url %}<a class="erp-action-link" href="{{ fila.duplicada_url }}" {% if fila.duplicada_url|slice:':1' != '#' %}target="_blank" rel="noopener"{% endif %}>Ver factura registrada</a>{% endif %}
 {% if fila.errores %}<div class="import-error" role="alert">{{ fila.errores|join:' · ' }}</div>{% endif %}
 <details {% if fila.avisos %}open{% endif %}><summary>Bases e impuestos{% if fila.avisos %} · {{ fila.avisos|length }} aviso(s){% endif %}</summary>
 <span>Exenta: {{ fila.exento|compra_importe }} · Base 15%: {{ fila.base_15|compra_importe }} · Base 18%: {{ fila.base_18|compra_importe }} · ISV 15%: {{ fila.isv_15|compra_importe }} · ISV 18%: {{ fila.isv_18|compra_importe }}</span>

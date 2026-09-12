@@ -98,9 +98,11 @@ class ImportacionClientesTests(TestCase):
 
     def test_duplicados_en_historial_y_entre_clientes(self):
         compra=RegistroCompraFiscal.objects.create(empresa=self.empresa,cliente_contable=self.nordic,proveedor=self.proveedor,
-            proveedor_nombre=self.proveedor.nombre,proveedor_rtn=self.proveedor.rtn,numero_factura='000-001-01-12345678',fecha_documento=date(2025,6,1),total=115)
+            proveedor_nombre=self.proveedor.nombre,proveedor_rtn=self.proveedor.rtn,numero_factura='000-001-01-12345678',fecha_documento=date(2025,6,1),periodo_anio=2025,periodo_mes=7,total=115)
         previo=self.previo(excel([(datetime(2026,1,1),self.proveedor.nombre,'0000010112345678',100,15,0,115)]))
-        self.assertTrue(previo.context['filas'][0]['duplicada'])
+        self.assertIn('Libro de Julio 2025',previo.context['filas'][0]['duplicada'])
+        self.assertIn('Fecha de factura: 01/06/2025',previo.context['filas'][0]['duplicada'])
+        self.assertTrue(previo.context['filas'][0]['duplicada_url'].endswith(f'/2025/7/#book-row-{compra.pk}'))
         self.confirmar(previo)
         self.assertEqual(RegistroCompraFiscal.objects.count(),1)
         self.client.force_login(self.admin)
