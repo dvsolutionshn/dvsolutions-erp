@@ -321,7 +321,10 @@ def importar_cliente(request, empresa_slug, cliente_id, anio, mes):
             error = '; '.join(exc.messages) if isinstance(exc,ValidationError) else str(exc)
         except (IntegrityError, OperationalError):
             error = 'Hubo otro guardado en curso. No se guardó este lote; revisa la vista previa y reintenta.'
-    total = sum((Decimal(f['total']) for f in filas if f.get('total') and f['seleccionada'] and not f['errores'] and not f['duplicada']),Decimal('0.00'))
+    campos_totales = ('exento', 'base_15', 'base_18', 'isv_15', 'isv_18', 'total')
+    validas = [f for f in filas if f.get('total') and f['seleccionada'] and not f['errores'] and not f['duplicada']]
+    totales = {campo: sum((Decimal(f[campo]) for f in validas), Decimal('0.00')) for campo in campos_totales}
+    total = totales['total']
     return render(request,'facturacion/importar_cliente.html',dict(empresa=empresa,cliente=cliente,anio=anio,mes=mes,
-        form=form,lote=lote,filas=filas,token=token,error=error,total=total,
+        form=form,lote=lote,filas=filas,token=token,error=error,total=total,totales=totales,
         diferencia=total-Decimal(lote['total_excel']) if lote and lote['total_excel'] is not None else None))

@@ -21,11 +21,11 @@
 {% for nota in lote.notas %}<p class="import-note">{{ nota }}</p>{% endfor %}
 <p>Corrige fechas, proveedor, RTN o referencia si hace falta. Las referencias cortas se conservan. Un número vacío se registra como «Sin número / número ilegible». Las fechas de otros meses permanecen en este libro.</p>
 <form method="post" id="import-review-form">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}">
-<div class="import-review"><strong>Total Excel:</strong> {{ lote.total_excel|default_if_none:'No disponible' }} · <strong>Total de filas válidas seleccionadas:</strong> {{ total|floatformat:2 }} · <strong>Diferencia:</strong> {{ diferencia|default_if_none:'No disponible' }}
+<div class="import-review"><strong>Total Excel:</strong> {{ lote.total_excel|default_if_none:'No disponible' }} · <strong>Total de filas válidas seleccionadas:</strong> <span id="import-top-total">{{ total|floatformat:2 }}</span> · <strong>Diferencia:</strong> <span id="import-top-difference">{{ diferencia|default_if_none:'No disponible' }}</span>
 <br>El cálculo usa dos decimales por factura. La diferencia también incluye filas excluidas, incompletas o duplicadas; no se reparte ni se ajustan facturas para cuadrar el total.</div>
 <button class="erp-action-link" name="accion" value="revisar" formnovalidate>Actualizar vista previa</button>
 <div class="purchase-table-wrap import-scroll"><table class="erp-table import-preview"><thead><tr><th>Incluir</th><th>Fila</th><th>Fecha</th><th>Proveedor</th><th>RTN</th><th>Nº factura</th><th>Total calculado</th><th>Total Excel</th><th>Diferencia</th></tr></thead>
-<tbody>{% for fila in filas %}<tr data-import-row>
+<tbody>{% for fila in filas %}<tr data-import-row data-valid="{% if not fila.errores and not fila.duplicada %}1{% else %}0{% endif %}" data-exento="{{ fila.exento }}" data-base_15="{{ fila.base_15 }}" data-base_18="{{ fila.base_18 }}" data-isv_15="{{ fila.isv_15 }}" data-isv_18="{{ fila.isv_18 }}" data-total="{{ fila.total }}">
 <td><input type="checkbox" name="filas" value="{{ fila.fila }}" aria-label="Incluir fila {{ fila.fila }}" {% if fila.seleccionada and not fila.duplicada %}checked{% endif %}></td><td>{{ fila.fila }}</td>
 <td><input name="fecha_{{ fila.fila }}" value="{{ fila.fecha }}" aria-label="Fecha fila {{ fila.fila }}"></td>
 <td><input name="proveedor_{{ fila.fila }}" value="{{ fila.proveedor }}" maxlength="200" aria-label="Proveedor fila {{ fila.fila }}"></td>
@@ -39,11 +39,37 @@
 <span>Exenta: {{ fila.exento }} · Base 15%: {{ fila.base_15 }} · Base 18%: {{ fila.base_18 }} · ISV 15%: {{ fila.isv_15 }} · ISV 18%: {{ fila.isv_18 }}</span>
 <ul>{% for aviso in fila.avisos %}<li class="import-note">{{ aviso }}</li>{% endfor %}</ul></details>
 </td></tr>{% endfor %}</tbody></table></div>
+<div class="import-review" id="import-totals" aria-live="polite" data-excel="{{ lote.total_excel|default_if_none:'' }}">
+<strong>TOTALES A IMPORTAR</strong>
+<div class="purchase-table-wrap"><table class="erp-table"><thead><tr><th>Exentas</th><th>Base 15%</th><th>Base 18%</th><th>ISV 15%</th><th>ISV 18%</th><th>Total general</th></tr></thead>
+<tbody><tr>{% for campo, importe in totales.items %}<td data-sum="{{ campo }}" style="font-weight:700;white-space:nowrap">{{ importe|floatformat:2 }}</td>{% endfor %}</tr></tbody></table></div>
+<p><strong>Total del Excel:</strong> {{ lote.total_excel|default_if_none:'No disponible' }} · <strong>Diferencia:</strong> <span data-difference>{{ diferencia|default_if_none:'No disponible' }}</span></p>
+<small>Se suman las filas seleccionadas válidas, excluyendo duplicadas. Al marcar o desmarcar una fila los totales cambian inmediatamente. Después de corregir datos, pulsa Actualizar vista previa para validarlos nuevamente.</small>
+</div>
 <p><label><input type="checkbox" name="revisado" required> Revisé el cliente/sucursal, período, fechas e importes y acepto las diferencias y advertencias de las filas seleccionadas.</label></p>
 <button class="erp-action-link" name="accion" value="confirmar">Confirmar importación</button>
 <p><a href="">Cargar otro archivo</a> · Vista previa válida durante una hora. Guardar no modifica compras existentes.</p>
 </form>
 <script>
+(function () {
+  const summary = document.getElementById('import-totals');
+  const fields = ['exento', 'base_15', 'base_18', 'isv_15', 'isv_18', 'total'];
+  const cents = value => { const [whole, fraction = ''] = value.split('.'); return BigInt(whole || '0') * 100n + BigInt(fraction.padEnd(2, '0')); };
+  const money = value => { const sign = value < 0n ? '-' : ''; const absolute = value < 0n ? -value : value; return sign + (absolute / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + (absolute % 100n).toString().padStart(2, '0'); };
+  function updateTotals() {
+    const sums = Object.fromEntries(fields.map(field => [field, 0n]));
+    document.querySelectorAll('[data-import-row][data-valid="1"]').forEach(row => {
+      if (row.querySelector('input[type=checkbox]').checked) fields.forEach(field => sums[field] += cents(row.dataset[field]));
+    });
+    fields.forEach(field => summary.querySelector('[data-sum="' + field + '"]').textContent = money(sums[field]));
+    const difference = summary.dataset.excel ? money(sums.total - cents(summary.dataset.excel)) : 'No disponible';
+    summary.querySelector('[data-difference]').textContent = difference;
+    document.getElementById('import-top-total').textContent = money(sums.total);
+    document.getElementById('import-top-difference').textContent = difference;
+  }
+  document.querySelectorAll('.import-preview input[type=checkbox]').forEach(input => input.addEventListener('change', updateTotals));
+  updateTotals();
+})();
 document.getElementById('import-review-form').addEventListener('submit', function () {
   const datos = {seleccionadas: []};
   this.querySelectorAll('.import-preview input').forEach(input => {
