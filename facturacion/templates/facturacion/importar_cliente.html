@@ -52,6 +52,7 @@
 </div>
 <p><label><input type="checkbox" name="revisado" required> Revisé el cliente/sucursal, período, fechas e importes y acepto las diferencias y advertencias de las filas seleccionadas.</label></p>
 <button class="erp-action-link" name="accion" value="confirmar">Confirmar importación</button>
+<a class="erp-action-link" href="{% url 'captura_cliente_contable' empresa.slug cliente.pk anio mes %}">Cancelar importación</a>
 <p><a href="">Cargar otro archivo</a> · Vista previa válida durante una hora. Guardar no modifica compras existentes.</p>
 </form>
 <script>
