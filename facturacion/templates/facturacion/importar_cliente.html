@@ -8,6 +8,9 @@
 .import-preview input[name^=numero_]{width:185px}.import-preview input[name^=proveedor_]{width:170px}
 .import-error{color:#a72635}.import-note{color:#72520f}.import-preview td{vertical-align:top!important;padding:8px!important}.import-preview .import-detail td{padding:4px 12px 12px!important;background:#f6f9fc}.import-preview details{font-size:12px;line-height:1.6}.import-preview summary{cursor:pointer;color:#325973}.import-preview ul{padding-left:16px;margin:4px 0}.import-review{padding:16px;background:#edf5fa;border-radius:8px;margin:18px 0;line-height:1.6}.import-scroll{max-height:65vh;overflow:auto}.import-preview thead{position:sticky;top:0;z-index:1}.import-preview .amount{white-space:nowrap;text-align:right}
 .import-preview tr:target{outline:3px solid #d88b13;scroll-margin-top:60px}.import-diagnostics{max-height:240px;overflow:auto}.import-diagnostics li{margin:6px 0}.import-diagnostics a{color:#087a8a;text-decoration:underline;font-weight:700}
+.purchase-module .erp-action-link.import-cancel{background:#fff1f2;border-color:#e9b5bd;color:#a72635}
+.purchase-module .erp-action-link.import-cancel:hover{background:#ffe1e5;border-color:#c85b6a;color:#891e2c}
+.purchase-module .erp-action-link.import-cancel:focus-visible{outline:3px solid #a72635;outline-offset:3px}
 </style>{% endblock %}
 {% block compras_content %}
 {% include "facturacion/_cliente_contable_nav.html" %}
@@ -52,7 +55,7 @@
 </div>
 <p><label><input type="checkbox" name="revisado" required> Revisé el cliente/sucursal, período, fechas e importes y acepto las diferencias y advertencias de las filas seleccionadas.</label></p>
 <button class="erp-action-link" name="accion" value="confirmar">Confirmar importación</button>
-<a class="erp-action-link" href="{% url 'captura_cliente_contable' empresa.slug cliente.pk anio mes %}">Cancelar importación</a>
+<a class="erp-action-link import-cancel" href="{% url 'captura_cliente_contable' empresa.slug cliente.pk anio mes %}">Cancelar importación</a>
 <p><a href="">Cargar otro archivo</a> · Vista previa válida durante una hora. Guardar no modifica compras existentes.</p>
 </form>
 <script>
