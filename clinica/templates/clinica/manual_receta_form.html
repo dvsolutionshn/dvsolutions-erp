@@ -1,0 +1,29 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}{% if manual %}Editar{% else %}Subir{% endif %} manual - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Manuales de Recetas{% endblock %}
+{% block header_title %}{% if manual %}Editar manual{% else %}Subir manual PDF{% endif %}{% endblock %}
+{% block header_description %}El documento se mantendrá separado por empresa y solo los manuales activos podrán seleccionarse en nuevas recetas.{% endblock %}
+
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'clinica_manuales_recetas' empresa.slug %}">Volver a manuales</a>{% endblock %}
+
+{% block content %}
+<style>
+.manual-form{max-width:780px;margin:auto;padding:22px;border:1px solid var(--line);border-radius:22px;background:#fff;box-shadow:0 18px 44px rgba(16,49,72,.07)}.manual-fields{display:grid;gap:16px}.manual-field{display:grid;gap:7px}.manual-field label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#617789;font-weight:900}.manual-field input:not([type=checkbox]),.manual-field textarea{width:100%;border:1px solid #bdd0dc;border-radius:12px;background:#fff;padding:11px 13px;color:#173047;font:inherit}.manual-check{display:flex;align-items:center;gap:10px}.manual-help{color:#6a7d8d;font-size:11px}.manual-error{color:#a63842;font-size:11px;font-weight:800}.manual-current{padding:12px;border-radius:12px;background:#eef7fb;color:#31566f;font-size:12px}.manual-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:17px;border-top:1px solid var(--line)}
+</style>
+<form method="post" enctype="multipart/form-data" class="manual-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="manual-error">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="manual-fields">
+        {% for field in form %}
+        <div class="manual-field{% if field.name == 'activo' %} manual-check{% endif %}">
+            {% if field.name == 'activo' %}{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% endif %}
+            {% if field.help_text %}<span class="manual-help">{{ field.help_text }}</span>{% endif %}
+            {% for error in field.errors %}<span class="manual-error">{{ error }}</span>{% endfor %}
+        </div>
+        {% endfor %}
+        {% if manual and manual.archivo %}<div class="manual-current">PDF actual: <a href="{% url 'clinica_archivo_manual_receta' empresa.slug manual.id %}" target="_blank" rel="noopener">abrir documento</a>. Si carga otro archivo, se usará el nuevo sin eliminar las asociaciones históricas.</div>{% endif %}
+    </div>
+    <div class="manual-actions"><a class="erp-btn-secondary" href="{% url 'clinica_manuales_recetas' empresa.slug %}">Cancelar</a><button class="erp-btn" type="submit">Guardar manual</button></div>
+</form>
+{% endblock %}

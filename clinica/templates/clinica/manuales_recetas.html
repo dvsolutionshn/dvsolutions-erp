@@ -1,0 +1,39 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Manuales de Recetas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Configuración clínica{% endblock %}
+{% block header_title %}Manuales de Recetas{% endblock %}
+{% block header_description %}Biblioteca de instructivos PDF disponibles para adjuntar a las recetas médicas.{% endblock %}
+
+{% block topbar_actions %}
+<a class="erp-btn-secondary" href="{% url 'clinica_configuracion' empresa.slug %}">Volver a configuración</a>
+<a class="erp-btn" href="{% url 'clinica_crear_manual_receta' empresa.slug %}">Subir manual PDF</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.manual-list{display:grid;gap:14px}.manual-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:18px 20px;border:1px solid var(--line);border-radius:20px;background:#fff;box-shadow:0 14px 34px rgba(16,40,62,.06)}.manual-card.is-inactive{background:#f7f9fb;opacity:.82}.manual-card h3{margin:0;color:#102338;font-size:16px}.manual-card p{margin:7px 0 0;color:#64798b;line-height:1.55;font-size:12px}.manual-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.manual-tag{padding:5px 9px;border-radius:999px;background:#eaf8f5;color:#08766d;font-size:10px;font-weight:900}.manual-tag.off{background:#edf0f3;color:#677684}.manual-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}@media(max-width:700px){.manual-card{grid-template-columns:1fr}.manual-actions{justify-content:flex-start}}
+</style>
+<section class="manual-list">
+    {% for manual in manuales %}
+    <article class="manual-card{% if not manual.activo %} is-inactive{% endif %}">
+        <div>
+            <h3>{{ manual.titulo }}</h3>
+            {% if manual.descripcion %}<p>{{ manual.descripcion }}</p>{% endif %}
+            <div class="manual-meta">
+                <span class="manual-tag{% if not manual.activo %} off{% endif %}">{% if manual.activo %}Activo{% else %}Inactivo{% endif %}</span>
+                <span class="manual-tag">{{ manual.total_recetas }} receta{{ manual.total_recetas|pluralize }}</span>
+                <span class="manual-tag">Actualizado {{ manual.fecha_actualizacion|date:"d/m/Y H:i" }}</span>
+            </div>
+        </div>
+        <div class="manual-actions">
+            <a class="erp-btn-secondary" href="{% url 'clinica_archivo_manual_receta' empresa.slug manual.id %}" target="_blank" rel="noopener">Ver PDF</a>
+            <a class="erp-btn-secondary" href="{% url 'clinica_archivo_manual_receta' empresa.slug manual.id %}?descargar=1">Descargar</a>
+            <a class="erp-btn" href="{% url 'clinica_editar_manual_receta' empresa.slug manual.id %}">Editar</a>
+        </div>
+    </article>
+    {% empty %}
+    <div class="erp-empty">Aún no hay manuales PDF. Suba el primero para poder adjuntarlo a una receta.</div>
+    {% endfor %}
+</section>
+{% endblock %}

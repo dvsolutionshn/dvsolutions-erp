@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -23,7 +24,7 @@ from crm.models import (
 )
 from facturacion.models import Cliente, Producto
 from .forms import FUNCIONES_ORGANICAS_SISTEMAS, PreconsultaClinicaPublicaForm
-from .models import CitaClinica, ClasificacionAlopecia, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, Paciente, PacienteFotoEvolucion, PlanTratamientoPaciente, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
+from .models import CitaClinica, ClasificacionAlopecia, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, ManualReceta, Paciente, PacienteFotoEvolucion, PlanTratamientoPaciente, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
 from .tokens import hash_token_preconsulta
 
 
@@ -1352,6 +1353,171 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Medicamento catálogo")
         self.assertContains(response, "Medicamento externo")
         self.assertContains(response, "Cada 12 horas")
+
+    def test_manuales_receta_se_guardan_por_empresa_y_permanecen_en_historial(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-RX-MAN",
+            nombre="Paciente Manual",
+            identidad="0801199900399",
+        )
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                reverse("clinica_crear_manual_receta", args=[self.empresa.slug]),
+                {
+                    "titulo": "Cuidados posteriores",
+                    "descripcion": "Indicaciones para recuperación.",
+                    "activo": "on",
+                    "archivo": SimpleUploadedFile(
+                        "cuidados.pdf",
+                        b"%PDF-1.4\nmanual de prueba\n%%EOF",
+                        content_type="application/pdf",
+                    ),
+                },
+            )
+            self.assertRedirects(response, reverse("clinica_manuales_recetas", args=[self.empresa.slug]))
+            manual = ManualReceta.objects.get(empresa=self.empresa)
+
+            response = self.client.post(
+                reverse("clinica_crear_receta_paciente", args=[self.empresa.slug, paciente.id]),
+                {
+                    "fecha": "2026-09-13",
+                    "diagnostico": "Control",
+                    "indicaciones": "Continuar cuidados.",
+                    "manuales": [str(manual.id)],
+                },
+            )
+            receta = RecetaMedica.objects.get(paciente=paciente)
+            self.assertRedirects(response, reverse("clinica_receta_imprimir", args=[self.empresa.slug, paciente.id, receta.id]))
+            self.assertEqual(list(receta.manuales.values_list("id", flat=True)), [manual.id])
+            with patch("clinica.views._generar_receta_pdf_bytes", return_value=b"%PDF-1.4 receta"):
+                pdf_response = self.client.get(
+                    reverse("clinica_receta_pdf", args=[self.empresa.slug, paciente.id, receta.id])
+                )
+            self.assertEqual(pdf_response.status_code, 200)
+            self.assertEqual(pdf_response["Content-Type"], "application/pdf")
+            self.assertTrue(pdf_response.content.startswith(b"%PDF"))
+
+            manual.activo = False
+            manual.save(update_fields=["activo"])
+            historial = self.client.get(reverse("clinica_recetas_paciente", args=[self.empresa.slug, paciente.id]))
+            self.assertContains(historial, "Manuales asociados")
+            self.assertContains(historial, "Cuidados posteriores")
+            descarga = self.client.get(reverse("clinica_archivo_manual_receta", args=[self.empresa.slug, manual.id]))
+            self.assertEqual(descarga.status_code, 200)
+            descarga.close()
+
+    def test_manuales_receta_restringe_administracion_y_seleccion_a_la_empresa(self):
+        rol = RolSistema.objects.create(
+            nombre="Clínica sin configuración",
+            codigo="clinica-sin-config-manuales",
+            activo=True,
+            puede_clinica=True,
+            puede_pacientes=True,
+        )
+        usuario = get_user_model().objects.create_user(
+            username="recetador-sin-config",
+            password="pass",
+            empresa=self.empresa,
+            rol_sistema=rol,
+        )
+        self.client.force_login(usuario)
+        response = self.client.get(reverse("clinica_manuales_recetas", args=[self.empresa.slug]))
+        self.assertEqual(response.status_code, 403)
+
+        otra_empresa = Empresa.objects.create(
+            nombre="Otra clínica",
+            slug="otra_clinica_manuales",
+            rtn="0801199900799",
+            tipo_solucion="clinica",
+        )
+        manual_ajeno = ManualReceta.objects.create(
+            empresa=otra_empresa,
+            titulo="Manual ajeno",
+            archivo="clinica/manuales_recetas/empresa-ajena/ajeno.pdf",
+        )
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-RX-AJENO",
+            nombre="Paciente Empresa",
+            identidad="0801199900699",
+        )
+        response = self.client.post(
+            reverse("clinica_crear_receta_paciente", args=[self.empresa.slug, paciente.id]),
+            {
+                "fecha": "2026-09-13",
+                "indicaciones": "Indicaciones",
+                "manuales": [str(manual_ajeno.id)],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(RecetaMedica.objects.filter(paciente=paciente).exists())
+        self.assertIn("manuales", response.context["form"].errors)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    @patch("clinica.views._generar_receta_pdf_bytes", return_value=b"%PDF-1.4 receta")
+    def test_envio_receta_correo_incluye_pdf_y_manuales(self, _pdf_mock):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-RX-MAIL",
+            nombre="Paciente Correo",
+            identidad="0801199900499",
+            correo="paciente@example.com",
+        )
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            manual = ManualReceta.objects.create(
+                empresa=self.empresa,
+                titulo="Manual correo",
+                archivo=SimpleUploadedFile("manual-correo.pdf", b"%PDF-1.4 manual", content_type="application/pdf"),
+                creado_por=self.user,
+            )
+            receta = RecetaMedica.objects.create(
+                empresa=self.empresa,
+                paciente=paciente,
+                indicaciones="Indicaciones",
+                creada_por=self.user,
+            )
+            receta.manuales.add(manual)
+            response = self.client.post(
+                reverse("clinica_enviar_receta_correo", args=[self.empresa.slug, paciente.id, receta.id])
+            )
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertEqual(len(mail.outbox[0].attachments), 2)
+            self.assertEqual(mail.outbox[0].to, ["paciente@example.com"])
+
+    @patch("clinica.views.enviar_documento_whatsapp")
+    @patch("clinica.views.subir_documento_whatsapp", side_effect=["media-receta", "media-manual"])
+    @patch("clinica.views._generar_receta_pdf_bytes", return_value=b"%PDF-1.4 receta")
+    def test_envio_receta_whatsapp_incluye_pdf_y_manuales(self, _pdf_mock, subir_mock, enviar_mock):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-RX-WA",
+            nombre="Paciente WhatsApp",
+            identidad="0801199900599",
+            whatsapp="99998888",
+        )
+        ConfiguracionCRM.objects.create(empresa=self.empresa, whatsapp_activo=True)
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            manual = ManualReceta.objects.create(
+                empresa=self.empresa,
+                titulo="Manual WhatsApp",
+                archivo=SimpleUploadedFile("manual-whatsapp.pdf", b"%PDF-1.4 manual", content_type="application/pdf"),
+                creado_por=self.user,
+            )
+            receta = RecetaMedica.objects.create(
+                empresa=self.empresa,
+                paciente=paciente,
+                indicaciones="Indicaciones",
+                creada_por=self.user,
+            )
+            receta.manuales.add(manual)
+            response = self.client.post(
+                reverse("clinica_enviar_receta_whatsapp", args=[self.empresa.slug, paciente.id, receta.id])
+            )
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(subir_mock.call_count, 2)
+            self.assertEqual(enviar_mock.call_count, 2)
 
     def test_recetas_avanzadas_se_configuran_por_tipo_solucion_clinica(self):
         modulo = Modulo.objects.get(codigo="clinica_medica")

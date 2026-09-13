@@ -1,24 +1,31 @@
 import logging
 import re
+import tempfile
 import unicodedata
 from copy import deepcopy
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import quote
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
-from django.http import Http404, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
+from weasyprint import HTML
 
 from core.access import interfaz_clinica_activa
 from core.models import Empresa
@@ -53,6 +60,7 @@ from .forms import (
     EvaluacionClinicaIntegralForm,
     HistoriaClinicaEspecialidadForm,
     IncapacidadClinicaForm,
+    ManualRecetaForm,
     PacienteForm,
     PacienteFotoEvolucionForm,
     PlanTratamientoPacienteForm,
@@ -75,6 +83,7 @@ from .models import (
     ExpedienteEvento,
     HistoriaClinicaEspecialidad,
     InvitacionRegistroPaciente,
+    ManualReceta,
     MedicamentoPrescrito,
     Paciente,
     PacienteFotoEvolucion,
@@ -105,7 +114,12 @@ from crm.models import (
     SesionCamaraHiperbarica,
     SesionTerapiaPostQuirurgica,
 )
-from crm.services import WhatsAppAPIError, enviar_plantilla_preconsulta_whatsapp
+from crm.services import (
+    WhatsAppAPIError,
+    enviar_documento_whatsapp,
+    enviar_plantilla_preconsulta_whatsapp,
+    subir_documento_whatsapp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +322,26 @@ def _requiere_interfaz_clinica(empresa):
 
 def _recetas_avanzadas_activas(empresa):
     return interfaz_clinica_activa(empresa)
+
+
+def _puede_administrar_manuales_receta(user, empresa):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and user.puede_acceder_empresa(empresa)
+        and user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
+    )
+
+
+def _puede_consultar_manual_receta(user, empresa):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and user.puede_acceder_empresa(empresa)
+        and (
+            user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
+            or user.tiene_permiso_erp("puede_pacientes", empresa)
+            or user.tiene_permiso_erp("puede_expediente_clinico", empresa)
+        )
+    )
 
 
 def _ip_cliente(request):
@@ -1751,6 +1785,103 @@ def _serializar_plantillas_receta(plantillas):
     ]
 
 
+def _nombre_receta_pdf(receta):
+    paciente = slugify(receta.paciente.nombre) or f"paciente-{receta.paciente_id}"
+    return f"receta-{paciente}-{receta.fecha:%Y-%m-%d}-{receta.id}.pdf"
+
+
+def _generar_receta_pdf_bytes(empresa, paciente, receta):
+    html_string = render_to_string(
+        "clinica/receta_imprimir.html",
+        {"empresa": empresa, "paciente": paciente, "receta": receta},
+    )
+    return HTML(string=html_string, base_url=str(settings.BASE_DIR)).write_pdf()
+
+
+def _receta_con_adjuntos(empresa, paciente, receta_id):
+    return get_object_or_404(
+        RecetaMedica.objects.select_related("profesional", "creada_por", "paciente").prefetch_related(
+            "productos", "detalles_medicamentos__producto", "manuales"
+        ),
+        id=receta_id,
+        empresa=empresa,
+        paciente=paciente,
+    )
+
+
+@login_required
+def manuales_recetas(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not _puede_administrar_manuales_receta(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para administrar manuales de recetas.")
+    manuales = list(
+        ManualReceta.objects.filter(empresa=empresa)
+        .select_related("creado_por")
+        .annotate(total_recetas=Count("recetas"))
+        .order_by("-activo", "titulo")
+    )
+    return render(
+        request,
+        "clinica/manuales_recetas.html",
+        {"empresa": empresa, "manuales": manuales},
+    )
+
+
+def _manual_receta_form_view(request, empresa, manual=None):
+    if not _puede_administrar_manuales_receta(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para administrar manuales de recetas.")
+    form = ManualRecetaForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=manual,
+        empresa=empresa,
+    )
+    if request.method == "POST" and form.is_valid():
+        objeto = form.save(commit=False)
+        objeto.empresa = empresa
+        if not objeto.creado_por_id:
+            objeto.creado_por = request.user
+        objeto.save()
+        messages.success(request, f"Manual «{objeto.titulo}» guardado correctamente.")
+        return redirect("clinica_manuales_recetas", empresa_slug=empresa.slug)
+    return render(
+        request,
+        "clinica/manual_receta_form.html",
+        {"empresa": empresa, "manual": manual, "form": form},
+    )
+
+
+@login_required
+def crear_manual_receta(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    return _manual_receta_form_view(request, empresa)
+
+
+@login_required
+def editar_manual_receta(request, empresa_slug, manual_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    manual = get_object_or_404(ManualReceta, id=manual_id, empresa=empresa)
+    return _manual_receta_form_view(request, empresa, manual)
+
+
+@login_required
+def archivo_manual_receta(request, empresa_slug, manual_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not _puede_consultar_manual_receta(request.user, empresa):
+        raise PermissionDenied("No tiene permiso para consultar este manual.")
+    manual = get_object_or_404(ManualReceta, id=manual_id, empresa=empresa)
+    if not manual.archivo:
+        raise Http404("El manual no tiene un PDF disponible.")
+    descargar = request.GET.get("descargar") == "1"
+    nombre = Path(manual.archivo.name).name
+    return FileResponse(
+        manual.archivo.open("rb"),
+        as_attachment=descargar,
+        filename=nombre,
+        content_type="application/pdf",
+    )
+
+
 @login_required
 def recetas_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
@@ -1758,7 +1889,7 @@ def recetas_paciente(request, empresa_slug, paciente_id):
     recetas = list(
         RecetaMedica.objects.filter(empresa=empresa, paciente=paciente)
         .select_related("profesional", "creada_por")
-        .prefetch_related("productos", "detalles_medicamentos__producto")
+        .prefetch_related("productos", "detalles_medicamentos__producto", "manuales")
         .order_by("-fecha", "-fecha_creacion")
     )
     return render(
@@ -1777,19 +1908,113 @@ def recetas_paciente(request, empresa_slug, paciente_id):
 def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    receta = get_object_or_404(
-        RecetaMedica.objects.select_related("profesional", "creada_por").prefetch_related(
-            "productos", "detalles_medicamentos__producto"
-        ),
-        id=receta_id,
-        empresa=empresa,
-        paciente=paciente,
-    )
+    receta = _receta_con_adjuntos(empresa, paciente, receta_id)
     return render(
         request,
         "clinica/receta_imprimir.html",
         {"empresa": empresa, "paciente": paciente, "receta": receta},
     )
+
+
+@login_required
+def descargar_receta_pdf(request, empresa_slug, paciente_id, receta_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    receta = _receta_con_adjuntos(empresa, paciente, receta_id)
+    response = HttpResponse(_generar_receta_pdf_bytes(empresa, paciente, receta), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{_nombre_receta_pdf(receta)}"'
+    return response
+
+
+@login_required
+@require_POST
+def enviar_receta_correo(request, empresa_slug, paciente_id, receta_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    receta = _receta_con_adjuntos(empresa, paciente, receta_id)
+    if not paciente.correo:
+        messages.error(request, "El paciente no tiene correo electrónico registrado.")
+        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+
+    total_manuales = receta.manuales.count()
+    detalle_manuales = (
+        f" junto con {total_manuales} manual(es) seleccionado(s)"
+        if total_manuales
+        else ""
+    )
+    try:
+        mensaje = EmailMultiAlternatives(
+            subject=f"Receta médica - {empresa.nombre}",
+            body=(
+                f"Hola {paciente.nombre},\n\nAdjuntamos su receta médica{detalle_manuales}."
+                f"\n\n{empresa.nombre}"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[paciente.correo],
+        )
+        mensaje.attach(
+            _nombre_receta_pdf(receta),
+            _generar_receta_pdf_bytes(empresa, paciente, receta),
+            "application/pdf",
+        )
+        for manual in receta.manuales.all():
+            manual.archivo.open("rb")
+            try:
+                mensaje.attach(Path(manual.archivo.name).name, manual.archivo.read(), "application/pdf")
+            finally:
+                manual.archivo.close()
+        mensaje.send(fail_silently=False)
+    except Exception:
+        logger.exception("No se pudo enviar la receta %s por correo", receta.id)
+        messages.error(request, "No se pudo enviar la receta por correo. Revise la configuración de correo e intente nuevamente.")
+    else:
+        messages.success(
+            request,
+            f"Receta{f' y {total_manuales} manual(es)' if total_manuales else ''} enviada por correo a {paciente.correo}.",
+        )
+    return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+
+
+@login_required
+@require_POST
+def enviar_receta_whatsapp(request, empresa_slug, paciente_id, receta_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    receta = _receta_con_adjuntos(empresa, paciente, receta_id)
+    config = ConfiguracionCRM.objects.filter(empresa=empresa).first()
+    if not config or not config.whatsapp_activo:
+        messages.error(request, "Active y configure WhatsApp Cloud API en CRM antes de enviar recetas.")
+        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+    telefono = paciente.whatsapp or paciente.telefono or ""
+    if not telefono:
+        messages.error(request, "El paciente no tiene teléfono o WhatsApp registrado.")
+        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="receta_medica_") as directorio:
+            documentos = []
+            ruta_receta = Path(directorio) / _nombre_receta_pdf(receta)
+            ruta_receta.write_bytes(_generar_receta_pdf_bytes(empresa, paciente, receta))
+            documentos.append((ruta_receta, ruta_receta.name, f"{empresa.nombre} le comparte su receta médica."))
+            for indice, manual in enumerate(receta.manuales.all(), start=1):
+                nombre_manual = Path(manual.archivo.name).name
+                ruta_manual = Path(directorio) / f"{indice}-{nombre_manual}"
+                manual.archivo.open("rb")
+                try:
+                    ruta_manual.write_bytes(manual.archivo.read())
+                finally:
+                    manual.archivo.close()
+                documentos.append((ruta_manual, nombre_manual, manual.titulo))
+            for ruta, nombre, caption in documentos:
+                media_id = subir_documento_whatsapp(config, ruta, "application/pdf")
+                enviar_documento_whatsapp(config, telefono, media_id, nombre, caption=caption)
+    except Exception as exc:
+        logger.exception("No se pudo enviar la receta %s por WhatsApp", receta.id)
+        detalle = str(exc) if isinstance(exc, WhatsAppAPIError) else "No fue posible preparar todos los documentos."
+        messages.error(request, f"No se pudo completar el envío por WhatsApp: {detalle}")
+    else:
+        messages.success(request, f"Receta y {receta.manuales.count()} manual(es) enviados por WhatsApp.")
+    return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
 
 
 def _config_documento_clinico(categoria):

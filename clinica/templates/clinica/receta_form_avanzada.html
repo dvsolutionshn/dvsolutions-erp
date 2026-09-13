@@ -7,6 +7,7 @@
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_plantillas_recetas' empresa.slug %}">Administrar plantillas</a>
+{% if erp_access.configuracion_clinica %}<a class="erp-btn-secondary" href="{% url 'clinica_manuales_recetas' empresa.slug %}">Manuales PDF</a>{% endif %}
 <a class="erp-btn-secondary" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Volver a recetas</a>
 {% endblock %}
 
@@ -15,7 +16,8 @@
 .rx-page{display:grid;gap:18px}.rx-patient{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:17px 20px;border:1px solid #cfe0eb;border-radius:20px;background:linear-gradient(135deg,#f0faf8,#f4f8ff)}.rx-patient strong{display:block;color:#132a40;font-size:17px}.rx-patient span{display:block;margin-top:4px;color:#6b7e8d;font-size:11px}.rx-patient-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#16b8ad,#2878e9);color:#fff;font-weight:900;font-size:17px;box-shadow:0 10px 24px rgba(30,131,184,.22)}
 .rx-template-bar{border:1px solid #cfe0eb;border-radius:20px;background:#fff;padding:18px;box-shadow:0 14px 34px rgba(17,50,72,.06)}.rx-template-bar h3{margin:0;color:#142b40;font-size:17px}.rx-template-bar p{margin:5px 0 12px;color:#687c8c;font-size:11px}.rx-template-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}.rx-template-controls select{min-height:46px;border:1px solid #b8cfdd;border-radius:12px;background:#fff;padding:0 13px;color:#193147;font:inherit}.rx-template-controls button{border:0;border-radius:12px;padding:0 19px;background:linear-gradient(135deg,#16b8ad,#2878e9);color:#fff;font-weight:900;cursor:pointer}.rx-template-empty{padding:11px 13px;border-radius:11px;background:#f4f8fb;color:#6b7f8e;font-size:11px}
 .rx-form-card{border:1px solid #cfe0eb;border-radius:22px;background:#fff;padding:20px;box-shadow:0 18px 44px rgba(16,49,72,.07)}.rx-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.rx-field{display:grid;gap:7px}.rx-field.is-wide{grid-column:1/-1}.rx-field label{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:#617789;font-weight:900}.rx-field input,.rx-field select,.rx-field textarea{width:100%;border:1px solid #bdd0dc;border-radius:12px;background:#fff;color:#173047;padding:11px 13px;font:inherit;outline:0}.rx-field input,.rx-field select{min-height:46px}.rx-field textarea{resize:vertical}.rx-field input:focus,.rx-field select:focus,.rx-field textarea:focus{border-color:#21aab2;box-shadow:0 0 0 4px rgba(23,168,176,.09)}.rx-errors{border:1px solid #f0b9bd;border-radius:14px;background:#fff5f5;color:#a63842;padding:13px 15px;font-size:12px;font-weight:800}.rx-actions{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:18px 4px 4px}.rx-actions p{margin:0;color:#687c8c;font-size:11px}.rx-action-buttons{display:flex;gap:10px}.rx-submit{border:0;border-radius:12px;background:linear-gradient(135deg,#16b8ad,#2878e9);color:#fff;padding:12px 20px;font-weight:900;cursor:pointer;box-shadow:0 12px 26px rgba(28,139,187,.2)}
-@media(max-width:720px){.rx-grid{grid-template-columns:1fr}.rx-field.is-wide{grid-column:auto}.rx-template-controls{grid-template-columns:1fr}.rx-template-controls button{min-height:46px}.rx-actions{align-items:stretch;flex-direction:column}.rx-action-buttons{width:100%}.rx-action-buttons>*{flex:1;text-align:center}.rx-patient{align-items:flex-start}}
+.rx-manual-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.rx-manual-head h3{margin:0;color:#142b40;font-size:17px}.rx-manual-head p{margin:5px 0 0;color:#687c8c;font-size:11px}.rx-manual-clear{border:1px solid #b8cfdd;border-radius:10px;background:#fff;color:#31566f;padding:8px 11px;font-weight:800;cursor:pointer}.rx-manual-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}.rx-manual-options>div{margin:0}.rx-manual-options label{display:flex;align-items:center;gap:9px;min-height:45px;padding:10px 12px;border:1px solid #d5e3eb;border-radius:12px;background:#f9fcfd;color:#233e54;font-size:12px;font-weight:800;cursor:pointer}.rx-manual-options input{width:auto;min-height:auto}.rx-manual-selected{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.rx-manual-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;border-radius:999px;background:#eaf8f5;color:#08766d;font-size:10px;font-weight:900}.rx-manual-chip button{border:0;background:transparent;color:inherit;font-weight:900;cursor:pointer}.rx-manual-empty{margin-top:13px;padding:11px 13px;border-radius:11px;background:#f4f8fb;color:#6b7f8e;font-size:11px}
+@media(max-width:720px){.rx-grid{grid-template-columns:1fr}.rx-field.is-wide{grid-column:auto}.rx-template-controls{grid-template-columns:1fr}.rx-template-controls button{min-height:46px}.rx-actions{align-items:stretch;flex-direction:column}.rx-action-buttons{width:100%}.rx-action-buttons>*{flex:1;text-align:center}.rx-patient{align-items:flex-start}.rx-manual-options{grid-template-columns:1fr}}
 </style>
 
 <form method="post" class="rx-page" id="recipeForm">
@@ -62,6 +64,20 @@
         </div>
     </section>
 
+    <section class="rx-form-card">
+        <div class="rx-manual-head">
+            <div><h3>Adjuntar manual</h3><p>Opcional. Seleccione uno o varios instructivos PDF para enviarlos junto con la receta.</p></div>
+            {% if form.manuales.field.queryset %}<button class="rx-manual-clear" type="button" id="clearRecipeManuals">No adjuntar ninguno</button>{% endif %}
+        </div>
+        {% if form.manuales.field.queryset %}
+        <div class="rx-manual-options" id="recipeManualOptions">{{ form.manuales }}</div>
+        <div class="rx-manual-selected" id="recipeManualSelected" aria-live="polite"></div>
+        {% else %}
+        <div class="rx-manual-empty">No hay manuales activos disponibles. Un usuario autorizado puede cargarlos en “Manuales de Recetas”.</div>
+        {% endif %}
+        {% for error in form.manuales.errors %}<span class="rx-errors">{{ error }}</span>{% endfor %}
+    </section>
+
     <div class="rx-actions">
         <p>La receta se guardará en el expediente y podrá imprimirse inmediatamente.</p>
         <div class="rx-action-buttons">
@@ -92,6 +108,35 @@
         button.textContent = "Plantilla cargada ✓";
         window.setTimeout(function(){ button.textContent = "Cargar plantilla"; }, 1300);
     });
+})();
+(function(){
+    const container = document.getElementById("recipeManualOptions");
+    const selected = document.getElementById("recipeManualSelected");
+    const clear = document.getElementById("clearRecipeManuals");
+    if(!container || !selected){ return; }
+    const inputs = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+    function labelFor(input){
+        const label = container.querySelector('label[for="' + input.id + '"]');
+        return label ? label.textContent.trim() : "Manual PDF";
+    }
+    function render(){
+        selected.innerHTML = "";
+        inputs.filter(input => input.checked).forEach(function(input){
+            const chip = document.createElement("span");
+            chip.className = "rx-manual-chip";
+            chip.append(document.createTextNode(labelFor(input)));
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.setAttribute("aria-label", "Quitar " + labelFor(input));
+            remove.textContent = "×";
+            remove.addEventListener("click", function(){ input.checked = false; render(); });
+            chip.append(remove);
+            selected.append(chip);
+        });
+    }
+    inputs.forEach(input => input.addEventListener("change", render));
+    if(clear){ clear.addEventListener("click", function(){ inputs.forEach(input => input.checked = false); render(); }); }
+    render();
 })();
 </script>
 {% endblock %}

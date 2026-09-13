@@ -14,6 +14,7 @@ from .models import (
     ExamenPaciente,
     ExpedienteEvento,
     HistoriaClinicaEspecialidad,
+    ManualReceta,
     MedicamentoPrescrito,
     Paciente,
     PacienteFotoEvolucion,
@@ -609,15 +610,17 @@ class IncapacidadClinicaForm(BaseClinicaForm):
 class RecetaMedicaForm(BaseClinicaForm):
     class Meta:
         model = RecetaMedica
-        fields = ["fecha", "profesional", "diagnostico", "productos", "indicaciones", "observaciones"]
+        fields = ["fecha", "profesional", "diagnostico", "productos", "indicaciones", "observaciones", "manuales"]
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}),
             "diagnostico": forms.TextInput(attrs={"placeholder": "Diagnóstico o motivo clínico"}),
             "indicaciones": forms.Textarea(attrs={"rows": 4, "placeholder": "Indicaciones generales para el paciente"}),
             "observaciones": forms.Textarea(attrs={"rows": 3, "placeholder": "Observaciones adicionales de la receta"}),
+            "manuales": forms.CheckboxSelectMultiple(),
         }
         labels = {
             "indicaciones": "Indicaciones generales",
+            "manuales": "Adjuntar manual",
         }
 
     def __init__(self, *args, **kwargs):
@@ -626,12 +629,59 @@ class RecetaMedicaForm(BaseClinicaForm):
         self.fields["productos"].required = False
         self.fields["profesional"].required = False
         self.fields["indicaciones"].required = False
+        self.fields["manuales"].required = False
+        self.fields["manuales"].queryset = ManualReceta.objects.none()
+        self.fields["manuales"].help_text = "Opcional. Puede seleccionar uno o varios PDF activos."
         if empresa:
             from facturacion.models import Producto
 
             self.fields["productos"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            self.fields["manuales"].queryset = ManualReceta.objects.filter(empresa=empresa, activo=True).order_by("titulo")
         self.fields["productos"].widget.attrs.update({"size": "8"})
+
+
+class ManualRecetaForm(BaseClinicaForm):
+    MAX_ARCHIVO_MB = 20
+
+    class Meta:
+        model = ManualReceta
+        fields = ["titulo", "descripcion", "archivo", "activo"]
+        widgets = {
+            "descripcion": forms.Textarea(attrs={"rows": 4, "placeholder": "Descripción opcional del instructivo"}),
+            "archivo": forms.FileInput(attrs={"accept": "application/pdf,.pdf"}),
+        }
+        labels = {
+            "titulo": "Nombre o título",
+            "archivo": "Archivo PDF",
+            "activo": "Disponible para adjuntar en recetas",
+        }
+
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, empresa=empresa, **kwargs)
+        self.fields["archivo"].required = not bool(self.instance and self.instance.pk)
+        self.fields["archivo"].help_text = (
+            f"Solo PDF, máximo {self.MAX_ARCHIVO_MB} MB. Al editar puede conservar el archivo actual."
+        )
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if not archivo:
+            return archivo
+        if not hasattr(archivo, "content_type"):
+            return archivo
+        if archivo.size > self.MAX_ARCHIVO_MB * 1024 * 1024:
+            raise forms.ValidationError(f"El PDF no puede superar {self.MAX_ARCHIVO_MB} MB.")
+        if not (archivo.name or "").lower().endswith(".pdf"):
+            raise forms.ValidationError("Solo se permiten archivos PDF.")
+        content_type = getattr(archivo, "content_type", "")
+        if content_type and content_type not in {"application/pdf", "application/x-pdf"}:
+            raise forms.ValidationError("Solo se permiten archivos PDF.")
+        encabezado = archivo.read(5)
+        archivo.seek(0)
+        if encabezado != b"%PDF-":
+            raise forms.ValidationError("El archivo no contiene un PDF válido.")
+        return archivo
 
 
 class PlantillaRecetaForm(BaseClinicaForm):

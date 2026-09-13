@@ -1,9 +1,11 @@
 import unicodedata
+from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.utils.text import get_valid_filename
 
 from core.models import Empresa
 from facturacion.models import Cliente, Producto
@@ -1018,6 +1020,36 @@ class DocumentoClinicoPaciente(models.Model):
         return (self.archivo.name or "").lower().endswith(".pdf")
 
 
+def manual_receta_upload_to(instance, filename):
+    nombre = get_valid_filename(Path(filename or "manual.pdf").name) or "manual.pdf"
+    return f"clinica/manuales_recetas/empresa_{instance.empresa_id}/{nombre}"
+
+
+class ManualReceta(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="manuales_recetas")
+    titulo = models.CharField(max_length=180)
+    descripcion = models.TextField(blank=True)
+    archivo = models.FileField(upload_to=manual_receta_upload_to)
+    activo = models.BooleanField(default=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="manuales_recetas_creados",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["titulo", "id"]
+        verbose_name = "Manual de receta"
+        verbose_name_plural = "Manuales de recetas"
+
+    def __str__(self):
+        return self.titulo
+
+
 class RecetaMedica(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="recetas_medicas")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="recetas")
@@ -1025,6 +1057,7 @@ class RecetaMedica(models.Model):
     diagnostico = models.CharField(max_length=240, blank=True, null=True)
     indicaciones = models.TextField(help_text="Detalle libre de medicamentos, dosis, frecuencia, duracion e indicaciones.")
     productos = models.ManyToManyField(Producto, blank=True, related_name="recetas_clinicas")
+    manuales = models.ManyToManyField(ManualReceta, blank=True, related_name="recetas")
     profesional = models.ForeignKey(ProfesionalSalud, on_delete=models.SET_NULL, null=True, blank=True, related_name="recetas_emitidas")
     observaciones = models.TextField(blank=True, null=True)
     creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
