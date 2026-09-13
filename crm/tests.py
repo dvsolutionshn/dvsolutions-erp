@@ -13,7 +13,16 @@ from django.utils import timezone
 from unittest.mock import patch
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario
-from facturacion.models import CAI, Cliente, Factura
+from facturacion.models import (
+    BodegaInventario,
+    CAI,
+    Cliente,
+    ExistenciaLoteBodega,
+    Factura,
+    InventarioProducto,
+    LoteInventario,
+    Producto,
+)
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
 
 from .forms import CitaClienteForm
@@ -98,6 +107,7 @@ class CRMTests(TestCase):
         self.assertContains(response_app, 'class="mobile-home mobile-app-screen active"')
         self.assertNotContains(response_app, 'id="facturas-app"')
         self.assertNotContains(response_app, 'id="patientInviteForm"')
+        self.assertNotContains(response_app, 'id="productos-app"')
 
     def test_app_pacientes_permite_generar_y_copiar_enlace_con_permiso(self):
         modulo_clinica, _ = Modulo.objects.get_or_create(
@@ -121,6 +131,95 @@ class CRMTests(TestCase):
         self.assertContains(response, "Generar y copiar link de paciente nuevo")
         self.assertContains(response, "navigator.clipboard")
         self.assertContains(response, 'document.execCommand("copy")')
+
+    def test_app_hospital_mia_muestra_inventario_movil_aislado_y_ordenado_fefo(self):
+        modulo_facturacion, _ = Modulo.objects.get_or_create(
+            codigo="facturacion",
+            defaults={"nombre": "Facturación", "es_comercial": True},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_facturacion, activo=True)
+        self.rol.puede_inventario = True
+        self.rol.save(update_fields=["puede_inventario"])
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Gomitas Capilares",
+            codigo="GOM-01",
+            tipo_item="producto",
+            precio=Decimal("350.00"),
+            controla_inventario=True,
+        )
+        InventarioProducto.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            existencias=Decimal("8.00"),
+            stock_minimo=Decimal("10.00"),
+        )
+        principal = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Principal",
+            tipo="principal",
+        )
+        vitrina = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Vitrina",
+            tipo="vitrina",
+        )
+        lote_tardio = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="L-02",
+            fecha_vencimiento=timezone.localdate() + timedelta(days=50),
+        )
+        lote_proximo = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="L-01",
+            fecha_vencimiento=timezone.localdate() + timedelta(days=15),
+        )
+        ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=principal,
+            lote=lote_tardio,
+            cantidad=Decimal("5.00"),
+        )
+        ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=vitrina,
+            lote=lote_proximo,
+            cantidad=Decimal("3.00"),
+        )
+        otra_empresa = Empresa.objects.create(
+            nombre="Otra clínica",
+            slug="otra_clinica_inventario",
+            estado_licencia="activa",
+        )
+        Producto.objects.create(
+            empresa=otra_empresa,
+            nombre="Producto ajeno",
+            tipo_item="producto",
+            precio=Decimal("100.00"),
+            controla_inventario=True,
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="productos-app"')
+        self.assertContains(response, "Buscar producto...")
+        self.assertContains(response, "Próximos a vencer")
+        payload = response.context["inventario_productos_app_payload"]
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["nombre"], "Gomitas Capilares")
+        self.assertEqual(payload[0]["existencia"], 8.0)
+        self.assertTrue(payload[0]["stock_bajo"])
+        self.assertTrue(payload[0]["proximo_vencer"])
+        self.assertEqual([lote["numero"] for lote in payload[0]["lotes"]], ["L-01", "L-02"])
+        self.assertEqual(
+            {bodega["nombre"] for bodega in payload[0]["bodegas"]},
+            {"Principal", "Vitrina"},
+        )
+        self.assertNotContains(response, "Producto ajeno")
 
     def test_luque_sin_modulo_citas_programa_directamente_en_hospital_mia(self):
         self.empresa.tipo_solucion = "clinica"
