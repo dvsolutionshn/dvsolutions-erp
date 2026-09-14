@@ -552,6 +552,7 @@ class ProgramaTerapiaPostQuirurgica(models.Model):
     )
     cirugia = models.CharField(max_length=220, blank=True)
     fecha_cirugia = models.DateField(blank=True, null=True)
+    sesiones_habilitadas = models.PositiveIntegerField(default=30)
     activo = models.BooleanField(default=True)
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -585,9 +586,12 @@ class ProgramaTerapiaPostQuirurgica(models.Model):
         super().clean()
         if self.paciente_id and self.empresa_id and self.paciente.empresa_id != self.empresa_id:
             raise ValidationError("El paciente no pertenece a la empresa del programa post quirúrgico.")
+        if self.sesiones_habilitadas < 30:
+            raise ValidationError({"sesiones_habilitadas": "El programa debe conservar al menos 30 sesiones."})
 
 
 class SesionTerapiaPostQuirurgica(models.Model):
+    FASE_CHOICES = [(1, "Fase 1"), (2, "Fase 2")]
     ESTADO_CHOICES = [("borrador", "Borrador"), ("finalizada", "Sesión finalizada")]
     ESTADO_PACIENTE_CHOICES = [
         ("bueno", "Bueno"), ("regular", "Regular"), ("malo", "Malo"),
@@ -625,8 +629,9 @@ class SesionTerapiaPostQuirurgica(models.Model):
         blank=True,
         related_name="control_terapia_postquirurgica",
     )
-    numero_sesion = models.PositiveSmallIntegerField()
-    numero_sesion_adicional = models.PositiveSmallIntegerField(blank=True, null=True)
+    fase = models.PositiveSmallIntegerField(choices=FASE_CHOICES, default=1)
+    numero_sesion = models.PositiveIntegerField()
+    numero_sesion_adicional = models.PositiveIntegerField(blank=True, null=True)
     fecha_sesion = models.DateTimeField(default=timezone.now, editable=False)
     hora_inicio = models.TimeField(blank=True, null=True)
     hora_finalizacion = models.TimeField(blank=True, null=True)
@@ -666,21 +671,21 @@ class SesionTerapiaPostQuirurgica(models.Model):
         ordering = ["numero_sesion", "fecha_sesion", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["programa", "numero_sesion"], name="crm_terapia_post_programa_sesion_uniq"
+                fields=["programa", "fase", "numero_sesion"], name="crm_terapia_post_programa_fase_sesion_uniq"
             ),
             models.CheckConstraint(
-                condition=models.Q(numero_sesion__gte=1, numero_sesion__lte=12),
-                name="crm_terapia_post_sesion_1_12",
+                condition=models.Q(numero_sesion__gte=1),
+                name="crm_terapia_post_sesion_positiva",
             ),
             models.CheckConstraint(
                 condition=(
                     models.Q(numero_sesion_adicional__isnull=True)
                     | (
-                        models.Q(numero_sesion_adicional__gte=1, numero_sesion_adicional__lte=12)
+                        models.Q(numero_sesion_adicional__gte=1)
                         & ~models.Q(numero_sesion_adicional=models.F("numero_sesion"))
                     )
                 ),
-                name="crm_terapia_post_sesion_adicional_valida",
+                name="crm_terapia_post_sesion_adicional_positiva",
             ),
         ]
         indexes = [models.Index(fields=["empresa", "paciente", "estado"])]
@@ -691,7 +696,7 @@ class SesionTerapiaPostQuirurgica(models.Model):
         numeros = str(self.numero_sesion)
         if self.numero_sesion_adicional:
             numeros += f" y {self.numero_sesion_adicional}"
-        return f"{self.paciente.nombre} · Terapia post quirúrgica {numeros}"
+        return f"{self.paciente.nombre} · {self.get_fase_display()} · Terapia post quirúrgica {numeros}"
 
     @property
     def bloqueada(self):
@@ -719,11 +724,13 @@ class SesionTerapiaPostQuirurgica(models.Model):
 
         super().clean()
         errores = {}
-        if not 1 <= (self.numero_sesion or 0) <= 12:
-            errores["numero_sesion"] = "La sesión debe estar comprendida entre 1 y 12."
+        if self.fase not in {1, 2}:
+            errores["fase"] = "Seleccione Fase 1 o Fase 2."
+        if (self.numero_sesion or 0) < 1:
+            errores["numero_sesion"] = "La sesión debe ser mayor o igual a 1."
         if self.numero_sesion_adicional is not None:
-            if not 1 <= self.numero_sesion_adicional <= 12:
-                errores["numero_sesion_adicional"] = "La segunda sesión debe estar comprendida entre 1 y 12."
+            if self.numero_sesion_adicional < 1:
+                errores["numero_sesion_adicional"] = "La segunda sesión debe ser mayor o igual a 1."
             elif self.numero_sesion_adicional == self.numero_sesion:
                 errores["numero_sesion_adicional"] = "Seleccione una sesión diferente de la primera."
         if self.escala_dolor is not None and self.escala_dolor > 10:

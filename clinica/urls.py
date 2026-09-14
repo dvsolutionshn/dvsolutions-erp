@@ -45,6 +45,7 @@ urlpatterns = [
     path("pacientes/<int:paciente_id>/historia-clinica/completar/", views.completar_historia_clinica_paciente, name="clinica_completar_historia_clinica_paciente"),
     path("pacientes/<int:paciente_id>/historias/nueva/<slug:tipo>/", views.crear_historia_especialidad, name="clinica_crear_historia_especialidad"),
     path("pacientes/<int:paciente_id>/controles/<slug:tipo>/registrar/", views.registrar_control_especial_desde_historial, name="clinica_registrar_control_especial"),
+    path("pacientes/<int:paciente_id>/controles/terapias-postquirurgicas/agregar-sesion/", views.agregar_sesion_terapia_postquirurgica, name="clinica_agregar_sesion_terapia_postquirurgica"),
     path("pacientes/<int:paciente_id>/historias/<int:historia_id>/editar/", views.editar_historia_especialidad, name="clinica_editar_historia_especialidad"),
     path("pacientes/<int:paciente_id>/preconsulta/generar/", views.generar_enlace_preconsulta, name="clinica_generar_enlace_preconsulta"),
     path("pacientes/<int:paciente_id>/preconsulta/generar/<slug:tipo>/", views.generar_enlace_preconsulta, name="clinica_generar_enlace_preconsulta_tipo"),

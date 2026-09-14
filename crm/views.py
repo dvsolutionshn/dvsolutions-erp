@@ -84,7 +84,7 @@ EMPRESAS_AGENDA_CENTRAL_HOSPITAL_MIA = frozenset({
 })
 
 
-def _conflicto_numero_sesion(modelo, programa, numeros, sesion=None):
+def _conflicto_numero_sesion(modelo, programa, numeros, sesion=None, *, fase=None):
     """Busca cualquier registro que ya ocupe una de las sesiones solicitadas."""
     numeros = {numero for numero in numeros if numero}
     if not programa or not numeros:
@@ -92,6 +92,8 @@ def _conflicto_numero_sesion(modelo, programa, numeros, sesion=None):
     consulta = modelo.objects.filter(programa=programa).filter(
         Q(numero_sesion__in=numeros) | Q(numero_sesion_adicional__in=numeros)
     )
+    if fase is not None:
+        consulta = consulta.filter(fase=fase)
     if sesion:
         consulta = consulta.exclude(pk=sesion.pk)
     return consulta.order_by("numero_sesion").first()
@@ -244,27 +246,42 @@ def _contexto_terapias_postquirurgicas(empresa, request, fecha_seleccionada, *, 
         ).first()
         if programa:
             historial = list(programa.sesiones.select_related("cita", "creado_por", "actualizado_por"))
+        fase_actual = sesion.fase if sesion else (
+            cita_control.fase_servicio if cita_control.fase_servicio in {1, 2} else 1
+        )
+        historial_fase = [item for item in historial if item.fase == fase_actual]
         usados = {
             numero
-            for item in historial
+            for item in historial_fase
             for numero in (item.numero_sesion, item.numero_sesion_adicional)
             if numero
         }
-        numero_desde_cita = cita_control.sesion_servicio if 1 <= (cita_control.sesion_servicio or 0) <= 12 else None
+        numero_desde_cita = cita_control.sesion_servicio if (cita_control.sesion_servicio or 0) >= 1 else None
         sugerido = numero_desde_cita
         if sugerido in usados and (not sesion or sesion.numero_sesion != sugerido):
             sugerido = None
-        sugerido = sugerido or next((numero for numero in range(1, 13) if numero not in usados), 12)
+        sesiones_habilitadas = programa.sesiones_habilitadas if programa else 30
+        sugerido = sugerido or next(
+            (numero for numero in range(1, sesiones_habilitadas + 1) if numero not in usados),
+            sesiones_habilitadas,
+        )
         numero_actual = None if sesion and sesion.bloqueada else (sesion.numero_sesion if sesion else sugerido)
         programa_form = ProgramaTerapiaPostQuirurgicaForm(instance=programa)
         sesion_form = SesionTerapiaPostQuirurgicaForm(
             instance=sesion,
-            initial={"numero_sesion": sesion.numero_sesion if sesion else sugerido},
+            initial={
+                "fase": sesion.fase if sesion else fase_actual,
+                "numero_sesion": sesion.numero_sesion if sesion else sugerido,
+            },
             bloqueada=bool(sesion and sesion.bloqueada),
         )
+    if not cita_control:
+        fase_actual = 1
+        historial_fase = []
+        sesiones_habilitadas = 30
     por_numero = {
         numero: item
-        for item in historial
+        for item in historial_fase
         for numero in (item.numero_sesion, item.numero_sesion_adicional)
         if numero
     }
@@ -279,11 +296,14 @@ def _contexto_terapias_postquirurgicas(empresa, request, fecha_seleccionada, *, 
         "historial_terapias_post": historial,
         "tablero_sesiones_terapia": [
             {"numero": numero, "registro": por_numero.get(numero), "actual": numero == numero_actual}
-            for numero in range(1, 13)
+            for numero in range(1, sesiones_habilitadas + 1)
         ],
+        "fase_terapia_actual": fase_actual,
+        "sesiones_terapia_habilitadas": sesiones_habilitadas,
+        "paciente_terapia_id": cita_control.paciente_id if cita_control else None,
         "sesiones_terapia_completadas": sum(
             len([numero for numero in (item.numero_sesion, item.numero_sesion_adicional) if numero])
-            for item in historial if item.estado == "finalizada"
+            for item in historial_fase if item.estado == "finalizada"
         ),
     }
 
@@ -1529,12 +1549,19 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
         programa = ProgramaTerapiaPostQuirurgica.objects.filter(
             id=programa_id, empresa=empresa, paciente=cita.paciente, activo=True
         ).first()
+    if not programa:
+        programa = ProgramaTerapiaPostQuirurgica.objects.filter(
+            empresa=empresa, paciente=cita.paciente, activo=True
+        ).first()
     finalizar = request.POST.get("accion") == "finalizar"
     programa_form = ProgramaTerapiaPostQuirurgicaForm(request.POST, instance=programa)
     datos = request.POST.copy()
-    numero_cita = cita.sesion_servicio if 1 <= (cita.sesion_servicio or 0) <= 12 else None
+    numero_cita = cita.sesion_servicio if (cita.sesion_servicio or 0) >= 1 else None
+    fase_cita = cita.fase_servicio if cita.fase_servicio in {1, 2} else None
     if numero_cita:
         datos["numero_sesion"] = str(numero_cita)
+    if fase_cita:
+        datos["fase"] = str(fase_cita)
     sesion_form = SesionTerapiaPostQuirurgicaForm(datos, instance=sesion, finalizar=finalizar)
     programa_valido = programa_form.is_valid()
     sesion_valida = sesion_form.is_valid()
@@ -1552,6 +1579,7 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
                     sesion_form.cleaned_data.get("numero_sesion_adicional"),
                 ),
                 sesion,
+                fase=sesion_form.cleaned_data["fase"],
             )
             if duplicada:
                 sesion_form.add_error("numero_sesion_adicional", "Una de las sesiones seleccionadas ya está registrada en el programa.")
@@ -1565,6 +1593,12 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
             if not programa_guardado.pk:
                 programa_guardado.creado_por = request.user
             programa_guardado.actualizado_por = request.user
+            programa_guardado.sesiones_habilitadas = max(
+                programa_guardado.sesiones_habilitadas,
+                sesion_limpia.cleaned_data["numero_sesion"],
+                sesion_limpia.cleaned_data.get("numero_sesion_adicional") or 0,
+                30,
+            )
             programa_guardado.save()
             sesion_guardada = sesion_limpia.save(commit=False)
             sesion_guardada.programa = programa_guardado
@@ -1602,6 +1636,7 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
                     borrador_form.cleaned_data.get("numero_sesion_adicional"),
                 ),
                 sesion,
+                fase=borrador_form.cleaned_data["fase"],
             )
             if not duplicada:
                 programa, sesion = guardar(programa_form, borrador_form, "borrador")
@@ -2479,7 +2514,15 @@ def progreso_servicios_paciente(request, empresa_slug):
             terapias.append({"fase": cita.fase_servicio, "sesion": cita.sesion_servicio})
         elif recurso == "camara_hiperbarica":
             camara.append(cita.sesion_servicio)
-    return JsonResponse({"ok": True, "terapias": terapias, "camara": camara})
+    programa_terapia = ProgramaTerapiaPostQuirurgica.objects.filter(
+        empresa=empresa, paciente_id=paciente_id, activo=True
+    ).first()
+    return JsonResponse({
+        "ok": True,
+        "terapias": terapias,
+        "camara": camara,
+        "terapias_habilitadas": max(30, programa_terapia.sesiones_habilitadas) if programa_terapia else 30,
+    })
 
 
 def _numero_contacto_cita(cita):

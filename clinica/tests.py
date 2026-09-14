@@ -357,7 +357,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Funciones Orgánicas")
         self.assertContains(response, "Examen Físico")
         self.assertContains(response, "Programa completo de 22 sesiones")
-        self.assertContains(response, "Cuadro completo de 12 sesiones")
+        self.assertContains(response, "Cuadro por fases con 30 sesiones ampliables")
         self.assertContains(response, "Tricopigmentación")
         self.assertNotContains(response, 'href="#resumen-paciente">Datos generales</a>')
         self.assertEqual(
@@ -1193,7 +1193,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(response, "Examen físico")
         self.assertContains(response, "Tricopigmentación")
         self.assertContains(response, "Cuadro longitudinal completo de 22 sesiones")
-        self.assertContains(response, "Cuadro clínico completo de 12 sesiones")
+        self.assertContains(response, "Cuadro por fases con 30 sesiones ampliables")
         self.assertNotContains(response, 'class="clinical-side-actions"')
         self.assertNotContains(response, "Nueva nota clínica")
         self.assertContains(response, "Recordatorios de tratamiento al calendario")
@@ -2248,7 +2248,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.context["sesiones_finalizadas"], 1)
         self.assertFalse(HistoriaClinicaEspecialidad.objects.filter(paciente=paciente).exists())
 
-    def test_historia_terapias_postquirurgicas_muestra_cuadro_completo_de_12_sesiones(self):
+    def test_historia_terapias_postquirurgicas_muestra_cuadro_de_30_sesiones_por_fase(self):
         paciente = Paciente.objects.create(
             empresa=self.empresa,
             expediente_codigo="MIA-TPQ-001",
@@ -2268,6 +2268,7 @@ class ClinicaPacienteTests(TestCase):
             programa=programa,
             empresa=self.empresa,
             paciente=paciente,
+            fase=1,
             numero_sesion=1,
             hora_inicio=datetime.strptime("09:00", "%H:%M").time(),
             hora_finalizacion=datetime.strptime("10:00", "%H:%M").time(),
@@ -2298,10 +2299,12 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "clinica/historia_terapias_postquirurgicas.html")
         self.assertContains(response, "Registro de Terapias Postoperatorias")
-        self.assertContains(response, "Cuadro clínico completo de 12 sesiones")
+        self.assertContains(response, "30 sesiones iniciales")
+        self.assertContains(response, "Fase 1")
+        self.assertContains(response, self.user.username)
         self.assertContains(response, "Evolución postoperatoria satisfactoria")
         self.assertContains(response, "Liposucción")
-        self.assertEqual(len(response.context["tablero_sesiones_terapia"]), 12)
+        self.assertEqual(len(response.context["tablero_sesiones_terapia"]), 30)
         self.assertEqual(response.context["sesiones_finalizadas"], 1)
 
     def test_registra_terapia_directamente_desde_historial_sin_cita_y_para_dos_sesiones(self):
@@ -2326,6 +2329,7 @@ class ClinicaPacienteTests(TestCase):
         response = self.client.post(
             url,
             {
+                "fase": "2",
                 "cirugia": "Liposucción",
                 "fecha_cirugia": "2026-08-20",
                 "numero_sesion": "4",
@@ -2338,16 +2342,61 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(response.status_code, 302)
         sesion = SesionTerapiaPostQuirurgica.objects.get(paciente=paciente)
         self.assertIsNone(sesion.cita_id)
+        self.assertEqual(sesion.fase, 2)
         self.assertEqual((sesion.numero_sesion, sesion.numero_sesion_adicional), (4, 5))
         historia = self.client.get(
             reverse(
                 "clinica_crear_historia_especialidad",
                 args=[self.empresa.slug, paciente.id, "terapias_postquirurgicas"],
-            )
+            ),
+            {"fase": 2},
         )
         self.assertEqual(historia.context["tablero_sesiones_terapia"][3]["registro"], sesion)
         self.assertEqual(historia.context["tablero_sesiones_terapia"][4]["registro"], sesion)
         self.assertContains(historia, "Registrar sesión sin cita")
+
+    def test_terapia_postquirurgica_agrega_sesion_31_sin_alterar_registros(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-TPQ-031",
+            nombre="Paciente Sesión Extendida",
+        )
+        programa = ProgramaTerapiaPostQuirurgica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            cirugia="Abdominoplastia",
+            creado_por=self.user,
+        )
+        sesion_existente = SesionTerapiaPostQuirurgica.objects.create(
+            programa=programa,
+            empresa=self.empresa,
+            paciente=paciente,
+            fase=1,
+            numero_sesion=1,
+            nota_enfermeria="Registro que debe conservarse.",
+            creado_por=self.user,
+        )
+        url = reverse(
+            "clinica_agregar_sesion_terapia_postquirurgica",
+            args=[self.empresa.slug, paciente.id],
+        )
+
+        response = self.client.post(url, {"programa_id": programa.id, "fase": 1})
+
+        self.assertEqual(response.status_code, 302)
+        programa.refresh_from_db()
+        sesion_existente.refresh_from_db()
+        self.assertEqual(programa.sesiones_habilitadas, 31)
+        self.assertEqual(sesion_existente.nota_enfermeria, "Registro que debe conservarse.")
+        historia = self.client.get(
+            reverse(
+                "clinica_crear_historia_especialidad",
+                args=[self.empresa.slug, paciente.id, "terapias_postquirurgicas"],
+            ),
+            {"programa": programa.id, "fase": 1},
+        )
+        self.assertEqual(len(historia.context["tablero_sesiones_terapia"]), 31)
+        self.assertEqual(historia.context["tablero_sesiones_terapia"][30]["numero"], 31)
 
     def test_camara_directa_reutiliza_el_mismo_formulario_de_agenda(self):
         paciente = Paciente.objects.create(

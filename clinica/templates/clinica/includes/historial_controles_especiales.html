@@ -22,7 +22,7 @@
             <div class="special-control-icon">12</div>
             <div>
                 <span>Terapias Post Quirúrgicas</span>
-                <h4>Cuadro completo de 12 sesiones</h4>
+                <h4>Cuadro por fases con 30 sesiones ampliables</h4>
                 {% if programa_postquirurgico %}
                 <p>{{ programa_postquirurgico.sesiones.all|length }} sesión(es) registrada(s) · {{ programa_postquirurgico.cirugia|default:"Cirugía no indicada" }}</p>
                 {% else %}<p>Sin programa registrado todavía. El cuadro está listo para la primera sesión.</p>{% endif %}

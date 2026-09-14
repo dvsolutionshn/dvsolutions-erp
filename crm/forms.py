@@ -245,6 +245,12 @@ class ProgramaTerapiaPostQuirurgicaForm(forms.ModelForm):
 
 
 class SesionTerapiaPostQuirurgicaForm(forms.ModelForm):
+    fase = forms.TypedChoiceField(
+        label="Fase del tratamiento",
+        choices=(("", "Seleccione la fase"), *SesionTerapiaPostQuirurgica.FASE_CHOICES),
+        coerce=int,
+        required=True,
+    )
     estado_paciente = forms.MultipleChoiceField(
         label="Estado del paciente",
         choices=SesionTerapiaPostQuirurgica.ESTADO_PACIENTE_CHOICES,
@@ -273,22 +279,22 @@ class SesionTerapiaPostQuirurgicaForm(forms.ModelForm):
     class Meta:
         model = SesionTerapiaPostQuirurgica
         fields = [
-            "numero_sesion", "numero_sesion_adicional", "hora_inicio", "hora_finalizacion", "presion_arterial",
+            "fase", "numero_sesion", "numero_sesion_adicional", "hora_inicio", "hora_finalizacion", "presion_arterial",
             "frecuencia_cardiaca", "frecuencia_respiratoria", "saturacion_oxigeno",
             "temperatura", "escala_dolor", "estado_paciente", "equipos_utilizados",
             "minutos_area", "cuidados_realizados", "cuidado_otro", "nota_enfermeria",
             "enfermera_nombre", "firma_enfermeria",
         ]
         widgets = {
-            "numero_sesion": forms.NumberInput(attrs={"min": 1, "max": 12}),
-            "numero_sesion_adicional": forms.NumberInput(attrs={"min": 1, "max": 12}),
+            "numero_sesion": forms.NumberInput(attrs={"min": 1}),
+            "numero_sesion_adicional": forms.NumberInput(attrs={"min": 1}),
             "hora_inicio": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
             "hora_finalizacion": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
             "escala_dolor": forms.NumberInput(attrs={"min": 0, "max": 10}),
             "nota_enfermeria": forms.Textarea(attrs={"rows": 4}),
         }
         labels = {
-            "numero_sesion": "Sesión", "numero_sesion_adicional": "Segunda sesión (opcional)", "hora_inicio": "Hora inicio", "hora_finalizacion": "Hora final",
+            "fase": "Fase del tratamiento", "numero_sesion": "Sesión", "numero_sesion_adicional": "Segunda sesión (opcional)", "hora_inicio": "Hora inicio", "hora_finalizacion": "Hora final",
             "presion_arterial": "PA", "frecuencia_cardiaca": "FC", "frecuencia_respiratoria": "FR",
             "saturacion_oxigeno": "SpO₂", "temperatura": "Temperatura", "escala_dolor": "Dolor /10",
             "minutos_area": "Minutos / área", "cuidado_otro": "Otro cuidado",
@@ -846,8 +852,7 @@ class CitaClienteForm(forms.ModelForm):
                     sesion = int(fila.get("sesion"))
                 except (TypeError, ValueError):
                     fase = sesion = 0
-                maximo = 22 if fase == 1 else 10 if fase == 2 else 0
-                if not maximo or not 1 <= sesion <= maximo:
+                if fase not in {1, 2} or sesion < 1:
                     self.add_error("detalles_agenda", "Selecciona una sesión válida de Terapias.")
                     continue
                 limpia.update({"fase": fase, "sesion": sesion})

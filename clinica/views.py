@@ -2656,13 +2656,15 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     )
 
 
-def _conflicto_control_especial(modelo, programa, numeros, sesion=None):
+def _conflicto_control_especial(modelo, programa, numeros, sesion=None, *, fase=None):
     numeros = {numero for numero in numeros if numero}
     if not programa or not numeros:
         return None
     consulta = modelo.objects.filter(programa=programa).filter(
         Q(numero_sesion__in=numeros) | Q(numero_sesion_adicional__in=numeros)
     )
+    if fase is not None:
+        consulta = consulta.filter(fase=fase)
     if sesion:
         consulta = consulta.exclude(pk=sesion.pk)
     return consulta.first()
@@ -2687,7 +2689,7 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
         },
         "terapias_postquirurgicas": {
             "nombre": "Terapias Post Quirúrgicas",
-            "maximo": 12,
+            "maximo": 30,
             "programa_modelo": ProgramaTerapiaPostQuirurgica,
             "sesion_modelo": SesionTerapiaPostQuirurgica,
             "programa_form": ProgramaTerapiaPostQuirurgicaForm,
@@ -2708,18 +2710,27 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
     sesion_id = (request.POST.get("sesion_id") or "").strip()
     sesion = SesionModelo.objects.filter(id=sesion_id, empresa=empresa, paciente=paciente).first() if sesion_id else None
     numero_get = (request.GET.get("sesion") or "").strip()
+    fase_get = (request.GET.get("fase") or "").strip()
     if not sesion and numero_get.isdigit() and programa:
         numero = int(numero_get)
-        sesion = programa.sesiones.filter(
+        consulta_sesion = programa.sesiones.filter(
             Q(numero_sesion=numero) | Q(numero_sesion_adicional=numero)
-        ).first()
+        )
+        if tipo == "terapias_postquirurgicas" and fase_get in {"1", "2"}:
+            consulta_sesion = consulta_sesion.filter(fase=int(fase_get))
+        sesion = consulta_sesion.first()
     if sesion:
         programa = sesion.programa
 
     finalizar = request.method == "POST" and request.POST.get("accion") == "finalizar"
     inicial = {}
-    if not sesion and numero_get.isdigit() and 1 <= int(numero_get) <= config["maximo"]:
+    es_terapia_post = tipo == "terapias_postquirurgicas"
+    if not sesion and numero_get.isdigit() and int(numero_get) >= 1 and (
+        es_terapia_post or int(numero_get) <= config["maximo"]
+    ):
         inicial["numero_sesion"] = int(numero_get)
+    if es_terapia_post and not sesion and fase_get in {"1", "2"}:
+        inicial["fase"] = int(fase_get)
     programa_form = config["programa_form"](request.POST or None, instance=programa)
     sesion_form = config["sesion_form"](
         request.POST or None,
@@ -2747,6 +2758,7 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
                         sesion_form.cleaned_data.get("numero_sesion_adicional"),
                     ),
                     sesion,
+                    fase=sesion_form.cleaned_data.get("fase") if es_terapia_post else None,
                 )
                 if conflicto:
                     sesion_form.add_error(
@@ -2762,6 +2774,13 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
                     if not programa_guardado.pk:
                         programa_guardado.creado_por = request.user
                     programa_guardado.actualizado_por = request.user
+                    if es_terapia_post:
+                        programa_guardado.sesiones_habilitadas = max(
+                            programa_guardado.sesiones_habilitadas,
+                            sesion_form.cleaned_data["numero_sesion"],
+                            sesion_form.cleaned_data.get("numero_sesion_adicional") or 0,
+                            30,
+                        )
                     programa_guardado.save()
                     sesion_guardada = sesion_form.save(commit=False)
                     sesion_guardada.programa = programa_guardado
@@ -2781,25 +2800,39 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
                     f"Registro de sesión {' y '.join(map(str, numeros))} guardado correctamente.",
                 )
                 destino = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.id, tipo])
-                return redirect(f"{destino}?programa={programa_guardado.id}")
+                fase_destino = f"&fase={sesion_guardada.fase}" if es_terapia_post else ""
+                return redirect(f"{destino}?programa={programa_guardado.id}{fase_destino}")
 
-    historial = list(programa.sesiones.select_related("cita") if programa else [])
+    historial = list(
+        programa.sesiones.select_related("cita", "creado_por", "actualizado_por") if programa else []
+    )
+    fase_solicitada = (request.POST.get("fase") or fase_get) if es_terapia_post else ""
+    fase_actual = sesion.fase if es_terapia_post and sesion else (
+        int(fase_solicitada) if es_terapia_post and fase_solicitada in {"1", "2"} else 1
+    )
+    historial_tablero = [
+        registro for registro in historial
+        if not es_terapia_post or registro.fase == fase_actual
+    ]
     por_numero = {
         numero: registro
-        for registro in historial
+        for registro in historial_tablero
         for numero in (registro.numero_sesion, registro.numero_sesion_adicional)
         if numero
     }
     numero_actual = None if sesion and sesion.bloqueada else (
         sesion.numero_sesion if sesion else inicial.get("numero_sesion")
     )
+    sesiones_habilitadas = (
+        max(30, programa.sesiones_habilitadas) if es_terapia_post and programa else config["maximo"]
+    )
     tablero = [
         {"numero": numero, "registro": por_numero.get(numero), "actual": numero == numero_actual}
-        for numero in range(1, config["maximo"] + 1)
+        for numero in range(1, sesiones_habilitadas + 1)
     ]
     completadas = sum(
         len([numero for numero in (registro.numero_sesion, registro.numero_sesion_adicional) if numero])
-        for registro in historial if registro.estado == "finalizada"
+        for registro in historial_tablero if registro.estado == "finalizada"
     )
     errores = []
     if request.method == "POST":
@@ -2816,6 +2849,9 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
         "programa_id_directo": programa.id if programa else "",
         "sesion_id_directo": sesion.id if sesion else "",
         "numero_sesion_desde_cita": None,
+        "fase_terapia_actual": fase_actual,
+        "sesiones_terapia_habilitadas": sesiones_habilitadas,
+        "paciente_terapia_id": paciente.id,
     }
     if tipo == "camara_hiperbarica":
         contexto.update({
@@ -2841,6 +2877,38 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
         "errores_terapia_post": errores,
     })
     return render(request, "crm/terapias_postquirurgicas.html", contexto)
+
+
+@login_required
+@require_POST
+def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    _requiere_interfaz_clinica(empresa)
+    if not request.user.puede_acceder_empresa(empresa):
+        raise PermissionDenied("No tiene acceso a esta empresa.")
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    programa_id = (request.POST.get("programa_id") or "").strip()
+    with transaction.atomic():
+        programa = ProgramaTerapiaPostQuirurgica.objects.select_for_update().filter(
+            id=programa_id, empresa=empresa, paciente=paciente
+        ).first()
+        if programa is None:
+            programa = ProgramaTerapiaPostQuirurgica.objects.create(
+                empresa=empresa,
+                paciente=paciente,
+                sesiones_habilitadas=30,
+                creado_por=request.user,
+                actualizado_por=request.user,
+            )
+        programa.sesiones_habilitadas = max(30, programa.sesiones_habilitadas) + 1
+        programa.actualizado_por = request.user
+        programa.save(update_fields=["sesiones_habilitadas", "actualizado_por", "fecha_actualizacion"])
+    fase = request.POST.get("fase") if request.POST.get("fase") in {"1", "2"} else "1"
+    destino = reverse(
+        "clinica_crear_historia_especialidad",
+        args=[empresa.slug, paciente.id, "terapias_postquirurgicas"],
+    )
+    return redirect(f"{destino}?programa={programa.id}&fase={fase}")
 
 
 @login_required
@@ -2935,14 +3003,18 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         programa = next((item for item in programas if str(item.id) == programa_id), None) if programa_id else None
         programa = programa or (programas[0] if programas else None)
         sesiones = list(programa.sesiones.all()) if programa else []
+        fase_texto = (request.GET.get("fase") or "1").strip()
+        fase_actual = int(fase_texto) if fase_texto in {"1", "2"} else 1
+        sesiones_fase = [sesion for sesion in sesiones if sesion.fase == fase_actual]
         por_numero = {
             numero: sesion
-            for sesion in sesiones
+            for sesion in sesiones_fase
             for numero in (sesion.numero_sesion, sesion.numero_sesion_adicional)
             if numero
         }
         tablero = []
-        for numero in range(1, 13):
+        sesiones_habilitadas = max(30, programa.sesiones_habilitadas) if programa else 30
+        for numero in range(1, sesiones_habilitadas + 1):
             sesion = por_numero.get(numero)
             abrir_url = ""
             if sesion and sesion.cita_id:
@@ -2955,7 +3027,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                 abrir_url = reverse(
                     "clinica_registrar_control_especial",
                     args=[empresa.slug, paciente.id, "terapias_postquirurgicas"],
-                ) + f"?sesion={numero}" + (f"&programa={programa.id}" if programa else "")
+                ) + f"?sesion={numero}&fase={fase_actual}" + (f"&programa={programa.id}" if programa else "")
             tablero.append({"numero": numero, "registro": sesion, "abrir_url": abrir_url})
         return render(
             request,
@@ -2964,13 +3036,15 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                 "empresa": empresa, "paciente": paciente, "tipo": tipo,
                 "tipo_nombre": tipos_validos[tipo], "programas_terapia": programas,
                 "programa_terapia": programa, "tablero_sesiones_terapia": tablero,
+                "fase_terapia_actual": fase_actual,
+                "sesiones_terapia_habilitadas": sesiones_habilitadas,
                 "sesiones_finalizadas": sum(
                     len([numero for numero in (item.numero_sesion, item.numero_sesion_adicional) if numero])
-                    for item in sesiones if item.estado == "finalizada"
+                    for item in sesiones_fase if item.estado == "finalizada"
                 ),
                 "sesiones_borrador": sum(
                     len([numero for numero in (item.numero_sesion, item.numero_sesion_adicional) if numero])
-                    for item in sesiones if item.estado == "borrador"
+                    for item in sesiones_fase if item.estado == "borrador"
                 ),
             },
         )
