@@ -243,7 +243,7 @@ class CitaClinicaForm(BaseClinicaForm):
 
     class Meta:
         model = CitaClinica
-        fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "pagada", "sala", "observaciones"]
+        fields = ["paciente", "profesional", "servicio", "fecha_hora", "estado", "canal", "motivo", "pagada", "cortesia", "sala", "observaciones"]
 
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
@@ -258,6 +258,8 @@ class CitaClinicaForm(BaseClinicaForm):
             self.fields["servicio"].queryset = ServicioClinico.objects.none()
         self.fields["profesional"].required = False
         self.fields["servicio"].required = False
+        self.fields["pagada"].label = "Cita pagada"
+        self.fields["cortesia"].label = "Cita de cortesía"
         self.fields.pop("fecha_hora")
         if self.instance and self.instance.pk and self.instance.fecha_hora:
             fecha_local = timezone.localtime(self.instance.fecha_hora)
@@ -272,11 +274,16 @@ class CitaClinicaForm(BaseClinicaForm):
             })
         self.order_fields([
             "paciente", "profesional", "servicio", "fecha_cita", "hora_cita",
-            "periodo_cita", "estado", "canal", "motivo", "pagada", "sala", "observaciones",
+            "periodo_cita", "estado", "canal", "motivo", "pagada", "cortesia", "sala", "observaciones",
         ])
 
     def clean(self):
         cleaned_data = super().clean()
+        if cleaned_data.get("pagada") and cleaned_data.get("cortesia"):
+            self.add_error(
+                "cortesia",
+                "Una cita de cortesía no puede marcarse también como pagada.",
+            )
         fecha = cleaned_data.get("fecha_cita")
         hora_texto = cleaned_data.get("hora_cita")
         periodo = cleaned_data.get("periodo_cita")

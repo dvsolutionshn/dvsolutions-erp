@@ -183,6 +183,7 @@ class CitaCliente(models.Model):
     responsable = models.CharField(max_length=120, blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="pendiente")
     pagada = models.BooleanField(default=False)
+    cortesia = models.BooleanField(default=False)
     observacion = models.TextField(blank=True, null=True)
     cirugia_detalle = models.TextField(blank=True, null=True)
     cirugia_fin_estimada = models.DateTimeField(blank=True, null=True)
@@ -197,6 +198,12 @@ class CitaCliente(models.Model):
 
     class Meta:
         ordering = ["fecha_hora"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(pagada=True, cortesia=True),
+                name="crm_cita_no_pagada_y_cortesia",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.titulo} - {self.display_cliente}"

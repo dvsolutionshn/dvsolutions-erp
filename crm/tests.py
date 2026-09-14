@@ -1174,6 +1174,73 @@ class CRMTests(TestCase):
         self.assertContains(calendario, "data-appointment-paid=\"Pagada\"")
         self.assertContains(calendario, "appointment-paid-badge")
 
+    def test_agenda_guarda_y_muestra_cita_de_cortesia_sin_pago(self):
+        self.empresa.tipo_solucion = "clinica"
+        self.empresa.save(update_fields=["tipo_solucion"])
+        modulo_clinica, _ = Modulo.objects.get_or_create(
+            codigo="clinica_medica",
+            defaults={"nombre": "Clínica Médica", "es_comercial": True},
+        )
+        EmpresaModulo.objects.get_or_create(
+            empresa=self.empresa,
+            modulo=modulo_clinica,
+            defaults={"activo": True},
+        )
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="EXP-CORTESIA",
+            nombre="Paciente Cortesía",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta de cortesía",
+            categoria="consulta",
+            duracion_minutos=30,
+        )
+        doctor = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dra. Cortesía",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        url = reverse("agenda_citas", args=[self.empresa.slug])
+
+        response = self.client.get(url)
+        self.assertContains(response, "Cita de cortesía")
+        response = self.client.post(url, {
+            "paciente": paciente.id,
+            "servicio_clinico": servicio.id,
+            "profesional_salud": doctor.id,
+            "fecha_cita": "2026-09-20",
+            "hora_cita": "10:00",
+            "periodo_cita": "AM",
+            "estado": "confirmada",
+            "cortesia": "on",
+        })
+
+        self.assertEqual(response.status_code, 302)
+        cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
+        self.assertTrue(cita.cortesia)
+        self.assertFalse(cita.pagada)
+        self.assertTrue(cita.cita_clinica.cortesia)
+        calendario = self.client.get(url, {"vista": "mes", "fecha": "2026-09-20"})
+        self.assertContains(calendario, "is-courtesy")
+        self.assertContains(calendario, "appointment-courtesy-badge")
+        self.assertContains(calendario, "Cortesía")
+
+        conflicto = CitaClienteForm({
+            "paciente": paciente.id,
+            "servicio_clinico": servicio.id,
+            "profesional_salud": doctor.id,
+            "fecha_cita": "2026-09-21",
+            "hora_cita": "10:00",
+            "periodo_cita": "AM",
+            "estado": "confirmada",
+            "pagada": "on",
+            "cortesia": "on",
+        }, empresa=self.empresa)
+        self.assertFalse(conflicto.is_valid())
+        self.assertIn("no puede marcarse también como pagada", conflicto.errors.as_text())
+
     def test_agenda_clinica_crea_paciente_rapido_y_lo_sincroniza_con_facturacion(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])

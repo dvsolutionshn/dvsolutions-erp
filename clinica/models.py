@@ -331,6 +331,7 @@ class CitaClinica(models.Model):
     canal = models.CharField(max_length=20, choices=CANAL_CHOICES, default="recepcion")
     motivo = models.CharField(max_length=220)
     pagada = models.BooleanField(default=False)
+    cortesia = models.BooleanField(default=False)
     es_recordatorio_tratamiento = models.BooleanField(default=False)
     tratamiento_recordatorio = models.CharField(max_length=180, blank=True, null=True)
     sala = models.CharField(max_length=80, blank=True, null=True)
@@ -341,6 +342,12 @@ class CitaClinica(models.Model):
         ordering = ["fecha_hora"]
         verbose_name = "Cita clinica"
         verbose_name_plural = "Citas clinicas"
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(pagada=True, cortesia=True),
+                name="clinica_cita_no_pagada_y_cortesia",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.paciente.nombre} - {self.fecha_hora:%d/%m/%Y %H:%M}"

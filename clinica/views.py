@@ -275,6 +275,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
             "duracion_minutos": cita.servicio.duracion_minutos if cita.servicio_id else 60,
             "estado": estados.get(cita.estado, "pendiente"),
             "pagada": cita.pagada,
+            "cortesia": cita.cortesia,
             "observacion": cita.observaciones or cita.motivo,
             "enviar_confirmacion_whatsapp": not es_recordatorio,
             "recordatorio_semana_whatsapp": True,
@@ -290,6 +291,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
     agenda.duracion_minutos = cita.servicio.duracion_minutos if cita.servicio_id else agenda.duracion_minutos or 60
     agenda.estado = estados.get(cita.estado, "pendiente")
     agenda.pagada = cita.pagada
+    agenda.cortesia = cita.cortesia
     agenda.observacion = cita.observaciones or cita.motivo
     agenda.enviar_confirmacion_whatsapp = not es_recordatorio
     agenda.recordatorio_semana_whatsapp = True

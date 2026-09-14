@@ -23,7 +23,7 @@ from crm.models import (
     SesionTerapiaPostQuirurgica,
 )
 from facturacion.models import Cliente, Producto
-from .forms import FUNCIONES_ORGANICAS_SISTEMAS, PreconsultaClinicaPublicaForm
+from .forms import CitaClinicaForm, FUNCIONES_ORGANICAS_SISTEMAS, PreconsultaClinicaPublicaForm
 from .models import CitaClinica, ClasificacionAlopecia, ConsentimientoClinico, DocumentoClinicoPaciente, ExamenPaciente, HistoriaClinicaEspecialidad, InvitacionRegistroPaciente, ManualReceta, Paciente, PacienteFotoEvolucion, PlanTratamientoPaciente, PlantillaReceta, PreconsultaClinica, ProfesionalSalud, RecetaMedica, RecetaMedicaDetalle, ServicioClinico
 from .tokens import hash_token_preconsulta
 
@@ -892,6 +892,54 @@ class ClinicaPacienteTests(TestCase):
         self.assertTrue(agenda.enviar_confirmacion_whatsapp)
         self.assertTrue(agenda.recordatorio_semana_whatsapp)
         self.assertTrue(agenda.recordatorio_dia_whatsapp)
+
+    def test_cita_clinica_cortesia_se_sincroniza_y_no_admite_pago(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="HM-CORTESIA",
+            nombre="Paciente Cortesía",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dra. Cortesía",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta de cortesía",
+        )
+        url = reverse("clinica_crear_cita", args=[self.empresa.slug])
+        datos = {
+            "paciente": paciente.id,
+            "profesional": profesional.id,
+            "servicio": servicio.id,
+            "fecha_cita": "2026-09-22",
+            "hora_cita": "11:30",
+            "periodo_cita": "AM",
+            "estado": "solicitada",
+            "canal": "recepcion",
+            "motivo": "Atención sin cobro",
+            "cortesia": "on",
+            "sala": "1",
+            "observaciones": "",
+        }
+
+        response = self.client.post(url, datos)
+
+        self.assertEqual(response.status_code, 302)
+        cita = CitaClinica.objects.get(empresa=self.empresa, paciente=paciente)
+        self.assertTrue(cita.cortesia)
+        self.assertFalse(cita.pagada)
+        self.assertTrue(cita.cita_agenda.cortesia)
+        calendario = self.client.get(reverse("clinica_citas", args=[self.empresa.slug]))
+        self.assertContains(calendario, "is-courtesy")
+        self.assertContains(calendario, "Cortesía")
+
+        conflicto = CitaClinicaForm(
+            {**datos, "pagada": "on"},
+            empresa=self.empresa,
+        )
+        self.assertFalse(conflicto.is_valid())
+        self.assertIn("no puede marcarse también como pagada", conflicto.errors.as_text())
 
     def test_paciente_medico_exige_identidad_en_validacion(self):
         for slug in ("hospital_mia", "medical_spa"):

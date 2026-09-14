@@ -480,7 +480,7 @@ class CitaClienteForm(forms.ModelForm):
 
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cortesia", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "cirugia_detalle": forms.Textarea(attrs={"rows": 3, "placeholder": "Ejemplo: Abdominoplastia con liposuccion, zona a operar, preparacion especial o detalle clinico."}),
@@ -668,6 +668,7 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["profesional_salud"].error_messages["required"] = "Selecciona el doctor o profesional que atendera la cita."
             self.fields["observacion"].label = "Motivo o notas de la cita"
             self.fields["pagada"].label = "Cita pagada"
+            self.fields["cortesia"].label = "Cita de cortesía"
             self.fields["enviar_confirmacion_whatsapp"].label = "Enviar confirmación por WhatsApp al guardar"
             self.fields["recordatorio_semana_whatsapp"].label = "Recordar 7 días antes"
             self.fields["recordatorio_dia_whatsapp"].label = "Recordar 1 día antes"
@@ -678,12 +679,13 @@ class CitaClienteForm(forms.ModelForm):
             if not self.notificaciones_cita_activas:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "cortesia", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
         else:
             for nombre in ["paciente", "servicio_clinico", "profesional_salud", "cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre, None)
             self.fields["pagada"].label = "Cita pagada"
-            self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "duracion_minutos", "responsable", "estado", "pagada", "observacion"])
+            self.fields["cortesia"].label = "Cita de cortesía"
+            self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "duracion_minutos", "responsable", "estado", "pagada", "cortesia", "observacion"])
 
     def _armar_fecha_hora(self, fecha, hora_texto, periodo):
         hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
@@ -884,6 +886,11 @@ class CitaClienteForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        if cleaned_data.get("pagada") and cleaned_data.get("cortesia"):
+            self.add_error(
+                "cortesia",
+                "Una cita de cortesía no puede marcarse también como pagada.",
+            )
         fecha = cleaned_data.get("fecha_cita")
         hora_texto = cleaned_data.get("hora_cita")
         periodo = cleaned_data.get("periodo_cita")
