@@ -775,6 +775,17 @@
 
 {% block extra_js %}
 {{ block.super }}
+{% if empresa.slug == "hospital_mia" %}
+<script>
+(function(){
+    const isInstalledApp = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    const mobileAppUrl = "{% url 'agenda_mobile' empresa.slug %}";
+    if(isInstalledApp && window.location.pathname !== mobileAppUrl){
+        window.location.replace(mobileAppUrl);
+    }
+})();
+</script>
+{% endif %}
 <script>
 document.addEventListener("DOMContentLoaded", function(){
     const modal = document.getElementById("erpPlansModal");

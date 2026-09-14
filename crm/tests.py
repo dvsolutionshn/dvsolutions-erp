@@ -100,6 +100,8 @@ class CRMTests(TestCase):
         self.assertEqual(response_dashboard.status_code, 200)
         self.assertTemplateUsed(response_dashboard, "core/dashboard_premium.html")
         self.assertNotContains(response_dashboard, 'class="mobile-home mobile-app-screen active"')
+        self.assertContains(response_dashboard, '(display-mode: standalone)')
+        self.assertContains(response_dashboard, reverse("agenda_mobile", args=[self.empresa.slug]))
 
         response_app = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
         self.assertEqual(response_app.status_code, 200)
