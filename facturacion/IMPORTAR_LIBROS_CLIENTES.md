@@ -11,7 +11,7 @@ Disponible en `dubon_asociados`, dentro de los libros de clientes contables. Usa
 Las filas seleccionadas con errores se enumeran en un resumen con enlaces a la fila original del Excel. Los importes se muestran con coma de miles y punto decimal. Al pie, el desglose explica el efecto de cada fila excluida, duplicada o con diferencias de cálculo y cualquier diferencia entre la suma de las filas del Excel y su total general. Si faltan valores de origen, se indica que no es posible atribuir toda la diferencia.
 
 5. Revisar las advertencias y marcar la confirmación; pulsar **Confirmar importación**. Las filas seleccionadas con errores impiden guardar el lote completo. Las duplicadas se omiten.
-6. Las compras aparecen en el cuadro mensual y alimentan el resumen anual existente. El acumulado definitivo por cuentas sigue pendiente del formato que proporcionará el usuario.
+6. Las compras aparecen en el cuadro mensual y alimentan el resumen anual existente. Nordic dispone del acumulado de costos y gastos por cuentas descrito en `ACUMULADO_NORDIC.md`.
 
 La vista previa caduca tras una hora sin renovarse. Límite: 5 MB, 1000 filas de compras, 40 columnas y 5000 filas físicas de hoja. Para documentos mayores, dividirlos en archivos.
 
@@ -25,6 +25,8 @@ Se reutiliza la detección de encabezados del importador tradicional. Campos mí
 - Las fechas anteriores permanecen en el período seleccionado. Una fecha posterior al período se señala para revisar el año; nunca se corrige automáticamente. El usuario confirma expresamente las fechas y las advertencias antes de guardar. Esto no constituye una validación de elegibilidad fiscal.
 
 ## Proveedores y números
+
+Nordic usa la identificación y vinculación mejoradas descritas en [Proveedores y clasificación](PROVEEDORES_ACUMULADO_NORDIC.md), incluida la normalización de acentos, espacios y puntuación. Las reglas siguientes de coincidencia de nombres describen el comportamiento conservado para los demás clientes.
 
 Se buscan proveedores exclusivamente dentro de empresa + cliente, por RTN si se informa o por nombre sin distinguir mayúsculas si falta. Los nuevos proveedores se crean al confirmar, una sola vez por identidad dentro del lote, respetando el permiso de crear proveedores.
 

@@ -58,6 +58,8 @@
 {% if cliente and cliente.cuentas_acumulado.exists %}<a class="erp-action-link" href="{% url 'acumulado_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}&amp;mes={{ mes }}#clasificar">Clasificar compras</a>{% endif %}
 {% if cliente and permisos.crear %}<a class="erp-action-link" href="{% url 'importar_compras_cliente' empresa.slug cliente.pk anio mes %}">Importar Excel</a>{% endif %}
 </div>
+{% if es_nordic and permisos.editar %}<p><a class="erp-action-link" href="{% url 'vincular_proveedores_libro' empresa.slug cliente.pk anio mes %}">Crear / Vincular proveedores desde este libro</a></p>{% endif %}
+<p id="supplier-suggestion" style="color:#086d70" hidden></p>
 <p class="capture-help">TAB avanza · SHIFT + TAB retrocede · ↑ ↓ elige proveedor · ENTER en Base 18% guarda · ESC omite duplicada. Fecha día/mes/año: 5/8/26, 05/08/2026 o 050826.</p>
 <form id="capture-form" data-create="{{ permisos.crear|yesno:'true,false' }}" data-edit="{{ permisos.editar|yesno:'true,false' }}" data-void="{{ permisos.anular|yesno:'true,false' }}" data-create-supplier="{{ puede_crear_proveedor|yesno:'true,false' }}" autocomplete="off" action="{% if cliente %}{% url 'captura_cliente_contable' empresa.slug cliente.pk anio mes %}{% else %}{% url 'captura_rapida_compras_periodo' empresa.slug anio mes %}{% endif %}" method="post">
 {% csrf_token %}

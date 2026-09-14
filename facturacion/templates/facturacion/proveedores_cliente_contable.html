@@ -5,8 +5,8 @@
 {% include "facturacion/_cliente_contable_nav.html" %}
 <section class="erp-card">
 <form method="get" class="purchase-filter"><div class="purchase-field"><label for="supplier-search">Buscar proveedor</label><input id="supplier-search" type="search" name="q" value="{{ q }}" placeholder="Nombre o RTN"></div><button class="erp-action-link">Buscar</button></form>
-<div class="purchase-table-wrap"><table class="erp-table" style="width:100%"><thead><tr><th>Nombre</th><th>RTN</th><th>Estado</th><th></th></tr></thead>
-<tbody>{% for proveedor in proveedores %}<tr><td>{{ proveedor.nombre }}</td><td>{{ proveedor.rtn }}</td><td>{{ proveedor.activo|yesno:'Activo,Inactivo' }}</td><td>{% if puede_editar %}<a href="{% url 'editar_proveedor_cliente_contable' empresa.slug cliente.pk proveedor.pk %}">Editar</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="4">Sin proveedores.</td></tr>{% endfor %}</tbody></table></div>
+<div class="purchase-table-wrap"><table class="erp-table" style="width:100%"><thead><tr><th>Nombre</th><th>RTN</th><th>Estado</th>{% if es_nordic %}<th>Cuenta habitual</th>{% endif %}<th></th></tr></thead>
+<tbody>{% for proveedor in proveedores %}<tr><td>{{ proveedor.nombre }}</td><td>{{ proveedor.rtn }}</td><td>{{ proveedor.activo|yesno:'Activo,Inactivo' }}</td>{% if es_nordic %}<td>{{ proveedor.cuenta_habitual.nombre|default:'Sin sugerencia' }}{% if proveedor.cuenta_habitual_en %}<small style="display:block">{{ proveedor.cuenta_habitual_por }} · {{ proveedor.cuenta_habitual_en|date:'d/m/Y H:i' }}</small>{% endif %}</td>{% endif %}<td>{% if puede_editar %}<a href="{% url 'editar_proveedor_cliente_contable' empresa.slug cliente.pk proveedor.pk %}">Editar</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="4">Sin proveedores.</td></tr>{% endfor %}</tbody></table></div>
 {% if puede_guardar %}<h2>{% if form.instance.pk %}Editar proveedor{% else %}Crear proveedor{% endif %}</h2>
 <form method="post" class="purchase-form">{% csrf_token %}{{ form.as_p }}<button class="erp-action-link">Guardar proveedor</button></form>{% endif %}
 </section>{% endblock %}

@@ -13,6 +13,7 @@ from django.db.models.functions import Coalesce, Replace, Trim
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from .clientes_contables import cliente_autorizado
+from .proveedores_compras import es_nordic, resolver_proveedor, cuenta_sugerida, nombre_normalizado
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -78,20 +79,23 @@ def crear_proveedor_captura(request, empresa, cliente_contable=None):
     try:
         with transaction.atomic():
             Empresa.objects.select_for_update().get(pk=empresa.pk)
-            existentes = list(Proveedor.objects.filter(cliente_contable=cliente_contable, empresa=empresa).annotate(
-                rtn_normalizado=Replace(sin_guiones('rtn'), Value(' '), Value(''))
-            ).filter(rtn_normalizado=form.cleaned_data['rtn']).order_by('-activo', 'pk')[:2])
-            if existentes:
-                if not existentes[0].activo:
-                    return JsonResponse({'error': 'Este RTN pertenece a un proveedor inactivo. Revisa su ficha en Proveedores.'}, status=409)
-                if len(existentes) > 1 and existentes[1].activo:
-                    return JsonResponse({'error': 'Hay varios proveedores con ese RTN. Selecciona el correcto en el buscador.'}, status=409)
-                proveedor, creado = existentes[0], False
+            if es_nordic(cliente_contable):
+                proveedor, creado = resolver_proveedor(empresa, cliente_contable, form.cleaned_data['nombre'], form.cleaned_data['rtn'], request.user)
             else:
-                proveedor = form.save(commit=False)
-                proveedor.empresa = empresa
-                proveedor.save()
-                creado = True
+                existentes = list(Proveedor.objects.filter(cliente_contable=cliente_contable, empresa=empresa).annotate(
+                    rtn_normalizado=Replace(sin_guiones('rtn'), Value(' '), Value(''))
+                ).filter(rtn_normalizado=form.cleaned_data['rtn']).order_by('-activo', 'pk')[:2])
+                if existentes:
+                    if not existentes[0].activo:
+                        return JsonResponse({'error': 'Este RTN pertenece a un proveedor inactivo. Revisa su ficha en Proveedores.'}, status=409)
+                    if len(existentes) > 1 and existentes[1].activo:
+                        return JsonResponse({'error': 'Hay varios proveedores con ese RTN. Selecciona el correcto en el buscador.'}, status=409)
+                    proveedor, creado = existentes[0], False
+                else:
+                    proveedor = form.save(commit=False)
+                    proveedor.empresa = empresa
+                    proveedor.save()
+                    creado = True
     except forms.ValidationError as exc:
         return JsonResponse({'errores': {'__all__': exc.messages}}, status=400)
     except OperationalError as exc:
@@ -162,6 +166,15 @@ def buscar_duplicada(empresa, proveedor, numero, excluir=None, cliente_contable=
                                        Q(numero_comparable=normalizado)).first())
     if fiscal:
         return serializar(fiscal)
+    if es_nordic(cliente_contable):
+        historicas = (RegistroCompraFiscal.objects.filter(empresa=empresa, cliente_contable=cliente_contable,
+                         proveedor__isnull=True).exclude(pk=excluir)
+                      .filter(Q(proveedor_rtn='') | Q(proveedor_rtn__isnull=True))
+                      .annotate(numero_comparable=sin_guiones('numero_factura'))
+                      .filter(Q(numero_factura_normalizado=normalizado) | Q(numero_comparable=normalizado)))
+        for anterior in historicas:
+            if nombre_normalizado(anterior.proveedor_nombre) == nombre_normalizado(proveedor.nombre):
+                return serializar(anterior)
     if cliente_contable is not None:
         return None
     identidad = Q(proveedor_id=proveedor.pk) if proveedor.pk else Q(pk__in=[])
@@ -185,7 +198,7 @@ MESES = ('Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto
 
 def serializar(registro):
     datos = dict(id=registro.pk, fecha=registro.fecha_documento.strftime('%d/%m/%Y'),
-                 proveedor=registro.proveedor_nombre, proveedor_id=registro.proveedor_id,
+                 proveedor=registro.proveedor_nombre, proveedor_id=registro.proveedor_id, proveedor_rtn=registro.proveedor_rtn or '',
                  numero=registro.numero_factura, estado=registro.get_estado_display(),
                  estado_codigo=registro.estado, exonerado=f'{registro.exonerado:.2f}',
                  periodo_anio=registro.periodo_anio, periodo_mes=registro.periodo_mes,
@@ -263,12 +276,17 @@ def captura_rapida(request, empresa_slug, anio=None, mes=None, cliente_id=None, 
                 inventario = (CompraInventario.objects.filter(empresa=empresa, proveedor_id=OuterRef('pk'))
                               .order_by().values('proveedor_id').annotate(n=Count('pk')).values('n'))
                 frecuencia += Coalesce(Subquery(inventario), 0)
+            busqueda = request.GET.get('q', '').strip()
+            filtro = Q(nombre__icontains=busqueda) | Q(rtn__icontains=busqueda)
+            if es_nordic(cliente_contable):
+                ids = [p.pk for p in Proveedor.objects.filter(empresa=empresa,cliente_contable=cliente_contable,activo=True) if nombre_normalizado(busqueda) in nombre_normalizado(p.nombre) or busqueda in (p.rtn or '')]
+                filtro = Q(pk__in=ids)
             proveedores = (Proveedor.objects.filter(cliente_contable=cliente_contable, empresa=empresa, activo=True)
-                           .filter(Q(nombre__icontains=request.GET.get('q', '').strip()) |
-                                   Q(rtn__icontains=request.GET.get('q', '').strip()))
+                           .filter(filtro)
                            .annotate(frecuencia=frecuencia)
-                           .order_by('-frecuencia', 'nombre', 'pk')[:15])
-            return JsonResponse({'proveedores': [dict(id=p.pk, nombre=p.nombre, rtn=p.rtn or '')
+                           .select_related('cuenta_habitual').order_by('-frecuencia', 'nombre', 'pk')[:15])
+            return JsonResponse({'proveedores': [dict(id=p.pk, nombre=p.nombre, rtn=p.rtn or '',
+                                                sugerencia=(cuenta_sugerida(p).nombre if es_nordic(cliente_contable) and cuenta_sugerida(p) else ''))
                                                 for p in proveedores]})
         if accion == 'duplicado':
             form = IdentidadForm(request.GET, empresa=empresa, cliente_contable=cliente_contable)
@@ -287,7 +305,7 @@ def captura_rapida(request, empresa_slug, anio=None, mes=None, cliente_id=None, 
             return JsonResponse(cuadro)
         return render(request, 'facturacion/captura_rapida.html', {
             'empresa': empresa, 'cliente': cliente_contable, 'puede_crear_proveedor': puede_crear_proveedor, 'permisos': permisos,
-            'anio': anio, 'mes': mes, 'nombre_mes': MESES[mes-1], 'cuadro': cuadro})
+            'es_nordic': es_nordic(cliente_contable), 'anio': anio, 'mes': mes, 'nombre_mes': MESES[mes-1], 'cuadro': cuadro})
     if anio is None:
         return JsonResponse({'error': 'Selecciona el año y mes del Libro de Compras antes de capturar.'}, status=400)
     permiso = {'guardar':'crear', 'editar':'editar', 'anular':'anular', 'estado':'editar'}.get(accion)

@@ -60,6 +60,8 @@
       return;
     }
     supplier.value = item.nombre; field('proveedor').value = item.id;
+    const hint = document.getElementById('supplier-suggestion');
+    if (hint) { hint.hidden = !item.sugerencia; hint.textContent = item.sugerencia ? 'Cuenta sugerida: ' + item.sugerencia + '. Puedes revisarla y aplicarla desde el acumulado.' : ''; }
     ++searchVersion; closeOptions(); changedIdentity();
   }
   function renderOptions() {
@@ -95,6 +97,7 @@
     } catch(error) { if (version === searchVersion) message.textContent = error.message; }
   }
   supplier.addEventListener('input', () => {
+    const hint = document.getElementById('supplier-suggestion'); if (hint) hint.hidden = true;
     field('proveedor').value = ''; suggestions = []; closeOptions(); ++searchVersion;
     changedIdentity(); clearTimeout(timer); timer = setTimeout(search, 100);
   });
@@ -177,6 +180,7 @@
   for (const name of ['exento','base_15','base_18']) field(name).addEventListener('input', calculate);
   function nextRow() {
     ++searchVersion; ++duplicateVersion; clearTimeout(timer); clearTimeout(duplicateTimer);
+    const hint = document.getElementById('supplier-suggestion'); if (hint) hint.hidden = true;
     editing = null; form.reset(); suggestions = []; closeOptions(); showDuplicate(null);
     form.querySelectorAll('[aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
     document.querySelectorAll('.is-editing').forEach(row => row.classList.remove('is-editing'));

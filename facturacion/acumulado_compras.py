@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction, IntegrityError, OperationalError
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum, Min
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -17,7 +17,10 @@ from django.views.decorators.http import require_http_methods
 from core.models import Empresa
 from .captura_rapida import MESES, selector_libros, serializar
 from .clientes_contables import empresa_contable, cliente_autorizado
-from .models import CuentaAcumuladoCompra, RegistroCompraFiscal
+from .models import CuentaAcumuladoCompra, RegistroCompraFiscal, Proveedor
+
+from .proveedores_compras import es_nordic, cuenta_sugerida
+from .clasificacion_masiva import revisar_o_confirmar, guardar_cuenta
 
 ZERO = Decimal('0.00')
 
@@ -95,8 +98,48 @@ def acumulado_cliente(request, empresa_slug, cliente_id):
     except ValueError:
         raise Http404('Selecciona un año y mes válidos.')
     registros = RegistroCompraFiscal.objects.filter(empresa=empresa, cliente_contable=cliente, periodo_anio=anio)
+    filtro_cuenta = request.GET.get('cuenta', 'pendiente')
+    detalle = registros.exclude(estado='anulada').select_related('cuenta_acumulado', 'clasificado_por', 'proveedor__cuenta_habitual')
+    if mes:
+        detalle = detalle.filter(periodo_mes=mes)
+    if filtro_cuenta == 'pendiente':
+        detalle = detalle.filter(cuenta_acumulado__isnull=True)
+    elif filtro_cuenta != 'todas':
+        if not filtro_cuenta.isdigit():
+            raise Http404
+        cuenta = get_object_or_404(cuentas, pk=filtro_cuenta)
+        detalle = detalle.filter(cuenta_acumulado=cuenta)
+    proveedor = request.GET.get('proveedor', '').strip()
+    if proveedor:
+        detalle = detalle.filter(proveedor_nombre__icontains=proveedor)
+    proveedor_id = request.GET.get('proveedor_id', '') if es_nordic(cliente) else ''
+    if proveedor_id == 'sin_vincular':
+        detalle = detalle.filter(proveedor__isnull=True)
+    elif proveedor_id:
+        if not proveedor_id.isdigit():
+            raise Http404
+        get_object_or_404(Proveedor, empresa=empresa, cliente_contable=cliente, pk=proveedor_id)
+        detalle = detalle.filter(proveedor_id=proveedor_id)
+    detalle = detalle.annotate(importe_acumulado=sin_isv()).order_by('periodo_mes', 'pk')
     error = None
-    if request.method == 'POST':
+    if request.method == 'POST' and es_nordic(cliente):
+        if not puede_editar:
+            raise PermissionDenied
+        try:
+            with transaction.atomic():
+                Empresa.objects.select_for_update().get(pk=empresa.pk)
+                if not cliente_autorizado(request, empresa, cliente_id).activo:
+                    raise PermissionDenied
+                cantidad, revision = revisar_o_confirmar(request, empresa, cliente, anio, registros, detalle, cuentas)
+                if revision is not None:
+                    return revision
+            messages.success(request, f'{cantidad} facturas clasificadas. Los importes originales se conservaron.')
+            return redirect(request.get_full_path())
+        except (ValueError, ValidationError) as exc:
+            error = '; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+        except (IntegrityError, OperationalError):
+            error = 'No se guardó el lote. Actualiza la página y reintenta.'
+    elif request.method == 'POST':
         if not puede_editar:
             raise PermissionDenied
         try:
@@ -120,40 +163,34 @@ def acumulado_cliente(request, empresa_slug, cliente_id):
                     if compra.estado == 'anulada' or request.POST.get(f'version_{compra.pk}') != serializar(compra)['version']:
                         raise ValueError(f'La factura #{compra.pk} cambió o fue anulada. Actualiza la página y revisa la selección.')
                 for compra in elegidas:
-                    compra.cuenta_acumulado = cuenta
-                    compra.clasificado_por = request.user
-                    compra.clasificado_en = timezone.now()
-                    compra.save(update_fields=['cuenta_acumulado', 'clasificado_por', 'clasificado_en'])
+                    guardar_cuenta(compra, cuenta, request.user)
             messages.success(request, f'{len(elegidas)} facturas clasificadas. El acumulado se actualizó con sus importes existentes.')
             return redirect(request.get_full_path())
         except (ValueError, ValidationError) as exc:
             error = '; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
         except (IntegrityError, OperationalError):
             error = 'No se guardó la clasificación. Actualiza la página y reintenta cuando termine el otro guardado.'
-    filtro_cuenta = request.GET.get('cuenta', 'pendiente')
-    detalle = registros.exclude(estado='anulada').select_related('cuenta_acumulado', 'clasificado_por')
-    if mes:
-        detalle = detalle.filter(periodo_mes=mes)
-    if filtro_cuenta == 'pendiente':
-        detalle = detalle.filter(cuenta_acumulado__isnull=True)
-    elif filtro_cuenta != 'todas':
-        if not filtro_cuenta.isdigit():
-            raise Http404
-        cuenta = get_object_or_404(cuentas, pk=filtro_cuenta)
-        detalle = detalle.filter(cuenta_acumulado=cuenta)
-    proveedor = request.GET.get('proveedor', '').strip()
-    if proveedor:
-        detalle = detalle.filter(proveedor_nombre__icontains=proveedor)
-    detalle = detalle.annotate(importe_acumulado=sin_isv()).order_by('periodo_mes', 'pk')
     pagina = Paginator(detalle, 100).get_page(request.GET.get('pagina'))
     for compra in pagina:
+        compra.sugerencia = cuenta_sugerida(compra.proveedor) if es_nordic(cliente) else None
         compra.version_acumulado = serializar(compra)['version']
         compra.nombre_mes = MESES[compra.periodo_mes - 1]
     params = request.GET.copy()
     params.pop('pagina', None)
     cuenta_lista = list(cuentas)
+    grupos = []
+    proveedores_catalogo = Proveedor.objects.filter(empresa=empresa, cliente_contable=cliente).select_related('cuenta_habitual').order_by('nombre')
+    if es_nordic(cliente):
+        catalogo = {p.pk:p for p in proveedores_catalogo}
+        grupos = list(detalle.order_by().values('proveedor_id').annotate(cantidad=Count('pk'), subtotal=Sum('subtotal'), isv15=Sum('isv_15'), isv18=Sum('isv_18'), total=Sum('total')).order_by('proveedor_id'))
+        for g in grupos:
+            p = catalogo.get(g['proveedor_id'])
+            g['nombre'] = p.nombre if p else 'Sin proveedor vinculado'
+            g['sugerencia'] = cuenta_sugerida(p)
+            g['impuestos'] = (g['isv15'] or ZERO) + (g['isv18'] or ZERO)
     return render(request, 'facturacion/acumulado_cuentas.html', dict(
         empresa=empresa, cliente=cliente, anio=anio, mes=mes, meses=list(enumerate(MESES, 1)),
+        es_nordic=es_nordic(cliente), proveedores_catalogo=proveedores_catalogo, proveedor_id=proveedor_id, grupos_proveedores=grupos,
         cuentas=cuenta_lista, pagina=pagina, filtro_cuenta=filtro_cuenta, proveedor=proveedor,
         params=params.urlencode(), puede_editar=puede_editar, error=error,
         **construir_acumulado(registros, cuenta_lista)))

@@ -11,7 +11,8 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 
 from core.models import Empresa, Usuario
-from .models import ClienteContable, Proveedor, LibroCompraMensual, RegistroCompraFiscal
+from .models import ClienteContable, Proveedor, LibroCompraMensual, RegistroCompraFiscal, CuentaAcumuladoCompra
+from .proveedores_compras import es_nordic, buscar_proveedor, rtn_normalizado
 
 
 def es_admin(usuario):
@@ -123,9 +124,27 @@ def proveedores_cliente(request, empresa_slug, cliente_id, proveedor_id=None):
 
     class ProveedorClienteForm(ProveedorCapturaForm):
         class Meta(ProveedorCapturaForm.Meta):
-            fields = ('nombre', 'rtn', 'activo')
+            fields = ('nombre', 'rtn', 'activo', 'cuenta_habitual')
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            if es_nordic(cliente):
+                self.fields['cuenta_habitual'].queryset = CuentaAcumuladoCompra.objects.filter(cliente_contable=cliente, activa=True)
+                self.fields['cuenta_habitual'].help_text = 'Sugerencia editable para futuras compras; no cambia las cuentas de facturas existentes.'
+            else:
+                self.fields.pop('cuenta_habitual')
+
+        def clean(self):
+            datos = super().clean()
+            if es_nordic(cliente) and not self.errors:
+                candidato = buscar_proveedor(list(proveedores.exclude(pk=self.instance.pk)), datos.get('nombre'), datos.get('rtn'))
+                if candidato:
+                    raise forms.ValidationError(f'Ya existe el proveedor {candidato.nombre}. Edita su ficha en lugar de duplicarlo.')
+            return datos
 
         def clean_rtn(self):
+            if es_nordic(cliente):
+                return rtn_normalizado(self.cleaned_data.get('rtn'))
             rtn = super().clean_rtn()
             existentes = proveedores.annotate(normalizado=Replace(sin_guiones('rtn'),Value(' '),Value('')))
             if existentes.filter(normalizado=rtn).exclude(pk=self.instance.pk).exists():
@@ -139,9 +158,13 @@ def proveedores_cliente(request, empresa_slug, cliente_id, proveedor_id=None):
         with transaction.atomic():
             Empresa.objects.select_for_update().get(pk=empresa.pk)
             if form.is_valid():
-                form.save()
+                guardado = form.save(commit=False)
+                if es_nordic(cliente) and 'cuenta_habitual' in form.changed_data:
+                    guardado.cuenta_habitual_por = request.user
+                    guardado.cuenta_habitual_en = timezone.now()
+                guardado.save()
                 return redirect('proveedores_cliente_contable', empresa_slug=empresa_slug, cliente_id=cliente.pk)
     q = request.GET.get('q','').strip()
     return render(request, 'facturacion/proveedores_cliente_contable.html', {
-        'empresa': empresa, 'cliente': cliente, 'proveedores': proveedores.filter(Q(nombre__icontains=q)|Q(rtn__icontains=q)).order_by('nombre'),
-        'form': form, 'puede_guardar': puede_guardar, 'puede_editar': cliente.activo and request.user.tiene_permiso_erp('puede_editar_proveedores',empresa), 'q': q})
+        'empresa': empresa, 'cliente': cliente, 'proveedores': proveedores.filter(Q(nombre__icontains=q)|Q(rtn__icontains=q)).select_related('cuenta_habitual','cuenta_habitual_por').order_by('nombre'),
+        'form': form, 'es_nordic': es_nordic(cliente), 'puede_guardar': puede_guardar, 'puede_editar': cliente.activo and request.user.tiene_permiso_erp('puede_editar_proveedores',empresa), 'q': q})

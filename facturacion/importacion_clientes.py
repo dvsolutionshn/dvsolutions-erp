@@ -25,6 +25,7 @@ from core.models import Empresa
 from .captura_rapida import CapturaForm, buscar_duplicada, calcular_importes, numero_normalizado, serializar, MESES
 from .clientes_contables import empresa_contable, cliente_autorizado
 from .importadores import _detectar_encabezado, _indice, _normalizar_texto
+from .proveedores_compras import es_nordic, buscar_proveedor, resolver_proveedor, cuenta_sugerida, nombre_normalizado
 from .models import LibroCompraMensual, Proveedor, RegistroCompraFiscal
 
 SALT = 'compras.importacion.cliente.v1'
@@ -172,24 +173,41 @@ def revisar(lote, empresa, cliente, usuario, post=None):
                 fila['avisos'].append('Fecha de otro período; permanecerá en el libro seleccionado.')
         except ValidationError as exc:
             fila['errores'].extend(exc.messages)
-        nombre = fila['proveedor'].casefold()
-        coincidencias = [p for p in proveedores if (rtn and numero_normalizado(p.rtn or '').replace(' ','') == rtn)
-                         or (not rtn and p.nombre.strip().casefold() == nombre)]
-        if len(coincidencias) > 1:
-            fila['errores'].append('Hay varios proveedores coincidentes. Completa el RTN para identificarlo.')
-        elif coincidencias:
-            fila['obj_proveedor'] = coincidencias[0]
-            if not fila['rtn']:
-                fila['rtn'] = numero_normalizado(coincidencias[0].rtn or '').replace(' ', '')
-            if not coincidencias[0].activo:
-                fila['errores'].append('El proveedor está inactivo. Revisa su ficha antes de importar.')
+        nombre = nombre_normalizado(fila['proveedor']) if es_nordic(cliente) else fila['proveedor'].casefold()
+        if es_nordic(cliente):
+            try:
+                encontrado = buscar_proveedor(proveedores, fila['proveedor'], rtn)
+                fila['obj_proveedor'] = encontrado
+                if encontrado:
+                    if not fila['rtn']:
+                        fila['rtn'] = encontrado.rtn or ''
+                    sugerida = cuenta_sugerida(encontrado)
+                    if sugerida:
+                        fila['avisos'].append(f'Cuenta sugerida: {sugerida.nombre}. Podrás aplicarla desde el acumulado.')
+                else:
+                    if not usuario.tiene_permiso_erp('puede_crear_proveedores', empresa):
+                        fila['errores'].append('No tienes permiso para crear este proveedor.')
+                    fila['avisos'].append('Se creará un proveedor dentro de este cliente.')
+            except ValidationError as exc:
+                fila['errores'].extend(exc.messages)
         else:
-            mismo_nombre = [p for p in proveedores if p.nombre.strip().casefold() == nombre]
-            if rtn and mismo_nombre:
-                fila['errores'].append('Existe ese nombre con otro RTN o sin RTN. Completa/corrige su ficha para vincularlo sin duplicarlo.')
-            if not usuario.tiene_permiso_erp('puede_crear_proveedores', empresa):
-                fila['errores'].append('No tienes permiso para crear este proveedor.')
-            fila['avisos'].append('Se creará un proveedor dentro de este cliente.')
+            coincidencias = [p for p in proveedores if (rtn and numero_normalizado(p.rtn or '').replace(' ','') == rtn)
+                             or (not rtn and p.nombre.strip().casefold() == nombre)]
+            if len(coincidencias) > 1:
+                fila['errores'].append('Hay varios proveedores coincidentes. Completa el RTN para identificarlo.')
+            elif coincidencias:
+                fila['obj_proveedor'] = coincidencias[0]
+                if not fila['rtn']:
+                    fila['rtn'] = numero_normalizado(coincidencias[0].rtn or '').replace(' ', '')
+                if not coincidencias[0].activo:
+                    fila['errores'].append('El proveedor está inactivo. Revisa su ficha antes de importar.')
+            else:
+                mismo_nombre = [p for p in proveedores if p.nombre.strip().casefold() == nombre]
+                if rtn and mismo_nombre:
+                    fila['errores'].append('Existe ese nombre con otro RTN o sin RTN. Completa/corrige su ficha para vincularlo sin duplicarlo.')
+                if not usuario.tiene_permiso_erp('puede_crear_proveedores', empresa):
+                    fila['errores'].append('No tienes permiso para crear este proveedor.')
+                fila['avisos'].append('Se creará un proveedor dentro de este cliente.')
         proveedor = fila['obj_proveedor'] or Proveedor(empresa=empresa,cliente_contable=cliente,nombre=fila['proveedor'],rtn=rtn)
         if not proveedor.rtn:
             fila['avisos'].append('Proveedor sin RTN: podrás completarlo en su ficha.')
@@ -298,8 +316,11 @@ def importar_cliente(request, empresa_slug, cliente_id, anio, mes):
                         if libro.estado == 'finalizado':
                             raise ValueError('El libro está finalizado. Reábrelo para importar.')
                         creadas, nuevos = 0, {}
+                        catalogo = list(Proveedor.objects.filter(empresa=empresa, cliente_contable=cliente)) if es_nordic(cliente) else None
                         for fila in elegidas:
                             proveedor = fila['obj_proveedor']
+                            if es_nordic(cliente):
+                                proveedor, _ = resolver_proveedor(empresa, cliente, fila['proveedor'], fila['rtn'], request.user, catalogo)
                             if proveedor is None:
                                 # Otra fila del lote puede haber creado este proveedor dentro de la transacción.
                                 identidad_proveedor = ('rtn',fila['rtn']) if fila['rtn'] else ('nombre',fila['proveedor'].casefold())

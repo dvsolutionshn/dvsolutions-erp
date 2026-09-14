@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 from importlib import import_module
 import os
+import json
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
@@ -45,9 +46,14 @@ class AcumuladoComprasTests(TestCase):
         self.cuenta = CuentaAcumuladoCompra.objects.get(cliente_contable=self.nordic, nombre='Compras en PriceSmart')
 
     def asignar(self, filas, cuenta=None, **extra):
-        return self.client.post(self.url, {'registros':[str(c.pk) for c in filas],
+        response = self.client.post(self.url, {'registros':[str(c.pk) for c in filas],
             'cuenta_destino':cuenta if cuenta is not None else self.cuenta.pk,
             **{f'version_{c.pk}':serializar(c)['version'] for c in filas}, **extra})
+
+        if response.status_code == 200 and response.context and response.context.get('token'):
+            return self.client.post(self.url, {'accion':'confirmar_asignacion','token':response.context['token'],
+                'seleccion':json.dumps([c.pk for c in filas])})
+        return response
 
     def test_referencia_solo_nordic_idempotente_sin_modificar_compras(self):
         c = compra(self.nordic, self.proveedor, '123')

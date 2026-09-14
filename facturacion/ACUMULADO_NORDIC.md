@@ -6,7 +6,7 @@ Primera etapa para Nordic de `dubon_asociados`, basada en la estructura de costo
 
 1. Libro Compras → Nordic → año 2026 → Ver acumulado.
 2. La matriz muestra 66 cuentas iniciales: 26 de costos, 39 de operación/administración y una de gastos financieros. El catálogo conserva las cuentas de la referencia, incluidas las que todavía no tienen movimientos de compras. Ingresos y movimientos sin factura quedan para otra etapa; no se calcula utilidad ni flujo de efectivo.
-3. Las compras importadas comienzan en **Por clasificar**. En Facturas del acumulado, filtrar por mes y/o nombre de proveedor, seleccionar las facturas y elegir su cuenta. Se pueden asignar hasta 100 facturas de la página por operación. No se clasifica automáticamente por semejanza de nombres.
+3. Las compras importadas comienzan en **Por clasificar**. En Facturas del acumulado, filtrar por mes, proveedor y cuenta, seleccionar facturas y revisar la cuenta antes de confirmar. Nordic permite hasta 100 seleccionadas de la página o 1,000 del filtro. Las excepciones se pueden desmarcar durante la revisión.
 4. Cada factura tiene una cuenta. Para cambiarla, seleccionar la cuenta actual o Todas en el filtro y volver a asignar; también se puede quitar la cuenta. Una factura mixta no se divide entre cuentas en esta etapa.
 5. Pulsar un importe de la matriz abre el detalle del mes/cuenta. **Ver factura** abre el libro en otra pestaña y señala el registro original. El libro mensual también tiene el acceso **Clasificar compras**.
 6. **Administrar cuentas** permite agregar cuentas, cambiar nombre/grupo/orden y desactivarlas. Las cuentas inactivas conservan sus importes históricos y no reciben nuevas asignaciones.
@@ -19,7 +19,7 @@ Se agrupa por `periodo_anio` y `periodo_mes`, independientemente de la fecha doc
 
 `CuentaAcumuladoCompra` es un catálogo de presentación por cliente, sin importes ni asientos. Las clasificaciones y cuentas contables existentes de la empresa administradora no están habilitadas para clientes en la arquitectura actual; se mantiene esa separación. Este informe no genera asientos contables ni modifica reportes fiscales de Dubón.
 
-La cuenta se vincula al registro original, junto con usuario y fecha de la última clasificación. No cambia proveedor, fecha, número, importes, período, estado ni encabezado del libro. Puede clasificarse un libro finalizado según el permiso existente de editar compras. No incluye reglas automáticas para futuras compras por proveedor.
+La cuenta se vincula al registro original, junto con usuario y fecha de la última clasificación. No cambia proveedor, fecha, número, importes, período, estado ni encabezado del libro. Puede clasificarse un libro finalizado según el permiso existente de editar compras. Nordic permite configurar una cuenta habitual por proveedor como sugerencia editable; consulta [Proveedores y clasificación](PROVEEDORES_ACUMULADO_NORDIC.md).
 
 ## Aislamiento y concurrencia
 

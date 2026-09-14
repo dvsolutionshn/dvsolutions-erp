@@ -576,6 +576,11 @@ class Proveedor(models.Model):
         blank=True,
         related_name="proveedores_cxp",
     )
+    cuenta_habitual = models.ForeignKey('CuentaAcumuladoCompra', null=True, blank=True,
+        on_delete=models.PROTECT, related_name='proveedores_habituales', verbose_name='Cuenta contable habitual')
+    cuenta_habitual_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='cuentas_habituales_configuradas')
+    cuenta_habitual_en = models.DateTimeField(null=True, blank=True)
     condicion_pago = models.CharField(max_length=20, choices=CONDICIONES_PAGO, default='contado')
     dias_credito = models.PositiveIntegerField(default=0)
 
@@ -588,6 +593,8 @@ class Proveedor(models.Model):
             raise ValidationError({'cliente_contable': 'El cliente contable debe pertenecer a la empresa del proveedor.'})
         if self.cliente_contable_id and self.cuenta_contable_id:
             raise ValidationError({'cuenta_contable': 'No se comparten cuentas de la administradora con clientes contables.'})
+        if self.cuenta_habitual_id and self.cuenta_habitual.cliente_contable_id != self.cliente_contable_id:
+            raise ValidationError({'cuenta_habitual': 'La cuenta habitual debe pertenecer al mismo cliente.'})
         if self.condicion_pago == 'contado':
             self.dias_credito = 0
 
@@ -1027,6 +1034,9 @@ class RegistroCompraFiscal(models.Model):
     clasificado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL,
                                        related_name='compras_clasificadas')
     clasificado_en = models.DateTimeField(null=True, blank=True)
+    proveedor_vinculado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='proveedores_compras_vinculados')
+    proveedor_vinculado_en = models.DateTimeField(null=True, blank=True)
     # La captura rapida completa estos campos sin reescribir el historial.
     numero_factura_normalizado = models.CharField(max_length=120, null=True, blank=True)
     identidad_captura = models.CharField(max_length=40, null=True, blank=True, editable=False)

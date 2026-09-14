@@ -1,0 +1,18 @@
+{% extends "facturacion/compras_base.html" %}{% load custom_filters %}
+{% block header_title %}Revisar asignación masiva · {{ cliente.nombre }} · {{ anio }}{% endblock %}
+{% block compras_content %}{% include "facturacion/_cliente_contable_nav.html" %}
+<section class="erp-card"><h2>Confirmar cuentas de las compras seleccionadas</h2>
+<p><strong>Cuenta a aplicar:</strong> {{ cuentas_destino }}</p>
+<p id="mass-summary" aria-live="polite"><strong id="mass-count">{{ filas|length }}</strong> compras · Sin ISV: <strong id="mass-net">{{ neto|compra_importe }}</strong> · Total de facturas: <strong id="mass-total">{{ total|compra_importe }}</strong></p>
+<p>Desmarca las excepciones antes de confirmar. Se actualizará la cuenta de las seleccionadas, incluso si ya tenían otra; los importes y libros permanecen iguales.</p>
+<form method="post" id="mass-form">{% csrf_token %}<input type="hidden" name="accion" value="confirmar_asignacion"><input type="hidden" name="token" value="{{ token }}"><input type="hidden" name="seleccion" id="mass-selection">
+<div class="purchase-table-wrap" style="max-height:60vh;overflow:auto"><table class="erp-table"><thead><tr><th>Incluir</th><th>Libro</th><th>Proveedor / Factura</th><th>Cuenta a aplicar</th><th>Sin ISV</th><th>Total</th></tr></thead><tbody>
+{% for f in filas %}<tr><td><input type="checkbox" data-mass-id="{{ f.id }}" data-total="{{ f.total }}" data-net="{{ f.neto }}" checked aria-label="Incluir factura {{ f.id }}"></td><td>{{ f.mes }} {{ anio }}</td><td>{{ f.proveedor }} · {{ f.numero|default:'Sin número' }} · #{{ f.id }}</td><td>{{ f.cuenta_nombre }}</td><td>{{ f.neto|compra_importe }}</td><td>{{ f.total|compra_importe }}</td></tr>{% endfor %}
+</tbody></table></div><button class="erp-action-link">Confirmar asignación</button><a class="erp-action-link" href="{% url 'acumulado_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}#clasificar">Cancelar</a></form></section>
+<script>(()=>{
+ const items=[...document.querySelectorAll('[data-mass-id]')];
+ const cents=s=>{const [a,b='']=s.split('.');return BigInt(a)*100n+BigInt(b.padEnd(2,'0'));};
+ const money=n=>(n/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')+'.'+(n%100n).toString().padStart(2,'0');
+ function update(){const selected=items.filter(i=>i.checked);document.getElementById('mass-selection').value=JSON.stringify(selected.map(i=>i.dataset.massId));document.getElementById('mass-count').textContent=selected.length;document.getElementById('mass-net').textContent=money(selected.reduce((n,i)=>n+cents(i.dataset.net),0n));document.getElementById('mass-total').textContent=money(selected.reduce((n,i)=>n+cents(i.dataset.total),0n));}
+ items.forEach(i=>i.addEventListener('change',update));update();
+})();</script>{% endblock %}

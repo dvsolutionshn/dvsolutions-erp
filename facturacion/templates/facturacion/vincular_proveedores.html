@@ -1,0 +1,12 @@
+{% extends "facturacion/compras_base.html" %}
+{% block header_title %}Vincular proveedores · {{ cliente.nombre }} · {{ nombre_mes }} {{ anio }}{% endblock %}
+{% block compras_content %}{% include "facturacion/_cliente_contable_nav.html" %}
+<section class="erp-card"><h2>Crear / Vincular proveedores desde este libro</h2>
+<p>{{ vinculadas }} facturas ya tienen proveedor y conservan su vínculo. Se revisan las restantes, incluidas anuladas; esta operación no cambia fechas, números, importes, estados ni cuentas asignadas.</p>
+<p>Si una ficha existente no tiene RTN, se completa con el RTN informado en la factura cuando tengas permiso para editar proveedores. Los nombres y RTN originales de las facturas se conservan.</p>
+{% if error %}<p role="alert" style="color:#a72635">{{ error }}</p>{% endif %}
+<form method="post" id="link-suppliers-form">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}">
+<div class="purchase-table-wrap"><table class="erp-table"><thead><tr><th>Incluir</th><th>Proveedor del libro</th><th>RTN</th><th>Facturas</th><th>Resultado previsto</th></tr></thead><tbody>
+{% for g in grupos %}<tr><td>{% if not g.error %}<input type="checkbox" name="grupos" value="{{ g.id }}" checked aria-label="Incluir {{ g.nombre }}">{% endif %}</td><td>{{ g.nombre }}</td><td>{{ g.rtn|default:'Sin RTN' }}</td><td>{{ g.registros|length }}</td><td>{% if g.error %}<span style="color:#a72635">{{ g.error }}</span>{% elif g.proveedor %}Reutilizar {{ g.proveedor.nombre }}{% else %}Crear si todavía no existe{% endif %}</td></tr>{% empty %}<tr><td colspan="5">Todas las facturas ya están vinculadas.</td></tr>{% endfor %}
+</tbody></table></div>{% if grupos %}<button class="erp-action-link">Confirmar vinculación</button>{% endif %}
+<a class="erp-action-link" href="{% url 'captura_cliente_contable' empresa.slug cliente.pk anio mes %}">Volver al libro</a></form></section><script>document.getElementById('link-suppliers-form').addEventListener('submit',function(){const selected=[];this.querySelectorAll('[name=grupos]').forEach(i=>{if(i.checked)selected.push(i.value);i.removeAttribute('name');});const input=document.createElement('input');input.type='hidden';input.name='seleccion';input.value=JSON.stringify(selected);this.append(input);});</script>{% endblock %}
