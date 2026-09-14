@@ -4337,6 +4337,114 @@ def entrada_inventario(request, empresa_slug):
 
 
 @login_required
+@require_POST
+def entrada_inventario_rapida_app(request, empresa_slug):
+    empresa = get_object_or_404(Empresa, slug=empresa_slug, activa=True)
+    if empresa.slug != "hospital_mia":
+        return JsonResponse({"ok": False, "error": "Esta entrada rápida solo está disponible en Hospital Mía."}, status=404)
+    if not request.user.puede_acceder_empresa(empresa):
+        return JsonResponse({"ok": False, "error": "Acceso no autorizado."}, status=403)
+    if not request.user.tiene_permiso_erp("puede_ajustar_inventario", empresa):
+        return JsonResponse({"ok": False, "error": "Tu usuario no puede ajustar inventario."}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Los datos enviados no son válidos."}, status=400)
+
+    producto = Producto.objects.filter(
+        id=payload.get("producto_id"),
+        empresa=empresa,
+        activo=True,
+        eliminado=False,
+        controla_inventario=True,
+        tipo_item="producto",
+    ).first()
+    bodega = BodegaInventario.objects.filter(
+        id=payload.get("bodega_id"),
+        empresa=empresa,
+        activa=True,
+    ).first()
+    numero_lote = " ".join(str(payload.get("numero_lote") or "").split())[:80]
+    fecha_vencimiento_raw = str(payload.get("fecha_vencimiento") or "").strip()
+    referencia = " ".join(str(payload.get("referencia") or "").split())[:120]
+    observacion = str(payload.get("observacion") or "").strip()
+    try:
+        cantidad = Decimal(str(payload.get("cantidad") or "0")).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError):
+        cantidad = Decimal("0.00")
+    try:
+        fecha_vencimiento = date.fromisoformat(fecha_vencimiento_raw) if fecha_vencimiento_raw else None
+    except ValueError:
+        fecha_vencimiento = None
+
+    if not producto:
+        return JsonResponse({"ok": False, "error": "El producto no existe o no controla inventario."}, status=400)
+    if not bodega:
+        return JsonResponse({"ok": False, "error": "Selecciona una bodega activa de Hospital Mía."}, status=400)
+    if cantidad <= 0:
+        return JsonResponse({"ok": False, "error": "La cantidad debe ser mayor que cero."}, status=400)
+    if not numero_lote:
+        return JsonResponse({"ok": False, "error": "Escribe el número de lote."}, status=400)
+    if _empresa_usa_control_lotes_fefo(empresa) and not fecha_vencimiento:
+        return JsonResponse({"ok": False, "error": "La fecha de vencimiento es obligatoria para FEFO."}, status=400)
+
+    referencia_final = referencia or f"Carga rápida app · lote {numero_lote}"
+    observacion_final = observacion or "Entrada rápida registrada desde la app móvil."
+    try:
+        with transaction.atomic():
+            lote, creado = LoteInventario.objects.get_or_create(
+                empresa=empresa,
+                producto=producto,
+                numero_lote=numero_lote,
+                defaults={"fecha_vencimiento": fecha_vencimiento, "activo": True},
+            )
+            if not creado and lote.fecha_vencimiento and lote.fecha_vencimiento != fecha_vencimiento:
+                raise ValidationError(
+                    f"El lote {numero_lote} ya existe con vencimiento {lote.fecha_vencimiento.strftime('%d/%m/%Y')}."
+                )
+            campos_lote = []
+            if lote.fecha_vencimiento != fecha_vencimiento:
+                lote.fecha_vencimiento = fecha_vencimiento
+                campos_lote.append("fecha_vencimiento")
+            if not lote.activo:
+                lote.activo = True
+                campos_lote.append("activo")
+            if campos_lote:
+                lote.save(update_fields=campos_lote)
+            _registrar_movimiento_lote_bodega(
+                empresa=empresa,
+                bodega=bodega,
+                lote=lote,
+                tipo="entrada",
+                cantidad=cantidad,
+                referencia=referencia_final,
+                observacion=observacion_final,
+                usuario=request.user,
+            )
+            movimiento = _registrar_movimiento_inventario(
+                empresa=empresa,
+                producto=producto,
+                bodega=bodega,
+                tipo="entrada",
+                cantidad=cantidad,
+                referencia=referencia_final,
+                observacion=observacion_final,
+                usuario=request.user,
+            )
+    except ValidationError as exc:
+        return JsonResponse({"ok": False, "error": "; ".join(exc.messages)}, status=400)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "mensaje": f"Se agregaron {cantidad:.2f} unidades de {producto.nombre} en {bodega.nombre}.",
+            "existencia": float(movimiento.existencia_resultante),
+        }
+    )
+
+
+@login_required
 def entradas_inventario_dashboard(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     entradas = EntradaInventarioDocumento.objects.filter(empresa=empresa).prefetch_related('lineas').order_by('-fecha_documento', '-id')

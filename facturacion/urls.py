@@ -87,6 +87,7 @@ urlpatterns = [
     path('inventario/entradas/crear/', views.crear_entrada_inventario_documento, name='crear_entrada_inventario_documento'),
     path('inventario/entradas/<int:entrada_id>/', views.ver_entrada_inventario, name='ver_entrada_inventario'),
     path('inventario/ajuste/', views.ajustar_inventario, name='ajustar_inventario'),
+    path('inventario/ajuste/app/', views.entrada_inventario_rapida_app, name='entrada_inventario_rapida_app'),
     path('inventario/kardex/', views.kardex_inventario, name='kardex_inventario'),
     path('cai/', views.cai_facturacion, name='cai_facturacion'),
     path('cai/crear/', views.crear_cai, name='crear_cai_facturacion'),

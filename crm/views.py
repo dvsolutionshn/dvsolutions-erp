@@ -1948,6 +1948,10 @@ def agenda_mobile(request, empresa_slug):
         and request.user.tiene_permiso_erp("puede_inventario", empresa)
     )
     contexto["puede_ver_productos_app"] = puede_ver_productos_app
+    contexto["puede_alimentar_productos_app"] = bool(
+        puede_ver_productos_app
+        and request.user.tiene_permiso_erp("puede_ajustar_inventario", empresa)
+    )
     contexto["inventario_productos_app_payload"] = []
     if puede_ver_productos_app:
         productos_inventario = list(

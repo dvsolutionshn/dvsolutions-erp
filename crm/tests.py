@@ -1,5 +1,6 @@
 ﻿from datetime import date, datetime, timedelta
 from decimal import Decimal
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -21,6 +22,8 @@ from facturacion.models import (
     Factura,
     InventarioProducto,
     LoteInventario,
+    MovimientoInventario,
+    MovimientoLoteBodega,
     Producto,
 )
 from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClinico
@@ -210,6 +213,8 @@ class CRMTests(TestCase):
         self.assertContains(response, 'id="productos-app"')
         self.assertContains(response, "Buscar producto...")
         self.assertContains(response, "Próximos a vencer")
+        self.assertFalse(response.context["puede_alimentar_productos_app"])
+        self.assertNotContains(response, 'id="inventoryQuickEntryOpen"')
         payload = response.context["inventario_productos_app_payload"]
         self.assertEqual(len(payload), 1)
         self.assertEqual(payload[0]["nombre"], "Gomitas Capilares")
@@ -222,6 +227,116 @@ class CRMTests(TestCase):
             {"Principal", "Vitrina"},
         )
         self.assertNotContains(response, "Producto ajeno")
+
+    def test_app_hospital_mia_permite_alimentar_existencia_con_lote_y_bodega(self):
+        modulo_facturacion, _ = Modulo.objects.get_or_create(
+            codigo="facturacion",
+            defaults={"nombre": "Facturación", "es_comercial": True},
+        )
+        EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo_facturacion, activo=True)
+        self.rol.puede_inventario = True
+        self.rol.puede_ajustar_inventario = True
+        self.rol.save(update_fields=["puede_inventario", "puede_ajustar_inventario"])
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto sin existencia",
+            codigo="SIN-01",
+            tipo_item="producto",
+            precio=Decimal("125.00"),
+            controla_inventario=True,
+        )
+        bodega = BodegaInventario.objects.create(
+            empresa=self.empresa,
+            nombre="Principal",
+            tipo="principal",
+        )
+        otra_empresa = Empresa.objects.create(
+            nombre="Empresa ajena",
+            slug="empresa_ajena_entrada_app",
+            estado_licencia="activa",
+        )
+        bodega_ajena = BodegaInventario.objects.create(
+            empresa=otra_empresa,
+            nombre="Bodega ajena",
+            tipo="principal",
+        )
+        self.client.login(username="crmuser", password="pass12345")
+
+        response_app = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
+
+        self.assertEqual(response_app.status_code, 200)
+        self.assertTrue(response_app.context["puede_alimentar_productos_app"])
+        self.assertContains(response_app, 'id="inventoryQuickEntryOpen"')
+        self.assertContains(response_app, "Agregar existencia")
+        self.assertContains(
+            response_app,
+            reverse("entrada_inventario_rapida_app", args=[self.empresa.slug]),
+        )
+
+        vencimiento = timezone.localdate() + timedelta(days=180)
+        response = self.client.post(
+            reverse("entrada_inventario_rapida_app", args=[self.empresa.slug]),
+            data=json.dumps(
+                {
+                    "producto_id": producto.id,
+                    "bodega_id": bodega.id,
+                    "cantidad": "6.50",
+                    "numero_lote": "APP-001",
+                    "fecha_vencimiento": vencimiento.isoformat(),
+                    "referencia": "Compra rápida",
+                    "observacion": "Ingreso desde prueba móvil",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        inventario = InventarioProducto.objects.get(empresa=self.empresa, producto=producto)
+        self.assertEqual(inventario.existencias, Decimal("6.50"))
+        lote = LoteInventario.objects.get(empresa=self.empresa, producto=producto, numero_lote="APP-001")
+        self.assertEqual(lote.fecha_vencimiento, vencimiento)
+        self.assertEqual(
+            ExistenciaLoteBodega.objects.get(empresa=self.empresa, bodega=bodega, lote=lote).cantidad,
+            Decimal("6.50"),
+        )
+        self.assertTrue(
+            MovimientoInventario.objects.filter(
+                empresa=self.empresa,
+                producto=producto,
+                bodega=bodega,
+                tipo="entrada",
+                usuario=self.usuario,
+            ).exists()
+        )
+        self.assertTrue(
+            MovimientoLoteBodega.objects.filter(
+                empresa=self.empresa,
+                bodega=bodega,
+                lote=lote,
+                tipo="entrada",
+                usuario=self.usuario,
+            ).exists()
+        )
+
+        response_ajena = self.client.post(
+            reverse("entrada_inventario_rapida_app", args=[self.empresa.slug]),
+            data=json.dumps(
+                {
+                    "producto_id": producto.id,
+                    "bodega_id": bodega_ajena.id,
+                    "cantidad": "2.00",
+                    "numero_lote": "APP-002",
+                    "fecha_vencimiento": vencimiento.isoformat(),
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response_ajena.status_code, 400)
+        inventario.refresh_from_db()
+        self.assertEqual(inventario.existencias, Decimal("6.50"))
 
     def test_luque_sin_modulo_citas_programa_directamente_en_hospital_mia(self):
         self.empresa.tipo_solucion = "clinica"
