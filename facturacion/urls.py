@@ -2,9 +2,12 @@ from django.urls import path
 from . import views
 from .captura_rapida import captura_rapida
 from .importacion_clientes import importar_cliente
+from .acumulado_compras import acumulado_cliente, cuentas_cliente
 from .clientes_contables import clientes_contables, editar_cliente_contable, proveedores_cliente, panel_cliente_contable
 
 urlpatterns = [
+    path('libro-compras/clientes/<int:cliente_id>/acumulado/cuentas/', cuentas_cliente, name='cuentas_acumulado_cliente'),
+    path('libro-compras/clientes/<int:cliente_id>/acumulado/cuentas/<int:cuenta_id>/', cuentas_cliente, name='editar_cuenta_acumulado_cliente'),
     path('libro-compras/clientes/<int:cliente_id>/libros/<int:anio>/<int:mes>/importar/', importar_cliente, name='importar_compras_cliente'),
     path('libro-compras/propias/', views.libro_compras_fiscal, {'compras_propias': True}, name='libros_compras_propias'),
     path('libro-compras/clientes/', clientes_contables, name='clientes_contables'),
@@ -12,7 +15,7 @@ urlpatterns = [
     path('libro-compras/clientes/<int:cliente_id>/', panel_cliente_contable, name='panel_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/editar/', editar_cliente_contable, name='editar_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/libros/', captura_rapida, name='libros_cliente_contable'),
-    path('libro-compras/clientes/<int:cliente_id>/acumulado/', captura_rapida, {'acumulado': True}, name='acumulado_cliente_contable'),
+    path('libro-compras/clientes/<int:cliente_id>/acumulado/', acumulado_cliente, name='acumulado_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/libros/<int:anio>/<int:mes>/', captura_rapida, name='captura_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/proveedores/', proveedores_cliente, name='proveedores_cliente_contable'),
     path('libro-compras/clientes/<int:cliente_id>/proveedores/<int:proveedor_id>/editar/', proveedores_cliente, name='editar_proveedor_cliente_contable'),

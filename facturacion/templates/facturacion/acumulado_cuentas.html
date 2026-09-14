@@ -1,0 +1,73 @@
+{% extends "facturacion/compras_base.html" %}
+{% load custom_filters %}
+{% block title %}Acumulado de compras · {{ cliente.nombre }} · {{ anio }}{% endblock %}
+{% block header_title %}Acumulado por cuentas · {{ cliente.nombre }} · {{ anio }}{% endblock %}
+{% block header_description %}Costos y gastos de compras, sin ISV, por período del libro. Expresado en lempiras.{% endblock %}
+{% block extra_head %}{{ block.super }}<style>
+.acc-scroll{max-height:65vh;overflow:auto;border:1px solid #d5e3eb;border-radius:10px}
+.acc-table{border-collapse:separate;border-spacing:0;table-layout:fixed;width:100%;min-width:1710px;font-size:12px;font-variant-numeric:tabular-nums}
+.acc-table th,.acc-table td{padding:9px 10px;border-bottom:1px solid #e4edf3;white-space:nowrap;text-align:right;background:#fff}
+.acc-table thead th{position:sticky;top:0;background:#edf5f8;z-index:3;color:#325973}
+.acc-table th:first-child{position:sticky;left:0;min-width:260px;max-width:320px;white-space:normal;text-align:left;z-index:2;font-weight:500}
+.acc-table thead th:first-child{z-index:4}
+.acc-table td:last-child,.acc-table thead th:last-child{position:sticky;right:0;background:#e4eff6;box-shadow:-1px 0 #cadde5}
+.acc-table .grupo th{background:#dceeed;color:#086d70;font-weight:700}
+.acc-table .subtotal>*{background:#f0f7f7;font-weight:700}.acc-table .control>*{background:#e4eff6;font-weight:700}
+.acc-table .pendiente>*{background:#fff7e5;font-weight:700}.acc-table .alerta>*{background:#fff1f2;color:#a72635}
+.acc-table a{color:#086d70;text-decoration:underline;text-underline-offset:3px}
+.acc-info{padding:12px 16px;background:#edf5f8;border-radius:8px;margin:14px 0;line-height:1.6}
+.acc-actions{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:14px 0}
+.acc-actions select,.acc-actions input{padding:9px;border:1px solid #b9cedc;border-radius:7px;max-width:300px;background:white;color:#173042}
+.acc-actions label{display:flex;flex-direction:column;gap:5px;font-size:13px}.acc-error{color:#a72635}
+.acc-detail td{font-size:12px;vertical-align:top}.acc-detail .amount{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.acc-detail small{display:block;color:#526179}.acc-detail input[type=checkbox]{width:17px;height:17px;accent-color:#087a80}
+.acc-pagination{display:flex;gap:16px;align-items:center;margin-top:16px}
+</style>{% endblock %}
+{% block compras_content %}
+{% include "facturacion/_cliente_contable_nav.html" %}
+<section class="erp-card">
+<form method="get" class="purchase-filter"><div class="purchase-field"><label for="acc-year">Año del acumulado</label><input id="acc-year" name="anio" type="number" min="1" max="9999" value="{{ anio }}" required></div><button class="erp-action-link">Ver acumulado</button></form>
+<div class="acc-info"><strong>{{ documentos }} facturas activas · {{ pendientes }} por clasificar</strong><br>
+Cada importe usa el mes del libro, aunque la fecha de la factura sea anterior. Suma exentas, bases y exoneradas si existen; el ISV se muestra separado.
+<br>Esta etapa incluye compras. Ingresos, sueldos sin factura, depreciaciones y otros movimientos pendientes de incorporar no se interpretan como cero ni se calcula utilidad.</div>
+<div class="acc-actions"><a class="erp-action-link" href="#clasificar">Clasificar facturas</a>{% if puede_editar %}<a class="erp-action-link" href="{% url 'cuentas_acumulado_cliente' empresa.slug cliente.pk %}">Administrar cuentas</a>{% endif %}</div>
+<div class="acc-scroll"><table class="acc-table" id="acc-matrix"><colgroup><col style="width:280px"><col span="12" style="width:110px"><col style="width:140px"></colgroup><thead><tr><th>Cuenta</th>{% for numero, nombre in meses %}<th>{{ nombre }}</th>{% endfor %}<th>Acumulado {{ anio }}</th></tr></thead><tbody>
+{% for fila in filas %}
+{% if fila.tipo == 'grupo' %}<tr class="grupo"><th colspan="14">{{ fila.nombre }}</th></tr>
+{% else %}<tr class="{{ fila.tipo }}"><th>{{ fila.nombre }}{% if fila.cuenta and not fila.cuenta.activa %} · Inactiva{% endif %}</th>
+{% for importe in fila.importes %}<td>{% if fila.tipo == 'cuenta' or fila.tipo == 'pendiente' %}<a href="?anio={{ anio }}&amp;mes={{ forloop.counter }}&amp;cuenta={% if fila.cuenta %}{{ fila.cuenta.pk }}{% else %}pendiente{% endif %}#clasificar" aria-label="Ver {{ fila.nombre }}, mes {{ forloop.counter }}">{{ importe|compra_importe }}</a>{% else %}{{ importe|compra_importe }}{% endif %}</td>{% endfor %}
+<td><strong>{{ fila.total|compra_importe }}</strong></td></tr>{% endif %}
+{% endfor %}</tbody></table></div>
+{% if diferencia %}<p class="acc-error">Hay importes que no coinciden con las bases y el ISV registrados. Revisa las facturas del mes señalado antes de dar por conciliado el acumulado.</p>{% endif %}
+</section>
+<section class="erp-card" id="clasificar" style="margin-top:20px;scroll-margin-top:20px">
+<h2>Facturas del acumulado</h2><p>Filtra por mes, cuenta o proveedor. Cada factura tiene una cuenta y su importe proviene del libro original.</p>
+{% if error %}<p class="acc-error" role="alert">{{ error }}</p>{% endif %}
+<form method="get" class="acc-actions" action="#clasificar"><input type="hidden" name="anio" value="{{ anio }}">
+<label>Mes<select name="mes"><option value="0">Todo el año</option>{% for numero, nombre in meses %}<option value="{{ numero }}" {% if mes == numero %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select></label>
+<label>Cuenta<select name="cuenta"><option value="pendiente" {% if filtro_cuenta == 'pendiente' %}selected{% endif %}>Por clasificar</option><option value="todas" {% if filtro_cuenta == 'todas' %}selected{% endif %}>Todas</option>{% for cuenta in cuentas %}<option value="{{ cuenta.pk }}" {% if filtro_cuenta == cuenta.pk|stringformat:'s' %}selected{% endif %}>{{ cuenta.nombre }}</option>{% endfor %}</select></label>
+<label>Proveedor<input name="proveedor" value="{{ proveedor }}" placeholder="Buscar por nombre"></label><button class="erp-action-link">Filtrar facturas</button>
+</form>
+<p>{{ pagina.paginator.count }} facturas encontradas · Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</p>
+<form method="post" action="#clasificar" id="acc-classify-form">{% csrf_token %}
+{% if puede_editar %}<div class="acc-actions"><label>Asignar a cuenta<select name="cuenta_destino" required><option value="">Seleccionar cuenta…</option>{% for cuenta in cuentas %}{% if cuenta.activa %}<option value="{{ cuenta.pk }}">{{ cuenta.get_grupo_display }} · {{ cuenta.nombre }}</option>{% endif %}{% endfor %}<option value="pendiente">Quitar cuenta / dejar por clasificar</option></select></label><button class="erp-action-link" type="submit">Aplicar a seleccionadas</button><span id="acc-selected" aria-live="polite">0 seleccionadas</span></div>{% endif %}
+<div class="purchase-table-wrap"><table class="erp-table acc-detail" id="acc-detail"><thead><tr><th>{% if puede_editar %}<input type="checkbox" id="acc-select-page" aria-label="Seleccionar las facturas de esta página">{% endif %}</th><th>Libro</th><th>Fecha factura</th><th>Proveedor / Nº factura</th><th>Sin ISV</th><th>ISV</th><th>Total</th><th>Cuenta</th><th></th></tr></thead><tbody>
+{% for compra in pagina %}<tr><td>{% if puede_editar %}<input type="checkbox" name="registros" value="{{ compra.pk }}" aria-label="Seleccionar factura {{ compra.pk }}"><input type="hidden" name="version_{{ compra.pk }}" value="{{ compra.version_acumulado }}">{% endif %}</td><td>{{ compra.nombre_mes }} {{ anio }}</td><td>{{ compra.fecha_documento|date:'d/m/Y' }}</td><td>{{ compra.proveedor_nombre }}<small>{{ compra.numero_factura|default:'Sin número / ilegible' }} · Registro #{{ compra.pk }}</small></td><td class="amount">{{ compra.importe_acumulado|compra_importe }}</td><td class="amount">{{ compra.impuesto_total|compra_importe }}</td><td class="amount">{{ compra.total|compra_importe }}</td><td>{{ compra.cuenta_acumulado.nombre|default:'Por clasificar' }}{% if compra.clasificado_en %}<small>{{ compra.clasificado_por|default:'Usuario eliminado' }} · {{ compra.clasificado_en|date:'d/m/Y H:i' }}</small>{% endif %}</td><td><a class="erp-action-link" href="{% url 'captura_cliente_contable' empresa.slug cliente.pk anio compra.periodo_mes %}#book-row-{{ compra.pk }}" target="_blank" rel="noopener">Ver factura</a></td></tr>
+{% empty %}<tr><td colspan="9">No hay facturas para estos filtros.</td></tr>{% endfor %}
+</tbody></table></div></form>
+<nav class="acc-pagination" aria-label="Páginas de facturas">{% if pagina.has_previous %}<a class="erp-action-link" href="?{{ params }}&amp;pagina={{ pagina.previous_page_number }}#clasificar">Anterior</a>{% endif %}{% if pagina.has_next %}<a class="erp-action-link" href="?{{ params }}&amp;pagina={{ pagina.next_page_number }}#clasificar">Siguiente</a>{% endif %}</nav>
+{% if puede_editar %}<p>Seleccionar todo abarca únicamente esta página (hasta 100 facturas). Revisa las seleccionadas antes de aplicar la cuenta. Puedes reclasificar o quitar la cuenta posteriormente.</p>{% endif %}
+</section>
+<script>
+(() => {
+ const form = document.getElementById('acc-classify-form');
+ const all = document.getElementById('acc-select-page');
+ if (!all) return;
+ const items = [...form.querySelectorAll('[name=registros]')];
+ function update() {const n = items.filter(i => i.checked).length;document.getElementById('acc-selected').textContent = n + ' seleccionadas';all.checked = n > 0 && n === items.length;all.indeterminate = n > 0 && n < items.length;}
+ all.addEventListener('change', () => {items.forEach(i => i.checked = all.checked);update();});
+ items.forEach(i => i.addEventListener('change', update));
+ form.addEventListener('submit', event => {if (!items.some(i => i.checked)) {event.preventDefault();document.getElementById('acc-selected').textContent = 'Selecciona al menos una factura.';}});
+})();
+</script>
+{% endblock %}

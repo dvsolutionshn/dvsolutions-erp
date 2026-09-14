@@ -985,6 +985,29 @@ class LibroCompraMensual(models.Model):
         return f'{self.empresa_id} / {self.anio} / {self.mes}'
 
 
+class CuentaAcumuladoCompra(models.Model):
+    """Cuenta de presentación por cliente; no genera asientos ni guarda importes."""
+    GRUPOS = (('costo', 'Costo de producción y venta'),
+              ('gasto', 'Gastos de operación y administración'),
+              ('financiero', 'Gastos financieros'))
+    cliente_contable = models.ForeignKey(ClienteContable, on_delete=models.PROTECT, related_name='cuentas_acumulado')
+    nombre = models.CharField(max_length=200)
+    grupo = models.CharField(max_length=20, choices=GRUPOS)
+    orden = models.PositiveIntegerField(default=100)
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['orden', 'pk']
+        constraints = [models.UniqueConstraint(fields=['cliente_contable', 'nombre'], name='unique_cuenta_acumulado_cliente')]
+
+    def __str__(self):
+        return self.nombre
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class RegistroCompraFiscal(models.Model):
     ESTADOS = (
         ('registrada', 'Registrada'),
@@ -999,6 +1022,11 @@ class RegistroCompraFiscal(models.Model):
     proveedor_rtn = models.CharField(max_length=20, blank=True, null=True)
     numero_factura = models.CharField(max_length=120, blank=True)
     clave_importacion = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
+    cuenta_acumulado = models.ForeignKey(CuentaAcumuladoCompra, null=True, blank=True, on_delete=models.PROTECT,
+                                        related_name='compras')
+    clasificado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL,
+                                       related_name='compras_clasificadas')
+    clasificado_en = models.DateTimeField(null=True, blank=True)
     # La captura rapida completa estos campos sin reescribir el historial.
     numero_factura_normalizado = models.CharField(max_length=120, null=True, blank=True)
     identidad_captura = models.CharField(max_length=40, null=True, blank=True, editable=False)
@@ -1051,6 +1079,8 @@ class RegistroCompraFiscal(models.Model):
             raise ValidationError({'proveedor': 'El proveedor debe pertenecer a la misma empresa y cliente contable.'})
         if self.cliente_contable_id and self.clasificacion_contable_id:
             raise ValidationError('No se comparten clasificaciones de la administradora con clientes contables.')
+        if self.cuenta_acumulado_id and self.cuenta_acumulado.cliente_contable_id != self.cliente_contable_id:
+            raise ValidationError({'cuenta_acumulado': 'La cuenta debe pertenecer al mismo cliente contable.'})
         if not self.numero_factura and not (self.cliente_contable_id and self.clave_importacion):
             raise ValidationError({'numero_factura': 'El número es obligatorio fuera de una importación histórica.'})
         if self.fecha_documento:

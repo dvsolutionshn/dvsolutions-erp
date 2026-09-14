@@ -1,0 +1,11 @@
+{% extends "facturacion/compras_base.html" %}
+{% block title %}Cuentas del acumulado · {{ cliente.nombre }}{% endblock %}
+{% block header_title %}Cuentas del acumulado · {{ cliente.nombre }}{% endblock %}
+{% block compras_content %}
+{% include "facturacion/_cliente_contable_nav.html" %}
+<section class="erp-card"><a class="erp-action-link" href="{% url 'acumulado_cliente_contable' empresa.slug cliente.pk %}?anio={{ anio }}">Volver al acumulado</a>
+<h2>{% if cuenta %}Editar cuenta{% else %}Agregar cuenta{% endif %}</h2>
+<p>El catálogo pertenece a este cliente. Cambiar el nombre o grupo actualiza la presentación de sus compras clasificadas; desactivarla impide nuevas asignaciones y conserva las anteriores.</p>
+<form method="post" class="purchase-form">{% csrf_token %}{{ form.as_p }}<button class="erp-action-link">Guardar cuenta</button>{% if cuenta %}<a class="erp-action-link" href="{% url 'cuentas_acumulado_cliente' empresa.slug cliente.pk %}">Cancelar edición</a>{% endif %}</form></section>
+<section class="erp-card" style="margin-top:20px"><div class="purchase-table-wrap"><table class="erp-table"><thead><tr><th>Cuenta</th><th>Grupo</th><th>Orden</th><th>Estado</th><th></th></tr></thead><tbody>{% for c in cuentas %}<tr><td>{{ c.nombre }}</td><td>{{ c.get_grupo_display }}</td><td>{{ c.orden }}</td><td>{{ c.activa|yesno:'Activa,Inactiva' }}</td><td><a class="erp-action-link" href="{% url 'editar_cuenta_acumulado_cliente' empresa.slug cliente.pk c.pk %}">Editar</a></td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

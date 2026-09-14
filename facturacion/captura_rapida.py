@@ -189,6 +189,7 @@ def serializar(registro):
                  numero=registro.numero_factura, estado=registro.get_estado_display(),
                  estado_codigo=registro.estado, exonerado=f'{registro.exonerado:.2f}',
                  periodo_anio=registro.periodo_anio, periodo_mes=registro.periodo_mes,
+                 cuenta_acumulado_id=registro.cuenta_acumulado_id,
                  **{campo: f'{getattr(registro, campo):.2f}' for campo in MONTOS_LIBRO})
     datos['version'] = hashlib.sha256(json.dumps(datos, sort_keys=True).encode()).hexdigest()
     return datos
