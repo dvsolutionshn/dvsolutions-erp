@@ -19,9 +19,9 @@
     <div class="rx-finder">
         <div class="rx-search-shell">
             <span class="rx-search-icon" aria-hidden="true">⌕</span>
-            <input class="rx-search" type="search" autocomplete="off" placeholder="Buscar por nombre o código…" data-rx-search aria-label="Buscar medicamento">
+            <input class="rx-search" type="search" autocomplete="off" placeholder="Buscar por nombre o código…" data-rx-search aria-label="Buscar medicamento" role="combobox" aria-autocomplete="list" aria-controls="rxMedicationResults" aria-expanded="false">
         </div>
-        <div class="rx-results" data-rx-results></div>
+        <div class="rx-results" id="rxMedicationResults" data-rx-results role="listbox"></div>
     </div>
     <div class="rx-selected" data-rx-selected></div>
     <div class="rx-empty" data-rx-empty>Empiece buscando un medicamento. Las opciones aparecerán en vivo mientras escribe.</div>
@@ -41,6 +41,7 @@
     const empty = root.querySelector("[data-rx-empty]");
     const count = root.querySelector("[data-rx-count]");
     let lines = [];
+    let suppressNextFocus = false;
 
     const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const clean = value => String(value == null ? "" : value);
@@ -136,17 +137,31 @@
         renderLines();
     }
 
+    function closeResults(){
+        results.classList.remove("is-open");
+        search.setAttribute("aria-expanded", "false");
+    }
+    function openResults(){
+        if(!results.children.length){ closeResults(); return; }
+        results.classList.add("is-open");
+        search.setAttribute("aria-expanded", "true");
+    }
+    function returnToSearch(){
+        suppressNextFocus = true;
+        search.focus({preventScroll:true});
+        closeResults();
+    }
     function renderResults(){
         const query = normalize(search.value);
         results.replaceChildren();
-        if(!query){ results.classList.remove("is-open"); return; }
-        const matches = catalog.filter(function(item){
+        const matches = (query ? catalog.filter(function(item){
             return normalize(item.nombre + " " + (item.codigo || "") + " " + (item.descripcion || "")).includes(query);
-        }).slice(0, 10);
+        }).slice(0, 10) : catalog);
         matches.forEach(function(item){
             const button = document.createElement("button");
             button.type = "button";
             button.className = "rx-result";
+            button.setAttribute("role", "option");
             const text = document.createElement("span");
             const title = document.createElement("strong");
             title.textContent = item.nombre;
@@ -160,47 +175,74 @@
             button.addEventListener("click", function(){
                 addLine({producto_id:item.id, nombre:item.nombre});
                 search.value = "";
-                results.classList.remove("is-open");
-                search.focus();
+                returnToSearch();
             });
             results.appendChild(button);
         });
-        const manual = document.createElement("button");
-        manual.type = "button";
-        manual.className = "rx-result rx-result-action";
-        const manualText = document.createElement("span");
-        const manualTitle = document.createElement("strong");
-        manualTitle.textContent = "Agregar «" + search.value.trim() + "»";
-        const manualDetail = document.createElement("small");
-        manualDetail.textContent = "Usar como medicamento externo al catálogo";
-        manualText.append(manualTitle, manualDetail);
-        const manualMark = document.createElement("span");
-        manualMark.className = "rx-result-mark";
-        manualMark.textContent = "✎";
-        manual.append(manualText, manualMark);
-        manual.addEventListener("click", function(){
-            const value = search.value.trim();
-            if(value){ addLine({medicamento_manual:value, nombre:value}); }
-            search.value = "";
-            results.classList.remove("is-open");
-            search.focus();
-        });
-        results.appendChild(manual);
-        results.classList.add("is-open");
+        if(query){
+            const manual = document.createElement("button");
+            manual.type = "button";
+            manual.className = "rx-result rx-result-action";
+            manual.setAttribute("role", "option");
+            const manualText = document.createElement("span");
+            const manualTitle = document.createElement("strong");
+            manualTitle.textContent = "Agregar «" + search.value.trim() + "»";
+            const manualDetail = document.createElement("small");
+            manualDetail.textContent = "Usar como medicamento externo al catálogo";
+            manualText.append(manualTitle, manualDetail);
+            const manualMark = document.createElement("span");
+            manualMark.className = "rx-result-mark";
+            manualMark.textContent = "✎";
+            manual.append(manualText, manualMark);
+            manual.addEventListener("click", function(){
+                const value = search.value.trim();
+                if(value){ addLine({medicamento_manual:value, nombre:value}); }
+                search.value = "";
+                returnToSearch();
+            });
+            results.appendChild(manual);
+        }
+        openResults();
     }
 
     search.addEventListener("input", renderResults);
-    search.addEventListener("focus", renderResults);
+    search.addEventListener("focus", function(){
+        if(suppressNextFocus){ suppressNextFocus = false; return; }
+        renderResults();
+    });
+    search.addEventListener("click", renderResults);
     search.addEventListener("keydown", function(event){
         if(event.key === "Enter"){
             event.preventDefault();
             const first = results.querySelector(".rx-result");
             if(first){ first.click(); }
         }
-        if(event.key === "Escape"){ results.classList.remove("is-open"); }
+        if(event.key === "ArrowDown"){
+            event.preventDefault();
+            if(!results.classList.contains("is-open")){ renderResults(); }
+            const first = results.querySelector(".rx-result");
+            if(first){ first.focus(); }
+        }
+        if(event.key === "Escape"){ closeResults(); }
+    });
+    results.addEventListener("keydown", function(event){
+        const options = Array.from(results.querySelectorAll(".rx-result"));
+        const current = options.indexOf(document.activeElement);
+        if(event.key === "ArrowDown" && current >= 0){
+            event.preventDefault();
+            options[Math.min(current + 1, options.length - 1)].focus();
+        }
+        if(event.key === "ArrowUp" && current >= 0){
+            event.preventDefault();
+            if(current === 0){ search.focus(); } else { options[current - 1].focus(); }
+        }
+        if(event.key === "Escape"){
+            event.preventDefault();
+            returnToSearch();
+        }
     });
     document.addEventListener("click", function(event){
-        if(!root.contains(event.target)){ results.classList.remove("is-open"); }
+        if(!root.contains(event.target)){ closeResults(); }
     });
 
     lines = initial.map(item => ({...item}));

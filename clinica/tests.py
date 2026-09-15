@@ -1463,6 +1463,10 @@ class ClinicaPacienteTests(TestCase):
                 {item["id"] for item in response.context["catalogo_medicamentos"]},
                 ids_spa,
             )
+            self.assertContains(response, 'role="combobox"', html=False)
+            self.assertContains(response, 'search.addEventListener("click", renderResults)', html=False)
+            self.assertContains(response, 'const matches = (query ? catalog.filter', html=False)
+            self.assertContains(response, 'event.key === "ArrowDown"', html=False)
 
         response_hospital = self.client.get(
             reverse(
