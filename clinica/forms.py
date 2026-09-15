@@ -41,6 +41,27 @@ RH_CHOICES = [
 ]
 
 
+EMPRESAS_RECETA_CATALOGO_MEDICAL_SPA = frozenset({
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+})
+
+
+def productos_disponibles_receta(empresa):
+    """Catálogo visible únicamente al prescribir; no altera propiedad ni inventario."""
+    from core.models import Empresa
+    from facturacion.models import Producto
+
+    disponibles = Producto.objects.filter(activo=True, eliminado=False)
+    if empresa.slug == "hospital_mia":
+        return disponibles.none()
+    if empresa.slug in EMPRESAS_RECETA_CATALOGO_MEDICAL_SPA:
+        empresa_catalogo_id = Empresa.objects.filter(slug="medical_spa").values_list("id", flat=True).first()
+        return disponibles.filter(empresa_id=empresa_catalogo_id) if empresa_catalogo_id else disponibles.none()
+    return disponibles.filter(empresa=empresa)
+
+
 class BaseClinicaForm(forms.ModelForm):
     def __init__(self, *args, empresa=None, **kwargs):
         self.empresa = empresa
@@ -640,9 +661,7 @@ class RecetaMedicaForm(BaseClinicaForm):
         self.fields["manuales"].queryset = ManualReceta.objects.none()
         self.fields["manuales"].help_text = "Opcional. Puede seleccionar uno o varios PDF activos."
         if empresa:
-            from facturacion.models import Producto
-
-            self.fields["productos"].queryset = Producto.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            self.fields["productos"].queryset = productos_disponibles_receta(empresa).order_by("nombre")
             self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
             self.fields["manuales"].queryset = ManualReceta.objects.filter(empresa=empresa, activo=True).order_by("titulo")
         self.fields["productos"].widget.attrs.update({"size": "8"})

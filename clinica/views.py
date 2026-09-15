@@ -68,6 +68,7 @@ from .forms import (
     PreconsultaClinicaPublicaForm,
     ProfesionalSaludForm,
     RecetaMedicaForm,
+    productos_disponibles_receta,
     PlantillaRecetaForm,
     ServicioClinicoForm,
     TratamientoPacienteForm,
@@ -1637,7 +1638,7 @@ def consentimientos_paciente(request, empresa_slug, paciente_id):
 
 def _catalogo_medicamentos_receta(empresa):
     return list(
-        Producto.objects.filter(empresa=empresa, activo=True, eliminado=False)
+        productos_disponibles_receta(empresa)
         .order_by("nombre")
         .values("id", "nombre", "codigo", "descripcion")
     )
@@ -1669,12 +1670,7 @@ def _extraer_lineas_receta(post_data, empresa):
             continue
     productos = {
         producto.id: producto
-        for producto in Producto.objects.filter(
-            empresa=empresa,
-            activo=True,
-            eliminado=False,
-            id__in=ids_validos,
-        )
+        for producto in productos_disponibles_receta(empresa).filter(id__in=ids_validos)
     }
 
     lineas = []
