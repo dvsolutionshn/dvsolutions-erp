@@ -119,6 +119,27 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+## 9.1 Automatizaciones del CRM
+
+El temporizador procesa las confirmaciones y recordatorios de citas de todas las
+empresas que tengan el CRM y WhatsApp habilitados. No se debe crear un cron por
+empresa.
+
+```bash
+sudo cp deploy/crm-automatizaciones.service /etc/systemd/system/dvsolutions-crm-automatizaciones.service
+sudo cp deploy/crm-automatizaciones.timer /etc/systemd/system/dvsolutions-crm-automatizaciones.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now dvsolutions-crm-automatizaciones.timer
+sudo systemctl status dvsolutions-crm-automatizaciones.timer
+```
+
+Para comprobar una ejecución sin esperar al temporizador:
+
+```bash
+sudo systemctl start dvsolutions-crm-automatizaciones.service
+sudo journalctl -u dvsolutions-crm-automatizaciones.service -n 50 --no-pager
+```
+
 ## 10. SSL gratis con Certbot
 
 ```bash

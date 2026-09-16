@@ -213,6 +213,8 @@ def enviar_plantilla_cita_whatsapp(
         "confirmacion de cita": getattr(config, "mensaje_cita_confirmacion", "") or "confirmacion de cita",
         "confirmaciÃ³n de cita": getattr(config, "mensaje_cita_confirmacion", "") or "confirmacion de cita",
         "recordatorio: falta una semana": getattr(config, "mensaje_cita_recordatorio_7_dias", "") or "recordatorio: falta una semana",
+        "recordatorio: faltan cinco dias": getattr(config, "mensaje_cita_recordatorio_7_dias", "") or "recordatorio: faltan cinco dias",
+        "recordatorio: faltan tres dias": getattr(config, "mensaje_cita_recordatorio_3_dias", "") or "recordatorio: faltan tres dias",
         "recordatorio: su cita es maÃ±ana": getattr(config, "mensaje_cita_recordatorio_1_dia", "") or "recordatorio: su cita es manana",
         "recordatorio: su cita es manana": getattr(config, "mensaje_cita_recordatorio_1_dia", "") or "recordatorio: su cita es manana",
         "cita cancelada": getattr(config, "mensaje_cita_cancelada", "") or "cita cancelada",

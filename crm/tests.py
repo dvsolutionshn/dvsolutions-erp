@@ -1649,12 +1649,15 @@ class CRMTests(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         cita = CitaCliente.objects.get(empresa=self.empresa, paciente=paciente)
-        self.assertEqual(cita.notificaciones_whatsapp.count(), 3)
+        self.assertEqual(cita.notificaciones_whatsapp.count(), 4)
         confirmacion = cita.notificaciones_whatsapp.get(tipo="confirmacion")
         self.assertEqual(confirmacion.estado, "enviado")
         semana = cita.notificaciones_whatsapp.get(tipo="semana")
         self.assertEqual(timezone.localtime(semana.programada_para).hour, 9)
         self.assertEqual(timezone.localtime(semana.programada_para).minute, 0)
+        tres_dias = cita.notificaciones_whatsapp.get(tipo="tres_dias")
+        self.assertEqual(timezone.localtime(tres_dias.programada_para).hour, 9)
+        self.assertEqual(timezone.localtime(tres_dias.programada_para).minute, 0)
         dia = cita.notificaciones_whatsapp.get(tipo="dia")
         self.assertEqual(timezone.localtime(dia.programada_para).hour, 9)
         self.assertEqual(timezone.localtime(dia.programada_para).minute, 0)
@@ -2352,6 +2355,19 @@ class CRMTests(TestCase):
         self.assertEqual(resultado["enviadas"], 2)
         self.assertEqual(NotificacionCumpleanosWhatsApp.objects.filter(empresa=self.empresa, estado="enviado").count(), 2)
         self.assertEqual(mock_enviar.call_count, 2)
+
+    def test_servicios_medicos_habilita_notificaciones_whatsapp_de_citas(self):
+        servicios = Empresa.objects.create(
+            nombre="Servicios Medicos Gonzalez",
+            slug="serviciosmedicos",
+            rtn="0801199900999",
+            tipo_solucion="clinica",
+        )
+
+        form = CitaClienteForm(empresa=servicios)
+
+        self.assertTrue(form.notificaciones_cita_activas)
+        self.assertFalse(form.fields["enviar_confirmacion_whatsapp"].widget.is_hidden)
 
     @patch("crm.views.enviar_plantilla_marketing_whatsapp")
     def test_enviar_campania_por_api_actualiza_envios(self, mock_enviar):

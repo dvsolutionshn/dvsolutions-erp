@@ -1149,13 +1149,13 @@ html.calendar-modal-open,body.calendar-modal-open{overflow:hidden!important}
             {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
             {% for error in form.cirugia_periodo_fin.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}
           </div>
-          {% elif field.name == "pagada" or field.name == "cortesia" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
+          {% elif field.name == "pagada" or field.name == "cortesia" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_tres_dias_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
           <div class="erp-field appointment-toggle {% if field.name == 'pagada' %}is-paid{% elif field.name == 'cortesia' %}is-courtesy{% elif field.name == 'enviar_confirmacion_whatsapp' %}is-whatsapp{% endif %}" data-field-name="{{ field.name }}">
             <label class="appointment-toggle-card" for="{{ field.id_for_label }}">
               {{ field }}
               <span class="appointment-toggle-copy">
                 <strong>{{ field.label }}</strong>
-                <small>{% if field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al paciente al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Enviar aviso siete días antes.{% else %}Enviar aviso un día antes.{% endif %}</small>
+                <small>{% if field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al paciente al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Enviar aviso cinco días antes.{% elif field.name == "recordatorio_tres_dias_whatsapp" %}Enviar aviso tres días antes.{% else %}Enviar aviso un día antes.{% endif %}</small>
               </span>
             </label>
             {% for error in field.errors %}<div class="erp-field-help" style="color:#9f1239">{{ error }}</div>{% endfor %}

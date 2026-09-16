@@ -280,6 +280,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
             "observacion": cita.observaciones or cita.motivo,
             "enviar_confirmacion_whatsapp": not es_recordatorio,
             "recordatorio_semana_whatsapp": True,
+            "recordatorio_tres_dias_whatsapp": True,
             "recordatorio_dia_whatsapp": True,
         },
     )
@@ -296,6 +297,7 @@ def _sincronizar_agenda_desde_cita_clinica(cita):
     agenda.observacion = cita.observaciones or cita.motivo
     agenda.enviar_confirmacion_whatsapp = not es_recordatorio
     agenda.recordatorio_semana_whatsapp = True
+    agenda.recordatorio_tres_dias_whatsapp = True
     agenda.recordatorio_dia_whatsapp = True
     agenda.save()
 

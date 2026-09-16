@@ -31,6 +31,7 @@ class ConfiguracionCRM(models.Model):
     whatsapp_cita_incluir_enlace = models.BooleanField(default=False)
     mensaje_cita_confirmacion = models.TextField(default="confirmacion de cita")
     mensaje_cita_recordatorio_7_dias = models.TextField(default="recordatorio: falta una semana")
+    mensaje_cita_recordatorio_3_dias = models.TextField(default="recordatorio: faltan tres dias")
     mensaje_cita_recordatorio_1_dia = models.TextField(default="recordatorio: su cita es manana")
     mensaje_cita_cancelada = models.TextField(default="cita cancelada")
     mensaje_cita_reagendada = models.TextField(default="cita reagendada")
@@ -193,6 +194,7 @@ class CitaCliente(models.Model):
     sesion_servicio = models.PositiveSmallIntegerField(blank=True, null=True)
     enviar_confirmacion_whatsapp = models.BooleanField(default=False)
     recordatorio_semana_whatsapp = models.BooleanField(default=True)
+    recordatorio_tres_dias_whatsapp = models.BooleanField(default=True)
     recordatorio_dia_whatsapp = models.BooleanField(default=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
@@ -811,10 +813,12 @@ class CitaCirugiaFoto(models.Model):
 class NotificacionCitaWhatsApp(models.Model):
     TIPO_CONFIRMACION = "confirmacion"
     TIPO_SEMANA = "semana"
+    TIPO_TRES_DIAS = "tres_dias"
     TIPO_DIA = "dia"
     TIPO_CHOICES = [
         (TIPO_CONFIRMACION, "Confirmación al crear"),
-        (TIPO_SEMANA, "Recordatorio 7 días antes"),
+        (TIPO_SEMANA, "Recordatorio 5 días antes"),
+        (TIPO_TRES_DIAS, "Recordatorio 3 días antes"),
         (TIPO_DIA, "Recordatorio 1 día antes"),
     ]
     ESTADO_CHOICES = [

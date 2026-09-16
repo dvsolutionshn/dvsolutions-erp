@@ -749,13 +749,13 @@
           {% endif %}
           <div class="errors">{{ field.errors }}</div>
         </div>
-        {% elif field.name == "pagada" or field.name == "cortesia" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
+        {% elif field.name == "pagada" or field.name == "cortesia" or field.name == "enviar_confirmacion_whatsapp" or field.name == "recordatorio_semana_whatsapp" or field.name == "recordatorio_tres_dias_whatsapp" or field.name == "recordatorio_dia_whatsapp" %}
         <div class="field mobile-appointment-toggle {% if field.name == 'pagada' %}is-paid{% elif field.name == 'cortesia' %}is-courtesy{% elif field.name == 'enviar_confirmacion_whatsapp' %}is-whatsapp{% endif %}" data-field-name="{{ field.name }}">
           <label class="mobile-appointment-toggle-card" for="{{ field.id_for_label }}">
             {{ field }}
             <span class="mobile-appointment-toggle-copy">
               <strong>{{ field.label }}</strong>
-              <small>{% if field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Avisar siete días antes.{% else %}Avisar un día antes.{% endif %}</small>
+              <small>{% if field.name == "pagada" %}La atención ya fue pagada.{% elif field.name == "cortesia" %}Registrar esta atención como cortesía.{% elif field.name == "enviar_confirmacion_whatsapp" %}Notificar al guardar la cita.{% elif field.name == "recordatorio_semana_whatsapp" %}Avisar cinco días antes.{% elif field.name == "recordatorio_tres_dias_whatsapp" %}Avisar tres días antes.{% else %}Avisar un día antes.{% endif %}</small>
             </span>
           </label>
           <div class="errors">{{ field.errors }}</div>

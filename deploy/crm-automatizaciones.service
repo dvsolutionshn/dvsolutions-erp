@@ -1,0 +1,15 @@
+[Unit]
+Description=DV Solutions - automatizaciones del CRM
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dvsolutions
+Group=dvsolutions
+WorkingDirectory=/opt/dvsolutions/repo
+EnvironmentFile=/opt/dvsolutions/repo/.env.production
+ExecStart=/opt/dvsolutions/repo/venv/bin/python manage.py procesar_recordatorios_citas
+
+[Install]
+WantedBy=multi-user.target

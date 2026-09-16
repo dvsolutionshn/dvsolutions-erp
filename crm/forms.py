@@ -8,6 +8,7 @@ from django.utils import timezone
 from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
 
+from .constants import EMPRESAS_WHATSAPP_CITAS
 from .models import (
     CampaniaMarketing,
     CitaCliente,
@@ -341,6 +342,7 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_cita_incluir_enlace",
             "mensaje_cita_confirmacion",
             "mensaje_cita_recordatorio_7_dias",
+            "mensaje_cita_recordatorio_3_dias",
             "mensaje_cita_recordatorio_1_dia",
             "mensaje_cita_cancelada",
             "mensaje_cita_reagendada",
@@ -357,6 +359,7 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_token": forms.PasswordInput(render_value=True),
             "mensaje_cita_confirmacion": forms.Textarea(attrs={"rows": 2}),
             "mensaje_cita_recordatorio_7_dias": forms.Textarea(attrs={"rows": 2}),
+            "mensaje_cita_recordatorio_3_dias": forms.Textarea(attrs={"rows": 2}),
             "mensaje_cita_recordatorio_1_dia": forms.Textarea(attrs={"rows": 2}),
             "mensaje_cita_cancelada": forms.Textarea(attrs={"rows": 2}),
             "mensaje_cita_reagendada": forms.Textarea(attrs={"rows": 2}),
@@ -364,7 +367,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
         labels = {
             "whatsapp_cita_incluir_enlace": "La plantilla de citas incluye enlace de confirmacion",
             "mensaje_cita_confirmacion": "Texto para confirmacion de cita",
-            "mensaje_cita_recordatorio_7_dias": "Texto para recordatorio 7 dias antes",
+            "mensaje_cita_recordatorio_7_dias": "Texto para recordatorio 5 dias antes",
+            "mensaje_cita_recordatorio_3_dias": "Texto para recordatorio 3 dias antes",
             "mensaje_cita_recordatorio_1_dia": "Texto para recordatorio 1 dia antes",
             "mensaje_cita_cancelada": "Texto para cita cancelada",
             "mensaje_cita_reagendada": "Texto para cita reagendada",
@@ -385,7 +389,8 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "whatsapp_idioma_cita": "Código de idioma aprobado para la plantilla de citas, normalmente es.",
             "whatsapp_cita_incluir_enlace": "Activalo solo cuando la plantilla aprobada en Meta tenga la variable del enlace para confirmar o cancelar la cita.",
             "mensaje_cita_confirmacion": "Texto que viaja como variable aviso. Ejemplo: confirmacion de cita.",
-            "mensaje_cita_recordatorio_7_dias": "Texto que viaja como variable aviso. Ejemplo: recordatorio: falta una semana.",
+            "mensaje_cita_recordatorio_7_dias": "Texto que viaja como variable aviso. Ejemplo: recordatorio: faltan cinco dias.",
+            "mensaje_cita_recordatorio_3_dias": "Texto que viaja como variable aviso. Ejemplo: recordatorio: faltan tres dias.",
             "mensaje_cita_recordatorio_1_dia": "Texto que viaja como variable aviso. Ejemplo: recordatorio: su cita es manana.",
             "mensaje_cita_cancelada": "Texto que viaja como variable aviso cuando se cancela desde el calendario.",
             "mensaje_cita_reagendada": "Texto que viaja como variable aviso cuando se cambia la fecha u hora.",
@@ -429,7 +434,7 @@ class CampaniaMarketingForm(forms.ModelForm):
 
 
 class CitaClienteForm(forms.ModelForm):
-    EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
+    EMPRESAS_WHATSAPP_CITAS = EMPRESAS_WHATSAPP_CITAS
     EMPRESAS_CIRUGIA_EXTENDIDA = {"hospital_mia", "serviciosmedicos"}
     CAPACIDAD_RECURSOS_AGENDA = {
         "tratamientos": {"nombre": "Tratamientos", "capacidad": 4},
@@ -486,7 +491,7 @@ class CitaClienteForm(forms.ModelForm):
 
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cortesia", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cortesia", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "cirugia_detalle": forms.Textarea(attrs={"rows": 3, "placeholder": "Ejemplo: Abdominoplastia con liposuccion, zona a operar, preparacion especial o detalle clinico."}),
@@ -676,18 +681,20 @@ class CitaClienteForm(forms.ModelForm):
             self.fields["pagada"].label = "Cita pagada"
             self.fields["cortesia"].label = "Cita de cortesía"
             self.fields["enviar_confirmacion_whatsapp"].label = "Enviar confirmación por WhatsApp al guardar"
-            self.fields["recordatorio_semana_whatsapp"].label = "Recordar 7 días antes"
+            self.fields["recordatorio_semana_whatsapp"].label = "Recordar 5 días antes"
+            self.fields["recordatorio_tres_dias_whatsapp"].label = "Recordar 3 días antes"
             self.fields["recordatorio_dia_whatsapp"].label = "Recordar 1 día antes"
             if self.notificaciones_cita_activas and not (self.instance and self.instance.pk):
                 self.initial.setdefault("enviar_confirmacion_whatsapp", True)
                 self.initial.setdefault("recordatorio_semana_whatsapp", True)
+                self.initial.setdefault("recordatorio_tres_dias_whatsapp", True)
                 self.initial.setdefault("recordatorio_dia_whatsapp", True)
             if not self.notificaciones_cita_activas:
-                for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
+                for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "cortesia", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "cortesia", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"])
         else:
-            for nombre in ["paciente", "servicio_clinico", "profesional_salud", "cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_dia_whatsapp"]:
+            for nombre in ["paciente", "servicio_clinico", "profesional_salud", "cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre, None)
             self.fields["pagada"].label = "Cita pagada"
             self.fields["cortesia"].label = "Cita de cortesía"

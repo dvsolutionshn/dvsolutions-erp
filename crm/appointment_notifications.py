@@ -6,11 +6,11 @@ from django.utils import timezone
 
 from facturacion.models import Cliente
 
+from .constants import EMPRESAS_WHATSAPP_CITAS
 from .models import CitaCliente, ConfiguracionCRM, NotificacionCitaWhatsApp, NotificacionCumpleanosWhatsApp, PlantillaMensaje
 from .services import WhatsAppAPIError, enviar_plantilla_cita_whatsapp, enviar_plantilla_marketing_whatsapp
 from .tokens import construir_url_respuesta_cita
 
-EMPRESAS_WHATSAPP_CITAS = {"hospital_mia", "medical_spa", "luque_aestetic"}
 HORA_RECORDATORIO_CITA = time(9, 0)
 
 
@@ -35,7 +35,8 @@ def programar_notificaciones_cita(cita, ahora=None):
 
     reglas = [
         (NotificacionCitaWhatsApp.TIPO_CONFIRMACION, cita.enviar_confirmacion_whatsapp, ahora),
-        (NotificacionCitaWhatsApp.TIPO_SEMANA, cita.recordatorio_semana_whatsapp, a_las_nueve(7)),
+        (NotificacionCitaWhatsApp.TIPO_SEMANA, cita.recordatorio_semana_whatsapp, a_las_nueve(5)),
+        (NotificacionCitaWhatsApp.TIPO_TRES_DIAS, cita.recordatorio_tres_dias_whatsapp, a_las_nueve(3)),
         (NotificacionCitaWhatsApp.TIPO_DIA, cita.recordatorio_dia_whatsapp, a_las_nueve(1)),
     ]
     resultado = []
@@ -93,7 +94,8 @@ def procesar_notificacion(notificacion_id, ahora=None):
         local = timezone.localtime(cita.fecha_hora)
         aviso = {
             "confirmacion": "confirmación de cita",
-            "semana": "recordatorio: falta una semana",
+            "semana": "recordatorio: faltan cinco dias",
+            "tres_dias": "recordatorio: faltan tres dias",
             "dia": "recordatorio: su cita es mañana",
         }[notificacion.tipo]
         try:

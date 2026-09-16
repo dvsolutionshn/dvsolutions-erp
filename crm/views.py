@@ -699,6 +699,7 @@ def _guardar_cita_formulario(request, empresa, form, objeto=None):
         if empresa.slug in CitaClienteForm.EMPRESAS_WHATSAPP_CITAS:
             cita_base.enviar_confirmacion_whatsapp = True
             cita_base.recordatorio_semana_whatsapp = True
+            cita_base.recordatorio_tres_dias_whatsapp = True
             cita_base.recordatorio_dia_whatsapp = True
         grupo = cita_base.grupo_atencion or (uuid.uuid4() if detalles else None)
         creadas = []
@@ -722,6 +723,7 @@ def _guardar_cita_formulario(request, empresa, form, objeto=None):
                     duracion_minutos=cita_base.duracion_minutos,
                     enviar_confirmacion_whatsapp=False,
                     recordatorio_semana_whatsapp=cita_base.recordatorio_semana_whatsapp,
+                    recordatorio_tres_dias_whatsapp=cita_base.recordatorio_tres_dias_whatsapp,
                     recordatorio_dia_whatsapp=cita_base.recordatorio_dia_whatsapp,
                 )
             if detalle:
