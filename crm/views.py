@@ -4,9 +4,13 @@ import logging
 import re
 import unicodedata
 import uuid
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 
 from django.contrib import messages
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.db.models import Count, Q
@@ -991,7 +995,84 @@ def configuracion_crm(request, empresa_slug):
         form.save()
         messages.success(request, "Configuracion CRM actualizada correctamente.")
         return redirect("crm_dashboard", empresa_slug=empresa.slug)
-    return render(request, "crm/form.html", {"empresa": empresa, "form": form, "titulo": "Configuracion CRM"})
+    response = render(
+        request,
+        "crm/form.html",
+        {
+            "empresa": empresa,
+            "form": form,
+            "titulo": "Configuracion CRM",
+            "meta_whatsapp_app_id": settings.META_WHATSAPP_APP_ID,
+            "meta_whatsapp_config_id": settings.META_WHATSAPP_CONFIG_ID,
+            "meta_whatsapp_graph_version": settings.META_WHATSAPP_GRAPH_VERSION,
+            "meta_whatsapp_ready": bool(
+                settings.META_WHATSAPP_APP_ID
+                and settings.META_WHATSAPP_CONFIG_ID
+                and settings.META_WHATSAPP_APP_SECRET
+            ),
+        },
+    )
+    response["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    return response
+
+
+@login_required
+@require_POST
+def conectar_whatsapp_meta(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not settings.META_WHATSAPP_APP_SECRET:
+        return JsonResponse(
+            {"ok": False, "error": "Falta configurar el secreto de la app de Meta en el servidor."},
+            status=503,
+        )
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JsonResponse({"ok": False, "error": "Respuesta de Meta no valida."}, status=400)
+
+    code = str(payload.get("code") or "").strip()
+    waba_id = str(payload.get("waba_id") or "").strip()
+    phone_number_id = str(payload.get("phone_number_id") or "").strip()
+    if not code or not waba_id or not phone_number_id:
+        return JsonResponse({"ok": False, "error": "Meta no devolvio todos los datos del numero."}, status=400)
+
+    query = urlencode(
+        {
+            "client_id": settings.META_WHATSAPP_APP_ID,
+            "client_secret": settings.META_WHATSAPP_APP_SECRET,
+            "code": code,
+        }
+    )
+    token_url = f"https://graph.facebook.com/{settings.META_WHATSAPP_GRAPH_VERSION}/oauth/access_token?{query}"
+    try:
+        with urlopen(Request(token_url, method="GET"), timeout=20) as response:
+            token_payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        logger.warning("Meta Embedded Signup token exchange failed: HTTP %s", exc.code)
+        return JsonResponse({"ok": False, "error": "Meta no pudo completar la autorizacion."}, status=502)
+    except (URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError):
+        logger.exception("Meta Embedded Signup token exchange failed")
+        return JsonResponse({"ok": False, "error": "No fue posible comunicarse con Meta."}, status=502)
+
+    access_token = str(token_payload.get("access_token") or "").strip()
+    if not access_token:
+        return JsonResponse({"ok": False, "error": "Meta no entrego el token de acceso."}, status=502)
+
+    config = _configuracion_crm(empresa)
+    config.whatsapp_business_account_id = waba_id
+    config.whatsapp_phone_number_id = phone_number_id
+    config.whatsapp_token = access_token
+    config.whatsapp_activo = True
+    config.save(
+        update_fields=[
+            "whatsapp_business_account_id",
+            "whatsapp_phone_number_id",
+            "whatsapp_token",
+            "whatsapp_activo",
+        ]
+    )
+    return JsonResponse({"ok": True, "message": "Numero real conectado correctamente."})
 
 
 @login_required

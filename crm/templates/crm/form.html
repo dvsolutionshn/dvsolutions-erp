@@ -26,6 +26,8 @@
 .crm-config-side{position:sticky;top:92px;display:grid;gap:14px}.crm-side-card{border:1px solid #cfe1ec;border-radius:22px;background:#fff;padding:18px;box-shadow:0 18px 48px rgba(15,43,73,.06)}.crm-side-card.dark{background:linear-gradient(145deg,#102c3a,#0f5960);color:white}.crm-side-card h3{margin:0 0 8px;color:#102338}.crm-side-card.dark h3{color:white}.crm-side-card p{margin:0;color:#63798b;line-height:1.55}.crm-side-card.dark p{color:#dcfbfb}.crm-check-list{display:grid;gap:9px;margin-top:13px}.crm-check-list span{display:flex;gap:8px;align-items:flex-start;color:#30465a;font-size:12px}.crm-side-card.dark .crm-check-list span{color:#eafdfb}.crm-check-list i{width:19px;height:19px;display:grid;place-items:center;border-radius:50%;background:#e8f7ef;color:#10725f;font-style:normal;font-weight:900;font-size:10px;flex:0 0 auto}
 .crm-form-actions{position:sticky;bottom:12px;z-index:2;display:flex;justify-content:flex-end;gap:10px;padding:14px;border:1px solid #d7e6ef;border-radius:20px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);box-shadow:0 18px 45px rgba(15,43,73,.11)}
 .crm-test-box{margin-top:16px;border:1px solid #cfe1ec;border-radius:20px;padding:18px;background:linear-gradient(135deg,#fff,#f7fcff)}
+.crm-meta-connect{grid-column:1/-1;border:1px solid #b9dfd7;border-radius:18px;padding:16px;background:linear-gradient(135deg,#f4fffc,#f2f8ff)}
+.crm-meta-connect h4{margin:0 0 6px;color:#123047}.crm-meta-connect p{margin:0 0 12px;color:#587082;line-height:1.45}.crm-meta-connect button{border:0;border-radius:13px;padding:12px 16px;background:#1877f2;color:#fff;font-weight:800;cursor:pointer}.crm-meta-connect button:disabled{opacity:.55;cursor:wait}.crm-meta-result{margin-top:10px;font-size:12px;font-weight:700}.crm-meta-result.ok{color:#08755b}.crm-meta-result.error{color:#a61b3b}
 @media(max-width:1100px){.crm-config-shell{grid-template-columns:1fr}.crm-config-side{position:static}.crm-config-status{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.crm-config-grid,.crm-config-status{grid-template-columns:1fr}.crm-section-head{flex-direction:column}}
 </style>
@@ -59,6 +61,16 @@
         <section class="crm-section">
             <div class="crm-section-head"><div class="crm-section-icon">02</div><div><h3>Credenciales Meta / WhatsApp</h3><p>Datos tecnicos del numero conectado a WhatsApp Business Cloud API.</p></div></div>
             <div class="crm-config-grid">
+                <div class="crm-meta-connect">
+                    <h4>Conectar el numero real de WhatsApp Business</h4>
+                    <p>Usa el registro oficial de Meta con Coexistencia para mantener el numero en el telefono y conectarlo tambien al CRM.</p>
+                    {% if meta_whatsapp_ready %}
+                    <button type="button" id="meta-whatsapp-connect">Conectar numero real con Meta</button>
+                    <div id="meta-whatsapp-result" class="crm-meta-result" aria-live="polite"></div>
+                    {% else %}
+                    <div class="crm-meta-result error">Antes de conectar falta configurar el secreto de la app de Meta en el servidor.</div>
+                    {% endif %}
+                </div>
                 <div class="crm-config-field"><label for="{{ form.whatsapp_api_version.id_for_label }}">{{ form.whatsapp_api_version.label }}</label>{{ form.whatsapp_api_version }}{% if form.whatsapp_api_version.help_text %}<div class="crm-help">{{ form.whatsapp_api_version.help_text }}</div>{% endif %}{% for error in form.whatsapp_api_version.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
                 <div class="crm-config-field"><label for="{{ form.whatsapp_phone_number_id.id_for_label }}">{{ form.whatsapp_phone_number_id.label }}</label>{{ form.whatsapp_phone_number_id }}{% if form.whatsapp_phone_number_id.help_text %}<div class="crm-help">{{ form.whatsapp_phone_number_id.help_text }}</div>{% endif %}{% for error in form.whatsapp_phone_number_id.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
                 <div class="crm-config-field"><label for="{{ form.whatsapp_business_account_id.id_for_label }}">{{ form.whatsapp_business_account_id.label }}</label>{{ form.whatsapp_business_account_id }}{% if form.whatsapp_business_account_id.help_text %}<div class="crm-help">{{ form.whatsapp_business_account_id.help_text }}</div>{% endif %}{% for error in form.whatsapp_business_account_id.errors %}<div class="crm-error">{{ error }}</div>{% endfor %}</div>
@@ -142,6 +154,94 @@
         <button class="erp-btn-secondary" type="submit">Enviar prueba WhatsApp</button>
     </div>
 </form>
+{% endif %}
+
+{% if meta_whatsapp_ready %}
+<script>
+(function () {
+    const appId = "{{ meta_whatsapp_app_id|escapejs }}";
+    const configId = "{{ meta_whatsapp_config_id|escapejs }}";
+    const graphVersion = "{{ meta_whatsapp_graph_version|escapejs }}";
+    const endpoint = "{% url 'crm_conectar_whatsapp_meta' empresa.slug %}";
+    const button = document.getElementById("meta-whatsapp-connect");
+    const result = document.getElementById("meta-whatsapp-result");
+    let sessionInfo = null;
+    let oauthCode = null;
+    if (!button || !result) return;
+
+    function csrfToken() {
+        return document.querySelector('[name="csrfmiddlewaretoken"]').value;
+    }
+    function show(message, kind) {
+        result.textContent = message;
+        result.className = "crm-meta-result " + (kind || "");
+    }
+    async function completeConnection() {
+        if (!sessionInfo || !oauthCode) return;
+        show("Meta confirmo el numero. Guardando la conexion en el CRM...", "");
+        try {
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken()},
+                body: JSON.stringify({code: oauthCode, waba_id: sessionInfo.waba_id, phone_number_id: sessionInfo.phone_number_id})
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo guardar la conexion.");
+            show(data.message, "ok");
+            window.setTimeout(function () { window.location.reload(); }, 1200);
+        } catch (error) {
+            button.disabled = false;
+            show(error.message, "error");
+        }
+    }
+    window.addEventListener("message", function (event) {
+        if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
+        let data = event.data;
+        try { if (typeof data === "string") data = JSON.parse(data); } catch (_) { return; }
+        if (!data || data.type !== "WA_EMBEDDED_SIGNUP") return;
+        if (data.event === "FINISH" || data.event === "FINISH_ONLY_WABA") {
+            sessionInfo = data.data || {};
+            completeConnection();
+        } else if (data.event === "CANCEL") {
+            button.disabled = false;
+            show("El registro fue cancelado antes de conectar el numero.", "error");
+        } else if (data.event === "ERROR") {
+            button.disabled = false;
+            show("Meta informo un error durante el registro.", "error");
+        }
+    });
+    window.fbAsyncInit = function () {
+        FB.init({appId: appId, cookie: true, xfbml: false, version: graphVersion});
+        button.addEventListener("click", function () {
+            button.disabled = true;
+            sessionInfo = null;
+            oauthCode = null;
+            show("Abriendo el registro seguro de Meta...", "");
+            FB.login(function (response) {
+                if (response.authResponse && response.authResponse.code) {
+                    oauthCode = response.authResponse.code;
+                    completeConnection();
+                } else {
+                    button.disabled = false;
+                    show("Meta no completo la autorizacion.", "error");
+                }
+            }, {
+                config_id: configId,
+                response_type: "code",
+                override_default_response_type: true,
+                extras: {setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3"}
+            });
+        });
+    };
+    const sdk = document.createElement("script");
+    sdk.id = "facebook-jssdk";
+    sdk.async = true;
+    sdk.defer = true;
+    sdk.crossOrigin = "anonymous";
+    sdk.src = "https://connect.facebook.net/es_LA/sdk.js";
+    document.body.appendChild(sdk);
+})();
+</script>
 {% endif %}
 
 {% else %}

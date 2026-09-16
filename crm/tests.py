@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 from PIL import Image
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
@@ -411,6 +411,40 @@ class CRMTests(TestCase):
         self.assertContains(response, "Centro de automatizaciones CRM")
         self.assertContains(response, "Mensajes automaticos de citas")
         self.assertContains(response, "Plantillas aprobadas en Meta")
+
+    @override_settings(META_WHATSAPP_APP_SECRET="")
+    def test_configuracion_crm_no_expone_boton_meta_sin_secreto(self):
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.get(reverse("crm_configuracion", args=[self.empresa.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "falta configurar el secreto de la app de Meta")
+        self.assertNotContains(response, 'id="meta-whatsapp-connect"')
+
+    @override_settings(
+        META_WHATSAPP_APP_ID="app-id",
+        META_WHATSAPP_CONFIG_ID="config-id",
+        META_WHATSAPP_APP_SECRET="server-secret",
+        META_WHATSAPP_GRAPH_VERSION="v23.0",
+    )
+    @patch("crm.views.urlopen")
+    def test_conectar_whatsapp_meta_guarda_numero_real(self, mock_urlopen):
+        self.client.login(username="crmuser", password="pass12345")
+        response_context = mock_urlopen.return_value.__enter__.return_value
+        response_context.read.return_value = json.dumps({"access_token": "token-real"}).encode("utf-8")
+
+        response = self.client.post(
+            reverse("crm_conectar_whatsapp_meta", args=[self.empresa.slug]),
+            data=json.dumps({"code": "oauth-code", "waba_id": "waba-real", "phone_number_id": "phone-real"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        config = ConfiguracionCRM.objects.get(empresa=self.empresa)
+        self.assertTrue(config.whatsapp_activo)
+        self.assertEqual(config.whatsapp_business_account_id, "waba-real")
+        self.assertEqual(config.whatsapp_phone_number_id, "phone-real")
+        self.assertEqual(config.whatsapp_token, "token-real")
 
     @patch("crm.services._post_whatsapp")
     def test_plantilla_cita_usa_texto_editable_de_configuracion(self, mock_post):

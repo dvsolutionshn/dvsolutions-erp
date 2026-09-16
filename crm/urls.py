@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path("", views.crm_dashboard, name="crm_dashboard"),
     path("configuracion/", views.configuracion_crm, name="crm_configuracion"),
+    path("configuracion/conectar-whatsapp-meta/", views.conectar_whatsapp_meta, name="crm_conectar_whatsapp_meta"),
     path("configuracion/enviar-prueba-whatsapp/", views.enviar_prueba_whatsapp, name="crm_enviar_prueba_whatsapp"),
     path("plantillas/", views.plantillas, name="crm_plantillas"),
     path("campanias/", views.campanias, name="crm_campanias"),

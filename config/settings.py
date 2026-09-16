@@ -216,6 +216,13 @@ COMMERCIAL_REQUEST_RECIPIENTS = env_list("COMMERCIAL_REQUEST_RECIPIENTS", ["dv.s
 PUBLIC_WHATSAPP_NUMBER = os.environ.get("PUBLIC_WHATSAPP_NUMBER", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://dvsolutionshn.com").rstrip("/")
 
+# Meta Embedded Signup (WhatsApp Business App + Cloud API coexistence).
+# The app secret must only exist in the server environment.
+META_WHATSAPP_APP_ID = os.environ.get("META_WHATSAPP_APP_ID", "1247884751184656").strip()
+META_WHATSAPP_CONFIG_ID = os.environ.get("META_WHATSAPP_CONFIG_ID", "1785228876001463").strip()
+META_WHATSAPP_APP_SECRET = os.environ.get("META_WHATSAPP_APP_SECRET", "").strip()
+META_WHATSAPP_GRAPH_VERSION = os.environ.get("META_WHATSAPP_GRAPH_VERSION", "v23.0").strip()
+
 
 # Onix (OpenAI). Without a key the ERP keeps the local guided assistant.
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
