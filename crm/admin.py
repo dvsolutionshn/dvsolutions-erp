@@ -5,7 +5,7 @@ from .models import CampaniaMarketing, CitaCliente, ConfiguracionCRM, EnvioCampa
 
 @admin.register(ConfiguracionCRM)
 class ConfiguracionCRMAdmin(admin.ModelAdmin):
-    list_display = ("empresa", "whatsapp_activo", "whatsapp_phone_number_id", "whatsapp_business_account_id", "recordatorio_cumpleanos_activo", "recordatorio_citas_activo")
+    list_display = ("empresa", "whatsapp_activo", "whatsapp_numero_conectado", "whatsapp_phone_number_id", "whatsapp_business_account_id", "recordatorio_cumpleanos_activo", "recordatorio_citas_activo")
     search_fields = ("empresa__nombre",)
 
 

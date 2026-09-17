@@ -20,6 +20,7 @@ class ConfiguracionCRM(models.Model):
     whatsapp_api_version = models.CharField(max_length=20, default="v25.0")
     whatsapp_phone_number_id = models.CharField(max_length=120, blank=True, null=True)
     whatsapp_business_account_id = models.CharField(max_length=120, blank=True, null=True)
+    whatsapp_numero_conectado = models.CharField(max_length=30, blank=True, null=True)
     whatsapp_token = models.TextField(blank=True, null=True)
     whatsapp_numero_prueba = models.CharField(max_length=30, blank=True, null=True)
     whatsapp_plantilla_prueba = models.CharField(max_length=80, default="hello_world")

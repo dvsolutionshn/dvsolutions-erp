@@ -7,7 +7,7 @@ import uuid
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from django.contrib import messages
 from django.conf import settings
@@ -1061,20 +1061,50 @@ def conectar_whatsapp_meta(request, empresa_slug):
     if not access_token:
         return JsonResponse({"ok": False, "error": "Meta no entrego el token de acceso."}, status=502)
 
+    phone_url = (
+        f"https://graph.facebook.com/{settings.META_WHATSAPP_GRAPH_VERSION}/"
+        f"{quote(phone_number_id, safe='')}?fields=id,display_phone_number,verified_name"
+    )
+    try:
+        phone_request = Request(
+            phone_url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            method="GET",
+        )
+        with urlopen(phone_request, timeout=20) as response:
+            phone_payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        logger.warning("Meta phone verification failed: HTTP %s", exc.code)
+        return JsonResponse({"ok": False, "error": "Meta no pudo verificar el numero autorizado."}, status=502)
+    except (URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError):
+        logger.exception("Meta phone verification failed")
+        return JsonResponse({"ok": False, "error": "No fue posible verificar el numero con Meta."}, status=502)
+
+    verified_phone_id = str(phone_payload.get("id") or "").strip()
+    display_phone_number = str(phone_payload.get("display_phone_number") or "").strip()
+    if verified_phone_id != phone_number_id or not display_phone_number:
+        return JsonResponse({"ok": False, "error": "Meta devolvio un numero diferente al autorizado."}, status=502)
+
     config = _configuracion_crm(empresa)
     config.whatsapp_business_account_id = waba_id
     config.whatsapp_phone_number_id = phone_number_id
+    config.whatsapp_numero_conectado = display_phone_number
     config.whatsapp_token = access_token
     config.whatsapp_activo = True
     config.save(
         update_fields=[
             "whatsapp_business_account_id",
             "whatsapp_phone_number_id",
+            "whatsapp_numero_conectado",
             "whatsapp_token",
             "whatsapp_activo",
         ]
     )
-    return JsonResponse({"ok": True, "message": "Numero real conectado correctamente."})
+    return JsonResponse({
+        "ok": True,
+        "message": f"Numero real {display_phone_number} conectado correctamente.",
+        "display_phone_number": display_phone_number,
+    })
 
 
 @login_required

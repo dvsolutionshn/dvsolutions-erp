@@ -431,7 +431,14 @@ class CRMTests(TestCase):
     def test_conectar_whatsapp_meta_guarda_numero_real(self, mock_urlopen):
         self.client.login(username="crmuser", password="pass12345")
         response_context = mock_urlopen.return_value.__enter__.return_value
-        response_context.read.return_value = json.dumps({"access_token": "token-real"}).encode("utf-8")
+        response_context.read.side_effect = [
+            json.dumps({"access_token": "token-real"}).encode("utf-8"),
+            json.dumps({
+                "id": "phone-real",
+                "display_phone_number": "+504 9575-5514",
+                "verified_name": "Hospital Mia",
+            }).encode("utf-8"),
+        ]
 
         response = self.client.post(
             reverse("crm_conectar_whatsapp_meta", args=[self.empresa.slug]),
@@ -444,7 +451,42 @@ class CRMTests(TestCase):
         self.assertTrue(config.whatsapp_activo)
         self.assertEqual(config.whatsapp_business_account_id, "waba-real")
         self.assertEqual(config.whatsapp_phone_number_id, "phone-real")
+        self.assertEqual(config.whatsapp_numero_conectado, "+504 9575-5514")
         self.assertEqual(config.whatsapp_token, "token-real")
+        self.assertContains(response, "+504 9575-5514")
+
+    @override_settings(
+        META_WHATSAPP_APP_ID="app-id",
+        META_WHATSAPP_CONFIG_ID="config-id",
+        META_WHATSAPP_APP_SECRET="server-secret",
+        META_WHATSAPP_GRAPH_VERSION="v23.0",
+    )
+    @patch("crm.views.urlopen")
+    def test_conectar_whatsapp_meta_no_reemplaza_configuracion_si_meta_devuelve_otro_numero(self, mock_urlopen):
+        self.client.login(username="crmuser", password="pass12345")
+        config, _ = ConfiguracionCRM.objects.get_or_create(empresa=self.empresa)
+        config.whatsapp_phone_number_id = "phone-anterior"
+        config.whatsapp_token = "token-anterior"
+        config.save(update_fields=["whatsapp_phone_number_id", "whatsapp_token"])
+        response_context = mock_urlopen.return_value.__enter__.return_value
+        response_context.read.side_effect = [
+            json.dumps({"access_token": "token-nuevo"}).encode("utf-8"),
+            json.dumps({
+                "id": "phone-diferente",
+                "display_phone_number": "+504 9000-0000",
+            }).encode("utf-8"),
+        ]
+
+        response = self.client.post(
+            reverse("crm_conectar_whatsapp_meta", args=[self.empresa.slug]),
+            data=json.dumps({"code": "oauth-code", "waba_id": "waba-real", "phone_number_id": "phone-real"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 502)
+        config.refresh_from_db()
+        self.assertEqual(config.whatsapp_phone_number_id, "phone-anterior")
+        self.assertEqual(config.whatsapp_token, "token-anterior")
 
     @patch("crm.services._post_whatsapp")
     def test_plantilla_cita_usa_texto_editable_de_configuracion(self, mock_post):

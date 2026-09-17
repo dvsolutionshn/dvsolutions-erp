@@ -365,6 +365,7 @@ class ConfiguracionCRMForm(forms.ModelForm):
             "mensaje_cita_reagendada": forms.Textarea(attrs={"rows": 2}),
         }
         labels = {
+            "whatsapp_numero_prueba": "Numero destinatario para pruebas",
             "whatsapp_cita_incluir_enlace": "La plantilla de citas incluye enlace de confirmacion",
             "mensaje_cita_confirmacion": "Texto para confirmacion de cita",
             "mensaje_cita_recordatorio_7_dias": "Texto para recordatorio 5 dias antes",

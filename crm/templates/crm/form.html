@@ -37,7 +37,7 @@
     <h3>Centro de automatizaciones CRM</h3>
     <p>Configura WhatsApp Cloud API, plantillas aprobadas de Meta y los textos editables que usa el sistema para citas, cumpleanos, campanas y preconsultas.</p>
     <div class="crm-config-status">
-        <div class="crm-status-chip"><span>WhatsApp</span><strong>{% if form.instance.whatsapp_activo %}Activo{% else %}Inactivo{% endif %}</strong></div>
+        <div class="crm-status-chip"><span>WhatsApp</span><strong>{% if form.instance.whatsapp_numero_conectado %}{{ form.instance.whatsapp_numero_conectado }}{% elif form.instance.whatsapp_activo %}Activo{% else %}Inactivo{% endif %}</strong></div>
         <div class="crm-status-chip"><span>Plantilla citas</span><strong>{{ form.instance.whatsapp_plantilla_cita|default:"-" }}</strong></div>
         <div class="crm-status-chip"><span>Marketing</span><strong>{{ form.instance.whatsapp_plantilla_marketing|default:"-" }}</strong></div>
         <div class="crm-status-chip"><span>Recordatorios</span><strong>{% if form.instance.recordatorio_citas_activo %}Activos{% else %}Inactivos{% endif %}</strong></div>
@@ -64,6 +64,9 @@
                 <div class="crm-meta-connect">
                     <h4>Conectar el numero real de WhatsApp Business</h4>
                     <p>Usa el registro oficial de Meta con Coexistencia para mantener el numero en el telefono y conectarlo tambien al CRM.</p>
+                    {% if form.instance.whatsapp_numero_conectado %}
+                    <p><strong>Numero conectado:</strong> {{ form.instance.whatsapp_numero_conectado }}</p>
+                    {% endif %}
                     {% if meta_whatsapp_ready %}
                     <button type="button" id="meta-whatsapp-connect">Conectar numero real con Meta</button>
                     <div id="meta-whatsapp-result" class="crm-meta-result" aria-live="polite"></div>

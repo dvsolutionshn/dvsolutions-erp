@@ -7,9 +7,9 @@ Wants=network-online.target
 Type=oneshot
 User=dvsolutions
 Group=dvsolutions
-WorkingDirectory=/opt/dvsolutions/repo
-EnvironmentFile=/opt/dvsolutions/repo/.env.production
-ExecStart=/opt/dvsolutions/repo/venv/bin/python manage.py procesar_recordatorios_citas
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__ENV_FILE__
+ExecStart=__PYTHON_BIN__ manage.py procesar_recordatorios_citas
 
 [Install]
 WantedBy=multi-user.target
