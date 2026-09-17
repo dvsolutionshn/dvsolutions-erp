@@ -48,6 +48,16 @@ set -a
 source "${ENV_FILE}"
 set +a
 
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "Falta DATABASE_URL en ${ENV_FILE}. No se modifico produccion." >&2
+  exit 1
+fi
+
+if [[ -z "${META_WHATSAPP_APP_SECRET:-}" ]]; then
+  echo "Falta META_WHATSAPP_APP_SECRET en ${ENV_FILE}. No se modifico produccion." >&2
+  exit 1
+fi
+
 mkdir -p "${BACKUP_DIR}"
 chmod 700 "${BACKUP_DIR}"
 pg_dump "${DATABASE_URL}" > "${BACKUP_DIR}/pre-crm-whatsapp-$(date +%Y%m%d-%H%M%S).sql"
