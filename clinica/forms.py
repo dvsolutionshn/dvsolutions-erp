@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from copy import copy
 from datetime import datetime
 
 from django import forms
@@ -2190,10 +2191,19 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
                 "referido_por", "referido_por_detalle", "consentimiento_datos",
                 "motivo_categoria", "procedimientos_interes", "procedimientos_interes_otros",
             }
-            for campo, field in self.fields.items():
+            # El flujo corto solo recopila los tres pasos administrativos.
+            # Quitar los campos clinicos evita que Django valide como opciones
+            # nuevas los textos historicos guardados por formularios anteriores.
+            # Al no formar parte de cleaned_data, ModelForm conserva esos valores
+            # en la instancia y el segundo formulario puede completarlos despues.
+            self._meta = copy(self._meta)
+            self._meta.fields = [
+                campo for campo in self._meta.fields
+                if campo in campos_paciente_nuevo
+            ]
+            for campo in list(self.fields):
                 if campo not in campos_paciente_nuevo:
-                    field.required = False
-                    field.disabled = True
+                    self.fields.pop(campo)
             self.fields["foto_perfil"].required = False
             self.fields["consentimiento_datos"].required = False
             self.fields["motivo_categoria"].required = True
