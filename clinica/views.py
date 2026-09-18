@@ -19,6 +19,7 @@ from django.db.models.functions import ExtractDay, ExtractMonth
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
@@ -1790,10 +1791,30 @@ def _nombre_receta_pdf(receta):
     return f"receta-{paciente}-{receta.fecha:%Y-%m-%d}-{receta.id}.pdf"
 
 
+SELLO_FIRMA_RECETA_LUQUE = "clinica/luque-aestetic-sello-firma.png"
+
+
+def _contexto_receta_impresion(empresa, paciente, receta, *, para_pdf=False):
+    sello_firma_src = ""
+    if empresa.slug == "luque_aestetic":
+        if para_pdf:
+            ruta_sello = settings.BASE_DIR / "clinica" / "static" / SELLO_FIRMA_RECETA_LUQUE
+            if ruta_sello.exists():
+                sello_firma_src = ruta_sello.resolve().as_uri()
+        else:
+            sello_firma_src = static(SELLO_FIRMA_RECETA_LUQUE)
+    return {
+        "empresa": empresa,
+        "paciente": paciente,
+        "receta": receta,
+        "sello_firma_src": sello_firma_src,
+    }
+
+
 def _generar_receta_pdf_bytes(empresa, paciente, receta):
     html_string = render_to_string(
         "clinica/receta_imprimir.html",
-        {"empresa": empresa, "paciente": paciente, "receta": receta},
+        _contexto_receta_impresion(empresa, paciente, receta, para_pdf=True),
     )
     return HTML(string=html_string, base_url=str(settings.BASE_DIR)).write_pdf()
 
@@ -1912,7 +1933,7 @@ def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
     return render(
         request,
         "clinica/receta_imprimir.html",
-        {"empresa": empresa, "paciente": paciente, "receta": receta},
+        _contexto_receta_impresion(empresa, paciente, receta),
     )
 
 
