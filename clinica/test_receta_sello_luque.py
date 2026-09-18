@@ -29,8 +29,8 @@ class RecetaSelloLuqueTests(SimpleTestCase):
         )
 
     def test_sello_se_activa_solo_para_luque_aestetic(self):
-        luque = SimpleNamespace(slug="luque_aestetic")
-        otra_empresa = SimpleNamespace(slug="hospital_mia")
+        luque = SimpleNamespace(slug="luque_aestetic", logo=None)
+        otra_empresa = SimpleNamespace(slug="hospital_mia", logo=None)
 
         contexto_web = _contexto_receta_impresion(luque, self.paciente, self.receta)
         contexto_pdf = _contexto_receta_impresion(
@@ -52,7 +52,24 @@ class RecetaSelloLuqueTests(SimpleTestCase):
         )
         self.assertTrue(contexto_pdf["sello_firma_src"].startswith("file:///"))
         self.assertEqual(contexto_otra["sello_firma_src"], "")
+        self.assertEqual(contexto_otra["logo_src"], "")
         self.assertTrue(
             Path("clinica", "static", SELLO_FIRMA_RECETA_LUQUE).is_file(),
             "La imagen limpia del sello y firma debe formar parte del proyecto.",
         )
+
+    def test_pdf_usa_ruta_local_para_el_logo_de_la_empresa(self):
+        ruta_logo = Path("clinica", "static", SELLO_FIRMA_RECETA_LUQUE).resolve()
+        logo = SimpleNamespace(path=str(ruta_logo), url="/media/logos/empresa.png")
+        empresa = SimpleNamespace(slug="hospital_mia", logo=logo)
+
+        contexto_web = _contexto_receta_impresion(empresa, self.paciente, self.receta)
+        contexto_pdf = _contexto_receta_impresion(
+            empresa,
+            self.paciente,
+            self.receta,
+            para_pdf=True,
+        )
+
+        self.assertEqual(contexto_web["logo_src"], "/media/logos/empresa.png")
+        self.assertEqual(contexto_pdf["logo_src"], ruta_logo.as_uri())

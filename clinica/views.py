@@ -1796,6 +1796,17 @@ SELLO_FIRMA_RECETA_LUQUE = "clinica/luque-aestetic-sello-firma.png"
 
 def _contexto_receta_impresion(empresa, paciente, receta, *, para_pdf=False):
     sello_firma_src = ""
+    logo_src = ""
+    if empresa.logo:
+        if para_pdf:
+            try:
+                ruta_logo = Path(empresa.logo.path)
+            except (NotImplementedError, ValueError):
+                ruta_logo = None
+            if ruta_logo and ruta_logo.exists():
+                logo_src = ruta_logo.resolve().as_uri()
+        else:
+            logo_src = empresa.logo.url
     if empresa.slug == "luque_aestetic":
         if para_pdf:
             ruta_sello = settings.BASE_DIR / "clinica" / "static" / SELLO_FIRMA_RECETA_LUQUE
@@ -1807,6 +1818,7 @@ def _contexto_receta_impresion(empresa, paciente, receta, *, para_pdf=False):
         "empresa": empresa,
         "paciente": paciente,
         "receta": receta,
+        "logo_src": logo_src,
         "sello_firma_src": sello_firma_src,
     }
 
