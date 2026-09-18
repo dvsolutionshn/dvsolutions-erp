@@ -564,6 +564,77 @@ class CRMTests(TestCase):
         self.assertEqual(citas.first().grupo_atencion, citas.last().grupo_atencion)
         self.assertNotEqual(citas.first().fecha_hora, citas.last().fecha_hora)
 
+    def test_editar_sesion_usa_hora_visible_aunque_detalle_oculto_este_desactualizado(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-92001-EDIT",
+            identidad="08011999009211",
+            nombre="Paciente Hora Terapia",
+        )
+        profesional = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Enfermera Horarios",
+            especialidad="Terapias",
+        )
+        CitaClienteForm(empresa=self.empresa)
+        servicio = ServicioClinico.objects.get(empresa=self.empresa, nombre="Terapias")
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=profesional,
+            titulo="Terapias · Fase 1 · Sesión 1",
+            fecha_hora=timezone.make_aware(datetime(2026, 9, 21, 1, 0)),
+            estado="pendiente",
+            fase_servicio=1,
+            sesion_servicio=1,
+        )
+        form = CitaClienteForm(
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": profesional.id,
+                "fecha_cita": "2026-09-21",
+                "hora_cita": "10:00",
+                "periodo_cita": "AM",
+                "detalles_agenda": '[{"tipo":"terapias","clave":"terapia-1-1","fase":1,"sesion":1,"hora":"01:00","periodo":"AM"}]',
+                "estado": "pendiente",
+            },
+            empresa=self.empresa,
+            instance=cita,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        cita = form.save()
+        self.assertEqual(timezone.localtime(cita.fecha_hora).strftime("%I:%M %p"), "10:00 AM")
+        self.assertEqual(
+            timezone.localtime(form.cleaned_data["detalles_agenda_limpios"][0]["inicio"]).strftime("%I:%M %p"),
+            "10:00 AM",
+        )
+
+        form_nueva = CitaClienteForm(
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": profesional.id,
+                "fecha_cita": "2026-09-22",
+                "hora_cita": "11:00",
+                "periodo_cita": "AM",
+                "detalles_agenda": '[{"tipo":"terapias","clave":"terapia-1-2","fase":1,"sesion":2,"hora":"01:00","periodo":"AM"}]',
+                "estado": "pendiente",
+            },
+            empresa=self.empresa,
+        )
+        self.assertTrue(form_nueva.is_valid(), form_nueva.errors.as_text())
+        cita_nueva = form_nueva.save(commit=False)
+        cita_nueva.empresa = self.empresa
+        cita_nueva.save()
+        self.assertEqual(timezone.localtime(cita_nueva.fecha_hora).strftime("%I:%M %p"), "11:00 AM")
+
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]), {"editar": cita.id})
+        self.assertContains(response, "syncFirstSelectionFromAppointment")
+
     def test_hidrofacial_pasa_de_tipo_consulta_a_opcion_tratamiento(self):
         self.empresa.tipo_solucion = "clinica"
         self.empresa.save(update_fields=["tipo_solucion"])

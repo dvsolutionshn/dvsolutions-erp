@@ -910,8 +910,16 @@ class CitaClienteForm(forms.ModelForm):
         servicio = cleaned_data.get("servicio_clinico")
         detalles = self._limpiar_detalles_agenda(servicio, fecha)
         if detalles:
-            hora_texto = detalles[0]["hora"]
-            periodo = detalles[0]["periodo"]
+            if len(detalles) == 1 and hora_texto and periodo:
+                # En una sesión individual, la hora visible del formulario es la fuente
+                # principal. Esto evita que un valor oculto anterior imponga la hora
+                # predeterminada si el navegador no sincronizó el constructor.
+                detalles[0]["hora"] = hora_texto
+                detalles[0]["periodo"] = periodo
+                detalles[0]["inicio"] = self._armar_fecha_hora(fecha, hora_texto, periodo)
+            else:
+                hora_texto = detalles[0]["hora"]
+                periodo = detalles[0]["periodo"]
             cleaned_data["detalles_agenda_limpios"] = detalles
 
         # Compatibilidad con integraciones y formularios anteriores al selector AM/PM.

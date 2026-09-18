@@ -33,6 +33,8 @@
   const content=document.getElementById('agendaDetailContent');
   const empty=document.getElementById('agendaDetailEmpty');
   const title=document.getElementById('agendaDetailTitle');
+  const baseHour=document.getElementById('id_hora_cita');
+  const basePeriod=document.getElementById('id_periodo_cita');
   if(!builder||!service||!hidden||!content)return;
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const times=[];for(let h=1;h<=12;h++)for(const m of ['00','15','30','45'])times.push(String(h).padStart(2,'0')+':'+m);
@@ -42,7 +44,7 @@
   function kind(){const txt=norm(service.options[service.selectedIndex]?.text);if(txt.includes('hiperbar')||txt.includes('camara'))return'camara';if(txt.includes('terapia'))return'terapias';if(txt.trim()==='tratamientos'||txt.trim()==='tratamiento')return'tratamientos';if(txt.trim()==='spa')return'spa';return''}
   function sync(){hidden.value=JSON.stringify(selections)}
   function optionLabel(item){if(item.fase&&item.sesion)return `Fase ${item.fase} · Sesión ${item.sesion}`;if(item.sesion)return `Sesión ${item.sesion}`;return item.opcion_nombre||item.opcion||'Servicio'}
-  function add(item){if(selections.some(x=>x.clave===item.clave))return;const baseHour=document.getElementById('id_hora_cita')?.value||'01:00',basePeriod=document.getElementById('id_periodo_cita')?.value||'AM';selections.push({...item,hora:baseHour,periodo:basePeriod});render()}
+  function add(item){if(selections.some(x=>x.clave===item.clave))return;selections.push({...item,hora:baseHour?.value||'01:00',periodo:basePeriod?.value||'AM'});render()}
   function choices(items){return `<div class="agenda-choice-grid">${items.map(i=>`<label class="agenda-choice${i.done?' is-completed':''}${selections.some(x=>x.clave===i.clave)?' is-selected':''}"><input type="checkbox" data-agenda-choice='${JSON.stringify(i).replace(/'/g,'&#39;')}' ${i.done?'disabled checked':''} ${selections.some(x=>x.clave===i.clave)?'checked':''}><span>${i.label}${i.done?' · Realizada':''}</span></label>`).join('')}</div>`}
   function render(){
     const type=kind();builder.classList.toggle('is-visible',!!type);empty.style.display=type?'none':'';if(!type){selections=[];content.innerHTML='';sync();return}
@@ -56,11 +58,12 @@
   }
   function bind(){
     content.querySelectorAll('[data-agenda-choice]').forEach(el=>el.addEventListener('change',()=>{const i=JSON.parse(el.dataset.agendaChoice);if(el.checked)add(i);else{selections=selections.filter(x=>x.clave!==i.clave);render()}}));
-    content.querySelectorAll('[data-time-index]').forEach(el=>el.addEventListener('change',()=>{selections[+el.dataset.timeIndex].hora=el.value;sync()}));content.querySelectorAll('[data-period-index]').forEach(el=>el.addEventListener('change',()=>{selections[+el.dataset.periodIndex].periodo=el.value;sync()}));content.querySelectorAll('[data-remove-index]').forEach(el=>el.addEventListener('click',()=>{selections.splice(+el.dataset.removeIndex,1);render()}));
+    content.querySelectorAll('[data-time-index]').forEach(el=>el.addEventListener('change',()=>{const index=+el.dataset.timeIndex;selections[index].hora=el.value;if(index===0&&baseHour)baseHour.value=el.value;sync()}));content.querySelectorAll('[data-period-index]').forEach(el=>el.addEventListener('change',()=>{const index=+el.dataset.periodIndex;selections[index].periodo=el.value;if(index===0&&basePeriod)basePeriod.value=el.value;sync()}));content.querySelectorAll('[data-remove-index]').forEach(el=>el.addEventListener('click',()=>{selections.splice(+el.dataset.removeIndex,1);render()}));
     document.getElementById('addTreatmentButton')?.addEventListener('click',async()=>{const input=document.getElementById('newTreatmentName');const body=new FormData();body.append('nombre',input.value);body.append('csrfmiddlewaretoken',document.querySelector('[name=csrfmiddlewaretoken]').value);const response=await fetch(builder.dataset.createTreatmentUrl,{method:'POST',body,headers:{'X-Requested-With':'XMLHttpRequest'}});const data=await response.json();if(!response.ok){alert(data.error||'No se pudo agregar.');return}treatments.push(data.opcion);add({tipo:'tratamientos',clave:`tratamiento-${data.opcion.id}`,opcion_id:String(data.opcion.id),opcion_nombre:data.opcion.nombre,label:data.opcion.nombre})});
   }
+  function syncFirstSelectionFromAppointment(){if(!selections.length)return;selections[0].hora=baseHour?.value||selections[0].hora;selections[0].periodo=basePeriod?.value||selections[0].periodo;render()}
   async function loadProgress(){if(!patient?.value){completed={terapias:[],camara:[]};therapyCount=30;render();return}try{const r=await fetch(builder.dataset.progressUrl+'?paciente='+encodeURIComponent(patient.value));const d=await r.json();if(d.ok){completed={terapias:d.terapias||[],camara:d.camara||[]};therapyCount=Math.max(30,Number(d.terapias_habilitadas)||30)}}catch(e){}render()}
-  service.addEventListener('change',()=>{selections=[];loadProgress()});patient?.addEventListener('change',loadProgress);loadProgress();
+  baseHour?.addEventListener('change',syncFirstSelectionFromAppointment);basePeriod?.addEventListener('change',syncFirstSelectionFromAppointment);service.addEventListener('change',()=>{selections=[];loadProgress()});patient?.addEventListener('change',loadProgress);loadProgress();
 })();
 </script>
 {% endif %}
