@@ -28,10 +28,13 @@
         .products td{border-top:1px solid #e1e9ef;padding:7px;font-size:10px;vertical-align:top;line-height:1.35}
         .pill{display:inline-block;margin:0 4px 4px 0;padding:5px 8px;border-radius:999px;background:#eef7fb;color:#0f6f8a;font-weight:700;font-size:10px}
         .signature{display:grid;grid-template-columns:1fr 1fr;gap:42px;margin-top:36px;break-inside:avoid}
-        .signature.has-stamp{display:table;width:100%;table-layout:fixed;border-spacing:25px 0;margin-top:14px;break-inside:avoid}
-        .signature.has-stamp>div{display:table-cell;width:50%;vertical-align:bottom}
-        .signature-stamp{height:96px}
+        .signature.has-stamp{display:block;width:330px;margin:16px auto 0;break-inside:avoid}
+        .signature.has-stamp>div{display:block;width:100%}
+        .signature-stamp{text-align:center}
         .signature-mark{display:block;width:300px;height:76px;object-fit:contain;margin:0 auto -2px}
+        .signature-caption{border-top:1px solid #102338;padding-top:5px;text-align:center;color:#52687a;font-size:10px}
+        .signature-caption strong{display:block;color:#102338;font-size:11px;font-weight:700}
+        .signature-caption span{display:block;margin-top:2px}
         .line{border-top:1px solid #102338;text-align:center;padding-top:5px;color:#52687a;font-size:10px}
         .actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:18px}
         .actions form{margin:0}
@@ -81,8 +84,13 @@
     {% if receta.observaciones %}<section class="section"><h3>Observaciones</h3><div class="box">{{ receta.observaciones }}</div></section>{% endif %}
     {% if sello_firma_src %}
     <section class="signature has-stamp">
-        <div class="line">{% if receta.profesional %}{{ receta.profesional.nombre }}{% else %}Medico tratante{% endif %}</div>
-        <div class="signature-stamp"><img class="signature-mark" src="{{ sello_firma_src }}" alt="Sello y firma de la doctora"><div class="line">Sello y firma</div></div>
+        <div class="signature-stamp">
+            <img class="signature-mark" src="{{ sello_firma_src }}" alt="Sello y firma de la doctora">
+            <div class="signature-caption">
+                <strong>{% if receta.profesional %}{{ receta.profesional.nombre }}{% else %}Medico tratante{% endif %}</strong>
+                <span>Sello y firma</span>
+            </div>
+        </div>
     </section>
     {% else %}
     <section class="signature">
