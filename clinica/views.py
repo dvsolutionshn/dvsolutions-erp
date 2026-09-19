@@ -1792,6 +1792,11 @@ def _nombre_receta_pdf(receta):
 
 
 SELLO_FIRMA_RECETA_LUQUE = "clinica/luque-aestetic-sello-firma.png"
+SELLO_FIRMA_RECETA_SERVICIOSMEDICOS = "clinica/serviciosmedicos-sello-firma.png"
+SELLOS_FIRMA_RECETA_POR_EMPRESA = {
+    "luque_aestetic": SELLO_FIRMA_RECETA_LUQUE,
+    "serviciosmedicos": SELLO_FIRMA_RECETA_SERVICIOSMEDICOS,
+}
 
 
 def _contexto_receta_impresion(empresa, paciente, receta, *, para_pdf=False):
@@ -1807,13 +1812,14 @@ def _contexto_receta_impresion(empresa, paciente, receta, *, para_pdf=False):
                 logo_src = ruta_logo.resolve().as_uri()
         else:
             logo_src = empresa.logo.url
-    if empresa.slug == "luque_aestetic":
+    sello_firma_estatico = SELLOS_FIRMA_RECETA_POR_EMPRESA.get(empresa.slug)
+    if sello_firma_estatico:
         if para_pdf:
-            ruta_sello = settings.BASE_DIR / "clinica" / "static" / SELLO_FIRMA_RECETA_LUQUE
+            ruta_sello = settings.BASE_DIR / "clinica" / "static" / sello_firma_estatico
             if ruta_sello.exists():
                 sello_firma_src = ruta_sello.resolve().as_uri()
         else:
-            sello_firma_src = static(SELLO_FIRMA_RECETA_LUQUE)
+            sello_firma_src = static(sello_firma_estatico)
     return {
         "empresa": empresa,
         "paciente": paciente,

@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 
 from .views import (
     SELLO_FIRMA_RECETA_LUQUE,
+    SELLO_FIRMA_RECETA_SERVICIOSMEDICOS,
     _contexto_receta_impresion,
 )
 
@@ -56,6 +57,27 @@ class RecetaSelloLuqueTests(SimpleTestCase):
         self.assertTrue(
             Path("clinica", "static", SELLO_FIRMA_RECETA_LUQUE).is_file(),
             "La imagen limpia del sello y firma debe formar parte del proyecto.",
+        )
+
+    def test_serviciosmedicos_usa_su_propio_sello_y_firma(self):
+        empresa = SimpleNamespace(slug="serviciosmedicos", logo=None)
+
+        contexto_web = _contexto_receta_impresion(empresa, self.paciente, self.receta)
+        contexto_pdf = _contexto_receta_impresion(
+            empresa,
+            self.paciente,
+            self.receta,
+            para_pdf=True,
+        )
+
+        self.assertEqual(
+            contexto_web["sello_firma_src"],
+            f"/static/{SELLO_FIRMA_RECETA_SERVICIOSMEDICOS}",
+        )
+        self.assertTrue(contexto_pdf["sello_firma_src"].startswith("file:///"))
+        self.assertTrue(
+            Path("clinica", "static", SELLO_FIRMA_RECETA_SERVICIOSMEDICOS).is_file(),
+            "El sello de Servicios Medicos debe formar parte del proyecto.",
         )
 
     def test_pdf_usa_ruta_local_para_el_logo_de_la_empresa(self):
