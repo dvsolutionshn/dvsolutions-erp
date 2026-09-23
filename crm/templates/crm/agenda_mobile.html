@@ -644,7 +644,7 @@
           {% for bloqueo in dia.bloqueos %}
           <article class="appointment is-unavailable">
             <div class="time">{% if bloqueo.dia_completo %}TODO<small>EL DÍA</small>{% else %}{{ bloqueo.hora_inicio|time:"h:i" }}<small>{{ bloqueo.hora_inicio|time:"A" }}</small>{% endif %}</div>
-            <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div>
+            <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.horario_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div>
             <span></span>
           </article>
           {% endfor %}
@@ -694,7 +694,7 @@
       {% for dia in dias %}{% for bloqueo in dia.bloqueos %}
       <article class="appointment is-unavailable">
         <div class="time">{% if bloqueo.dia_completo %}TODO<small>EL DÍA</small>{% else %}{{ bloqueo.hora_inicio|time:"h:i" }}<small>{{ bloqueo.hora_inicio|time:"A" }}</small>{% endif %}</div>
-        <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div><span></span>
+        <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.horario_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div><span></span>
       </article>
       {% endfor %}{% endfor %}
       {% for cita in citas %}
@@ -736,7 +736,9 @@
       {% csrf_token %}<input type="hidden" name="regresar_a" value="app">{% if bloqueo_editando %}<input type="hidden" name="bloqueo_id" value="{{ bloqueo_editando.id }}">{% endif %}
       <div class="form-grid">
         {% for field in bloqueo_form %}
-        <div class="field {% if field.name == 'motivo' or field.name == 'dia_completo' %}wide{% endif %}" data-mobile-availability-field="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}<div class="errors">{{ field.errors }}</div></div>
+        {% if field.name == "hora_inicio" %}<div class="field wide" data-mobile-availability-field="hora_inicio"><label for="{{ field.id_for_label }}">{{ field.label }}</label><div class="datetime">{{ field }}{{ bloqueo_form.hora_inicio_periodo }}</div><div class="errors">{{ field.errors }}{{ bloqueo_form.hora_inicio_periodo.errors }}</div></div>
+        {% elif field.name == "hora_fin" %}<div class="field wide" data-mobile-availability-field="hora_fin"><label for="{{ field.id_for_label }}">{{ field.label }}</label><div class="datetime">{{ field }}{{ bloqueo_form.hora_fin_periodo }}</div><div class="errors">{{ field.errors }}{{ bloqueo_form.hora_fin_periodo.errors }}</div></div>
+        {% elif field.name != "hora_inicio_periodo" and field.name != "hora_fin_periodo" %}<div class="field {% if field.name == 'motivo' or field.name == 'dia_completo' %}wide{% endif %}" data-mobile-availability-field="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}<div class="errors">{{ field.errors }}</div></div>{% endif %}
         {% endfor %}
       </div>
       <button class="save" type="submit">{% if bloqueo_editando %}Guardar cambios{% else %}Crear bloqueo{% endif %}</button>
@@ -907,7 +909,7 @@
   const availabilitySheet=document.getElementById("disponibilidad-medica");
   document.querySelectorAll("[data-open-availability]").forEach(b=>b.addEventListener("click",()=>openSheet(availabilitySheet)));
   const availabilityForm=document.querySelector("[data-mobile-availability-form]");
-  if(availabilityForm){const full=availabilityForm.querySelector("#id_dia_completo"),start=availabilityForm.querySelector("#id_hora_inicio"),end=availabilityForm.querySelector("#id_hora_fin");const toggleAvailabilityTimes=()=>{const disabled=Boolean(full?.checked);if(start)start.disabled=disabled;if(end)end.disabled=disabled};full?.addEventListener("change",toggleAvailabilityTimes);toggleAvailabilityTimes()}
+  if(availabilityForm){const full=availabilityForm.querySelector("#id_dia_completo"),times=["#id_hora_inicio","#id_hora_inicio_periodo","#id_hora_fin","#id_hora_fin_periodo"].map(selector=>availabilityForm.querySelector(selector));const toggleAvailabilityTimes=()=>{const disabled=Boolean(full?.checked);times.forEach(field=>{if(field)field.disabled=disabled})};full?.addEventListener("change",toggleAvailabilityTimes);toggleAvailabilityTimes()}
   document.querySelectorAll("[data-close-sheet]").forEach(b=>b.addEventListener("click",()=>closeSheet(b.closest(".sheet"))));
   document.querySelectorAll("[data-cita-actions]").forEach(b=>b.addEventListener("click",()=>openSheet(document.getElementById(`actions-${b.dataset.citaActions}`))));
   document.querySelectorAll(".sheet").forEach(s=>s.addEventListener("click",e=>{if(e.target===s)closeSheet(s)}));

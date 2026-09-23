@@ -557,14 +557,19 @@ class CRMTests(TestCase):
             {
                 "profesional": candy.id,
                 "fecha": "2026-09-22",
-                "hora_inicio": "14:00",
-                "hora_fin": "17:00",
+                "hora_inicio": "02:00",
+                "hora_inicio_periodo": "PM",
+                "hora_fin": "05:00",
+                "hora_fin_periodo": "PM",
                 "motivo": "No disponible",
             },
         )
         self.assertEqual(response.status_code, 302)
         bloqueo = BloqueoDisponibilidadMedica.objects.get(empresa=self.empresa)
         self.assertEqual(bloqueo.profesional, candy)
+        self.assertEqual(bloqueo.hora_inicio.hour, 14)
+        self.assertEqual(bloqueo.hora_fin.hour, 17)
+        self.assertEqual(bloqueo.horario_display, "02:00 PM – 05:00 PM")
 
         agenda = self.client.get(
             reverse("agenda_citas", args=[self.empresa.slug]),
@@ -572,6 +577,7 @@ class CRMTests(TestCase):
         )
         self.assertContains(agenda, "No disponible")
         self.assertContains(agenda, "Dra. Candy Luque")
+        self.assertContains(agenda, "02:00 PM – 05:00 PM")
 
         form_bloqueado = CitaClienteForm(
             {
@@ -671,7 +677,9 @@ class CRMTests(TestCase):
                 "profesional": candy.id,
                 "fecha": "2026-09-24",
                 "hora_inicio": "08:00",
+                "hora_inicio_periodo": "AM",
                 "hora_fin": "10:00",
+                "hora_fin_periodo": "AM",
                 "motivo": "Horario actualizado",
             },
         )

@@ -437,21 +437,38 @@ class CampaniaMarketingForm(forms.ModelForm):
 
 
 class BloqueoDisponibilidadMedicaForm(forms.ModelForm):
+    HORAS_12 = [
+        (f"{hora:02d}:{minuto:02d}", f"{hora}:{minuto:02d}")
+        for hora in range(1, 13)
+        for minuto in (0, 15, 30, 45)
+    ]
+    PERIODOS = (("AM", "AM"), ("PM", "PM"))
+
+    hora_inicio = forms.ChoiceField(label="Hora de inicio", required=False, choices=HORAS_12)
+    hora_inicio_periodo = forms.ChoiceField(label="AM / PM inicio", required=False, choices=PERIODOS)
+    hora_fin = forms.ChoiceField(label="Hora de finalización", required=False, choices=HORAS_12)
+    hora_fin_periodo = forms.ChoiceField(label="AM / PM final", required=False, choices=PERIODOS)
+
     class Meta:
         model = BloqueoDisponibilidadMedica
-        fields = ["profesional", "fecha", "dia_completo", "hora_inicio", "hora_fin", "motivo"]
+        fields = [
+            "profesional",
+            "fecha",
+            "dia_completo",
+            "hora_inicio",
+            "hora_inicio_periodo",
+            "hora_fin",
+            "hora_fin_periodo",
+            "motivo",
+        ]
         labels = {
             "profesional": "Doctor / profesional",
             "fecha": "Fecha",
             "dia_completo": "Bloquear el día completo",
-            "hora_inicio": "Hora de inicio",
-            "hora_fin": "Hora de finalización",
             "motivo": "Motivo (opcional)",
         }
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}),
-            "hora_inicio": forms.TimeInput(attrs={"type": "time", "step": "900"}),
-            "hora_fin": forms.TimeInput(attrs={"type": "time", "step": "900"}),
             "motivo": forms.TextInput(attrs={"placeholder": "Ejemplo: No disponible"}),
         }
 
@@ -466,26 +483,52 @@ class BloqueoDisponibilidadMedicaForm(forms.ModelForm):
             if usuario and not puede_gestionar_otros:
                 profesionales = profesionales.filter(usuario=usuario)
         self.fields["profesional"].queryset = profesionales
-        self.fields["hora_inicio"].required = False
-        self.fields["hora_fin"].required = False
+        if self.instance and self.instance.pk and not self.instance.dia_completo:
+            for prefijo, valor in (("hora_inicio", self.instance.hora_inicio), ("hora_fin", self.instance.hora_fin)):
+                if not valor:
+                    continue
+                hora_12 = valor.hour % 12 or 12
+                valor_hora = f"{hora_12:02d}:{valor.minute:02d}"
+                if valor_hora not in dict(self.HORAS_12):
+                    self.fields[prefijo].choices = [*self.HORAS_12, (valor_hora, f"{hora_12}:{valor.minute:02d}")]
+                self.initial[prefijo] = valor_hora
+                self.initial[f"{prefijo}_periodo"] = "PM" if valor.hour >= 12 else "AM"
+
+    @staticmethod
+    def _convertir_hora_12(hora_texto, periodo):
+        if not hora_texto or periodo not in {"AM", "PM"}:
+            return None
+        hora, minuto = (int(valor) for valor in hora_texto.split(":"))
+        hora_24 = hora % 12 + (12 if periodo == "PM" else 0)
+        return datetime.strptime(f"{hora_24:02d}:{minuto:02d}", "%H:%M").time()
 
     def clean(self):
         cleaned_data = super().clean()
         profesional = cleaned_data.get("profesional")
         fecha = cleaned_data.get("fecha")
         dia_completo = bool(cleaned_data.get("dia_completo"))
-        hora_inicio = cleaned_data.get("hora_inicio")
-        hora_fin = cleaned_data.get("hora_fin")
+        hora_inicio_texto = cleaned_data.get("hora_inicio")
+        hora_inicio_periodo = cleaned_data.get("hora_inicio_periodo")
+        hora_fin_texto = cleaned_data.get("hora_fin")
+        hora_fin_periodo = cleaned_data.get("hora_fin_periodo")
         if profesional and self.empresa and profesional.empresa_id != self.empresa.id:
             self.add_error("profesional", "El profesional no pertenece a esta empresa.")
         if dia_completo:
             cleaned_data["hora_inicio"] = None
             cleaned_data["hora_fin"] = None
         else:
-            if not hora_inicio:
+            if not hora_inicio_texto:
                 self.add_error("hora_inicio", "Selecciona la hora de inicio.")
-            if not hora_fin:
+            if not hora_inicio_periodo:
+                self.add_error("hora_inicio_periodo", "Selecciona AM o PM.")
+            if not hora_fin_texto:
                 self.add_error("hora_fin", "Selecciona la hora de finalización.")
+            if not hora_fin_periodo:
+                self.add_error("hora_fin_periodo", "Selecciona AM o PM.")
+            hora_inicio = self._convertir_hora_12(hora_inicio_texto, hora_inicio_periodo)
+            hora_fin = self._convertir_hora_12(hora_fin_texto, hora_fin_periodo)
+            cleaned_data["hora_inicio"] = hora_inicio
+            cleaned_data["hora_fin"] = hora_fin
             if hora_inicio and hora_fin and hora_fin <= hora_inicio:
                 self.add_error("hora_fin", "La hora final debe ser posterior a la hora de inicio.")
         if self.errors or not all((self.empresa, profesional, fecha)):
