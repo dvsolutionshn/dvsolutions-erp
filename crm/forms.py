@@ -454,21 +454,24 @@ class BloqueoDisponibilidadMedicaForm(forms.ModelForm):
         fields = [
             "profesional",
             "fecha",
-            "dia_completo",
             "hora_inicio",
             "hora_inicio_periodo",
+            "fecha_fin",
             "hora_fin",
             "hora_fin_periodo",
+            "dia_completo",
             "motivo",
         ]
         labels = {
             "profesional": "Doctor / profesional",
-            "fecha": "Fecha",
-            "dia_completo": "Bloquear el día completo",
+            "fecha": "Fecha de inicio",
+            "fecha_fin": "Fecha final",
+            "dia_completo": "Bloquear días completos",
             "motivo": "Motivo (opcional)",
         }
         widgets = {
             "fecha": forms.DateInput(attrs={"type": "date"}),
+            "fecha_fin": forms.DateInput(attrs={"type": "date"}),
             "motivo": forms.TextInput(attrs={"placeholder": "Ejemplo: No disponible"}),
         }
 
@@ -506,6 +509,7 @@ class BloqueoDisponibilidadMedicaForm(forms.ModelForm):
         cleaned_data = super().clean()
         profesional = cleaned_data.get("profesional")
         fecha = cleaned_data.get("fecha")
+        fecha_fin = cleaned_data.get("fecha_fin")
         dia_completo = bool(cleaned_data.get("dia_completo"))
         hora_inicio_texto = cleaned_data.get("hora_inicio")
         hora_inicio_periodo = cleaned_data.get("hora_inicio_periodo")
@@ -513,6 +517,8 @@ class BloqueoDisponibilidadMedicaForm(forms.ModelForm):
         hora_fin_periodo = cleaned_data.get("hora_fin_periodo")
         if profesional and self.empresa and profesional.empresa_id != self.empresa.id:
             self.add_error("profesional", "El profesional no pertenece a esta empresa.")
+        if fecha and fecha_fin and fecha_fin < fecha:
+            self.add_error("fecha_fin", "La fecha final no puede ser anterior a la fecha de inicio.")
         if dia_completo:
             cleaned_data["hora_inicio"] = None
             cleaned_data["hora_fin"] = None
@@ -529,12 +535,21 @@ class BloqueoDisponibilidadMedicaForm(forms.ModelForm):
             hora_fin = self._convertir_hora_12(hora_fin_texto, hora_fin_periodo)
             cleaned_data["hora_inicio"] = hora_inicio
             cleaned_data["hora_fin"] = hora_fin
-            if hora_inicio and hora_fin and hora_fin <= hora_inicio:
-                self.add_error("hora_fin", "La hora final debe ser posterior a la hora de inicio.")
-        if self.errors or not all((self.empresa, profesional, fecha)):
+            if fecha and fecha_fin and hora_inicio and hora_fin:
+                inicio, fin = rango_bloqueo(
+                    fecha=fecha,
+                    fecha_fin=fecha_fin,
+                    dia_completo=False,
+                    hora_inicio=hora_inicio,
+                    hora_fin=hora_fin,
+                )
+                if fin <= inicio:
+                    self.add_error("hora_fin", "La fecha y hora final deben ser posteriores al inicio.")
+        if self.errors or not all((self.empresa, profesional, fecha, fecha_fin)):
             return cleaned_data
         inicio, fin = rango_bloqueo(
             fecha=fecha,
+            fecha_fin=fecha_fin,
             dia_completo=dia_completo,
             hora_inicio=cleaned_data.get("hora_inicio"),
             hora_fin=cleaned_data.get("hora_fin"),

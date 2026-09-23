@@ -588,7 +588,7 @@
     {% if not hospital_mia_app_premium or vista == 'dia' %}
     <nav class="days" data-day-strip-swipe data-prev-url="?vista=dia&fecha={{ fecha_anterior|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}" data-next-url="?vista=dia&fecha={{ fecha_siguiente|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}">
       {% for dia in dias_moviles %}
-      <a class="day {% if dia.fecha == fecha_seleccionada %}active{% endif %}" href="?vista=dia&fecha={{ dia.fecha|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}"><span>{{ dia.dia_corto }}</span><strong>{{ dia.fecha.day }}</strong><i>{{ dia.total }}</i></a>
+      <a class="day {% if dia.fecha == fecha_seleccionada %}active{% endif %}" href="?vista=dia&fecha={{ dia.fecha|date:'Y-m-d' }}{{ filtros_query }}{% if hospital_mia_app_premium %}&app=agenda#agenda-app{% endif %}"><span>{{ dia.dia_corto }}</span><strong>{{ dia.fecha.day }}</strong><i>{% if dia.bloqueado %}●{% else %}{{ dia.total }}{% endif %}</i></a>
       {% endfor %}
     </nav>
     {% endif %}
@@ -643,8 +643,8 @@
         <div class="appointments">
           {% for bloqueo in dia.bloqueos %}
           <article class="appointment is-unavailable">
-            <div class="time">{% if bloqueo.dia_completo %}TODO<small>EL DÍA</small>{% else %}{{ bloqueo.hora_inicio|time:"h:i" }}<small>{{ bloqueo.hora_inicio|time:"A" }}</small>{% endif %}</div>
-            <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.horario_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div>
+            <div class="time">{% if bloqueo.dia_completo or dia.fecha > bloqueo.fecha and dia.fecha < bloqueo.fecha_fin %}TODO<small>EL DÍA</small>{% elif dia.fecha == bloqueo.fecha_fin and dia.fecha != bloqueo.fecha %}HASTA<small>{{ bloqueo.hora_fin|time:"h:i A" }}</small>{% else %}DESDE<small>{{ bloqueo.hora_inicio|time:"h:i A" }}</small>{% endif %}</div>
+            <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.periodo_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div>
             <span></span>
           </article>
           {% endfor %}
@@ -683,7 +683,9 @@
         <div class="mobile-period-card-head"><strong>{{ dia.dia_corto }} {{ dia.fecha|date:"d/m" }}</strong><em>{{ dia.citas|length }} cita{{ dia.citas|length|pluralize:"s" }}</em></div>
         <span>Toca para ver el detalle del día.</span>
         <div class="mobile-mini-list">
-          {% for cita in dia.citas|slice:":4" %}<b>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.display_cliente }}</b>{% empty %}<b>Sin citas</b>{% endfor %}
+          {% for bloqueo in dia.bloqueos %}<b>No disponible · {{ bloqueo.profesional.nombre }}</b>{% endfor %}
+          {% for cita in dia.citas|slice:":4" %}<b>{{ cita.fecha_hora|date:"h:i A" }} · {{ cita.display_cliente }}</b>{% endfor %}
+          {% if not dia.citas and not dia.bloqueos %}<b>Sin citas ni bloqueos</b>{% endif %}
         </div>
       </a>
       {% endfor %}
@@ -693,8 +695,8 @@
     <section class="appointments">
       {% for dia in dias %}{% for bloqueo in dia.bloqueos %}
       <article class="appointment is-unavailable">
-        <div class="time">{% if bloqueo.dia_completo %}TODO<small>EL DÍA</small>{% else %}{{ bloqueo.hora_inicio|time:"h:i" }}<small>{{ bloqueo.hora_inicio|time:"A" }}</small>{% endif %}</div>
-        <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.horario_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div><span></span>
+        <div class="time">{% if bloqueo.dia_completo or dia.fecha > bloqueo.fecha and dia.fecha < bloqueo.fecha_fin %}TODO<small>EL DÍA</small>{% elif dia.fecha == bloqueo.fecha_fin and dia.fecha != bloqueo.fecha %}HASTA<small>{{ bloqueo.hora_fin|time:"h:i A" }}</small>{% else %}DESDE<small>{{ bloqueo.hora_inicio|time:"h:i A" }}</small>{% endif %}</div>
+        <div class="appointment-main"><strong>No disponible</strong><span>{{ bloqueo.profesional.nombre }} · {{ bloqueo.periodo_display }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span><em class="status unavailable">Bloqueo médico</em></div><span></span>
       </article>
       {% endfor %}{% endfor %}
       {% for cita in citas %}
@@ -745,7 +747,7 @@
     </form>
     <div class="availability-mobile-list">
       {% for bloqueo in bloqueos %}
-      <article class="availability-mobile-row"><div><strong>{{ bloqueo.fecha|date:"d/m/Y" }} · {{ bloqueo.horario_display }}</strong><span>{{ bloqueo.profesional.nombre }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span></div>{% if bloqueo.puede_gestionar %}<div class="availability-mobile-actions"><a href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar_bloqueo={{ bloqueo.id }}#disponibilidad-medica">Editar</a><form method="post" action="{% url 'agenda_bloqueo_eliminar' empresa.slug bloqueo.id %}" onsubmit="return confirm('¿Eliminar este bloqueo?')">{% csrf_token %}<input type="hidden" name="regresar_a" value="app"><button type="submit">Eliminar</button></form></div>{% endif %}</article>
+      <article class="availability-mobile-row"><div><strong>{{ bloqueo.periodo_display }}</strong><span>{{ bloqueo.profesional.nombre }}{% if bloqueo.motivo %} · {{ bloqueo.motivo }}{% endif %}</span></div>{% if bloqueo.puede_gestionar %}<div class="availability-mobile-actions"><a href="?vista={{ vista }}&fecha={{ fecha_seleccionada|date:'Y-m-d' }}&editar_bloqueo={{ bloqueo.id }}#disponibilidad-medica">Editar</a><form method="post" action="{% url 'agenda_bloqueo_eliminar' empresa.slug bloqueo.id %}" onsubmit="return confirm('¿Eliminar este bloqueo?')">{% csrf_token %}<input type="hidden" name="regresar_a" value="app"><button type="submit">Eliminar</button></form></div>{% endif %}</article>
       {% empty %}<div class="empty">No hay bloqueos en el período mostrado.</div>{% endfor %}
     </div>
   </div>

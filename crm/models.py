@@ -172,6 +172,7 @@ class BloqueoDisponibilidadMedica(models.Model):
         related_name="bloqueos_disponibilidad",
     )
     fecha = models.DateField()
+    fecha_fin = models.DateField()
     hora_inicio = models.TimeField(blank=True, null=True)
     hora_fin = models.TimeField(blank=True, null=True)
     dia_completo = models.BooleanField(default=False)
@@ -190,16 +191,24 @@ class BloqueoDisponibilidadMedica(models.Model):
         ordering = ["fecha", "hora_inicio", "profesional__nombre"]
         indexes = [
             models.Index(fields=["empresa", "fecha"], name="crm_bloq_empresa_fecha"),
+            models.Index(fields=["empresa", "fecha_fin"], name="crm_bloq_empresa_fin"),
             models.Index(fields=["profesional", "fecha"], name="crm_bloq_prof_fecha"),
         ]
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    models.Q(dia_completo=True)
+                    models.Q(dia_completo=True, fecha_fin__gte=models.F("fecha"))
                     | (
-                        models.Q(hora_inicio__isnull=False)
+                        models.Q(dia_completo=False)
+                        & models.Q(hora_inicio__isnull=False)
                         & models.Q(hora_fin__isnull=False)
-                        & models.Q(hora_fin__gt=models.F("hora_inicio"))
+                        & (
+                            models.Q(fecha_fin__gt=models.F("fecha"))
+                            | (
+                                models.Q(fecha_fin=models.F("fecha"))
+                                & models.Q(hora_fin__gt=models.F("hora_inicio"))
+                            )
+                        )
                     )
                 ),
                 name="crm_bloqueo_horario_valido",
@@ -209,15 +218,30 @@ class BloqueoDisponibilidadMedica(models.Model):
         verbose_name_plural = "Bloqueos de disponibilidad médica"
 
     def __str__(self):
-        return f"{self.profesional.nombre} · {self.fecha:%d/%m/%Y} · {self.horario_display}"
+        return f"{self.profesional.nombre} · {self.periodo_display}"
 
     @property
     def horario_display(self):
         if self.dia_completo:
-            return "Día completo"
+            return "Día completo" if self.fecha_fin == self.fecha else "Días completos"
         if not self.hora_inicio or not self.hora_fin:
             return "Horario no definido"
         return f"{self.hora_inicio.strftime('%I:%M %p')} – {self.hora_fin.strftime('%I:%M %p')}"
+
+    @property
+    def periodo_display(self):
+        if self.dia_completo:
+            if self.fecha_fin == self.fecha:
+                return f"{self.fecha:%d/%m/%Y} · Día completo"
+            return f"{self.fecha:%d/%m/%Y} – {self.fecha_fin:%d/%m/%Y} · Días completos"
+        if not self.hora_inicio or not self.hora_fin:
+            return "Período no definido"
+        if self.fecha_fin == self.fecha:
+            return f"{self.fecha:%d/%m/%Y} · {self.horario_display}"
+        return (
+            f"{self.fecha:%d/%m/%Y} {self.hora_inicio.strftime('%I:%M %p')} – "
+            f"{self.fecha_fin:%d/%m/%Y} {self.hora_fin.strftime('%I:%M %p')}"
+        )
 
 
 class CitaCliente(models.Model):

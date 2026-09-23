@@ -552,11 +552,27 @@ class CRMTests(TestCase):
             duracion_minutos=60,
         )
         self.client.login(username="crmuser", password="pass12345")
+        invalido = self.client.post(
+            reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
+            {
+                "profesional": candy.id,
+                "fecha": "2026-09-25",
+                "fecha_fin": "2026-09-24",
+                "hora_inicio": "08:00",
+                "hora_inicio_periodo": "AM",
+                "hora_fin": "06:00",
+                "hora_fin_periodo": "PM",
+            },
+        )
+        self.assertEqual(invalido.status_code, 400)
+        self.assertContains(invalido, "La fecha final no puede ser anterior", status_code=400)
+        self.assertFalse(BloqueoDisponibilidadMedica.objects.exists())
         response = self.client.post(
             reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
             {
                 "profesional": candy.id,
                 "fecha": "2026-09-22",
+                "fecha_fin": "2026-09-22",
                 "hora_inicio": "02:00",
                 "hora_inicio_periodo": "PM",
                 "hora_fin": "05:00",
@@ -622,6 +638,78 @@ class CRMTests(TestCase):
         )
         self.assertTrue(form_otro_medico.is_valid(), form_otro_medico.errors.as_text())
 
+    def test_bloqueo_medico_multidia_cubre_todo_el_rango_y_todos_los_dias(self):
+        candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Candy Luque")
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-BLOQ-MULTI",
+            identidad="08011999009911",
+            nombre="Paciente rango múltiple",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta rango múltiple",
+            categoria="consulta",
+            duracion_minutos=30,
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.post(
+            reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
+            {
+                "profesional": candy.id,
+                "fecha": "2026-09-25",
+                "fecha_fin": "2026-09-29",
+                "hora_inicio": "08:00",
+                "hora_inicio_periodo": "AM",
+                "hora_fin": "06:00",
+                "hora_fin_periodo": "PM",
+                "motivo": "Ausencia médica",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        bloqueo = BloqueoDisponibilidadMedica.objects.get()
+        self.assertEqual(bloqueo.fecha_fin, date(2026, 9, 29))
+        self.assertEqual(
+            bloqueo.periodo_display,
+            "25/09/2026 08:00 AM – 29/09/2026 06:00 PM",
+        )
+
+        for fecha_bloqueada in ("2026-09-25", "2026-09-27", "2026-09-29"):
+            agenda = self.client.get(
+                reverse("agenda_citas", args=[self.empresa.slug]),
+                {"vista": "dia", "fecha": fecha_bloqueada},
+            )
+            self.assertContains(agenda, "No disponible")
+            self.assertContains(agenda, "25/09/2026 08:00 AM – 29/09/2026 06:00 PM")
+        agenda_mobile = self.client.get(
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            {"vista": "dia", "fecha": "2026-09-27"},
+        )
+        self.assertContains(agenda_mobile, "No disponible")
+        self.assertContains(agenda_mobile, "25/09/2026 08:00 AM – 29/09/2026 06:00 PM")
+
+        def formulario_cita(fecha, hora, periodo):
+            return CitaClienteForm(
+                {
+                    "paciente": paciente.id,
+                    "servicio_clinico": servicio.id,
+                    "profesional_salud": candy.id,
+                    "fecha_cita": fecha,
+                    "hora_cita": hora,
+                    "periodo_cita": periodo,
+                    "estado": "pendiente",
+                },
+                empresa=self.empresa,
+            )
+
+        self.assertFalse(formulario_cita("2026-09-25", "08:00", "AM").is_valid())
+        self.assertFalse(formulario_cita("2026-09-27", "12:00", "PM").is_valid())
+        self.assertFalse(formulario_cita("2026-09-29", "05:45", "PM").is_valid())
+        antes = formulario_cita("2026-09-25", "07:30", "AM")
+        despues = formulario_cita("2026-09-29", "06:00", "PM")
+        self.assertTrue(antes.is_valid(), antes.errors.as_text())
+        self.assertTrue(despues.is_valid(), despues.errors.as_text())
+
     def test_bloqueo_con_citas_exige_confirmacion_y_no_modifica_las_existentes(self):
         candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Candy Luque")
         paciente = Paciente.objects.create(
@@ -649,6 +737,7 @@ class CRMTests(TestCase):
         datos = {
             "profesional": candy.id,
             "fecha": "2026-09-23",
+            "fecha_fin": "2026-09-25",
             "dia_completo": "1",
             "motivo": "Congreso médico",
         }
@@ -666,6 +755,7 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 302)
         bloqueo = BloqueoDisponibilidadMedica.objects.get()
         self.assertTrue(bloqueo.dia_completo)
+        self.assertEqual(bloqueo.fecha_fin, date(2026, 9, 25))
         cita.refresh_from_db()
         self.assertEqual(cita.estado, "confirmada")
         self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
@@ -676,6 +766,7 @@ class CRMTests(TestCase):
                 "bloqueo_id": bloqueo.id,
                 "profesional": candy.id,
                 "fecha": "2026-09-24",
+                "fecha_fin": "2026-09-24",
                 "hora_inicio": "08:00",
                 "hora_inicio_periodo": "AM",
                 "hora_fin": "10:00",
@@ -709,7 +800,12 @@ class CRMTests(TestCase):
 
         response = self.client.post(
             reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
-            {"profesional": luis.id, "fecha": "2026-09-24", "dia_completo": "1"},
+            {
+                "profesional": luis.id,
+                "fecha": "2026-09-24",
+                "fecha_fin": "2026-09-24",
+                "dia_completo": "1",
+            },
         )
         self.assertEqual(response.status_code, 400)
         self.assertFalse(BloqueoDisponibilidadMedica.objects.exists())
@@ -719,6 +815,7 @@ class CRMTests(TestCase):
             {
                 "profesional": candy.id,
                 "fecha": "2026-09-24",
+                "fecha_fin": "2026-09-24",
                 "dia_completo": "1",
                 "regresar_a": "app",
             },

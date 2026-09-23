@@ -31,6 +31,7 @@
       {% if bloqueo %}<input type="hidden" name="bloqueo_id" value="{{ bloqueo.id }}">{% endif %}
     <input type="hidden" name="profesional" value="{{ bloqueo_form.cleaned_data.profesional.id }}">
     <input type="hidden" name="fecha" value="{{ bloqueo_form.cleaned_data.fecha|date:'Y-m-d' }}">
+    <input type="hidden" name="fecha_fin" value="{{ bloqueo_form.cleaned_data.fecha_fin|date:'Y-m-d' }}">
     {% if bloqueo_form.cleaned_data.dia_completo %}<input type="hidden" name="dia_completo" value="1">{% endif %}
     {% if bloqueo_form.cleaned_data.hora_inicio %}<input type="hidden" name="hora_inicio" value="{{ bloqueo_form.cleaned_data.hora_inicio|time:'h:i' }}"><input type="hidden" name="hora_inicio_periodo" value="{{ bloqueo_form.cleaned_data.hora_inicio_periodo }}">{% endif %}
     {% if bloqueo_form.cleaned_data.hora_fin %}<input type="hidden" name="hora_fin" value="{{ bloqueo_form.cleaned_data.hora_fin|time:'h:i' }}"><input type="hidden" name="hora_fin_periodo" value="{{ bloqueo_form.cleaned_data.hora_fin_periodo }}">{% endif %}

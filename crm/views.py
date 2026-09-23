@@ -543,8 +543,8 @@ def _contexto_calendario(
     bloqueos_qs = (
         BloqueoDisponibilidadMedica.objects.filter(
             empresa=empresa_agenda,
-            fecha__gte=inicio,
             fecha__lte=fin,
+            fecha_fin__gte=inicio,
         )
         .select_related("profesional", "creado_por")
         .order_by("fecha", "hora_inicio", "profesional__nombre")
@@ -576,7 +576,7 @@ def _contexto_calendario(
         "instance": bloqueo_editando,
     }
     if not bloqueo_editando:
-        bloqueo_form_kwargs["initial"] = {"fecha": seleccionada}
+        bloqueo_form_kwargs["initial"] = {"fecha": seleccionada, "fecha_fin": seleccionada}
     bloqueo_form = BloqueoDisponibilidadMedicaForm(**bloqueo_form_kwargs)
     puede_gestionar_bloqueos = bool(
         puede_gestionar_otros_bloqueos
@@ -601,7 +601,11 @@ def _contexto_calendario(
         por_fecha.setdefault(clave, []).append(cita)
     bloqueos_por_fecha = {}
     for bloqueo in bloqueos:
-        bloqueos_por_fecha.setdefault(bloqueo.fecha, []).append(bloqueo)
+        dia_bloqueado = max(bloqueo.fecha, inicio)
+        ultimo_dia_bloqueado = min(bloqueo.fecha_fin, fin)
+        while dia_bloqueado <= ultimo_dia_bloqueado:
+            bloqueos_por_fecha.setdefault(dia_bloqueado, []).append(bloqueo)
+            dia_bloqueado += timedelta(days=1)
 
     semanas = []
     if vista == "mes":
@@ -1470,6 +1474,7 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
             empresa=empresa_agenda,
             profesional=profesional,
             fecha=form.cleaned_data["fecha"],
+            fecha_fin=form.cleaned_data["fecha_fin"],
             dia_completo=form.cleaned_data["dia_completo"],
             hora_inicio=form.cleaned_data.get("hora_inicio"),
             hora_fin=form.cleaned_data.get("hora_fin"),
@@ -2033,11 +2038,28 @@ def agenda_mobile(request, empresa_slug):
             fila["fecha_hora__date"]: fila["total"]
             for fila in citas_tira.values("fecha_hora__date").annotate(total=Count("id"))
         }
+    bloqueos_tira = BloqueoDisponibilidadMedica.objects.filter(
+        empresa=empresa_agenda,
+        fecha__lte=fin_tira,
+        fecha_fin__gte=inicio_tira,
+    )
+    if agenda_espejo and empresa.slug == "serviciosmedicos":
+        bloqueos_tira = bloqueos_tira.filter(profesional__nombre__icontains="Luis")
+    if contexto.get("filtro_profesional"):
+        bloqueos_tira = bloqueos_tira.filter(profesional_id=contexto["filtro_profesional"])
+    dias_bloqueados_tira = set()
+    for bloqueo in bloqueos_tira:
+        dia_bloqueado = max(bloqueo.fecha, inicio_tira)
+        ultimo_dia = min(bloqueo.fecha_fin, fin_tira)
+        while dia_bloqueado <= ultimo_dia:
+            dias_bloqueados_tira.add(dia_bloqueado)
+            dia_bloqueado += timedelta(days=1)
     contexto["dias_moviles"] = [
         {
             "fecha": inicio_tira + timedelta(days=indice),
             "dia_corto": dias_semana[(inicio_tira + timedelta(days=indice)).weekday()],
             "total": conteos.get(inicio_tira + timedelta(days=indice), 0),
+            "bloqueado": inicio_tira + timedelta(days=indice) in dias_bloqueados_tira,
         }
         for indice in range(7)
     ]
