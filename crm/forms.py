@@ -621,10 +621,23 @@ class CitaClienteForm(forms.ModelForm):
         help_text="Adjunta fotos o videos de referencia al momento de programar la cirugia.",
     )
     detalles_agenda = forms.CharField(required=False, widget=forms.HiddenInput())
+    crear_serie = forms.BooleanField(
+        label="Agendar varias citas",
+        required=False,
+        help_text="Crea varias citas a la misma hora, avanzando por día y omitiendo los domingos.",
+    )
+    cantidad_serie = forms.IntegerField(
+        label="Cantidad de citas",
+        required=False,
+        min_value=2,
+        max_value=30,
+        initial=7,
+        widget=forms.NumberInput(attrs={"min": 2, "max": 30, "inputmode": "numeric"}),
+    )
 
     class Meta:
         model = CitaCliente
-        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cortesia", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]
+        fields = ["cliente", "paciente", "producto", "servicio_clinico", "titulo", "fecha_hora", "duracion_minutos", "responsable", "profesional_salud", "estado", "pagada", "cortesia", "cirugia_detalle", "cirugia_fin_estimada", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp", "crear_serie", "cantidad_serie"]
         widgets = {
             "fecha_hora": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "cirugia_detalle": forms.Textarea(attrs={"rows": 3, "placeholder": "Ejemplo: Abdominoplastia con liposuccion, zona a operar, preparacion especial o detalle clinico."}),
@@ -728,6 +741,9 @@ class CitaClienteForm(forms.ModelForm):
         self.fields["cirugia_hora_fin"].label = "Hora final estimada"
         self.fields["cirugia_periodo_fin"].label = "AM / PM final"
         self.fields["cirugia_detalle"].required = False
+        if self.instance and self.instance.pk:
+            self.fields.pop("crear_serie", None)
+            self.fields.pop("cantidad_serie", None)
         if self.instance and self.instance.pk and self.instance.fecha_hora:
             fecha_local = timezone.localtime(self.instance.fecha_hora)
             hora_12 = fecha_local.hour % 12 or 12
@@ -825,19 +841,30 @@ class CitaClienteForm(forms.ModelForm):
             if not self.notificaciones_cita_activas:
                 for nombre in ["enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]:
                     self.fields.pop(nombre)
-            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "cortesia", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"])
+            self.order_fields(["paciente", "servicio_clinico", "profesional_salud", "fecha_cita", "hora_cita", "periodo_cita", "crear_serie", "cantidad_serie", "detalles_agenda", "cirugia_hora_fin", "cirugia_periodo_fin", "cirugia_detalle", "fotos_cirugia", "estado", "pagada", "cortesia", "observacion", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"])
         else:
             for nombre in ["paciente", "servicio_clinico", "profesional_salud", "cirugia_detalle", "cirugia_hora_fin", "cirugia_periodo_fin", "fotos_cirugia", "enviar_confirmacion_whatsapp", "recordatorio_semana_whatsapp", "recordatorio_tres_dias_whatsapp", "recordatorio_dia_whatsapp"]:
                 self.fields.pop(nombre, None)
             self.fields["pagada"].label = "Cita pagada"
             self.fields["cortesia"].label = "Cita de cortesía"
-            self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "duracion_minutos", "responsable", "estado", "pagada", "cortesia", "observacion"])
+            self.order_fields(["cliente", "producto", "titulo", "fecha_cita", "hora_cita", "periodo_cita", "crear_serie", "cantidad_serie", "duracion_minutos", "responsable", "estado", "pagada", "cortesia", "observacion"])
 
     def _armar_fecha_hora(self, fecha, hora_texto, periodo):
         hora_12, minuto = (int(parte) for parte in hora_texto.split(":"))
         hora_24 = hora_12 % 12 + (12 if periodo == "PM" else 0)
         fecha_hora = datetime.combine(fecha, datetime.min.time()).replace(hour=hora_24, minute=minuto)
         return timezone.make_aware(fecha_hora)
+
+    @staticmethod
+    def _inicios_serie(inicio, cantidad):
+        inicios = [inicio]
+        candidato = inicio
+        while len(inicios) < cantidad:
+            candidato += timedelta(days=1)
+            if timezone.localtime(candidato).weekday() == 6:
+                continue
+            inicios.append(candidato)
+        return inicios
 
     def _servicio_es_cirugia(self, servicio):
         if not servicio:
@@ -939,8 +966,8 @@ class CitaClienteForm(forms.ModelForm):
             bloqueo = conflictos[0]
             motivo = f" Motivo: {bloqueo.motivo}." if bloqueo.motivo else ""
             raise forms.ValidationError(
-                f"{profesional.nombre} está marcado como No disponible el "
-                f"{bloqueo.fecha:%d/%m/%Y}, {bloqueo.horario_display}.{motivo}"
+                f"{profesional.nombre} está marcado como No disponible: "
+                f"{bloqueo.periodo_display}.{motivo}"
             )
 
     def _validar_traslapes_agenda_extendida(self, inicio, fin_bloque, profesional=None):
@@ -1108,6 +1135,17 @@ class CitaClienteForm(forms.ModelForm):
             inicio = self._armar_fecha_hora(fecha, hora_texto, periodo)
             cleaned_data["fecha_hora_compuesta"] = inicio
         profesional = cleaned_data.get("profesional_salud")
+        crear_serie = bool(cleaned_data.get("crear_serie"))
+        cantidad_serie = cleaned_data.get("cantidad_serie")
+        if self.instance and self.instance.pk and crear_serie:
+            self.add_error("crear_serie", "La generación múltiple solo está disponible al crear citas nuevas.")
+        if crear_serie and not cantidad_serie:
+            self.add_error("cantidad_serie", "Indica cuántas citas deseas generar.")
+        if crear_serie and len(detalles) > 1:
+            self.add_error(
+                "detalles_agenda",
+                "Para generar una serie selecciona una sola sesión o servicio; el sistema lo repetirá en cada fecha.",
+            )
         fin_bloque = inicio + timedelta(minutes=(getattr(servicio, "duracion_minutos", None) or cleaned_data.get("duracion_minutos") or 30))
         hora_fin = cleaned_data.get("cirugia_hora_fin")
         periodo_fin = cleaned_data.get("cirugia_periodo_fin")
@@ -1141,7 +1179,29 @@ class CitaClienteForm(forms.ModelForm):
             cleaned_data["cirugia_detalle"] = ""
             cleaned_data["cirugia_fin_estimada_compuesta"] = fin_estimada
 
-        if not self.errors and detalles:
+        if not self.errors and crear_serie:
+            duracion = getattr(servicio, "duracion_minutos", None) or cleaned_data.get("duracion_minutos") or 30
+            inicio_base = detalles[0]["inicio"] if detalles else inicio
+            inicios_serie = self._inicios_serie(inicio_base, cantidad_serie)
+            if detalles and detalles[0].get("sesion"):
+                ultima_sesion = detalles[0]["sesion"] + cantidad_serie - 1
+                if self._recurso_capacidad_servicio(servicio) == "camara_hiperbarica" and ultima_sesion > 22:
+                    self.add_error("cantidad_serie", "La serie supera las 22 sesiones disponibles de Cámara hiperbárica.")
+            if not self.errors:
+                for inicio_serie in inicios_serie:
+                    fin_serie = inicio_serie + timedelta(minutes=duracion)
+                    try:
+                        self._validar_disponibilidad_profesional(inicio_serie, fin_serie, profesional)
+                        usa_capacidad = self._validar_capacidad_recurso(inicio_serie, fin_serie, servicio)
+                        if not usa_capacidad:
+                            self._validar_traslapes_agenda_extendida(inicio_serie, fin_serie, profesional)
+                    except forms.ValidationError as exc:
+                        fecha_conflicto = timezone.localtime(inicio_serie).strftime("%d/%m/%Y")
+                        self.add_error("cantidad_serie", f"No se puede crear la serie el {fecha_conflicto}: {exc.messages[0]}")
+                        break
+            if not self.errors:
+                cleaned_data["inicios_serie"] = inicios_serie
+        elif not self.errors and detalles:
             duracion = getattr(servicio, "duracion_minutos", None) or 60
             vistos = []
             for detalle in detalles:

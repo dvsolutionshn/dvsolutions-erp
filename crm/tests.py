@@ -528,6 +528,85 @@ class CRMTests(TestCase):
         self.assertContains(response, "Calendario de Citas")
         self.assertContains(response, reverse("agenda_mobile", args=[self.empresa.slug]))
 
+    def test_agenda_crea_serie_diaria_a_la_misma_hora_omitiendo_domingos(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-SERIE-01",
+            identidad="08011999008801",
+            nombre="Paciente Serie Terapias",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Terapias",
+            categoria="tratamiento",
+            duracion_minutos=60,
+        )
+        doctora = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Dra. Candy Luque")
+        detalle = json.dumps([
+            {
+                "tipo": "terapias",
+                "clave": "terapia-1-1",
+                "fase": 1,
+                "sesion": 1,
+                "hora": "10:00",
+                "periodo": "AM",
+            }
+        ])
+        self.client.login(username="crmuser", password="pass12345")
+
+        formulario = self.client.get(reverse("agenda_citas", args=[self.empresa.slug]))
+        self.assertContains(formulario, "Agendar varias citas")
+        app = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
+        self.assertContains(app, "Agendar varias citas")
+
+        BloqueoDisponibilidadMedica.objects.create(
+            empresa=self.empresa,
+            profesional=doctora,
+            fecha=date(2026, 9, 30),
+            fecha_fin=date(2026, 9, 30),
+            hora_inicio=datetime(2026, 9, 30, 10, 0).time(),
+            hora_fin=datetime(2026, 9, 30, 11, 0).time(),
+            motivo="No disponible",
+        )
+        datos = {
+            "paciente": paciente.id,
+            "servicio_clinico": servicio.id,
+            "profesional_salud": doctora.id,
+            "fecha_cita": "2026-09-26",
+            "hora_cita": "10:00",
+            "periodo_cita": "AM",
+            "detalles_agenda": detalle,
+            "crear_serie": "on",
+            "cantidad_serie": "7",
+            "estado": "pendiente",
+        }
+        conflicto = self.client.post(reverse("agenda_citas", args=[self.empresa.slug]), datos)
+        self.assertEqual(conflicto.status_code, 200)
+        self.assertContains(conflicto, "No se puede crear la serie el 30/09/2026")
+        self.assertFalse(CitaCliente.objects.filter(paciente=paciente).exists())
+
+        BloqueoDisponibilidadMedica.objects.all().delete()
+        response = self.client.post(reverse("agenda_citas", args=[self.empresa.slug]), datos)
+        self.assertEqual(response.status_code, 302)
+        citas = list(CitaCliente.objects.filter(paciente=paciente).order_by("fecha_hora"))
+        self.assertEqual(len(citas), 7)
+        self.assertEqual(
+            [timezone.localtime(cita.fecha_hora).date() for cita in citas],
+            [
+                date(2026, 9, 26),
+                date(2026, 9, 28),
+                date(2026, 9, 29),
+                date(2026, 9, 30),
+                date(2026, 10, 1),
+                date(2026, 10, 2),
+                date(2026, 10, 3),
+            ],
+        )
+        self.assertTrue(all(timezone.localtime(cita.fecha_hora).hour == 10 for cita in citas))
+        self.assertEqual([cita.sesion_servicio for cita in citas], list(range(1, 8)))
+        self.assertEqual(len({cita.grupo_atencion for cita in citas}), 1)
+        self.assertIsNotNone(citas[0].grupo_atencion)
+
     def test_bloqueo_medico_se_muestra_y_evitar_nuevas_citas_en_backend(self):
         candy = ProfesionalSalud.objects.create(
             empresa=self.empresa,

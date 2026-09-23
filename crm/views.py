@@ -770,6 +770,7 @@ def _contexto_calendario(
 
 def _guardar_cita_formulario(request, empresa, form, objeto=None):
     detalles = form.cleaned_data.get("detalles_agenda_limpios") or []
+    inicios_serie = form.cleaned_data.get("inicios_serie") or []
     if objeto and len(detalles) > 1:
         raise ValueError("Al editar una cita solo puede conservarse una opción por registro.")
     with transaction.atomic():
@@ -780,9 +781,23 @@ def _guardar_cita_formulario(request, empresa, form, objeto=None):
             cita_base.recordatorio_semana_whatsapp = True
             cita_base.recordatorio_tres_dias_whatsapp = True
             cita_base.recordatorio_dia_whatsapp = True
-        grupo = cita_base.grupo_atencion or (uuid.uuid4() if detalles else None)
+        grupo = cita_base.grupo_atencion or (uuid.uuid4() if detalles or inicios_serie else None)
         creadas = []
-        filas = detalles or [None]
+        if inicios_serie:
+            detalle_base = detalles[0] if detalles else {
+                "opcion": "",
+                "fase": None,
+                "sesion": None,
+            }
+            filas = []
+            for indice_serie, inicio_serie in enumerate(inicios_serie):
+                detalle_serie = dict(detalle_base)
+                detalle_serie["inicio"] = inicio_serie
+                if detalle_serie.get("sesion"):
+                    detalle_serie["sesion"] += indice_serie
+                filas.append(detalle_serie)
+        else:
+            filas = detalles or [None]
         for indice, detalle in enumerate(filas):
             if indice == 0:
                 cita = cita_base
@@ -817,6 +832,11 @@ def _guardar_cita_formulario(request, empresa, form, objeto=None):
             creadas.append(cita)
         _guardar_fotos_cirugia_cita(cita_base, form.cleaned_data.get("fotos_cirugia"), request.user)
     _programar_whatsapp_cita(request, cita_base)
+    for cita_adicional in creadas[1:]:
+        try:
+            programar_notificaciones_cita(cita_adicional)
+        except Exception:
+            logger.exception("No se pudieron programar recordatorios para la cita %s de una serie", cita_adicional.pk)
     return cita_base, creadas
 
 
