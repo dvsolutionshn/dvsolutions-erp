@@ -13,6 +13,11 @@ from core.access import (
     permiso_tecnicentro_desde_ruta,
 )
 from core.models import Empresa
+from core.clinical_permissions import (
+    permiso_agenda_granular,
+    permiso_clinica_granular,
+    rol_clinico_granular,
+)
 from core.audit_context import reset_audit_request, set_audit_request
 
 
@@ -60,6 +65,8 @@ class EmpresaAccessMiddleware:
                     suffix = "/".join(parts[3:])
                     permiso = permiso_facturacion_desde_ruta(suffix)
                     permiso_accion = permiso_facturacion_accion(suffix)
+                    if permiso_accion == "puede_transferir_inventario" and not rol_clinico_granular(request.user, empresa):
+                        permiso_accion = "puede_inventario"
                     if permiso and not permiso_accion and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion.")
                         return redirect("dashboard", slug=empresa.slug)
@@ -188,6 +195,15 @@ class EmpresaAccessMiddleware:
                     return redirect("dashboard", slug=empresa.slug)
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
+                    rol_granular = rol_clinico_granular(request.user, empresa)
+                    if rol_granular:
+                        permiso = permiso_agenda_granular(suffix, request.method)
+                        if permiso == "__denegar__" or (
+                            permiso and not request.user.tiene_permiso_erp(permiso, empresa)
+                        ):
+                            messages.error(request, "Tu rol no tiene permiso para ejecutar esta acción de agenda.")
+                            return redirect("dashboard", slug=empresa.slug)
+                        return self.get_response(request)
                     tiene_permiso_app = bool(
                         (es_app_clinica_global or es_gestion_disponibilidad_medica)
                         and (
@@ -218,7 +234,15 @@ class EmpresaAccessMiddleware:
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     suffix = "/".join(parts[3:])
-                    permiso = permiso_clinica_desde_ruta(suffix)
+                    rol_granular = rol_clinico_granular(request.user, empresa)
+                    permiso = (
+                        permiso_clinica_granular(suffix, request.method)
+                        if rol_granular
+                        else permiso_clinica_desde_ruta(suffix)
+                    )
+                    if permiso == "__denegar__":
+                        messages.error(request, "Tu rol no tiene permiso para entrar a esta sección clínica.")
+                        return redirect("dashboard", slug=empresa.slug)
                     if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion clinica.")
                         return redirect("dashboard", slug=empresa.slug)

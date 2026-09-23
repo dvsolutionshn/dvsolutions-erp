@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
@@ -29,6 +30,7 @@ from django.views.decorators.http import require_POST
 from weasyprint import HTML
 
 from core.access import interfaz_clinica_activa
+from core.clinical_permissions import rol_clinico_granular
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
 from contabilidad.services import asegurar_cuenta_contable_cliente
@@ -331,22 +333,27 @@ def _recetas_avanzadas_activas(empresa):
 
 
 def _puede_administrar_manuales_receta(user, empresa):
+    granular = bool(rol_clinico_granular(user, empresa))
     return bool(
         getattr(user, "is_authenticated", False)
         and user.puede_acceder_empresa(empresa)
-        and user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
+        and user.tiene_permiso_erp(
+            "puede_administrar_manuales_pdf" if granular else "puede_configuracion_clinica",
+            empresa,
+        )
     )
 
 
 def _puede_consultar_manual_receta(user, empresa):
+    granular = bool(rol_clinico_granular(user, empresa))
     return bool(
         getattr(user, "is_authenticated", False)
         and user.puede_acceder_empresa(empresa)
-        and (
+        and (user.tiene_permiso_erp("puede_ver_manuales_pdf", empresa) if granular else (
             user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
             or user.tiene_permiso_erp("puede_pacientes", empresa)
             or user.tiene_permiso_erp("puede_expediente_clinico", empresa)
-        )
+        ))
     )
 
 
@@ -809,23 +816,28 @@ def _sincronizar_cliente_facturacion_paciente(paciente, *, identidad_anterior=No
 @login_required
 def clinica_dashboard(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    granular = bool(rol_clinico_granular(request.user, empresa))
+    permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
+    puede_calendario = permiso("puede_ver_calendario", "puede_citas")
+    puede_planes = permiso("puede_ver_planes_tratamiento", "puede_tratamientos_clinicos")
+    puede_historia = permiso("puede_ver_historia_clinica", "puede_expediente_clinico")
     hoy = timezone.localdate()
     inicio_mes = hoy.replace(day=1)
     citas_hoy = CitaClinica.objects.filter(empresa=empresa, fecha_hora__date=hoy)
     citas_mes = CitaClinica.objects.filter(empresa=empresa, fecha_hora__date__gte=inicio_mes)
     pacientes = Paciente.objects.filter(empresa=empresa)
-    tratamientos_activos = TratamientoPaciente.objects.filter(empresa=empresa, estado__in=["planificado", "en_proceso"])
+    tratamientos_activos = TratamientoPaciente.objects.filter(empresa=empresa, estado__in=["planificado", "en_proceso"]) if puede_planes else TratamientoPaciente.objects.none()
     seguimientos_pendientes = SeguimientoPostOperatorio.objects.filter(
         empresa=empresa,
         estado__in=["pendiente", "requiere_revision"],
         fecha_programada__gte=hoy,
-    )
-    ultimos_eventos = ExpedienteEvento.objects.filter(empresa=empresa).select_related("paciente", "profesional")[:8]
+    ) if puede_historia else SeguimientoPostOperatorio.objects.none()
+    ultimos_eventos = ExpedienteEvento.objects.filter(empresa=empresa).select_related("paciente", "profesional")[:8] if puede_historia else []
     proximas_citas = (
         CitaClinica.objects.filter(empresa=empresa, fecha_hora__date__gte=hoy)
         .select_related("paciente", "profesional", "servicio")
         .order_by("fecha_hora")[:8]
-    )
+    ) if puede_calendario else []
     embudo_citas = (
         citas_mes
         .values("estado")
@@ -865,7 +877,7 @@ def clinica_dashboard(request, empresa_slug):
                 "pacientes": pacientes.filter(activo=True).count(),
                 "citas_hoy": citas_hoy.count(),
                 "tratamientos_activos": tratamientos_activos.count(),
-                "eventos_mes": ExpedienteEvento.objects.filter(empresa=empresa, fecha__date__gte=inicio_mes).count(),
+                "eventos_mes": ExpedienteEvento.objects.filter(empresa=empresa, fecha__date__gte=inicio_mes).count() if puede_historia else 0,
                 "seguimientos_pendientes": seguimientos_pendientes.count(),
             },
             "proximas_citas": proximas_citas,
@@ -940,6 +952,11 @@ def pacientes(request, empresa_slug):
 @login_required
 def pacientes_sugerencias(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    granular = bool(rol_clinico_granular(request.user, empresa))
+    puede_ver_historia = request.user.tiene_permiso_erp(
+        "puede_ver_historia_clinica" if granular else "puede_expediente_clinico",
+        empresa,
+    )
     q = (request.GET.get("q") or "").strip()
     if len(q) < 2:
         return JsonResponse({"results": []})
@@ -966,7 +983,7 @@ def pacientes_sugerencias(request, empresa_slug):
             "url": request.build_absolute_uri(
                 reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id])
             ),
-            "alergico": paciente.es_alergico,
+            "alergico": paciente.es_alergico if puede_ver_historia else False,
         }
         for paciente in pacientes_qs
     ]
@@ -1311,28 +1328,35 @@ def paciente_detalle(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     asegurar_profesionales_agenda_base(empresa)
-    eventos = paciente.eventos_expediente.select_related("profesional", "tratamiento")[:20]
-    citas = paciente.citas.select_related("profesional", "servicio")[:10]
+    granular = bool(rol_clinico_granular(request.user, empresa))
+    permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
+    puede_historia = permiso("puede_ver_historia_clinica", "puede_expediente_clinico")
+    puede_anexos = permiso("puede_ver_anexos_clinicos", "puede_expediente_clinico")
+    puede_recetas = permiso("puede_ver_recetas", "puede_expediente_clinico")
+    puede_planes = permiso("puede_ver_planes_tratamiento", "puede_tratamientos_clinicos")
+    puede_recordatorios = permiso("puede_crear_recordatorios_paciente", "puede_pacientes")
+    eventos = paciente.eventos_expediente.select_related("profesional", "tratamiento")[:20] if puede_historia else []
+    citas = paciente.citas.select_related("profesional", "servicio")[:10] if puede_recordatorios else []
     recordatorios_tratamiento = (
         paciente.citas.filter(es_recordatorio_tratamiento=True)
         .select_related("profesional", "servicio")
         .order_by("fecha_hora")[:8]
-    )
-    tratamientos = paciente.tratamientos.select_related("profesional", "servicio")[:10]
+    ) if puede_recordatorios else []
+    tratamientos = paciente.tratamientos.select_related("profesional", "servicio")[:10] if puede_planes else []
     profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
-    fotos_evolucion = paciente.fotos_evolucion.select_related("creado_por")[:12]
-    medicamentos = MedicamentoPrescrito.objects.filter(empresa=empresa, paciente=paciente)[:10]
-    consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10]
-    examenes = ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente)[:10]
-    recetas = RecetaMedica.objects.filter(empresa=empresa, paciente=paciente).select_related("profesional")[:10]
+    fotos_evolucion = paciente.fotos_evolucion.select_related("creado_por")[:12] if puede_anexos else []
+    medicamentos = MedicamentoPrescrito.objects.filter(empresa=empresa, paciente=paciente)[:10] if puede_historia else []
+    consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10] if puede_anexos else []
+    examenes = ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente)[:10] if puede_anexos else []
+    recetas = RecetaMedica.objects.filter(empresa=empresa, paciente=paciente).select_related("profesional")[:10] if puede_recetas else []
     documentos_clinicos_conteos = {
         item["categoria"]: item["total"]
-        for item in DocumentoClinicoPaciente.objects.filter(empresa=empresa, paciente=paciente)
+        for item in (DocumentoClinicoPaciente.objects.filter(empresa=empresa, paciente=paciente) if puede_anexos else DocumentoClinicoPaciente.objects.none())
         .values("categoria")
         .annotate(total=Count("id"))
     }
-    historias_especialidad = paciente.historias_especialidad.select_related("profesional", "actualizado_por")[:20]
-    ultima_historia_general = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
+    historias_especialidad = paciente.historias_especialidad.select_related("profesional", "actualizado_por")[:20] if puede_historia else []
+    ultima_historia_general = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first() if puede_historia else None
     historia_clinica_pendiente_doctor = bool(
         ultima_historia_general
         and isinstance(ultima_historia_general.datos_generales, dict)
@@ -1851,8 +1875,14 @@ def _receta_con_adjuntos(empresa, paciente, receta_id):
 @login_required
 def manuales_recetas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    if not _puede_administrar_manuales_receta(request.user, empresa):
-        raise PermissionDenied("No tiene permiso para administrar manuales de recetas.")
+    granular = bool(rol_clinico_granular(request.user, empresa))
+    puede_listar = (
+        _puede_consultar_manual_receta(request.user, empresa)
+        if granular
+        else _puede_administrar_manuales_receta(request.user, empresa)
+    )
+    if not puede_listar:
+        raise PermissionDenied("No tiene permiso para consultar manuales de recetas.")
     manuales = list(
         ManualReceta.objects.filter(empresa=empresa)
         .select_related("creado_por")
@@ -1862,7 +1892,7 @@ def manuales_recetas(request, empresa_slug):
     return render(
         request,
         "clinica/manuales_recetas.html",
-        {"empresa": empresa, "manuales": manuales},
+        {"empresa": empresa, "manuales": manuales, "puede_administrar_manuales": _puede_administrar_manuales_receta(request.user, empresa)},
     )
 
 
@@ -1919,6 +1949,39 @@ def archivo_manual_receta(request, empresa_slug, manual_id):
         filename=nombre,
         content_type="application/pdf",
     )
+
+
+@login_required
+@require_POST
+def enviar_manual_receta_correo(request, empresa_slug, manual_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    granular = bool(rol_clinico_granular(request.user, empresa))
+    permiso = "puede_enviar_manuales_pdf" if granular else "puede_expediente_clinico"
+    if not request.user.puede_acceder_empresa(empresa) or not request.user.tiene_permiso_erp(permiso, empresa):
+        raise PermissionDenied("No tiene permiso para enviar manuales PDF.")
+    manual = get_object_or_404(ManualReceta, id=manual_id, empresa=empresa, activo=True)
+    destinatario = (request.POST.get("correo") or "").strip()
+    try:
+        validate_email(destinatario)
+    except ValidationError:
+        messages.error(request, "Ingrese un correo electrónico válido.")
+        return redirect("clinica_manuales_recetas", empresa_slug=empresa.slug)
+    if not manual.archivo:
+        raise Http404("El manual no tiene un PDF disponible.")
+    mensaje = EmailMultiAlternatives(
+        subject=f"{manual.titulo} - {empresa.nombre}",
+        body=f"Adjuntamos el manual «{manual.titulo}» enviado por {empresa.nombre}.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[destinatario],
+    )
+    manual.archivo.open("rb")
+    try:
+        mensaje.attach(Path(manual.archivo.name).name, manual.archivo.read(), "application/pdf")
+    finally:
+        manual.archivo.close()
+    mensaje.send(fail_silently=False)
+    messages.success(request, f"Manual enviado correctamente a {destinatario}.")
+    return redirect("clinica_manuales_recetas", empresa_slug=empresa.slug)
 
 
 @login_required
@@ -2219,7 +2282,7 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     puede_crear_plan = request.user.tiene_permiso_erp(
-        "puede_expediente_clinico",
+        "puede_editar_planes_tratamiento" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico",
         empresa,
     )
     form = PlanTratamientoPacienteForm(request.POST or None) if puede_crear_plan else None
@@ -2953,6 +3016,11 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    acceso_granular = bool(rol_clinico_granular(request.user, empresa))
+    puede_ver_historia = request.user.tiene_permiso_erp(
+        "puede_ver_historia_clinica" if acceso_granular else "puede_expediente_clinico",
+        empresa,
+    )
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     if tipo not in tipos_validos:
         raise Http404("Formulario clinico no valido.")
@@ -3089,11 +3157,11 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
     if profesional_usuario:
         initial["profesional"] = profesional_usuario
-    preconsultas_tipo = paciente.preconsultas.filter(tipo=tipo).select_related("creada_por")[:10]
+    preconsultas_tipo = paciente.preconsultas.filter(tipo=tipo).select_related("creada_por")[:10] if puede_ver_historia else []
     ultima_preconsulta = (
         paciente.preconsultas.filter(estado="completada", tipo__in=[tipo, "general"])
         .order_by("-fecha_completada", "-fecha_creacion")
-        .first()
+        .first() if puede_ver_historia else None
     )
     if ultima_preconsulta:
         resumen = _resumen_preconsulta(ultima_preconsulta)
@@ -3131,12 +3199,15 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         historia.save()
         _guardar_clasificacion_alopecia(historia, form, request.user)
         messages.success(request, f"Historia de {historia.get_tipo_display()} guardada correctamente.")
+        if acceso_granular and not puede_ver_historia:
+            return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     historias_previas = (
         paciente.historias_especialidad.filter(tipo=tipo)
         .exclude(plan_tratamiento="")
         .select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")[:12]
+        if puede_ver_historia else []
     )
     clasificaciones_alopecia = (
         paciente.clasificaciones_alopecia.select_related("profesional", "creado_por")[:20]

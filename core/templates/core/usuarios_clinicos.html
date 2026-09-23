@@ -26,7 +26,7 @@
     <h2>Un equipo, accesos claros</h2>
     <p>Cada ajuste realizado aquí se aplica únicamente en <strong>{{ empresa.nombre }}</strong>. Los accesos del mismo usuario en otras empresas permanecen sin cambios.</p>
   </div>
-  <div class="clinical-users-count"><strong>{{ total_usuarios }}</strong><span>Usuarios</span></div>
+  <div><a class="clinical-edit-btn" href="{% url 'roles_clinicos' empresa.slug %}">Administrar roles y permisos</a><div class="clinical-users-count"><strong>{{ total_usuarios }}</strong><span>Usuarios</span></div></div>
 </section>
 
 <section class="clinical-user-grid">
@@ -57,7 +57,7 @@
     {% else %}
     <div class="clinical-user-empty">Este usuario todavía no tiene permisos operativos en esta empresa.</div>
     {% endif %}
-    <a class="clinical-edit-btn" href="{% url 'usuario_clinico_permisos' empresa.slug fila.usuario.id %}">Revisar y editar {{ fila.total_permisos }} permiso(s)</a>
+    <a class="clinical-edit-btn" href="{% url 'usuario_clinico_permisos' empresa.slug fila.usuario.id %}">Asignar rol</a>
   </article>
   {% empty %}
   <article class="erp-card">No hay usuarios vinculados a esta empresa.</article>

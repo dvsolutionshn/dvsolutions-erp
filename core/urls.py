@@ -46,6 +46,8 @@ from .views import (
     superadmin_auditoria,
     usuarios_clinicos,
     usuario_clinico_permisos,
+    roles_clinicos,
+    rol_clinico_editar,
 )
 
 urlpatterns = [
@@ -97,6 +99,9 @@ urlpatterns = [
     path('<slug:slug>/dashboard/auditoria/', auditoria_empresa, name='auditoria_empresa'),
     path('<slug:slug>/dashboard/usuarios-clinicos/', usuarios_clinicos, name='usuarios_clinicos'),
     path('<slug:slug>/dashboard/usuarios-clinicos/<int:usuario_id>/permisos/', usuario_clinico_permisos, name='usuario_clinico_permisos'),
+    path('<slug:slug>/dashboard/roles-clinicos/', roles_clinicos, name='roles_clinicos'),
+    path('<slug:slug>/dashboard/roles-clinicos/nuevo/', rol_clinico_editar, name='rol_clinico_crear'),
+    path('<slug:slug>/dashboard/roles-clinicos/<int:rol_id>/editar/', rol_clinico_editar, name='rol_clinico_editar'),
     path('<slug:slug>/dashboard/auditoria/<slug:app_label>/<slug:modelo>/<str:objeto_id>/', auditoria_objeto, name='auditoria_objeto'),
     path('<slug:slug>/dashboard/', dashboard, name='dashboard'),
     path('<slug:slug>/logout/', cerrar_sesion, name='cerrar_sesion'),

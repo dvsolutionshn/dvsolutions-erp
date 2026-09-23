@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.text import slugify
 from django.views.decorators.http import require_GET, require_POST
 
 from .assistant import responder_consulta
@@ -55,6 +56,11 @@ from .models import (
     TokenAccesoUsuario,
     Usuario,
     UsuarioEmpresaPermiso,
+)
+from .clinical_permissions import (
+    EMPRESAS_CLINICAS_CON_ROLES,
+    PERMISOS_CLINICOS,
+    TODOS_LOS_PERMISOS_CLINICOS,
 )
 
 
@@ -234,12 +240,18 @@ CATEGORIAS_PERMISOS_CLINICOS = {
     "puede_configuracion_crm": "Configuración de CRM",
 }
 
+# El catálogo nuevo es la única fuente para roles clínicos granulares. Los
+# campos antiguos permanecen en el modelo para no alterar roles ya existentes.
+PERMISOS_ROL_CLINICO_LEGADO = PERMISOS_ROL_CLINICO
+PERMISOS_ROL_CLINICO = PERMISOS_CLINICOS
+
 
 def _puede_administrar_usuarios_clinicos(usuario, empresa):
     return bool(
         usuario
         and usuario.is_authenticated
         and interfaz_clinica_activa(empresa)
+        and empresa.slug in EMPRESAS_CLINICAS_CON_ROLES
         and usuario.puede_acceder_empresa(empresa)
         and (
             usuario.is_superuser
@@ -251,12 +263,13 @@ def _puede_administrar_usuarios_clinicos(usuario, empresa):
 def _permisos_visibles_rol(rol):
     if not rol:
         return []
+    catalogo = PERMISOS_ROL_CLINICO if rol.usa_permisos_clinicos_granulares else PERMISOS_ROL_CLINICO_LEGADO
     return [
         {
             "grupo": grupo,
             "permisos": [etiqueta for campo, etiqueta in permisos if getattr(rol, campo, False)],
         }
-        for grupo, permisos in PERMISOS_ROL_CLINICO
+        for grupo, permisos in catalogo
         if any(getattr(rol, campo, False) for campo, _ in permisos)
     ]
 
@@ -1371,13 +1384,14 @@ def usuarios_clinicos(request, slug):
     filas = []
     for usuario in usuarios:
         rol = usuario.rol_para_empresa(empresa)
+        catalogo = PERMISOS_ROL_CLINICO if rol and rol.usa_permisos_clinicos_granulares else PERMISOS_ROL_CLINICO_LEGADO
         filas.append({
             "usuario": usuario,
             "rol": rol,
             "permisos": _permisos_visibles_rol(rol),
             "total_permisos": sum(
                 1
-                for _, permisos in PERMISOS_ROL_CLINICO
+                for _, permisos in catalogo
                 for campo, _ in permisos
                 if rol and getattr(rol, campo, False)
             ),
@@ -1399,81 +1413,89 @@ def usuario_clinico_permisos(request, slug, usuario_id):
     # El filtro empresarial también protege GET y POST. No se acepta un ID de
     # usuario que pertenezca a otra empresa aunque se manipule la URL/formulario.
     usuario = get_object_or_404(_usuarios_operativos_de_empresa(empresa), pk=usuario_id)
-    rol_actual = usuario.rol_para_empresa(empresa)
+    asignacion = UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa=empresa).first()
+    rol_actual = asignacion.rol_sistema if asignacion and asignacion.activo else usuario.rol_para_empresa(empresa)
+    roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
 
     if request.method == "POST":
-        valores = {
-            campo: request.POST.get(campo) == "1"
-            for _, permisos in PERMISOS_ROL_CLINICO
-            for campo, _ in permisos
-        }
-        codigo_rol = f"clinico-{empresa.pk}-{usuario.pk}"
+        rol_id = (request.POST.get("rol_sistema") or "").strip()
+        rol = get_object_or_404(roles, pk=rol_id) if rol_id else None
+        UsuarioEmpresaPermiso.objects.update_or_create(
+            usuario=usuario,
+            empresa=empresa,
+            defaults={"rol_sistema": rol, "activo": True},
+        )
         nombre_usuario = usuario.get_full_name().strip() or usuario.username
-        with transaction.atomic():
-            rol_personalizado, _ = RolSistema.objects.update_or_create(
-                codigo=codigo_rol,
-                defaults={
-                    "nombre": f"Permisos de {nombre_usuario} - {empresa.nombre}"[:120],
-                    "descripcion": (
-                        f"Configuración individual de {nombre_usuario} para {empresa.nombre}."
-                    ),
-                    "activo": True,
-                    **valores,
-                },
-            )
-            UsuarioEmpresaPermiso.objects.update_or_create(
-                usuario=usuario,
-                empresa=empresa,
-                defaults={"rol_sistema": rol_personalizado, "activo": True},
-            )
         messages.success(
             request,
-            f"Los permisos de {nombre_usuario} se actualizaron solamente para {empresa.nombre}.",
+            f"Se asignó {rol.nombre if rol else 'Sin rol'} a {nombre_usuario} únicamente en {empresa.nombre}.",
         )
         return redirect("usuarios_clinicos", slug=empresa.slug)
-
-    grupos = []
-    total_permisos_activos = 0
-    total_permisos_disponibles = 0
-    for indice, (grupo, permisos) in enumerate(PERMISOS_ROL_CLINICO):
-        meta = MODULOS_PERMISOS_PRESENTACION[indice]
-        categorias = {}
-        permisos_modulo = []
-        for campo, etiqueta in permisos:
-            permiso = {
-                "campo": campo,
-                "etiqueta": etiqueta,
-                "activo": bool(rol_actual and getattr(rol_actual, campo, False)),
-            }
-            categoria = CATEGORIAS_PERMISOS_CLINICOS.get(campo, "Funciones del módulo")
-            categorias.setdefault(categoria, []).append(permiso)
-            permisos_modulo.append(permiso)
-
-        activos = sum(1 for permiso in permisos_modulo if permiso["activo"])
-        total_permisos_activos += activos
-        total_permisos_disponibles += len(permisos_modulo)
-        grupos.append({
-            "nombre": grupo,
-            "codigo": meta["codigo"],
-            "descripcion": meta["descripcion"],
-            "permisos": permisos_modulo,
-            "categorias": [
-                {"nombre": nombre, "permisos": permisos_categoria}
-                for nombre, permisos_categoria in categorias.items()
-            ],
-            "activos": activos,
-            "total": len(permisos_modulo),
-        })
 
     return render(request, "core/usuario_clinico_permisos.html", {
         "empresa": empresa,
         "usuario_gestionado": usuario,
         "rol_actual": rol_actual,
-        "grupos": grupos,
-        "total_permisos_activos": total_permisos_activos,
-        "total_permisos_disponibles": total_permisos_disponibles,
-        "total_modulos_activos": sum(1 for grupo in grupos if grupo["activos"]),
+        "roles": roles,
     })
+
+
+@login_required
+def roles_clinicos(request, slug):
+    empresa = _resolver_empresa_request(request, slug)
+    if not _puede_administrar_usuarios_clinicos(request.user, empresa):
+        return JsonResponse({"error": "No tiene permiso para administrar roles de esta empresa."}, status=403)
+    roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
+    return render(request, "core/roles_clinicos.html", {"empresa": empresa, "roles": roles})
+
+
+@login_required
+def rol_clinico_editar(request, slug, rol_id=None):
+    empresa = _resolver_empresa_request(request, slug)
+    if not _puede_administrar_usuarios_clinicos(request.user, empresa):
+        return JsonResponse({"error": "No tiene permiso para administrar roles de esta empresa."}, status=403)
+    rol = get_object_or_404(RolSistema, pk=rol_id, es_rol_clinico=True) if rol_id else None
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip()
+        if not nombre:
+            messages.error(request, "El nombre del rol es obligatorio.")
+        else:
+            codigo_base = slugify(nombre) or "rol-clinico"
+            codigo = rol.codigo if rol else f"clinico-{codigo_base}"
+            if not rol:
+                original = codigo
+                consecutivo = 2
+                while RolSistema.objects.filter(codigo=codigo).exists():
+                    codigo = f"{original}-{consecutivo}"
+                    consecutivo += 1
+            valores = {campo: request.POST.get(campo) == "1" for campo in TODOS_LOS_PERMISOS_CLINICOS}
+            defaults = {
+                "nombre": nombre[:120],
+                "descripcion": (request.POST.get("descripcion") or "").strip(),
+                "activo": request.POST.get("activo") == "1",
+                "es_rol_clinico": True,
+                "usa_permisos_clinicos_granulares": True,
+                **valores,
+            }
+            if rol:
+                for campo, valor in defaults.items():
+                    setattr(rol, campo, valor)
+                rol.save()
+            else:
+                rol = RolSistema.objects.create(codigo=codigo, **defaults)
+            messages.success(request, f"El rol {rol.nombre} fue guardado.")
+            return redirect("roles_clinicos", slug=empresa.slug)
+    grupos = [
+        {
+            "nombre": nombre,
+            "permisos": [
+                {"campo": campo, "etiqueta": etiqueta, "activo": bool(rol and getattr(rol, campo, False))}
+                for campo, etiqueta in permisos
+            ],
+        }
+        for nombre, permisos in PERMISOS_CLINICOS
+    ]
+    return render(request, "core/rol_clinico_form.html", {"empresa": empresa, "rol": rol, "grupos": grupos})
 
 
 @login_required

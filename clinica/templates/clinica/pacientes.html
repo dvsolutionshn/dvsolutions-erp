@@ -6,13 +6,13 @@
 {% block header_description %}Base maestra de pacientes con datos generales, contacto, riesgos y acceso directo al expediente.{% endblock %}
 
 {% block topbar_actions %}
-{% if empresa.slug == "hospital_mia" %}
+{% if empresa.slug == "hospital_mia" and erp_access.crear_pacientes %}
 <form method="post" action="{% url 'clinica_generar_enlace_registro_paciente' empresa.slug %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-btn-secondary" type="submit">Enlace para paciente nuevo</button>
 </form>
 {% endif %}
-<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>
+{% if erp_access.crear_pacientes %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Nuevo paciente</a>{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -346,7 +346,7 @@
             <div class="patients-filter-group" aria-label="Filtros rápidos">
                 <button class="patients-filter-button is-active" type="button" data-patient-filter="all">Todos</button>
                 <button class="patients-filter-button" type="button" data-patient-filter="birthday">Cumpleaños</button>
-                <button class="patients-filter-button" type="button" data-patient-filter="alert">Con alerta</button>
+                {% if erp_access.ver_historia_clinica %}<button class="patients-filter-button" type="button" data-patient-filter="alert">Con alerta</button>{% endif %}
             </div>
             <div class="patients-view-group" aria-label="Vista del directorio">
                 <button class="patients-view-button is-active" type="button" data-patient-view="grid">Tarjetas</button>
@@ -356,7 +356,7 @@
 
         <div class="patients-premium-grid" data-patient-grid>
             {% for paciente in pacientes %}
-            <article class="premium-patient-card-web" style="--patient-index:{{ forloop.counter0 }}" data-patient-card data-birthday="{% if paciente.cumple_mes == 0 %}true{% else %}false{% endif %}" data-alert="{% if paciente.es_alergico %}true{% else %}false{% endif %}">
+            <article class="premium-patient-card-web" style="--patient-index:{{ forloop.counter0 }}" data-patient-card data-birthday="{% if paciente.cumple_mes == 0 %}true{% else %}false{% endif %}" data-alert="{% if erp_access.ver_historia_clinica and paciente.es_alergico %}true{% else %}false{% endif %}">
                 <div class="premium-patient-card-head">
                     <div class="premium-patient-avatar">
                         {% if paciente.foto_perfil %}
@@ -374,7 +374,7 @@
 
                 <div class="premium-patient-badges">
                     <span class="premium-patient-badge">ID {{ paciente.identidad|default:"No indicada" }}</span>
-                    {% if paciente.es_alergico %}<span class="premium-patient-badge is-alert">Alerta de alergia</span>{% endif %}
+                    {% if erp_access.ver_historia_clinica and paciente.es_alergico %}<span class="premium-patient-badge is-alert">Alerta de alergia</span>{% endif %}
                     {% if paciente.cumple_mes == 0 %}<span class="premium-patient-badge is-birthday">Cumple {{ paciente.fecha_nacimiento|date:"d/m" }}</span>{% endif %}
                 </div>
 
@@ -397,10 +397,10 @@
                     <span class="premium-patient-action is-disabled" aria-disabled="true">Sin teléfono</span>
                     <span class="premium-patient-action is-disabled" aria-disabled="true">Sin WhatsApp</span>
                     {% endif %}
-                    <a class="premium-patient-action" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">
+                    {% if erp_access.ver_historia_clinica %}<a class="premium-patient-action" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v15H5Z"></path><path d="M9 11h6M9 15h6M9 7h3"></path></svg>
                         Historia clínica
-                    </a>
+                    </a>{% endif %}
                     <a class="premium-patient-action is-primary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3"></circle><path d="M5.5 20c.6-4 2.8-6 6.5-6s5.9 2 6.5 6"></path></svg>
                         Abrir expediente
@@ -408,8 +408,8 @@
                 </div>
 
                 <div class="premium-patient-admin">
-                    <a href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar datos</a>
-                    {% if puede_eliminar_pacientes %}
+                    {% if erp_access.editar_pacientes %}<a href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar datos</a>{% endif %}
+                    {% if erp_access.eliminar_pacientes %}
                     <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
                         {% csrf_token %}
                         <button type="submit">Eliminar</button>
@@ -471,7 +471,7 @@
                     <td>{% if paciente.correo %}<a class="erp-inline-link" href="mailto:{{ paciente.correo }}">{{ paciente.correo }}</a>{% else %}-{% endif %}</td>
                     <td>Principal</td>
                     <td>
-                        {% if paciente.es_alergico %}
+                        {% if erp_access.ver_historia_clinica and paciente.es_alergico %}
                         <span class="erp-badge danger">Alergico</span>
                         {% else %}
                         <span class="erp-card-muted">-</span>
@@ -487,8 +487,8 @@
                     <td>
                         <div class="patient-action-strip">
                             <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Ver</a>
-                            <a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a>
-                            {% if puede_eliminar_pacientes %}
+                            {% if erp_access.editar_pacientes %}<a class="erp-action-link" href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Editar</a>{% endif %}
+                            {% if erp_access.eliminar_pacientes %}
                             <form method="post" action="{% url 'clinica_eliminar_paciente' empresa.slug paciente.id %}" onsubmit="return confirm('¿Eliminar definitivamente a {{ paciente.nombre|escapejs }}? Esta acción no se puede deshacer.');">
                                 {% csrf_token %}
                                 <button class="erp-btn-secondary patient-delete-button" type="submit">Eliminar</button>

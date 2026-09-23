@@ -136,27 +136,41 @@
         <div>
             <div class="erp-kpi-label">Datos generales</div>
             <h3 class="erp-panel-title" style="margin:6px 0 0;">{{ paciente.expediente_codigo }}</h3>
-            {% if paciente.es_alergico %}
+            {% if erp_access.ver_historia_clinica and paciente.es_alergico %}
             <div class="patient-alert" style="margin-top:12px;">Paciente alergico{% if paciente.alergias %}: {{ paciente.alergias }}{% endif %}</div>
             {% endif %}
             <div class="patient-quick-grid">
                 <div class="patient-info-item"><span>Documento</span><strong>{{ paciente.identidad|default:"-" }}</strong></div>
                 <div class="patient-info-item"><span>Edad</span><strong>{% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</strong></div>
                 <div class="patient-info-item"><span>Telefono</span><strong>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</strong></div>
-                <div class="patient-info-item"><span>RH</span><strong>{{ paciente.rh|default:"No indicado" }}</strong></div>
+                {% if erp_access.ver_historia_clinica %}<div class="patient-info-item"><span>RH</span><strong>{{ paciente.rh|default:"No indicado" }}</strong></div>{% endif %}
             </div>
         </div>
     </div>
 </section>
 
+{% if erp_access.subir_anexos_clinicos and not erp_access.ver_anexos_clinicos %}
+<section class="erp-card" style="margin-top:16px">
+    <div class="erp-kpi-label">Anexos</div><h3>Subir un archivo nuevo</h3>
+    <p class="erp-card-muted">Puede agregar documentos, pero este perfil no puede consultar anexos anteriores.</p>
+    <div class="clinical-focus-actions">
+        <a class="erp-btn" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id 'documento' %}">Subir documento</a>
+        <a class="erp-btn-secondary" href="{% url 'clinica_subir_documento_categoria_paciente' empresa.slug paciente.id 'laboratorio' %}">Subir laboratorio</a>
+        <a class="erp-btn-secondary" href="{% url 'clinica_subir_consentimiento_paciente' empresa.slug paciente.id %}">Subir consentimiento</a>
+    </div>
+</section>
+{% endif %}
+
+{% if erp_access.ver_historia_clinica or erp_access.ver_anexos_clinicos or erp_access.ver_recetas or erp_access.ver_planes_tratamiento or erp_access.escribir_enfermeria or erp_access.ver_terapias or erp_access.ver_camara_hiperbarica or erp_access.ver_postquirurgicas or erp_access.crear_recordatorios_paciente %}
 <section class="clinical-workspace">
+    {% if erp_access.ver_historia_clinica or erp_access.ver_anexos_clinicos or erp_access.ver_recetas or erp_access.ver_camara_hiperbarica or erp_access.ver_postquirurgicas or erp_access.crear_recordatorios_paciente %}
     <aside class="clinical-side-panel" aria-label="Navegacion del expediente">
         <div class="clinical-side-head">
             <span>Historia clinica</span>
             <strong>{{ paciente.nombre }}</strong>
             <small>{{ paciente.expediente_codigo }} · {{ paciente.identidad|default:"Sin documento" }}</small>
         </div>
-        <details class="clinical-side-group">
+        {% if erp_access.ver_historia_clinica %}<details class="clinical-side-group">
             <summary><i>01</i>Historial Clinico</summary>
             <div class="clinical-submenu">
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=motivo_consulta#informacion-paciente">Motivo de consulta</a>
@@ -169,39 +183,43 @@
                 <a href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}">Terapias Post Quirúrgicas</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=completa">Historia clínica completa</a>
             </div>
-        </details>
-        <details class="clinical-side-group">
+        </details>{% endif %}
+        {% if erp_access.ver_anexos_clinicos or erp_access.ver_recetas %}<details class="clinical-side-group">
             <summary><i>02</i>Anexos</summary>
             <div class="clinical-submenu">
+                {% if erp_access.ver_anexos_clinicos %}
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'laboratorio' %}">Laboratorio</a>
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'radiologico' %}">Radiografías</a>
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'documento' %}">Documentos</a>
                 <a href="{% url 'clinica_consentimientos_paciente' empresa.slug paciente.id %}">Consentimientos</a>
-                <a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas médicas</a>
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'remision' %}">Remisiones</a>
                 <a href="{% url 'clinica_evolucion_paciente' empresa.slug paciente.id %}">Fotografías / Videos</a>
                 <a href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}">Exámenes generales</a>
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'detalle_remision' %}">Detalle de remisiones</a>
                 <a href="{% url 'clinica_documentos_categoria_paciente' empresa.slug paciente.id 'incapacidad' %}">Incapacidades</a>
+                {% endif %}{% if erp_access.ver_recetas %}<a href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Recetas médicas</a>{% endif %}
             </div>
-        </details>
-        <details class="clinical-side-group">
+        </details>{% endif %}
+        {% if erp_access.ver_historia_clinica or erp_access.crear_recordatorios_paciente %}<details class="clinical-side-group">
             <summary><i>03</i>Atención y especialidades</summary>
             <div class="clinical-submenu">
+                {% if erp_access.ver_historia_clinica %}
                 <a href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}">Especialidades</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=cirugia_plastica#trabajo-clinico">Cirugía Plástica</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=medicina_estetica#trabajo-clinico">Medicina Estética</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=capilar#trabajo-clinico">Capilar</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=tricopigmentacion#tricopigmentacion">Tricopigmentación</a>
-                <a href="#recordatorios-tratamiento">Citas / Recordatorios</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=enfermeria#trabajo-clinico">Enfermería / Tratamientos</a>
                 <a href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}?seccion=especialidad&amp;tipo=terapias#trabajo-clinico">Terapias clínicas</a>
                 <a href="{% url 'clinica_crear_tratamiento' empresa.slug %}?paciente={{ paciente.id }}">Tratamientos del paciente</a>
                 <a href="{% url 'clinica_seguimientos_paciente' empresa.slug paciente.id %}">Seguimiento Estético / Clínico</a>
+                {% endif %}{% if erp_access.crear_recordatorios_paciente %}<a href="#recordatorios-tratamiento">Citas / Recordatorios</a>{% endif %}
             </div>
-        </details>
+        </details>{% endif %}
     </aside>
+    {% endif %}
     <div class="clinical-workspace-main">
+        {% if erp_access.ver_historia_clinica or erp_access.ver_anexos_clinicos or erp_access.ver_recetas or erp_access.ver_planes_tratamiento or erp_access.escribir_enfermeria or erp_access.ver_terapias or erp_access.ver_camara_hiperbarica or erp_access.ver_postquirurgicas %}
         <section class="erp-card clinical-focus-panel patient-anchor-offset" id="resumen-clinico">
             <div class="clinical-focus-head">
                 <div>
@@ -210,22 +228,37 @@
                     <p>Abra el historial, consulte anexos, trabaje por especialidad o programe el siguiente control sin perder el contexto del paciente.</p>
                 </div>
                 <div class="clinical-focus-actions">
-                    <a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>
-                    <a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>
+                    {% if erp_access.ver_historia_clinica %}<a class="erp-btn" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}">Clinica completa</a>{% endif %}
+                    {% if erp_access.crear_citas %}<a class="erp-btn" href="{% url 'clinica_crear_cita' empresa.slug %}?paciente={{ paciente.id }}">Agendar cita</a>{% endif %}
                 </div>
             </div>
             <div class="clinical-quick-grid">
+                {% if erp_access.ver_historia_clinica %}
                 <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><strong>Historial Clínico</strong><span>Consulta, funciones orgánicas, examen físico, antecedentes, diagnóstico y plan.</span></a>
+                {% endif %}{% if erp_access.ver_planes_tratamiento %}
                 <a class="clinical-quick-card" href="{% url 'clinica_planes_tratamiento_paciente' empresa.slug paciente.id %}"><strong>Plan y Tratamiento</strong><span>Indicaciones clínicas e historial de planes del paciente.</span></a>
+                {% endif %}{% if erp_access.ver_anexos_clinicos %}
                 <a class="clinical-quick-card" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><strong>Anexos</strong><span>Laboratorio, radiografías, documentos, consentimientos, recetas y archivos visuales.</span></a>
+                {% endif %}{% if erp_access.ver_historia_clinica %}
                 <a class="clinical-quick-card" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><strong>Especialidades</strong><span>Cirugía, estética, capilar, terapias, cámara hiperbárica y enfermería.</span></a>
+                {% endif %}{% if erp_access.escribir_enfermeria %}
+                <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'enfermeria' %}"><strong>Enfermería</strong><span>Registrar el formulario de Enfermería.</span></a>
+                {% endif %}{% if erp_access.escribir_terapias %}
+                <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias' %}"><strong>Terapias</strong><span>Registrar una nueva terapia clínica.</span></a>
+                {% endif %}{% if erp_access.crear_recordatorios_paciente %}
                 <a class="clinical-quick-card" href="#recordatorios-tratamiento"><strong>Citas / Recordatorios</strong><span>Agenda y seguimiento estético o clínico conectado al calendario.</span></a>
+                {% endif %}{% if erp_access.ver_camara_hiperbarica %}
                 <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'camara_hiperbarica' %}"><strong>Cámara Hiperbárica</strong><span>Cuadro longitudinal completo de 22 sesiones.</span></a>
+                {% endif %}{% if erp_access.ver_postquirurgicas %}
                 <a class="clinical-quick-card" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias_postquirurgicas' %}"><strong>Terapias Post Quirúrgicas</strong><span>Cuadro por fases con 30 sesiones ampliables.</span></a>
+                {% endif %}{% if erp_access.ver_historia_clinica %}
                 <a class="clinical-quick-card" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}#tricopigmentacion"><strong>Tricopigmentación</strong><span>Sesiones, pigmentos, zonas tratadas, evolución y cuidados.</span></a>
+                {% endif %}
             </div>
         </section>
+        {% endif %}
 
+{% if erp_access.crear_recordatorios_paciente %}
 <section class="erp-card patient-reminder-card patient-anchor-offset" id="recordatorios-tratamiento">
     <div class="patient-reminder-head">
         <div>
@@ -399,9 +432,11 @@
     </div>
     {% endif %}
 </section>
+{% endif %}
 
 </div>
 </section>
+{% endif %}
 
 <div class="patient-photo-modal" id="patientPhotoModal" aria-hidden="true">
     <div class="patient-photo-modal-card" role="dialog" aria-modal="true" aria-labelledby="patientPhotoModalTitle">

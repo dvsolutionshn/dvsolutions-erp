@@ -7,6 +7,20 @@ from datetime import date
 import uuid
 
 
+PERMISOS_CLINICOS_GRANULARES = {
+    "puede_ver_calendario", "puede_crear_citas", "puede_editar_citas", "puede_eliminar_citas",
+    "puede_ver_pacientes", "puede_ver_datos_generales_paciente", "puede_crear_pacientes",
+    "puede_editar_pacientes", "puede_eliminar_pacientes", "puede_crear_recordatorios_paciente",
+    "puede_ver_historia_clinica", "puede_crear_historia_clinica", "puede_editar_historia_clinica",
+    "puede_ver_anexos_clinicos", "puede_subir_anexos_clinicos", "puede_eliminar_anexos_clinicos",
+    "puede_ver_recetas", "puede_crear_recetas", "puede_enviar_recetas",
+    "puede_ver_planes_tratamiento", "puede_editar_planes_tratamiento", "puede_escribir_enfermeria",
+    "puede_ver_terapias", "puede_escribir_terapias", "puede_ver_camara_hiperbarica",
+    "puede_escribir_camara_hiperbarica", "puede_ver_postquirurgicas", "puede_escribir_postquirurgicas",
+    "puede_ver_manuales_pdf", "puede_enviar_manuales_pdf", "puede_administrar_manuales_pdf",
+}
+
+
 class PlanComercial(models.Model):
     nombre = models.CharField(max_length=120)
     codigo = models.SlugField(unique=True)
@@ -28,6 +42,8 @@ class RolSistema(models.Model):
     codigo = models.SlugField(unique=True)
     descripcion = models.TextField(blank=True, null=True)
     activo = models.BooleanField(default=True)
+    es_rol_clinico = models.BooleanField(default=False)
+    usa_permisos_clinicos_granulares = models.BooleanField(default=False)
     puede_punto_venta = models.BooleanField(default=False)
     puede_configuracion_facturacion = models.BooleanField(default=False)
     puede_cierres_caja = models.BooleanField(default=False)
@@ -88,6 +104,38 @@ class RolSistema(models.Model):
     puede_expediente_clinico = models.BooleanField(default=False)
     puede_tratamientos_clinicos = models.BooleanField(default=False)
     puede_configuracion_clinica = models.BooleanField(default=False)
+    puede_ver_calendario = models.BooleanField(default=False)
+    puede_crear_citas = models.BooleanField(default=False)
+    puede_editar_citas = models.BooleanField(default=False)
+    puede_eliminar_citas = models.BooleanField(default=False)
+    puede_ver_pacientes = models.BooleanField(default=False)
+    puede_ver_datos_generales_paciente = models.BooleanField(default=False)
+    puede_crear_pacientes = models.BooleanField(default=False)
+    puede_editar_pacientes = models.BooleanField(default=False)
+    puede_eliminar_pacientes = models.BooleanField(default=False)
+    puede_crear_recordatorios_paciente = models.BooleanField(default=False)
+    puede_ver_historia_clinica = models.BooleanField(default=False)
+    puede_crear_historia_clinica = models.BooleanField(default=False)
+    puede_editar_historia_clinica = models.BooleanField(default=False)
+    puede_ver_anexos_clinicos = models.BooleanField(default=False)
+    puede_subir_anexos_clinicos = models.BooleanField(default=False)
+    puede_eliminar_anexos_clinicos = models.BooleanField(default=False)
+    puede_ver_recetas = models.BooleanField(default=False)
+    puede_crear_recetas = models.BooleanField(default=False)
+    puede_enviar_recetas = models.BooleanField(default=False)
+    puede_ver_planes_tratamiento = models.BooleanField(default=False)
+    puede_editar_planes_tratamiento = models.BooleanField(default=False)
+    puede_escribir_enfermeria = models.BooleanField(default=False)
+    puede_ver_terapias = models.BooleanField(default=False)
+    puede_escribir_terapias = models.BooleanField(default=False)
+    puede_ver_camara_hiperbarica = models.BooleanField(default=False)
+    puede_escribir_camara_hiperbarica = models.BooleanField(default=False)
+    puede_ver_postquirurgicas = models.BooleanField(default=False)
+    puede_escribir_postquirurgicas = models.BooleanField(default=False)
+    puede_ver_manuales_pdf = models.BooleanField(default=False)
+    puede_enviar_manuales_pdf = models.BooleanField(default=False)
+    puede_administrar_manuales_pdf = models.BooleanField(default=False)
+    puede_transferir_inventario = models.BooleanField(default=False)
     puede_tecnicentro = models.BooleanField(default=False)
     puede_recepcion_taller = models.BooleanField(default=False)
     puede_diagnostico_taller = models.BooleanField(default=False)
@@ -175,16 +223,19 @@ class RolSistema(models.Model):
 
     @property
     def tiene_algun_acceso_clinica(self):
-        return any(
-            getattr(self, permiso)
-            for permiso in [
+        permisos = [
                 "puede_clinica",
                 "puede_pacientes",
                 "puede_expediente_clinico",
                 "puede_tratamientos_clinicos",
                 "puede_configuracion_clinica",
-            ]
-        )
+        ]
+        if self.usa_permisos_clinicos_granulares:
+            permisos.extend([
+                field.name for field in self._meta.fields
+                if field.name.startswith("puede_") and field.name in PERMISOS_CLINICOS_GRANULARES
+            ])
+        return any(getattr(self, permiso, False) for permiso in permisos)
 
     @property
     def tiene_algun_acceso_tecnicentro(self):
@@ -535,7 +586,7 @@ class Usuario(AbstractUser):
 class UsuarioEmpresaPermiso(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="permisos_por_empresa")
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="permisos_usuarios")
-    rol_sistema = models.ForeignKey(RolSistema, on_delete=models.PROTECT, related_name="permisos_empresa_usuario")
+    rol_sistema = models.ForeignKey(RolSistema, on_delete=models.PROTECT, related_name="permisos_empresa_usuario", null=True, blank=True)
     activo = models.BooleanField(default=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -546,7 +597,8 @@ class UsuarioEmpresaPermiso(models.Model):
         verbose_name_plural = "Permisos de usuarios por empresa"
 
     def __str__(self):
-        return f"{self.usuario.email or self.usuario.username} - {self.empresa.nombre}: {self.rol_sistema.nombre}"
+        rol = self.rol_sistema.nombre if self.rol_sistema else "Sin rol"
+        return f"{self.usuario.email or self.usuario.username} - {self.empresa.nombre}: {rol}"
 
 
 class RegistroAuditoria(models.Model):

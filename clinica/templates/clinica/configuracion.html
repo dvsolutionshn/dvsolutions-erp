@@ -45,6 +45,8 @@
             {% endif %}
             {% if erp_access.configuracion_clinica and recetas_avanzadas %}
             <a class="clinical-config-card" href="{% url 'clinica_plantillas_recetas' empresa.slug %}"><i class="clinical-config-icon">Rx</i><span><strong>Plantillas de recetas</strong><span>Indicaciones y medicamentos reutilizables en consulta.</span></span></a>
+            {% endif %}
+            {% if recetas_avanzadas and erp_access.ver_manuales_pdf or recetas_avanzadas and erp_access.administrar_manuales_pdf %}
             <a class="clinical-config-card" href="{% url 'clinica_manuales_recetas' empresa.slug %}"><i class="clinical-config-icon">PDF</i><span><strong>Manuales de Recetas</strong><span>Biblioteca de instructivos PDF para adjuntar al enviar una receta.</span></span></a>
             {% endif %}
             {% if puede_controlar_enlaces_pacientes %}
@@ -59,7 +61,8 @@
         </div>
         <div class="clinical-config-grid">
             {% if erp_access.administrar_usuarios_clinicos %}
-            <a class="clinical-config-card" href="{% url 'usuarios_clinicos' empresa.slug %}"><i class="clinical-config-icon">U</i><span><strong>Usuarios y permisos</strong><span>Acceso por empresa, roles y permisos clínicos.</span></span></a>
+            <a class="clinical-config-card" href="{% url 'roles_clinicos' empresa.slug %}"><i class="clinical-config-icon">R</i><span><strong>Roles y permisos</strong><span>Cree roles reutilizables y defina sus acciones autorizadas.</span></span></a>
+            <a class="clinical-config-card" href="{% url 'usuarios_clinicos' empresa.slug %}"><i class="clinical-config-icon">U</i><span><strong>Asignar roles a usuarios</strong><span>Seleccione el rol de cada usuario únicamente para esta empresa.</span></span></a>
             {% endif %}
             {% if erp_access.configuracion_facturacion %}
             <a class="clinical-config-card" href="{% url 'configuracion_facturacion' empresa.slug %}"><i class="clinical-config-icon">F</i><span><strong>Configuración de facturación</strong><span>Datos fiscales, comprobantes y opciones de cobro.</span></span></a>

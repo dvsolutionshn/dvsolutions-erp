@@ -132,6 +132,8 @@ def permiso_facturacion_accion(path_suffix):
             return "puede_editar_proveedores"
         return None
     if first == "inventario":
+        if len(parts) > 2 and parts[1] == "farmaceutico" and parts[2] == "traslado-rapido":
+            return "puede_transferir_inventario"
         if len(parts) > 1 and parts[1] == "ajuste":
             return "puede_ajustar_inventario"
         if len(parts) > 2 and parts[1] == "compras" and parts[2] == "crear":

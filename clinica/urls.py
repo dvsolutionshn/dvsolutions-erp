@@ -34,6 +34,7 @@ urlpatterns = [
     path("recetas/manuales/crear/", views.crear_manual_receta, name="clinica_crear_manual_receta"),
     path("recetas/manuales/<int:manual_id>/editar/", views.editar_manual_receta, name="clinica_editar_manual_receta"),
     path("recetas/manuales/<int:manual_id>/archivo/", views.archivo_manual_receta, name="clinica_archivo_manual_receta"),
+    path("recetas/manuales/<int:manual_id>/enviar-correo/", views.enviar_manual_receta_correo, name="clinica_enviar_manual_receta_correo"),
     path("pacientes/<int:paciente_id>/documentos/<slug:categoria>/", views.documentos_clinicos_paciente, name="clinica_documentos_categoria_paciente"),
     path("pacientes/<int:paciente_id>/documentos/<slug:categoria>/subir/", views.subir_documento_clinico_paciente, name="clinica_subir_documento_categoria_paciente"),
     path("pacientes/<int:paciente_id>/documentos/incapacidades/<int:documento_id>/imprimir/", views.imprimir_incapacidad_paciente, name="clinica_incapacidad_imprimir"),

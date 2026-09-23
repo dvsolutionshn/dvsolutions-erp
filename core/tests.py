@@ -2061,18 +2061,21 @@ class PermisosClinicosPorEmpresaTests(TestCase):
         self.assertContains(response, "rosa-enfermera")
         self.assertContains(response, "Ver pacientes")
 
-    def test_edicion_crea_permisos_individuales_solo_para_empresa_activa(self):
+    def test_asignacion_aplica_un_rol_reutilizable_solo_para_empresa_activa(self):
+        rol_recepcion = RolSistema.objects.create(
+            nombre="Recepción prueba",
+            codigo="recepcion-prueba-reutilizable",
+            es_rol_clinico=True,
+            usa_permisos_clinicos_granulares=True,
+            puede_ver_calendario=True,
+            puede_crear_facturas=True,
+        )
         response = self.client.post(
             reverse(
                 "usuario_clinico_permisos",
                 args=[self.hospital.slug, self.enfermera.pk],
             ),
-            {
-                "puede_clinica": "1",
-                "puede_pacientes": "1",
-                "puede_citas": "1",
-                "puede_crear_facturas": "1",
-            },
+            {"rol_sistema": str(rol_recepcion.pk)},
         )
 
         self.assertRedirects(response, reverse("usuarios_clinicos", args=[self.hospital.slug]))
@@ -2080,7 +2083,8 @@ class PermisosClinicosPorEmpresaTests(TestCase):
             usuario=self.enfermera,
             empresa=self.hospital,
         )
-        self.assertTrue(permiso.rol_sistema.puede_citas)
+        self.assertEqual(permiso.rol_sistema, rol_recepcion)
+        self.assertTrue(permiso.rol_sistema.puede_ver_calendario)
         self.assertTrue(permiso.rol_sistema.puede_crear_facturas)
         self.assertFalse(permiso.rol_sistema.puede_ver_facturas)
         self.assertEqual(self.enfermera.rol_sistema, self.rol_base)

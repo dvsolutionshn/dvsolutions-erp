@@ -455,6 +455,7 @@
             </div>
 
             <div class="clinic-action-deck" aria-label="Acciones rapidas clinicas">
+                {% if erp_access.crear_pacientes %}
                 <a class="clinic-action-card" href="{% url 'clinica_crear_paciente' empresa.slug %}">
                     <div class="clinic-action-icon">01</div>
                     <div>
@@ -462,6 +463,7 @@
                         <span>Crear expediente con datos criticos, foto, contacto y alertas.</span>
                     </div>
                 </a>
+                {% endif %}{% if erp_access.crear_citas %}
                 <a class="clinic-action-card" href="{% url 'clinica_crear_cita' empresa.slug %}">
                     <div class="clinic-action-icon">02</div>
                     <div>
@@ -469,6 +471,7 @@
                         <span>Registrar motivo, servicio, profesional y estado de atencion.</span>
                     </div>
                 </a>
+                {% endif %}
             </div>
         </div>
 
@@ -485,15 +488,15 @@
                 {% if resumen.citas_hoy %}
                 <strong>Revisar cola del dia</strong>
                 <p class="erp-card-muted">Confirma llegada, abre expediente y registra la atencion.</p>
-                <a class="erp-btn" href="{% url 'clinica_citas' empresa.slug %}">Ver cola</a>
+                {% if erp_access.ver_calendario %}<a class="erp-btn" href="{% url 'clinica_citas' empresa.slug %}">Ver cola</a>{% endif %}
                 {% elif resumen.seguimientos_pendientes %}
                 <strong>Atender seguimientos</strong>
                 <p class="erp-card-muted">Hay controles pendientes que necesitan revision.</p>
-                <a class="erp-btn" href="{% url 'clinica_tratamientos' empresa.slug %}">Ver tratamientos</a>
+                {% if erp_access.ver_planes_tratamiento %}<a class="erp-btn" href="{% url 'clinica_tratamientos' empresa.slug %}">Ver tratamientos</a>{% endif %}
                 {% else %}
                 <strong>Capturar nuevo paciente</strong>
                 <p class="erp-card-muted">La agenda esta estable. Puedes preparar el siguiente expediente.</p>
-                <a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Crear paciente</a>
+                {% if erp_access.crear_pacientes %}<a class="erp-btn" href="{% url 'clinica_crear_paciente' empresa.slug %}">Crear paciente</a>{% endif %}
                 {% endif %}
             </div>
         </aside>
@@ -501,20 +504,20 @@
 </section>
 
 <section class="clinic-metric-grid">
-    <article class="erp-card clinic-kpi">
+    {% if erp_access.ver_planes_tratamiento %}<article class="erp-card clinic-kpi">
         <div class="clinic-kpi-top">
             <div><div class="erp-kpi-label">Pacientes activos</div><div class="erp-stat-value">{{ resumen.pacientes }}</div></div>
             <div class="clinic-kpi-icon">PX</div>
         </div>
         <p class="erp-card-muted">Expedientes disponibles para atencion, ventas medicas y seguimiento.</p>
-    </article>
-    <article class="erp-card clinic-kpi">
+    </article>{% endif %}
+    {% if erp_access.ver_historia_clinica %}<article class="erp-card clinic-kpi">
         <div class="clinic-kpi-top">
             <div><div class="erp-kpi-label">Citas de hoy</div><div class="erp-stat-value">{{ resumen.citas_hoy }}</div></div>
             <div class="clinic-kpi-icon">HOY</div>
         </div>
         <p class="erp-card-muted">Lo que recepcion y equipo medico deben atender primero.</p>
-    </article>
+    </article>{% endif %}
     <article class="erp-card clinic-kpi">
         <div class="clinic-kpi-top">
             <div><div class="erp-kpi-label">Tratamientos activos</div><div class="erp-stat-value">{{ resumen.tratamientos_activos }}</div></div>
@@ -532,7 +535,7 @@
 </section>
 
 <section class="clinic-status-board">
-    <article class="erp-card">
+    {% if erp_access.ver_calendario %}<article class="erp-card">
         <div class="clinic-section-head">
             <div>
                 <div class="erp-kpi-label">Agenda del mes</div>
@@ -546,15 +549,15 @@
             <div class="clinic-status-item"><span>En atencion</span><strong>{{ agenda_estado.en_atencion }}</strong></div>
             <div class="clinic-status-item"><span>Completadas</span><strong>{{ agenda_estado.completadas }}</strong></div>
         </div>
-    </article>
+    </article>{% endif %}
 
-    <article class="erp-card">
+    {% if erp_access.ver_historia_clinica or erp_access.ver_planes_tratamiento %}<article class="erp-card">
         <div class="clinic-section-head">
             <div>
                 <div class="erp-kpi-label">Automatizaciones</div>
                 <h3 class="erp-panel-title" style="margin:6px 0 0;">Alertas que guian al equipo</h3>
             </div>
-            <a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>
+            {% if erp_access.editar_planes_tratamiento %}<a class="erp-action-link" href="{% url 'clinica_crear_tratamiento' empresa.slug %}">Crear tratamiento</a>{% endif %}
         </div>
         <div class="clinic-automation-grid">
             {% for item in automatizaciones %}
@@ -572,11 +575,11 @@
             </article>
             {% endfor %}
         </div>
-    </article>
+    </article>{% endif %}
 </section>
 
 <section class="clinic-worklist">
-    <article class="erp-card">
+    {% if erp_access.ver_calendario %}<article class="erp-card">
         <div class="clinic-section-head">
             <div>
                 <div class="erp-kpi-label">Cola de trabajo</div>
@@ -608,9 +611,9 @@
             <div class="erp-empty">Todavia no hay citas programadas.</div>
             {% endfor %}
         </div>
-    </article>
+    </article>{% endif %}
 
-    <article class="erp-card">
+    {% if erp_access.ver_historia_clinica %}<article class="erp-card">
         <div class="clinic-section-head">
             <div>
                 <div class="erp-kpi-label">Expediente vivo</div>
@@ -626,6 +629,6 @@
         {% empty %}
         <div class="erp-empty">El expediente clinico aun no tiene movimientos.</div>
         {% endfor %}
-    </article>
+    </article>{% endif %}
 </section>
 {% endblock %}
