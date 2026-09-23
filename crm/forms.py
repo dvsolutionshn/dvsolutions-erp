@@ -8,8 +8,10 @@ from django.utils import timezone
 from facturacion.models import Cliente, Producto
 from clinica.models import Paciente, ProfesionalSalud, ServicioClinico, asegurar_profesionales_agenda_base
 
+from .availability import bloqueos_en_conflicto, rango_bloqueo
 from .constants import EMPRESAS_WHATSAPP_CITAS
 from .models import (
+    BloqueoDisponibilidadMedica,
     CampaniaMarketing,
     CitaCliente,
     ConfiguracionCRM,
@@ -434,6 +436,78 @@ class CampaniaMarketingForm(forms.ModelForm):
             self.fields["plantilla"].queryset = PlantillaMensaje.objects.none()
 
 
+class BloqueoDisponibilidadMedicaForm(forms.ModelForm):
+    class Meta:
+        model = BloqueoDisponibilidadMedica
+        fields = ["profesional", "fecha", "dia_completo", "hora_inicio", "hora_fin", "motivo"]
+        labels = {
+            "profesional": "Doctor / profesional",
+            "fecha": "Fecha",
+            "dia_completo": "Bloquear el día completo",
+            "hora_inicio": "Hora de inicio",
+            "hora_fin": "Hora de finalización",
+            "motivo": "Motivo (opcional)",
+        }
+        widgets = {
+            "fecha": forms.DateInput(attrs={"type": "date"}),
+            "hora_inicio": forms.TimeInput(attrs={"type": "time", "step": "900"}),
+            "hora_fin": forms.TimeInput(attrs={"type": "time", "step": "900"}),
+            "motivo": forms.TextInput(attrs={"placeholder": "Ejemplo: No disponible"}),
+        }
+
+    def __init__(self, *args, empresa=None, usuario=None, puede_gestionar_otros=False, **kwargs):
+        self.empresa = empresa
+        self.usuario = usuario
+        self.puede_gestionar_otros = puede_gestionar_otros
+        super().__init__(*args, **kwargs)
+        profesionales = ProfesionalSalud.objects.none()
+        if empresa:
+            profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+            if usuario and not puede_gestionar_otros:
+                profesionales = profesionales.filter(usuario=usuario)
+        self.fields["profesional"].queryset = profesionales
+        self.fields["hora_inicio"].required = False
+        self.fields["hora_fin"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        profesional = cleaned_data.get("profesional")
+        fecha = cleaned_data.get("fecha")
+        dia_completo = bool(cleaned_data.get("dia_completo"))
+        hora_inicio = cleaned_data.get("hora_inicio")
+        hora_fin = cleaned_data.get("hora_fin")
+        if profesional and self.empresa and profesional.empresa_id != self.empresa.id:
+            self.add_error("profesional", "El profesional no pertenece a esta empresa.")
+        if dia_completo:
+            cleaned_data["hora_inicio"] = None
+            cleaned_data["hora_fin"] = None
+        else:
+            if not hora_inicio:
+                self.add_error("hora_inicio", "Selecciona la hora de inicio.")
+            if not hora_fin:
+                self.add_error("hora_fin", "Selecciona la hora de finalización.")
+            if hora_inicio and hora_fin and hora_fin <= hora_inicio:
+                self.add_error("hora_fin", "La hora final debe ser posterior a la hora de inicio.")
+        if self.errors or not all((self.empresa, profesional, fecha)):
+            return cleaned_data
+        inicio, fin = rango_bloqueo(
+            fecha=fecha,
+            dia_completo=dia_completo,
+            hora_inicio=cleaned_data.get("hora_inicio"),
+            hora_fin=cleaned_data.get("hora_fin"),
+        )
+        existentes = bloqueos_en_conflicto(
+            empresa=self.empresa,
+            profesional=profesional,
+            inicio=inicio,
+            fin=fin,
+            excluir_id=self.instance.pk if self.instance and self.instance.pk else None,
+        )
+        if existentes:
+            self.add_error(None, "Ya existe un bloqueo para ese profesional que se cruza con el horario seleccionado.")
+        return cleaned_data
+
+
 class CitaClienteForm(forms.ModelForm):
     EMPRESAS_WHATSAPP_CITAS = EMPRESAS_WHATSAPP_CITAS
     EMPRESAS_CIRUGIA_EXTENDIDA = {"hospital_mia", "serviciosmedicos"}
@@ -782,6 +856,35 @@ class CitaClienteForm(forms.ModelForm):
         minutos = cita.duracion_minutos or getattr(cita.servicio_clinico, "duracion_minutos", None) or 30
         return inicio, inicio + timedelta(minutes=minutos)
 
+    def _validar_disponibilidad_profesional(self, inicio, fin_bloque, profesional):
+        if not self.empresa or not profesional:
+            return
+        if self.instance and self.instance.pk:
+            original = (
+                CitaCliente.objects.select_related("servicio_clinico")
+                .filter(pk=self.instance.pk)
+                .first()
+            )
+            if (
+                original
+                and original.profesional_salud_id == profesional.id
+                and self._rango_bloqueado_cita(original) == (inicio, fin_bloque)
+            ):
+                return
+        conflictos = bloqueos_en_conflicto(
+            empresa=self.empresa,
+            profesional=profesional,
+            inicio=inicio,
+            fin=fin_bloque,
+        )
+        if conflictos:
+            bloqueo = conflictos[0]
+            motivo = f" Motivo: {bloqueo.motivo}." if bloqueo.motivo else ""
+            raise forms.ValidationError(
+                f"{profesional.nombre} está marcado como No disponible el "
+                f"{bloqueo.fecha:%d/%m/%Y}, {bloqueo.horario_display}.{motivo}"
+            )
+
     def _validar_traslapes_agenda_extendida(self, inicio, fin_bloque, profesional=None):
         if not self.cirugia_extendida_activa or not self.empresa:
             return
@@ -986,6 +1089,7 @@ class CitaClienteForm(forms.ModelForm):
             for detalle in detalles:
                 detalle_fin = detalle["inicio"] + timedelta(minutes=duracion)
                 try:
+                    self._validar_disponibilidad_profesional(detalle["inicio"], detalle_fin, profesional)
                     usa_capacidad = self._validar_capacidad_recurso(detalle["inicio"], detalle_fin, servicio)
                     if not usa_capacidad:
                         self._validar_traslapes_agenda_extendida(detalle["inicio"], detalle_fin, profesional)
@@ -998,6 +1102,7 @@ class CitaClienteForm(forms.ModelForm):
                 vistos.append((detalle["inicio"], detalle_fin))
         elif not self.errors:
             try:
+                self._validar_disponibilidad_profesional(inicio, fin_bloque, profesional)
                 usa_capacidad = self._validar_capacidad_recurso(inicio, fin_bloque, servicio)
                 if not usa_capacidad:
                     self._validar_traslapes_agenda_extendida(inicio, fin_bloque, profesional)

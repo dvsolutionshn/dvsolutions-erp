@@ -38,6 +38,7 @@ from facturacion.models import (
 from clinica.models import CitaClinica, Paciente, PacienteFotoEvolucion, PreconsultaClinica, ProfesionalSalud, ServicioClinico
 
 from .forms import (
+    BloqueoDisponibilidadMedicaForm,
     CampaniaMarketingForm,
     CitaClienteForm,
     ConfiguracionCRMForm,
@@ -49,6 +50,7 @@ from .forms import (
     SesionTerapiaPostQuirurgicaForm,
 )
 from .models import (
+    BloqueoDisponibilidadMedica,
     CampaniaMarketing,
     CitaCirugiaFoto,
     CitaCliente,
@@ -61,6 +63,7 @@ from .models import (
     SesionCamaraHiperbarica,
     SesionTerapiaPostQuirurgica,
 )
+from .availability import citas_afectadas_por_bloqueo
 from .appointment_notifications import procesar_notificacion, programar_notificaciones_cita
 from .models import NotificacionCitaWhatsApp
 from .services import (
@@ -136,6 +139,29 @@ def _profesional_pertenece_agenda_espejo(profesional, empresa):
         return True
     nombre = _normalizar_texto_agenda(getattr(profesional, "nombre", ""))
     return all(token in nombre for token in AGENDA_ESPEJO_SERVICIOSMEDICOS["profesional_tokens"])
+
+
+def _puede_gestionar_bloqueos_otros(user, empresa):
+    return bool(
+        user.is_authenticated
+        and user.puede_acceder_empresa(empresa)
+        and (
+            user.is_superuser
+            or user.es_administrador_empresa
+            or user.tiene_permiso_erp("puede_citas", empresa)
+            or user.tiene_permiso_erp("puede_configuracion_clinica", empresa)
+        )
+    )
+
+
+def _puede_gestionar_bloqueo(user, empresa, profesional):
+    if _puede_gestionar_bloqueos_otros(user, empresa):
+        return True
+    return bool(
+        user.is_authenticated
+        and user.puede_acceder_empresa(empresa)
+        and profesional.usuario_id == user.id
+    )
 
 
 def _empresa_desde_slug(empresa_slug):
@@ -514,6 +540,48 @@ def _contexto_calendario(
         for cita in citas_qs
         if _cita_pertenece_agenda_espejo(cita, empresa)
     ]
+    bloqueos_qs = (
+        BloqueoDisponibilidadMedica.objects.filter(
+            empresa=empresa_agenda,
+            fecha__gte=inicio,
+            fecha__lte=fin,
+        )
+        .select_related("profesional", "creado_por")
+        .order_by("fecha", "hora_inicio", "profesional__nombre")
+    )
+    if agenda_espejo and empresa.slug == "serviciosmedicos":
+        bloqueos_qs = bloqueos_qs.filter(profesional__nombre__icontains="Luis")
+    if filtro_profesional:
+        bloqueos_qs = bloqueos_qs.filter(profesional_id=int(filtro_profesional))
+    bloqueos = list(bloqueos_qs)
+    puede_gestionar_otros_bloqueos = _puede_gestionar_bloqueos_otros(request.user, empresa_agenda)
+    for bloqueo in bloqueos:
+        bloqueo.puede_gestionar = _puede_gestionar_bloqueo(request.user, empresa_agenda, bloqueo.profesional)
+    bloqueo_editando = None
+    bloqueo_editar_id = (request.GET.get("editar_bloqueo") or "").strip()
+    if bloqueo_editar_id:
+        try:
+            candidato = BloqueoDisponibilidadMedica.objects.select_related("profesional").get(
+                empresa=empresa_agenda,
+                pk=int(bloqueo_editar_id),
+            )
+        except (BloqueoDisponibilidadMedica.DoesNotExist, TypeError, ValueError):
+            candidato = None
+        if candidato and _puede_gestionar_bloqueo(request.user, empresa_agenda, candidato.profesional):
+            bloqueo_editando = candidato
+    bloqueo_form_kwargs = {
+        "empresa": empresa_agenda,
+        "usuario": request.user,
+        "puede_gestionar_otros": puede_gestionar_otros_bloqueos,
+        "instance": bloqueo_editando,
+    }
+    if not bloqueo_editando:
+        bloqueo_form_kwargs["initial"] = {"fecha": seleccionada}
+    bloqueo_form = BloqueoDisponibilidadMedicaForm(**bloqueo_form_kwargs)
+    puede_gestionar_bloqueos = bool(
+        puede_gestionar_otros_bloqueos
+        or ProfesionalSalud.objects.filter(empresa=empresa_agenda, activo=True, usuario=request.user).exists()
+    )
 
     filtros_query = urlencode({
         clave: valor
@@ -531,13 +599,16 @@ def _contexto_calendario(
     for cita in citas:
         clave = timezone.localtime(cita.fecha_hora).date()
         por_fecha.setdefault(clave, []).append(cita)
+    bloqueos_por_fecha = {}
+    for bloqueo in bloqueos:
+        bloqueos_por_fecha.setdefault(bloqueo.fecha, []).append(bloqueo)
 
     semanas = []
     if vista == "mes":
         calendario = calendar.Calendar(firstweekday=0)
         for semana in calendario.monthdatescalendar(seleccionada.year, seleccionada.month):
             semanas.append([
-                {"fecha": dia, "es_mes": dia.month == seleccionada.month, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, [])}
+                {"fecha": dia, "es_mes": dia.month == seleccionada.month, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, []), "bloqueos": bloqueos_por_fecha.get(dia, [])}
                 for dia in semana
             ])
     meses_agenda = []
@@ -555,7 +626,7 @@ def _contexto_calendario(
                 "citas": citas_mes[:4],
             })
     dias = [
-        {"fecha": dia, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, [])}
+        {"fecha": dia, "es_hoy": dia == timezone.localdate(), "citas": por_fecha.get(dia, []), "bloqueos": bloqueos_por_fecha.get(dia, [])}
         for dia in (inicio + timedelta(days=i) for i in range((fin - inicio).days + 1))
     ]
     paciente_busqueda_inicial = None
@@ -685,6 +756,10 @@ def _contexto_calendario(
         "paciente_historial_id": paciente_historial_id,
         "citas_historial_futuras": citas_historial_futuras,
         "citas_historial_pasadas": citas_historial_pasadas,
+        "bloqueos": bloqueos,
+        "bloqueo_form": bloqueo_form,
+        "bloqueo_editando": bloqueo_editando,
+        "puede_gestionar_bloqueos": puede_gestionar_bloqueos,
     }
     return contexto
 
@@ -1362,6 +1437,103 @@ def agenda_citas(request, empresa_slug):
         messages.success(request, "Cita actualizada correctamente." if objeto else f"{len(creadas)} cita(s) guardada(s) correctamente.")
         return redirect("agenda_citas", empresa_slug=empresa.slug)
     return render(request, "crm/citas.html", _contexto_calendario(empresa, request, form, modo_agenda=True))
+
+
+@login_required
+@require_POST
+def guardar_bloqueo_disponibilidad(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    empresa_agenda = _empresa_origen_agenda(empresa)
+    bloqueo_id = (request.POST.get("bloqueo_id") or "").strip()
+    bloqueo = None
+    if bloqueo_id:
+        bloqueo = get_object_or_404(
+            BloqueoDisponibilidadMedica.objects.select_related("profesional"),
+            empresa=empresa_agenda,
+            pk=bloqueo_id,
+        )
+        if not _puede_gestionar_bloqueo(request.user, empresa_agenda, bloqueo.profesional):
+            return HttpResponse("No tiene permiso para editar este bloqueo.", status=403)
+    puede_otros = _puede_gestionar_bloqueos_otros(request.user, empresa_agenda)
+    form = BloqueoDisponibilidadMedicaForm(
+        request.POST,
+        empresa=empresa_agenda,
+        usuario=request.user,
+        puede_gestionar_otros=puede_otros,
+        instance=bloqueo,
+    )
+    if form.is_valid():
+        profesional = form.cleaned_data["profesional"]
+        if not _puede_gestionar_bloqueo(request.user, empresa_agenda, profesional):
+            return HttpResponse("No tiene permiso para gestionar bloqueos de este profesional.", status=403)
+        afectadas = citas_afectadas_por_bloqueo(
+            empresa=empresa_agenda,
+            profesional=profesional,
+            fecha=form.cleaned_data["fecha"],
+            dia_completo=form.cleaned_data["dia_completo"],
+            hora_inicio=form.cleaned_data.get("hora_inicio"),
+            hora_fin=form.cleaned_data.get("hora_fin"),
+        )
+        if afectadas and request.POST.get("confirmar_conflictos") != "1":
+            return render(
+                request,
+                "crm/bloqueo_disponibilidad_form.html",
+                {
+                    "empresa": empresa,
+                    "empresa_agenda": empresa_agenda,
+                    "bloqueo_form": form,
+                    "bloqueo": bloqueo,
+                    "citas_afectadas": afectadas,
+                },
+            )
+        registro = form.save(commit=False)
+        registro.empresa = empresa_agenda
+        if not registro.creado_por_id:
+            registro.creado_por = request.user
+        registro.save()
+        messages.success(
+            request,
+            "Bloqueo de disponibilidad actualizado." if bloqueo else "Horario marcado como No disponible.",
+        )
+        if request.POST.get("regresar_a") == "app":
+            return redirect(
+                f"{reverse('agenda_mobile', args=[empresa.slug])}?vista=dia&fecha={registro.fecha.isoformat()}#disponibilidad-medica"
+            )
+        return redirect(
+            f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={registro.fecha.isoformat()}#disponibilidad-medica"
+        )
+    return render(
+        request,
+        "crm/bloqueo_disponibilidad_form.html",
+        {
+            "empresa": empresa,
+            "empresa_agenda": empresa_agenda,
+            "bloqueo_form": form,
+            "bloqueo": bloqueo,
+            "citas_afectadas": [],
+        },
+        status=400,
+    )
+
+
+@login_required
+@require_POST
+def eliminar_bloqueo_disponibilidad(request, empresa_slug, bloqueo_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    empresa_agenda = _empresa_origen_agenda(empresa)
+    bloqueo = get_object_or_404(
+        BloqueoDisponibilidadMedica.objects.select_related("profesional"),
+        empresa=empresa_agenda,
+        pk=bloqueo_id,
+    )
+    if not _puede_gestionar_bloqueo(request.user, empresa_agenda, bloqueo.profesional):
+        return HttpResponse("No tiene permiso para eliminar este bloqueo.", status=403)
+    fecha = bloqueo.fecha.isoformat()
+    bloqueo.delete()
+    messages.success(request, "Bloqueo de disponibilidad eliminado.")
+    if request.POST.get("regresar_a") == "app":
+        return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?vista=dia&fecha={fecha}#disponibilidad-medica")
+    return redirect(f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={fecha}#disponibilidad-medica")
 
 
 @login_required

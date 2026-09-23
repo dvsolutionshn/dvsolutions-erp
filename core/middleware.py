@@ -178,14 +178,18 @@ class EmpresaAccessMiddleware:
                         or suffix in rutas_auxiliares_app
                     )
                 )
+                es_gestion_disponibilidad_medica = bool(
+                    interfaz_clinica_activa(empresa)
+                    and suffix.startswith("disponibilidad/")
+                )
 
-                if not empresa.tiene_modulo_activo("agenda_citas") and not es_app_clinica_global:
+                if not empresa.tiene_modulo_activo("agenda_citas") and not es_app_clinica_global and not es_gestion_disponibilidad_medica:
                     messages.error(request, "El modulo de citas no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
                     tiene_permiso_app = bool(
-                        es_app_clinica_global
+                        (es_app_clinica_global or es_gestion_disponibilidad_medica)
                         and (
                             request.user.tiene_permiso_erp("puede_citas", empresa)
                             or request.user.tiene_alguna_permision_facturacion_empresa(empresa)

@@ -164,6 +164,62 @@ class EnvioCampania(models.Model):
         return f"https://wa.me/{telefono}?text={quote(self.mensaje)}" if telefono else ""
 
 
+class BloqueoDisponibilidadMedica(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="bloqueos_disponibilidad_medica")
+    profesional = models.ForeignKey(
+        "clinica.ProfesionalSalud",
+        on_delete=models.CASCADE,
+        related_name="bloqueos_disponibilidad",
+    )
+    fecha = models.DateField()
+    hora_inicio = models.TimeField(blank=True, null=True)
+    hora_fin = models.TimeField(blank=True, null=True)
+    dia_completo = models.BooleanField(default=False)
+    motivo = models.CharField(max_length=220, blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bloqueos_disponibilidad_creados",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["fecha", "hora_inicio", "profesional__nombre"]
+        indexes = [
+            models.Index(fields=["empresa", "fecha"], name="crm_bloq_empresa_fecha"),
+            models.Index(fields=["profesional", "fecha"], name="crm_bloq_prof_fecha"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(dia_completo=True)
+                    | (
+                        models.Q(hora_inicio__isnull=False)
+                        & models.Q(hora_fin__isnull=False)
+                        & models.Q(hora_fin__gt=models.F("hora_inicio"))
+                    )
+                ),
+                name="crm_bloqueo_horario_valido",
+            ),
+        ]
+        verbose_name = "Bloqueo de disponibilidad médica"
+        verbose_name_plural = "Bloqueos de disponibilidad médica"
+
+    def __str__(self):
+        return f"{self.profesional.nombre} · {self.fecha:%d/%m/%Y} · {self.horario_display}"
+
+    @property
+    def horario_display(self):
+        if self.dia_completo:
+            return "Día completo"
+        if not self.hora_inicio or not self.hora_fin:
+            return "Horario no definido"
+        return f"{self.hora_inicio.strftime('%I:%M %p')} – {self.hora_fin.strftime('%I:%M %p')}"
+
+
 class CitaCliente(models.Model):
     ESTADO_CHOICES = [
         ("pendiente", "Pendiente"),

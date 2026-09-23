@@ -1,0 +1,66 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Bloqueo de disponibilidad - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Agenda médica{% endblock %}
+{% block header_title %}Bloquear horario / No disponible{% endblock %}
+{% block header_description %}Los bloqueos no cancelan ni modifican citas existentes.{% endblock %}
+{% block topbar_actions %}<a class="erp-action-link" href="{% if request.POST.regresar_a == 'app' %}{% url 'agenda_mobile' empresa.slug %}{% else %}{% url 'agenda_citas' empresa.slug %}{% endif %}">Volver al calendario</a>{% endblock %}
+
+{% block content %}
+<style>
+.availability-warning{display:grid;gap:14px}.availability-alert{padding:16px 18px;border:1px solid #f2c879;border-left:5px solid #d97706;border-radius:16px;background:#fff9ec;color:#704b0e}.availability-alert h3{margin:0;color:#8b5307}.availability-alert p{margin:7px 0 0;line-height:1.55}.availability-conflicts{display:grid;gap:8px}.availability-conflict{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e3e9ef;border-radius:14px;background:#fff}.availability-conflict strong,.availability-conflict span{display:block}.availability-conflict span{margin-top:3px;color:#687b8c;font-size:11px}.availability-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.availability-field{display:grid;gap:6px}.availability-field.wide{grid-column:1/-1}.availability-field label{color:#607487;font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.availability-field input,.availability-field select{width:100%;min-height:44px;border:1px solid #bfd0dc;border-radius:12px;background:#fff;padding:0 12px}.availability-field input[type=checkbox]{width:22px;min-height:22px;padding:0}.availability-errors{color:#a8323f;font-size:11px}.availability-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.availability-confirm{min-height:44px;border:0;border-radius:12px;background:#b45309;color:#fff;padding:0 17px;font-weight:900}.availability-cancel{min-height:44px;display:inline-flex;align-items:center;border:1px solid #cbd8e3;border-radius:12px;background:#fff;color:#42596d;padding:0 17px;text-decoration:none;font-weight:900}@media(max-width:700px){.availability-form-grid{grid-template-columns:1fr}.availability-field.wide{grid-column:auto}.availability-conflict{grid-template-columns:1fr}}
+</style>
+<section class="erp-card availability-warning">
+  {% if citas_afectadas %}
+  <div class="availability-alert">
+    <h3>Existen citas programadas en este horario</h3>
+    <p>Revise las citas afectadas antes de confirmar. Ninguna cita será cancelada ni modificada automáticamente.</p>
+  </div>
+  <div class="availability-conflicts">
+    {% for cita in citas_afectadas %}
+    <article class="availability-conflict">
+      <div><strong>{{ cita.fecha_hora|date:"d/m/Y" }}</strong><span>{{ cita.fecha_hora|date:"h:i A" }}</span></div>
+      <div><strong>{{ cita.display_cliente }}</strong><span>{{ cita.display_servicio }} · {{ cita.display_responsable }}</span></div>
+      <span class="appointment-status {{ cita.estado }}">{{ cita.get_estado_display }}</span>
+    </article>
+    {% endfor %}
+  </div>
+  <form method="post" action="{% url 'agenda_bloqueo_guardar' empresa.slug %}">
+      {% csrf_token %}
+      {% if request.POST.regresar_a %}<input type="hidden" name="regresar_a" value="{{ request.POST.regresar_a }}">{% endif %}
+      {% if bloqueo %}<input type="hidden" name="bloqueo_id" value="{{ bloqueo.id }}">{% endif %}
+    <input type="hidden" name="profesional" value="{{ bloqueo_form.cleaned_data.profesional.id }}">
+    <input type="hidden" name="fecha" value="{{ bloqueo_form.cleaned_data.fecha|date:'Y-m-d' }}">
+    {% if bloqueo_form.cleaned_data.dia_completo %}<input type="hidden" name="dia_completo" value="1">{% endif %}
+    {% if bloqueo_form.cleaned_data.hora_inicio %}<input type="hidden" name="hora_inicio" value="{{ bloqueo_form.cleaned_data.hora_inicio|time:'H:i' }}">{% endif %}
+    {% if bloqueo_form.cleaned_data.hora_fin %}<input type="hidden" name="hora_fin" value="{{ bloqueo_form.cleaned_data.hora_fin|time:'H:i' }}">{% endif %}
+    <input type="hidden" name="motivo" value="{{ bloqueo_form.cleaned_data.motivo }}">
+    <input type="hidden" name="confirmar_conflictos" value="1">
+    <div class="availability-actions">
+      <button class="availability-confirm" type="submit">Confirmar bloqueo sin modificar citas</button>
+      <a class="availability-cancel" href="{% if request.POST.regresar_a == 'app' %}{% url 'agenda_mobile' empresa.slug %}{% else %}{% url 'agenda_citas' empresa.slug %}{% endif %}?vista=dia&fecha={{ bloqueo_form.cleaned_data.fecha|date:'Y-m-d' }}#disponibilidad-medica">Cancelar</a>
+    </div>
+  </form>
+  {% else %}
+  <div class="availability-alert">
+    <h3>Revise los datos del bloqueo</h3>
+    <p>Hay campos que deben corregirse antes de guardar.</p>
+  </div>
+  <form method="post" action="{% url 'agenda_bloqueo_guardar' empresa.slug %}">
+    {% csrf_token %}
+    {% if request.POST.regresar_a %}<input type="hidden" name="regresar_a" value="{{ request.POST.regresar_a }}">{% endif %}
+    {% if bloqueo %}<input type="hidden" name="bloqueo_id" value="{{ bloqueo.id }}">{% endif %}
+    <div class="availability-form-grid">
+      {% for field in bloqueo_form %}
+      <div class="availability-field {% if field.name == 'motivo' %}wide{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+        {% for error in field.errors %}<span class="availability-errors">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% for error in bloqueo_form.non_field_errors %}<p class="availability-errors">{{ error }}</p>{% endfor %}
+    <div class="availability-actions"><button class="erp-btn" type="submit">Guardar bloqueo</button><a class="availability-cancel" href="{% if request.POST.regresar_a == 'app' %}{% url 'agenda_mobile' empresa.slug %}{% else %}{% url 'agenda_citas' empresa.slug %}{% endif %}">Cancelar</a></div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

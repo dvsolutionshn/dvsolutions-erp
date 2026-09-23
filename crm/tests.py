@@ -30,6 +30,7 @@ from clinica.models import CitaClinica, Paciente, ProfesionalSalud, ServicioClin
 
 from .forms import CitaClienteForm, SesionTerapiaPostQuirurgicaForm
 from .models import (
+    BloqueoDisponibilidadMedica,
     CampaniaMarketing,
     CitaCliente,
     ConfiguracionCRM,
@@ -526,6 +527,203 @@ class CRMTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Calendario de Citas")
         self.assertContains(response, reverse("agenda_mobile", args=[self.empresa.slug]))
+
+    def test_bloqueo_medico_se_muestra_y_evitar_nuevas_citas_en_backend(self):
+        candy = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dra. Candy Luque",
+            especialidad="Cirugía plástica",
+        )
+        luis = ProfesionalSalud.objects.create(
+            empresa=self.empresa,
+            nombre="Dr. Luis Gonzales",
+            especialidad="Medicina general",
+        )
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-BLOQ-01",
+            identidad="08011999009901",
+            nombre="Paciente Disponibilidad",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta disponibilidad",
+            categoria="consulta",
+            duracion_minutos=60,
+        )
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.post(
+            reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
+            {
+                "profesional": candy.id,
+                "fecha": "2026-09-22",
+                "hora_inicio": "14:00",
+                "hora_fin": "17:00",
+                "motivo": "No disponible",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        bloqueo = BloqueoDisponibilidadMedica.objects.get(empresa=self.empresa)
+        self.assertEqual(bloqueo.profesional, candy)
+
+        agenda = self.client.get(
+            reverse("agenda_citas", args=[self.empresa.slug]),
+            {"vista": "dia", "fecha": "2026-09-22"},
+        )
+        self.assertContains(agenda, "No disponible")
+        self.assertContains(agenda, "Dra. Candy Luque")
+
+        form_bloqueado = CitaClienteForm(
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": candy.id,
+                "fecha_cita": "2026-09-22",
+                "hora_cita": "03:00",
+                "periodo_cita": "PM",
+                "estado": "pendiente",
+            },
+            empresa=self.empresa,
+        )
+        self.assertFalse(form_bloqueado.is_valid())
+        self.assertIn("está marcado como No disponible", form_bloqueado.errors.as_text())
+
+        form_al_terminar_bloqueo = CitaClienteForm(
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": candy.id,
+                "fecha_cita": "2026-09-22",
+                "hora_cita": "05:00",
+                "periodo_cita": "PM",
+                "estado": "pendiente",
+            },
+            empresa=self.empresa,
+        )
+        self.assertTrue(form_al_terminar_bloqueo.is_valid(), form_al_terminar_bloqueo.errors.as_text())
+
+        form_otro_medico = CitaClienteForm(
+            {
+                "paciente": paciente.id,
+                "servicio_clinico": servicio.id,
+                "profesional_salud": luis.id,
+                "fecha_cita": "2026-09-22",
+                "hora_cita": "03:00",
+                "periodo_cita": "PM",
+                "estado": "pendiente",
+            },
+            empresa=self.empresa,
+        )
+        self.assertTrue(form_otro_medico.is_valid(), form_otro_medico.errors.as_text())
+
+    def test_bloqueo_con_citas_exige_confirmacion_y_no_modifica_las_existentes(self):
+        candy = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Candy Luque")
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-BLOQ-02",
+            identidad="08011999009902",
+            nombre="Paciente con cita previa",
+        )
+        servicio = ServicioClinico.objects.create(
+            empresa=self.empresa,
+            nombre="Consulta previa",
+            categoria="consulta",
+            duracion_minutos=60,
+        )
+        cita = CitaCliente.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            servicio_clinico=servicio,
+            profesional_salud=candy,
+            titulo=servicio.nombre,
+            fecha_hora=timezone.make_aware(datetime(2026, 9, 23, 15, 0)),
+            estado="confirmada",
+            duracion_minutos=60,
+        )
+        datos = {
+            "profesional": candy.id,
+            "fecha": "2026-09-23",
+            "dia_completo": "1",
+            "motivo": "Congreso médico",
+        }
+        self.client.login(username="crmuser", password="pass12345")
+        response = self.client.post(reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]), datos)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Existen citas programadas")
+        self.assertContains(response, paciente.nombre)
+        self.assertFalse(BloqueoDisponibilidadMedica.objects.exists())
+
+        response = self.client.post(
+            reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
+            {**datos, "confirmar_conflictos": "1"},
+        )
+        self.assertEqual(response.status_code, 302)
+        bloqueo = BloqueoDisponibilidadMedica.objects.get()
+        self.assertTrue(bloqueo.dia_completo)
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado, "confirmada")
+        self.assertEqual(timezone.localtime(cita.fecha_hora).hour, 15)
+
+        response = self.client.post(
+            reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
+            {
+                "bloqueo_id": bloqueo.id,
+                "profesional": candy.id,
+                "fecha": "2026-09-24",
+                "hora_inicio": "08:00",
+                "hora_fin": "10:00",
+                "motivo": "Horario actualizado",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        bloqueo.refresh_from_db()
+        self.assertEqual(bloqueo.fecha, date(2026, 9, 24))
+        self.assertFalse(bloqueo.dia_completo)
+        self.assertEqual(bloqueo.motivo, "Horario actualizado")
+
+        response = self.client.post(
+            reverse("agenda_bloqueo_eliminar", args=[self.empresa.slug, bloqueo.id])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(BloqueoDisponibilidadMedica.objects.exists())
+
+    def test_medico_solo_puede_crear_bloqueos_propios_sin_permiso_administrativo(self):
+        rol_medico = RolSistema.objects.create(nombre="Médico", codigo="medico-bloqueos", puede_clinica=True)
+        medico_usuario = Usuario.objects.create_user(
+            username="medicoagenda",
+            password="pass12345",
+            empresa=self.empresa,
+            rol_sistema=rol_medico,
+        )
+        candy = ProfesionalSalud.objects.create(empresa=self.empresa, usuario=medico_usuario, nombre="Candy Luque")
+        luis = ProfesionalSalud.objects.create(empresa=self.empresa, nombre="Luis Gonzales")
+        self.client.login(username="medicoagenda", password="pass12345")
+
+        response = self.client.post(
+            reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
+            {"profesional": luis.id, "fecha": "2026-09-24", "dia_completo": "1"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(BloqueoDisponibilidadMedica.objects.exists())
+
+        response = self.client.post(
+            reverse("agenda_bloqueo_guardar", args=[self.empresa.slug]),
+            {
+                "profesional": candy.id,
+                "fecha": "2026-09-24",
+                "dia_completo": "1",
+                "regresar_a": "app",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("agenda_mobile", args=[self.empresa.slug]), response.url)
+        self.assertTrue(BloqueoDisponibilidadMedica.objects.filter(profesional=candy).exists())
+        app = self.client.get(
+            reverse("agenda_mobile", args=[self.empresa.slug]),
+            {"vista": "dia", "fecha": "2026-09-24"},
+        )
+        self.assertContains(app, "Bloquear horario / No disponible")
+        self.assertContains(app, "Candy Luque")
 
     def test_hospital_mia_crea_varias_sesiones_con_hora_individual(self):
         self.empresa.tipo_solucion = "clinica"
