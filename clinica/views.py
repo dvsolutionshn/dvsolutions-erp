@@ -10,6 +10,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core import signing
 from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
@@ -127,6 +128,8 @@ from crm.services import (
 )
 
 logger = logging.getLogger(__name__)
+MANUAL_PDF_LINK_SALT = "clinica.manual-pdf.descarga"
+MANUAL_PDF_LINK_MAX_AGE_DEFAULT = 7 * 24 * 60 * 60
 
 def _texto_busqueda_profesional(valor):
     return unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode("ascii").lower().strip()
@@ -1944,6 +1947,55 @@ def _registrar_resultado_envio_manual(envio, estado, detalle_error=""):
     envio.save(update_fields=["estado", "detalle_error"])
 
 
+def _enlace_publico_manual_pdf(request, manual, paciente):
+    token = signing.dumps(
+        {
+            "empresa_id": manual.empresa_id,
+            "manual_id": manual.id,
+            "paciente_id": paciente.id,
+        },
+        salt=MANUAL_PDF_LINK_SALT,
+        compress=True,
+    )
+    return request.build_absolute_uri(
+        reverse("clinica_descargar_manual_pdf_publico", args=[token])
+    )
+
+
+def descargar_manual_pdf_publico(request, token):
+    try:
+        datos = signing.loads(
+            token,
+            salt=MANUAL_PDF_LINK_SALT,
+            max_age=getattr(settings, "MANUAL_PDF_LINK_MAX_AGE", MANUAL_PDF_LINK_MAX_AGE_DEFAULT),
+        )
+    except (signing.BadSignature, signing.SignatureExpired, TypeError, ValueError):
+        raise Http404("El enlace de descarga no es válido o ya venció.")
+    if not isinstance(datos, dict):
+        raise Http404("El enlace de descarga no es válido.")
+
+    manual = get_object_or_404(
+        ManualReceta.objects.select_related("empresa"),
+        id=datos.get("manual_id"),
+        empresa_id=datos.get("empresa_id"),
+        activo=True,
+    )
+    if not Paciente.objects.filter(
+        id=datos.get("paciente_id"),
+        empresa_id=manual.empresa_id,
+        activo=True,
+    ).exists() or not manuales_pdf_habilitados(manual.empresa):
+        raise Http404("El enlace de descarga ya no está disponible.")
+    if not manual.archivo:
+        raise Http404("El manual no tiene un PDF disponible.")
+    return FileResponse(
+        manual.archivo.open("rb"),
+        as_attachment=True,
+        filename=Path(manual.archivo.name).name,
+        content_type="application/pdf",
+    )
+
+
 @login_required
 @require_POST
 def enviar_manuales_pdf(request, empresa_slug):
@@ -2007,10 +2059,14 @@ def enviar_manuales_pdf(request, empresa_slug):
     envio.manuales.set(manuales)
 
     if canal == EnvioManualPDF.CANAL_WHATSAPP_MANUAL:
-        nombres_manuales = "\n".join(f"• {manual.titulo}" for manual in manuales)
+        manuales_con_enlace = "\n\n".join(
+            f"• {manual.titulo}\n{_enlace_publico_manual_pdf(request, manual, paciente)}"
+            for manual in manuales
+        )
         texto = (
             f"Hola {paciente.nombre}, le compartimos los siguientes manuales de {empresa.nombre}:\n\n"
-            f"{nombres_manuales}"
+            f"{manuales_con_enlace}\n\n"
+            "Toque cada enlace para descargar el PDF. Los enlaces estarán disponibles durante 7 días."
         )
         _registrar_resultado_envio_manual(envio, EnvioManualPDF.ESTADO_PREPARADO)
         return redirect(f"https://web.whatsapp.com/send?phone={destinatario}&text={quote(texto)}")

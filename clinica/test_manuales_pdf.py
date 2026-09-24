@@ -1,5 +1,7 @@
+import re
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.parse import unquote, urlsplit
 
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -170,9 +172,30 @@ class ManualesPDFOperativosTests(TestCase):
                 },
             )
 
+            url_decodificada = unquote(response.url)
+            coincidencia = re.search(
+                r"https?://[^\s]+/formularios/clinica/manuales/[^\s]+/descargar/",
+                url_decodificada,
+            )
+            self.assertIsNotNone(coincidencia)
+            enlace_descarga = coincidencia.group(0)
+            descarga = self.client.get(urlsplit(enlace_descarga).path)
+            self.assertEqual(descarga.status_code, 200)
+            self.assertEqual(descarga["Content-Type"], "application/pdf")
+            self.assertEqual(b"".join(descarga.streaming_content), b"%PDF-1.4\nmanual\n%%EOF")
+
+            ruta_descarga = urlsplit(enlace_descarga).path
+            token = ruta_descarga.split("/")[-3]
+            token_alterado = f"{token[:-1]}{'a' if token[-1] != 'a' else 'b'}"
+            descarga_invalida = self.client.get(
+                reverse("clinica_descargar_manual_pdf_publico", args=[token_alterado])
+            )
+            self.assertEqual(descarga_invalida.status_code, 404)
+
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.url.startswith("https://web.whatsapp.com/send?phone=50499998888"))
         self.assertIn("Manual%20para%20WhatsApp%20Web", response.url)
+        self.assertIn("Toque%20cada%20enlace", response.url)
         subir_mock.assert_not_called()
         enviar_mock.assert_not_called()
         envio = EnvioManualPDF.objects.get()
