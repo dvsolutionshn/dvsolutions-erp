@@ -243,7 +243,11 @@ class EmpresaAccessMiddleware:
                     if permiso == "__denegar__":
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta sección clínica.")
                         return redirect("dashboard", slug=empresa.slug)
-                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa):
+                    acceso_administracion_manuales = bool(
+                        suffix.strip("/") == "configuracion"
+                        and request.user.tiene_permiso_erp("puede_administrar_manuales_pdf", empresa)
+                    )
+                    if permiso and not request.user.tiene_permiso_erp(permiso, empresa) and not acceso_administracion_manuales:
                         messages.error(request, "Tu rol no tiene permiso para entrar a esta seccion clinica.")
                         return redirect("dashboard", slug=empresa.slug)
                     if not suffix and not request.user.tiene_alguna_permision_clinica_empresa(empresa):

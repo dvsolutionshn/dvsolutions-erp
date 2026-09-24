@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
-from core.models import Empresa, EmpresaModulo, Modulo, RolSistema
+from core.models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo, RolSistema
 from crm.models import (
     CitaCliente,
     ConfiguracionCRM,
@@ -35,6 +35,10 @@ class ClinicaPacienteTests(TestCase):
         )
         modulo, _ = Modulo.objects.get_or_create(nombre="Clinica Medica", codigo="clinica_medica")
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=modulo, activo=True)
+        ConfiguracionAvanzadaEmpresa.objects.create(
+            empresa=self.empresa,
+            manuales_pdf_habilitados=True,
+        )
         rol = RolSistema.objects.create(
             nombre="Clinica Admin",
             codigo="clinica-admin-test",

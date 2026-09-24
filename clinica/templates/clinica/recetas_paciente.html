@@ -8,7 +8,7 @@
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}">Volver al expediente</a>
 {% if recetas_avanzadas %}<a class="erp-btn-secondary" href="{% url 'clinica_plantillas_recetas' empresa.slug %}">Plantillas</a>{% endif %}
-{% if erp_access.configuracion_clinica %}<a class="erp-btn-secondary" href="{% url 'clinica_manuales_recetas' empresa.slug %}">Manuales PDF</a>{% endif %}
+{% if erp_access.administrar_manuales_pdf %}<a class="erp-btn-secondary" href="{% url 'clinica_manuales_recetas' empresa.slug %}">Administrar manuales PDF</a>{% endif %}
 <a class="erp-btn" href="{% url 'clinica_crear_receta_paciente' empresa.slug paciente.id %}">Crear receta</a>
 {% endblock %}
 

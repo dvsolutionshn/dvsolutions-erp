@@ -74,6 +74,7 @@
     {% url 'agenda_terapias_postquirurgicas' empresa.slug as agenda_terapias_postquirurgicas_url %}
     {% url 'clinica_dashboard' empresa.slug as clinica_url %}
     {% url 'clinica_configuracion' empresa.slug as clinica_configuracion_url %}
+    {% url 'clinica_manuales_pdf' empresa.slug as clinica_manuales_pdf_url %}
     {% url 'clinica_pacientes' empresa.slug as clinica_pacientes_url %}
     {% url 'clinica_control_enlaces_registro_paciente' empresa.slug as clinica_control_enlaces_url %}
     {% url 'clinica_citas' empresa.slug as clinica_citas_url %}
@@ -189,6 +190,12 @@
                 <a class="erp-nav-link {% if request.path == clinica_configuracion_url or '/dashboard/usuarios-clinicos/' in request.path %}is-active{% endif %}" href="{{ clinica_configuracion_url }}">
                     <span class="erp-nav-bullet"></span>
                     <span>Configuración</span>
+                </a>
+                {% endif %}
+                {% if erp_access.ver_manuales_pdf %}
+                <a class="erp-nav-link {% if '/dashboard/clinica/manuales-pdf/' in request.path %}is-active{% endif %}" href="{{ clinica_manuales_pdf_url }}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Manuales PDF</span>
                 </a>
                 {% endif %}
                 {% else %}

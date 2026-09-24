@@ -6,6 +6,7 @@ from django import forms
 from django.utils import timezone
 
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
+from core.access import manuales_pdf_habilitados
 
 from .models import (
     CitaClinica,
@@ -664,7 +665,8 @@ class RecetaMedicaForm(BaseClinicaForm):
         if empresa:
             self.fields["productos"].queryset = productos_disponibles_receta(empresa).order_by("nombre")
             self.fields["profesional"].queryset = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
-            self.fields["manuales"].queryset = ManualReceta.objects.filter(empresa=empresa, activo=True).order_by("titulo")
+            if manuales_pdf_habilitados(empresa):
+                self.fields["manuales"].queryset = ManualReceta.objects.filter(empresa=empresa, activo=True).order_by("titulo")
         self.fields["productos"].widget.attrs.update({"size": "8"})
 
 

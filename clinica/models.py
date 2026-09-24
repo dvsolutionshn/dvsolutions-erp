@@ -1057,6 +1057,48 @@ class ManualReceta(models.Model):
         return self.titulo
 
 
+class EnvioManualPDF(models.Model):
+    CANAL_WHATSAPP = "whatsapp"
+    CANAL_CORREO = "correo"
+    CANAL_CHOICES = [
+        (CANAL_WHATSAPP, "WhatsApp"),
+        (CANAL_CORREO, "Correo"),
+    ]
+    ESTADO_ENVIADO = "enviado"
+    ESTADO_PARCIAL = "parcial"
+    ESTADO_FALLIDO = "fallido"
+    ESTADO_CHOICES = [
+        (ESTADO_ENVIADO, "Enviado"),
+        (ESTADO_PARCIAL, "Envío parcial"),
+        (ESTADO_FALLIDO, "Fallido"),
+    ]
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="envios_manuales_pdf")
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="envios_manuales_pdf")
+    manuales = models.ManyToManyField(ManualReceta, related_name="envios")
+    fecha_envio = models.DateTimeField(auto_now_add=True)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="envios_manuales_pdf",
+    )
+    canal = models.CharField(max_length=20, choices=CANAL_CHOICES)
+    destinatario = models.CharField(max_length=254)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default=ESTADO_ENVIADO)
+    detalle_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-fecha_envio", "-id"]
+        verbose_name = "Envío de manual PDF"
+        verbose_name_plural = "Envíos de manuales PDF"
+
+    def __str__(self):
+        fecha = self.fecha_envio.strftime("%d/%m/%Y %H:%M") if self.fecha_envio else "sin fecha"
+        return f"{self.paciente.nombre} · {self.get_canal_display()} · {fecha}"
+
+
 class RecetaMedica(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="recetas_medicas")
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="recetas")

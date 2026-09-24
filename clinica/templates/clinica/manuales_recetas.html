@@ -1,13 +1,13 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Manuales de Recetas - {{ empresa.nombre }}{% endblock %}
+{% block title %}Administrar Manuales PDF - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Configuración clínica{% endblock %}
-{% block header_title %}Manuales de Recetas{% endblock %}
-{% block header_description %}Biblioteca de instructivos PDF disponibles para adjuntar a las recetas médicas.{% endblock %}
+{% block header_title %}Administrar Manuales PDF{% endblock %}
+{% block header_description %}Suba, edite y active los documentos disponibles para el módulo clínico.{% endblock %}
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_configuracion' empresa.slug %}">Volver a configuración</a>
-{% if puede_administrar_manuales %}<a class="erp-btn" href="{% url 'clinica_crear_manual_receta' empresa.slug %}">Subir manual PDF</a>{% endif %}
+<a class="erp-btn" href="{% url 'clinica_crear_manual_receta' empresa.slug %}">Subir manual PDF</a>
 {% endblock %}
 
 {% block content %}
@@ -29,12 +29,11 @@
         <div class="manual-actions">
             <a class="erp-btn-secondary" href="{% url 'clinica_archivo_manual_receta' empresa.slug manual.id %}" target="_blank" rel="noopener">Ver PDF</a>
             <a class="erp-btn-secondary" href="{% url 'clinica_archivo_manual_receta' empresa.slug manual.id %}?descargar=1">Descargar</a>
-            {% if puede_administrar_manuales %}<a class="erp-btn" href="{% url 'clinica_editar_manual_receta' empresa.slug manual.id %}">Editar</a>{% endif %}
-            {% if erp_access.enviar_manuales_pdf %}<form method="post" action="{% url 'clinica_enviar_manual_receta_correo' empresa.slug manual.id %}" style="display:flex;gap:6px">{% csrf_token %}<input type="email" name="correo" required placeholder="correo@destino.com" aria-label="Correo para enviar {{ manual.titulo }}"><button class="erp-btn" type="submit">Enviar</button></form>{% endif %}
+            <a class="erp-btn" href="{% url 'clinica_editar_manual_receta' empresa.slug manual.id %}">Editar</a>
         </div>
     </article>
     {% empty %}
-    <div class="erp-empty">Aún no hay manuales PDF. Suba el primero para poder adjuntarlo a una receta.</div>
+    <div class="erp-empty">Aún no hay manuales PDF. Suba el primero para dejarlo disponible en el módulo clínico.</div>
     {% endfor %}
 </section>
 {% endblock %}

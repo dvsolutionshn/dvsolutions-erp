@@ -30,6 +30,7 @@ class ConfiguracionAvanzadaEmpresaAdmin(admin.ModelAdmin):
         'usa_reporte_bancos',
         'usa_inventario_farmaceutico',
         'usa_control_lotes_fefo',
+        'manuales_pdf_habilitados',
         'usa_bodegas_internas',
         'modulos_clinicos_visibles',
     )
@@ -42,6 +43,7 @@ class ConfiguracionAvanzadaEmpresaAdmin(admin.ModelAdmin):
         'usa_reporte_bancos',
         'usa_inventario_farmaceutico',
         'usa_control_lotes_fefo',
+        'manuales_pdf_habilitados',
         'usa_bodegas_internas',
     )
 

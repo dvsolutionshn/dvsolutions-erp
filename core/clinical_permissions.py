@@ -101,6 +101,8 @@ def permiso_clinica_granular(path_suffix, method="GET"):
         return None
     if parts[0] == "configuracion":
         return "puede_configuracion_clinica"
+    if parts[0] == "manuales-pdf":
+        return "puede_enviar_manuales_pdf" if method != "GET" or "enviar" in parts else "puede_ver_manuales_pdf"
     if parts[0] in {"profesionales", "servicios"}:
         return "puede_configuracion_clinica"
     if parts[0] == "citas":
@@ -113,7 +115,9 @@ def permiso_clinica_granular(path_suffix, method="GET"):
         if len(parts) > 1 and parts[1] == "manuales":
             if "enviar-correo" in parts:
                 return "puede_enviar_manuales_pdf"
-            return "puede_administrar_manuales_pdf" if any(x in parts for x in {"crear", "editar"}) else "puede_ver_manuales_pdf"
+            if "archivo" in parts:
+                return "puede_ver_manuales_pdf"
+            return "puede_administrar_manuales_pdf"
         return "puede_editar_historia_clinica"
     if parts[0] != "pacientes":
         return "__denegar__"

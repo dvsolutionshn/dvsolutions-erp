@@ -3,7 +3,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from core.models import ConfiguracionOnix, ConsumoOnix, Empresa
-from core.access import interfaz_clinica_activa, modo_clinico_simple_activo
+from core.access import interfaz_clinica_activa, manuales_pdf_habilitados, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
 
 
@@ -50,6 +50,7 @@ def erp_access(request):
     tecnicentro_activo = bool(empresa and empresa.tiene_modulo_activo("tecnicentro"))
     cotizaciones_activa = bool(empresa and empresa.tiene_modulo_activo("cotizaciones"))
     interfaz_clinica = interfaz_clinica_activa(empresa)
+    modulo_manuales_pdf = manuales_pdf_habilitados(empresa)
     modulos_adicionales_clinica = set()
     if interfaz_clinica and config_avanzada:
         modulos_adicionales_clinica = set(
@@ -187,9 +188,9 @@ def erp_access(request):
         "escribir_terapias": permiso("puede_escribir_terapias") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
         "ver_camara_hiperbarica": permiso("puede_ver_camara_hiperbarica") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
         "ver_postquirurgicas": permiso("puede_ver_postquirurgicas") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
-        "ver_manuales_pdf": permiso("puede_ver_manuales_pdf") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
-        "enviar_manuales_pdf": permiso("puede_enviar_manuales_pdf") if permisos_clinicos_granulares else permiso("puede_expediente_clinico"),
-        "administrar_manuales_pdf": permiso("puede_administrar_manuales_pdf") if permisos_clinicos_granulares else permiso("puede_configuracion_clinica"),
+        "ver_manuales_pdf": modulo_manuales_pdf and (permiso("puede_ver_manuales_pdf") if permisos_clinicos_granulares else permiso("puede_expediente_clinico")),
+        "enviar_manuales_pdf": modulo_manuales_pdf and (permiso("puede_enviar_manuales_pdf") if permisos_clinicos_granulares else permiso("puede_expediente_clinico")),
+        "administrar_manuales_pdf": modulo_manuales_pdf and (permiso("puede_administrar_manuales_pdf") if permisos_clinicos_granulares else permiso("puede_configuracion_clinica")),
         "transferir_inventario": permiso("puede_transferir_inventario") if permisos_clinicos_granulares else permiso("puede_inventario"),
         "tecnicentro": tecnicentro_activo and permiso("puede_tecnicentro"),
         "recepcion_taller": tecnicentro_activo and permiso("puede_recepcion_taller"),
@@ -228,6 +229,7 @@ def erp_access(request):
             or base["configuracion_facturacion"]
             or base["configuracion_crm"]
             or base["administrar_usuarios_clinicos"]
+            or base["administrar_manuales_pdf"]
             or base["modulo_crm"]
         )
     )

@@ -448,6 +448,7 @@
             {% if erp_access.modulo_contabilidad %}<a class="erp-doctor-action" href="{% url 'contabilidad_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/accounting.svg' %}" alt=""></i><span><strong>Contabilidad</strong><span>Operación contable y reportes autorizados.</span></span></a>{% endif %}
             {% if erp_access.modulo_tecnicentro %}<a class="erp-doctor-action" href="{% url 'tecnicentro_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/tecnicentro.svg' %}" alt=""></i><span><strong>Tecnicentro</strong><span>Recepción, diagnóstico y operación del taller.</span></span></a>{% endif %}
             {% if erp_access.configuracion_producto_clinico %}<a class="erp-doctor-action" href="{% url 'clinica_configuracion' empresa.slug %}"><i><img src="{% static 'core/img/modules/settings.svg' %}" alt=""></i><span><strong>Configuración</strong><span>Servicios, usuarios, permisos e integraciones.</span></span></a>{% endif %}
+            {% if erp_access.ver_manuales_pdf %}<a class="erp-doctor-action" href="{% url 'clinica_manuales_pdf' empresa.slug %}"><i><img src="{% static 'core/img/modules/manuals.svg' %}" alt=""></i><span><strong>Manuales PDF</strong><span>Consultar y enviar indicaciones a pacientes.</span></span></a>{% endif %}
         </div>
     </div>
     <aside class="erp-doctor-side">
@@ -462,6 +463,7 @@
             {% if erp_access.modulo_rrhh %}<li>Recursos Humanos</li>{% endif %}
             {% if erp_access.modulo_crm %}<li>CRM y Marketing</li>{% endif %}
             {% if erp_access.modulo_contabilidad %}<li>Contabilidad</li>{% endif %}
+            {% if erp_access.ver_manuales_pdf %}<li>Manuales PDF para pacientes</li>{% endif %}
             <li>Configuración por permisos</li>
         </ul>
         </div>

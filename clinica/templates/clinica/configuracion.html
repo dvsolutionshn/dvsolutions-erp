@@ -46,8 +46,8 @@
             {% if erp_access.configuracion_clinica and recetas_avanzadas %}
             <a class="clinical-config-card" href="{% url 'clinica_plantillas_recetas' empresa.slug %}"><i class="clinical-config-icon">Rx</i><span><strong>Plantillas de recetas</strong><span>Indicaciones y medicamentos reutilizables en consulta.</span></span></a>
             {% endif %}
-            {% if recetas_avanzadas and erp_access.ver_manuales_pdf or recetas_avanzadas and erp_access.administrar_manuales_pdf %}
-            <a class="clinical-config-card" href="{% url 'clinica_manuales_recetas' empresa.slug %}"><i class="clinical-config-icon">PDF</i><span><strong>Manuales de Recetas</strong><span>Biblioteca de instructivos PDF para adjuntar al enviar una receta.</span></span></a>
+            {% if recetas_avanzadas and erp_access.administrar_manuales_pdf %}
+            <a class="clinical-config-card" href="{% url 'clinica_manuales_recetas' empresa.slug %}"><i class="clinical-config-icon">PDF</i><span><strong>Manuales PDF</strong><span>Subir, editar y activar los documentos disponibles para consulta y envío.</span></span></a>
             {% endif %}
             {% if puede_controlar_enlaces_pacientes %}
             <a class="clinical-config-card" href="{% url 'clinica_control_enlaces_registro_paciente' empresa.slug %}"><i class="clinical-config-icon">↗</i><span><strong>Enlaces de registro</strong><span>Control de formularios enviados a nuevos pacientes.</span></span></a>

@@ -516,6 +516,8 @@ class Usuario(AbstractUser):
         if self.is_superuser or self.es_administrador_empresa:
             return True
         rol = self.rol_para_empresa(empresa)
+        if permiso == "puede_ver_manuales_pdf" and rol and rol.activo and rol.puede_administrar_manuales_pdf:
+            return True
         return bool(
             rol
             and rol.activo
@@ -898,6 +900,10 @@ class ConfiguracionAvanzadaEmpresa(models.Model):
     usa_control_lotes_fefo = models.BooleanField(
         default=False,
         help_text="Muestra el control de lotes, vencimientos y salida por FEFO en Inventario.",
+    )
+    manuales_pdf_habilitados = models.BooleanField(
+        default=False,
+        help_text="Muestra la biblioteca operativa de Manuales PDF en el sistema clínico.",
     )
     usa_bodegas_internas = models.BooleanField(default=False)
     ventas_solo_desde_vitrina = models.BooleanField(default=False)

@@ -32,6 +32,17 @@ def interfaz_clinica_activa(empresa):
     return bool(empresa and getattr(empresa, "tipo_solucion", "") == "clinica")
 
 
+def manuales_pdf_habilitados(empresa):
+    """Controla por configuracion, no por slug, donde se ofrece el modulo de manuales."""
+    if not interfaz_clinica_activa(empresa):
+        return False
+    try:
+        configuracion = empresa.configuracion_avanzada
+    except Exception:
+        return False
+    return bool(configuracion.manuales_pdf_habilitados)
+
+
 def modo_clinico_simple_activo(user, empresa):
     """Limita la interfaz clínica simplificada a las empresas autorizadas."""
     return bool(

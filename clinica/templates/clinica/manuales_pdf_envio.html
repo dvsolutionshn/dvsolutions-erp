@@ -1,0 +1,202 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+
+{% block title %}Manuales PDF - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Atención clínica{% endblock %}
+{% block header_title %}Manuales PDF{% endblock %}
+{% block header_description %}Consulte los documentos disponibles y compártalos con el paciente por WhatsApp o correo.{% endblock %}
+
+{% block extra_head %}
+<style>
+.manual-send-page{display:grid;gap:20px;max-width:1180px;margin:0 auto 36px}.manual-send-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 22px;border:1px solid #d6e7ef;border-radius:22px;background:linear-gradient(135deg,#fff,#f2fbfa);box-shadow:0 14px 38px rgba(20,52,73,.06)}.manual-send-intro h3{margin:0;color:#10283d;font-size:19px}.manual-send-intro p{margin:5px 0 0;color:#687d8d;font-size:12px}.manual-select-all{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#245067;font-size:12px;font-weight:850}.manual-select-all input,.manual-card-check input{width:18px;height:18px;accent-color:#10a99f}.manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.manual-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:17px;border:1px solid #d6e5ed;border-radius:18px;background:#fff;box-shadow:0 10px 30px rgba(17,48,69,.05);transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease}.manual-card:has(input:checked){border-color:#43bcb4;box-shadow:0 13px 32px rgba(20,157,150,.12);transform:translateY(-1px)}.manual-card-check{display:grid;place-items:center}.manual-card h3{margin:0;color:#153047;font-size:14px}.manual-card p{margin:5px 0 0;color:#6a7d8d;font-size:11px;line-height:1.5}.manual-preview{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 12px;border:1px solid #bed5e1;border-radius:10px;color:#157d7a;background:#fff;text-decoration:none;font-size:11px;font-weight:900}.manual-send-bar{position:sticky;bottom:14px;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #cce2e9;border-radius:18px;background:rgba(255,255,255,.96);box-shadow:0 18px 44px rgba(17,48,69,.15);backdrop-filter:blur(12px)}.manual-send-count{color:#526f81;font-size:12px}.manual-send-count strong{color:#112c42}.manual-primary{border:0;border-radius:12px;background:linear-gradient(135deg,#10ada3,#247fea);color:#fff;min-height:43px;padding:0 18px;font-weight:900;cursor:pointer;box-shadow:0 10px 24px rgba(25,137,181,.2)}.manual-primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}.manual-empty{padding:30px;border:1px dashed #bcd1dc;border-radius:20px;background:#fbfdfe;text-align:center;color:#647c8d}.manual-history{padding:20px;border:1px solid #d9e6ed;border-radius:22px;background:#fff}.manual-history-head h3{margin:0;color:#10283d;font-size:17px}.manual-history-head p{margin:5px 0 15px;color:#6c7e8d;font-size:11px}.manual-history-list{display:grid;gap:8px}.manual-history-row{display:grid;grid-template-columns:minmax(170px,1.1fr) minmax(190px,1.5fr) auto auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e0e9ee;border-radius:13px;background:#fbfdfe;font-size:11px;color:#567083}.manual-history-row strong{display:block;color:#18344a;font-size:12px}.manual-history-manuals{display:flex;gap:5px;flex-wrap:wrap}.manual-history-chip,.manual-status{padding:5px 8px;border-radius:999px;background:#edf5f8;color:#315d73;font-size:9px;font-weight:900}.manual-status.is-enviado{background:#e5f8f3;color:#08796d}.manual-status.is-parcial{background:#fff4d9;color:#8b6112}.manual-status.is-fallido{background:#fff0f1;color:#a33a45}.manual-modal[hidden]{display:none}.manual-modal{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:18px;background:rgba(11,31,46,.55);backdrop-filter:blur(4px)}.manual-dialog{width:min(720px,100%);max-height:92vh;overflow:auto;border:1px solid #cfe0e9;border-radius:24px;background:#fff;box-shadow:0 30px 90px rgba(7,28,43,.32)}.manual-dialog-head{display:flex;justify-content:space-between;gap:15px;align-items:start;padding:20px 22px;border-bottom:1px solid #e2ebef}.manual-dialog-head h3{margin:0;color:#10283d;font-size:20px}.manual-dialog-head p{margin:5px 0 0;color:#687d8d;font-size:11px}.manual-close{border:1px solid #c9dbe4;border-radius:10px;background:#fff;color:#33566a;width:38px;height:38px;font-size:21px;cursor:pointer}.manual-dialog-body{display:grid;gap:17px;padding:20px 22px 23px}.manual-selection-summary{padding:13px 15px;border-radius:14px;background:#eef9f7;color:#1a5f5c;font-size:11px;line-height:1.55}.patient-search-field label{display:block;margin-bottom:7px;color:#29495d;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:900}.patient-search-field input{width:100%;min-height:46px;border:1px solid #bad0dc;border-radius:12px;padding:0 14px;color:#17354b;font:inherit;outline:0}.patient-search-field input:focus{border-color:#16aaa2;box-shadow:0 0 0 4px rgba(22,170,162,.1)}.patient-results{display:grid;gap:7px}.patient-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;width:100%;padding:12px 14px;border:1px solid #d6e4eb;border-radius:13px;background:#fbfdfe;text-align:left;color:#17354b;cursor:pointer}.patient-result:hover{border-color:#70c6c1;background:#f4fbfa}.patient-result strong,.patient-result span{display:block}.patient-result span{margin-top:3px;color:#708391;font-size:10px}.patient-result em{align-self:center;color:#16847f;font-size:10px;font-style:normal;font-weight:900}.patient-search-state{padding:11px 13px;border-radius:12px;background:#f4f8fa;color:#667d8d;font-size:11px}.patient-selected{padding:15px;border:1px solid #bfe1dc;border-radius:15px;background:#f4fbfa}.patient-selected strong{color:#12334a}.patient-selected p{margin:5px 0 0;color:#5c7788;font-size:11px}.manual-channel-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.manual-channel{min-height:48px;border:1px solid #b8d2dd;border-radius:13px;background:#fff;color:#19445c;font-weight:900;cursor:pointer}.manual-channel.is-whatsapp{border-color:#86d7bf;color:#087b60;background:#f1fbf7}.manual-channel.is-email{border-color:#a9c8ec;color:#2264a7;background:#f4f8fd}.manual-channel:disabled{opacity:.42;cursor:not-allowed}.channel-warning{margin:0;color:#a33f49;font-size:10px;font-weight:800}.manual-no-send{padding:14px 16px;border:1px solid #f0d8a6;border-radius:14px;background:#fff9ec;color:#825f1d;font-size:12px}
+@media(max-width:800px){.manual-grid{grid-template-columns:1fr}.manual-history-row{grid-template-columns:1fr}.manual-send-intro{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.manual-card{grid-template-columns:auto minmax(0,1fr)}.manual-preview{grid-column:2}.manual-send-bar{align-items:stretch;flex-direction:column}.manual-primary{width:100%}.manual-channel-actions{grid-template-columns:1fr}.manual-dialog-head,.manual-dialog-body{padding-left:16px;padding-right:16px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="manual-send-page">
+    <form method="post" action="{% url 'clinica_enviar_manuales_pdf' empresa.slug %}" id="manualSendForm">
+        {% csrf_token %}
+        <section class="manual-send-intro">
+            <div><h3>Documentos disponibles</h3><p>Seleccione uno o varios manuales precargados para compartirlos con un paciente.</p></div>
+            {% if puede_enviar_manuales and manuales %}<label class="manual-select-all"><input type="checkbox" id="manualSelectAll"> Seleccionar todos</label>{% endif %}
+        </section>
+
+        {% if manuales %}
+        <section class="manual-grid" style="margin-top:12px">
+            {% for manual in manuales %}
+            <article class="manual-card">
+                {% if puede_enviar_manuales %}<label class="manual-card-check" aria-label="Seleccionar {{ manual.titulo }}"><input type="checkbox" name="manuales" value="{{ manual.id }}" data-manual-title="{{ manual.titulo }}"></label>{% endif %}
+                <div><h3>{{ manual.titulo }}</h3>{% if manual.descripcion %}<p>{{ manual.descripcion }}</p>{% endif %}</div>
+                <a class="manual-preview" href="{% url 'clinica_archivo_manual_receta' empresa.slug manual.id %}" target="_blank" rel="noopener">Abrir PDF</a>
+            </article>
+            {% endfor %}
+        </section>
+        {% else %}
+        <div class="manual-empty" style="margin-top:12px">No hay manuales activos disponibles en este momento.</div>
+        {% endif %}
+
+        {% if puede_enviar_manuales and manuales %}
+        <div class="manual-send-bar">
+            <span class="manual-send-count"><strong id="manualSelectedCount">0</strong> manual(es) seleccionado(s)</span>
+            <button class="manual-primary" type="button" id="openPatientDialog" disabled>Enviar seleccionados</button>
+        </div>
+
+        <div class="manual-modal" id="patientDialog" hidden>
+            <section class="manual-dialog" role="dialog" aria-modal="true" aria-labelledby="patientDialogTitle">
+                <header class="manual-dialog-head">
+                    <div><h3 id="patientDialogTitle">Seleccionar paciente</h3><p>Busque por nombre, identidad, expediente, teléfono o correo.</p></div>
+                    <button class="manual-close" type="button" id="closePatientDialog" aria-label="Cerrar">×</button>
+                </header>
+                <div class="manual-dialog-body">
+                    <div class="manual-selection-summary"><strong>Manuales seleccionados:</strong> <span id="selectedManualNames"></span></div>
+                    <div class="patient-search-field">
+                        <label for="patientSearch">Paciente</label>
+                        <input id="patientSearch" type="search" autocomplete="off" placeholder="Escriba al menos 2 caracteres" data-url="{% url 'clinica_pacientes_sugerencias' empresa.slug %}">
+                    </div>
+                    <div class="patient-results" id="patientResults"><div class="patient-search-state">Escriba para buscar un paciente.</div></div>
+                    <input type="hidden" name="paciente_id" id="selectedPatientId">
+                    <section class="patient-selected" id="selectedPatientCard" hidden>
+                        <strong id="selectedPatientName"></strong>
+                        <p id="selectedPatientDetails"></p>
+                    </section>
+                    <p class="channel-warning" id="patientChannelWarning" hidden></p>
+                    <div class="manual-channel-actions" id="channelActions" hidden>
+                        <button class="manual-channel is-whatsapp" type="submit" name="canal" value="whatsapp" id="sendWhatsapp">Enviar por WhatsApp</button>
+                        <button class="manual-channel is-email" type="submit" name="canal" value="correo" id="sendEmail">Enviar por correo</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+        {% elif manuales %}
+        <div class="manual-no-send">Su usuario puede consultar los manuales, pero no tiene permiso para enviarlos.</div>
+        {% endif %}
+    </form>
+
+    <section class="manual-history">
+        <div class="manual-history-head"><h3>Historial de envíos</h3><p>Últimos envíos realizados para {{ empresa.nombre }}.</p></div>
+        <div class="manual-history-list">
+            {% for envio in historial %}
+            <article class="manual-history-row">
+                <div><strong>{{ envio.paciente.nombre }}</strong><span>{{ envio.fecha_envio|date:"d/m/Y H:i" }} · {{ envio.get_canal_display }}</span></div>
+                <div class="manual-history-manuals">{% for manual in envio.manuales.all %}<span class="manual-history-chip">{{ manual.titulo }}</span>{% endfor %}</div>
+                <div><strong>{{ envio.enviado_por.get_full_name|default:envio.enviado_por.username|default:"Usuario no disponible" }}</strong><span>{{ envio.destinatario }}</span></div>
+                <span class="manual-status is-{{ envio.estado }}">{{ envio.get_estado_display }}</span>
+            </article>
+            {% empty %}<div class="manual-empty">Todavía no hay envíos registrados.</div>{% endfor %}
+        </div>
+    </section>
+</main>
+
+{% if puede_enviar_manuales and manuales %}
+<script>
+(function(){
+    const checkboxes = Array.from(document.querySelectorAll('input[name="manuales"]'));
+    const selectAll = document.getElementById("manualSelectAll");
+    const count = document.getElementById("manualSelectedCount");
+    const openButton = document.getElementById("openPatientDialog");
+    const dialog = document.getElementById("patientDialog");
+    const closeButton = document.getElementById("closePatientDialog");
+    const selectedNames = document.getElementById("selectedManualNames");
+    const search = document.getElementById("patientSearch");
+    const results = document.getElementById("patientResults");
+    const patientId = document.getElementById("selectedPatientId");
+    const patientCard = document.getElementById("selectedPatientCard");
+    const patientName = document.getElementById("selectedPatientName");
+    const patientDetails = document.getElementById("selectedPatientDetails");
+    const channelActions = document.getElementById("channelActions");
+    const warning = document.getElementById("patientChannelWarning");
+    const whatsappButton = document.getElementById("sendWhatsapp");
+    const emailButton = document.getElementById("sendEmail");
+    let timer = null;
+    let controller = null;
+
+    function selectedManuals(){ return checkboxes.filter(input => input.checked); }
+    function syncSelection(){
+        const selected = selectedManuals();
+        count.textContent = String(selected.length);
+        openButton.disabled = selected.length === 0;
+        if(selectAll){ selectAll.checked = selected.length === checkboxes.length; selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length; }
+    }
+    checkboxes.forEach(input => input.addEventListener("change", syncSelection));
+    if(selectAll){ selectAll.addEventListener("change", function(){ checkboxes.forEach(input => input.checked = selectAll.checked); syncSelection(); }); }
+
+    function resetPatient(){
+        patientId.value = "";
+        patientCard.hidden = true;
+        channelActions.hidden = true;
+        warning.hidden = true;
+    }
+    function openDialog(){
+        const selected = selectedManuals();
+        if(!selected.length){ return; }
+        selectedNames.textContent = selected.map(input => input.dataset.manualTitle).join(", ");
+        dialog.hidden = false;
+        document.body.style.overflow = "hidden";
+        window.setTimeout(() => search.focus(), 20);
+    }
+    function closeDialog(){ dialog.hidden = true; document.body.style.overflow = ""; }
+    openButton.addEventListener("click", openDialog);
+    closeButton.addEventListener("click", closeDialog);
+    dialog.addEventListener("click", event => { if(event.target === dialog){ closeDialog(); } });
+    document.addEventListener("keydown", event => { if(event.key === "Escape" && !dialog.hidden){ closeDialog(); } });
+
+    function state(text){ results.replaceChildren(Object.assign(document.createElement("div"), {className:"patient-search-state", textContent:text})); }
+    function selectPatient(patient){
+        patientId.value = patient.id;
+        patientName.textContent = patient.nombre;
+        const contact = [patient.expediente ? "Exp. " + patient.expediente : "", patient.telefono || "Sin teléfono", patient.correo || "Sin correo"].filter(Boolean);
+        patientDetails.textContent = contact.join(" · ");
+        patientCard.hidden = false;
+        channelActions.hidden = false;
+        whatsappButton.disabled = !patient.telefono;
+        emailButton.disabled = !patient.correo;
+        const missing = [];
+        if(!patient.telefono){ missing.push("No tiene teléfono o WhatsApp registrado"); }
+        if(!patient.correo){ missing.push("No tiene correo electrónico registrado"); }
+        warning.textContent = missing.join(". ");
+        warning.hidden = missing.length === 0;
+        results.replaceChildren();
+    }
+    function renderPatients(items){
+        results.replaceChildren();
+        if(!items.length){ state("No se encontraron pacientes con esa búsqueda."); return; }
+        items.forEach(patient => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "patient-result";
+            const info = document.createElement("span");
+            const name = document.createElement("strong");
+            name.textContent = patient.nombre;
+            const meta = document.createElement("span");
+            meta.textContent = [patient.expediente, patient.documento, patient.telefono, patient.correo].filter(Boolean).join(" · ");
+            info.append(name, meta);
+            const action = document.createElement("em");
+            action.textContent = "Seleccionar";
+            button.append(info, action);
+            button.addEventListener("click", () => selectPatient(patient));
+            results.append(button);
+        });
+    }
+    search.addEventListener("input", function(){
+        resetPatient();
+        window.clearTimeout(timer);
+        const query = search.value.trim();
+        if(query.length < 2){ state("Escriba al menos 2 caracteres para buscar."); return; }
+        timer = window.setTimeout(async function(){
+            if(controller){ controller.abort(); }
+            controller = new AbortController();
+            state("Buscando pacientes…");
+            try{
+                const response = await fetch(search.dataset.url + "?q=" + encodeURIComponent(query), {headers:{"X-Requested-With":"XMLHttpRequest"}, signal:controller.signal});
+                if(!response.ok){ throw new Error("search"); }
+                const data = await response.json();
+                renderPatients(data.results || []);
+            }catch(error){ if(error.name !== "AbortError"){ state("No fue posible buscar pacientes. Intente nuevamente."); } }
+        }, 250);
+    });
+    syncSelection();
+})();
+</script>
+{% endif %}
+{% endblock %}

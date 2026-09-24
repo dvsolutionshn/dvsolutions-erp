@@ -7,7 +7,7 @@
 
 {% block topbar_actions %}
 <a class="erp-btn-secondary" href="{% url 'clinica_plantillas_recetas' empresa.slug %}">Administrar plantillas</a>
-{% if erp_access.configuracion_clinica %}<a class="erp-btn-secondary" href="{% url 'clinica_manuales_recetas' empresa.slug %}">Manuales PDF</a>{% endif %}
+{% if erp_access.administrar_manuales_pdf %}<a class="erp-btn-secondary" href="{% url 'clinica_manuales_recetas' empresa.slug %}">Administrar manuales PDF</a>{% endif %}
 <a class="erp-btn-secondary" href="{% url 'clinica_recetas_paciente' empresa.slug paciente.id %}">Volver a recetas</a>
 {% endblock %}
 
@@ -73,7 +73,7 @@
         <div class="rx-manual-options" id="recipeManualOptions">{{ form.manuales }}</div>
         <div class="rx-manual-selected" id="recipeManualSelected" aria-live="polite"></div>
         {% else %}
-        <div class="rx-manual-empty">No hay manuales activos disponibles. Un usuario autorizado puede cargarlos en “Manuales de Recetas”.</div>
+        <div class="rx-manual-empty">No hay manuales activos disponibles. Un usuario autorizado puede cargarlos desde Configuración → Manuales PDF.</div>
         {% endif %}
         {% for error in form.manuales.errors %}<span class="rx-errors">{{ error }}</span>{% endfor %}
     </section>

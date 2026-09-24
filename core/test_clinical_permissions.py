@@ -36,6 +36,24 @@ class ClinicalPermissionRoutingTests(TestCase):
             "puede_enviar_manuales_pdf",
         )
 
+    def test_operational_manual_module_separates_view_send_and_admin(self):
+        self.assertEqual(
+            permiso_clinica_granular("manuales-pdf/", "GET"),
+            "puede_ver_manuales_pdf",
+        )
+        self.assertEqual(
+            permiso_clinica_granular("manuales-pdf/enviar/", "POST"),
+            "puede_enviar_manuales_pdf",
+        )
+        self.assertEqual(
+            permiso_clinica_granular("recetas/manuales/", "GET"),
+            "puede_administrar_manuales_pdf",
+        )
+        self.assertEqual(
+            permiso_clinica_granular("recetas/manuales/7/archivo/", "GET"),
+            "puede_ver_manuales_pdf",
+        )
+
     def test_nursing_and_therapy_writes_are_separate_from_medical_history(self):
         self.assertEqual(
             permiso_clinica_granular("pacientes/10/historias/nueva/enfermeria/", "POST"),

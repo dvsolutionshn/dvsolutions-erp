@@ -60,6 +60,11 @@ class EmpresaControlForm(forms.ModelForm):
         label="Permitir plantilla de factura independiente",
         help_text="Activalo para habilitar un formato PDF exclusivo, mas sobrio y visualmente separado del resto del ERP.",
     )
+    manuales_pdf_habilitados = forms.BooleanField(
+        required=False,
+        label="Mostrar Manuales PDF",
+        help_text="Habilita la biblioteca clínica para consultar y enviar manuales a pacientes.",
+    )
     modulos_adicionales_visibles_clinica = forms.ModelMultipleChoiceField(
         queryset=Modulo.objects.filter(es_comercial=True).exclude(
             codigo__in=["facturacion", "punto_venta", "clinica_medica", "agenda_citas"]
@@ -119,6 +124,9 @@ class EmpresaControlForm(forms.ModelForm):
         self.fields["permite_plantilla_factura_independiente"].initial = bool(
             configuracion_avanzada and configuracion_avanzada.permite_plantilla_factura_independiente
         )
+        self.fields["manuales_pdf_habilitados"].initial = bool(
+            configuracion_avanzada and configuracion_avanzada.manuales_pdf_habilitados
+        )
         if configuracion_avanzada:
             self.fields["modulos_adicionales_visibles_clinica"].initial = (
                 configuracion_avanzada.modulos_adicionales_visibles_clinica.all()
@@ -147,6 +155,7 @@ class EmpresaControlForm(forms.ModelForm):
             "activa": ("Empresa activa", "Si la desactivas, toda la empresa queda fuera de operacion aunque tenga plan."),
             "permite_cai_historico": ("Permitir correccion fiscal historica", "Activalo solo cuando necesites ajustes especiales de CAI, facturacion historica o correcciones fiscales ya emitidas."),
             "permite_plantilla_factura_independiente": ("Permitir plantilla de factura independiente", "Activalo solo cuando quieras habilitar un PDF de factura exclusivo para esta empresa, con una presentacion separada del estilo general del ERP."),
+            "manuales_pdf_habilitados": ("Mostrar Manuales PDF", "Habilita la biblioteca clínica para consultar y enviar manuales a pacientes."),
             "modulos_adicionales_visibles_clinica": ("Modulos visibles en la interfaz clinica", "No activa ni desactiva funciones; solo permite mostrar en el perfil clinico los modulos que tambien esten habilitados para la empresa."),
         }
         for field_name, (label, help_text) in textos.items():
@@ -229,6 +238,7 @@ class EmpresaControlForm(forms.ModelForm):
         configuracion, _ = ConfiguracionAvanzadaEmpresa.objects.get_or_create(empresa=empresa)
         valor = bool(self.cleaned_data.get("permite_cai_historico"))
         valor_plantilla_independiente = bool(self.cleaned_data.get("permite_plantilla_factura_independiente"))
+        valor_manuales_pdf = bool(self.cleaned_data.get("manuales_pdf_habilitados"))
         campos_actualizar = []
         if configuracion.permite_cai_historico != valor:
             configuracion.permite_cai_historico = valor
@@ -236,6 +246,9 @@ class EmpresaControlForm(forms.ModelForm):
         if configuracion.permite_plantilla_factura_independiente != valor_plantilla_independiente:
             configuracion.permite_plantilla_factura_independiente = valor_plantilla_independiente
             campos_actualizar.append("permite_plantilla_factura_independiente")
+        if configuracion.manuales_pdf_habilitados != valor_manuales_pdf:
+            configuracion.manuales_pdf_habilitados = valor_manuales_pdf
+            campos_actualizar.append("manuales_pdf_habilitados")
         if campos_actualizar:
             configuracion.save(update_fields=campos_actualizar)
         configuracion.modulos_adicionales_visibles_clinica.set(
