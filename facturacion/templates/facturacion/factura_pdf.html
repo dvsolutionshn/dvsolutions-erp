@@ -321,7 +321,7 @@ body {
                     <div class="title">FACTURA</div>
                     <div class="number">{{ factura.numero_factura|default:"Borrador" }}</div>
                     <div class="meta">
-                        Emision: {{ factura.fecha_emision|date:"d/m/Y" }}<br>
+                        Fecha: {{ factura.fecha_emision|date:"d/m/Y" }}<br>
                         Vence: {{ factura.fecha_vencimiento|date:"d/m/Y"|default:"-" }}
                         {% if configuracion_facturacion.mostrar_vendedor and factura.vendedor %}
                         <br>Vendedor: {{ factura.vendedor }}
@@ -350,7 +350,7 @@ body {
                     <div class="info-label">Documento</div>
                     <div class="info-value">
                         Moneda: {{ factura.get_moneda_display }}<br>
-                        Emision: {{ factura.fecha_emision|date:"d/m/Y" }}<br>
+                        Fecha: {{ factura.fecha_emision|date:"d/m/Y" }}<br>
                         Vencimiento: {{ factura.fecha_vencimiento|date:"d/m/Y"|default:"-" }}
                         {% if factura.cotizacion_origen %}
                         <br>Cotizacion origen: {{ factura.cotizacion_origen.numero }}
