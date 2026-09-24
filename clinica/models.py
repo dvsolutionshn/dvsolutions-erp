@@ -1059,15 +1059,19 @@ class ManualReceta(models.Model):
 
 class EnvioManualPDF(models.Model):
     CANAL_WHATSAPP = "whatsapp"
+    CANAL_WHATSAPP_MANUAL = "whatsapp_manual"
     CANAL_CORREO = "correo"
     CANAL_CHOICES = [
         (CANAL_WHATSAPP, "WhatsApp"),
+        (CANAL_WHATSAPP_MANUAL, "WhatsApp Web"),
         (CANAL_CORREO, "Correo"),
     ]
+    ESTADO_PREPARADO = "preparado"
     ESTADO_ENVIADO = "enviado"
     ESTADO_PARCIAL = "parcial"
     ESTADO_FALLIDO = "fallido"
     ESTADO_CHOICES = [
+        (ESTADO_PREPARADO, "Preparado manualmente"),
         (ESTADO_ENVIADO, "Enviado"),
         (ESTADO_PARCIAL, "Envío parcial"),
         (ESTADO_FALLIDO, "Fallido"),

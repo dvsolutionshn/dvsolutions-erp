@@ -156,6 +156,29 @@ class ManualesPDFOperativosTests(TestCase):
         self.assertEqual(envio.destinatario, "50499998888")
         self.assertEqual(envio.estado, EnvioManualPDF.ESTADO_ENVIADO)
 
+    @patch("clinica.views.enviar_documento_whatsapp")
+    @patch("clinica.views.subir_documento_whatsapp")
+    def test_whatsapp_web_abre_el_chat_sin_usar_meta_y_registra_preparacion(self, subir_mock, enviar_mock):
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            manual = self.crear_manual("Manual para WhatsApp Web")
+            response = self.client.post(
+                reverse("clinica_enviar_manuales_pdf", args=[self.empresa.slug]),
+                {
+                    "manuales": [str(manual.id)],
+                    "paciente_id": str(self.paciente.id),
+                    "canal": "whatsapp_manual",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith("https://web.whatsapp.com/send?phone=50499998888"))
+        self.assertIn("Manual%20para%20WhatsApp%20Web", response.url)
+        subir_mock.assert_not_called()
+        enviar_mock.assert_not_called()
+        envio = EnvioManualPDF.objects.get()
+        self.assertEqual(envio.canal, EnvioManualPDF.CANAL_WHATSAPP_MANUAL)
+        self.assertEqual(envio.estado, EnvioManualPDF.ESTADO_PREPARADO)
+
     def test_rechaza_manual_de_otra_empresa_sin_enviar_ni_registrar(self):
         otra_empresa = Empresa.objects.create(
             nombre="Otra clínica",

@@ -1975,8 +1975,13 @@ def enviar_manuales_pdf(request, empresa_slug):
         messages.error(request, "Seleccione un paciente válido antes de enviar los manuales.")
         return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
     canal = (request.POST.get("canal") or "").strip().lower()
-    if canal not in {EnvioManualPDF.CANAL_WHATSAPP, EnvioManualPDF.CANAL_CORREO}:
-        messages.error(request, "Seleccione WhatsApp o correo como método de envío.")
+    canales_validos = {
+        EnvioManualPDF.CANAL_WHATSAPP,
+        EnvioManualPDF.CANAL_WHATSAPP_MANUAL,
+        EnvioManualPDF.CANAL_CORREO,
+    }
+    if canal not in canales_validos:
+        messages.error(request, "Seleccione WhatsApp, WhatsApp Web o correo como método de envío.")
         return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
 
     if canal == EnvioManualPDF.CANAL_CORREO:
@@ -2000,6 +2005,15 @@ def enviar_manuales_pdf(request, empresa_slug):
         estado=EnvioManualPDF.ESTADO_FALLIDO,
     )
     envio.manuales.set(manuales)
+
+    if canal == EnvioManualPDF.CANAL_WHATSAPP_MANUAL:
+        nombres_manuales = "\n".join(f"• {manual.titulo}" for manual in manuales)
+        texto = (
+            f"Hola {paciente.nombre}, le compartimos los siguientes manuales de {empresa.nombre}:\n\n"
+            f"{nombres_manuales}"
+        )
+        _registrar_resultado_envio_manual(envio, EnvioManualPDF.ESTADO_PREPARADO)
+        return redirect(f"https://web.whatsapp.com/send?phone={destinatario}&text={quote(texto)}")
 
     if canal == EnvioManualPDF.CANAL_CORREO:
         try:
