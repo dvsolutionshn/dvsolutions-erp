@@ -532,6 +532,117 @@ class PlanTratamientoPaciente(models.Model):
         )
 
 
+class AntecedenteAdicionalPaciente(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="antecedentes_adicionales_pacientes",
+    )
+    paciente = models.OneToOneField(
+        Paciente,
+        on_delete=models.CASCADE,
+        related_name="antecedente_adicional",
+    )
+    contenido = models.TextField(blank=True)
+    profesional = models.ForeignKey(
+        ProfesionalSalud,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="antecedentes_adicionales_actualizados",
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="antecedentes_adicionales_actualizados",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        ordering = ["-fecha_actualizacion", "-id"]
+        verbose_name = "Antecedente adicional del paciente"
+        verbose_name_plural = "Antecedentes adicionales de pacientes"
+
+    def __str__(self):
+        return f"Antecedentes adicionales - {self.paciente.nombre}"
+
+    @property
+    def responsable_display(self):
+        if self.profesional_id:
+            return self.profesional.nombre
+        if self.actualizado_por_id:
+            return (
+                self.actualizado_por.get_full_name().strip()
+                or self.actualizado_por.username
+            )
+        return "Usuario no disponible"
+
+
+class AntecedenteAdicionalHistorial(models.Model):
+    antecedente = models.ForeignKey(
+        AntecedenteAdicionalPaciente,
+        on_delete=models.CASCADE,
+        related_name="historial",
+    )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="historial_antecedentes_adicionales",
+    )
+    paciente = models.ForeignKey(
+        Paciente,
+        on_delete=models.CASCADE,
+        related_name="historial_antecedentes_adicionales",
+    )
+    texto_anterior = models.TextField(blank=True)
+    texto_nuevo = models.TextField(blank=True)
+    profesional = models.ForeignKey(
+        ProfesionalSalud,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cambios_antecedentes_adicionales",
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cambios_antecedentes_adicionales",
+    )
+    responsable_nombre = models.CharField(max_length=180, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-fecha", "-id"]
+        indexes = [
+            models.Index(fields=["empresa", "paciente", "-fecha"]),
+        ]
+        verbose_name = "Cambio de antecedentes adicionales"
+        verbose_name_plural = "Cambios de antecedentes adicionales"
+
+    def __str__(self):
+        return f"Cambio de antecedentes - {self.paciente.nombre} - {self.fecha:%d/%m/%Y %H:%M}"
+
+    def save(self, *args, **kwargs):
+        if not self.responsable_nombre:
+            self.responsable_nombre = (
+                self.profesional.nombre if self.profesional_id else ""
+            ) or (
+                self.usuario.get_full_name().strip() if self.usuario_id else ""
+            ) or (
+                self.usuario.username if self.usuario_id else ""
+            )
+        super().save(*args, **kwargs)
+
+    @property
+    def responsable_display(self):
+        return self.responsable_nombre or "Usuario no disponible"
+
+
 class ClasificacionAlopecia(models.Model):
     ESCALA_HAMILTON_NORWOOD = "hamilton_norwood"
     ESCALA_LUDWIG = "ludwig"

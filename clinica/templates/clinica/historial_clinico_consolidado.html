@@ -98,6 +98,25 @@
 .doctor-note-edit textarea:focus{border-color:#1769d2;box-shadow:0 0 0 3px rgba(23,105,210,.11)}
 .doctor-note-edit-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
 .empty-sheet{padding:24px;text-align:center;color:#60748d;border:1px dashed #cbd9e8;border-radius:18px;background:#fbfdff}
+.additional-history{border:1px solid #bcd9dc;border-radius:20px;background:linear-gradient(135deg,#f4fcfa,#f8fbff);padding:18px;margin-bottom:16px}
+.additional-history-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:13px}
+.additional-history-head h4{margin:0;color:#102338;font-size:17px}
+.additional-history-head p{margin:5px 0 0;color:#60748d;font-size:12px;line-height:1.5}
+.additional-history textarea{width:100%;min-height:170px;border:1px solid #aec9d8;border-radius:15px;padding:13px 14px;background:#fff;color:#102338;font:inherit;line-height:1.55;resize:vertical;outline:none}
+.additional-history textarea:focus{border-color:#0b9f91;box-shadow:0 0 0 3px rgba(11,159,145,.12)}
+.additional-history-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:11px}
+.additional-history-updated{color:#61788b;font-size:11px;font-weight:750}
+.additional-history-readonly{min-height:130px;border:1px solid #d3e2eb;border-radius:15px;background:#fff;padding:14px;color:#14253a;line-height:1.6}
+.additional-history-log{margin-top:14px;border-top:1px solid #d6e7e8;padding-top:13px}
+.additional-history-log>summary{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid #bad4dc;border-radius:999px;background:#fff;color:#087466;padding:8px 12px;font-size:11px;font-weight:900;list-style:none}
+.additional-history-log>summary::-webkit-details-marker{display:none}
+.additional-history-log[open]>summary{background:#eafaf6;border-color:#56b9ad}
+.additional-history-versions{display:grid;gap:10px;margin-top:12px}
+.additional-history-version{border:1px solid #d6e4ec;border-radius:15px;background:#fff;padding:13px}
+.additional-history-version header{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;color:#536d82;font-size:11px;font-weight:800}
+.additional-history-diff{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.additional-history-diff>div{border:1px solid #e0e9ef;border-radius:12px;background:#fbfdff;padding:11px;color:#263d52;line-height:1.5;overflow-wrap:anywhere}
+.additional-history-diff span{display:block;margin-bottom:6px;color:#6a7e91;font-size:9px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}
 .summary-clinical-hero{position:relative;overflow:hidden;border-radius:30px;background:radial-gradient(circle at 88% 8%,rgba(125,211,252,.25),transparent 25%),radial-gradient(circle at 72% 110%,rgba(45,212,191,.22),transparent 29%),linear-gradient(135deg,#0b3147 0%,#0d5365 54%,#176c72 100%);color:#fff;box-shadow:0 26px 65px rgba(7,45,66,.22);padding:28px;margin-bottom:16px;animation:summaryClinicalEnter .45s ease both}
 .summary-clinical-hero:after{content:"";position:absolute;right:-60px;bottom:-130px;width:360px;height:360px;border-radius:50%;border:1px solid rgba(255,255,255,.12);box-shadow:0 0 0 42px rgba(255,255,255,.035),0 0 0 84px rgba(255,255,255,.025);pointer-events:none}
 .summary-clinical-top{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;min-width:0}
@@ -140,7 +159,7 @@
 @media(max-width:1050px){
     .cover-grid,.sheet-grid,.inline-fields,.inline-field ul{grid-template-columns:1fr}
     .inline-alopecia-grid,.inline-alopecia-panel[data-scale="ludwig"] .inline-alopecia-grid{grid-template-columns:repeat(2,minmax(130px,1fr))}.inline-trichology-grid{grid-template-columns:1fr}
-    .panel-head,.note-title,.doctor-note-head,.clinical-area summary{flex-direction:column;align-items:flex-start}
+    .panel-head,.note-title,.doctor-note-head,.clinical-area summary,.additional-history-head{flex-direction:column;align-items:flex-start}
     .summary-clinical-top{grid-template-columns:1fr}.summary-clinical-actions{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}.summary-clinical-action.is-wide{grid-column:auto}
     .summary-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}
     .integral-clinical-grid,.special-control-grid{grid-template-columns:1fr}.integral-meta-grid{grid-template-columns:1fr 1fr}.record-grid{grid-template-columns:1fr 1fr}
@@ -150,7 +169,7 @@
     .summary-clinical-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-clinical-action.is-primary{grid-column:1/-1}
     .summary-dashboard{grid-template-columns:1fr 1fr}.summary-dashboard-card{min-height:112px;padding:14px}.summary-dashboard-card.is-next{grid-column:1/-1}
     .summary-section-nav{top:5px;border-radius:15px}
-    .integral-meta-grid,.physical-grid,.tricopig-grid,.record-grid,.inline-alopecia-grid,.inline-alopecia-panel[data-scale="ludwig"] .inline-alopecia-grid{grid-template-columns:1fr}.organic-table-head{display:none}.organic-row{grid-template-columns:1fr}.special-control-card{grid-template-columns:1fr}.special-control-card>a{grid-column:auto}
+    .integral-meta-grid,.physical-grid,.tricopig-grid,.record-grid,.inline-alopecia-grid,.inline-alopecia-panel[data-scale="ludwig"] .inline-alopecia-grid,.additional-history-diff{grid-template-columns:1fr}.organic-table-head{display:none}.organic-row{grid-template-columns:1fr}.special-control-card{grid-template-columns:1fr}.special-control-card>a{grid-column:auto}
 }
 @media(prefers-reduced-motion:reduce){
     .summary-clinical-hero,.summary-dashboard-card{animation:none}.summary-clinical-action,.summary-dashboard-card{transition:none}
@@ -263,6 +282,60 @@
             </div>
         </div>
         <div class="panel-body">
+            {% if seccion_activa == "completa" or seccion_activa == "antecedentes" %}
+            <article class="additional-history" id="antecedentes-adicionales">
+                <div class="additional-history-head">
+                    <div>
+                        <h4>Antecedentes adicionales</h4>
+                        <p>Información clínica relevante que no encaja en los campos estructurados.</p>
+                    </div>
+                </div>
+                {% if puede_editar_antecedentes %}
+                <form method="post" action="?seccion=antecedentes#antecedentes-adicionales">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="guardar_antecedente_adicional">
+                    {{ antecedente_adicional_form.contenido }}
+                    {% for error in antecedente_adicional_form.contenido.errors %}<span class="inline-error">{{ error }}</span>{% endfor %}
+                    <div class="additional-history-actions">
+                        <div class="additional-history-updated">
+                            {% if antecedente_adicional %}
+                            Última actualización: {{ antecedente_adicional.fecha_actualizacion|date:"d/m/Y - h:i A" }} - {{ antecedente_adicional.responsable_display }}
+                            {% else %}
+                            Todavía no se ha registrado información adicional.
+                            {% endif %}
+                        </div>
+                        <button class="save-clinical-btn" type="submit">Guardar cambios</button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="additional-history-readonly">
+                    {{ antecedente_adicional.contenido|default:"Sin antecedentes adicionales registrados."|linebreaksbr }}
+                </div>
+                {% if antecedente_adicional %}
+                <div class="additional-history-updated">Última actualización: {{ antecedente_adicional.fecha_actualizacion|date:"d/m/Y - h:i A" }} - {{ antecedente_adicional.responsable_display }}</div>
+                {% endif %}
+                {% endif %}
+                {% if historial_antecedente_adicional %}
+                <details class="additional-history-log">
+                    <summary>Ver historial de cambios</summary>
+                    <div class="additional-history-versions">
+                        {% for cambio in historial_antecedente_adicional %}
+                        <article class="additional-history-version">
+                            <header>
+                                <strong>{{ cambio.fecha|date:"d/m/Y - h:i A" }}</strong>
+                                <span>{{ cambio.responsable_display }}</span>
+                            </header>
+                            <div class="additional-history-diff">
+                                <div><span>Texto anterior</span>{{ cambio.texto_anterior|default:"Sin contenido anterior"|linebreaksbr }}</div>
+                                <div><span>Texto nuevo</span>{{ cambio.texto_nuevo|default:"Contenido eliminado"|linebreaksbr }}</div>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+            </article>
+            {% endif %}
             {% for bloque in bloques_preconsulta_enfoque %}
             <article class="single-note">
                 <div class="note-title">

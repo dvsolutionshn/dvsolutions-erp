@@ -38,6 +38,7 @@ from contabilidad.services import asegurar_cuenta_contable_cliente
 from facturacion.models import Cliente, Producto
 
 from .forms import (
+    AntecedenteAdicionalPacienteForm,
     ANTECEDENTES_FAMILIARES_CHOICES,
     ANTECEDENTES_PERSONALES_CHOICES,
     ALOPECIA_HAMILTON_NORWOOD_GRADOS,
@@ -79,6 +80,8 @@ from .forms import (
     TricopigmentacionForm,
 )
 from .models import (
+    AntecedenteAdicionalHistorial,
+    AntecedenteAdicionalPaciente,
     CitaClinica,
     ClasificacionAlopecia,
     ConsentimientoClinico,
@@ -2588,11 +2591,85 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     tipos_validos = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
     tipo_post = request.POST.get("tipo_historia") if request.method == "POST" else None
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
+    permisos_granulares = bool(rol_clinico_granular(request.user, empresa))
+    puede_editar_antecedentes = request.user.tiene_permiso_erp(
+        "puede_editar_historia_clinica" if permisos_granulares else "puede_expediente_clinico",
+        empresa,
+    )
+    antecedente_adicional = (
+        AntecedenteAdicionalPaciente.objects.filter(empresa=empresa, paciente=paciente)
+        .select_related("profesional", "actualizado_por")
+        .first()
+    )
+    antecedente_adicional_form = AntecedenteAdicionalPacienteForm(
+        instance=antecedente_adicional,
+        prefix="antecedente_adicional",
+    )
     puede_eliminar_notas_clinicas = _es_dueno_erp(request.user)
     evaluacion_form = None
     funciones_form = None
     examen_form = None
     tricopigmentacion_form = None
+    if request.method == "POST" and request.POST.get("accion") == "guardar_antecedente_adicional":
+        if not puede_editar_antecedentes:
+            raise PermissionDenied("No tiene permiso para editar la historia clínica.")
+        antecedente_adicional_form = AntecedenteAdicionalPacienteForm(
+            request.POST,
+            instance=antecedente_adicional,
+            prefix="antecedente_adicional",
+        )
+        if antecedente_adicional_form.is_valid():
+            texto_nuevo = antecedente_adicional_form.cleaned_data["contenido"]
+            cambio_guardado = False
+            with transaction.atomic():
+                antecedente_bloqueado = (
+                    AntecedenteAdicionalPaciente.objects.select_for_update()
+                    .filter(empresa=empresa, paciente=paciente)
+                    .first()
+                )
+                texto_anterior = antecedente_bloqueado.contenido if antecedente_bloqueado else ""
+                if texto_nuevo != texto_anterior:
+                    if antecedente_bloqueado is None:
+                        antecedente_bloqueado = AntecedenteAdicionalPaciente.objects.create(
+                            empresa=empresa,
+                            paciente=paciente,
+                            contenido=texto_nuevo,
+                            profesional=profesional_usuario,
+                            actualizado_por=request.user,
+                        )
+                    else:
+                        antecedente_bloqueado.contenido = texto_nuevo
+                        antecedente_bloqueado.profesional = profesional_usuario
+                        antecedente_bloqueado.actualizado_por = request.user
+                        antecedente_bloqueado.save(
+                            update_fields=[
+                                "contenido",
+                                "profesional",
+                                "actualizado_por",
+                                "fecha_actualizacion",
+                            ]
+                        )
+                    AntecedenteAdicionalHistorial.objects.create(
+                        antecedente=antecedente_bloqueado,
+                        empresa=empresa,
+                        paciente=paciente,
+                        texto_anterior=texto_anterior,
+                        texto_nuevo=texto_nuevo,
+                        profesional=profesional_usuario,
+                        usuario=request.user,
+                    )
+                    cambio_guardado = True
+            if cambio_guardado:
+                messages.success(request, "Antecedentes adicionales actualizados correctamente.")
+            else:
+                messages.info(request, "No hay cambios nuevos en los antecedentes adicionales.")
+            destino = reverse(
+                "clinica_historial_clinico_consolidado",
+                args=[empresa.slug, paciente.id],
+            )
+            return redirect(f"{destino}?seccion=antecedentes#antecedentes-adicionales")
+        seccion_activa = "antecedentes"
+        messages.error(request, "Revise el texto de antecedentes adicionales.")
     if request.method == "POST" and request.POST.get("accion") == "eliminar_historia":
         if not puede_eliminar_notas_clinicas:
             messages.error(request, "Solo el dueño del ERP puede eliminar notas clínicas guardadas.")
@@ -2968,6 +3045,11 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         .order_by("-activo", "-fecha_creacion", "-id")
         .first()
     )
+    historial_antecedente_adicional = (
+        antecedente_adicional.historial.select_related("profesional", "usuario").all()
+        if antecedente_adicional
+        else AntecedenteAdicionalHistorial.objects.none()
+    )
     return render(
         request,
         "clinica/historial_clinico_consolidado.html",
@@ -3002,6 +3084,10 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "programa_camara": programa_camara,
             "programa_postquirurgico": programa_postquirurgico,
             "puede_eliminar_notas_clinicas": puede_eliminar_notas_clinicas,
+            "puede_editar_antecedentes": puede_editar_antecedentes,
+            "antecedente_adicional": antecedente_adicional,
+            "antecedente_adicional_form": antecedente_adicional_form,
+            "historial_antecedente_adicional": historial_antecedente_adicional,
             "resumen_operativo": resumen_operativo,
         },
     )

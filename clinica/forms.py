@@ -9,6 +9,7 @@ from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normal
 from core.access import manuales_pdf_habilitados
 
 from .models import (
+    AntecedenteAdicionalPaciente,
     CitaClinica,
     ClasificacionAlopecia,
     ConsentimientoClinico,
@@ -385,6 +386,27 @@ class PlanTratamientoPacienteForm(BaseClinicaForm):
         if not texto:
             raise forms.ValidationError("Escriba el plan antes de guardarlo.")
         return texto
+
+
+class AntecedenteAdicionalPacienteForm(BaseClinicaForm):
+    class Meta:
+        model = AntecedenteAdicionalPaciente
+        fields = ["contenido"]
+        labels = {"contenido": "Antecedentes adicionales"}
+        widgets = {
+            "contenido": forms.Textarea(
+                attrs={
+                    "rows": 8,
+                    "placeholder": (
+                        "Escriba antecedentes, observaciones o información clínica "
+                        "relevante que no esté contemplada en los campos anteriores."
+                    ),
+                }
+            ),
+        }
+
+    def clean_contenido(self):
+        return (self.cleaned_data.get("contenido") or "").strip()
 
 
 class ExpedienteEventoForm(BaseClinicaForm):
