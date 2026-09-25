@@ -74,6 +74,11 @@ SESSION_EXPIRED_MESSAGE_KEY = "dvsolutions_session_expired_message"
 SESSION_EXPIRED_MESSAGE = "Vuelve a iniciar sesion para continuar."
 BACKUP_TOKEN_MAX_ATTEMPTS = 5
 BACKUP_TOKEN_WINDOW_SECONDS = 15 * 60
+
+
+@require_GET
+def politica_privacidad(request):
+    return render(request, "core/politica_privacidad.html")
 PERMISOS_ROL_CLINICO = (
     ("Facturación", (
         ("puede_facturas", "Ingresar al módulo de facturación"),
