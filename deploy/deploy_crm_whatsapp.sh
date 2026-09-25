@@ -48,8 +48,8 @@ set -a
 source "${ENV_FILE}"
 set +a
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "Falta DATABASE_URL en ${ENV_FILE}. No se modifico produccion." >&2
+if [[ -z "${DATABASE_URL:-}" && -z "${POSTGRES_DB:-}" ]]; then
+  echo "Falta DATABASE_URL o POSTGRES_DB en ${ENV_FILE}. No se modifico produccion." >&2
   exit 1
 fi
 
@@ -60,7 +60,16 @@ fi
 
 mkdir -p "${BACKUP_DIR}"
 chmod 700 "${BACKUP_DIR}"
-pg_dump "${DATABASE_URL}" > "${BACKUP_DIR}/pre-crm-whatsapp-$(date +%Y%m%d-%H%M%S).sql"
+BACKUP_FILE="${BACKUP_DIR}/pre-crm-whatsapp-$(date +%Y%m%d-%H%M%S).sql"
+if [[ -n "${DATABASE_URL:-}" ]]; then
+  pg_dump "${DATABASE_URL}" > "${BACKUP_FILE}"
+else
+  PGPASSWORD="${POSTGRES_PASSWORD:-}" pg_dump \
+    --host "${POSTGRES_HOST:-localhost}" \
+    --port "${POSTGRES_PORT:-5432}" \
+    --username "${POSTGRES_USER:-}" \
+    "${POSTGRES_DB}" > "${BACKUP_FILE}"
+fi
 
 source "${VENV_DIR}/bin/activate"
 pip install -r requirements.txt
