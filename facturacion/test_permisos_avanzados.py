@@ -45,6 +45,10 @@ class PermisosAvanzadosTests(TestCase):
         )
         self.assertRedirects(respuesta, reverse('facturas_dashboard', args=[self.empresa.slug]))
         self.assertContains(respuesta, 'Descargar PDF')
+        self.assertContains(respuesta, 'id="factura-pdf-dialog"')
+        self.assertEqual(respuesta.context['factura_editada'].pk, factura.pk)
+        siguiente = self.client.get(reverse('facturas_dashboard', args=[self.empresa.slug]))
+        self.assertNotContains(siguiente, 'id="factura-pdf-dialog"')
         self.assertContains(respuesta, 'href="{}" download>Descargar PDF</a>'.format(
             reverse('descargar_factura_pdf', args=[self.empresa.slug, factura.pk]),
         ))
