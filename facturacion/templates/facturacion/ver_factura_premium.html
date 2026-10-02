@@ -474,10 +474,14 @@
         border-radius:16px;
     }
 }
+{% include "facturacion/descarga_pdf_estilos.html" %}
 </style>
 {% endblock %}
 
 {% block content %}
+{% if empresa.slug == "iss" and request.GET.nueva == "1" %}
+{% include "facturacion/descarga_pdf_dialogo.html" with factura_pdf=factura %}
+{% endif %}
 <div class="erp-document-flow">
     {% if request.GET.nueva == "1" %}
     <section class="erp-card erp-document-alert">

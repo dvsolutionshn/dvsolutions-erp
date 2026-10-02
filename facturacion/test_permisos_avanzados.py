@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -8,7 +8,7 @@ from django.core.exceptions import PermissionDenied
 from django.urls import reverse
 
 from core.models import Empresa, RegistroAuditoria, RolSistema, UsuarioEmpresaPermiso
-from facturacion.models import Factura, PagoFactura, Cliente
+from facturacion.models import Factura, PagoFactura, Cliente, InventarioProducto
 from facturacion import tests as fixtures
 from facturacion import views
 
@@ -57,6 +57,36 @@ class PermisosAvanzadosTests(TestCase):
         self.assertTrue(RegistroAuditoria.objects.filter(
             objeto_id=str(factura.pk), cambios__accion_factura__nuevo='editar',
         ).exists())
+
+    def test_crear_iss_muestra_ventana_descarga_pdf(self):
+        self.empresa.slug = 'iss'
+        self.empresa.save(update_fields=['slug'])
+        InventarioProducto.objects.create(
+            empresa=self.empresa, producto=self.producto, existencias=Decimal('10'),
+        )
+        for estado in ('borrador', 'emitida'):
+            with self.subTest(estado=estado):
+                respuesta = self.client.post(
+                    reverse('crear_factura', args=[self.empresa.slug]),
+                    {
+                        'cliente': self.cliente.pk, 'fecha_emision': str(date.today()),
+                        'fecha_vencimiento': '', 'vendedor': '', 'tipo_cambio': '1',
+                        'moneda': 'HNL', 'estado': estado,
+                        'lineas-TOTAL_FORMS': '1', 'lineas-INITIAL_FORMS': '0',
+                        'lineas-0-producto': self.producto.pk,
+                        'lineas-0-cantidad': '2', 'lineas-0-precio_unitario': '50',
+                        'lineas-0-descuento_porcentaje': '0',
+                        'lineas-0-impuesto': self.impuesto.pk,
+                    }, follow=True,
+                )
+                factura = Factura.objects.filter(empresa=self.empresa).latest('pk')
+                url = reverse('ver_factura', args=[self.empresa.slug, factura.pk])
+                self.assertRedirects(respuesta, url + '?nueva=1')
+                self.assertContains(respuesta, 'id="factura-pdf-dialog"')
+                self.assertContains(respuesta, 'href="{}" download>Descargar PDF</a>'.format(
+                    reverse('descargar_factura_pdf', args=[self.empresa.slug, factura.pk]),
+                ))
+                self.assertNotContains(self.client.get(url), 'id="factura-pdf-dialog"')
 
     def test_editar_recalcula_y_registra_lineas(self):
         factura = self.crear_factura_con_linea(estado='borrador')

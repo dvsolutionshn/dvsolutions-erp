@@ -1,0 +1,13 @@
+<dialog id="factura-pdf-dialog" class="erp-pdf-dialog" aria-labelledby="factura-pdf-title" aria-describedby="factura-pdf-description">
+    <h3 id="factura-pdf-title">Factura guardada correctamente</h3>
+    <p id="factura-pdf-description">Puedes descargar el PDF de la factura {{ factura_pdf.numero_factura|default:factura_pdf.id }}.</p>
+    <div class="erp-pdf-dialog-actions">
+        <a class="erp-btn" href="{% url 'descargar_factura_pdf' empresa.slug factura_pdf.id %}" download>Descargar PDF</a>
+        <form method="dialog"><button type="submit" class="erp-btn-secondary">Cerrar</button></form>
+    </div>
+</dialog>
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    document.getElementById("factura-pdf-dialog").showModal();
+});
+</script>
