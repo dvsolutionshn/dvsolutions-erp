@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django import forms
 from django.contrib import messages
+from django.utils.html import format_html
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.forms import modelform_factory, inlineformset_factory
@@ -7706,7 +7707,14 @@ def editar_factura(request, empresa_slug, factura_id):
                         if empresa.slug == "iss" else form.cleaned_data['motivo_auditoria'],
                     )
 
-                messages.success(request, "Factura actualizada correctamente.")
+                if empresa.slug == "iss":
+                    messages.success(request, format_html(
+                        'Factura actualizada correctamente. '
+                        '<a class="erp-pill-link" href="{}" download>Descargar PDF</a>',
+                        reverse("descargar_factura_pdf", args=[empresa.slug, factura.pk]),
+                    ))
+                else:
+                    messages.success(request, "Factura actualizada correctamente.")
                 return redirect("facturas_dashboard", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):

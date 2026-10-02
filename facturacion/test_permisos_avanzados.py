@@ -33,6 +33,27 @@ class PermisosAvanzadosTests(TestCase):
         self.rol_total.puede_cambiar_fecha_factura = True
         self.rol_total.save()
 
+    def test_editar_iss_ofrece_descarga_pdf_al_guardar_sin_motivo(self):
+        self.empresa.slug = 'iss'
+        self.empresa.save(update_fields=['slug'])
+        factura = self.crear_factura_con_linea(estado='borrador')
+        datos = self.datos_edicion(factura)
+        datos.pop('motivo_auditoria')
+        respuesta = self.client.post(
+            reverse('editar_factura', args=[self.empresa.slug, factura.pk]),
+            datos, follow=True,
+        )
+        self.assertRedirects(respuesta, reverse('facturas_dashboard', args=[self.empresa.slug]))
+        self.assertContains(respuesta, 'Descargar PDF')
+        self.assertContains(respuesta, 'href="{}" download>Descargar PDF</a>'.format(
+            reverse('descargar_factura_pdf', args=[self.empresa.slug, factura.pk]),
+        ))
+        factura.refresh_from_db()
+        self.assertEqual(factura.total, Decimal('103.50'))
+        self.assertTrue(RegistroAuditoria.objects.filter(
+            objeto_id=str(factura.pk), cambios__accion_factura__nuevo='editar',
+        ).exists())
+
     def test_editar_recalcula_y_registra_lineas(self):
         factura = self.crear_factura_con_linea(estado='borrador')
         respuesta = self.client.post(reverse('editar_factura', args=[self.empresa.slug, factura.pk]), self.datos_edicion(factura))
