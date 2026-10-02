@@ -7586,17 +7586,18 @@ def editar_factura(request, empresa_slug, factura_id):
                 form.fields['numero_factura'].help_text = (
                     "Opcional. Si lo completas, el ERP validara que pertenezca al CAI activo para la fecha de esta factura."
                 )
-        form.fields['motivo_auditoria'] = forms.CharField(
-            required=True,
-            min_length=8,
-            max_length=500,
-            label='Motivo de la modificacion',
-            help_text='Explica brevemente por que se modifica esta factura. Quedara en la bitacora permanente.',
-            widget=forms.Textarea(attrs={
-                'rows': 2,
-                'placeholder': 'Ejemplo: Correccion solicitada por el cliente.',
-            }),
-        )
+        if empresa.slug != "iss":
+            form.fields['motivo_auditoria'] = forms.CharField(
+                required=True,
+                min_length=8,
+                max_length=500,
+                label='Motivo de la modificacion',
+                help_text='Explica brevemente por que se modifica esta factura. Quedara en la bitacora permanente.',
+                widget=forms.Textarea(attrs={
+                    'rows': 2,
+                    'placeholder': 'Ejemplo: Correccion solicitada por el cliente.',
+                }),
+            )
         return form
 
     if request.method == "POST":
@@ -7699,7 +7700,11 @@ def editar_factura(request, empresa_slug, factura_id):
                             creado_por=factura.vendedor,
                         )
 
-                    _auditar_cambio_factura(request, factura, anterior, "editar", form.cleaned_data['motivo_auditoria'])
+                    _auditar_cambio_factura(
+                        request, factura, anterior, "editar",
+                        "Factura modificada desde el formulario de edicion."
+                        if empresa.slug == "iss" else form.cleaned_data['motivo_auditoria'],
+                    )
 
                 messages.success(request, "Factura actualizada correctamente.")
                 return redirect("facturas_dashboard", empresa_slug=empresa.slug)

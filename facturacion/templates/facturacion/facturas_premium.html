@@ -165,6 +165,9 @@
                         <td class="actions">
                             <div class="erp-actions-cluster">
                                 <a class="erp-pill-link" href="{% url 'ver_factura' empresa.slug factura.id %}">Ver</a>
+                                {% if empresa.slug == "iss" %}
+                                <a class="erp-pill-link" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}" download>PDF</a>
+                                {% endif %}
                                 {% if erp_access.editar_facturas and factura.estado != "anulada" and not factura.tiene_notas_credito_activas %}
                                 <a class="erp-pill-link" href="{% url 'editar_factura' empresa.slug factura.id %}">Editar</a>
                                 {% endif %}
