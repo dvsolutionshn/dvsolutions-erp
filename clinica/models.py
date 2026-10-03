@@ -242,6 +242,11 @@ class Paciente(models.Model):
             (hoy.month, hoy.day) < (self.fecha_nacimiento.month, self.fecha_nacimiento.day)
         )
 
+    @property
+    def sexo_normalizado(self):
+        """Valor estable para decisiones visuales sin modificar datos históricos."""
+        return (self.sexo or "").strip().lower()
+
 
 class PacienteFotoEvolucion(models.Model):
     TIPO_CHOICES = [

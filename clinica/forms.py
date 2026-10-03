@@ -75,6 +75,11 @@ class BaseClinicaForm(forms.ModelForm):
 
 
 class PacienteForm(BaseClinicaForm):
+    SEXO_FORM_CHOICES = [
+        ("femenino", "Femenino"),
+        ("masculino", "Masculino"),
+    ]
+
     class Meta:
         model = Paciente
         fields = [
@@ -184,6 +189,8 @@ class PacienteForm(BaseClinicaForm):
 
     def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
+        self.fields["sexo"].choices = self.SEXO_FORM_CHOICES
+        self.fields["sexo"].required = True
         self.fields["nombre"].required = False
         self.fields["expediente_codigo"].widget.attrs["readonly"] = "readonly"
         self.fields["prefijo_telefono"].widget = forms.Select(choices=CODIGO_AREA_CHOICES)
@@ -1198,25 +1205,47 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
         if self.muestra_clasificacion_alopecia and self.instance and self.instance.pk:
             clasificacion_previa = self.instance.clasificaciones_alopecia.order_by("-fecha", "-id").first()
         if self.muestra_clasificacion_alopecia:
-            sexo = getattr(self.paciente, "sexo", "") or ""
-            escala_inicial = clasificacion_previa.escala if clasificacion_previa else ""
-            if not escala_inicial and sexo == "masculino":
-                escala_inicial = ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD
-            elif not escala_inicial and sexo == "femenino":
-                escala_inicial = ClasificacionAlopecia.ESCALA_LUDWIG
-            escala_widget = (
-                forms.HiddenInput()
-                if sexo in {"masculino", "femenino"}
-                else forms.RadioSelect(attrs={"class": "alopecia-scale-options"})
+            sexo = getattr(
+                self.paciente,
+                "sexo_normalizado",
+                (getattr(self.paciente, "sexo", "") or "").strip().lower(),
             )
+            self.sexo_paciente_original = sexo
+            sexo_confirmado = (
+                (self.data.get(self.add_prefix("paciente_sexo_confirmado")) or "").strip().lower()
+                if self.is_bound
+                else ""
+            )
+            if sexo not in {"femenino", "masculino"}:
+                self.fields["paciente_sexo_confirmado"] = forms.ChoiceField(
+                    required=True,
+                    label="Especifique el sexo del paciente",
+                    choices=[
+                        ("", "Seleccione una opción"),
+                        ("femenino", "Femenino"),
+                        ("masculino", "Masculino"),
+                    ],
+                    widget=forms.RadioSelect(attrs={"class": "alopecia-sex-options"}),
+                )
+            sexo_para_escala = sexo if sexo in {"femenino", "masculino"} else sexo_confirmado
+            escala_inicial = ""
+            if sexo_para_escala == "masculino":
+                escala_inicial = ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD
+            elif sexo_para_escala == "femenino":
+                escala_inicial = ClasificacionAlopecia.ESCALA_LUDWIG
             self.fields["alopecia_escala"] = forms.ChoiceField(
                 required=False,
                 label="Escala utilizada",
                 choices=ClasificacionAlopecia.ESCALA_CHOICES,
-                widget=escala_widget,
+                widget=forms.HiddenInput(),
                 initial=escala_inicial,
             )
-            if escala_inicial == ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD:
+            if sexo not in {"femenino", "masculino"}:
+                grados = list(dict.fromkeys([
+                    *ClasificacionAlopecia.GRADOS_HAMILTON_NORWOOD,
+                    *ClasificacionAlopecia.GRADOS_LUDWIG,
+                ]))
+            elif escala_inicial == ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD:
                 grados = ClasificacionAlopecia.GRADOS_HAMILTON_NORWOOD
             elif escala_inicial == ClasificacionAlopecia.ESCALA_LUDWIG:
                 grados = ClasificacionAlopecia.GRADOS_LUDWIG
@@ -1230,8 +1259,13 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                 label="Grado actual",
                 choices=[(grado, "III Vertex" if grado == "III_VERTEX" else grado) for grado in grados],
                 widget=forms.RadioSelect(attrs={"class": "alopecia-grade-options"}),
-                initial=clasificacion_previa.grado if clasificacion_previa else "",
+                initial=(
+                    clasificacion_previa.grado
+                    if clasificacion_previa and clasificacion_previa.escala == escala_inicial
+                    else ""
+                ),
             )
+            self.escala_alopecia_activa = escala_inicial
         for nombre, etiqueta, opciones, multiple in self.campos_estructurados:
             field_class = forms.MultipleChoiceField if multiple else forms.ChoiceField
             choices = opciones if multiple else [("", "Seleccione una opcion"), *opciones]
@@ -1265,6 +1299,8 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
                 })
             orden = ["profesional", "fecha_atencion"]
             if self.muestra_clasificacion_alopecia:
+                if "paciente_sexo_confirmado" in self.fields:
+                    orden.append("paciente_sexo_confirmado")
                 orden.extend(["alopecia_escala", "alopecia_grado"])
             for nombre, *_resto in self.campos_estructurados:
                 orden.extend([nombre, f"{nombre}_otros"])
@@ -1337,6 +1373,21 @@ class HistoriaClinicaEspecialidadForm(BaseClinicaForm):
             return cleaned_data
         escala = cleaned_data.get("alopecia_escala")
         grado = cleaned_data.get("alopecia_grado")
+        sexo = getattr(
+            self.paciente,
+            "sexo_normalizado",
+            (getattr(self.paciente, "sexo", "") or "").strip().lower(),
+        )
+        sexo_confirmado = cleaned_data.get("paciente_sexo_confirmado")
+        if sexo not in {"femenino", "masculino"}:
+            sexo = sexo_confirmado or ""
+        escala_por_sexo = {
+            "femenino": ClasificacionAlopecia.ESCALA_LUDWIG,
+            "masculino": ClasificacionAlopecia.ESCALA_HAMILTON_NORWOOD,
+        }.get(sexo)
+        if escala_por_sexo:
+            escala = escala_por_sexo
+            cleaned_data["alopecia_escala"] = escala_por_sexo
         if escala and not grado:
             self.add_error("alopecia_grado", "Seleccione el grado actual de alopecia.")
         elif grado and not escala:
@@ -1786,7 +1837,14 @@ class PreconsultaClinicaPublicaForm(forms.ModelForm):
     segundo_apellido = forms.CharField(max_length=80, required=False, widget=forms.HiddenInput())
     identidad = forms.CharField(max_length=30, label="Numero de identidad")
     fecha_nacimiento = forms.DateField(label="Fecha de nacimiento", widget=forms.DateInput(attrs={"type": "date"}))
-    sexo = forms.ChoiceField(label="Sexo", choices=[("", "Seleccione una opcion"), *Paciente.SEXO_CHOICES])
+    sexo = forms.ChoiceField(
+        label="Sexo",
+        choices=[
+            ("", "Seleccione una opcion"),
+            ("femenino", "Femenino"),
+            ("masculino", "Masculino"),
+        ],
+    )
     estado_civil = forms.ChoiceField(label="Estado civil", choices=[("", "Seleccione una opcion"), *Paciente.ESTADO_CIVIL_CHOICES])
     correo = forms.EmailField(required=False, label="Correo electronico")
     telefono_codigo_area = forms.ChoiceField(

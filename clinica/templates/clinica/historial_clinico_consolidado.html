@@ -437,34 +437,38 @@
                                 {% for error in tipo.form.fecha_atencion.errors %}<span class="inline-error">{{ error }}</span>{% endfor %}
                             </div>
                         </div>
-                        <section class="inline-alopecia-selector" data-inline-alopecia data-initial-scale="{{ tipo.form.alopecia_escala.value|default:'' }}">
+                        <section class="inline-alopecia-selector" data-inline-alopecia data-initial-scale="{{ tipo.form.escala_alopecia_activa|default:'' }}">
                             <h5>Clasificación de Alopecia: Hamilton-Norwood / Ludwig</h5>
                             <p class="inline-alopecia-intro">Seleccione una sola fotografía. La opción marcada se guardará como grado estructurado en el historial del paciente.</p>
-                            {% if paciente.sexo == "masculino" %}
-                                {{ tipo.form.alopecia_escala }}
+                            {{ tipo.form.alopecia_escala }}
+                            {% if paciente.sexo_normalizado == "masculino" %}
                                 <div class="inline-alopecia-fixed">Escala sugerida: <strong>Hamilton-Norwood</strong></div>
-                            {% elif paciente.sexo == "femenino" %}
-                                {{ tipo.form.alopecia_escala }}
+                            {% elif paciente.sexo_normalizado == "femenino" %}
                                 <div class="inline-alopecia-fixed">Escala sugerida: <strong>Ludwig</strong></div>
                             {% else %}
-                                <div class="inline-alopecia-scale"><label>{{ tipo.form.alopecia_escala.label }}</label>{{ tipo.form.alopecia_escala }}</div>
+                                <div class="inline-alopecia-scale">
+                                    <label>{{ tipo.form.paciente_sexo_confirmado.label }}</label>
+                                    {{ tipo.form.paciente_sexo_confirmado }}
+                                    <span class="inline-alopecia-intro">Confirme este dato para mostrar la escala correspondiente y actualizar el expediente.</span>
+                                </div>
+                                {% for error in tipo.form.paciente_sexo_confirmado.errors %}<span class="inline-error">{{ error }}</span>{% endfor %}
                             {% endif %}
-                            <div class="inline-alopecia-panel" data-scale="hamilton_norwood" {% if tipo.form.alopecia_escala.value == "ludwig" %}hidden{% endif %}>
+                            <div class="inline-alopecia-panel" data-scale="hamilton_norwood" {% if tipo.form.escala_alopecia_activa != "hamilton_norwood" %}hidden{% endif %}>
                                 <div class="inline-alopecia-grid">
                                     {% for etapa in alopecia_hamilton_grados %}
                                     <label class="inline-alopecia-card">
                                         <img class="inline-alopecia-photo" src="{% static etapa.imagen %}" alt="Hamilton-Norwood {{ etapa.label }}: {{ etapa.descripcion }}">
-                                        <span class="inline-alopecia-mark"><input type="radio" name="{{ tipo.form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if tipo.form.alopecia_escala.value != "ludwig" and tipo.form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
+                                        <span class="inline-alopecia-mark"><input type="radio" name="{{ tipo.form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if tipo.form.escala_alopecia_activa == "hamilton_norwood" and tipo.form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
                                     </label>
                                     {% endfor %}
                                 </div>
                             </div>
-                            <div class="inline-alopecia-panel" data-scale="ludwig" {% if tipo.form.alopecia_escala.value != "ludwig" %}hidden{% endif %}>
+                            <div class="inline-alopecia-panel" data-scale="ludwig" {% if tipo.form.escala_alopecia_activa != "ludwig" %}hidden{% endif %}>
                                 <div class="inline-alopecia-grid">
                                     {% for etapa in alopecia_ludwig_grados %}
                                     <label class="inline-alopecia-card">
                                         <img class="inline-alopecia-photo" src="{% static etapa.imagen %}" alt="Ludwig {{ etapa.label }}: {{ etapa.descripcion }}">
-                                        <span class="inline-alopecia-mark"><input type="radio" name="{{ tipo.form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if tipo.form.alopecia_escala.value == "ludwig" and tipo.form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
+                                        <span class="inline-alopecia-mark"><input type="radio" name="{{ tipo.form.alopecia_grado.html_name }}" value="{{ etapa.value }}" {% if tipo.form.escala_alopecia_activa == "ludwig" and tipo.form.alopecia_grado.value == etapa.value %}checked{% endif %}> Marcar</span>
                                     </label>
                                     {% endfor %}
                                 </div>
@@ -478,7 +482,7 @@
                         <div class="inline-fields">
                             {% for field in tipo.form %}
                             {% if tipo.codigo != "capilar" or field.name != "profesional" and field.name != "fecha_atencion" %}
-                            {% if field.name != "alopecia_escala" and field.name != "alopecia_grado" and field.name != "capilar_hallazgos_tricologicos" and field.name != "capilar_hallazgos_tricologicos_otros" and field.name != "capilar_distribucion_tricologica" and field.name != "capilar_distribucion_tricologica_otros" and field.name != "capilar_patron_clinico" and field.name != "capilar_patron_clinico_otros" %}
+                            {% if field.name != "alopecia_escala" and field.name != "alopecia_grado" and field.name != "paciente_sexo_confirmado" and field.name != "capilar_hallazgos_tricologicos" and field.name != "capilar_hallazgos_tricologicos_otros" and field.name != "capilar_distribucion_tricologica" and field.name != "capilar_distribucion_tricologica_otros" and field.name != "capilar_patron_clinico" and field.name != "capilar_patron_clinico_otros" %}
                             {% if tipo.codigo == "capilar" and field.name == "plan_tratamiento" %}
                             <section class="inline-trichology" data-inline-trichology>
                                 <h5>Hallazgos tricológicos</h5>
@@ -703,12 +707,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.querySelectorAll("[data-inline-alopecia]").forEach(function (root) {
         const scaleInputs = Array.from(root.querySelectorAll('input[name$="-alopecia_escala"]'));
+        const sexInputs = Array.from(root.querySelectorAll('input[name$="-paciente_sexo_confirmado"]'));
         const gradeInputs = Array.from(root.querySelectorAll('input[name$="-alopecia_grado"]'));
         const panels = Array.from(root.querySelectorAll("[data-scale]"));
         const selectedScale = function () {
             const selected = scaleInputs.find(function (input) { return input.checked; });
             const hidden = scaleInputs.find(function (input) { return input.type === "hidden"; });
-            return (selected && selected.value) || (hidden && hidden.value) || root.dataset.initialScale || "hamilton_norwood";
+            return root.dataset.initialScale || (selected && selected.value) || (hidden && hidden.value) || "";
         };
         const showScale = function (scale, clearGrade) {
             panels.forEach(function (panel) {
@@ -723,6 +728,15 @@ document.addEventListener("DOMContentLoaded", function () {
             if (input.type !== "hidden") {
                 input.addEventListener("change", function () { showScale(input.value, true); });
             }
+        });
+        sexInputs.forEach(function (input) {
+            input.addEventListener("change", function () {
+                const scale = input.value === "femenino" ? "ludwig" : input.value === "masculino" ? "hamilton_norwood" : "";
+                const hiddenScale = scaleInputs.find(function (item) { return item.type === "hidden"; });
+                if (hiddenScale) hiddenScale.value = scale;
+                root.dataset.initialScale = scale;
+                showScale(scale, true);
+            });
         });
     });
 
