@@ -1,0 +1,42 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#12324a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>{% block mobile_title %}Factura{% endblock %} · {{ empresa.nombre }}</title>
+  <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}" crossorigin="use-credentials">
+  <link rel="icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
+  <link rel="apple-touch-icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
+  <link rel="stylesheet" href="{% static 'facturacion/mobile_invoice.css' %}">
+  {% block mobile_head %}{% endblock %}
+</head>
+<body>
+<main class="mi-app">
+  <header class="mi-header">
+    <div class="mi-header-top">
+      <a class="mi-back" href="{% block mobile_back_url %}{{ app_invoices_url }}{% endblock %}" aria-label="Volver"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></a>
+      <div class="mi-brand"><small>Empresa activa</small><strong>{{ empresa.nombre }}</strong></div>
+      {% block mobile_header_actions %}{% endblock %}
+    </div>
+    <div class="mi-header-copy"><small>{% block mobile_kicker %}Facturación{% endblock %}</small><h1>{% block mobile_page_title %}Factura{% endblock %}</h1>{% block mobile_header_description %}{% endblock %}</div>
+  </header>
+  <div class="mi-content">
+    {% if messages %}<div class="mi-messages" role="status">{% for message in messages %}<div class="mi-message {% if message.tags %}{{ message.tags }}{% endif %}">{{ message }}</div>{% endfor %}</div>{% endif %}
+    {% block mobile_content %}{% endblock %}
+  </div>
+</main>
+<nav class="mi-bottom" aria-label="Navegación de la app">
+  <a href="{{ app_base_url }}#inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/></svg><span>Inicio</span></a>
+  {% if erp_access.pacientes %}<a href="{{ app_base_url }}#pacientes-app"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg><span>Pacientes</span></a>{% endif %}
+  {% if erp_access.ver_calendario %}<a href="{{ app_base_url }}#agenda-app"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 11h16"/></svg><span>Citas</span></a>{% endif %}
+  {% if erp_access.crear_facturas %}<a href="{{ app_base_url }}#factura-app"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2ZM9 8h6M9 12h6"/></svg><span>Facturar</span></a>{% endif %}
+  {% if erp_access.facturas %}<a class="active" href="{{ app_invoices_url }}" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6ZM9 8h6M9 12h6M9 16h3"/></svg><span>Facturas</span></a>{% endif %}
+</nav>
+<script src="{% static 'facturacion/mobile_invoice.js' %}" defer></script>
+{% block mobile_scripts %}{% endblock %}
+</body>
+</html>

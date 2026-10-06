@@ -72,6 +72,7 @@
   .premium-module-hero small{position:relative;z-index:1;display:block;font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;opacity:.72}.premium-module-hero h2{position:relative;z-index:1;margin:5px 0 0;font-size:24px;line-height:1.1}.premium-module-hero p{position:relative;z-index:1;max-width:450px;margin:7px 0 0;font-size:10px;line-height:1.5;opacity:.78}
   .quick-invoice-history{position:relative;z-index:1;display:inline-grid;place-items:center;width:max-content;min-height:38px;margin-top:12px;border:1px solid rgba(255,255,255,.28);border-radius:13px;background:rgba(255,255,255,.13);color:#fff;padding:0 13px;text-decoration:none;font-size:9px;font-weight:900;backdrop-filter:blur(8px)}
   .mobile-invoices-shell{display:grid;gap:12px}.mobile-invoices-head{padding:17px;border-radius:24px;background:linear-gradient(140deg,#12324a,#168b65);color:#fff;box-shadow:0 18px 40px rgba(18,50,74,.16)}.mobile-invoices-head small{display:block;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.72}.mobile-invoices-head h2{margin:5px 0 0;font-size:22px}.mobile-invoices-head p{margin:6px 0 0;font-size:10px;line-height:1.45;opacity:.78}.mobile-invoices-list{display:grid;gap:9px}.mobile-invoice-row{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #d8e7ee;border-radius:18px;background:#fff;box-shadow:0 10px 25px rgba(18,50,74,.06)}.mobile-invoice-number{color:#168b65;font-size:12px;font-weight:950}.mobile-invoice-main{min-width:0}.mobile-invoice-main strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.mobile-invoice-main span{display:block;margin-top:4px;color:var(--navy);font-size:11px;font-weight:900}.mobile-invoice-pdf{min-height:38px;display:grid;place-items:center;border-radius:12px;background:#12324a;color:#fff;padding:0 11px;text-decoration:none;font-size:9px;font-weight:900}
+  .mobile-invoice-main small{display:block;margin-top:6px;color:var(--muted);font-size:8px;line-height:1.6}.mobile-invoice-state{font-style:normal;font-weight:900}.mobile-invoice-state.anulada{color:#a53142}.mobile-invoice-actions{display:grid;gap:5px}.mobile-invoice-detail{min-height:32px;display:grid;place-items:center;border:1px solid #cae0e6;border-radius:11px;background:#edf8f6;color:#155466;padding:0 8px;text-decoration:none;font-size:9px;font-weight:900}
   .premium-progress{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:16px}.premium-progress span{min-height:30px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.16);border-radius:11px;background:rgba(255,255,255,.08);font-size:8px;font-weight:900}.premium-progress span:first-child{background:#fff;color:#155466}
   .premium-invoice-shell{display:grid;gap:12px}.premium-invoice-shell .quick-invoice-body{padding:0}.premium-invoice-shell .quick-step{padding:14px;border-color:#d5e5ed;border-radius:22px;background:rgba(255,255,255,.94);box-shadow:0 13px 30px rgba(18,50,74,.065)}
   .premium-invoice-shell .quick-step-title{justify-content:space-between}.premium-invoice-shell .quick-step-title .step-copy{display:flex;align-items:center;gap:9px}.premium-invoice-shell .quick-step-title small{color:var(--muted);font-size:8px;font-weight:800}.premium-invoice-shell .quick-input,.premium-invoice-shell .quick-select{min-height:49px;border-color:#bfd2dd;border-radius:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
@@ -423,14 +424,14 @@
         <header class="mobile-invoices-head">
           <small>{{ empresa.nombre }}</small>
           <h2>Facturas</h2>
-          <p>Número resumido, cliente y monto. Toca “Ver PDF” para abrir el documento completo.</p>
+          <p>Consulta el documento completo en PDF o abre el detalle para ver su historial y las acciones disponibles.</p>
         </header>
         <div class="mobile-invoices-list">
           {% for factura in facturas_app %}
           <article class="mobile-invoice-row">
             <div class="mobile-invoice-number">#{{ factura.numero_resumido }}</div>
-            <div class="mobile-invoice-main"><strong>{{ factura.cliente }}</strong><span>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2 }}</span></div>
-            <a class="mobile-invoice-pdf" href="{{ factura.pdf_url }}" target="_blank" rel="noopener">Ver PDF</a>
+            <div class="mobile-invoice-main"><strong>{{ factura.cliente }}</strong><span>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2 }}</span><small>{{ factura.fecha|date:"d/m/Y" }} · <em class="mobile-invoice-state {{ factura.estado }}">{{ factura.estado_label|upper }}</em></small></div>
+            <div class="mobile-invoice-actions"><a class="mobile-invoice-pdf" href="{{ factura.pdf_url }}" target="_blank" rel="noopener">Ver PDF</a><a class="mobile-invoice-detail" href="{{ factura.detalle_url }}">Detalle · ⋮</a></div>
           </article>
           {% empty %}
           <div class="app-empty">Todavía no hay facturas registradas para esta empresa.</div>
@@ -1032,7 +1033,7 @@
   const upcoming=JSON.parse(document.getElementById("upcomingAppointments").textContent||"[]");
   async function registerApp(){
     if(!("serviceWorker" in navigator))return;
-    sw=await navigator.serviceWorker.register("{% url 'agenda_mobile_service_worker' empresa.slug %}",{scope:"{% url 'agenda_mobile' empresa.slug %}"});
+    sw=await navigator.serviceWorker.register("{% url 'agenda_mobile_service_worker' empresa.slug %}",{scope:"{{ app_scope_url|escapejs }}"});
     if("setAppBadge" in navigator)navigator.setAppBadge({{ pendientes_hoy }}).catch(()=>{});
     scheduleVisibleReminders();
   }
@@ -1785,9 +1786,11 @@
       if(quickClientSearch)quickClientSearch.value="";
       quickClientSelected?.classList.remove("show");
       const facturaUrl=data.factura_url||"#";
+      const mobileFacturaUrl=new URL(facturaUrl,window.location.origin);
+      mobileFacturaUrl.searchParams.set("app","1");
       const pdfUrl=facturaUrl.replace(/\/?$/,"/pdf/");
       const ticketUrl=data.ticket_url||facturaUrl;
-      setQuickStatus(`Factura <strong>${escapeHtml(data.numero_factura||"generada")}</strong> creada correctamente.<div class="quick-success-actions"><a href="${facturaUrl}">Ver factura</a><a href="${pdfUrl}" target="_blank" rel="noopener">Abrir PDF</a><a href="${ticketUrl}" target="_blank" rel="noopener">Comprobante</a><button type="button" data-send-invoice-whatsapp="${data.whatsapp_url||""}">Enviar por WhatsApp</button></div><span class="quick-whatsapp-feedback"></span>`,false);
+      setQuickStatus(`Factura <strong>${escapeHtml(data.numero_factura||"generada")}</strong> creada correctamente.<div class="quick-success-actions"><a href="${escapeHtml(mobileFacturaUrl.href)}">Ver factura</a><a href="${pdfUrl}" target="_blank" rel="noopener">Abrir PDF</a><a href="${ticketUrl}" target="_blank" rel="noopener">Comprobante</a><button type="button" data-send-invoice-whatsapp="${data.whatsapp_url||""}">Enviar por WhatsApp</button></div><span class="quick-whatsapp-feedback"></span>`,false);
     }catch(error){
       setQuickStatus(escapeHtml(error.message||"No se pudo completar la factura."),true);
     }finally{

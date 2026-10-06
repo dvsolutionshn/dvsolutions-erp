@@ -2477,11 +2477,16 @@ def agenda_mobile(request, empresa_slug):
             "cliente": factura.cliente.nombre,
             "total": factura.total,
             "moneda": factura.moneda,
+            "fecha": factura.fecha_emision,
+            "estado": factura.estado,
+            "estado_label": factura.get_estado_display(),
+            "detalle_url": f"{reverse('ver_factura', args=[empresa.slug, factura.id])}?app=1",
             "pdf_url": reverse("descargar_factura_pdf", args=[empresa.slug, factura.id]),
         }
         for factura in facturas_app_qs
     ]
     contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
+    contexto["app_scope_url"] = reverse("dashboard", args=[empresa.slug])
     response = render(request, "crm/agenda_mobile.html", contexto)
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response["Pragma"] = "no-cache"
@@ -2508,7 +2513,7 @@ def agenda_mobile_manifest(request, empresa_slug):
             "description": "Calendario móvil de citas conectado a DV Solutions ERP.",
             "id": inicio,
             "start_url": inicio,
-            "scope": inicio,
+            "scope": reverse("dashboard", args=[empresa.slug]),
             "display": "standalone",
             "orientation": "portrait-primary",
             "background_color": "#f4f8fb",
@@ -2554,7 +2559,7 @@ self.addEventListener("message", event => {{
 }});
 """
     response = HttpResponse(script, content_type="application/javascript")
-    response["Service-Worker-Allowed"] = inicio
+    response["Service-Worker-Allowed"] = reverse("dashboard", args=[empresa.slug])
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 

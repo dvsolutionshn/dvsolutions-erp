@@ -1,0 +1,6 @@
+<div class="mi-field{% if wide %} mi-wide{% endif %}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {{ field }}
+  {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+  {% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+</div>

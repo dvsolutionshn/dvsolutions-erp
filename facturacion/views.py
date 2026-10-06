@@ -51,6 +51,7 @@ from contabilidad.services import (
 from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, Cotizacion, EMPRESAS_FACTURACION_SOLO_CONTADO, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaCotizacion, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoComisionProveedor, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoComisionProveedorForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
+from .mobile_presentation import preparar_historial_factura_mobile
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_documento_whatsapp
@@ -2923,6 +2924,90 @@ def _validar_stock_disponible_para_lineas(lineas):
         )
 
 
+def _factura_modo_app(request):
+    return request.GET.get("app") == "1" or request.POST.get("app") == "1"
+
+
+def _redirect_factura(request, empresa, factura_id=None, *, destino="ver_factura"):
+    """Conserva la navegación móvil al usar las mismas acciones del ERP."""
+    if _factura_modo_app(request):
+        if factura_id is None:
+            return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}#facturas-app")
+        if destino == "facturas_dashboard":
+            destino = "ver_factura"
+        return redirect(f"{reverse(destino, args=[empresa.slug, factura_id])}?app=1")
+    kwargs = {"empresa_slug": empresa.slug}
+    if factura_id is not None and destino != "facturas_dashboard":
+        kwargs["factura_id"] = factura_id
+    return redirect(destino, **kwargs)
+
+
+def _contexto_factura_app(request, empresa, factura, config_avanzada=None):
+    config_avanzada = config_avanzada or ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    permiso = lambda nombre: request.user.tiene_permiso_erp(nombre, empresa)
+    borrador_eliminable = factura.estado == "borrador" and not factura.numero_factura
+    puede_eliminar_borrador = borrador_eliminable and permiso("puede_eliminar_borradores")
+    puede_eliminar_historica = bool(
+        permiso("puede_eliminar_facturas")
+        and (
+            borrador_eliminable
+            or (
+                config_avanzada.permite_gestion_fiscal_historica
+                and not factura.tiene_pagos_registrados
+                and not factura.recibos_pago.exists()
+                and not factura.tiene_notas_credito_activas
+                and not factura.correcciones_numero.exists()
+            )
+        )
+    )
+    app_base_url = reverse("agenda_mobile", args=[empresa.slug])
+    contexto = {
+        "modo_app": True,
+        "app_base_url": app_base_url,
+        "app_invoices_url": f"{app_base_url}#facturas-app",
+        "can_edit_invoice": permiso("puede_editar_facturas") and not _factura_bloqueada_para_edicion(factura, request.user),
+        "can_change_invoice_date": permiso("puede_cambiar_fecha_factura") and factura.estado != "anulada",
+        "can_correct_invoice_fiscal": bool(permiso("puede_editar_facturas") and config_avanzada.permite_gestion_fiscal_historica and factura.estado == "emitida"),
+        "can_void_invoice": permiso("puede_anular_facturas") and factura.estado != "anulada",
+        "can_delete_invoice": bool(puede_eliminar_borrador or puede_eliminar_historica),
+        "app_delete_url": reverse("eliminar_factura_borrador" if puede_eliminar_borrador else "eliminar_factura", args=[empresa.slug, factura.pk]) + "?app=1",
+    }
+    for clave, vista in {
+        "app_detail_url": "ver_factura",
+        "app_edit_url": "editar_factura",
+        "app_date_url": "cambiar_fecha_factura",
+        "app_fiscal_url": "corregir_numero_factura",
+        "app_void_url": "anular_factura",
+    }.items():
+        contexto[clave] = reverse(vista, args=[empresa.slug, factura.pk]) + "?app=1"
+    return contexto
+
+
+def _adaptar_fechas_factura_app(form):
+    for nombre in ("fecha_emision", "fecha_vencimiento"):
+        if nombre in form.fields:
+            form.fields[nombre].widget = forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+
+
+def _render_factura(request, template_name, contexto):
+    response = render(request, template_name, contexto)
+    if _factura_modo_app(request):
+        response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response["Pragma"] = "no-cache"
+        response["Expires"] = "0"
+    return response
+
+
+def _validar_confirmacion_eliminacion_app(request):
+    if not _factura_modo_app(request):
+        return True
+    motivo = (request.POST.get("motivo") or "").strip()
+    if request.POST.get("confirmacion") != "ELIMINAR" or not 8 <= len(motivo) <= 500:
+        messages.error(request, "Escribe ELIMINAR y un motivo de al menos 8 caracteres para confirmar la eliminación.")
+        return False
+    return True
+
+
 @login_required
 @transaction.atomic
 def cambiar_fecha_factura(request, empresa_slug, factura_id):
@@ -2955,12 +3040,16 @@ def cambiar_fecha_factura(request, empresa_slug, factura_id):
                     registrar_asiento_factura_emitida(factura)
                 _auditar_cambio_factura(request, factura, anterior, 'cambiar_fecha', form.cleaned_data['motivo_auditoria'])
             messages.success(request, 'Fecha de factura actualizada.')
-            return redirect('ver_factura', empresa_slug=empresa.slug, factura_id=factura.pk)
+            return _redirect_factura(request, empresa, factura.pk)
         except (ValidationError, ValueError) as exc:
             form.add_error(None, '; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc))
-    return render(request, 'facturacion/cambiar_fecha_factura.html', {
-        'empresa': empresa, 'factura': factura, 'form': form,
-    })
+    contexto = {'empresa': empresa, 'factura': factura, 'form': form}
+    template_name = 'facturacion/cambiar_fecha_factura.html'
+    if _factura_modo_app(request):
+        _adaptar_fechas_factura_app(form)
+        contexto.update(_contexto_factura_app(request, empresa, factura))
+        template_name = 'facturacion/mobile_invoice_date.html'
+    return _render_factura(request, template_name, contexto)
 
 
 def _autorizar_cambio_factura(request, empresa, permiso):
@@ -7339,16 +7428,17 @@ def crear_factura(request, empresa_slug):
 @login_required
 def corregir_numero_factura(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _autorizar_cambio_factura(request, empresa, "puede_editar_facturas")
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
 
     if not config_avanzada.permite_gestion_fiscal_historica:
         messages.error(request, "La correccion fiscal historica no esta habilitada para esta empresa.")
-        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        return _redirect_factura(request, empresa, factura.id)
 
     if factura.estado != "emitida":
         messages.info(request, "Los borradores se corrigen desde la edicion normal de la factura.")
-        return redirect("editar_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        return _redirect_factura(request, empresa, factura.id, destino="editar_factura")
 
     form = CorreccionNumeroFacturaForm(
         request.POST or None,
@@ -7412,11 +7502,7 @@ def corregir_numero_factura(request, empresa_slug, factura_id):
                         f"Numero fiscal corregido de {numero_anterior} a {numero_nuevo}. "
                         "Los pagos, totales y recibos no fueron modificados.",
                     )
-                    return redirect(
-                        "ver_factura",
-                        empresa_slug=empresa.slug,
-                        factura_id=factura_bloqueada.id,
-                    )
+                    return _redirect_factura(request, empresa, factura_bloqueada.id)
         except ValidationError as exc:
             if hasattr(exc, "message_dict"):
                 for error in exc.message_dict.get("numero_factura", []):
@@ -7430,11 +7516,17 @@ def corregir_numero_factura(request, empresa_slug, factura_id):
         except ValueError as exc:
             form.add_error("numero_factura", str(exc))
 
-    return render(request, "facturacion/corregir_numero_factura.html", {
+    contexto = {
         "empresa": empresa,
         "factura": factura,
         "form": form,
-    })
+    }
+    template_name = "facturacion/corregir_numero_factura.html"
+    if _factura_modo_app(request):
+        contexto.update(_contexto_factura_app(request, empresa, factura, config_avanzada))
+        contexto["correcciones_numero"] = factura.correcciones_numero.select_related("realizado_por")[:10]
+        template_name = "facturacion/mobile_invoice_fiscal.html"
+    return _render_factura(request, template_name, contexto)
 
 
 @login_required
@@ -7453,7 +7545,7 @@ def editar_factura(request, empresa_slug, factura_id):
             request,
             f"No se puede editar esta factura emitida. {factura.motivo_bloqueo_edicion}"
         )
-        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        return _redirect_factura(request, empresa, factura.id)
 
     campos_factura = [
         'cliente',
@@ -7716,6 +7808,8 @@ def editar_factura(request, empresa_slug, factura_id):
                 if empresa.slug == "iss":
                     request.session[f"factura_editada_pdf_{empresa.pk}"] = factura.pk
                 messages.success(request, "Factura actualizada correctamente.")
+                if _factura_modo_app(request):
+                    return _redirect_factura(request, empresa, factura.id)
                 return redirect("facturas_dashboard", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
@@ -7746,7 +7840,7 @@ def editar_factura(request, empresa_slug, factura_id):
             f.fields['descripcion_manual'].required = False
             f.fields['descripcion_manual'].widget = forms.HiddenInput()
 
-    return render(request, "facturacion/crear_factura_premium.html", {
+    contexto = {
         "empresa": empresa,
         "form": form,
         "formset": formset,
@@ -7767,7 +7861,38 @@ def editar_factura(request, empresa_slug, factura_id):
         "numero_factura_prefijo_manual": prefijo_manual,
         "prefijo_factura_manual_url": reverse("prefijo_factura_manual", args=[empresa.slug]),
         "precios_incluyen_impuesto": _precios_incluyen_impuesto(empresa),
-    })
+    }
+    template_name = "facturacion/crear_factura_premium.html"
+    if _factura_modo_app(request):
+        _adaptar_fechas_factura_app(form)
+        contexto.update(_contexto_factura_app(request, empresa, factura, config_avanzada))
+        contexto["mobile_invoice_products"] = [
+            {
+                "id": producto.pk,
+                "nombre": producto.nombre,
+                "codigo": producto.codigo or "",
+                "precio": str(producto.precio),
+                "impuesto_id": producto.impuesto_predeterminado_id,
+                "price_includes_tax": contexto["precios_incluyen_impuesto"],
+            }
+            for producto in productos_qs
+        ]
+        contexto["mobile_invoice_taxes"] = [
+            {"id": impuesto.pk, "porcentaje": str(impuesto.porcentaje)}
+            for impuesto in impuestos_qs
+        ]
+        contexto["mobile_invoice_lines_tax_mode"] = [
+            {"id": linea.pk, "price_includes_tax": linea.precio_incluye_impuesto}
+            for linea in factura.lineas.all()
+        ]
+        empty_line_form = formset.empty_form
+        empty_line_form.fields["producto"].queryset = productos_qs
+        empty_line_form.fields["impuesto"].queryset = impuestos_qs
+        empty_line_form.fields["descripcion_manual"].required = False
+        empty_line_form.fields["descripcion_manual"].widget = forms.HiddenInput()
+        contexto["mobile_empty_line_form"] = empty_line_form
+        template_name = "facturacion/mobile_invoice_edit.html"
+    return _render_factura(request, template_name, contexto)
 
 # =====================================================
 # REGISTRAR PAGO
@@ -8449,16 +8574,16 @@ def anular_factura(request, empresa_slug, factura_id):
 
     if factura.estado == 'anulada':
         messages.info(request, "La factura ya estaba anulada.")
-        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        return _redirect_factura(request, empresa, factura.id)
 
     if not 5 <= len(motivo) <= 500:
         messages.error(request, "Explica el motivo de la anulacion con al menos 5 caracteres.")
-        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        return _redirect_factura(request, empresa, factura.id)
 
     with transaction.atomic():
         factura = Factura.objects.select_for_update().get(id=factura.id, empresa=empresa)
         if factura.estado == 'anulada':
-            return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+            return _redirect_factura(request, empresa, factura.id)
         anterior = _estado_auditoria_factura(factura)
         if factura.estado == 'emitida':
             _revertir_salida_factura(factura)
@@ -8503,7 +8628,7 @@ def anular_factura(request, empresa_slug, factura_id):
         _auditar_cambio_factura(request, factura, anterior, "anular", motivo)
     messages.success(request, "Factura anulada correctamente y registrada en la bitacora.")
 
-    return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+    return _redirect_factura(request, empresa, factura.id)
 
 
 @login_required
@@ -8511,16 +8636,26 @@ def anular_factura(request, empresa_slug, factura_id):
 def eliminar_factura(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _autorizar_cambio_factura(request, empresa, "puede_eliminar_borradores")
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    if not _validar_confirmacion_eliminacion_app(request):
+        return _redirect_factura(request, empresa, factura.id)
 
     if factura.estado == 'borrador' and not factura.numero_factura:
-        factura.delete()
-        messages.success(request, "Factura borrador eliminada correctamente.")
+        try:
+            with transaction.atomic():
+                factura.delete()
+            messages.success(request, "Factura borrador eliminada correctamente.")
+        except ProtectedError:
+            messages.error(request, "No se puede eliminar esta factura porque tiene registros relacionados protegidos.")
+            if _factura_modo_app(request):
+                return _redirect_factura(request, empresa, factura_id)
     else:
         messages.error(request, "Solo se pueden eliminar facturas en borrador y sin número.")
+        if _factura_modo_app(request):
+            return _redirect_factura(request, empresa, factura.id)
 
-    return redirect("facturas_dashboard", empresa_slug=empresa.slug)
+    return _redirect_factura(request, empresa, destino="facturas_dashboard")
 
 
 @login_required
@@ -8528,51 +8663,63 @@ def eliminar_factura(request, empresa_slug, factura_id):
 def eliminar_factura_historica(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _autorizar_cambio_factura(request, empresa, "puede_eliminar_facturas")
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    if not _validar_confirmacion_eliminacion_app(request):
+        return _redirect_factura(request, empresa, factura.id)
 
     if factura.estado == 'borrador' and not factura.numero_factura:
-        factura.delete()
+        try:
+            with transaction.atomic():
+                factura.delete()
+        except ProtectedError:
+            messages.error(request, "No se puede eliminar esta factura porque tiene registros relacionados protegidos.")
+            return _redirect_factura(request, empresa, factura_id, destino="facturas_dashboard")
         messages.success(request, "Factura borrador eliminada correctamente.")
-        return redirect("facturas_dashboard", empresa_slug=empresa.slug)
+        return _redirect_factura(request, empresa, destino="facturas_dashboard")
 
     if not config_avanzada.permite_gestion_fiscal_historica:
         messages.error(request, "Esta empresa no tiene habilitada la correccion fiscal historica.")
-        return redirect("facturas_dashboard", empresa_slug=empresa.slug)
+        return _redirect_factura(request, empresa, factura.id, destino="facturas_dashboard")
 
     if factura.tiene_pagos_registrados or factura.recibos_pago.exists():
         messages.error(request, "No se puede eliminar esta factura porque ya tiene pagos o recibos registrados.")
-        return redirect("facturas_dashboard", empresa_slug=empresa.slug)
+        return _redirect_factura(request, empresa, factura.id, destino="facturas_dashboard")
 
     if factura.tiene_notas_credito_activas:
         messages.error(request, "No se puede eliminar esta factura porque tiene notas de credito relacionadas.")
-        return redirect("facturas_dashboard", empresa_slug=empresa.slug)
+        return _redirect_factura(request, empresa, factura.id, destino="facturas_dashboard")
 
     cai_id = factura.cai_id
 
-    with transaction.atomic():
-        if factura.estado == 'emitida':
-            _revertir_salida_factura(factura)
-            registrar_reversion_documento(
-                empresa=factura.empresa,
-                documento_tipo='factura',
-                documento_id=factura.id,
-                evento_origen='emision',
-                evento_reversion='eliminacion',
-                fecha=timezone.now().date(),
-                descripcion=f"Eliminacion historica factura {factura.numero_factura or factura.id}",
-                referencia=factura.numero_factura or str(factura.id),
-                origen_modulo='facturacion',
-                creado_por=factura.vendedor,
-            )
+    try:
+        with transaction.atomic():
+            if factura.estado == 'emitida':
+                _revertir_salida_factura(factura)
+                registrar_reversion_documento(
+                    empresa=factura.empresa,
+                    documento_tipo='factura',
+                    documento_id=factura.id,
+                    evento_origen='emision',
+                    evento_reversion='eliminacion',
+                    fecha=timezone.now().date(),
+                    descripcion=f"Eliminacion historica factura {factura.numero_factura or factura.id}",
+                    referencia=factura.numero_factura or str(factura.id),
+                    origen_modulo='facturacion',
+                    creado_por=factura.vendedor,
+                )
 
-        factura.delete()
+            factura.delete()
 
-        if cai_id:
-            _recalcular_correlativo_cai_factura(cai_id)
+            if cai_id:
+                _recalcular_correlativo_cai_factura(cai_id)
+    except ProtectedError:
+        messages.error(request, "No se puede eliminar esta factura porque tiene registros relacionados protegidos.")
+        return _redirect_factura(request, empresa, factura_id, destino="facturas_dashboard")
 
     messages.success(request, "Factura eliminada correctamente para correccion historica.")
-    return redirect("facturas_dashboard", empresa_slug=empresa.slug)
+    return _redirect_factura(request, empresa, destino="facturas_dashboard")
 
 
 @login_required
@@ -8650,6 +8797,7 @@ def duplicar_factura(request, empresa_slug, factura_id):
 def ver_factura(request, empresa_slug, factura_id):
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    _autorizar_cambio_factura(request, empresa, "puede_ver_facturas")
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
 
@@ -8668,7 +8816,7 @@ def ver_factura(request, empresa_slug, factura_id):
         | Q(app_label="facturacion", identificador_solicitud__in=solicitudes_factura)
     ).select_related("usuario").distinct()[:30]
 
-    return render(request, "facturacion/ver_factura_premium.html", {
+    contexto = {
         "empresa": empresa,
         "factura": factura,
         "resumen": resumen,
@@ -8680,7 +8828,14 @@ def ver_factura(request, empresa_slug, factura_id):
         "permite_plantilla_amkt": _empresa_permite_plantilla_amkt(empresa),
         "configuracion_facturacion": ConfiguracionFacturacionEmpresa.objects.get_or_create(empresa=empresa)[0],
         "historial_auditoria": historial_auditoria,
-    })
+    }
+    template_name = "facturacion/ver_factura_premium.html"
+    if _factura_modo_app(request):
+        contexto.update(_contexto_factura_app(request, empresa, factura, config_avanzada))
+        contexto["correcciones_numero"] = factura.correcciones_numero.select_related("realizado_por")[:10]
+        contexto["mobile_invoice_audit"] = preparar_historial_factura_mobile(historial_auditoria)
+        template_name = "facturacion/mobile_invoice_detail.html"
+    return _render_factura(request, template_name, contexto)
 
 
 @login_required

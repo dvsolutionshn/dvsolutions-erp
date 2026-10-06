@@ -1,0 +1,91 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load humanize %}
+{% block mobile_title %}Detalle de factura{% endblock %}
+{% block mobile_page_title %}Tu factura{% endblock %}
+{% block mobile_header_description %}<p>Consulta el documento, su detalle y las acciones disponibles.</p>{% endblock %}
+{% block mobile_header_actions %}
+{% if can_edit_invoice or can_change_invoice_date or can_correct_invoice_fiscal or can_void_invoice or can_delete_invoice %}<button class="mi-more" type="button" data-open-sheet="invoiceActionsSheet" aria-label="Más acciones de factura"><b aria-hidden="true">⋮</b> Más acciones</button>{% endif %}
+{% endblock %}
+{% block mobile_content %}
+<section class="mi-card">
+  <span class="mi-kicker">Número de factura</span>
+  <div class="mi-number">{{ factura.numero_factura|default:"Sin número · Borrador" }}</div>
+  <div class="mi-badges"><span class="mi-badge {{ factura.estado }}">{{ factura.get_estado_display|upper }}</span>{% if factura.estado != "anulada" %}<span class="mi-badge {{ factura.estado_pago }}">{{ factura.get_estado_pago_display }}</span>{% endif %}</div>
+  <div class="mi-row"><span>Fecha</span><strong>{{ factura.fecha_emision|date:"d/m/Y" }}</strong></div>
+  {% if factura.fecha_vencimiento %}<div class="mi-row"><span>Vencimiento</span><strong>{{ factura.fecha_vencimiento|date:"d/m/Y" }}</strong></div>{% endif %}
+  <div class="mi-row total"><span>Total</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
+  {% if factura.estado == "anulada" %}<div class="mi-warning danger mi-status-space">Esta factura está ANULADA. Su anulación y motivo se conservan en el historial.</div>{% endif %}
+  <a class="mi-button mi-status-space" href="{% url 'descargar_factura_pdf' empresa.slug factura.id %}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6ZM14 3v5h4M9 13h6M9 17h4"/></svg>Abrir PDF</a>
+</section>
+<section class="mi-card">
+  <span class="mi-kicker">Cliente</span><h2>{{ factura.cliente.nombre }}</h2>
+  {% if factura.cliente.rtn %}<div class="mi-row"><span>RTN</span><strong>{{ factura.cliente.rtn }}</strong></div>{% endif %}
+  {% if factura.cliente.telefono %}<div class="mi-row"><span>Teléfono</span><strong>{{ factura.cliente.telefono }}</strong></div>{% endif %}
+  {% if factura.vendedor %}<div class="mi-row"><span>Atendido por</span><strong>{{ factura.vendedor.get_full_name|default:factura.vendedor.username }}</strong></div>{% endif %}
+</section>
+<section class="mi-card">
+  <h2>Productos y servicios</h2>
+  <div class="mi-line-list">
+    {% for linea in factura.lineas.all %}
+    <article class="mi-detail-line">
+      <div class="mi-detail-line-head"><strong>{{ linea.descripcion_visual }}</strong><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.total_linea|floatformat:2|intcomma }}</strong></div>
+      <div class="mi-row"><span>Cantidad × precio</span><strong>{{ linea.cantidad|floatformat:2 }} × {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.precio_unitario|floatformat:2|intcomma }}</strong></div>
+      {% if linea.descuento_porcentaje %}<div class="mi-row"><span>Descuento {{ linea.descuento_porcentaje|floatformat:2 }}%</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.descuento_monto|floatformat:2|intcomma }}</strong></div>{% endif %}
+      <div class="mi-row"><span>{{ linea.impuesto.nombre }}</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ linea.impuesto_monto|floatformat:2|intcomma }}</strong></div>
+      {% if linea.comentario %}<div class="mi-line-note">{{ linea.comentario }}</div>{% endif %}
+    </article>
+    {% empty %}<p class="mi-muted">Esta factura todavía no tiene productos.</p>{% endfor %}
+  </div>
+</section>
+<section class="mi-card">
+  <h2>Resumen fiscal</h2>
+  <div class="mi-row"><span>Subtotal</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_bruto|floatformat:2|intcomma }}</strong></div>
+  <div class="mi-row"><span>Descuento</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.descuento_total|floatformat:2|intcomma }}</strong></div>
+  <div class="mi-row"><span>Antes de impuesto</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ resumen_detallado.subtotal_antes_impuesto|floatformat:2|intcomma }}</strong></div>
+  <div class="mi-row"><span>Impuesto</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.impuesto|floatformat:2|intcomma }}</strong></div>
+  <div class="mi-row total"><span>Total</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
+  {% if factura.estado != "anulada" %}<div class="mi-row"><span>Pagado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total_pagado|floatformat:2|intcomma }}</strong></div><div class="mi-row"><span>Pendiente</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</strong></div>{% endif %}
+</section>
+{% if factura.orden_compra_exenta or factura.registro_exonerado or factura.registro_sag %}<details class="mi-card mi-fold"><summary>Datos fiscales adicionales</summary><div>{% if factura.orden_compra_exenta %}<div class="mi-row"><span>Orden de compra exenta</span><strong>{{ factura.orden_compra_exenta }}</strong></div>{% endif %}{% if factura.registro_exonerado %}<div class="mi-row"><span>Registro exonerado</span><strong>{{ factura.registro_exonerado }}</strong></div>{% endif %}{% if factura.registro_sag %}<div class="mi-row"><span>Registro SAG</span><strong>{{ factura.registro_sag }}</strong></div>{% endif %}</div></details>{% endif %}
+{% if mobile_invoice_audit %}
+<details class="mi-card mi-fold"><summary>Historial de cambios · {{ mobile_invoice_audit|length }}</summary>
+  <div class="mi-audit-list">
+  {% for evento in mobile_invoice_audit %}<article class="mi-audit"><strong>{{ evento.accion }}</strong><div class="mi-audit-meta">{{ evento.fecha|date:"d/m/Y H:i" }} · {{ evento.usuario }}</div>{% if evento.motivo %}<p>{{ evento.motivo }}</p>{% endif %}{% if evento.cambios %}<details><summary>Ver cambios</summary>{% for cambio in evento.cambios %}<div class="mi-audit-change"><strong>{{ cambio.campo }}</strong><span>Anterior: {{ cambio.anterior|default_if_none:"—" }}</span><b>Nuevo: {{ cambio.nuevo|default_if_none:"—" }}</b></div>{% endfor %}</details>{% endif %}</article>{% endfor %}
+  </div>
+</details>
+{% endif %}
+{% if correcciones_numero %}<details class="mi-card mi-fold"><summary>Correcciones fiscales · {{ correcciones_numero|length }}</summary><div class="mi-audit-list">{% for correccion in correcciones_numero %}<article class="mi-audit"><strong>Corrección de número</strong><div class="mi-audit-meta">{{ correccion.fecha|date:"d/m/Y H:i" }} · {% if correccion.realizado_por %}{{ correccion.realizado_por.get_full_name|default:correccion.realizado_por.username }}{% else %}Sistema{% endif %}</div><p>{{ correccion.motivo }}</p><div class="mi-audit-change"><span>{{ correccion.numero_anterior }}</span><b>→ {{ correccion.numero_nuevo }}</b></div></article>{% endfor %}</div></details>{% endif %}
+{% if can_edit_invoice or can_change_invoice_date or can_correct_invoice_fiscal or can_void_invoice or can_delete_invoice %}
+<dialog class="mi-sheet" id="invoiceActionsSheet" aria-labelledby="invoiceActionsTitle">
+  <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><div><span class="mi-kicker">Factura {{ factura.numero_factura|default:factura.id }}</span><h2 id="invoiceActionsTitle">Más acciones</h2></div><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div>
+  <div class="mi-action-list">
+    {% if can_edit_invoice %}<a href="{{ app_edit_url }}">Editar factura <span aria-hidden="true">›</span></a>{% endif %}
+    {% if can_change_invoice_date %}<a href="{{ app_date_url }}">Corregir fecha <span aria-hidden="true">›</span></a>{% endif %}
+    {% if can_correct_invoice_fiscal %}<a href="{{ app_fiscal_url }}">Corrección fiscal histórica <span aria-hidden="true">›</span></a>{% endif %}
+    {% if can_void_invoice %}<button type="button" class="danger" data-open-sheet="invoiceVoidSheet">Anular factura <span aria-hidden="true">›</span></button>{% endif %}
+    {% if can_delete_invoice %}<button type="button" class="danger" data-open-sheet="invoiceDeleteSheet">Eliminar factura <span aria-hidden="true">›</span></button>{% endif %}
+  </div>
+</dialog>
+{% endif %}
+{% if can_void_invoice %}
+<dialog class="mi-sheet" id="invoiceVoidSheet" aria-labelledby="invoiceVoidTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="invoiceVoidTitle">Anular factura</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div>
+  <form method="post" action="{{ app_void_url }}" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">
+    <div class="mi-warning danger">La factura {{ factura.numero_factura|default:factura.id }} quedará ANULADA. El sistema aplicará las reversiones de inventario y contabilidad correspondientes.</div>
+    <div class="mi-field"><label for="invoiceVoidReason">Motivo de anulación</label><textarea id="invoiceVoidReason" name="motivo" required minlength="5" maxlength="500" rows="3" placeholder="Explica por qué se anula esta factura"></textarea><small>El motivo se registra con tu usuario, fecha y hora.</small></div>
+    <label class="mi-check"><input type="checkbox" required>Confirmo que deseo anular esta factura.</label>
+    <button class="mi-button danger" type="submit">Confirmar anulación</button>
+    <button class="mi-button secondary" type="button" data-close-sheet>Cancelar</button>
+  </form>
+</dialog>
+{% endif %}
+{% if can_delete_invoice %}
+<dialog class="mi-sheet" id="invoiceDeleteSheet" aria-labelledby="invoiceDeleteTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="invoiceDeleteTitle">Eliminar factura</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div>
+  <form method="post" action="{{ app_delete_url }}" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">
+    <div class="mi-warning danger">Vas a eliminar la factura {{ factura.numero_factura|default:factura.id }} de {{ factura.cliente.nombre }}. Esta acción no se puede deshacer desde la app y quedará en auditoría.</div>
+    <div class="mi-field"><label for="invoiceDeleteReason">Motivo de eliminación</label><textarea id="invoiceDeleteReason" name="motivo" required minlength="8" maxlength="500" rows="3" placeholder="Explica el motivo de la eliminación"></textarea></div>
+    <div class="mi-field"><label for="invoiceDeleteConfirmation">Escribe ELIMINAR para confirmar</label><input id="invoiceDeleteConfirmation" name="confirmacion" type="text" required pattern="ELIMINAR" autocomplete="off" autocapitalize="characters" placeholder="ELIMINAR"></div>
+    <button class="mi-button danger" type="submit">Eliminar definitivamente</button><button class="mi-button secondary" type="button" data-close-sheet>Cancelar</button>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

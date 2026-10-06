@@ -1,0 +1,14 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% block mobile_title %}Corregir fecha{% endblock %}
+{% block mobile_back_url %}{{ app_detail_url }}{% endblock %}
+{% block mobile_page_title %}Corregir fecha{% endblock %}
+{% block mobile_header_description %}<p>Factura {{ factura.numero_factura|default:factura.id }}</p>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card"><span class="mi-kicker">Fecha actual</span><div class="mi-number">{{ factura.fecha_emision|date:"d/m/Y" }}</div><p class="mi-muted">{{ factura.cliente.nombre }}</p></section>
+<form method="post" action="{{ app_date_url }}" class="mi-editor" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">
+  {% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  <section class="mi-card"><h2>Nueva fecha de factura</h2><div class="mi-field-grid">{% include "facturacion/mobile_invoice_field.html" with field=form.fecha_emision wide=True %}{% include "facturacion/mobile_invoice_field.html" with field=form.motivo_auditoria wide=True %}</div></section>
+  <div class="mi-warning">La fecha se validará con las reglas fiscales y el CAI de la factura. La modificación quedará registrada en su historial.</div>
+  <div class="mi-save-bar mi-form-actions"><button type="submit" class="mi-button">Guardar fecha</button><a class="mi-button secondary" href="{{ app_detail_url }}">Cancelar</a></div>
+</form>
+{% endblock %}

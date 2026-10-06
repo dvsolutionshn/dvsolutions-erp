@@ -1,0 +1,20 @@
+<article class="mi-line-card" data-invoice-line data-tax-included="{{ form_linea.instance.precio_incluye_impuesto|yesno:'true,false' }}">
+  {% for hidden in form_linea.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}
+  <div class="mi-line-top"><strong data-line-number>Producto / servicio</strong><button type="button" class="mi-remove" data-remove-line aria-label="Quitar esta línea"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button></div>
+  {% if form_linea.non_field_errors %}<div class="mi-error-box" role="alert">{{ form_linea.non_field_errors }}</div>{% endif %}
+  <div class="mi-field">
+    <label for="{{ form_linea.producto.id_for_label }}">Producto o servicio</label>
+    <div class="mi-native-product">{{ form_linea.producto }}</div>
+    <button class="mi-product-picker" type="button" data-choose-product><span data-product-name>{{ form_linea.instance.descripcion_visual|default:"Seleccionar producto…" }}</span><i aria-hidden="true">⌕</i></button>
+    {% for error in form_linea.producto.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+  </div>
+  <div class="mi-field-grid">
+    {% include "facturacion/mobile_invoice_field.html" with field=form_linea.cantidad %}
+    {% include "facturacion/mobile_invoice_field.html" with field=form_linea.precio_unitario %}
+    {% include "facturacion/mobile_invoice_field.html" with field=form_linea.descuento_porcentaje %}
+    {% include "facturacion/mobile_invoice_field.html" with field=form_linea.impuesto %}
+  </div>
+  <details class="mi-note-fold" {% if form_linea.comentario.value or form_linea.comentario.errors %}open{% endif %}><summary>Nota de esta línea</summary>{% include "facturacion/mobile_invoice_field.html" with field=form_linea.comentario %}</details>
+  <div class="mi-line-total"><span>Total de la línea</span><strong data-line-total>—</strong></div>
+  <label class="mi-delete-native">{{ form_linea.DELETE }} Quitar esta línea</label>
+</article>

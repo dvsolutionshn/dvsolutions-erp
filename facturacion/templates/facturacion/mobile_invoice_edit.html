@@ -1,0 +1,60 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load humanize %}
+{% block mobile_title %}Editar factura{% endblock %}
+{% block mobile_back_url %}{{ app_detail_url }}{% endblock %}
+{% block mobile_page_title %}Editar factura{% endblock %}
+{% block mobile_header_description %}<p>{{ factura.numero_factura|default:"Factura en borrador" }} · {{ factura.cliente.nombre }}</p>{% endblock %}
+{% block mobile_content %}
+<form method="post" action="{{ app_edit_url }}" class="mi-editor" id="mobileInvoiceEditor" data-submit-once data-formset-prefix="{{ formset.prefix }}" data-tax-included="{{ precios_incluyen_impuesto|yesno:'true,false' }}" data-prefix-url="{{ prefijo_factura_manual_url }}">
+  {% csrf_token %}<input type="hidden" name="app" value="1">
+  {% for hidden in form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<div class="mi-error-box" role="alert">{{ error }}</div>{% endfor %}{% endfor %}
+  {{ formset.management_form }}
+  {% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  {% if formset.non_form_errors %}<div class="mi-error-box" role="alert">{{ formset.non_form_errors }}</div>{% endif %}
+  {% if formset.management_form.errors %}<div class="mi-error-box" role="alert">No se pudo validar el detalle de la factura. {{ formset.management_form.errors }}</div>{% endif %}
+  <section class="mi-card">
+    <h2 class="mi-step-label"><span>1</span>Cliente y fecha</h2>
+    <div class="mi-field mi-client-search"><label for="invoiceClientSearch">Buscar cliente</label><input type="search" id="invoiceClientSearch" placeholder="Buscar por nombre…" autocomplete="off" aria-controls="invoiceClientResults"><div id="invoiceClientResults" class="mi-product-results" hidden></div></div>
+    <div class="mi-field-grid">
+      {% include "facturacion/mobile_invoice_field.html" with field=form.cliente wide=True %}
+      {% if not form.fecha_emision.field.disabled %}{% include "facturacion/mobile_invoice_field.html" with field=form.fecha_emision %}{% else %}<div class="mi-field"><label>Fecha de factura</label><strong>{{ factura.fecha_emision|date:"d/m/Y" }}</strong>{% for error in form.fecha_emision.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}</div>{% endif %}
+      {% include "facturacion/mobile_invoice_field.html" with field=form.fecha_vencimiento %}
+    </div>
+  </section>
+  <section class="mi-card">
+    <div class="mi-card-head"><h2 class="mi-step-label"><span>2</span>Productos y servicios</h2><span class="mi-muted" id="invoiceLineCount">{{ formset|length }} líneas</span></div>
+    <div class="mi-line-list" id="invoiceLineList">{% for form_linea in formset %}{% include "facturacion/mobile_invoice_line.html" with form_linea=form_linea %}{% endfor %}</div>
+    <button class="mi-add-line" type="button" id="invoiceAddLine">+ Agregar producto o servicio</button>
+  </section>
+  <details class="mi-card mi-fold" {% if form.vendedor.errors or form.moneda.errors or form.tipo_cambio.errors or form.estado.errors or form.numero_factura_sufijo.errors %}open{% endif %}>
+    <summary>Datos generales y fiscales</summary><div class="mi-field-grid">
+      {% include "facturacion/mobile_invoice_field.html" with field=form.vendedor wide=True %}
+      {% include "facturacion/mobile_invoice_field.html" with field=form.moneda %}
+      {% include "facturacion/mobile_invoice_field.html" with field=form.tipo_cambio %}
+      {% include "facturacion/mobile_invoice_field.html" with field=form.estado wide=True %}
+      {% if form.numero_factura_sufijo %}<div class="mi-wide"><span class="mi-kicker">Prefijo fiscal</span><div class="mi-fiscal-prefix" id="invoiceFiscalPrefix">{{ numero_factura_prefijo_manual|default:"Se asignará al emitir" }}</div><p class="mi-summary-note" id="invoiceFiscalPrefixNote">Completa únicamente los últimos 3 dígitos cuando corresponda.</p></div>{% include "facturacion/mobile_invoice_field.html" with field=form.numero_factura_sufijo wide=True %}{% endif %}
+      {% include "facturacion/mobile_invoice_field.html" with field=form.orden_compra_exenta wide=True %}
+      {% include "facturacion/mobile_invoice_field.html" with field=form.registro_exonerado wide=True %}
+      {% include "facturacion/mobile_invoice_field.html" with field=form.registro_sag wide=True %}
+    </div>
+  </details>
+  <section class="mi-card">
+    <h2 class="mi-step-label"><span>3</span>Revisar cambios</h2>
+    <div class="mi-row"><span>Subtotal</span><strong id="invoicePreviewGross">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.subtotal|floatformat:2|intcomma }}</strong></div>
+    <div class="mi-row"><span>Descuento</span><strong id="invoicePreviewDiscount">—</strong></div>
+    <div class="mi-row"><span>Antes de impuesto</span><strong id="invoicePreviewSubtotal">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.subtotal|floatformat:2|intcomma }}</strong></div>
+    <div class="mi-row"><span>Impuesto</span><strong id="invoicePreviewTax">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.impuesto|floatformat:2|intcomma }}</strong></div>
+    <div class="mi-row total"><span>Total</span><strong id="invoicePreviewTotal">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div>
+    <p class="mi-summary-note">Vista previa. El total y las validaciones fiscales se confirman al guardar.</p>
+    {% if form.motivo_auditoria %}<div class="mi-status-space">{% include "facturacion/mobile_invoice_field.html" with field=form.motivo_auditoria wide=True %}</div>{% endif %}
+  </section>
+  <div class="mi-save-bar mi-form-actions"><button class="mi-button" type="submit">Guardar cambios</button><a class="mi-button secondary" href="{{ app_detail_url }}">Cancelar</a></div>
+</form>
+<template id="invoiceEmptyLine">{% include "facturacion/mobile_invoice_line.html" with form_linea=mobile_empty_line_form %}</template>
+<dialog class="mi-sheet" id="invoiceProductSheet" aria-labelledby="invoiceProductSheetTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="invoiceProductSheetTitle">Seleccionar producto</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><div class="mi-field mi-product-search"><label for="invoiceProductSearch">Buscar producto o servicio</label><input type="search" id="invoiceProductSearch" placeholder="Nombre o código…" autocomplete="off"></div><div class="mi-product-results" id="invoiceProductResults"></div></dialog>
+{% endblock %}
+{% block mobile_scripts %}
+{{ mobile_invoice_products|json_script:"mobileInvoiceProducts" }}
+{{ mobile_invoice_taxes|json_script:"mobileInvoiceTaxes" }}
+{{ mobile_invoice_lines_tax_mode|json_script:"mobileInvoiceLineTaxModes" }}
+{% endblock %}

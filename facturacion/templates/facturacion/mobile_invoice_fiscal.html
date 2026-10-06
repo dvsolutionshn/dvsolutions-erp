@@ -1,0 +1,17 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load humanize %}
+{% block mobile_title %}Corrección fiscal histórica{% endblock %}
+{% block mobile_back_url %}{{ app_detail_url }}{% endblock %}
+{% block mobile_kicker %}Control fiscal{% endblock %}
+{% block mobile_page_title %}Corrección fiscal{% endblock %}
+{% block mobile_header_description %}<p>Corrige el número de una factura emitida con la autorización fiscal existente.</p>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card"><span class="mi-kicker">Número actual</span><div class="mi-number">{{ factura.numero_factura|default:"Sin número" }}</div><div class="mi-row"><span>Cliente</span><strong>{{ factura.cliente.nombre }}</strong></div><div class="mi-row"><span>Fecha original</span><strong>{{ factura.fecha_emision|date:"d/m/Y" }}</strong></div><div class="mi-row"><span>Total</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</strong></div></section>
+<form method="post" action="{{ app_fiscal_url }}" class="mi-editor" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">
+  {% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  <section class="mi-card"><h2>Nuevo número autorizado</h2><div class="mi-field-grid">{% include "facturacion/mobile_invoice_field.html" with field=form.numero_factura wide=True %}{% include "facturacion/mobile_invoice_field.html" with field=form.motivo wide=True %}</div></section>
+  <div class="mi-warning">El número debe pertenecer a un CAI válido para la fecha original. Se conservarán los productos, totales y pagos; el cambio de número y su motivo quedarán en el historial.</div>
+  <div class="mi-save-bar mi-form-actions"><button class="mi-button" type="submit">Guardar corrección fiscal</button><a class="mi-button secondary" href="{{ app_detail_url }}">Cancelar</a></div>
+</form>
+{% if correcciones_numero %}<details class="mi-card mi-fold"><summary>Correcciones anteriores</summary><div class="mi-audit-list">{% for correccion in correcciones_numero %}<article class="mi-audit"><strong>{{ correccion.numero_nuevo }}</strong><div class="mi-audit-meta">{{ correccion.fecha|date:"d/m/Y H:i" }} · {% if correccion.realizado_por %}{{ correccion.realizado_por.get_full_name|default:correccion.realizado_por.username }}{% else %}Sistema{% endif %}</div><p>{{ correccion.motivo }}</p><div class="mi-audit-change"><span>Anterior: {{ correccion.numero_anterior }}</span><b>Nuevo: {{ correccion.numero_nuevo }}</b></div></article>{% endfor %}</div></details>{% endif %}
+{% endblock %}
