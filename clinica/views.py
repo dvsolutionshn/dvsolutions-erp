@@ -192,6 +192,16 @@ def _guardar_clasificacion_alopecia(historia, form, usuario):
     )
 
 
+def _actualizar_sexo_paciente_desde_capilar(paciente, form):
+    sexo_confirmado = (form.cleaned_data.get("paciente_sexo_confirmado") or "").strip().lower()
+    if (
+        sexo_confirmado in {"femenino", "masculino"}
+        and paciente.sexo_normalizado not in {"femenino", "masculino"}
+    ):
+        paciente.sexo = sexo_confirmado
+        paciente.save(update_fields=["sexo", "fecha_actualizacion"])
+
+
 def _es_dueno_erp(usuario):
     if not getattr(usuario, "is_authenticated", False):
         return False
@@ -1261,6 +1271,26 @@ def editar_paciente(request, empresa_slug, paciente_id):
         messages.success(request, "Paciente actualizado correctamente.")
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
     return render(request, "clinica/paciente_form.html", {"empresa": empresa, "form": form, "titulo": f"Editar paciente: {paciente.nombre}"})
+
+
+@login_required
+@require_POST
+def confirmar_sexo_paciente(request, empresa_slug, paciente_id):
+    empresa = _empresa_desde_slug(empresa_slug)
+    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    granular = bool(rol_clinico_granular(request.user, empresa))
+    permiso = "puede_editar_pacientes" if granular else "puede_pacientes"
+    if not request.user.tiene_permiso_erp(permiso, empresa):
+        raise PermissionDenied("No tiene permiso para editar los datos del paciente.")
+
+    sexo = (request.POST.get("sexo") or "").strip().lower()
+    if sexo not in {"femenino", "masculino"}:
+        messages.error(request, "Seleccione Femenino o Masculino.")
+    else:
+        paciente.sexo = sexo
+        paciente.save(update_fields=["sexo", "fecha_actualizacion"])
+        messages.success(request, "Sexo del paciente actualizado correctamente.")
+    return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
 
 
 def _puede_eliminar_pacientes(user, empresa):
@@ -2815,6 +2845,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             historia.actualizado_por = request.user
             historia.save()
             _guardar_clasificacion_alopecia(historia, form_inline, request.user)
+            _actualizar_sexo_paciente_desde_capilar(paciente, form_inline)
             messages.success(request, f"Nota de {historia.get_tipo_display()} guardada en la historia clinica completa.")
             destino = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.id])
             if seccion_activa != "completa":
@@ -3535,6 +3566,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         historia.actualizado_por = request.user
         historia.save()
         _guardar_clasificacion_alopecia(historia, form, request.user)
+        _actualizar_sexo_paciente_desde_capilar(paciente, form)
         messages.success(request, f"Historia de {historia.get_tipo_display()} guardada correctamente.")
         if acceso_granular and not puede_ver_historia:
             return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
@@ -3608,6 +3640,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         historia.actualizado_por = request.user
         historia.save()
         _guardar_clasificacion_alopecia(historia, form, request.user)
+        _actualizar_sexo_paciente_desde_capilar(paciente, form)
         messages.success(request, "Historia clinica actualizada correctamente.")
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     historias_previas = (

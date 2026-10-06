@@ -15,6 +15,7 @@ urlpatterns = [
     path("pacientes/enlaces-registro/", views.control_enlaces_registro_paciente, name="clinica_control_enlaces_registro_paciente"),
     path("pacientes/<int:paciente_id>/", views.paciente_detalle, name="clinica_paciente_detalle"),
     path("pacientes/<int:paciente_id>/editar/", views.editar_paciente, name="clinica_editar_paciente"),
+    path("pacientes/<int:paciente_id>/confirmar-sexo/", views.confirmar_sexo_paciente, name="clinica_confirmar_sexo_paciente"),
     path("pacientes/<int:paciente_id>/eliminar/", views.eliminar_paciente, name="clinica_eliminar_paciente"),
     path("pacientes/<int:paciente_id>/seguimientos/", views.seguimientos_paciente, name="clinica_seguimientos_paciente"),
     path("pacientes/<int:paciente_id>/recordatorios-tratamiento/crear/", views.crear_recordatorios_tratamiento, name="clinica_crear_recordatorios_tratamiento"),

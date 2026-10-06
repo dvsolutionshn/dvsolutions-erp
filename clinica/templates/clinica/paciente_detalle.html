@@ -31,7 +31,7 @@
 .patient-hero{display:grid;grid-template-columns:150px minmax(0,1fr);gap:20px;align-items:start}
 .patient-profile-photo{width:150px;height:150px;border-radius:18px;border:1px solid var(--line);background:#f4f8fc;display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:46px;font-weight:900}
 .patient-profile-photo img{width:100%;height:100%;object-fit:cover}
-.patient-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.patient-quick-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:14px}
 .patient-info-item{padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
 .patient-info-item span{display:block;margin-bottom:5px;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:800}
 .patient-info-item strong{font-size:14px;color:#102338}
@@ -49,6 +49,14 @@
 .patient-evolution-carousel::-webkit-scrollbar{height:9px}.patient-evolution-carousel::-webkit-scrollbar-thumb{background:#c8d8e6;border-radius:999px}.patient-evolution-photo{position:relative;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 16px 38px rgba(16,40,62,.08);scroll-snap-align:start;text-align:left;cursor:zoom-in;transition:transform .18s ease,box-shadow .18s ease}.patient-evolution-photo:hover{transform:translateY(-4px);box-shadow:0 24px 52px rgba(16,40,62,.13)}.patient-evolution-photo img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}.patient-evolution-photo div{padding:14px}.patient-evolution-photo strong{display:block;font-size:14px;color:#102338}.patient-evolution-photo span{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.45}.patient-evolution-chip{position:absolute;top:12px;left:12px;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.92);color:#0f766e;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.patient-photo-modal{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(10,24,38,.78);backdrop-filter:blur(8px)}.patient-photo-modal.is-open{display:flex}.patient-photo-modal-card{width:min(980px,96vw);max-height:92vh;overflow:auto;border-radius:24px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.35)}.patient-photo-modal-card img{width:100%;max-height:72vh;object-fit:contain;background:#071422;display:block}.patient-photo-modal-info{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:18px 20px}.patient-photo-modal-info h3{margin:0;color:#102338}.patient-photo-modal-info p{margin:6px 0 0;color:var(--muted);line-height:1.55}.patient-photo-close{width:40px;height:40px;border:1px solid var(--line);border-radius:14px;background:#fff;color:#102338;font-size:22px;font-weight:900;cursor:pointer}
 .patient-consent-list{display:grid;gap:12px;margin-top:14px}.patient-consent-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#fff,#f8fbff)}.patient-consent-card strong{display:block;color:#102338}.patient-consent-card span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.patient-consent-actions{display:flex;gap:8px;flex-wrap:wrap}
 .patient-alert{border:1px solid rgba(220,38,38,.24);background:#fff5f5;color:#9f1239;border-radius:14px;padding:12px 14px;font-weight:800}
+.patient-data-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;border:1px solid #f0c36a;background:#fff9e8;color:#7a4b00;border-radius:14px;padding:12px 14px;font-weight:800}
+.patient-data-alert a{color:#155eef;text-decoration:none;white-space:nowrap}
+.patient-sex-dialog{width:min(520px,calc(100vw - 32px));border:0;border-radius:20px;padding:0;box-shadow:0 24px 80px rgba(15,35,55,.28)}
+.patient-sex-dialog::backdrop{background:rgba(9,24,39,.58);backdrop-filter:blur(3px)}
+.patient-sex-dialog-body{padding:24px}.patient-sex-dialog h3{margin:0;color:#102338}.patient-sex-dialog p{color:#5d7084;line-height:1.55}
+.patient-sex-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
+.patient-sex-options label{display:flex;align-items:center;gap:9px;border:1px solid #bfd2e5;border-radius:13px;padding:13px;background:#fff;font-weight:800;color:#102338;cursor:pointer}
+.patient-sex-dialog-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 .patient-anchor-offset{scroll-margin-top:100px}
 .clinical-workspace{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
 .clinical-side-panel{position:sticky;top:18px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(180deg,#ffffff,#f6fbff);box-shadow:0 18px 45px rgba(18,42,66,.07);overflow:hidden}
@@ -139,15 +147,55 @@
             {% if erp_access.ver_historia_clinica and paciente.es_alergico %}
             <div class="patient-alert" style="margin-top:12px;">Paciente alergico{% if paciente.alergias %}: {{ paciente.alergias }}{% endif %}</div>
             {% endif %}
+            {% if paciente.sexo_normalizado != "femenino" and paciente.sexo_normalizado != "masculino" %}
+            <div class="patient-data-alert" role="alert">
+                <span>Debe modificar el sexo del paciente y seleccionar Femenino o Masculino.</span>
+                {% if erp_access.editar_pacientes %}<a href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}">Corregir datos del paciente</a>{% endif %}
+            </div>
+            {% endif %}
             <div class="patient-quick-grid">
                 <div class="patient-info-item"><span>Documento</span><strong>{{ paciente.identidad|default:"-" }}</strong></div>
                 <div class="patient-info-item"><span>Edad</span><strong>{% if paciente.edad is not None %}{{ paciente.edad }} anos{% else %}-{% endif %}</strong></div>
+                <div class="patient-info-item"><span>Sexo</span><strong>{{ paciente.get_sexo_display|default:"No indicado" }}</strong></div>
                 <div class="patient-info-item"><span>Telefono</span><strong>{{ paciente.whatsapp|default:paciente.telefono|default:"-" }}</strong></div>
                 {% if erp_access.ver_historia_clinica %}<div class="patient-info-item"><span>RH</span><strong>{{ paciente.rh|default:"No indicado" }}</strong></div>{% endif %}
             </div>
         </div>
     </div>
 </section>
+
+{% if paciente.sexo_normalizado != "femenino" and paciente.sexo_normalizado != "masculino" %}
+<dialog class="patient-sex-dialog" data-patient-sex-dialog aria-labelledby="patient-sex-dialog-title">
+    <div class="patient-sex-dialog-body">
+        <h3 id="patient-sex-dialog-title">Confirme el sexo del paciente</h3>
+        <p>Este expediente tiene un dato histórico sin definir. Seleccione Femenino o Masculino para mostrar correctamente los formularios clínicos.</p>
+        {% if erp_access.editar_pacientes %}
+        <form method="post" action="{% url 'clinica_confirmar_sexo_paciente' empresa.slug paciente.id %}">
+            {% csrf_token %}
+            <div class="patient-sex-options">
+                <label><input type="radio" name="sexo" value="femenino" required> Femenino</label>
+                <label><input type="radio" name="sexo" value="masculino" required> Masculino</label>
+            </div>
+            <div class="patient-sex-dialog-actions">
+                <button class="erp-btn-secondary" type="button" data-close-patient-sex>Corregir después</button>
+                <button class="erp-btn" type="submit">Guardar sexo</button>
+            </div>
+        </form>
+        {% else %}
+        <p>Solicite la corrección a un usuario autorizado para editar los datos del paciente.</p>
+        <div class="patient-sex-dialog-actions"><button class="erp-btn-secondary" type="button" data-close-patient-sex>Cerrar</button></div>
+        {% endif %}
+    </div>
+</dialog>
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+    const dialog=document.querySelector("[data-patient-sex-dialog]");
+    if(!dialog)return;
+    if(typeof dialog.showModal==="function")dialog.showModal();else dialog.setAttribute("open","");
+    dialog.querySelectorAll("[data-close-patient-sex]").forEach(button=>button.addEventListener("click",()=>dialog.close()));
+});
+</script>
+{% endif %}
 
 {% if erp_access.subir_anexos_clinicos and not erp_access.ver_anexos_clinicos %}
 <section class="erp-card" style="margin-top:16px">

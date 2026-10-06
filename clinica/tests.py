@@ -2129,6 +2129,8 @@ class ClinicaPacienteTests(TestCase):
             editar_url,
             {
                 "fecha_atencion": "2026-08-31T10:00",
+                "paciente_sexo_confirmado": "femenino",
+                "alopecia_grado": "I",
                 "capilar_motivo": ["cejas"],
                 "plan_tratamiento": "Plan capilar actualizado",
                 "estado": "borrador",
@@ -2252,7 +2254,7 @@ class ClinicaPacienteTests(TestCase):
         self.assertContains(historial, "10/09/2026 11:30")
         self.assertContains(historial, "Dra. Candy Luque")
 
-    def test_formulario_capilar_prioriza_ludwig_y_permite_escala_manual_sin_sexo(self):
+    def test_formulario_capilar_prioriza_ludwig_y_exige_confirmar_sexo_historico(self):
         paciente_mujer = Paciente.objects.create(
             empresa=self.empresa,
             expediente_codigo="HM-CAP-LUDWIG",
@@ -2286,13 +2288,15 @@ class ClinicaPacienteTests(TestCase):
             len(list(response.context["form"].fields["alopecia_escala"].choices)),
             2,
         )
-        self.assertContains(response, "Hamilton-Norwood")
-        self.assertContains(response, "Ludwig")
+        self.assertContains(response, "Especifique el sexo del paciente")
+        self.assertContains(response, 'data-scale="hamilton_norwood" hidden')
+        self.assertContains(response, 'data-scale="ludwig" hidden')
 
         otro_sin_detalle = self.client.post(
             url_manual,
             {
                 "fecha_atencion": "2026-09-10T11:45",
+                "paciente_sexo_confirmado": "femenino",
                 "capilar_patron_clinico": ["otro"],
                 "alopecia_escala": "ludwig",
                 "alopecia_grado": "II",
@@ -2308,6 +2312,7 @@ class ClinicaPacienteTests(TestCase):
             url_manual,
             {
                 "fecha_atencion": "2026-09-10T12:00",
+                "paciente_sexo_confirmado": "femenino",
                 "alopecia_escala": "ludwig",
                 "alopecia_grado": "VII",
                 "plan_tratamiento": "Prueba de validación.",
