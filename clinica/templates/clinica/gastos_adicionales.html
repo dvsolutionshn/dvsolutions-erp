@@ -1,0 +1,56 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+
+{% block title %}Gastos Adicionales - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Gestión clínica{% endblock %}
+{% block header_title %}Gastos Adicionales{% endblock %}
+{% block header_description %}Documentos de productos y servicios por paciente, con historial y acceso a Facturación.{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'clinica/gastos_adicionales.css' %}">{% endblock %}
+{% block topbar_actions %}
+{% if erp_access.crear_gastos_adicionales %}<a class="erp-btn" href="{% url 'clinica_gasto_adicional_crear' empresa.slug %}">Nuevo gasto adicional</a>{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="ga-page">
+    <section class="ga-hero">
+        <div><span class="ga-eyebrow">Historial de documentos</span><h2>Atención y gastos, en un solo lugar.</h2><p>Consulte el documento del paciente, descargue su PDF y continúe hacia Facturación cuando lo necesite.</p></div>
+        <div class="ga-hero-mark" aria-hidden="true">GA</div>
+    </section>
+
+    <form class="ga-card ga-filters" method="get" aria-label="Filtrar gastos adicionales">
+        <div class="ga-field"><label for="ga-filter-patient">Paciente</label><input id="ga-filter-patient" name="paciente" type="search" value="{{ filtros.paciente|default:'' }}" placeholder="Nombre o identidad"></div>
+        <div class="ga-field"><label for="ga-filter-number">Número</label><input id="ga-filter-number" name="numero" value="{{ filtros.numero|default:'' }}" placeholder="GA-000001"></div>
+        <div class="ga-field"><label for="ga-filter-from">Desde</label><input id="ga-filter-from" name="desde" type="date" value="{{ filtros.desde|default:'' }}"></div>
+        <div class="ga-field"><label for="ga-filter-to">Hasta</label><input id="ga-filter-to" name="hasta" type="date" value="{{ filtros.hasta|default:'' }}"></div>
+        <div class="ga-field"><label for="ga-filter-state">Estado</label><select id="ga-filter-state" name="estado"><option value="">Todos</option><option value="pendiente" {% if filtros.estado == 'pendiente' %}selected{% endif %}>Pendiente</option><option value="facturado" {% if filtros.estado == 'facturado' %}selected{% endif %}>Facturado</option></select></div>
+        <div class="ga-filter-actions"><button class="erp-btn" type="submit">Filtrar</button><a class="erp-btn-secondary" href="{% url 'clinica_gastos_adicionales' empresa.slug %}">Limpiar</a></div>
+    </form>
+
+    <section class="ga-card ga-history" aria-label="Historial de gastos adicionales">
+        <div class="ga-section-head"><div><h2>Historial de Gastos Adicionales</h2><p>{{ gastos.paginator.count }} documento{{ gastos.paginator.count|pluralize:"s" }}{% if filtros.estado or filtros.paciente or filtros.numero or filtros.desde or filtros.hasta %} en esta búsqueda{% endif %}</p></div></div>
+        {% if gastos %}
+        <div class="ga-table-wrap"><table class="ga-table ga-history-table"><thead><tr><th>Número / fecha</th><th>Paciente</th><th>Total</th><th>Usuario</th><th>Estado / factura</th><th>Acciones</th></tr></thead><tbody>
+        {% for gasto in gastos %}
+            <tr>
+                <td data-label="Número / fecha"><a class="ga-document-number" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}">{{ gasto.numero }}</a><span class="ga-cell-sub">{{ gasto.fecha|date:"d/m/Y" }}</span></td>
+                <td data-label="Paciente"><strong>{{ gasto.paciente.nombre }}</strong><span class="ga-cell-sub">{{ gasto.paciente.identidad|default:"Sin identidad" }}</span></td>
+                <td class="ga-money" data-label="Total">L {{ gasto.total|floatformat:2 }}</td>
+                <td data-label="Usuario">{% if gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}</td>
+                <td data-label="Estado / factura"><span class="ga-status {% if gasto.estado == 'facturado' %}ga-status-paid{% endif %}">{{ gasto.get_estado_display }}</span>{% if gasto.factura %}{% if erp_access.facturas %}<a class="ga-cell-sub ga-link" href="{% url 'ver_factura' empresa.slug gasto.factura.id %}">{% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</a>{% elif erp_access.editar_facturas and gasto.factura.estado == 'borrador' %}<a class="ga-cell-sub ga-link" href="{% url 'editar_factura' empresa.slug gasto.factura.id %}">Borrador #{{ gasto.factura.id }}</a>{% else %}<span class="ga-cell-sub">{% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</span>{% endif %}{% endif %}</td>
+                <td data-label="Acciones"><div class="ga-inline-actions"><a class="erp-btn-secondary" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}">Ver</a><a class="erp-btn-secondary" href="{% url 'clinica_gasto_adicional_pdf' empresa.slug gasto.id %}" target="_blank" rel="noopener">PDF</a>{% if erp_access.editar_gastos_adicionales and not gasto.factura %}<a class="erp-btn-secondary" href="{% url 'clinica_gasto_adicional_editar' empresa.slug gasto.id %}">Editar</a>{% endif %}</div></td>
+            </tr>
+        {% endfor %}
+        </tbody></table></div>
+        {% else %}
+        <div class="ga-empty"><div class="ga-empty-mark" aria-hidden="true">GA</div><h3>No hay gastos adicionales en esta búsqueda.</h3><p>Ajuste los filtros o cree el primer documento para un paciente.</p>{% if erp_access.crear_gastos_adicionales %}<a class="erp-btn" href="{% url 'clinica_gasto_adicional_crear' empresa.slug %}">Nuevo gasto adicional</a>{% endif %}</div>
+        {% endif %}
+        {% if gastos.has_other_pages %}
+        <nav class="ga-pagination" aria-label="Páginas del historial">
+            {% if gastos.has_previous %}<a class="erp-btn-secondary" href="?page={{ gastos.previous_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}">Anterior</a>{% endif %}
+            <span>Página {{ gastos.number }} de {{ gastos.paginator.num_pages }}</span>
+            {% if gastos.has_next %}<a class="erp-btn-secondary" href="?page={{ gastos.next_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}">Siguiente</a>{% endif %}
+        </nav>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

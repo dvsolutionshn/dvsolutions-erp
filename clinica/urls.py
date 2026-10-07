@@ -1,9 +1,19 @@
 from django.urls import path
 
-from . import views
+from . import views, views_gastos_adicionales
 
 
 urlpatterns = [
+    path("gastos-adicionales/", views_gastos_adicionales.gastos_adicionales, name="clinica_gastos_adicionales"),
+    path("gastos-adicionales/nuevo/", views_gastos_adicionales.crear, name="clinica_gasto_adicional_crear"),
+    path("gastos-adicionales/pacientes/buscar/", views_gastos_adicionales.pacientes_buscar, name="clinica_gastos_adicionales_pacientes_buscar"),
+    path("gastos-adicionales/productos/buscar/", views_gastos_adicionales.productos_buscar, name="clinica_gastos_adicionales_productos_buscar"),
+    path("gastos-adicionales/<int:gasto_id>/", views_gastos_adicionales.detalle, name="clinica_gasto_adicional_detalle"),
+    path("gastos-adicionales/<int:gasto_id>/editar/", views_gastos_adicionales.editar, name="clinica_gasto_adicional_editar"),
+    path("gastos-adicionales/<int:gasto_id>/pdf/", views_gastos_adicionales.pdf, name="clinica_gasto_adicional_pdf"),
+    path("gastos-adicionales/<int:gasto_id>/enviar-correo/", views_gastos_adicionales.enviar_correo, name="clinica_gasto_adicional_enviar_correo"),
+    path("gastos-adicionales/<int:gasto_id>/enviar-whatsapp/", views_gastos_adicionales.enviar_whatsapp, name="clinica_gasto_adicional_enviar_whatsapp"),
+    path("gastos-adicionales/<int:gasto_id>/convertir/", views_gastos_adicionales.convertir, name="clinica_gasto_adicional_convertir"),
     path("", views.clinica_dashboard, name="clinica_dashboard"),
     path("configuracion/", views.configuracion_producto_clinico, name="clinica_configuracion"),
     path("manuales-pdf/", views.manuales_pdf, name="clinica_manuales_pdf"),

@@ -1,0 +1,30 @@
+{% extends "core/erp_base.html" %}
+{% load static %}
+
+{% block title %}{{ gasto.numero }} - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Gastos Adicionales{% endblock %}
+{% block header_title %}{{ gasto.numero }}{% endblock %}
+{% block header_description %}Documento del {{ gasto.fecha|date:"d/m/Y" }} para {{ gasto.paciente.nombre }}.{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'clinica/gastos_adicionales.css' %}">{% endblock %}
+{% block topbar_actions %}<a class="erp-btn-secondary" href="{% url 'clinica_gastos_adicionales' empresa.slug %}">Historial</a>{% if erp_access.editar_gastos_adicionales and not gasto.factura %}<a class="erp-btn-secondary" href="{% url 'clinica_gasto_adicional_editar' empresa.slug gasto.id %}">Editar</a>{% endif %}<a class="erp-btn" href="{% url 'clinica_gasto_adicional_pdf' empresa.slug gasto.id %}" target="_blank" rel="noopener">Generar PDF</a>{% endblock %}
+
+{% block content %}
+<div class="ga-page">
+    <section class="ga-hero ga-document-hero"><div><span class="ga-eyebrow">{{ empresa.nombre }}</span><h2>{{ gasto.paciente.nombre }}</h2><p>{{ gasto.paciente.identidad|default:"Sin identidad" }} · {{ gasto.fecha|date:"d/m/Y" }}{% if gasto.profesional %} · {{ gasto.profesional.nombre }}{% endif %}</p>{% if erp_access.modulo_clinica and erp_access.ver_datos_generales_paciente %}<a class="ga-link" href="{% url 'clinica_paciente_detalle' empresa.slug gasto.paciente.id %}">Abrir expediente del paciente →</a>{% endif %}</div><div class="ga-document-summary"><span class="ga-status {% if gasto.estado == 'facturado' %}ga-status-paid{% endif %}">{{ gasto.get_estado_display }}</span><strong>L {{ gasto.total|floatformat:2 }}</strong><span>{{ gasto.numero }}</span></div></section>
+
+    {% if gasto.factura %}
+    <section class="ga-linked-invoice"><div><span class="ga-eyebrow">Factura relacionada</span><h3>{% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</h3><p>{% if gasto.factura.estado == 'borrador' %}Pendiente de emisión. Revise y confirme la factura desde Facturación.{% elif gasto.factura.estado == 'anulada' %}La factura asociada está anulada.{% else %}Estado: Facturado · Factura emitida.{% endif %}</p>{% if gasto.convertido_por or gasto.fecha_conversion %}<span class="ga-help">Conversión{% if gasto.convertido_por %} por {{ gasto.convertido_por.get_full_name|default:gasto.convertido_por.username }}{% endif %}{% if gasto.fecha_conversion %} · {{ gasto.fecha_conversion|date:"d/m/Y H:i" }}{% endif %}.</span>{% endif %}</div>{% if erp_access.facturas %}<a class="erp-btn" href="{% url 'ver_factura' empresa.slug gasto.factura.id %}">Abrir factura</a>{% elif erp_access.editar_facturas and gasto.factura.estado == 'borrador' %}<a class="erp-btn" href="{% url 'editar_factura' empresa.slug gasto.factura.id %}">Revisar borrador</a>{% endif %}</section>
+    {% endif %}
+
+    <section class="ga-card"><div class="ga-section-head"><div><h2>Productos y servicios</h2><p>Detalle registrado en el documento original.</p></div></div><div class="ga-table-wrap"><table class="ga-table ga-document-table"><thead><tr><th>Producto / servicio</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead><tbody>{% for linea in gasto.lineas.all %}<tr><td data-label="Producto / servicio"><strong>{{ linea.descripcion|default:linea.producto.nombre }}</strong></td><td class="ga-money" data-label="Cantidad">{{ linea.cantidad|floatformat:"-2" }}</td><td class="ga-money" data-label="Precio unitario">L {{ linea.precio_unitario|floatformat:2 }}</td><td class="ga-money" data-label="Subtotal">L {{ linea.subtotal|floatformat:2 }}</td></tr>{% endfor %}</tbody></table></div><div class="ga-total"><div><span>Total del documento</span><small>Gasto adicional registrado</small></div><strong>L {{ gasto.total|floatformat:2 }}</strong></div>{% if gasto.observacion %}<div class="ga-observations"><span class="ga-eyebrow">Observaciones</span><p>{{ gasto.observacion }}</p></div>{% endif %}<p class="ga-help ga-audit">Registrado por {% if gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}{% if gasto.fecha_creacion %} · {{ gasto.fecha_creacion|date:"d/m/Y H:i" }}{% endif %}.</p></section>
+
+    <div class="ga-detail-actions">
+        {% if erp_access.enviar_gastos_adicionales %}
+        <section class="ga-card"><div class="ga-section-head"><div><h2>Enviar documento</h2><p>Comparta el PDF con el paciente.</p></div></div><div class="ga-send-grid"><form method="post" action="{% url 'clinica_gasto_adicional_enviar_whatsapp' empresa.slug gasto.id %}">{% csrf_token %}<div class="ga-field"><label for="ga-whatsapp">WhatsApp</label><input id="ga-whatsapp" type="tel" name="telefono" value="{{ gasto.paciente.whatsapp|default:gasto.paciente.telefono|default:'' }}" placeholder="Número con código de país" autocomplete="tel"></div><button class="erp-btn-secondary" type="submit">Enviar por WhatsApp</button></form><form method="post" action="{% url 'clinica_gasto_adicional_enviar_correo' empresa.slug gasto.id %}">{% csrf_token %}<div class="ga-field"><label for="ga-email">Correo</label><input id="ga-email" type="email" name="email" value="{{ gasto.paciente.correo|default:'' }}" placeholder="correo@ejemplo.com" autocomplete="email"></div><button class="erp-btn-secondary" type="submit">Enviar por correo</button></form></div></section>
+        {% endif %}
+        {% if erp_access.convertir_gastos_adicionales_factura and not gasto.factura %}
+        <section class="ga-card ga-convert-card"><span class="ga-eyebrow">Siguiente paso</span><h2>Convertir a Factura</h2><p>Se abrirá un borrador en Facturación con el paciente y los productos de este documento. Revise los impuestos y confirme su emisión desde el flujo habitual.</p><form method="post" action="{% url 'clinica_gasto_adicional_convertir' empresa.slug gasto.id %}">{% csrf_token %}<button class="erp-btn" type="submit">Convertir a Factura</button></form></section>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -479,6 +479,7 @@
 {% endblock %}
 
 {% block content %}
+{% include "facturacion/includes/gasto_adicional_origen.html" %}
 {% if empresa.slug == "iss" and request.GET.nueva == "1" %}
 {% include "facturacion/descarga_pdf_dialogo.html" with factura_pdf=factura %}
 {% endif %}

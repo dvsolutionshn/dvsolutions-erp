@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 from core.access import (
+    gastos_adicionales_habilitados,
     interfaz_clinica_activa,
     permiso_contabilidad_accion,
     permiso_contabilidad_desde_ruta,
@@ -14,6 +15,7 @@ from core.access import (
 )
 from core.models import Empresa
 from core.clinical_permissions import (
+    permisos_gastos_adicionales_desde_ruta,
     permiso_agenda_granular,
     permiso_clinica_granular,
     rol_clinico_granular,
@@ -228,12 +230,21 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
 
+                suffix = "/".join(parts[3:])
+                if parts[3:4] == ["gastos-adicionales"]:
+                    permisos = permisos_gastos_adicionales_desde_ruta(suffix, request.method)
+                    if not gastos_adicionales_habilitados(empresa) or not permisos or not any(
+                        request.user.tiene_permiso_erp(permiso, empresa) for permiso in permisos
+                    ):
+                        messages.error(request, "Tu usuario no tiene acceso a esta acción de Gastos Adicionales.")
+                        return redirect("dashboard", slug=empresa.slug)
+                    return self.get_response(request)
+
                 if not empresa.tiene_modulo_activo("clinica_medica"):
                     messages.error(request, "El modulo clinico no esta habilitado para esta empresa.")
                     return redirect("dashboard", slug=empresa.slug)
 
                 if not request.user.is_superuser and not request.user.es_administrador_empresa:
-                    suffix = "/".join(parts[3:])
                     rol_granular = rol_clinico_granular(request.user, empresa)
                     permiso = (
                         permiso_clinica_granular(suffix, request.method)

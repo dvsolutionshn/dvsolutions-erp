@@ -42,6 +42,13 @@ PERMISOS_CLINICOS = (
         ("puede_crear_recetas", "Crear recetas"),
         ("puede_enviar_recetas", "Imprimir o enviar recetas"),
     )),
+    ("Gastos Adicionales", (
+        ("puede_ver_gastos_adicionales", "Ver Gastos Adicionales y generar PDF"),
+        ("puede_crear_gastos_adicionales", "Crear Gastos Adicionales"),
+        ("puede_editar_gastos_adicionales", "Editar Gastos Adicionales"),
+        ("puede_enviar_gastos_adicionales", "Enviar Gastos Adicionales"),
+        ("puede_convertir_gastos_adicionales_factura", "Convertir Gasto Adicional a Factura"),
+    )),
     ("Plan y tratamiento", (
         ("puede_ver_planes_tratamiento", "Ver plan y tratamiento"),
         ("puede_editar_planes_tratamiento", "Crear o editar plan y tratamiento"),
@@ -95,10 +102,43 @@ def rol_clinico_granular(usuario, empresa):
     return rol if rol and rol.activo and rol.usa_permisos_clinicos_granulares else None
 
 
+def permisos_gastos_adicionales_desde_ruta(path_suffix, method="GET"):
+    """Permisos alternativos de cada ruta GA, aplicables también a roles legados.
+
+    Un conjunto vacío deniega la ruta/método. Los buscadores aceptan crear o
+    editar sin conceder acceso general al expediente ni al catálogo de productos.
+    """
+    parts = [part for part in (path_suffix or "").strip("/").split("/") if part]
+    if parts and parts[0] == "gastos-adicionales":
+        parts = parts[1:]
+    method = method.upper()
+    consulta = method in {"GET", "HEAD"}
+    if not parts:
+        return ("puede_ver_gastos_adicionales",) if consulta else ()
+    if parts == ["nuevo"]:
+        return ("puede_crear_gastos_adicionales",) if consulta or method == "POST" else ()
+    if parts in (["pacientes", "buscar"], ["productos", "buscar"]):
+        return ("puede_crear_gastos_adicionales", "puede_editar_gastos_adicionales") if consulta else ()
+    if not parts[0].isdigit():
+        return ()
+    if len(parts) == 1 or parts[1:] == ["pdf"]:
+        return ("puede_ver_gastos_adicionales",) if consulta else ()
+    if parts[1:] == ["editar"]:
+        return ("puede_editar_gastos_adicionales",) if consulta or method == "POST" else ()
+    if parts[1:] in (["enviar-correo"], ["enviar-whatsapp"]):
+        return ("puede_enviar_gastos_adicionales",) if method == "POST" else ()
+    if parts[1:] == ["convertir"]:
+        return ("puede_convertir_gastos_adicionales_factura",) if method == "POST" else ()
+    return ()
+
+
 def permiso_clinica_granular(path_suffix, method="GET"):
     parts = [part for part in (path_suffix or "").strip("/").split("/") if part]
     if not parts:
         return None
+    if parts[0] == "gastos-adicionales":
+        permisos = permisos_gastos_adicionales_desde_ruta(path_suffix, method)
+        return permisos[0] if len(permisos) == 1 else permisos or "__denegar__"
     if parts[0] == "configuracion":
         return "puede_configuracion_clinica"
     if parts[0] == "manuales-pdf":

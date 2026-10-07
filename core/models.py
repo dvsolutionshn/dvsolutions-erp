@@ -14,6 +14,8 @@ PERMISOS_CLINICOS_GRANULARES = {
     "puede_ver_historia_clinica", "puede_crear_historia_clinica", "puede_editar_historia_clinica",
     "puede_ver_anexos_clinicos", "puede_subir_anexos_clinicos", "puede_eliminar_anexos_clinicos",
     "puede_ver_recetas", "puede_crear_recetas", "puede_enviar_recetas",
+    "puede_ver_gastos_adicionales", "puede_crear_gastos_adicionales", "puede_editar_gastos_adicionales",
+    "puede_enviar_gastos_adicionales", "puede_convertir_gastos_adicionales_factura",
     "puede_ver_planes_tratamiento", "puede_editar_planes_tratamiento", "puede_escribir_enfermeria",
     "puede_ver_terapias", "puede_escribir_terapias", "puede_ver_camara_hiperbarica",
     "puede_escribir_camara_hiperbarica", "puede_ver_postquirurgicas", "puede_escribir_postquirurgicas",
@@ -123,6 +125,11 @@ class RolSistema(models.Model):
     puede_ver_recetas = models.BooleanField(default=False)
     puede_crear_recetas = models.BooleanField(default=False)
     puede_enviar_recetas = models.BooleanField(default=False)
+    puede_ver_gastos_adicionales = models.BooleanField(default=False)
+    puede_crear_gastos_adicionales = models.BooleanField(default=False)
+    puede_editar_gastos_adicionales = models.BooleanField(default=False)
+    puede_enviar_gastos_adicionales = models.BooleanField(default=False)
+    puede_convertir_gastos_adicionales_factura = models.BooleanField(default=False)
     puede_ver_planes_tratamiento = models.BooleanField(default=False)
     puede_editar_planes_tratamiento = models.BooleanField(default=False)
     puede_escribir_enfermeria = models.BooleanField(default=False)
@@ -229,6 +236,11 @@ class RolSistema(models.Model):
                 "puede_expediente_clinico",
                 "puede_tratamientos_clinicos",
                 "puede_configuracion_clinica",
+                "puede_ver_gastos_adicionales",
+                "puede_crear_gastos_adicionales",
+                "puede_editar_gastos_adicionales",
+                "puede_enviar_gastos_adicionales",
+                "puede_convertir_gastos_adicionales_factura",
         ]
         if self.usa_permisos_clinicos_granulares:
             permisos.extend([

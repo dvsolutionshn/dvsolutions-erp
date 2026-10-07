@@ -3,7 +3,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from core.models import ConfiguracionOnix, ConsumoOnix, Empresa
-from core.access import interfaz_clinica_activa, manuales_pdf_habilitados, modo_clinico_simple_activo
+from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados, modo_clinico_simple_activo
 from core.onix_access import onix_disponible_para_empresa
 
 
@@ -51,6 +51,7 @@ def erp_access(request):
     cotizaciones_activa = bool(empresa and empresa.tiene_modulo_activo("cotizaciones"))
     interfaz_clinica = interfaz_clinica_activa(empresa)
     modulo_manuales_pdf = manuales_pdf_habilitados(empresa)
+    modulo_gastos_adicionales = gastos_adicionales_habilitados(empresa)
     modulos_adicionales_clinica = set()
     if interfaz_clinica and config_avanzada:
         modulos_adicionales_clinica = set(
@@ -97,6 +98,17 @@ def erp_access(request):
         "modulo_crm": crm_activa and algun("crm"),
         "modulo_citas": citas_activa and permiso("puede_ver_calendario" if permisos_clinicos_granulares else "puede_citas"),
         "modulo_clinica": clinica_activa and algun("clinica"),
+        "modulo_gastos_adicionales": modulo_gastos_adicionales and (
+            permiso("puede_ver_gastos_adicionales") or permiso("puede_crear_gastos_adicionales")
+        ),
+        "ver_gastos_adicionales": modulo_gastos_adicionales and permiso("puede_ver_gastos_adicionales"),
+        "crear_gastos_adicionales": modulo_gastos_adicionales and permiso("puede_crear_gastos_adicionales"),
+        "editar_gastos_adicionales": modulo_gastos_adicionales and permiso("puede_editar_gastos_adicionales"),
+        "enviar_gastos_adicionales": modulo_gastos_adicionales and permiso("puede_enviar_gastos_adicionales"),
+        "convertir_gastos_adicionales_factura": modulo_gastos_adicionales and facturacion_activa
+            and permiso("puede_convertir_gastos_adicionales_factura")
+            and permiso("puede_crear_facturas") and permiso("puede_editar_facturas")
+            and permiso("puede_ver_facturas"),
         "modulo_tecnicentro": tecnicentro_activo and algun("tecnicentro"),
         "facturas": facturacion_activa and permiso("puede_ver_facturas"),
         "cotizaciones": facturacion_activa and cotizaciones_activa and permiso("puede_facturas"),

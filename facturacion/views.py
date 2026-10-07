@@ -7536,6 +7536,7 @@ def editar_factura(request, empresa_slug, factura_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     _autorizar_cambio_factura(request, empresa, "puede_editar_facturas")
     factura = get_object_or_404(Factura.objects.select_for_update(), id=factura_id, empresa=empresa)
+    gasto_adicional_origen = getattr(factura, "gasto_adicional_origen", None)
     anterior = _estado_auditoria_factura(factura)
     fecha_original = factura.fecha_emision
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
@@ -7581,6 +7582,10 @@ def editar_factura(request, empresa_slug, factura_id):
     )
 
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
+    if gasto_adicional_origen:
+        productos_qs = Producto.objects.filter(empresa=empresa).filter(
+            Q(activo=True) | Q(pk__in=factura.lineas.values_list("producto_id", flat=True))
+        ).select_related('impuesto_predeterminado')
     impuestos_qs = TipoImpuesto.objects.filter(activo=True)
     clientes_qs = Cliente.objects.filter(empresa=empresa)
     vendedores_qs = Usuario.objects.filter(Q(empresa=empresa) | Q(empresas_acceso=empresa)).distinct()
@@ -7609,7 +7614,9 @@ def editar_factura(request, empresa_slug, factura_id):
         return prefijo, ""
 
     def preparar_post_factura(post_data):
-        post_data = _forzar_factura_emitida_si_contado(post_data, empresa)
+        # Los GA llegan como borradores y requieren selección expresa de Emitida.
+        # El resto de facturas conserva el comportamiento de contado existente.
+        post_data = post_data.copy() if gasto_adicional_origen else _forzar_factura_emitida_si_contado(post_data, empresa)
         if not config_avanzada.permite_gestion_fiscal_historica:
             return post_data
 
@@ -7647,7 +7654,7 @@ def editar_factura(request, empresa_slug, factura_id):
         if 'estado' in form.fields:
             if factura.estado == 'emitida':
                 form.fields['estado'].disabled = True
-            if _empresa_factura_solo_contado(empresa):
+            if _empresa_factura_solo_contado(empresa) and not gasto_adicional_origen:
                 form.fields['estado'].choices = [('emitida', 'Emitida')]
                 form.fields['estado'].initial = 'emitida'
                 form.initial['estado'] = 'emitida'

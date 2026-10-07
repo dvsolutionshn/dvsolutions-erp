@@ -543,6 +543,7 @@
 {% endblock %}
 
 {% block content %}
+{% include "facturacion/includes/gasto_adicional_origen.html" %}
 <form method="post" class="erp-form-shell">
     {% csrf_token %}
 

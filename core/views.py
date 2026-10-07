@@ -113,6 +113,13 @@ PERMISOS_ROL_CLINICO = (
         ("puede_configuracion_clinica", "Configuración clínica"),
         ("puede_citas", "Agenda y citas"),
     )),
+    ("Gastos Adicionales", (
+        ("puede_ver_gastos_adicionales", "Ver Gastos Adicionales y generar PDF"),
+        ("puede_crear_gastos_adicionales", "Crear Gastos Adicionales"),
+        ("puede_editar_gastos_adicionales", "Editar Gastos Adicionales"),
+        ("puede_enviar_gastos_adicionales", "Enviar Gastos Adicionales"),
+        ("puede_convertir_gastos_adicionales_factura", "Convertir Gasto Adicional a Factura"),
+    )),
     ("Inventario y compras", (
         ("puede_productos", "Ver productos"),
         ("puede_crear_productos", "Crear productos"),
@@ -212,6 +219,11 @@ CATEGORIAS_PERMISOS_CLINICOS = {
     "puede_tratamientos_clinicos": "Atención al paciente",
     "puede_citas": "Agenda clínica",
     "puede_configuracion_clinica": "Administración clínica",
+    "puede_ver_gastos_adicionales": "Gastos Adicionales",
+    "puede_crear_gastos_adicionales": "Gastos Adicionales",
+    "puede_editar_gastos_adicionales": "Gastos Adicionales",
+    "puede_enviar_gastos_adicionales": "Gastos Adicionales",
+    "puede_convertir_gastos_adicionales_factura": "Gastos Adicionales",
     "puede_productos": "Productos",
     "puede_crear_productos": "Productos",
     "puede_editar_productos": "Productos",
@@ -975,7 +987,7 @@ def dashboard(request, slug=None):
         except ConfiguracionAvanzadaEmpresa.DoesNotExist:
             adicionales = []
         modulos_activos = modulos_activos.filter(
-            codigo__in={"clinica_medica", "agenda_citas", "facturacion", "punto_venta", *adicionales}
+            codigo__in={"clinica_medica", "gastos_adicionales", "agenda_citas", "facturacion", "punto_venta", *adicionales}
         )
 
     if empresa.slug == "demo_1":

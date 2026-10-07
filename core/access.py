@@ -32,6 +32,20 @@ def interfaz_clinica_activa(empresa):
     return bool(empresa and getattr(empresa, "tipo_solucion", "") == "clinica")
 
 
+EMPRESAS_CON_GASTOS_ADICIONALES = frozenset({
+    "hospital_mia", "medical_spa", "serviciosmedicos", "luque_aestetic",
+})
+
+
+def gastos_adicionales_habilitados(empresa):
+    """Ofrece el módulo únicamente a las clínicas existentes autorizadas."""
+    return bool(
+        empresa
+        and empresa.slug in EMPRESAS_CON_GASTOS_ADICIONALES
+        and empresa.tiene_modulo_activo("gastos_adicionales")
+    )
+
+
 def manuales_pdf_habilitados(empresa):
     """Controla por configuracion, no por slug, donde se ofrece el modulo de manuales."""
     if not interfaz_clinica_activa(empresa):

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>{{ gasto.numero }} · {{ nombre_clinica|default:empresa.nombre }}</title>
+    <style>
+        @page{size:letter;margin:17mm 16mm 22mm;@bottom-left{content:element(institutional-footer);width:155mm;}@bottom-right{content:"Página " counter(page) " / " counter(pages);color:#788894;font-family:Arial,Helvetica,sans-serif;font-size:8pt;}}
+        *{box-sizing:border-box}
+        body{margin:0;color:#172e42;font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.45}
+        .institutional-footer{position:running(institutional-footer);padding-top:8pt;border-top:1pt solid #d6e4e9;color:#667c8b;font-size:8pt;line-height:1.4}
+        .brand-header{display:table;width:100%;padding:0 0 15pt;border-bottom:2pt solid #139b97}
+        .brand-logo,.brand-copy{display:table-cell;vertical-align:middle}
+        .brand-logo{width:75pt;padding-right:15pt}
+        .brand-logo img{display:block;max-width:64pt;max-height:64pt;object-fit:contain}
+        .brand-initials{display:inline-block;padding:14pt 12pt;border:1pt solid #d0e3e8;border-radius:12pt;color:#118784;font-size:22pt;font-weight:bold;letter-spacing:1pt}
+        .brand-copy h1{margin:0 0 5pt;font-size:19pt;line-height:1.2;color:#173449}
+        .brand-copy p{margin:2pt 0;color:#687c8a;font-size:8.5pt}
+        .document-heading{display:table;width:100%;margin:20pt 0 15pt}
+        .document-title,.document-number{display:table-cell;vertical-align:top}
+        .eyebrow{display:block;color:#118784;font-size:8pt;font-weight:bold;letter-spacing:1.8pt;text-transform:uppercase;margin-bottom:6pt}
+        .document-title h2{font-size:23pt;font-weight:normal;letter-spacing:.3pt;margin:0;color:#173449;line-height:1.2}
+        .document-title p{color:#788894;font-size:8.5pt;margin:6pt 0 0}
+        .document-number{text-align:right;width:135pt}
+        .document-number strong{display:block;font-size:18pt;color:#118784;letter-spacing:.5pt;margin-bottom:5pt}
+        .document-number span{display:block;font-size:9pt;color:#6c7e8b}
+        .patient-panel{padding:13pt 17pt;border:1pt solid #d9e7eb;border-radius:10pt;background:#f7fbfc;margin-bottom:18pt;break-inside:avoid}
+        .patient-row{display:table;width:100%;table-layout:fixed}
+        .patient-field{display:table-cell;vertical-align:top;padding:0 10pt 0 0}
+        .patient-field:first-child{width:57%}
+        .patient-field label{display:block;font-size:7pt;color:#788894;text-transform:uppercase;letter-spacing:1pt;margin-bottom:4pt}
+        .patient-field strong{display:block;font-size:12pt;line-height:1.3;color:#173449;overflow-wrap:break-word}
+        .patient-field span{display:block;font-size:8.5pt;color:#627788;margin-top:5pt}
+        .section-label{font-size:9pt;color:#385569;letter-spacing:1pt;text-transform:uppercase;margin:0 0 9pt;font-weight:bold}
+        table{border-collapse:collapse;width:100%;table-layout:fixed}
+        thead{display:table-header-group}
+        tr{break-inside:avoid}
+        th{text-align:left;font-size:7pt;text-transform:uppercase;letter-spacing:.8pt;color:#507285;background:#ecf5f6;padding:10pt 9pt;border-bottom:1pt solid #c6dee3}
+        td{padding:9pt 9pt;border-bottom:1pt solid #e1eaee;font-size:9pt;color:#365267;vertical-align:top;overflow-wrap:break-word}
+        td strong{font-weight:bold;color:#1d3c51}
+        th.number,td.number{text-align:right;white-space:nowrap}
+        .product-col{width:48%}.quantity-col{width:12%}.price-col,.subtotal-col{width:20%}
+        .summary{margin:14pt 0 16pt;display:table;width:100%;break-inside:avoid}
+        .summary-note{display:table-cell;width:53%;padding-right:24pt;color:#788894;font-size:8pt;vertical-align:middle}
+        .total{display:table-cell;vertical-align:middle;background:#173b4a;color:#fff;border-radius:8pt;padding:15pt 17pt;text-align:right}
+        .total span{display:block;font-size:7pt;text-transform:uppercase;letter-spacing:1.5pt;color:#b9d9de;margin-bottom:3pt}
+        .total strong{font-size:23pt;font-weight:normal;letter-spacing:.3pt}
+        .observations{margin-top:5pt;padding:12pt 17pt;background:#fafcfd;border-left:3pt solid #b5d7dc;break-inside:avoid}
+        .observations h3{font-size:8pt;color:#507285;text-transform:uppercase;letter-spacing:1pt;margin:0 0 6pt}
+        .observations p{white-space:pre-wrap;margin:0;color:#365267;font-size:9pt;line-height:1.6;overflow-wrap:break-word}
+        .invoice-link{margin-top:17pt;border:1pt solid #d2e4e9;border-radius:7pt;padding:10pt 13pt;font-size:8.5pt;color:#426072;break-inside:avoid}
+        .invoice-link strong{color:#173449}.invoice-link p{margin:3pt 0}
+        .record-meta{margin-top:10pt;font-size:8pt;color:#788894;break-inside:avoid}
+    </style>
+</head>
+<body>
+    <footer class="institutional-footer">{{ pie_institucional|default:empresa.nombre }}<br>Documento interno de gastos adicionales · No constituye factura fiscal.</footer>
+    <header class="brand-header">
+        <div class="brand-logo">{% if logo_url %}<img src="{{ logo_url }}" alt="{{ nombre_clinica|default:empresa.nombre }}">{% else %}<span class="brand-initials">{{ empresa.nombre|slice:':2'|upper }}</span>{% endif %}</div>
+        <div class="brand-copy"><h1>{{ nombre_clinica|default:empresa.nombre }}</h1>{% if empresa.direccion %}<p>{{ empresa.direccion }}</p>{% endif %}<p>{% if empresa.telefono %}{{ empresa.telefono }}{% endif %}{% if empresa.correo %}{% if empresa.telefono %} · {% endif %}{{ empresa.correo }}{% endif %}</p></div>
+    </header>
+    <section class="document-heading"><div class="document-title"><span class="eyebrow">Documento clínico</span><h2>GASTOS ADICIONALES</h2><p>Detalle de productos y servicios para el paciente</p></div><div class="document-number"><strong>{{ gasto.numero }}</strong><span>{{ gasto.fecha|date:'d/m/Y' }}</span><span>Estado: {{ gasto.get_estado_display }}</span></div></section>
+    <section class="patient-panel"><div class="patient-row"><div class="patient-field"><label>Paciente</label><strong>{{ gasto.paciente.nombre }}</strong><span>Identidad: {{ gasto.paciente.identidad|default:'No indicada' }}{% if gasto.paciente.expediente_codigo %} · Expediente {{ gasto.paciente.expediente_codigo }}{% endif %}</span></div><div class="patient-field"><label>Profesional / usuario</label><strong>{% if gasto.profesional %}{{ gasto.profesional.nombre }}{% elif gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}</strong><span>Fecha de atención: {{ gasto.fecha|date:'d/m/Y' }}</span></div></div></section>
+    <h3 class="section-label">Detalle del documento</h3>
+    <table><thead><tr><th class="product-col">Producto / servicio</th><th class="number quantity-col">Cantidad</th><th class="number price-col">Precio unitario</th><th class="number subtotal-col">Subtotal</th></tr></thead><tbody>{% for linea in gasto.lineas.all %}<tr><td><strong>{{ linea.descripcion|default:linea.producto.nombre }}</strong></td><td class="number">{{ linea.cantidad|floatformat:'-2' }}</td><td class="number">L {{ linea.precio_unitario|floatformat:2 }}</td><td class="number">L {{ linea.subtotal|floatformat:2 }}</td></tr>{% endfor %}</tbody></table>
+    <section class="summary"><div class="summary-note">Este documento conserva el detalle de gastos registrado en el expediente del paciente.</div><div class="total"><span>Total del documento</span><strong>L {{ gasto.total|floatformat:2 }}</strong></div></section>
+    {% if gasto.observacion %}<section class="observations"><h3>Observaciones</h3><p>{{ gasto.observacion }}</p></section>{% endif %}
+    {% if gasto.factura %}<section class="invoice-link"><p><strong>Factura: {% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</strong></p><p>{% if gasto.factura.estado == 'borrador' %}Pendiente de revisión y emisión en Facturación.{% elif gasto.factura.estado == 'anulada' %}Factura asociada anulada.{% else %}Estado: Facturado.{% endif %}</p>{% if gasto.fecha_conversion %}<p>Conversión: {{ gasto.fecha_conversion|date:'d/m/Y H:i' }}{% if gasto.convertido_por %} · {{ gasto.convertido_por.get_full_name|default:gasto.convertido_por.username }}{% endif %}</p>{% endif %}</section>{% endif %}
+    <p class="record-meta">Registrado por {% if gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}{% if gasto.fecha_creacion %} · {{ gasto.fecha_creacion|date:'d/m/Y H:i' }}{% endif %}.</p>
+</body>
+</html>

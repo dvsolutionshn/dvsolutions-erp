@@ -1,5 +1,7 @@
 import logging
 import threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -34,6 +36,17 @@ CAMPOS_GENERALES_COMPARTIDOS = (
 )
 
 _estado = threading.local()
+_sincronizacion_suspendida = ContextVar("sincronizacion_clientes_compartidos_suspendida", default=False)
+
+
+@contextmanager
+def suspender_sincronizacion_clientes_compartidos():
+    """Limita una operación clínica a su empresa sin desconectar señales globales."""
+    token = _sincronizacion_suspendida.set(True)
+    try:
+        yield
+    finally:
+        _sincronizacion_suspendida.reset(token)
 
 
 def empresa_comparte_clientes(empresa):
@@ -46,7 +59,8 @@ def _datos_generales(cliente):
 
 def sincronizar_cliente_compartido(cliente):
     if (
-        getattr(_estado, "sincronizando", False)
+        _sincronizacion_suspendida.get()
+        or getattr(_estado, "sincronizando", False)
         or not empresa_comparte_clientes(cliente.empresa)
         or (cliente.nombre or "").strip().casefold() == "consumidor final"
     ):

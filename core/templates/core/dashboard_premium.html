@@ -432,6 +432,8 @@
 {% endblock %}
 
 {% block content %}
+{% url 'clinica_gastos_adicionales' empresa.slug as gastos_adicionales_url %}
+{% url 'clinica_gasto_adicional_crear' empresa.slug as gasto_adicional_nuevo_url %}
 {% if erp_access.interfaz_clinica %}
 <section class="erp-card erp-doctor-welcome">
     <div>
@@ -442,6 +444,7 @@
             {% if erp_access.pacientes %}<a class="erp-doctor-action" href="{% url 'clinica_pacientes' empresa.slug %}"><i><img src="{% static 'core/img/modules/customers.svg' %}" alt=""></i><span><strong>Pacientes</strong><span>Buscar, abrir expediente o registrar un paciente.</span></span></a>{% endif %}
             {% if erp_access.inventario %}<a class="erp-doctor-action" href="{% url 'inventario_facturacion' empresa.slug %}"><i><img src="{% static 'core/img/modules/inventory.svg' %}" alt=""></i><span><strong>Inventario</strong><span>Lotes, vencimientos, transferencias y existencias.</span></span></a>{% endif %}
             {% if erp_access.modulo_facturacion %}<a class="erp-doctor-action" href="{% url 'facturacion_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/receipts.svg' %}" alt=""></i><span><strong>Facturación</strong><span>Acceder a todas las funciones de facturación permitidas.</span></span></a>{% endif %}
+            {% if erp_access.modulo_gastos_adicionales %}<a class="erp-doctor-action" href="{% if erp_access.ver_gastos_adicionales %}{{ gastos_adicionales_url }}{% else %}{{ gasto_adicional_nuevo_url }}{% endif %}"><i><img src="{% static 'core/img/modules/receipts.svg' %}" alt=""></i><span><strong>Gastos Adicionales</strong><span>Productos por paciente, historial y documento clínico PDF.</span></span></a>{% endif %}
             {% if erp_access.modulo_citas %}<a class="erp-doctor-action" href="{% url 'agenda_citas' empresa.slug %}"><i><img src="{% static 'core/img/modules/appointments.svg' %}" alt=""></i><span><strong>Agenda</strong><span>Ver citas y organizar la jornada de atención.</span></span></a>{% endif %}
             {% if erp_access.modulo_rrhh %}<a class="erp-doctor-action" href="{% url 'rrhh_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/hr.svg' %}" alt=""></i><span><strong>Recursos Humanos</strong><span>Empleados, planillas, vacaciones y gestión del equipo.</span></span></a>{% endif %}
             {% if erp_access.modulo_crm %}<a class="erp-doctor-action" href="{% url 'crm_dashboard' empresa.slug %}"><i><img src="{% static 'core/img/modules/crm.svg' %}" alt=""></i><span><strong>CRM y Marketing</strong><span>Campañas, comunicaciones y seguimiento comercial.</span></span></a>{% endif %}
@@ -464,6 +467,7 @@
             {% if erp_access.modulo_crm %}<li>CRM y Marketing</li>{% endif %}
             {% if erp_access.modulo_contabilidad %}<li>Contabilidad</li>{% endif %}
             {% if erp_access.ver_manuales_pdf %}<li>Manuales PDF para pacientes</li>{% endif %}
+            {% if erp_access.modulo_gastos_adicionales %}<li>Gastos Adicionales por paciente</li>{% endif %}
             <li>Configuración por permisos</li>
         </ul>
         </div>
@@ -514,8 +518,19 @@
 <section class="erp-card">
     <h3 class="erp-panel-title">Modulos Disponibles</h3>
     <div class="erp-dashboard-card-grid">
+        {% if erp_access.modulo_gastos_adicionales %}
+        <article class="erp-card erp-module-card erp-dashboard-module">
+            <div class="erp-module-visual"><img src="{% static 'core/img/modules/receipts.svg' %}" alt="" aria-hidden="true"></div>
+            <div class="erp-kpi-label">Documento clínico</div>
+            <h3>Gastos Adicionales</h3>
+            <p>Productos por paciente, historial, PDF y conversión a factura para revisión.</p>
+            <div class="erp-dashboard-module-action"><a class="erp-btn" href="{% if erp_access.ver_gastos_adicionales %}{{ gastos_adicionales_url }}{% else %}{{ gasto_adicional_nuevo_url }}{% endif %}">Ingresar al módulo</a></div>
+        </article>
+        {% endif %}
         {% for modulo in modulos %}
-            {% if modulo.codigo == "facturacion" %}
+            {% if modulo.codigo == "gastos_adicionales" %}
+                {# La tarjeta independiente se muestra antes de este catálogo. #}
+            {% elif modulo.codigo == "facturacion" %}
                 {% if erp_access.modulo_facturacion %}
             <article class="erp-card erp-module-card erp-dashboard-module">
                 <div class="erp-module-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div>

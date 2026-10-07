@@ -486,6 +486,25 @@ document.addEventListener("DOMContentLoaded",function(){
 </section>
 {% endif %}
 
+{% if erp_access.ver_gastos_adicionales %}
+<section class="erp-card patient-anchor-offset" id="gastos-adicionales" style="margin-top:18px">
+    <div class="clinical-panel-title">
+        <div><div class="erp-kpi-label">Documentos del paciente</div><h3>Gastos Adicionales</h3><p>Historial de productos y servicios adicionales.</p></div>
+        <div class="clinical-focus-actions">
+            <a class="erp-action-link" href="{% url 'clinica_gastos_adicionales' empresa.slug %}?paciente_id={{ paciente.id }}">Ver historial completo</a>
+            {% if erp_access.crear_gastos_adicionales %}<a class="erp-btn" href="{% url 'clinica_gasto_adicional_crear' empresa.slug %}?paciente={{ paciente.id }}">Nuevo gasto</a>{% endif %}
+        </div>
+    </div>
+    <div class="patient-consent-list">
+        {% for gasto in gastos_adicionales %}
+        <div class="patient-consent-card">
+            <div><strong>{{ gasto.numero }} · L {{ gasto.total|floatformat:2 }}</strong><span>{{ gasto.fecha|date:"d/m/Y" }} · {{ gasto.get_estado_display }}{% if gasto.factura_id %} · Factura: {{ gasto.factura.numero_factura|default:"Borrador pendiente de emisión" }}{% endif %}</span></div>
+            <a class="erp-action-link" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}">Abrir documento</a>
+        </div>
+        {% empty %}<div class="clinical-soft-note">El paciente aún no tiene Gastos Adicionales registrados.</div>{% endfor %}
+    </div>
+</section>
+{% endif %}
 <div class="patient-photo-modal" id="patientPhotoModal" aria-hidden="true">
     <div class="patient-photo-modal-card" role="dialog" aria-modal="true" aria-labelledby="patientPhotoModalTitle">
         <img id="patientPhotoModalImage" alt="">

@@ -1,9 +1,12 @@
 import unicodedata
+from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.core.validators import MinValueValidator
+from django.db import models, transaction
+from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import get_valid_filename
 
@@ -1365,3 +1368,170 @@ class SeguimientoPostOperatorio(models.Model):
 
     def __str__(self):
         return f"{self.paciente.nombre} - {self.fecha_programada:%d/%m/%Y}"
+
+
+class GastoAdicional(models.Model):
+    """Documento clínico interno; su numeración es independiente del CAI."""
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.PROTECT, related_name="gastos_adicionales")
+    paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, related_name="gastos_adicionales")
+    profesional = models.ForeignKey(
+        ProfesionalSalud, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="gastos_adicionales",
+    )
+    fecha = models.DateField(default=timezone.localdate, db_index=True)
+    correlativo = models.PositiveIntegerField(editable=False)
+    numero = models.CharField(max_length=24, editable=False)
+    observacion = models.TextField(blank=True)
+    precio_incluye_impuesto = models.BooleanField(default=False, editable=False)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0, editable=False)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0, editable=False)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="gastos_adicionales_creados",
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="gastos_adicionales_actualizados",
+    )
+    factura = models.OneToOneField(
+        "facturacion.Factura", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="gasto_adicional_origen",
+    )
+    convertido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="gastos_adicionales_convertidos",
+    )
+    fecha_conversion = models.DateTimeField(null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha", "-id"]
+        verbose_name = "Gasto adicional"
+        verbose_name_plural = "Gastos adicionales"
+        constraints = [
+            models.UniqueConstraint(fields=["empresa", "numero"], name="uniq_ga_empresa_numero"),
+            models.UniqueConstraint(fields=["empresa", "correlativo"], name="uniq_ga_empresa_correlativo"),
+        ]
+
+    def __str__(self):
+        return f"{self.numero} - {self.paciente.nombre}"
+
+    @property
+    def estado(self):
+        return "facturado" if self.factura_id and self.factura.estado == "emitida" else "pendiente"
+
+    def get_estado_display(self):
+        return "Facturado" if self.estado == "facturado" else "Pendiente"
+
+    @property
+    def editable(self):
+        return not self.factura_id
+
+    def clean(self):
+        super().clean()
+        if self.paciente_id and self.empresa_id and self.paciente.empresa_id != self.empresa_id:
+            raise ValidationError({"paciente": "El paciente debe pertenecer a la empresa del documento."})
+        if self.profesional_id and self.empresa_id and self.profesional.empresa_id != self.empresa_id:
+            raise ValidationError({"profesional": "El profesional debe pertenecer a la empresa del documento."})
+        if self.factura_id and self.empresa_id and self.factura.empresa_id != self.empresa_id:
+            raise ValidationError({"factura": "La factura debe pertenecer a la empresa del documento."})
+        if self.subtotal < 0 or self.total < 0:
+            raise ValidationError("El total del documento no puede ser negativo.")
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self._state.adding:
+                # Esta fila existe antes del primer GA y serializa la numeración
+                # también cuando todavía no hay documentos de la empresa.
+                Empresa.objects.select_for_update().get(pk=self.empresa_id)
+                ultimo = type(self).objects.filter(empresa_id=self.empresa_id).aggregate(
+                    ultimo=Max("correlativo")
+                )["ultimo"] or 0
+                self.correlativo = ultimo + 1
+                self.numero = f"GA-{self.correlativo:06d}"
+                from facturacion.views import _precios_incluyen_impuesto
+                self.precio_incluye_impuesto = _precios_incluyen_impuesto(self.empresa)
+            else:
+                original = type(self).objects.select_for_update().get(pk=self.pk)
+                if (
+                    self.empresa_id != original.empresa_id
+                    or self.numero != original.numero
+                    or self.correlativo != original.correlativo
+                    or self.creado_por_id != original.creado_por_id
+                    or self.precio_incluye_impuesto != original.precio_incluye_impuesto
+                ):
+                    raise ValidationError("La empresa, numeración, autor y configuración original no se pueden cambiar.")
+                if original.factura_id:
+                    campos_inmutables = (
+                        "paciente_id", "profesional_id", "fecha", "observacion", "subtotal", "total",
+                        "factura_id", "convertido_por_id", "fecha_conversion", "actualizado_por_id",
+                    )
+                    if any(getattr(self, campo) != getattr(original, campo) for campo in campos_inmutables):
+                        raise ValidationError("El gasto ya tiene una factura vinculada y se conserva como documento histórico.")
+            self.full_clean()
+            super().save(*args, **kwargs)
+
+    def calcular_totales(self):
+        self.subtotal = sum((linea.subtotal for linea in self.lineas.all()), Decimal("0.00"))
+        self.total = self.subtotal
+
+    def delete(self, *args, **kwargs):
+        with transaction.atomic():
+            original = type(self).objects.select_for_update().get(pk=self.pk)
+            if original.factura_id:
+                raise ValidationError("El gasto con factura vinculada debe conservarse como documento histórico.")
+            return super().delete(*args, **kwargs)
+
+
+class LineaGastoAdicional(models.Model):
+    gasto = models.ForeignKey(GastoAdicional, on_delete=models.CASCADE, related_name="lineas")
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name="lineas_gastos_adicionales")
+    descripcion = models.CharField(max_length=255, blank=True)
+    cantidad = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    precio_unitario = models.DecimalField(
+        max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0, editable=False)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Línea de gasto adicional"
+        verbose_name_plural = "Líneas de gastos adicionales"
+
+    def __str__(self):
+        return self.descripcion
+
+    def clean(self):
+        super().clean()
+        if self.producto_id and self.gasto_id and self.producto.empresa_id != self.gasto.empresa_id:
+            raise ValidationError({"producto": "El producto debe pertenecer a la empresa del documento."})
+        if self.gasto_id and self.gasto.factura_id:
+            raise ValidationError("No se pueden modificar las líneas de un gasto con factura vinculada.")
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self.gasto_id:
+                self.gasto = GastoAdicional.objects.select_for_update().get(pk=self.gasto_id)
+            if self.pk:
+                original = type(self).objects.get(pk=self.pk)
+                if original.gasto_id != self.gasto_id:
+                    raise ValidationError("Una línea no puede trasladarse a otro documento.")
+            if self._state.adding or (self.pk and original.producto_id != self.producto_id):
+                self.descripcion = self.producto.nombre
+            # Valida cantidad y precio antes de multiplicar para rechazar valores
+            # no finitos, negativos o con más precisión que Facturación.
+            self.full_clean(exclude=["subtotal"])
+            self.subtotal = (self.cantidad * self.precio_unitario).quantize(Decimal("0.01"))
+            self.full_clean()
+            super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        with transaction.atomic():
+            gasto = GastoAdicional.objects.select_for_update().get(pk=self.gasto_id)
+            if gasto.factura_id:
+                raise ValidationError("No se pueden eliminar líneas de un gasto con factura vinculada.")
+            return super().delete(*args, **kwargs)

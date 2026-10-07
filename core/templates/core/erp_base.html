@@ -75,6 +75,8 @@
     {% url 'clinica_dashboard' empresa.slug as clinica_url %}
     {% url 'clinica_configuracion' empresa.slug as clinica_configuracion_url %}
     {% url 'clinica_manuales_pdf' empresa.slug as clinica_manuales_pdf_url %}
+    {% url 'clinica_gastos_adicionales' empresa.slug as clinica_gastos_adicionales_url %}
+    {% url 'clinica_gasto_adicional_crear' empresa.slug as clinica_gasto_adicional_nuevo_url %}
     {% url 'clinica_pacientes' empresa.slug as clinica_pacientes_url %}
     {% url 'clinica_control_enlaces_registro_paciente' empresa.slug as clinica_control_enlaces_url %}
     {% url 'clinica_citas' empresa.slug as clinica_citas_url %}
@@ -192,6 +194,12 @@
                     <span>Configuración</span>
                 </a>
                 {% endif %}
+                {% if erp_access.modulo_gastos_adicionales %}
+                <a class="erp-nav-link {% if '/dashboard/clinica/gastos-adicionales/' in request.path %}is-active{% endif %}" href="{% if erp_access.ver_gastos_adicionales %}{{ clinica_gastos_adicionales_url }}{% else %}{{ clinica_gasto_adicional_nuevo_url }}{% endif %}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Gastos Adicionales</span>
+                </a>
+                {% endif %}
                 {% if erp_access.ver_manuales_pdf %}
                 <a class="erp-nav-link {% if '/dashboard/clinica/manuales-pdf/' in request.path %}is-active{% endif %}" href="{{ clinica_manuales_pdf_url }}">
                     <span class="erp-nav-bullet"></span>
@@ -235,6 +243,12 @@
                 <a class="erp-nav-link {% if '/dashboard/clinica/' in request.path %}is-active{% endif %}" href="{{ clinica_url }}">
                     <span class="erp-nav-bullet"></span>
                     <span>Clinica</span>
+                </a>
+                {% endif %}
+                {% if erp_access.modulo_gastos_adicionales %}
+                <a class="erp-nav-link {% if '/dashboard/clinica/gastos-adicionales/' in request.path %}is-active{% endif %}" href="{% if erp_access.ver_gastos_adicionales %}{{ clinica_gastos_adicionales_url }}{% else %}{{ clinica_gasto_adicional_nuevo_url }}{% endif %}">
+                    <span class="erp-nav-bullet"></span>
+                    <span>Gastos Adicionales</span>
                 </a>
                 {% endif %}
                 {% if erp_access.administrar_usuarios_clinicos %}
@@ -621,6 +635,7 @@
     {% if erp_access.inventario %}<a class="{% if '/dashboard/facturacion/inventario/' in request.path %}is-active{% endif %}" href="{{ inventario_url }}"><span>Inventario</span></a>{% endif %}
     {% if erp_access.modulo_facturacion %}<a class="{% if '/dashboard/facturacion/' in request.path and '/dashboard/facturacion/inventario/' not in request.path %}is-active{% endif %}" href="{{ facturacion_url }}"><span>Facturación</span></a>{% endif %}
     {% if erp_access.modulo_citas %}<a class="{% if '/dashboard/citas/' in request.path %}is-active{% endif %}" href="{{ agenda_citas_url }}"><span>Agenda</span></a>{% endif %}
+    {% if erp_access.modulo_gastos_adicionales %}<a class="{% if '/dashboard/clinica/gastos-adicionales/' in request.path %}is-active{% endif %}" href="{% if erp_access.ver_gastos_adicionales %}{{ clinica_gastos_adicionales_url }}{% else %}{{ clinica_gasto_adicional_nuevo_url }}{% endif %}"><span>Gastos</span></a>{% endif %}
     {% if erp_access.configuracion_producto_clinico %}<a class="{% if request.path == clinica_configuracion_url %}is-active{% endif %}" href="{{ clinica_configuracion_url }}"><span>Config.</span></a>{% endif %}
     {% else %}
     <a class="{% if request.path == dashboard_url %}is-active{% endif %}" href="{{ dashboard_url }}">

@@ -30,7 +30,7 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
 from weasyprint import HTML
 
-from core.access import interfaz_clinica_activa, manuales_pdf_habilitados
+from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados
 from core.clinical_permissions import rol_clinico_granular
 from core.models import Empresa
 from core.phone_prefixes import apply_phone_prefix
@@ -90,6 +90,7 @@ from .models import (
     ExamenPaciente,
     ConfiguracionClinica,
     ExpedienteEvento,
+    GastoAdicional,
     HistoriaClinicaEspecialidad,
     InvitacionRegistroPaciente,
     ManualReceta,
@@ -1402,6 +1403,12 @@ def paciente_detalle(request, empresa_slug, paciente_id):
     consentimientos = ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)[:10] if puede_anexos else []
     examenes = ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente)[:10] if puede_anexos else []
     recetas = RecetaMedica.objects.filter(empresa=empresa, paciente=paciente).select_related("profesional")[:10] if puede_recetas else []
+    gastos_adicionales = (
+        GastoAdicional.objects.filter(empresa=empresa, paciente=paciente)
+        .select_related("factura", "creado_por").order_by("-fecha", "-pk")[:10]
+        if gastos_adicionales_habilitados(empresa) and request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa)
+        else []
+    )
     documentos_clinicos_conteos = {
         item["categoria"]: item["total"]
         for item in (DocumentoClinicoPaciente.objects.filter(empresa=empresa, paciente=paciente) if puede_anexos else DocumentoClinicoPaciente.objects.none())
@@ -1431,6 +1438,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "consentimientos": consentimientos,
             "examenes": examenes,
             "recetas": recetas,
+            "gastos_adicionales": gastos_adicionales,
             "documentos_clinicos_conteos": documentos_clinicos_conteos,
             "historias_especialidad": historias_especialidad,
             "formularios_hospitalarios": interfaz_clinica_activa(empresa),

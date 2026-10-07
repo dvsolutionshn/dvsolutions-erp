@@ -5,6 +5,7 @@
 {% block mobile_page_title %}Editar factura{% endblock %}
 {% block mobile_header_description %}<p>{{ factura.numero_factura|default:"Factura en borrador" }} · {{ factura.cliente.nombre }}</p>{% endblock %}
 {% block mobile_content %}
+{% include "facturacion/includes/gasto_adicional_origen.html" %}
 <form method="post" action="{{ app_edit_url }}" class="mi-editor" id="mobileInvoiceEditor" data-submit-once data-formset-prefix="{{ formset.prefix }}" data-tax-included="{{ precios_incluyen_impuesto|yesno:'true,false' }}" data-prefix-url="{{ prefijo_factura_manual_url }}">
   {% csrf_token %}<input type="hidden" name="app" value="1">
   {% for hidden in form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<div class="mi-error-box" role="alert">{{ error }}</div>{% endfor %}{% endfor %}

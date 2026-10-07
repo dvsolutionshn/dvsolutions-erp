@@ -1,0 +1,7 @@
+{% if erp_access.ver_gastos_adicionales and factura.gasto_adicional_origen %}
+<div class="erp-card" style="margin-bottom:18px;padding:16px">
+    <strong>Origen: Gastos Adicionales {{ factura.gasto_adicional_origen.numero }}</strong>
+    <a class="erp-action-link" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug factura.gasto_adicional_origen.id %}">Abrir documento clínico</a>
+    {% if factura.estado == "borrador" %}<p>Revise los datos y seleccione Emitida o use Validar factura para confirmar la emisión fiscal.</p>{% endif %}
+</div>
+{% endif %}

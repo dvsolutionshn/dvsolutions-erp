@@ -7,6 +7,7 @@
 {% if can_edit_invoice or can_change_invoice_date or can_correct_invoice_fiscal or can_void_invoice or can_delete_invoice %}<button class="mi-more" type="button" data-open-sheet="invoiceActionsSheet" aria-label="Más acciones de factura"><b aria-hidden="true">⋮</b> Más acciones</button>{% endif %}
 {% endblock %}
 {% block mobile_content %}
+{% include "facturacion/includes/gasto_adicional_origen.html" %}
 <section class="mi-card">
   <span class="mi-kicker">Número de factura</span>
   <div class="mi-number">{{ factura.numero_factura|default:"Sin número · Borrador" }}</div>

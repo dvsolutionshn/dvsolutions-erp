@@ -67,7 +67,7 @@ class EmpresaControlForm(forms.ModelForm):
     )
     modulos_adicionales_visibles_clinica = forms.ModelMultipleChoiceField(
         queryset=Modulo.objects.filter(es_comercial=True).exclude(
-            codigo__in=["facturacion", "punto_venta", "clinica_medica", "agenda_citas"]
+            codigo__in=["facturacion", "punto_venta", "clinica_medica", "gastos_adicionales", "agenda_citas"]
         ).order_by("nombre"),
         required=False,
         widget=forms.CheckboxSelectMultiple,
@@ -626,6 +626,11 @@ class RolSistemaForm(forms.ModelForm):
             "puede_cierres_caja": ("Puede gestionar Cierres de Caja", "Autoriza cierres por cajero, detalle y resumen diario."),
             "puede_facturas": ("Puede entrar a facturas", ""),
             "puede_ver_facturas": ("Puede ver historial de facturas", "Autoriza listado, busqueda y consulta de facturas anteriores. Desactivalo para personal que solo debe crear facturas."),
+            "puede_ver_gastos_adicionales": ("Ver Gastos Adicionales", "Autoriza historial, consulta del documento y generación de PDF."),
+            "puede_crear_gastos_adicionales": ("Crear Gastos Adicionales", "Autoriza nuevos documentos internos para pacientes."),
+            "puede_editar_gastos_adicionales": ("Editar Gastos Adicionales", "Autoriza modificar documentos pendientes."),
+            "puede_enviar_gastos_adicionales": ("Enviar Gastos Adicionales", "Autoriza enviar el PDF por correo o WhatsApp."),
+            "puede_convertir_gastos_adicionales_factura": ("Convertir Gasto Adicional a Factura", "Requiere también crear, editar y ver facturas para revisar el borrador y abrir la factura en Facturación."),
             "puede_clientes": ("Puede entrar a clientes", ""),
             "puede_productos": ("Puede entrar a productos", ""),
             "puede_proveedores": ("Puede entrar a proveedores", ""),
