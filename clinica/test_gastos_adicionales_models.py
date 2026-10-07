@@ -95,7 +95,8 @@ class GastoAdicionalModeloTests(TestCase):
         with self.assertRaises(ValidationError):
             GastoAdicional.objects.create(empresa=self.empresa, paciente=self.paciente, profesional=profesional)
         gasto = self._gasto()
-        producto_otro = Producto.objects.create(empresa=self.otra, nombre="Otro producto", precio="10.00")
+        empresa_catalogo_ajeno = Empresa.objects.create(nombre="Empresa ajena al catálogo GA", slug="catalogo_ajeno_ga", rtn="GA003")
+        producto_otro = Producto.objects.create(empresa=empresa_catalogo_ajeno, nombre="Otro producto", precio="10.00")
         with self.assertRaises(ValidationError):
             LineaGastoAdicional.objects.create(gasto=gasto, producto=producto_otro, cantidad=1, precio_unitario=10)
         cliente = self._cliente_sin_compartir(self.otra, "Cliente externo", "0801999999999")

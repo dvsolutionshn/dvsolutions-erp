@@ -2,14 +2,19 @@
 {% load static %}
 
 {% block title %}{% if gasto %}Editar {{ gasto.numero }}{% else %}Nuevo Gasto Adicional{% endif %} - {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} ga-compose-screen{% endblock %}
 {% block header_kicker %}Gastos Adicionales{% endblock %}
-{% block header_title %}{% if gasto %}Editar {{ gasto.numero }}{% else %}Nuevo gasto adicional{% endif %}{% endblock %}
-{% block header_description %}Seleccione un paciente, agregue productos y guarde su documento clínico.{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'clinica/gastos_adicionales.css' %}"><script src="{% static 'clinica/gastos_adicionales.js' %}" defer></script>{% endblock %}
-{% block topbar_actions %}{% if erp_access.ver_gastos_adicionales %}<a class="erp-btn-secondary" href="{% url 'clinica_gastos_adicionales' empresa.slug %}">Volver al historial</a>{% else %}<a class="erp-btn-secondary" href="{% url 'dashboard' empresa.slug %}">Panel principal</a>{% endif %}{% endblock %}
+{% block header_title %}{% if gasto %}Editar {{ gasto.numero }}{% else %}Crear gasto adicional{% endif %}{% endblock %}
+{% block header_description %}Registre los productos y servicios de la atención del paciente.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'clinica/gastos_adicionales.css' %}">
+<link rel="stylesheet" href="{% static 'clinica/gastos_adicionales_form.css' %}">
+<script src="{% static 'clinica/gastos_adicionales.js' %}" defer></script>
+{% endblock %}
+{% block topbar_actions %}{% if erp_access.ver_gastos_adicionales %}<a class="erp-btn-secondary" href="{% url 'clinica_gastos_adicionales' empresa.slug %}">Ver historial</a>{% else %}<a class="erp-btn-secondary" href="{% url 'dashboard' empresa.slug %}">Panel principal</a>{% endif %}{% endblock %}
 
 {% block content %}
-<form method="post" class="ga-page" id="ga-form" data-patient-url="{% url 'clinica_gastos_adicionales_pacientes_buscar' empresa.slug %}" data-product-url="{% url 'clinica_gastos_adicionales_productos_buscar' empresa.slug %}">
+<form method="post" class="ga-page ga-compose" id="ga-form" data-patient-url="{% url 'clinica_gastos_adicionales_pacientes_buscar' empresa.slug %}" data-product-url="{% url 'clinica_gastos_adicionales_productos_buscar' empresa.slug %}" data-price-includes-tax="{{ precios_incluyen_impuesto|yesno:'true,false' }}" data-can-edit-price="{{ puede_editar_precio|yesno:'true,false' }}">
     {% csrf_token %}
     <input type="hidden" id="ga-lines-data" name="lineas" value="{{ lineas_json|default:'[]' }}">
     {{ paciente_inicial|json_script:"ga-initial-patient" }}
@@ -18,24 +23,79 @@
     <div class="ga-errors" id="ga-client-errors" role="alert" hidden></div>
     <noscript><div class="ga-errors">Active JavaScript para utilizar los buscadores de pacientes y productos.</div></noscript>
 
-    <section class="ga-card">
-        <div class="ga-section-head"><div><span class="ga-eyebrow">01 · Datos del documento</span><h2>Paciente y atención</h2></div><span class="ga-status">{% if gasto %}{{ gasto.numero }}{% else %}Nuevo documento{% endif %}</span></div>
-        <div class="ga-form-grid">
-            <div class="ga-field ga-wide ga-search-field"><label for="ga-patient-search">Paciente <span aria-hidden="true">*</span></label>{{ form.paciente }}<input type="search" id="ga-patient-search" placeholder="Buscar por nombre, identidad o expediente" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ga-patient-results" aria-describedby="ga-patient-help"><div class="ga-search-results" id="ga-patient-results" role="listbox" hidden></div><span class="ga-help" id="ga-patient-help">Seleccione un paciente existente para vincular este documento a su expediente.</span>{% for error in form.paciente.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}<div class="ga-selected-patient" id="ga-selected-patient" hidden></div></div>
-            <div class="ga-field"><label for="{{ form.fecha.id_for_label }}">Fecha <span aria-hidden="true">*</span></label>{{ form.fecha }}{% for error in form.fecha.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}</div>
-            <div class="ga-field"><label for="{{ form.profesional.id_for_label }}">Profesional</label>{{ form.profesional }}{% for error in form.profesional.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}<span class="ga-help">Registrado por {{ request.user.get_full_name|default:request.user.username }}.</span></div>
+    <div class="ga-compose-path" aria-label="Pasos para crear el documento">
+        <span><b>1</b> Paciente</span><i aria-hidden="true"></i><span><b>2</b> Productos</span><i aria-hidden="true"></i><span><b>3</b> Resumen y guardar</span>
+        {% if gasto %}<span class="ga-compose-number">{{ gasto.numero }}</span>{% endif %}
+    </div>
+
+    <div class="ga-compose-layout">
+        <div class="ga-compose-main">
+            <section class="ga-card ga-patient-card" aria-labelledby="ga-patient-title">
+                <div class="ga-section-head">
+                    <div class="ga-compose-heading"><span class="ga-step-mark" aria-hidden="true">1</span><div><h2 id="ga-patient-title">Paciente</h2><p>Vincule el gasto a su expediente.</p></div></div>
+                </div>
+                <div class="ga-field ga-search-field">
+                    <label for="ga-patient-search">Seleccionar paciente <span aria-hidden="true">*</span></label>
+                    {{ form.paciente }}
+                    <div class="ga-search-control">
+                        <svg class="ga-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
+                        <input type="search" id="ga-patient-search" placeholder="Nombre, identidad o teléfono" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ga-patient-results" aria-describedby="ga-patient-help">
+                        <div class="ga-search-results" id="ga-patient-results" role="listbox" hidden></div>
+                    </div>
+                    <span class="ga-help" id="ga-patient-help">Haga clic para ver pacientes o escriba para buscar.</span>
+                    {% for error in form.paciente.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}
+                    <div class="ga-selected-patient" id="ga-selected-patient" hidden></div>
+                </div>
+                <div class="ga-form-grid ga-attention-fields">
+                    <div class="ga-field"><label for="{{ form.fecha.id_for_label }}">Fecha <span aria-hidden="true">*</span></label>{{ form.fecha }}{% for error in form.fecha.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}</div>
+                    <div class="ga-field"><label for="{{ form.profesional.id_for_label }}">Profesional <span class="ga-optional">Opcional</span></label>{{ form.profesional }}{% for error in form.profesional.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}</div>
+                </div>
+                <p class="ga-recorded-by">Registrado por <strong>{{ request.user.get_full_name|default:request.user.username }}</strong></p>
+            </section>
+
+            <section class="ga-card ga-products-card" aria-labelledby="ga-products-title">
+                <div class="ga-section-head">
+                    <div class="ga-compose-heading"><span class="ga-step-mark" aria-hidden="true">2</span><div><h2 id="ga-products-title">Productos y servicios</h2><p>Agregue productos y ajuste las cantidades{% if puede_editar_precio %} o los precios{% endif %}.</p></div></div>
+                    <span class="ga-line-count" id="ga-line-count">0 líneas</span>
+                </div>
+                <div class="ga-field ga-search-field ga-product-search">
+                    <label for="ga-product-search">Agregar producto o servicio</label>
+                    <div class="ga-search-control">
+                        <svg class="ga-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
+                        <input type="search" id="ga-product-search" placeholder="Ver catálogo o buscar producto" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ga-product-results" aria-describedby="ga-product-feedback">
+                        <div class="ga-search-results" id="ga-product-results" role="listbox" hidden></div>
+                    </div>
+                    <span class="ga-help" id="ga-product-feedback" aria-live="polite">Haga clic para ver productos. Seleccione uno para agregarlo.</span>
+                </div>
+                <div class="ga-table-wrap"><table class="ga-table ga-lines-table"><thead><tr><th scope="col">Producto / servicio</th><th scope="col">Cantidad</th><th scope="col">Precio unitario</th><th scope="col">Subtotal</th><th scope="col"><span class="ga-sr-only">Eliminar</span></th></tr></thead><tbody id="ga-lines"></tbody></table></div>
+                <div class="ga-empty ga-lines-empty" id="ga-lines-empty">
+                    <span class="ga-add-mark" aria-hidden="true">+</span><strong>Agregue el primer producto</strong><p>Seleccione del catálogo para comenzar el detalle.</p>
+                </div>
+                <details class="ga-observation" {% if form.observacion.value or form.observacion.errors %}open{% endif %}>
+                    <summary><span aria-hidden="true">+</span> Añadir una observación <span class="ga-optional">Opcional</span></summary>
+                    <div class="ga-field"><label class="ga-sr-only" for="{{ form.observacion.id_for_label }}">Observación</label>{{ form.observacion }}{% for error in form.observacion.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}</div>
+                </details>
+            </section>
+            <a class="ga-compose-cancel" href="{% if not erp_access.ver_gastos_adicionales %}{% url 'dashboard' empresa.slug %}{% elif gasto %}{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}{% else %}{% url 'clinica_gastos_adicionales' empresa.slug %}{% endif %}">Cancelar y volver</a>
         </div>
-    </section>
 
-    <section class="ga-card">
-        <div class="ga-section-head"><div><span class="ga-eyebrow">02 · Productos y servicios</span><h2>Detalle del gasto</h2><p>Agregue productos del catálogo y ajuste cantidades y precios.</p></div><span class="ga-line-count" id="ga-line-count">0 líneas</span></div>
-        <div class="ga-field ga-search-field ga-product-search"><label for="ga-product-search">Buscar producto o servicio</label><input type="search" id="ga-product-search" placeholder="Nombre o código del producto" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ga-product-results"><div class="ga-search-results" id="ga-product-results" role="listbox" hidden></div><span class="ga-help" id="ga-product-feedback" aria-live="polite">Seleccione un resultado para agregar una línea.</span></div>
-        <div class="ga-table-wrap"><table class="ga-table ga-lines-table"><thead><tr><th>Producto / servicio</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th><span class="ga-sr-only">Eliminar</span></th></tr></thead><tbody id="ga-lines"></tbody></table></div>
-        <div class="ga-empty ga-lines-empty" id="ga-lines-empty"><p>Busque un producto para comenzar.</p></div>
-        <div class="ga-total"><div><span>Total del documento</span><small>Los impuestos se revisarán al convertir a Factura.</small></div><strong id="ga-total" aria-live="polite">L 0.00</strong></div>
-    </section>
-
-    <section class="ga-card"><div class="ga-field"><label for="{{ form.observacion.id_for_label }}">Observación <span class="ga-optional">Opcional</span></label>{{ form.observacion }}{% for error in form.observacion.errors %}<span class="ga-field-error">{{ error }}</span>{% endfor %}</div></section>
-    <div class="ga-save-bar"><p>El documento se guarda en el expediente del paciente. Puede convertirlo a Factura después de revisarlo.</p><div class="ga-inline-actions"><a class="erp-btn-secondary" href="{% if not erp_access.ver_gastos_adicionales %}{% url 'dashboard' empresa.slug %}{% elif gasto %}{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}{% else %}{% url 'clinica_gastos_adicionales' empresa.slug %}{% endif %}">Cancelar</a><button class="{% if erp_access.ver_gastos_adicionales %}erp-btn-secondary{% else %}erp-btn{% endif %}" name="accion" value="guardar" type="submit">Guardar</button>{% if erp_access.ver_gastos_adicionales %}<button class="erp-btn" name="accion" value="pdf" type="submit">Guardar y generar PDF</button>{% endif %}</div></div>
+        <aside class="ga-card ga-compose-summary" aria-labelledby="ga-summary-title">
+            <div class="ga-section-head">
+                <div class="ga-compose-heading"><span class="ga-step-mark" aria-hidden="true">3</span><div><h2 id="ga-summary-title">Resumen</h2><p id="ga-summary-count">0 productos agregados</p></div></div>
+                <span class="ga-summary-currency">HNL</span>
+            </div>
+            <dl class="ga-summary-amounts">
+                <div class="ga-summary-subtotal"><dt>Subtotal</dt><dd id="ga-subtotal">L 0.00</dd></div>
+                <div class="ga-summary-taxes"><dt id="ga-tax-label">Impuestos <span class="ga-summary-estimate">estimados</span></dt><dd id="ga-taxes">L 0.00</dd></div>
+                <div class="ga-summary-total"><dt>TOTAL</dt><dd id="ga-total" aria-live="polite">L 0.00</dd></div>
+            </dl>
+            <p class="ga-tax-help" id="ga-tax-note" aria-live="polite">Vista previa según la configuración de los productos. Los impuestos se confirman en Facturación.</p>
+            <div class="ga-compose-actions">
+                <button class="ga-compose-button {% if erp_access.ver_gastos_adicionales %}ga-compose-button-secondary{% else %}ga-compose-button-primary{% endif %}" name="accion" value="guardar" type="submit">Guardar</button>
+                {% if erp_access.ver_gastos_adicionales %}<button class="ga-compose-button ga-compose-button-primary" name="accion" value="pdf" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"></path><path d="M14 3v6h5M8 13h8M8 17h5"></path></svg><span>Guardar y generar PDF</span></button>{% endif %}
+            </div>
+            <p class="ga-summary-foot">El documento se guardará en el expediente del paciente. Podrá convertirlo a factura después.</p>
+        </aside>
+    </div>
 </form>
 {% endblock %}

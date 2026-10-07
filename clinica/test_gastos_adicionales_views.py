@@ -71,10 +71,12 @@ class GastosAdicionalesFlujoTests(TestCase):
         self.assertEqual(response.context["gastos"].paginator.count, 1)
         response = self.client.get(reverse("clinica_paciente_detalle", kwargs={"empresa_slug": self.empresa.slug, "paciente_id": self.paciente.pk}))
         self.assertContains(response, "GA-000001")
-        for route, esperado, ajeno in (("clinica_gastos_adicionales_pacientes_buscar", self.paciente.pk, self.paciente_otro.pk), ("clinica_gastos_adicionales_productos_buscar", self.producto.pk, self.producto_otro.pk)):
-            ids = [dato["id"] for dato in self.client.get(self.url(route)).json()["results"]]
-            self.assertIn(esperado, ids)
-            self.assertNotIn(ajeno, ids)
+        pacientes = [dato["id"] for dato in self.client.get(self.url("clinica_gastos_adicionales_pacientes_buscar")).json()["results"]]
+        self.assertIn(self.paciente.pk, pacientes)
+        self.assertNotIn(self.paciente_otro.pk, pacientes)
+        productos = [dato["id"] for dato in self.client.get(self.url("clinica_gastos_adicionales_productos_buscar")).json()["results"]]
+        self.assertIn(self.producto.pk, productos)
+        self.assertIn(self.producto_otro.pk, productos)
 
     def test_modulo_independiente_funciona_con_clinica_general_desactivada(self):
         EmpresaModulo.objects.filter(empresa=self.empresa, modulo__codigo="clinica_medica").update(activo=False)
@@ -85,7 +87,9 @@ class GastosAdicionalesFlujoTests(TestCase):
         self.crear()
 
     def test_selecciones_ajenas_rechazadas_sin_documento_parcial(self):
-        for cambio in ({"paciente": self.paciente_otro.pk}, {"profesional": self.profesional_otro.pk}, {"lineas": json.dumps([{"producto_id": self.producto_otro.pk, "cantidad": 1, "precio_unitario": 10}])}):
+        empresa_ajena = Empresa.objects.create(nombre="Catálogo ajeno", slug="catalogo_ajeno_ga", rtn="GAV-3")
+        producto_ajeno = Producto.objects.create(empresa=empresa_ajena, nombre="Producto no compartido", precio=10)
+        for cambio in ({"paciente": self.paciente_otro.pk}, {"profesional": self.profesional_otro.pk}, {"lineas": json.dumps([{"producto_id": producto_ajeno.pk, "cantidad": 1, "precio_unitario": 10}])}):
             with self.subTest(cambio=cambio):
                 response = self.client.post(self.url("clinica_gasto_adicional_crear"), self.datos(**cambio))
                 self.assertEqual(response.status_code, 200)

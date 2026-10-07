@@ -1,0 +1,196 @@
+/* Form-only styles: history, document detail and PDF keep their existing layout. */
+.ga-compose-screen .erp-main{overflow-x:clip}
+.ga-compose-screen .erp-content{animation:none}
+.ga-compose-screen .erp-topbar{border-radius:16px;box-shadow:none}
+.ga-compose-screen .erp-topbar h2{font-size:23px;line-height:1.25}
+.ga-compose-screen .erp-topbar-kicker{font-size:10px;letter-spacing:.11em;margin-bottom:5px}
+.ga-compose-screen .erp-topbar p{font-size:12px;margin-top:5px}
+.ga-compose{--ga-ink:#18394a;--ga-muted:#647c8a;--ga-teal:#148b85;gap:16px;font-size:13px}
+.ga-compose .ga-card{padding:22px;border:1px solid #dce8ed;border-radius:16px;box-shadow:0 4px 16px rgba(23,60,74,.035)}
+.ga-compose-path{display:flex;align-items:center;gap:11px;padding:0 3px;color:#617a87;font-size:11px;font-weight:600}
+.ga-compose-path>span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ga-compose-path b{width:20px;height:20px;display:grid;place-items:center;border:1px solid #d4e7e9;border-radius:50%;font-size:10px;color:#168b85;background:#f3faf9}
+.ga-compose-path i{height:1px;width:20px;background:#d5e5e9}
+.ga-compose-path .ga-compose-number{margin-left:auto;color:#168b85}
+.ga-compose-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(270px,310px);gap:18px;align-items:start}
+.ga-compose-main{display:grid;gap:16px;min-width:0}
+.ga-compose .ga-section-head{margin-bottom:19px;align-items:center;gap:10px}
+.ga-compose-heading{display:flex;align-items:center;gap:11px;min-width:0}
+.ga-compose .ga-step-mark{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border-radius:10px;background:#eaf7f5;color:#14857c;font-size:12px;font-weight:700}
+.ga-compose .ga-section-head h2{font-size:15px;font-weight:700;line-height:1.3}
+.ga-compose .ga-section-head p{font-size:11px;line-height:1.4;margin-top:3px}
+.ga-compose .ga-field{gap:7px}
+.ga-compose .ga-field>label{font-size:11px;letter-spacing:0;text-transform:none;font-weight:600;color:#395a6b}
+.ga-compose .ga-field input,.ga-compose .ga-field select,.ga-compose .ga-field textarea{min-height:44px;padding:10px 12px;border:1px solid #d0dfe6;border-radius:10px;font-size:13px;color:var(--ga-ink);background:#fff}
+.ga-compose .ga-field input::placeholder,.ga-compose .ga-field textarea::placeholder{color:#78909d}
+.ga-compose .ga-field input:focus,.ga-compose .ga-field select:focus,.ga-compose .ga-field textarea:focus,.ga-compose .ga-lines-table input:focus{border-color:#1d9b92;box-shadow:0 0 0 3px #e8f5f3}
+.ga-compose .ga-help{font-size:10px;line-height:1.5;color:#708691}
+.ga-compose .ga-optional{font-size:10px;color:#7b919c;font-weight:400;margin-left:4px;letter-spacing:0}
+.ga-compose .ga-search-control{position:relative;min-width:0}
+.ga-compose .ga-search-control input{padding-left:39px;padding-right:10px;background:#fbfdfe}
+.ga-compose .ga-search-icon{position:absolute;left:13px;top:14px;width:17px;height:17px;fill:none;stroke:#6a929e;stroke-width:1.7;pointer-events:none}
+.ga-compose .ga-search-results{top:calc(100% + 5px);padding:5px;max-height:280px;border:1px solid #c7dfe4;border-radius:11px;box-shadow:0 12px 30px rgba(23,60,74,.14);z-index:45}
+.ga-compose .ga-search-option{min-height:48px;padding:10px;border-radius:7px;gap:10px}
+.ga-compose .ga-search-option>span:first-child{min-width:0;overflow-wrap:anywhere}
+.ga-compose .ga-search-option strong{font-size:12px;font-weight:600}
+.ga-compose .ga-search-option small{font-size:10px;line-height:1.4}
+.ga-compose .ga-search-option:hover,.ga-compose .ga-search-option[aria-selected=true]{background:#edf8f6}
+.ga-compose .ga-search-price{font-size:12px;font-weight:600}
+.ga-compose .ga-search-price small{text-align:right;font-weight:400;color:#73909a;font-size:9px}
+.ga-compose .ga-search-more{display:block;width:100%;padding:10px;border:1px solid #d7e8e9;border-radius:7px;background:#f5faf9;color:#167c77;font:inherit;font-size:11px;cursor:pointer;margin-top:5px}
+.ga-compose .ga-search-more:hover{background:#eaf5f3}
+.ga-compose .ga-search-more:focus-visible{outline:2px solid #118f8a;outline-offset:1px}
+.ga-compose .ga-search-more:disabled{opacity:.7;cursor:wait}
+.ga-compose .ga-search-meta{padding:8px 8px 4px;color:#7a939e;text-align:center;font-size:10px}
+.ga-compose .ga-selected-patient{position:relative;margin-top:3px;padding:10px 12px 10px 36px;border-radius:9px;background:#f0faf6;border:1px solid #d9eee4;font-size:11px;line-height:1.45}
+.ga-compose .ga-selected-patient::before{content:'✓';position:absolute;left:12px;top:10px;color:#22906c;font-weight:700}
+.ga-compose .ga-selected-patient strong{font-weight:600;font-size:12px}
+.ga-compose .ga-attention-fields{grid-template-columns:minmax(135px,.75fr) minmax(0,1.25fr);gap:14px;margin-top:17px}
+.ga-compose .ga-recorded-by{margin:13px 0 0;color:#718690;font-size:10px}
+.ga-compose .ga-recorded-by strong{font-weight:500;color:#466776}
+.ga-compose .ga-line-count{font-size:10px;padding:5px 9px;min-height:25px;color:#53798b;background:#f0f6f8;font-weight:600}
+.ga-compose .ga-product-search{margin-bottom:16px}
+.ga-compose .ga-table-wrap{overflow:visible}
+.ga-compose .ga-lines-table{min-width:0;table-layout:fixed;font-size:12px}
+.ga-compose .ga-lines-table th{font-size:9px;letter-spacing:0;text-transform:none;padding:10px 6px;background:#f6f9fa;border-bottom:1px solid #e3edf0;font-weight:600;color:#637e8b;white-space:normal}
+.ga-compose .ga-lines-table th:first-child{border-radius:8px 0 0 8px;padding-left:10px;width:40%}
+.ga-compose .ga-lines-table th:nth-child(2){width:15%}
+.ga-compose .ga-lines-table th:nth-child(3){width:19%}
+.ga-compose .ga-lines-table th:nth-child(4){width:19%}
+.ga-compose .ga-lines-table th:last-child{border-radius:0 8px 8px 0;width:7%}
+.ga-compose .ga-lines-table td{padding:14px 6px;border-bottom:1px solid #e7eef1;overflow-wrap:anywhere}
+.ga-compose .ga-lines-table td:first-child{padding-left:10px}
+.ga-compose .ga-lines-table td strong{font-size:12px;font-weight:600;line-height:1.45}
+.ga-compose .ga-lines-table td.ga-money{font-size:12px;font-weight:600;white-space:normal;overflow-wrap:normal;font-variant-numeric:tabular-nums;color:#2e596c}
+.ga-compose .ga-lines-table input{min-width:0;min-height:38px;padding:8px 6px;font-size:12px;border-radius:7px;border-color:#d5e3e9;text-align:right}
+.ga-compose .ga-lines-table input[readonly]{background:#f6f9fa;color:#667f8e}
+.ga-compose .ga-line-remove{border:0;background:transparent;width:29px;height:32px;border-radius:7px;color:#98a7ae;font-size:23px;transition:background .15s,color .15s}
+.ga-compose .ga-line-remove:hover{background:#fff0f2;color:#b05260}
+.ga-compose .ga-line-remove:focus-visible{outline:2px solid #118f8a;outline-offset:2px}
+.ga-compose .ga-lines-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:27px 15px;border:1px dashed #d5e4e9;border-radius:10px;margin-top:13px;background:#fdfefe}
+.ga-compose .ga-lines-empty .ga-add-mark{width:33px;height:33px;display:grid;place-items:center;background:#edf7f6;border-radius:10px;font-size:22px;color:#438f88;font-weight:400;margin-bottom:4px}
+.ga-compose .ga-lines-empty strong{font-size:12px;color:#446878;font-weight:600}
+.ga-compose .ga-lines-empty p{font-size:11px;color:#78909d;margin:0;line-height:1.5}
+.ga-compose .ga-observation{border-top:1px solid #e6eef1;margin-top:18px;padding-top:14px}
+.ga-compose .ga-observation>summary{display:flex;align-items:center;gap:7px;list-style:none;cursor:pointer;color:#537b89;font-size:11px;width:fit-content;padding:3px 0;min-height:30px;border-radius:5px}
+.ga-compose .ga-observation>summary::-webkit-details-marker{display:none}
+.ga-compose .ga-observation>summary>span:first-child{font-size:18px;color:#7b9ba6}
+.ga-compose .ga-observation[open]>summary>span:first-child{transform:rotate(45deg)}
+.ga-compose .ga-observation>summary:focus-visible{outline:2px solid #118f8a;outline-offset:4px}
+.ga-compose .ga-observation .ga-field{margin-top:10px}
+.ga-compose .ga-observation textarea{min-height:80px;line-height:1.5}
+.ga-compose .ga-compose-cancel{justify-self:start;font-size:11px;color:#6a8491;padding:0 4px 8px;text-decoration:underline;text-underline-offset:3px}
+.ga-compose .ga-compose-summary{position:sticky;top:20px;border-color:#cee4e5;padding:21px;z-index:25}
+.ga-compose .ga-compose-summary .ga-section-head{margin-bottom:23px}
+.ga-compose .ga-summary-currency{font-size:10px;color:#6b8995;border:1px solid #deeaee;border-radius:5px;padding:4px 6px;font-weight:600}
+.ga-compose .ga-summary-amounts{display:grid;gap:14px;margin:0}
+.ga-compose .ga-summary-amounts>div{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ga-compose .ga-summary-amounts dt{font-size:12px;color:#607c8a}
+.ga-compose .ga-summary-amounts dd{margin:0;font-size:13px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums;color:#35586b}
+.ga-compose .ga-summary-estimate{font-size:9px;color:#8398a2}
+.ga-compose .ga-summary-amounts .ga-summary-total{padding-top:18px;margin-top:1px;border-top:1px solid #e0ecef;align-items:baseline}
+.ga-compose .ga-summary-total dt{font-size:10px;letter-spacing:.08em;color:#315d68;font-weight:700}
+.ga-compose .ga-summary-total dd{font-size:28px;font-weight:700;color:#117e77;letter-spacing:-.7px}
+.ga-compose .ga-tax-help{color:#7b909b;font-size:10px;line-height:1.6;margin:12px 0 20px}
+.ga-compose .ga-tax-pending{color:#9a7135}
+.ga-compose .ga-compose-actions{display:grid;gap:9px}
+.ga-compose .ga-compose-button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;width:100%;border-radius:10px;padding:11px 13px;border:1px solid transparent;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;line-height:1.4;transition:background .15s,border-color .15s,box-shadow .15s}
+.ga-compose .ga-compose-button svg{width:16px;height:16px;flex:0 0 16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ga-compose .ga-compose-button-primary{background:#148a83;color:#fff;box-shadow:0 3px 8px rgba(20,138,131,.12)}
+.ga-compose .ga-compose-button-primary:hover{background:#0e7770;box-shadow:0 5px 12px rgba(20,138,131,.18)}
+.ga-compose .ga-compose-button-secondary{background:#fff;border-color:#d0e1e6;color:#426b7b}
+.ga-compose .ga-compose-button-secondary:hover{background:#f6fbfb;border-color:#adccd3}
+.ga-compose .ga-compose-button:focus-visible{outline:2px solid #118f8a;outline-offset:3px}
+.ga-compose .ga-summary-foot{margin:17px 0 0;font-size:10px;line-height:1.65;color:#83959e}
+.ga-compose[aria-busy=true] .ga-compose-button{cursor:wait;opacity:.65;pointer-events:none}
+
+@media(min-width:901px) and (max-width:1180px){
+    .ga-compose-layout{grid-template-columns:minmax(0,1fr) 255px;gap:14px}
+    .ga-compose .ga-card{padding:17px}
+    .ga-compose .ga-lines-table th:first-child{width:35%}
+    .ga-compose .ga-lines-table th:nth-child(2){width:16%}
+    .ga-compose .ga-lines-table th:nth-child(3){width:21%}
+    .ga-compose .ga-lines-table th:nth-child(4){width:20%}
+    .ga-compose .ga-lines-table th:last-child{width:8%}
+    .ga-compose .ga-summary-total dd{font-size:25px}
+}
+@media(max-width:900px){
+    .ga-compose-screen .erp-topbar{padding:14px;gap:10px;margin-bottom:14px}
+    .ga-compose-screen .erp-topbar h2{font-size:22px}
+    .ga-compose-screen .erp-topbar p{font-size:12px;line-height:1.45}
+    .ga-compose-screen .erp-topbar-actions{gap:7px}
+    .ga-compose-layout{grid-template-columns:minmax(0,1fr);gap:14px}
+    .ga-compose{padding-bottom:calc(var(--ga-mobile-summary-height,210px) + 20px);gap:13px}
+    .ga-compose .ga-card{padding:18px;border-radius:14px}
+    .ga-compose .ga-compose-summary{position:fixed;left:12px;right:12px;bottom:var(--ga-mobile-nav-offset,134px);top:auto;max-width:620px;margin:0 auto;padding:12px 15px 13px;border-color:#bfdcde;border-radius:14px;background:#fff;box-shadow:0 -4px 24px rgba(24,64,80,.1);z-index:35}
+    .ga-compose .ga-compose-summary .ga-section-head{margin-bottom:9px}
+    .ga-compose .ga-compose-summary .ga-step-mark{display:none}
+    .ga-compose .ga-compose-summary .ga-section-head h2{font-size:12px}
+    .ga-compose .ga-compose-summary .ga-section-head p{font-size:10px;margin:0}
+    .ga-compose .ga-compose-summary .ga-compose-heading{justify-content:space-between;width:100%}
+    .ga-compose .ga-compose-summary .ga-compose-heading>div{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%}
+    .ga-compose .ga-summary-currency{display:none}
+    .ga-compose .ga-summary-amounts{grid-template-columns:1fr 1fr;gap:7px 16px}
+    .ga-compose .ga-summary-amounts>div{gap:6px}
+    .ga-compose .ga-summary-amounts dt{font-size:10px}
+    .ga-compose .ga-summary-amounts dd{font-size:11px}
+    .ga-compose .ga-summary-estimate{display:none}
+    .ga-compose .ga-summary-amounts .ga-summary-total{grid-column:1/-1;margin-top:0;padding-top:7px}
+    .ga-compose .ga-summary-total dt{font-size:10px}
+    .ga-compose .ga-summary-total dd{font-size:23px;line-height:1.2}
+    .ga-compose .ga-tax-help{font-size:9px;line-height:1.3;margin:5px 0 9px}
+    .ga-compose .ga-compose-actions{grid-template-columns:1fr 1.6fr;gap:8px}
+    .ga-compose .ga-compose-actions>.ga-compose-button:only-child{grid-column:1/-1}
+    .ga-compose .ga-compose-button{min-height:40px;font-size:11px;padding:9px 7px;border-radius:8px;gap:5px}
+    .ga-compose .ga-summary-foot{display:none}
+    .ga-compose .ga-search-results{max-height:235px}
+}
+@media(max-width:720px){
+    .ga-compose-path{font-size:10px;gap:7px;padding:0 2px}
+    .ga-compose-path b{width:18px;height:18px;font-size:9px}
+    .ga-compose-path>span{gap:5px}
+    .ga-compose-path i{width:10px}
+    .ga-compose-path .ga-compose-number{display:none}
+    .ga-compose .ga-card{padding:16px}
+    .ga-compose .ga-section-head{margin-bottom:15px}
+    .ga-compose .ga-section-head p{font-size:10px}
+    .ga-compose-heading{gap:9px}
+    .ga-compose .ga-step-mark{flex-basis:28px;width:28px;height:28px;border-radius:9px}
+    .ga-compose .ga-field input,.ga-compose .ga-field select,.ga-compose .ga-field textarea{font-size:16px;padding:10px;min-height:44px}
+    .ga-compose .ga-search-control input{padding-left:36px;font-size:16px}
+    .ga-compose .ga-search-icon{left:11px}
+    .ga-compose .ga-attention-fields{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:10px;margin-top:14px}
+    .ga-compose .ga-attention-fields select{font-size:13px}
+    .ga-compose .ga-attention-fields input{font-size:13px}
+    .ga-compose .ga-lines-table{table-layout:auto}
+    .ga-compose .ga-lines-table thead{display:none}
+    .ga-compose .ga-lines-table tbody{display:grid;gap:11px}
+    .ga-compose .ga-lines-table tr{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:11px;border:1px solid #dce8ed;border-radius:11px;padding:13px;background:#fff}
+    .ga-compose .ga-lines-table td{display:block;padding:0!important;border:0;min-width:0}
+    .ga-compose .ga-lines-table td:first-child{grid-column:1/-1;padding:0 30px 11px 0!important;border-bottom:1px solid #e7eef1}
+    .ga-compose .ga-lines-table td[data-label]::before{font-size:10px;color:#6c8591;font-weight:500;margin-bottom:6px}
+    .ga-compose .ga-lines-table input{min-height:40px;font-size:15px;padding:8px 10px;text-align:left}
+    .ga-compose .ga-lines-table td.ga-money{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding-top:2px!important;font-size:13px;white-space:nowrap}
+    .ga-compose .ga-lines-table td.ga-money::before{display:inline;margin-bottom:0;font-size:10px}
+    .ga-compose .ga-lines-table td:last-child{position:absolute;right:9px;top:8px}
+    .ga-compose .ga-line-remove{width:30px;height:34px;background:#f5f8f9;color:#7d95a0}
+    .ga-compose .ga-line-count{font-size:9px;padding:4px 7px;min-height:24px}
+}
+@media(max-width:760px){
+    .ga-compose-screen .erp-mobile-topbar{color:#234e60;box-shadow:0 3px 15px rgba(24,64,80,.07)}
+    .ga-compose-screen .erp-mobile-brand strong{color:#234e60}
+    .ga-compose-screen .erp-mobile-brand span{color:#6c929f}
+    .ga-compose-screen .erp-mobile-menu-button{border-color:#d9e9ec;background:#f4fafb}
+    .ga-compose-screen .erp-mobile-menu-button span{background:#4b7a89}
+    .ga-compose-screen .erp-topbar-actions .erp-btn-secondary{width:auto;min-height:34px;padding:8px 12px;font-size:11px;border-radius:9px;box-shadow:none}
+    .ga-compose-screen .erp-topbar-actions .erp-user-chip{padding:7px 10px;font-size:11px;border-radius:9px;box-shadow:none}
+}
+@media(max-width:360px){
+    .ga-compose-path{gap:5px;font-size:9px}
+    .ga-compose-path i{width:5px}
+    .ga-compose .ga-card{padding:14px}
+    .ga-compose .ga-attention-fields{grid-template-columns:1fr}
+    .ga-compose .ga-compose-button-primary svg{display:none}
+    .ga-compose .ga-compose-button{font-size:10px}
+    .ga-compose .ga-summary-amounts{gap:7px 10px}
+}

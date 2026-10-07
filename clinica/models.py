@@ -1507,8 +1507,9 @@ class LineaGastoAdicional(models.Model):
 
     def clean(self):
         super().clean()
-        if self.producto_id and self.gasto_id and self.producto.empresa_id != self.gasto.empresa_id:
-            raise ValidationError({"producto": "El producto debe pertenecer a la empresa del documento."})
+        from .catalogo_gastos_adicionales import producto_permitido_gasto
+        if self.producto_id and self.gasto_id and not producto_permitido_gasto(self.gasto.empresa, self.producto):
+            raise ValidationError({"producto": "El producto no pertenece al catálogo permitido de Gastos Adicionales."})
         if self.gasto_id and self.gasto.factura_id:
             raise ValidationError("No se pueden modificar las líneas de un gasto con factura vinculada.")
 

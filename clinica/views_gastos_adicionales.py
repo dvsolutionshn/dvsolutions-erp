@@ -14,7 +14,8 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Value
+from django.db.models.functions import Replace
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -27,7 +28,8 @@ from core.access import gastos_adicionales_habilitados
 from core.models import Empresa
 from crm.models import ConfiguracionCRM
 from crm.services import enviar_documento_whatsapp, subir_documento_whatsapp
-from facturacion.models import ConfiguracionFacturacionEmpresa, Producto
+from facturacion.models import ConfiguracionFacturacionEmpresa
+from .catalogo_gastos_adicionales import productos_gastos_adicionales
 from .forms_gastos_adicionales import GastoAdicionalForm, es_id_valido, validar_lineas_gasto
 from .models import GastoAdicional, LineaGastoAdicional, Paciente, ProfesionalSalud
 from .services_gastos_adicionales import convertir_gasto_adicional
@@ -49,7 +51,7 @@ def _empresa_autorizada(request, slug, *permisos):
 def _gasto(empresa, gasto_id):
     return get_object_or_404(
         GastoAdicional.objects.select_related("paciente", "profesional", "creado_por", "factura", "convertido_por")
-        .prefetch_related("lineas__producto"), empresa=empresa, pk=gasto_id,
+        .prefetch_related("lineas__producto__empresa", "lineas__producto__impuesto_predeterminado"), empresa=empresa, pk=gasto_id,
     )
 
 
@@ -94,7 +96,37 @@ def gastos_adicionales(request, empresa_slug):
 
 
 def _paciente_payload(paciente):
-    return {"id": paciente.pk, "nombre": paciente.nombre, "identidad": paciente.identidad or "", "text": paciente.nombre, "expediente": paciente.expediente_codigo}
+    return {
+        "id": paciente.pk, "nombre": paciente.nombre, "text": paciente.nombre,
+        "identidad": paciente.identidad or "", "expediente": paciente.expediente_codigo,
+        "telefono": paciente.telefono or paciente.whatsapp or paciente.celular_2 or "",
+        "whatsapp": paciente.whatsapp or "", "celular_2": paciente.celular_2 or "",
+    }
+
+
+def _producto_payload(producto):
+    impuesto = producto.impuesto_predeterminado
+    return {
+        "id": producto.pk, "nombre": producto.nombre, "text": producto.nombre,
+        "codigo": producto.codigo or "", "descripcion": producto.descripcion or "",
+        "precio": str(producto.precio), "empresa_nombre": producto.empresa.nombre,
+        "empresa_slug": producto.empresa.slug, "tipo_item": producto.tipo_item,
+        "unidad_medida": producto.unidad_medida,
+        "impuesto_id": producto.impuesto_predeterminado_id,
+        "impuesto_nombre": impuesto.nombre if impuesto else "",
+        "impuesto_porcentaje": str(impuesto.porcentaje) if impuesto else None,
+        "impuesto_activo": bool(impuesto and impuesto.activo),
+    }
+
+
+def _resultados_paginados(queryset, request, payload):
+    pagina = Paginator(queryset, 40).get_page(request.GET.get("page"))
+    return JsonResponse({
+        "results": [payload(objeto) for objeto in pagina],
+        "page": pagina.number, "total": pagina.paginator.count,
+        "has_more": pagina.has_next(),
+        "next_page": pagina.next_page_number() if pagina.has_next() else None,
+    })
 
 
 @login_required
@@ -104,8 +136,23 @@ def pacientes_buscar(request, empresa_slug):
     q = (request.GET.get("q") or "").strip()[:160]
     pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
     if q:
-        pacientes = pacientes.filter(Q(nombre__icontains=q) | Q(identidad__icontains=q) | Q(expediente_codigo__icontains=q))
-    return JsonResponse({"results": [_paciente_payload(paciente) for paciente in pacientes.order_by("nombre")[:20]]})
+        coincidencias = (
+            Q(nombre__icontains=q) | Q(identidad__icontains=q) | Q(expediente_codigo__icontains=q)
+            | Q(telefono__icontains=q) | Q(whatsapp__icontains=q) | Q(celular_2__icontains=q)
+        )
+        digitos = "".join(caracter for caracter in q if caracter.isascii() and caracter.isdecimal())
+        if digitos and not any(caracter.isalpha() for caracter in q):
+            normalizados = {}
+            for campo in ("telefono", "whatsapp", "celular_2"):
+                valor = campo
+                for separador in (" ", "-", "(", ")", "+", ".", "\u00a0"):
+                    valor = Replace(valor, Value(separador), Value(""))
+                alias = f"_{campo}_busqueda"
+                normalizados[alias] = valor
+                coincidencias |= Q(**{f"{alias}__contains": digitos})
+            pacientes = pacientes.annotate(**normalizados)
+        pacientes = pacientes.filter(coincidencias)
+    return _resultados_paginados(pacientes.order_by("nombre", "pk"), request, _paciente_payload)
 
 
 @login_required
@@ -113,10 +160,13 @@ def pacientes_buscar(request, empresa_slug):
 def productos_buscar(request, empresa_slug):
     empresa = _empresa_autorizada(request, empresa_slug, "puede_crear_gastos_adicionales", "puede_editar_gastos_adicionales")
     q = (request.GET.get("q") or "").strip()[:160]
-    productos = Producto.objects.filter(empresa=empresa, activo=True)
+    productos = productos_gastos_adicionales(empresa)
     if q:
-        productos = productos.filter(Q(nombre__icontains=q) | Q(codigo__icontains=q))
-    return JsonResponse({"results": [{"id": producto.pk, "nombre": producto.nombre, "text": producto.nombre, "codigo": producto.codigo or "", "precio": str(producto.precio)} for producto in productos.order_by("nombre")[:20]]})
+        productos = productos.filter(
+            Q(nombre__icontains=q) | Q(codigo__icontains=q) | Q(descripcion__icontains=q)
+            | Q(empresa__nombre__icontains=q) | Q(empresa__slug__icontains=q)
+        )
+    return _resultados_paginados(productos.order_by("nombre", "empresa__nombre", "pk"), request, _producto_payload)
 
 
 def _formulario(request, empresa, gasto=None):
@@ -129,7 +179,11 @@ def _formulario(request, empresa, gasto=None):
     if gasto:
         inicial.update({"paciente": gasto.paciente_id, "fecha": gasto.fecha, "profesional": gasto.profesional_id, "observacion": gasto.observacion})
         paciente = gasto.paciente
-        lineas_iniciales = [{"producto_id": linea.producto_id, "nombre": linea.descripcion, "codigo": linea.producto.codigo or "", "cantidad": str(linea.cantidad), "precio_unitario": str(linea.precio_unitario)} for linea in gasto.lineas.all()]
+        lineas_iniciales = [
+            {**_producto_payload(linea.producto), "producto_id": linea.producto_id,
+             "nombre": linea.descripcion, "cantidad": str(linea.cantidad), "precio_unitario": str(linea.precio_unitario)}
+            for linea in gasto.lineas.all()
+        ]
     else:
         profesional = ProfesionalSalud.objects.filter(empresa=empresa, usuario=request.user, activo=True).first()
         if profesional:
@@ -181,20 +235,31 @@ def _formulario(request, empresa, gasto=None):
                 return _volver(request, empresa, documento)
         paciente_valor = request.POST.get("paciente", "")
         paciente = Paciente.objects.filter(empresa=empresa, pk=paciente_valor).first() if es_id_valido(paciente_valor) else None
-        # Preservar únicamente selecciones pertenecientes al catálogo de esta empresa.
+        # Reconstruir solo selecciones del mismo catálogo autorizado del POST.
         try:
             datos_post = json.loads(request.POST.get("lineas") or "[]")
         except (ValueError, TypeError):
             datos_post = []
         lineas_iniciales = []
         if isinstance(datos_post, list):
+            catalogo = productos_gastos_adicionales(empresa, gasto=gasto)
+            ids_post = [int(dato["producto_id"]) for dato in datos_post[:100] if isinstance(dato, dict) and es_id_valido(dato.get("producto_id", ""))]
+            productos_post = {producto.pk: producto for producto in catalogo.filter(pk__in=ids_post)}
             for dato in datos_post[:100]:
                 if not isinstance(dato, dict) or not es_id_valido(dato.get("producto_id", "")):
                     continue
-                producto = Producto.objects.filter(empresa=empresa, pk=dato["producto_id"]).first()
+                producto = productos_post.get(int(dato["producto_id"]))
                 if producto:
-                    lineas_iniciales.append({"producto_id": producto.pk, "nombre": producto.nombre, "codigo": producto.codigo or "", "cantidad": str(dato.get("cantidad", ""))[:30], "precio_unitario": str(dato.get("precio_unitario", ""))[:30]})
-    return render(request, "clinica/gastos_adicionales_form.html", {"empresa": empresa, "gasto": gasto, "form": form, "paciente_inicial": _paciente_payload(paciente) if paciente else None, "lineas_iniciales": lineas_iniciales, "errores_lineas": errores_lineas})
+                    lineas_iniciales.append({**_producto_payload(producto), "producto_id": producto.pk, "cantidad": str(dato.get("cantidad", ""))[:30], "precio_unitario": str(dato.get("precio_unitario", ""))[:30]})
+    from facturacion.views import _precios_incluyen_impuesto
+    permiso_precio = "puede_editar_gastos_adicionales" if gasto else "puede_crear_gastos_adicionales"
+    return render(request, "clinica/gastos_adicionales_form.html", {
+        "empresa": empresa, "gasto": gasto, "form": form,
+        "paciente_inicial": _paciente_payload(paciente) if paciente else None,
+        "lineas_iniciales": lineas_iniciales, "errores_lineas": errores_lineas,
+        "precios_incluyen_impuesto": gasto.precio_incluye_impuesto if gasto else _precios_incluyen_impuesto(empresa),
+        "puede_editar_precio": request.user.tiene_permiso_erp(permiso_precio, empresa),
+    })
 
 
 @login_required

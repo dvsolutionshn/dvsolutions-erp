@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from facturacion.models import Producto
+from .catalogo_gastos_adicionales import productos_gastos_adicionales
 from .models import Paciente, ProfesionalSalud
 
 
@@ -49,12 +49,7 @@ def validar_lineas_gasto(raw, empresa, *, gasto=None):
         if not es_id_valido(valor):
             raise ValidationError("Seleccione un producto válido en cada línea.")
         ids.append(int(valor))
-    productos = Producto.objects.filter(empresa=empresa, pk__in=ids)
-    if gasto:
-        originales = gasto.lineas.values_list("producto_id", flat=True)
-        productos = productos.filter(Q(activo=True) | Q(pk__in=originales))
-    else:
-        productos = productos.filter(activo=True)
+    productos = productos_gastos_adicionales(empresa, gasto=gasto).filter(pk__in=ids)
     por_id = {producto.pk: producto for producto in productos}
     cantidad_field = forms.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0.01"))
     precio_field = forms.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.00"))

@@ -14,9 +14,33 @@
     const emptyDisplay = document.getElementById("ga-lines-empty");
     const errorsDisplay = document.getElementById("ga-client-errors");
     const productFeedback = document.getElementById("ga-product-feedback");
+    const subtotalDisplay = document.getElementById("ga-subtotal");
+    const taxesDisplay = document.getElementById("ga-taxes");
+    const summaryCount = document.getElementById("ga-summary-count");
+    const summaryPatient = document.getElementById("ga-summary-patient");
+    const taxNote = document.getElementById("ga-tax-note");
+    const taxLabel = document.getElementById("ga-tax-label");
+    const pricesIncludeTax = form.dataset.priceIncludesTax !== "false";
+    const canEditPrice = form.dataset.canEditPrice !== "false";
     const numberFormat = new Intl.NumberFormat("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     let lineKey = 0;
     let submitting = false;
+
+    const mobileNavigation = document.querySelector(".erp-mobile-bottom-nav");
+    const summary = form.querySelector(".ga-compose-summary");
+    function positionMobileSummary() {
+        const navigationRect = mobileNavigation ? mobileNavigation.getBoundingClientRect() : null;
+        const offset = navigationRect && navigationRect.height > 0 ? Math.max(16, window.innerHeight - navigationRect.top + 10) : 16;
+        form.style.setProperty("--ga-mobile-nav-offset", offset + "px");
+        if (summary) form.style.setProperty("--ga-mobile-summary-height", summary.offsetHeight + "px");
+    }
+    if (typeof ResizeObserver !== "undefined") {
+        const observer = new ResizeObserver(positionMobileSummary);
+        if (mobileNavigation) observer.observe(mobileNavigation);
+        if (summary) observer.observe(summary);
+    }
+    window.addEventListener("resize", positionMobileSummary);
+    positionMobileSummary();
 
     function readData(id, fallback) {
         try {
@@ -46,6 +70,12 @@
         return "L " + numberFormat.format(Number(cents) / 100);
     }
 
+    function roundEven(numerator, denominator) {
+        const quotient = numerator / denominator;
+        const remainder = numerator % denominator;
+        return quotient + (remainder * 2n > denominator || (remainder * 2n === denominator && quotient % 2n === 1n) ? 1n : 0n);
+    }
+
     function element(tag, className, text) {
         const node = document.createElement(tag);
         if (className) node.className = className;
@@ -57,9 +87,10 @@
         patientId.value = patient.id;
         patientSearch.value = patient.nombre || patient.text || "";
         patientSelected.replaceChildren(element("strong", "", patient.nombre || patient.text || "Paciente seleccionado"));
-        const meta = [patient.identidad, patient.expediente_codigo || patient.expediente].filter(Boolean).join(" · ");
+        const meta = [patient.identidad, patient.telefono || patient.whatsapp, patient.expediente_codigo || patient.expediente].filter(Boolean).join(" · ");
         if (meta) patientSelected.appendChild(element("span", "", meta));
         patientSelected.hidden = false;
+        if (summaryPatient) summaryPatient.textContent = patient.nombre || patient.text || "Paciente seleccionado";
     }
 
     function createSearch(input, results, url, select, isProduct) {
@@ -68,8 +99,18 @@
         let generation = 0;
         let options = [];
         let active = -1;
+        let items = [];
+        let nextPage = null;
+        let currentQuery = "";
+        let loadingMore = false;
+        const cache = new Map();
 
-        function close() {
+        function close(dismiss) {
+            if (dismiss) {
+                generation += 1;
+                window.clearTimeout(timer);
+                if (controller) controller.abort();
+            }
             results.hidden = true;
             input.setAttribute("aria-expanded", "false");
             input.removeAttribute("aria-activedescendant");
@@ -101,14 +142,15 @@
         }
 
         function choose(item) {
-            generation += 1;
-            if (controller) controller.abort();
-            window.clearTimeout(timer);
             select(item);
-            close();
+            close(true);
         }
 
-        function render(items) {
+        function render(data, append) {
+            const scrollTop = results.scrollTop;
+            const newItems = Array.isArray(data.results) ? data.results : [];
+            items = append ? items.concat(newItems.filter(function (item) { return !items.some(function (existing) { return String(existing.id) === String(item.id); }); })) : newItems;
+            nextPage = data.has_more ? data.next_page : null;
             results.replaceChildren();
             active = -1;
             input.removeAttribute("aria-activedescendant");
@@ -120,38 +162,74 @@
                 option.setAttribute("aria-selected", "false");
                 const copy = element("span");
                 copy.appendChild(element("strong", "", item.nombre || item.text || ""));
-                const meta = isProduct ? item.codigo : [item.identidad, item.expediente_codigo || item.expediente].filter(Boolean).join(" · ");
+                const meta = isProduct ? [item.codigo, item.empresa_nombre].filter(Boolean).join(" · ") : [item.identidad, item.telefono || item.whatsapp, item.expediente_codigo || item.expediente].filter(Boolean).join(" · ");
                 if (meta) copy.appendChild(element("small", "", meta));
                 option.appendChild(copy);
                 if (isProduct) {
                     const price = hundredths(item.precio || item.precio_venta || "0");
-                    option.appendChild(element("span", "ga-search-price", money(price === null ? 0n : price)));
+                    const priceCopy = element("span", "ga-search-price");
+                    priceCopy.appendChild(element("strong", "", money(price === null ? 0n : price)));
+                    if (item.impuesto_id != null && item.impuesto_activo) priceCopy.appendChild(element("small", "", Number(item.impuesto_porcentaje) === 0 ? "Exento" : "ISV " + item.impuesto_porcentaje + "%"));
+                    option.appendChild(priceCopy);
                 }
                 option.addEventListener("click", function () { choose(item); });
                 results.appendChild(option);
                 return option;
             });
-            if (!options.length) message("No se encontraron resultados.");
-            else open();
+            if (!options.length) { message("No se encontraron resultados."); return; }
+            if (nextPage) {
+                const more = element("button", "ga-search-more", "Ver más " + (isProduct ? "productos" : "pacientes"));
+                more.type = "button";
+                more.addEventListener("click", function () { search(true); });
+                results.appendChild(more);
+            }
+            if (data.total != null) results.appendChild(element("div", "ga-search-meta", items.length + " de " + data.total + " " + (isProduct ? "productos" : "pacientes")));
+            open();
+            if (append) results.scrollTop = scrollTop;
         }
 
-        async function search() {
-            const query = input.value.trim();
+        function queryValue() {
+            // Un paciente ya seleccionado puede sustituirse desde la lista inicial.
+            return !isProduct && patientId.value ? "" : input.value.trim();
+        }
+
+        async function fetchPage(query, page, signal) {
+            const key = query + "\u0000" + page;
+            if (cache.has(key)) return cache.get(key);
+            const endpoint = new URL(url, window.location.origin);
+            endpoint.searchParams.set("q", query);
+            endpoint.searchParams.set("page", String(page));
+            const pending = fetch(endpoint, { signal: signal, credentials: "same-origin", headers: { Accept: "application/json" } }).then(function (response) {
+                if (!response.ok) throw new Error("search");
+                return response.json();
+            });
+            cache.set(key, pending);
+            try { return await pending; }
+            catch (error) { cache.delete(key); throw error; }
+        }
+
+        async function search(append) {
+            append = append === true;
+            const query = queryValue();
+            if (append && (loadingMore || !nextPage || query !== currentQuery)) return;
             const requestGeneration = ++generation;
             if (controller) controller.abort();
-            if (query.length < 2) { close(); return; }
             controller = new AbortController();
-            message("Buscando…");
+            const page = append ? nextPage : 1;
+            currentQuery = query;
+            if (append) {
+                loadingMore = true;
+                const button = results.querySelector(".ga-search-more");
+                if (button) { button.disabled = true; button.textContent = "Cargando…"; }
+            } else message(query ? "Buscando…" : "Cargando " + (isProduct ? "productos…" : "pacientes…"));
             try {
-                const endpoint = new URL(url, window.location.origin);
-                endpoint.searchParams.set("q", query);
-                const response = await fetch(endpoint, { signal: controller.signal, credentials: "same-origin", headers: { Accept: "application/json" } });
-                if (!response.ok) throw new Error("search");
-                const data = await response.json();
+                const data = await fetchPage(query, page, controller.signal);
                 if (requestGeneration !== generation) return;
-                render(Array.isArray(data.results) ? data.results : []);
+                render(data, append);
             } catch (error) {
                 if (error.name !== "AbortError" && requestGeneration === generation) message("No se pudo completar la búsqueda. Inténtelo de nuevo.");
+            } finally {
+                if (requestGeneration === generation) loadingMore = false;
             }
         }
 
@@ -159,33 +237,43 @@
             generation += 1;
             if (controller) controller.abort();
             window.clearTimeout(timer);
-            close();
+            loadingMore = false;
+            message(input.value.trim() ? "Buscando…" : "Cargando lista…");
             timer = window.setTimeout(search, 220);
         });
-        input.addEventListener("focus", function () {
-            if (input.value.trim().length >= 2) search();
+        input.addEventListener("focus", function () { search(); });
+        input.addEventListener("click", function () { if (results.hidden) search(); });
+        input.addEventListener("blur", function () {
+            window.setTimeout(function () { if (!input.parentElement.contains(document.activeElement)) close(true); }, 0);
         });
         input.addEventListener("keydown", function (event) {
-            if (event.key === "Escape") { close(); return; }
+            if (event.key === "Escape") { close(true); return; }
             if (event.key === "Enter") {
                 event.preventDefault();
                 if (!results.hidden && options.length) options[active < 0 ? 0 : active].click();
                 return;
             }
-            if (!results.hidden && options.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
                 const offset = event.key === "ArrowDown" ? 1 : -1;
-                setActive((active + offset + options.length) % options.length);
+                if (results.hidden) {
+                    search().then(function () { if (options.length && !results.hidden) setActive(offset > 0 ? 0 : options.length - 1); });
+                } else if (options.length) setActive(active < 0 ? (offset > 0 ? 0 : options.length - 1) : (active + offset + options.length) % options.length);
             }
         });
         document.addEventListener("pointerdown", function (event) {
-            if (!input.parentElement.contains(event.target)) close();
+            if (!input.parentElement.contains(event.target)) close(true);
         });
+        // Preparar la primera página hace que abrir el campo no requiera escribir.
+        fetchPage("", 1).catch(function () {});
     }
 
     function updateTotals() {
         const rows = Array.from(linesBody.children);
         let total = 0n;
+        let subtotalTotal = 0n;
+        let taxesTotal = 0n;
+        let missingTax = false;
         const data = rows.map(function (row) {
             const quantity = row.querySelector('[data-value="cantidad"]');
             const price = row.querySelector('[data-value="precio_unitario"]');
@@ -193,17 +281,28 @@
             const unit = hundredths(price.value);
             let subtotal = 0n;
             if (qty !== null && unit !== null) {
-                const product = qty * unit;
-                subtotal = product / 100n;
-                const remainder = product % 100n;
-                if (remainder > 50n || (remainder === 50n && subtotal % 2n === 1n)) subtotal += 1n;
+                subtotal = roundEven(qty * unit, 100n);
             }
             row.querySelector("[data-subtotal]").textContent = money(subtotal);
             total += subtotal;
+            const rate = hundredths(row.dataset.taxRate);
+            const knownTax = row.dataset.taxActive === "true" && rate !== null;
+            if (!knownTax) missingTax = true;
+            const net = pricesIncludeTax && knownTax ? roundEven(subtotal * 10000n, 10000n + rate) : subtotal;
+            subtotalTotal += net;
+            taxesTotal += pricesIncludeTax ? subtotal - net : (knownTax ? roundEven(subtotal * rate, 10000n) : 0n);
             return { producto_id: row.dataset.productId, cantidad: canonical(quantity.value), precio_unitario: canonical(price.value) };
         });
         totalDisplay.textContent = money(total);
+        if (subtotalDisplay) subtotalDisplay.textContent = money(subtotalTotal);
+        if (taxesDisplay) taxesDisplay.textContent = money(taxesTotal);
+        if (taxLabel) taxLabel.textContent = pricesIncludeTax ? "Impuestos incluidos" : "Impuestos al facturar";
+        if (taxNote) {
+            taxNote.textContent = missingTax ? "Un producto requiere revisar su impuesto antes de facturar." : (pricesIncludeTax ? "Impuestos incluidos según la configuración de cada producto." : "El total corresponde al gasto. Los impuestos se aplican al facturar.");
+            taxNote.classList.toggle("ga-tax-pending", missingTax);
+        }
         lineCount.textContent = rows.length + (rows.length === 1 ? " línea" : " líneas");
+        if (summaryCount) summaryCount.textContent = rows.length + (rows.length === 1 ? " producto seleccionado" : " productos seleccionados");
         emptyDisplay.hidden = rows.length > 0;
         linesData.value = JSON.stringify(data);
     }
@@ -211,10 +310,13 @@
     function addLine(product, focusQuantity) {
         const row = element("tr");
         row.dataset.productId = product.producto_id || product.id;
+        row.dataset.taxRate = product.impuesto_porcentaje == null ? "" : String(product.impuesto_porcentaje);
+        row.dataset.taxActive = String(product.impuesto_activo === true);
         const title = product.nombre || product.descripcion || product.text || "Producto del catálogo";
         const titleCell = element("td");
         titleCell.appendChild(element("strong", "", title));
-        if (product.codigo) titleCell.appendChild(element("span", "ga-cell-sub", product.codigo));
+        const lineMeta = [product.codigo, product.empresa_nombre].filter(Boolean).join(" · ");
+        if (lineMeta) titleCell.appendChild(element("span", "ga-cell-sub", lineMeta));
         row.appendChild(titleCell);
         const quantityId = "ga-quantity-" + (++lineKey);
         const priceId = "ga-price-" + lineKey;
@@ -238,7 +340,9 @@
             return input;
         }
         const quantity = numberCell(quantityId, "cantidad", "Cantidad", product.cantidad == null ? "1" : product.cantidad, "0.01");
-        numberCell(priceId, "precio_unitario", "Precio unitario", product.precio_unitario == null ? (product.precio || product.precio_venta || "0") : product.precio_unitario, "0");
+        const priceInput = numberCell(priceId, "precio_unitario", "Precio unitario", product.precio_unitario == null ? (product.precio || product.precio_venta || "0") : product.precio_unitario, "0");
+        priceInput.readOnly = !canEditPrice;
+        if (!canEditPrice) priceInput.title = "Precio según el catálogo";
         const subtotalCell = element("td", "ga-money");
         subtotalCell.dataset.subtotal = "";
         subtotalCell.dataset.label = "Subtotal";
@@ -267,6 +371,7 @@
     patientSearch.addEventListener("input", function () {
         patientId.value = "";
         patientSelected.hidden = true;
+        if (summaryPatient) summaryPatient.textContent = "Seleccione un paciente";
     });
     createSearch(patientSearch, document.getElementById("ga-patient-results"), form.dataset.patientUrl, selectPatient, false);
     createSearch(productSearch, document.getElementById("ga-product-results"), form.dataset.productUrl, function (product) {
@@ -274,6 +379,13 @@
         productSearch.value = "";
         productFeedback.textContent = "Agregado: " + (product.nombre || product.text || "producto") + ". Puede buscar el siguiente producto.";
     }, true);
+    form.querySelectorAll("[data-ga-add-more]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            productSearch.value = "";
+            productSearch.focus();
+            productSearch.click();
+        });
+    });
 
     const initialPatient = readData("ga-initial-patient", null);
     if (initialPatient && initialPatient.id) selectPatient(initialPatient);

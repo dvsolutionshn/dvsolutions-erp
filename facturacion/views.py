@@ -1536,6 +1536,18 @@ def _actualizar_totales_factura(factura):
     ])
 
 
+def _validar_inventario_local_gasto_adicional(factura, lineas):
+    if not getattr(factura, "gasto_adicional_origen", None):
+        return
+    for linea in lineas:
+        producto = getattr(linea, "producto", None)
+        if producto and producto.controla_inventario and producto.empresa_id != factura.empresa_id:
+            raise ValidationError(
+                f"El producto «{producto.nombre}» controla inventario de otra empresa. "
+                "Revise la línea y seleccione un producto de la empresa actual antes de emitir la factura."
+            )
+
+
 def _emitir_factura_desde_borrador(factura, usuario=None):
     if factura.estado == 'anulada':
         raise ValidationError("No se puede validar una factura anulada.")
@@ -1546,6 +1558,7 @@ def _emitir_factura_desde_borrador(factura, usuario=None):
     if not lineas:
         raise ValidationError("La factura debe tener al menos una linea para poder validarse.")
 
+    _validar_inventario_local_gasto_adicional(factura, lineas)
     _validar_stock_disponible_para_lineas(lineas)
 
     factura.estado = 'emitida'
@@ -7583,8 +7596,19 @@ def editar_factura(request, empresa_slug, factura_id):
 
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
     if gasto_adicional_origen:
-        productos_qs = Producto.objects.filter(empresa=empresa).filter(
-            Q(activo=True) | Q(pk__in=factura.lineas.values_list("producto_id", flat=True))
+        from clinica.catalogo_gastos_adicionales import productos_gastos_adicionales
+
+        # La revisión conserva las referencias compartidas que ya llegaron
+        # desde el GA, sin abrir el catálogo externo en Facturación.
+        productos_originales_ga = productos_gastos_adicionales(
+            empresa, solo_disponibles=False,
+        ).filter(pk__in=gasto_adicional_origen.lineas.values_list("producto_id", flat=True))
+        productos_qs = Producto.objects.filter(
+            (
+                Q(empresa=empresa)
+                & (Q(activo=True) | Q(pk__in=factura.lineas.values_list("producto_id", flat=True)))
+            )
+            | Q(pk__in=productos_originales_ga.values_list("pk", flat=True))
         ).select_related('impuesto_predeterminado')
     impuestos_qs = TipoImpuesto.objects.filter(activo=True)
     clientes_qs = Cliente.objects.filter(empresa=empresa)
@@ -7738,6 +7762,25 @@ def editar_factura(request, empresa_slug, factura_id):
 
             try:
                 with transaction.atomic():
+                    if gasto_adicional_origen and form.cleaned_data['estado'] == 'emitida':
+                        lineas_conservadas = {
+                            linea.pk: linea
+                            for linea in factura.lineas.select_related('producto').all()
+                        }
+                        lineas_nuevas = []
+                        for f in formset.forms:
+                            if not f.cleaned_data:
+                                continue
+                            if f.cleaned_data.get('DELETE', False):
+                                lineas_conservadas.pop(f.instance.pk, None)
+                            elif f.instance.pk:
+                                lineas_conservadas[f.instance.pk] = f.instance
+                            else:
+                                lineas_nuevas.append(f.instance)
+                        _validar_inventario_local_gasto_adicional(
+                            factura,
+                            list(lineas_conservadas.values()) + lineas_nuevas,
+                        )
                     factura = form.save()
                     reconstruir_factura_emitida = estado_original == 'emitida' and factura.estado == 'emitida'
                     if reconstruir_factura_emitida:
@@ -8739,6 +8782,12 @@ def duplicar_factura(request, empresa_slug, factura_id):
         id=factura_id,
         empresa=empresa,
     )
+
+    try:
+        _validar_inventario_local_gasto_adicional(factura_original, factura_original.lineas.all())
+    except ValidationError as exc:
+        messages.error(request, exc.message if hasattr(exc, "message") else str(exc))
+        return _redirect_factura(request, empresa, factura_original.id)
 
     with transaction.atomic():
         estado_factura = "emitida" if _empresa_factura_solo_contado(empresa) else "borrador"
