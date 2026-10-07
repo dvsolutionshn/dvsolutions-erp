@@ -1,3 +1,4 @@
+{% load humanize %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -41,15 +42,14 @@
         .product-col{width:48%}.quantity-col{width:12%}.price-col,.subtotal-col{width:20%}
         .summary{margin:14pt 0 16pt;display:table;width:100%;break-inside:avoid}
         .summary-note{display:table-cell;width:53%;padding-right:24pt;color:#788894;font-size:8pt;vertical-align:middle}
-        .total{display:table-cell;vertical-align:middle;background:#173b4a;color:#fff;border-radius:8pt;padding:15pt 17pt;text-align:right}
-        .total span{display:block;font-size:7pt;text-transform:uppercase;letter-spacing:1.5pt;color:#b9d9de;margin-bottom:3pt}
-        .total strong{font-size:23pt;font-weight:normal;letter-spacing:.3pt}
+        .total{display:table-cell;vertical-align:middle;border-top:.7pt solid #d6e4e9;padding:8pt 0;text-align:right;color:#173b4a}
+        .total span{display:block;font-size:7.5pt;letter-spacing:.4pt;color:#627788;margin-bottom:2pt}
+        .total strong{font-size:16pt;font-weight:bold;white-space:nowrap}
         .observations{margin-top:5pt;padding:12pt 17pt;background:#fafcfd;border-left:3pt solid #b5d7dc;break-inside:avoid}
         .observations h3{font-size:8pt;color:#507285;text-transform:uppercase;letter-spacing:1pt;margin:0 0 6pt}
         .observations p{white-space:pre-wrap;margin:0;color:#365267;font-size:9pt;line-height:1.6;overflow-wrap:break-word}
         .invoice-link{margin-top:17pt;border:1pt solid #d2e4e9;border-radius:7pt;padding:10pt 13pt;font-size:8.5pt;color:#426072;break-inside:avoid}
         .invoice-link strong{color:#173449}.invoice-link p{margin:3pt 0}
-        .record-meta{margin-top:10pt;font-size:8pt;color:#788894;break-inside:avoid}
     </style>
 </head>
 <body>
@@ -61,10 +61,9 @@
     <section class="document-heading"><div class="document-title"><span class="eyebrow">Documento clínico</span><h2>GASTOS ADICIONALES</h2><p>Detalle de productos y servicios para el paciente</p></div><div class="document-number"><strong>{{ gasto.numero }}</strong><span>{{ gasto.fecha|date:'d/m/Y' }}</span><span>Estado: {{ gasto.get_estado_display }}</span></div></section>
     <section class="patient-panel"><div class="patient-row"><div class="patient-field"><label>Paciente</label><strong>{{ gasto.paciente.nombre }}</strong><span>Identidad: {{ gasto.paciente.identidad|default:'No indicada' }}{% if gasto.paciente.expediente_codigo %} · Expediente {{ gasto.paciente.expediente_codigo }}{% endif %}</span></div><div class="patient-field"><label>Profesional / usuario</label><strong>{% if gasto.profesional %}{{ gasto.profesional.nombre }}{% elif gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}</strong><span>Fecha de atención: {{ gasto.fecha|date:'d/m/Y' }}</span></div></div></section>
     <h3 class="section-label">Detalle del documento</h3>
-    <table><thead><tr><th class="product-col">Producto / servicio</th><th class="number quantity-col">Cantidad</th><th class="number price-col">Precio unitario</th><th class="number subtotal-col">Subtotal</th></tr></thead><tbody>{% for linea in gasto.lineas.all %}<tr><td><strong>{{ linea.descripcion|default:linea.producto.nombre }}</strong></td><td class="number">{{ linea.cantidad|floatformat:'-2' }}</td><td class="number">L {{ linea.precio_unitario|floatformat:2 }}</td><td class="number">L {{ linea.subtotal|floatformat:2 }}</td></tr>{% endfor %}</tbody></table>
-    <section class="summary"><div class="summary-note">Este documento conserva el detalle de gastos registrado en el expediente del paciente.</div><div class="total"><span>Total del documento</span><strong>L {{ gasto.total|floatformat:2 }}</strong></div></section>
+    <table><thead><tr><th class="product-col">Producto / servicio</th><th class="number quantity-col">Cantidad</th><th class="number price-col">Precio unitario</th><th class="number subtotal-col">Subtotal</th></tr></thead><tbody>{% for linea in gasto.lineas.all %}<tr><td><strong>{{ linea.descripcion|default:linea.producto.nombre }}</strong></td><td class="number">{{ linea.cantidad|floatformat:'-2u'|intcomma:False }}</td><td class="number">L {{ linea.precio_unitario|floatformat:'2u'|intcomma:False }}</td><td class="number">L {{ linea.subtotal|floatformat:'2u'|intcomma:False }}</td></tr>{% endfor %}</tbody></table>
+    <section class="summary"><div class="summary-note">Este documento conserva el detalle de gastos registrado en el expediente del paciente.</div><div class="total"><span>Total del documento</span><strong>L {{ gasto.total|floatformat:'2u'|intcomma:False }}</strong></div></section>
     {% if gasto.observacion %}<section class="observations"><h3>Observaciones</h3><p>{{ gasto.observacion }}</p></section>{% endif %}
     {% if gasto.factura %}<section class="invoice-link"><p><strong>Factura: {% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</strong></p><p>{% if gasto.factura.estado == 'borrador' %}Pendiente de revisión y emisión en Facturación.{% elif gasto.factura.estado == 'anulada' %}Factura asociada anulada.{% else %}Estado: Facturado.{% endif %}</p>{% if gasto.fecha_conversion %}<p>Conversión: {{ gasto.fecha_conversion|date:'d/m/Y H:i' }}{% if gasto.convertido_por %} · {{ gasto.convertido_por.get_full_name|default:gasto.convertido_por.username }}{% endif %}</p>{% endif %}</section>{% endif %}
-    <p class="record-meta">Registrado por {% if gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}{% if gasto.fecha_creacion %} · {{ gasto.fecha_creacion|date:'d/m/Y H:i' }}{% endif %}.</p>
 </body>
 </html>
