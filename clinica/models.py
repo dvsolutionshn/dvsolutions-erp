@@ -1379,6 +1379,9 @@ class GastoAdicional(models.Model):
         ProfesionalSalud, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="gastos_adicionales",
     )
+    profesional_nombre = models.CharField(max_length=160, default="Dr. Luis González", editable=False)
+    tipo_cirugia = models.CharField(max_length=64, blank=True, default="")
+    tipo_cirugia_nombre = models.CharField(max_length=220, blank=True, default="")
     fecha = models.DateField(default=timezone.localdate, db_index=True)
     correlativo = models.PositiveIntegerField(editable=False)
     numero = models.CharField(max_length=24, editable=False)
@@ -1429,6 +1432,11 @@ class GastoAdicional(models.Model):
     def editable(self):
         return not self.factura_id
 
+    @property
+    def tipo_cirugia_label(self):
+        from .catalogo_cirugias_gastos_adicionales import nombre_cirugia_gasto_adicional
+        return self.tipo_cirugia_nombre or nombre_cirugia_gasto_adicional(self.tipo_cirugia)
+
     def clean(self):
         super().clean()
         if self.paciente_id and self.empresa_id and self.paciente.empresa_id != self.empresa_id:
@@ -1437,6 +1445,10 @@ class GastoAdicional(models.Model):
             raise ValidationError({"profesional": "El profesional debe pertenecer a la empresa del documento."})
         if self.factura_id and self.empresa_id and self.factura.empresa_id != self.empresa_id:
             raise ValidationError({"factura": "La factura debe pertenecer a la empresa del documento."})
+        if self.tipo_cirugia:
+            from .catalogo_cirugias_gastos_adicionales import nombre_cirugia_gasto_adicional
+            if not nombre_cirugia_gasto_adicional(self.tipo_cirugia):
+                raise ValidationError({"tipo_cirugia": "Seleccione un tipo de cirugía válido."})
         if self.subtotal < 0 or self.total < 0:
             raise ValidationError("El total del documento no puede ser negativo.")
 
@@ -1467,6 +1479,7 @@ class GastoAdicional(models.Model):
                     campos_inmutables = (
                         "paciente_id", "profesional_id", "fecha", "observacion", "subtotal", "total",
                         "factura_id", "convertido_por_id", "fecha_conversion", "actualizado_por_id",
+                        "tipo_cirugia", "tipo_cirugia_nombre", "profesional_nombre",
                     )
                     if any(getattr(self, campo) != getattr(original, campo) for campo in campos_inmutables):
                         raise ValidationError("El gasto ya tiene una factura vinculada y se conserva como documento histórico.")

@@ -1,5 +1,5 @@
 {% extends "core/erp_base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block title %}Gastos Adicionales - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Gestión clínica{% endblock %}
@@ -33,8 +33,8 @@
         {% for gasto in gastos %}
             <tr>
                 <td data-label="Número / fecha"><a class="ga-document-number" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}">{{ gasto.numero }}</a><span class="ga-cell-sub">{{ gasto.fecha|date:"d/m/Y" }}</span></td>
-                <td data-label="Paciente"><strong>{{ gasto.paciente.nombre }}</strong><span class="ga-cell-sub">{{ gasto.paciente.identidad|default:"Sin identidad" }}</span></td>
-                <td class="ga-money" data-label="Total">L {{ gasto.total|floatformat:2 }}</td>
+                <td data-label="Paciente"><strong>{{ gasto.paciente.nombre }}</strong><span class="ga-cell-sub">{{ gasto.paciente.identidad|default:"Sin identidad" }}</span>{% if gasto.tipo_cirugia_label %}<span class="ga-cell-sub">{{ gasto.tipo_cirugia_label }}</span>{% endif %}</td>
+                <td class="ga-money" data-label="Total">L {{ gasto.total|floatformat:'2u'|intcomma:False }}</td>
                 <td data-label="Usuario">{% if gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}</td>
                 <td data-label="Estado / factura"><span class="ga-status {% if gasto.estado == 'facturado' %}ga-status-paid{% endif %}">{{ gasto.get_estado_display }}</span>{% if gasto.factura %}{% if erp_access.facturas %}<a class="ga-cell-sub ga-link" href="{% url 'ver_factura' empresa.slug gasto.factura.id %}">{% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</a>{% elif erp_access.editar_facturas and gasto.factura.estado == 'borrador' %}<a class="ga-cell-sub ga-link" href="{% url 'editar_factura' empresa.slug gasto.factura.id %}">Borrador #{{ gasto.factura.id }}</a>{% else %}<span class="ga-cell-sub">{% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</span>{% endif %}{% endif %}</td>
                 <td data-label="Acciones"><div class="ga-inline-actions"><a class="erp-btn-secondary" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}">Ver</a><a class="erp-btn-secondary" href="{% url 'clinica_gasto_adicional_pdf' empresa.slug gasto.id %}" target="_blank" rel="noopener">PDF</a>{% if erp_access.editar_gastos_adicionales and not gasto.factura %}<a class="erp-btn-secondary" href="{% url 'clinica_gasto_adicional_editar' empresa.slug gasto.id %}">Editar</a>{% endif %}</div></td>

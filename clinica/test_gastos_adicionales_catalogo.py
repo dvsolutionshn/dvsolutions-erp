@@ -55,7 +55,7 @@ class GastoAdicionalCatalogoTests(TestCase):
     def datos(self, producto=None, **overrides):
         data = {
             "paciente": self.paciente.pk, "fecha": timezone.localdate().isoformat(),
-            "profesional": "", "observacion": "Detalle clínico", "accion": "guardar",
+            "profesional": "", "tipo_cirugia": "rinoplastia", "observacion": "Detalle clínico", "accion": "guardar",
             "lineas": json.dumps([{
                 "producto_id": (producto or self.productos["medical_spa"]).pk,
                 "cantidad": "2.00", "precio_unitario": "115.00",

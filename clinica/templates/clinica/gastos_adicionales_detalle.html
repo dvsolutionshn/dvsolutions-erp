@@ -1,5 +1,5 @@
 {% extends "core/erp_base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block title %}{{ gasto.numero }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Gastos Adicionales{% endblock %}
@@ -10,13 +10,48 @@
 
 {% block content %}
 <div class="ga-page">
-    <section class="ga-hero ga-document-hero"><div><span class="ga-eyebrow">{{ empresa.nombre }}</span><h2>{{ gasto.paciente.nombre }}</h2><p>{{ gasto.paciente.identidad|default:"Sin identidad" }} · {{ gasto.fecha|date:"d/m/Y" }}{% if gasto.profesional %} · {{ gasto.profesional.nombre }}{% endif %}</p>{% if erp_access.modulo_clinica and erp_access.ver_datos_generales_paciente %}<a class="ga-link" href="{% url 'clinica_paciente_detalle' empresa.slug gasto.paciente.id %}">Abrir expediente del paciente →</a>{% endif %}</div><div class="ga-document-summary"><span class="ga-status {% if gasto.estado == 'facturado' %}ga-status-paid{% endif %}">{{ gasto.get_estado_display }}</span><strong>L {{ gasto.total|floatformat:2 }}</strong><span>{{ gasto.numero }}</span></div></section>
+    <section class="ga-hero ga-document-hero">
+        <div class="ga-document-copy">
+            <span class="ga-eyebrow">{{ empresa.nombre }}</span><h2>{{ gasto.paciente.nombre }}</h2><p>{{ gasto.paciente.identidad|default:"Sin identidad" }} · {{ gasto.fecha|date:"d/m/Y" }}</p>
+            <dl class="ga-document-facts"><div><dt>Profesional</dt><dd>{{ gasto.profesional_nombre|default:"Pendiente de asignar" }}</dd></div>{% if gasto.tipo_cirugia_label %}<div><dt>Tipo de cirugía</dt><dd>{{ gasto.tipo_cirugia_label }}</dd></div>{% endif %}</dl>
+            {% if erp_access.modulo_clinica and erp_access.ver_datos_generales_paciente %}<a class="ga-link" href="{% url 'clinica_paciente_detalle' empresa.slug gasto.paciente.id %}">Abrir expediente del paciente →</a>{% endif %}
+        </div>
+        <div class="ga-document-summary"><span class="ga-status {% if gasto.estado == 'facturado' %}ga-status-paid{% endif %}">{{ gasto.get_estado_display }}</span><strong>L {{ importes.total_historico|floatformat:'2u'|intcomma:False }}</strong><span>{{ gasto.numero }}</span></div>
+    </section>
 
     {% if gasto.factura %}
     <section class="ga-linked-invoice"><div><span class="ga-eyebrow">Factura relacionada</span><h3>{% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</h3><p>{% if gasto.factura.estado == 'borrador' %}Pendiente de emisión. Revise y confirme la factura desde Facturación.{% elif gasto.factura.estado == 'anulada' %}La factura asociada está anulada.{% else %}Estado: Facturado · Factura emitida.{% endif %}</p>{% if gasto.convertido_por or gasto.fecha_conversion %}<span class="ga-help">Conversión{% if gasto.convertido_por %} por {{ gasto.convertido_por.get_full_name|default:gasto.convertido_por.username }}{% endif %}{% if gasto.fecha_conversion %} · {{ gasto.fecha_conversion|date:"d/m/Y H:i" }}{% endif %}.</span>{% endif %}</div>{% if erp_access.facturas %}<a class="erp-btn" href="{% url 'ver_factura' empresa.slug gasto.factura.id %}">Abrir factura</a>{% elif erp_access.editar_facturas and gasto.factura.estado == 'borrador' %}<a class="erp-btn" href="{% url 'editar_factura' empresa.slug gasto.factura.id %}">Revisar borrador</a>{% endif %}</section>
     {% endif %}
 
-    <section class="ga-card"><div class="ga-section-head"><div><h2>Productos y servicios</h2><p>Detalle registrado en el documento original.</p></div></div><div class="ga-table-wrap"><table class="ga-table ga-document-table"><thead><tr><th>Producto / servicio</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead><tbody>{% for linea in gasto.lineas.all %}<tr><td data-label="Producto / servicio"><strong>{{ linea.descripcion|default:linea.producto.nombre }}</strong></td><td class="ga-money" data-label="Cantidad">{{ linea.cantidad|floatformat:"-2" }}</td><td class="ga-money" data-label="Precio unitario">L {{ linea.precio_unitario|floatformat:2 }}</td><td class="ga-money" data-label="Subtotal">L {{ linea.subtotal|floatformat:2 }}</td></tr>{% endfor %}</tbody></table></div><div class="ga-total"><div><span>Total del documento</span><small>Gasto adicional registrado</small></div><strong>L {{ gasto.total|floatformat:2 }}</strong></div>{% if gasto.observacion %}<div class="ga-observations"><span class="ga-eyebrow">Observaciones</span><p>{{ gasto.observacion }}</p></div>{% endif %}<p class="ga-help ga-audit">Registrado por {% if gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}{% if gasto.fecha_creacion %} · {{ gasto.fecha_creacion|date:"d/m/Y H:i" }}{% endif %}.</p></section>
+    <section class="ga-card">
+        <div class="ga-section-head"><div><h2>Productos y servicios</h2><p>Detalle registrado en el documento original.</p></div></div>
+        <div class="ga-table-wrap">
+            <table class="ga-table ga-document-table">
+                <colgroup><col class="ga-document-product-col"><col class="ga-document-quantity-col"><col class="ga-document-price-col"><col class="ga-document-tax-col"><col class="ga-document-total-col"></colgroup>
+                <thead><tr><th>Producto / servicio</th><th>Cantidad</th><th>Precio unitario</th><th>ISV</th><th>Importe</th></tr></thead>
+                <tbody>
+                    {% for item in importes.lineas %}
+                    <tr>
+                        <td data-label="Producto / servicio"><strong class="ga-document-product-name">{{ item.descripcion }}</strong></td>
+                        <td class="ga-money" data-label="Cantidad">{{ item.cantidad|floatformat:'-2u'|intcomma:False }}</td>
+                        <td class="ga-money" data-label="Precio unitario">L {{ item.precio_unitario|floatformat:'2u'|intcomma:False }}</td>
+                        <td class="ga-money" data-label="ISV"><div class="ga-line-tax">{% if item.impuesto_configurado %}<span>L {{ item.impuesto_monto|floatformat:'2u'|intcomma:False }}</span><small>{{ item.impuesto_tasa|floatformat:'-2u'|intcomma:False }}%{% if not item.impuesto_tasa %} · {{ item.impuesto_nombre|default:'Exento' }}{% endif %}</small>{% else %}<span class="ga-tax-pending">Pendiente</span><small>Sin configurar</small>{% endif %}</div></td>
+                        <td class="ga-money ga-document-line-total" data-label="Importe">{% if item.total_linea != None %}L {{ item.total_linea|floatformat:'2u'|intcomma:False }}{% else %}<span class="ga-tax-pending">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="ga-document-totals">
+            <div class="ga-document-total-note"><p>Este documento conserva los gastos registrados en el expediente del paciente.</p>{% if gasto.precio_incluye_impuesto and importes.impuestos_configurados %}<p>El ISV está incluido en los precios.</p>{% endif %}{% if importes.nota_impuestos %}<p>{{ importes.nota_impuestos }}</p>{% endif %}</div>
+            <div class="ga-summary-values" role="group" aria-label="Resumen de importes">
+                <div class="ga-summary-row"><span>Subtotal sin ISV</span><strong>{% if importes.subtotal != None %}L {{ importes.subtotal|floatformat:'2u'|intcomma:False }}{% else %}<span class="ga-tax-pending">Pendiente</span>{% endif %}</strong></div>
+                <div class="ga-summary-row"><span>ISV</span><strong>{% if importes.impuestos_configurados %}L {{ importes.impuestos|floatformat:'2u'|intcomma:False }}{% else %}<span class="ga-tax-pending">Pendiente</span>{% endif %}</strong></div>
+                <div class="ga-summary-row ga-summary-total"><span>Total del documento</span><strong>L {{ importes.total_historico|floatformat:'2u'|intcomma:False }}</strong></div>
+            </div>
+        </div>
+        {% if gasto.observacion %}<div class="ga-observations"><span class="ga-eyebrow">Observaciones</span><p>{{ gasto.observacion }}</p></div>{% endif %}
+    </section>
 
     <div class="ga-detail-actions">
         {% if erp_access.enviar_gastos_adicionales %}

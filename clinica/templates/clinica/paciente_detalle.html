@@ -1,4 +1,5 @@
 {% extends "core/erp_base.html" %}
+{% load humanize %}
 
 {% block title %}{{ paciente.nombre }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Expediente {{ paciente.expediente_codigo }}{% endblock %}
@@ -498,7 +499,7 @@ document.addEventListener("DOMContentLoaded",function(){
     <div class="patient-consent-list">
         {% for gasto in gastos_adicionales %}
         <div class="patient-consent-card">
-            <div><strong>{{ gasto.numero }} · L {{ gasto.total|floatformat:2 }}</strong><span>{{ gasto.fecha|date:"d/m/Y" }} · {{ gasto.get_estado_display }}{% if gasto.factura_id %} · Factura: {{ gasto.factura.numero_factura|default:"Borrador pendiente de emisión" }}{% endif %}</span></div>
+            <div><strong>{{ gasto.numero }} · L {{ gasto.total|floatformat:'2u'|intcomma:False }}</strong><span>{{ gasto.fecha|date:"d/m/Y" }}{% if gasto.tipo_cirugia_label %} · {{ gasto.tipo_cirugia_label }}{% endif %} · {{ gasto.get_estado_display }}{% if gasto.factura_id %} · Factura: {{ gasto.factura.numero_factura|default:"Borrador pendiente de emisión" }}{% endif %}</span></div>
             <a class="erp-action-link" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}">Abrir documento</a>
         </div>
         {% empty %}<div class="clinical-soft-note">El paciente aún no tiene Gastos Adicionales registrados.</div>{% endfor %}

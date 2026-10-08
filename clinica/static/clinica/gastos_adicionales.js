@@ -7,6 +7,7 @@
     const patientSearch = document.getElementById("ga-patient-search");
     const patientSelected = document.getElementById("ga-selected-patient");
     const productSearch = document.getElementById("ga-product-search");
+    const surgeryField = form.querySelector('[name="tipo_cirugia"]');
     const linesBody = document.getElementById("ga-lines");
     const linesData = document.getElementById("ga-lines-data");
     const totalDisplay = document.getElementById("ga-total");
@@ -70,6 +71,19 @@
         return "L " + numberFormat.format(Number(cents) / 100);
     }
 
+    function updateSurgerySelection() {
+        const ready = !surgeryField || Boolean(surgeryField.value);
+        productSearch.disabled = !ready;
+        productSearch.placeholder = ready ? "Ver catálogo o buscar producto" : "Seleccione primero el tipo de cirugía";
+        productFeedback.textContent = ready ? "Haga clic para ver productos. Seleccione uno para agregarlo." : "Seleccione el tipo de cirugía en los datos del paciente para habilitar el catálogo.";
+        if (!ready) {
+            document.getElementById("ga-product-results").hidden = true;
+            productSearch.setAttribute("aria-expanded", "false");
+        }
+    }
+    if (surgeryField) surgeryField.addEventListener("change", updateSurgerySelection);
+    updateSurgerySelection();
+
     function roundEven(numerator, denominator) {
         const quotient = numerator / denominator;
         const remainder = numerator % denominator;
@@ -118,6 +132,7 @@
         }
 
         function open() {
+            if (input.disabled) { results.hidden = true; return; }
             results.hidden = false;
             input.setAttribute("aria-expanded", "true");
         }
@@ -289,13 +304,18 @@
             const knownTax = row.dataset.taxActive === "true" && rate !== null;
             if (!knownTax) missingTax = true;
             const net = pricesIncludeTax && knownTax ? roundEven(subtotal * 10000n, 10000n + rate) : subtotal;
+            const tax = pricesIncludeTax ? subtotal - net : (knownTax ? roundEven(subtotal * rate, 10000n) : 0n);
+            const lineTax = row.querySelector("[data-line-tax]");
+            if (lineTax) {
+                lineTax.textContent = !knownTax ? "Impuesto pendiente de configurar" : (rate === 0n ? "Exento · ISV L 0.00" : "ISV " + Number(rate) / 100 + "%: " + money(tax) + (pricesIncludeTax ? " incluido" : " al facturar"));
+            }
             subtotalTotal += net;
-            taxesTotal += pricesIncludeTax ? subtotal - net : (knownTax ? roundEven(subtotal * rate, 10000n) : 0n);
+            taxesTotal += tax;
             return { producto_id: row.dataset.productId, cantidad: canonical(quantity.value), precio_unitario: canonical(price.value) };
         });
         totalDisplay.textContent = money(total);
-        if (subtotalDisplay) subtotalDisplay.textContent = money(subtotalTotal);
-        if (taxesDisplay) taxesDisplay.textContent = money(taxesTotal);
+        if (subtotalDisplay) subtotalDisplay.textContent = missingTax ? "Pendiente" : money(subtotalTotal);
+        if (taxesDisplay) taxesDisplay.textContent = missingTax ? "Pendiente" : money(taxesTotal);
         if (taxLabel) taxLabel.textContent = pricesIncludeTax ? "Impuestos incluidos" : "Impuestos al facturar";
         if (taxNote) {
             taxNote.textContent = missingTax ? "Un producto requiere revisar su impuesto antes de facturar." : (pricesIncludeTax ? "Impuestos incluidos según la configuración de cada producto." : "El total corresponde al gasto. Los impuestos se aplican al facturar.");
@@ -317,6 +337,9 @@
         titleCell.appendChild(element("strong", "", title));
         const lineMeta = [product.codigo, product.empresa_nombre].filter(Boolean).join(" · ");
         if (lineMeta) titleCell.appendChild(element("span", "ga-cell-sub", lineMeta));
+        const lineTax = element("span", "ga-cell-sub ga-line-tax");
+        lineTax.dataset.lineTax = "";
+        titleCell.appendChild(lineTax);
         row.appendChild(titleCell);
         const quantityId = "ga-quantity-" + (++lineKey);
         const priceId = "ga-price-" + lineKey;
@@ -345,7 +368,7 @@
         if (!canEditPrice) priceInput.title = "Precio según el catálogo";
         const subtotalCell = element("td", "ga-money");
         subtotalCell.dataset.subtotal = "";
-        subtotalCell.dataset.label = "Subtotal";
+        subtotalCell.dataset.label = "Importe";
         row.appendChild(subtotalCell);
         const removeCell = element("td");
         const removeButton = element("button", "ga-line-remove", "×");
@@ -375,6 +398,7 @@
     });
     createSearch(patientSearch, document.getElementById("ga-patient-results"), form.dataset.patientUrl, selectPatient, false);
     createSearch(productSearch, document.getElementById("ga-product-results"), form.dataset.productUrl, function (product) {
+        if (surgeryField && !surgeryField.value) return;
         addLine(product, true);
         productSearch.value = "";
         productFeedback.textContent = "Agregado: " + (product.nombre || product.text || "producto") + ". Puede buscar el siguiente producto.";
@@ -400,6 +424,7 @@
         if (submitting) { event.preventDefault(); return; }
         const errors = [];
         if (!patientId.value) errors.push("Seleccione un paciente de los resultados de búsqueda.");
+        if (surgeryField && !surgeryField.value) errors.push("Seleccione el tipo de cirugía antes de guardar el gasto adicional.");
         if (!linesBody.children.length) errors.push("Agregue al menos un producto o servicio.");
         Array.from(linesBody.children).forEach(function (row, index) {
             const quantity = hundredths(row.querySelector('[data-value="cantidad"]').value);
@@ -414,6 +439,7 @@
             event.preventDefault();
             errorsDisplay.scrollIntoView({ block: "center", behavior: "smooth" });
             if (!patientId.value) patientSearch.focus();
+            else if (surgeryField && !surgeryField.value) surgeryField.focus();
             else if (!linesBody.children.length) productSearch.focus();
             return;
         }

@@ -2086,6 +2086,11 @@ class LineaFactura(models.Model):
         if self._state.adding and self.producto_id and not self.costo_unitario:
             self.costo_unitario = self.producto.costo_promedio or Decimal('0')
 
+        self.calcular_importes()
+        super().save(*args, **kwargs)
+
+    def calcular_importes(self):
+        """Calcula los importes de la línea sin validarla ni persistirla."""
         subtotal_base = (self.cantidad * self.precio_unitario).quantize(DOS_DECIMALES)
         descuento = self.descuento_porcentaje or Decimal('0')
         if self.precio_incluye_impuesto and self.impuesto.porcentaje:
@@ -2101,8 +2106,6 @@ class LineaFactura(models.Model):
             self.descuento_monto = (subtotal_base * (descuento / Decimal('100'))).quantize(DOS_DECIMALES)
             self.subtotal = (subtotal_base - self.descuento_monto).quantize(DOS_DECIMALES)
             self.impuesto_monto = (self.subtotal * (self.impuesto.porcentaje / Decimal('100'))).quantize(DOS_DECIMALES)
-
-        super().save(*args, **kwargs)
 
     @property
     def total_linea(self):

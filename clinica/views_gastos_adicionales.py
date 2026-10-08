@@ -30,8 +30,10 @@ from crm.models import ConfiguracionCRM
 from crm.services import enviar_documento_whatsapp, subir_documento_whatsapp
 from facturacion.models import ConfiguracionFacturacionEmpresa
 from .catalogo_gastos_adicionales import productos_gastos_adicionales
+from .catalogo_cirugias_gastos_adicionales import nombre_cirugia_gasto_adicional
 from .forms_gastos_adicionales import GastoAdicionalForm, es_id_valido, validar_lineas_gasto
-from .models import GastoAdicional, LineaGastoAdicional, Paciente, ProfesionalSalud
+from .importes_gastos_adicionales import desglose_gasto_adicional
+from .models import GastoAdicional, LineaGastoAdicional, Paciente
 from .services_gastos_adicionales import convertir_gasto_adicional
 
 logger = logging.getLogger(__name__)
@@ -177,7 +179,7 @@ def _formulario(request, empresa, gasto=None):
     paciente = None
     lineas_iniciales = []
     if gasto:
-        inicial.update({"paciente": gasto.paciente_id, "fecha": gasto.fecha, "profesional": gasto.profesional_id, "observacion": gasto.observacion})
+        inicial.update({"paciente": gasto.paciente_id, "fecha": gasto.fecha, "tipo_cirugia": gasto.tipo_cirugia, "observacion": gasto.observacion})
         paciente = gasto.paciente
         lineas_iniciales = [
             {**_producto_payload(linea.producto), "producto_id": linea.producto_id,
@@ -185,9 +187,6 @@ def _formulario(request, empresa, gasto=None):
             for linea in gasto.lineas.all()
         ]
     else:
-        profesional = ProfesionalSalud.objects.filter(empresa=empresa, usuario=request.user, activo=True).first()
-        if profesional:
-            inicial["profesional"] = profesional.pk
         paciente_id = request.GET.get("paciente")
         if paciente_id:
             if not es_id_valido(paciente_id):
@@ -212,8 +211,10 @@ def _formulario(request, empresa, gasto=None):
                             raise ValidationError("El gasto ya fue convertido y se conserva como documento histórico.")
                     else:
                         documento = GastoAdicional(empresa=empresa, creado_por=request.user)
-                    for campo in ("paciente", "fecha", "profesional", "observacion"):
+                    for campo in ("paciente", "fecha", "profesional", "tipo_cirugia", "observacion"):
                         setattr(documento, campo, form.cleaned_data[campo])
+                    documento.profesional_nombre = "Dr. Luis González"
+                    documento.tipo_cirugia_nombre = nombre_cirugia_gasto_adicional(documento.tipo_cirugia)
                     documento.actualizado_por = request.user
                     documento.save()
                     documento.lineas.all().delete()
@@ -280,7 +281,8 @@ def editar(request, empresa_slug, gasto_id):
 @require_GET
 def detalle(request, empresa_slug, gasto_id):
     empresa = _empresa_autorizada(request, empresa_slug, "puede_ver_gastos_adicionales")
-    return render(request, "clinica/gastos_adicionales_detalle.html", {"empresa": empresa, "gasto": _gasto(empresa, gasto_id)})
+    gasto = _gasto(empresa, gasto_id)
+    return render(request, "clinica/gastos_adicionales_detalle.html", {"empresa": empresa, "gasto": gasto, "importes": desglose_gasto_adicional(gasto)})
 
 
 def contexto_pdf(empresa, gasto):
@@ -293,7 +295,7 @@ def contexto_pdf(empresa, gasto):
         except (OSError, ValueError):
             logger.warning("No se pudo leer logo para GA de empresa %s", empresa.pk)
     configuracion = ConfiguracionFacturacionEmpresa.objects.filter(empresa=empresa).first()
-    return {"empresa": empresa, "gasto": gasto, "logo_url": logo_url, "nombre_clinica": (configuracion.nombre_comercial_documentos if configuracion else None) or empresa.nombre, "pie_institucional": (configuracion.pie_factura if configuracion else None) or f"{empresa.nombre} · Atención y cuidado de su salud."}
+    return {"empresa": empresa, "gasto": gasto, "importes": desglose_gasto_adicional(gasto), "logo_url": logo_url, "nombre_clinica": (configuracion.nombre_comercial_documentos if configuracion else None) or empresa.nombre, "pie_institucional": (configuracion.pie_factura if configuracion else None) or f"{empresa.nombre} · Atención y cuidado de su salud."}
 
 
 def generar_pdf_bytes(empresa, gasto):

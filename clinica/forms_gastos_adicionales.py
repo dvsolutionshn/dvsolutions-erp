@@ -8,6 +8,11 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .catalogo_gastos_adicionales import productos_gastos_adicionales
+from .catalogo_cirugias_gastos_adicionales import (
+    cirugias_gastos_adicionales_choices,
+    profesional_luis_gasto_adicional,
+    profesionales_luis_gasto_adicional,
+)
 from .models import Paciente, ProfesionalSalud
 
 
@@ -19,18 +24,24 @@ def es_id_valido(valor):
 class GastoAdicionalForm(forms.Form):
     paciente = forms.ModelChoiceField(queryset=Paciente.objects.none(), widget=forms.HiddenInput())
     fecha = forms.DateField(initial=timezone.localdate, widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
-    profesional = forms.ModelChoiceField(queryset=ProfesionalSalud.objects.none(), required=False, label="Profesional")
+    profesional = forms.ModelChoiceField(
+        queryset=ProfesionalSalud.objects.none(), required=False, disabled=True,
+        widget=forms.HiddenInput(), label="Profesional",
+    )
+    tipo_cirugia = forms.ChoiceField(required=True, choices=(), label="Tipo de cirugía")
     observacion = forms.CharField(required=False, max_length=5000, label="Observación", widget=forms.Textarea(attrs={"rows": 3}))
 
     def __init__(self, *args, empresa, gasto=None, **kwargs):
         super().__init__(*args, **kwargs)
         pacientes = Paciente.objects.filter(empresa=empresa, activo=True)
-        profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True)
         if gasto:
             pacientes = Paciente.objects.filter(empresa=empresa).filter(Q(activo=True) | Q(pk=gasto.paciente_id))
-            profesionales = ProfesionalSalud.objects.filter(empresa=empresa).filter(Q(activo=True) | Q(pk=gasto.profesional_id))
         self.fields["paciente"].queryset = pacientes
-        self.fields["profesional"].queryset = profesionales
+        self.fields["tipo_cirugia"].choices = [("", "Seleccione el tipo de cirugía"), *cirugias_gastos_adicionales_choices()]
+        self.initial.setdefault("tipo_cirugia", gasto.tipo_cirugia if gasto else "")
+        self.fields["profesional"].queryset = profesionales_luis_gasto_adicional(empresa)
+        profesional = profesional_luis_gasto_adicional(empresa)
+        self.initial["profesional"] = profesional.pk if profesional else None
 
 
 def validar_lineas_gasto(raw, empresa, *, gasto=None):

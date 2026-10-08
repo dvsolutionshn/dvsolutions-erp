@@ -95,10 +95,29 @@ un producto externo que controle inventario debe sustituirse por un producto
 local antes de emitir; también se impide duplicar una factura GA con ese caso.
 Guardar el GA, generar su PDF y preparar su borrador siguen disponibles.
 
+## Cirugía, profesional e impuestos en el documento
+
+La migración clínica `0035` agrega el tipo de cirugía y los nombres históricos
+del procedimiento y del profesional. Los documentos anteriores conservan su
+cirugía vacía; al crear o editar desde la pantalla se exige elegir una de las
+31 cirugías del catálogo clínico existente antes de agregar productos.
+
+El profesional visible es Dr. Luis González. La referencia se vincula únicamente
+si existe un profesional activo e inequívoco con ese nombre en la empresa actual;
+no se crean profesionales ni se utiliza un registro de otra empresa. El usuario
+que registra el documento sigue conservado en la trazabilidad interna.
+
+PDF y detalle muestran el ISV de cada producto y el resumen de subtotal sin ISV,
+impuestos y total. El desglose consulta la configuración actual del catálogo y
+utiliza `LineaFactura.calcular_importes()` en memoria, con las fórmulas originales
+de Facturación. No modifica el total histórico ni crea una factura. Un impuesto
+ausente o inactivo se muestra pendiente; una discrepancia con el importe original
+se indica explícitamente. La conversión y la emisión mantienen su flujo existente.
+
 ## Validación
 
 ```console
-python manage.py test clinica.test_gastos_adicionales_models clinica.test_gastos_adicionales_views clinica.test_gastos_adicionales_catalogo core.test_gastos_adicionales_permissions facturacion.test_gasto_adicional_catalogo
+python manage.py test clinica.test_gastos_adicionales_models clinica.test_gastos_adicionales_views clinica.test_gastos_adicionales_catalogo clinica.test_gastos_adicionales_cirugias clinica.test_gastos_adicionales_importes core.test_gastos_adicionales_permissions facturacion.test_gasto_adicional_catalogo
 ```
 
 Las pruebas de concurrencia requieren PostgreSQL y se omiten automáticamente con
@@ -108,7 +127,7 @@ renderizado en un proceso cuyo PATH de GTK no incluya las DLL de Poppler; la
 mezcla provoca un fallo nativo de fuentes y no una excepción de Python. Esta
 condición no modifica el motor PDF de producción.
 
-Verificación realizada en la base local: 69 pruebas específicas, 67 correctas y
+Verificación realizada en la base local: 86 pruebas específicas, 84 correctas y
 2 de concurrencia omitidas por SQLite. Se verificaron también búsquedas y edición
 en navegador a 1440 y 390 px, y PDFs de una página y cuatro páginas con nombres
 largos. La regresión de Facturación, permisos, Clínica y Recetas ejecutó 395
@@ -120,7 +139,8 @@ pantalla vacía renderizada indicada por `GA_TEST_URL` y respuestas de catálogo
 simuladas; no modifica datos reales. Usa `PLAYWRIGHT_MODULE` para el paquete de
 Playwright y opcionalmente `CHROME_EXECUTABLE` para el navegador. Verifica listas
 sin texto, un carácter, teléfono, teclado, paginación, redondeo e impuestos,
-contenido literal, agregar/eliminar líneas y disposición móvil.
+contenido literal, agregar/eliminar líneas, profesional fijo, selección de cirugía
+antes de abrir el catálogo y disposición móvil.
 
 El logo de `hospital_mia` está configurado en la base local; `medical_spa` no tiene
 logo configurado y utiliza sus iniciales hasta que se cargue su identidad gráfica.

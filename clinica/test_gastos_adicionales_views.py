@@ -49,7 +49,7 @@ class GastosAdicionalesFlujoTests(TestCase):
         return reverse(nombre, kwargs=kwargs)
 
     def datos(self, **overrides):
-        data = {"paciente": self.paciente.pk, "fecha": timezone.localdate().isoformat(), "profesional": "", "observacion": "Material y atención adicional.", "lineas": json.dumps([{"producto_id": self.producto.pk, "cantidad": "2.00", "precio_unitario": "115.00"}]), "accion": "guardar"}
+        data = {"paciente": self.paciente.pk, "fecha": timezone.localdate().isoformat(), "profesional": "", "tipo_cirugia": "rinoplastia", "observacion": "Material y atención adicional.", "lineas": json.dumps([{"producto_id": self.producto.pk, "cantidad": "2.00", "precio_unitario": "115.00"}]), "accion": "guardar"}
         data.update(overrides)
         return data
 
@@ -89,12 +89,17 @@ class GastosAdicionalesFlujoTests(TestCase):
     def test_selecciones_ajenas_rechazadas_sin_documento_parcial(self):
         empresa_ajena = Empresa.objects.create(nombre="Catálogo ajeno", slug="catalogo_ajeno_ga", rtn="GAV-3")
         producto_ajeno = Producto.objects.create(empresa=empresa_ajena, nombre="Producto no compartido", precio=10)
-        for cambio in ({"paciente": self.paciente_otro.pk}, {"profesional": self.profesional_otro.pk}, {"lineas": json.dumps([{"producto_id": producto_ajeno.pk, "cantidad": 1, "precio_unitario": 10}])}):
+        for cambio in ({"paciente": self.paciente_otro.pk}, {"lineas": json.dumps([{"producto_id": producto_ajeno.pk, "cantidad": 1, "precio_unitario": 10}])}):
             with self.subTest(cambio=cambio):
                 response = self.client.post(self.url("clinica_gasto_adicional_crear"), self.datos(**cambio))
                 self.assertEqual(response.status_code, 200)
                 self.assertFalse(GastoAdicional.objects.exists())
-        gasto = self.crear()
+        # El profesional es un dato fijo: un ID manipulado se ignora en el
+        # servidor, sin impedir la captura ni asociar personal de otra empresa.
+        response = self.client.post(self.url("clinica_gasto_adicional_crear"), self.datos(profesional=self.profesional_otro.pk))
+        self.assertEqual(response.status_code, 302)
+        gasto = GastoAdicional.objects.get(empresa=self.empresa)
+        self.assertIsNone(gasto.profesional_id)
         for route in ("clinica_gasto_adicional_detalle", "clinica_gasto_adicional_editar", "clinica_gasto_adicional_pdf"):
             self.assertEqual(self.client.get(self.url(route, gasto, self.otra)).status_code, 404)
         self.assertEqual(self.client.post(self.url("clinica_gasto_adicional_convertir", gasto, self.otra)).status_code, 404)

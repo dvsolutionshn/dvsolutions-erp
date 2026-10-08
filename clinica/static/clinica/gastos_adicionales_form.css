@@ -25,6 +25,10 @@
 .ga-compose .ga-field input::placeholder,.ga-compose .ga-field textarea::placeholder{color:#78909d}
 .ga-compose .ga-field input:focus,.ga-compose .ga-field select:focus,.ga-compose .ga-field textarea:focus,.ga-compose .ga-lines-table input:focus{border-color:#1d9b92;box-shadow:0 0 0 3px #e8f5f3}
 .ga-compose .ga-help{font-size:10px;line-height:1.5;color:#708691}
+.ga-compose .ga-surgery-field{margin-top:16px}
+.ga-compose .ga-field input[readonly]{background:#f5fafb;color:#31566a;font-weight:600}
+.ga-compose .ga-field input:disabled{background:#f5f8fa;color:#8396a1;cursor:not-allowed}
+.ga-compose .ga-line-tax{color:#497b7a;font-size:10px;margin-top:4px}
 .ga-compose .ga-optional{font-size:10px;color:#7b919c;font-weight:400;margin-left:4px;letter-spacing:0}
 .ga-compose .ga-search-control{position:relative;min-width:0}
 .ga-compose .ga-search-control input{padding-left:39px;padding-right:10px;background:#fbfdfe}

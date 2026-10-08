@@ -35,16 +35,25 @@
         table{border-collapse:collapse;width:100%;table-layout:fixed}
         thead{display:table-header-group}
         tr{break-inside:avoid}
-        th{text-align:left;font-size:7pt;text-transform:uppercase;letter-spacing:.8pt;color:#507285;background:#ecf5f6;padding:10pt 9pt;border-bottom:1pt solid #c6dee3}
-        td{padding:9pt 9pt;border-bottom:1pt solid #e1eaee;font-size:9pt;color:#365267;vertical-align:top;overflow-wrap:break-word}
+        th{text-align:left;font-size:6.5pt;text-transform:uppercase;letter-spacing:.4pt;color:#507285;background:#ecf5f6;padding:9pt 6pt;border-bottom:1pt solid #c6dee3}
+        td{padding:11pt 6pt;border-bottom:1pt solid #e1eaee;font-size:8pt;color:#365267;vertical-align:top;overflow-wrap:break-word}
         td strong{font-weight:bold;color:#1d3c51}
+        .product-name{display:block;font-size:10pt;line-height:1.4;padding-right:8pt}
+        .tax-label{display:block;color:#788894;font-size:7pt;margin-top:3pt;white-space:normal;line-height:1.35}
+        .line-total{font-weight:bold;color:#173449}
+        .pending{color:#967139;font-size:8pt}
         th.number,td.number{text-align:right;white-space:nowrap}
-        .product-col{width:48%}.quantity-col{width:12%}.price-col,.subtotal-col{width:20%}
+        .product-col{width:40%}.quantity-col{width:7%}.price-col{width:18%}.tax-col{width:15%}.subtotal-col{width:20%}
         .summary{margin:14pt 0 16pt;display:table;width:100%;break-inside:avoid}
-        .summary-note{display:table-cell;width:53%;padding-right:24pt;color:#788894;font-size:8pt;vertical-align:middle}
-        .total{display:table-cell;vertical-align:middle;border-top:.7pt solid #d6e4e9;padding:8pt 0;text-align:right;color:#173b4a}
-        .total span{display:block;font-size:7.5pt;letter-spacing:.4pt;color:#627788;margin-bottom:2pt}
-        .total strong{font-size:16pt;font-weight:bold;white-space:nowrap}
+        .summary-note{display:table-cell;width:53%;padding:9pt 24pt 0 0;color:#788894;font-size:8pt;vertical-align:top}
+        .summary-note p{margin:0 0 7pt;line-height:1.5}
+        .summary-values{display:table-cell;vertical-align:top}
+        .summary-row{display:table;width:100%;padding:5pt 0;color:#627788;font-size:8.5pt}
+        .summary-row span,.summary-row strong{display:table-cell;vertical-align:middle}
+        .summary-row strong{text-align:right;white-space:nowrap;font-weight:normal;color:#365267}
+        .summary-row.total{margin-top:5pt;border-top:1pt solid #b8d9df;padding:8pt 0;color:#173b4a}
+        .summary-row.total span{font-size:9pt;font-weight:bold}
+        .summary-row.total strong{font-size:16pt;font-weight:bold;color:#173b4a}
         .observations{margin-top:5pt;padding:12pt 17pt;background:#fafcfd;border-left:3pt solid #b5d7dc;break-inside:avoid}
         .observations h3{font-size:8pt;color:#507285;text-transform:uppercase;letter-spacing:1pt;margin:0 0 6pt}
         .observations p{white-space:pre-wrap;margin:0;color:#365267;font-size:9pt;line-height:1.6;overflow-wrap:break-word}
@@ -59,10 +68,30 @@
         <div class="brand-copy"><h1>{{ nombre_clinica|default:empresa.nombre }}</h1>{% if empresa.direccion %}<p>{{ empresa.direccion }}</p>{% endif %}<p>{% if empresa.telefono %}{{ empresa.telefono }}{% endif %}{% if empresa.correo %}{% if empresa.telefono %} · {% endif %}{{ empresa.correo }}{% endif %}</p></div>
     </header>
     <section class="document-heading"><div class="document-title"><span class="eyebrow">Documento clínico</span><h2>GASTOS ADICIONALES</h2><p>Detalle de productos y servicios para el paciente</p></div><div class="document-number"><strong>{{ gasto.numero }}</strong><span>{{ gasto.fecha|date:'d/m/Y' }}</span><span>Estado: {{ gasto.get_estado_display }}</span></div></section>
-    <section class="patient-panel"><div class="patient-row"><div class="patient-field"><label>Paciente</label><strong>{{ gasto.paciente.nombre }}</strong><span>Identidad: {{ gasto.paciente.identidad|default:'No indicada' }}{% if gasto.paciente.expediente_codigo %} · Expediente {{ gasto.paciente.expediente_codigo }}{% endif %}</span></div><div class="patient-field"><label>Profesional / usuario</label><strong>{% if gasto.profesional %}{{ gasto.profesional.nombre }}{% elif gasto.creado_por %}{{ gasto.creado_por.get_full_name|default:gasto.creado_por.username }}{% else %}—{% endif %}</strong><span>Fecha de atención: {{ gasto.fecha|date:'d/m/Y' }}</span></div></div></section>
+    <section class="patient-panel"><div class="patient-row"><div class="patient-field"><label>Paciente</label><strong>{{ gasto.paciente.nombre }}</strong><span>Identidad: {{ gasto.paciente.identidad|default:'No indicada' }}{% if gasto.paciente.expediente_codigo %} · Expediente {{ gasto.paciente.expediente_codigo }}{% endif %}</span>{% if gasto.tipo_cirugia_label %}<span>Tipo de cirugía: <b>{{ gasto.tipo_cirugia_label }}</b></span>{% endif %}</div><div class="patient-field"><label>Profesional</label><strong>{{ gasto.profesional_nombre|default:'Pendiente de asignar' }}</strong><span>Fecha de atención: {{ gasto.fecha|date:'d/m/Y' }}</span></div></div></section>
     <h3 class="section-label">Detalle del documento</h3>
-    <table><thead><tr><th class="product-col">Producto / servicio</th><th class="number quantity-col">Cantidad</th><th class="number price-col">Precio unitario</th><th class="number subtotal-col">Subtotal</th></tr></thead><tbody>{% for linea in gasto.lineas.all %}<tr><td><strong>{{ linea.descripcion|default:linea.producto.nombre }}</strong></td><td class="number">{{ linea.cantidad|floatformat:'-2u'|intcomma:False }}</td><td class="number">L {{ linea.precio_unitario|floatformat:'2u'|intcomma:False }}</td><td class="number">L {{ linea.subtotal|floatformat:'2u'|intcomma:False }}</td></tr>{% endfor %}</tbody></table>
-    <section class="summary"><div class="summary-note">Este documento conserva el detalle de gastos registrado en el expediente del paciente.</div><div class="total"><span>Total del documento</span><strong>L {{ gasto.total|floatformat:'2u'|intcomma:False }}</strong></div></section>
+    <table>
+        <thead><tr><th class="product-col">Producto / servicio</th><th class="number quantity-col">Cant.</th><th class="number price-col">Precio unitario</th><th class="number tax-col">ISV</th><th class="number subtotal-col">Importe</th></tr></thead>
+        <tbody>
+            {% for item in importes.lineas %}
+            <tr>
+                <td><strong class="product-name">{{ item.descripcion }}</strong></td>
+                <td class="number">{{ item.cantidad|floatformat:'-2u'|intcomma:False }}</td>
+                <td class="number">L {{ item.precio_unitario|floatformat:'2u'|intcomma:False }}</td>
+                <td class="number">{% if item.impuesto_configurado %}L {{ item.impuesto_monto|floatformat:'2u'|intcomma:False }}<span class="tax-label">{{ item.impuesto_tasa|floatformat:'-2u'|intcomma:False }}%{% if not item.impuesto_tasa %} · {{ item.impuesto_nombre|default:'Exento' }}{% endif %}</span>{% else %}<span class="pending">Pendiente</span><span class="tax-label">Sin configurar</span>{% endif %}</td>
+                <td class="number line-total">{% if item.total_linea != None %}L {{ item.total_linea|floatformat:'2u'|intcomma:False }}{% else %}<span class="pending">Pendiente</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <section class="summary">
+        <div class="summary-note"><p>Este documento conserva el detalle de gastos registrado en el expediente del paciente.</p>{% if gasto.precio_incluye_impuesto and importes.impuestos_configurados %}<p>El ISV está incluido en los precios.</p>{% endif %}{% if importes.nota_impuestos %}<p>{{ importes.nota_impuestos }}</p>{% endif %}</div>
+        <div class="summary-values">
+            <div class="summary-row"><span>Subtotal sin ISV</span><strong>{% if importes.subtotal != None %}L {{ importes.subtotal|floatformat:'2u'|intcomma:False }}{% else %}Pendiente{% endif %}</strong></div>
+            <div class="summary-row"><span>ISV</span><strong>{% if importes.impuestos_configurados %}L {{ importes.impuestos|floatformat:'2u'|intcomma:False }}{% else %}Pendiente{% endif %}</strong></div>
+            <div class="summary-row total"><span>Total del documento</span><strong>L {{ importes.total_historico|floatformat:'2u'|intcomma:False }}</strong></div>
+        </div>
+    </section>
     {% if gasto.observacion %}<section class="observations"><h3>Observaciones</h3><p>{{ gasto.observacion }}</p></section>{% endif %}
     {% if gasto.factura %}<section class="invoice-link"><p><strong>Factura: {% if gasto.factura.numero_factura %}{{ gasto.factura.numero_factura }}{% else %}Borrador #{{ gasto.factura.id }}{% endif %}</strong></p><p>{% if gasto.factura.estado == 'borrador' %}Pendiente de revisión y emisión en Facturación.{% elif gasto.factura.estado == 'anulada' %}Factura asociada anulada.{% else %}Estado: Facturado.{% endif %}</p>{% if gasto.fecha_conversion %}<p>Conversión: {{ gasto.fecha_conversion|date:'d/m/Y H:i' }}{% if gasto.convertido_por %} · {{ gasto.convertido_por.get_full_name|default:gasto.convertido_por.username }}{% endif %}</p>{% endif %}</section>{% endif %}
 </body>
