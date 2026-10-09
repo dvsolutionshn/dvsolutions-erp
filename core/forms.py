@@ -758,14 +758,14 @@ class SolicitudComercialPublicaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         textos = {
-            "nombre_contacto": ("Nombre completo", "Persona principal para continuar la conversacion comercial."),
+            "nombre_contacto": ("Nombre completo", "Persona principal para continuar la conversación comercial."),
             "empresa_interesada": ("Empresa o marca", "Opcional, pero nos ayuda a entender mejor el contexto del proyecto."),
-            "rtn_empresa": ("RTN de la empresa", "Nos ayuda a identificar mejor la empresa interesada y preparar una demo mas seria."),
-            "correo": ("Correo", "Te responderemos por aqui con propuesta, demo o siguiente paso."),
-            "telefono": ("Telefono / WhatsApp", "Ideal para acelerar la demo o la cotizacion."),
-            "servicio_interes": ("Que te interesa desarrollar", "Selecciona el tipo de solucion que mejor se parece a tu necesidad actual."),
-            "mensaje": ("Cuentanos tu proyecto", "Mientras mas detalle nos compartas, mas precisa sera nuestra propuesta."),
-            "solicita_prueba": ("Solicitar prueba de 7 dias", "Activalo si quieres que evaluemos tu acceso inicial al ERP con acompanamiento comercial."),
+            "rtn_empresa": ("RTN de la empresa", "Opcional. Nos ayuda a preparar una demo con tu configuración fiscal."),
+            "correo": ("Correo", "Te responderemos por aquí con la propuesta, la demo o el siguiente paso."),
+            "telefono": ("Teléfono / WhatsApp", "Ideal para coordinar la demo o la cotización."),
+            "servicio_interes": ("¿Qué te interesa?", "Selecciona la solución que más se parece a tu necesidad."),
+            "mensaje": ("Cuéntanos tu proyecto", "Mientras más detalle nos compartas, más precisa será nuestra propuesta."),
+            "solicita_prueba": ("Quiero una prueba guiada de 7 días", "Evaluamos tu solicitud y te damos acceso inicial al ERP con acompañamiento."),
         }
         placeholders = {
             "nombre_contacto": "Tu nombre",
@@ -789,3 +789,14 @@ class SolicitudComercialPublicaForm(forms.ModelForm):
             if field_name in placeholders:
                 field.widget.attrs["placeholder"] = placeholders[field_name]
         self.fields["mensaje"].widget.attrs["rows"] = 5
+        self.fields["servicio_interes"].choices = [
+            ("erp", "ERP empresarial"),
+            ("web", "Sitio web corporativo"),
+            ("app", "Aplicación móvil"),
+            ("software", "Software a medida"),
+            ("integracion", "Integración y automatización"),
+            ("branding", "Diseño digital y branding"),
+            ("otro", "Otro proyecto"),
+        ]
+        if not self.is_bound:
+            self.initial.setdefault("servicio_interes", "erp")

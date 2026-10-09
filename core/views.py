@@ -14,8 +14,9 @@ from django.core.paginator import Paginator
 from django.db import OperationalError, transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.functions import TruncDate
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import get_random_string
@@ -370,9 +371,9 @@ def _public_demo_catalog():
     return {
         "facturacion": {
             "slug": "facturacion",
-            "titulo": "Facturacion y cobros",
+            "titulo": "Facturación y cobros",
             "subtitulo": "Demo de factura",
-            "descripcion": "Visualizacion de facturas, cobros, impuestos, retenciones y lectura ejecutiva de la operacion comercial.",
+            "descripcion": "Visualización de facturas, cobros, impuestos, retenciones y lectura ejecutiva de la operación comercial.",
             "metricas": [
                 ("Factura", "000-001-01-00000364"),
                 ("Total", "L 53,229.42"),
@@ -381,30 +382,30 @@ def _public_demo_catalog():
             "lineas": [
                 "Factura premium con resumen fiscal, subtotal, impuesto y total final.",
                 "Historial de pagos, recibos y lectura de saldo pendiente.",
-                "Formato pensado para gestion comercial y control operativo.",
+                "Formato pensado para gestión comercial y control operativo.",
             ],
             "detalle_titulo": "Vista demo de factura empresarial",
-            "detalle_intro": "Esta demo reproduce la sensacion visual de una factura premium dentro del ecosistema DV Solutions, con lectura comercial, fiscal y financiera lista para presentar al cliente.",
+            "detalle_intro": "Esta demo reproduce la sensación visual de una factura premium dentro del ecosistema DV Solutions, con lectura comercial, fiscal y financiera lista para presentar al cliente.",
             "detalle_bloques": [
                 ("Cliente", "Constructora del Norte, S. de R.L."),
                 ("RTN", "08011999123456"),
-                ("Metodo de pago", "Transferencia bancaria"),
+                ("Método de pago", "Transferencia bancaria"),
                 ("Estado", "Emitida y lista para cobro"),
             ],
             "detalle_items": [
-                ("Implementacion de modulo comercial", "L 28,950.00"),
-                ("Configuracion fiscal y CAI", "L 9,850.00"),
-                ("Capacitacion operativa", "L 7,486.45"),
+                ("Implementación de módulo comercial", "L 28,950.00"),
+                ("Configuración fiscal y CAI", "L 9,850.00"),
+                ("Capacitación operativa", "L 7,486.45"),
                 ("ISV 15%", "L 6,942.97"),
             ],
             "detalle_total": "L 53,229.42",
-            "cta_label": "Solicitar una demo comercial de facturacion",
+            "cta_label": "Solicitar una demo comercial de facturación",
         },
         "rrhh": {
             "slug": "rrhh",
             "titulo": "Recursos humanos",
             "subtitulo": "Demo RRHH",
-            "descripcion": "Gestion de empleados, planillas, vacaciones y estructura interna con una vista mas clara para operaciones administrativas.",
+            "descripcion": "Gestión de empleados, planillas, vacaciones y estructura interna con una vista más clara para operaciones administrativas.",
             "metricas": [
                 ("Empleados", "128"),
                 ("Planilla", "Mensual"),
@@ -413,15 +414,15 @@ def _public_demo_catalog():
             "lineas": [
                 "Expedientes, vacaciones, bonos y deducciones en un solo flujo.",
                 "Panel preparado para seguimiento administrativo y soporte operativo.",
-                "Diseno pensado para empresas que necesitan control sin complejidad visual.",
+                "Diseño pensado para empresas que necesitan control sin complejidad visual.",
             ],
-            "detalle_titulo": "Vista demo de planilla y gestion de personal",
-            "detalle_intro": "Esta demo muestra como DV Solutions puede presentar planillas, equipo humano y alertas de RRHH con una lectura ejecutiva, limpia y lista para operacion real.",
+            "detalle_titulo": "Vista demo de planilla y gestión de personal",
+            "detalle_intro": "Esta demo muestra cómo DV Solutions puede presentar planillas, equipo humano y alertas de RRHH con una lectura ejecutiva, limpia y lista para operación real.",
             "detalle_bloques": [
                 ("Periodo", "Mayo 2026"),
                 ("Empleados liquidados", "128"),
                 ("Neto a pagar", "L 1,284,540.20"),
-                ("Estado", "Planilla lista para aprobacion"),
+                ("Estado", "Planilla lista para aprobación"),
             ],
             "detalle_items": [
                 ("Sueldos base", "L 1,020,000.00"),
@@ -436,33 +437,33 @@ def _public_demo_catalog():
             "slug": "crm",
             "titulo": "CRM y seguimiento",
             "subtitulo": "Demo comercial",
-            "descripcion": "Campanas, citas, prospectos y acciones comerciales coordinadas desde una capa mas estrategica del negocio.",
+            "descripcion": "Campañas, citas, prospectos y acciones comerciales coordinadas desde una capa más estratégica del negocio.",
             "metricas": [
-                ("Campanas", "12"),
+                ("Campañas", "12"),
                 ("Citas", "26"),
                 ("Prospectos", "41"),
             ],
             "lineas": [
-                "Seguimiento a leads, campanas y conversaciones desde el mismo ecosistema.",
+                "Seguimiento a leads, campañas y conversaciones desde el mismo ecosistema.",
                 "Ideal para equipos que venden, dan seguimiento o convierten demos en clientes.",
-                "Conexion natural entre marketing, operacion y ventas.",
+                "Conexión natural entre marketing, operación y ventas.",
             ],
             "detalle_titulo": "Vista demo de CRM y mensajes masivos",
-            "detalle_intro": "Esta demo muestra como un equipo comercial puede lanzar mensajes masivos, mover prospectos por etapa y coordinar citas sin salir del mismo sistema.",
+            "detalle_intro": "Esta demo muestra cómo un equipo comercial puede lanzar mensajes masivos, mover prospectos por etapa y coordinar citas sin salir del mismo sistema.",
             "detalle_bloques": [
-                ("Campana activa", "Lanzamiento ERP regional"),
+                ("Campaña activa", "Lanzamiento ERP regional"),
                 ("Mensajes enviados", "1,240"),
                 ("Respuestas recibidas", "214"),
                 ("Estado", "Seguimiento comercial en curso"),
             ],
             "detalle_items": [
-                ("WhatsApp masivo segmentado", "Campana enviada a prospectos filtrados por interes"),
-                ("Agenda de citas", "26 reuniones en ejecucion"),
+                ("WhatsApp masivo segmentado", "Campaña enviada a prospectos filtrados por interés"),
+                ("Agenda de citas", "26 reuniones en ejecución"),
                 ("Embudo comercial", "41 prospectos activos"),
-                ("Tablero de conversion", "12 oportunidades en propuesta"),
+                ("Tablero de conversión", "12 oportunidades en propuesta"),
             ],
-            "detalle_total": "Operacion comercial en tiempo real",
-            "cta_label": "Solicitar demo de CRM y automatizacion",
+            "detalle_total": "Operación comercial en tiempo real",
+            "cta_label": "Solicitar demo de CRM y automatización",
         },
     }
 
@@ -519,6 +520,15 @@ def _build_whatsapp_link(message, number=None):
     if not target:
         return ""
     return f"https://wa.me/{target}?text={quote(message)}"
+
+
+def _public_whatsapp_display():
+    numero = _normalizar_whatsapp_number(getattr(settings, "PUBLIC_WHATSAPP_NUMBER", ""))
+    if not numero:
+        return ""
+    if numero.startswith("504") and len(numero) == 11:
+        return f"+504 {numero[3:7]}-{numero[7:]}"
+    return f"+{numero}"
 
 
 def _login_throttle_key(scope, request):
@@ -832,52 +842,133 @@ def establecer_acceso(request, token_raw):
 def _public_site_context(form=None):
     demos_catalogo = list(_public_demo_catalog().values())
     whatsapp_url = _build_whatsapp_link(
-        "Hola DV Solutions, quiero informacion sobre una propuesta o una demo del sistema."
+        "Hola DV Solutions, quiero información sobre una propuesta o una demo del sistema."
+    )
+    onix_whatsapp_url = _build_whatsapp_link(
+        "Hola DV Solutions, quiero conocer a Onix, el agente empresarial del ERP."
     )
     return {
         "public_form": form or SolicitudComercialPublicaForm(),
         "erp_login_url": "/acceso/",
         "control_login_url": "/control/login/",
         "public_whatsapp_url": whatsapp_url,
+        "onix_whatsapp_url": onix_whatsapp_url,
+        "public_whatsapp_display": _public_whatsapp_display(),
+        "public_email": (getattr(settings, "COMMERCIAL_REQUEST_RECIPIENTS", None) or ["dv.solutionshn@gmail.com"])[0],
+        "public_base_url": getattr(settings, "PUBLIC_BASE_URL", "https://dvsolutionshn.com"),
         "eslogan_principal": "No te tienes que adaptar al sistema, el sistema se adapta a ti.",
+        "modulos_erp": [
+            {"icono": "factura", "titulo": "Facturación con CAI", "descripcion": "Facturas, recibos, notas de crédito y multimoneda, con control de CAI, rangos y vencimientos. PDF listo para enviar por WhatsApp."},
+            {"icono": "pos", "titulo": "Punto de venta", "descripcion": "Venta rápida en mostrador con pagos mixtos, promociones configurables y cierre ordenado."},
+            {"icono": "cotizacion", "titulo": "Cotizaciones", "descripcion": "Propuestas profesionales que se convierten en factura sin volver a capturar nada."},
+            {"icono": "inventario", "titulo": "Inventario y bodegas", "descripcion": "Existencias por bodega, kardex, costos y ajustes, con productos y servicios en un catálogo claro."},
+            {"icono": "compras", "titulo": "Compras y proveedores", "descripcion": "Compras de contado y crédito, pagos a proveedores, comprobantes de egreso y comisiones."},
+            {"icono": "cartera", "titulo": "Cuentas por cobrar y pagar", "descripcion": "Saldos por cliente y proveedor, abonos, recibos y movimientos bancarios."},
+            {"icono": "contabilidad", "titulo": "Contabilidad", "descripcion": "Cada operación genera su asiento. Catálogo de cuentas, libros y reportes contables ejecutivos."},
+            {"icono": "crm", "titulo": "CRM y campañas", "descripcion": "Prospectos, embudo comercial, campañas por WhatsApp y mensajes automáticos de cumpleaños y seguimiento."},
+            {"icono": "agenda", "titulo": "Agenda de citas", "descripcion": "Calendario por profesional y cubículo, con confirmaciones y recordatorios automáticos por WhatsApp."},
+            {"icono": "rrhh", "titulo": "RRHH y planillas", "descripcion": "Expedientes, vacaciones, bonos y deducciones. Planilla con IHSS, RAP e ISR calculados y trazables."},
+            {"icono": "clinica", "titulo": "Gestión clínica", "descripcion": "Expediente clínico, preconsulta por enlace, recetas, consentimientos, exámenes y planes de tratamiento."},
+            {"icono": "taller", "titulo": "Tecnicentro", "descripcion": "Recepción, inspección, diagnóstico, órdenes de trabajo y entrega del vehículo en un mismo flujo."},
+        ],
+        "industrias": [
+            {
+                "imagen": "core/img/web/clinic.webp",
+                "etiqueta": "Salud",
+                "titulo": "Clínicas, hospitales y centros estéticos",
+                "descripcion": "Desde la agenda hasta la factura, con el expediente del paciente en el centro.",
+                "puntos": [
+                    "Expediente clínico continuo con evolución, exámenes y documentos",
+                    "Preconsulta y registro de pacientes por enlace",
+                    "Recetas, plantillas, incapacidades y consentimientos",
+                    "Agenda por profesional con recordatorios por WhatsApp",
+                ],
+            },
+            {
+                "imagen": "core/img/web/workshop.webp",
+                "etiqueta": "Automotriz",
+                "titulo": "Tecnicentros y talleres",
+                "descripcion": "Cada vehículo con su historia, cada orden con su responsable.",
+                "puntos": [
+                    "Recepción e inspección del vehículo",
+                    "Diagnóstico y orden de trabajo",
+                    "Agenda del taller y seguimiento al cliente",
+                    "Facturación y entrega sin doble captura",
+                ],
+            },
+            {
+                "imagen": "core/img/web/pos.webp",
+                "etiqueta": "Comercio",
+                "titulo": "Comercio, retail y distribución",
+                "descripcion": "Vende rápido en mostrador sin perder el control del inventario.",
+                "puntos": [
+                    "Punto de venta con pagos mixtos y promociones",
+                    "Inventario por bodega y kardex",
+                    "Compras, proveedores y cuentas por pagar",
+                    "Reportes de ventas e impuestos",
+                ],
+            },
+            {
+                "imagen": "core/img/web/quotes.webp",
+                "etiqueta": "Servicios",
+                "titulo": "Servicios profesionales y empresas",
+                "descripcion": "Cotiza, factura y cobra con una imagen seria frente a tus clientes.",
+                "puntos": [
+                    "Cotizaciones que se convierten en factura",
+                    "CRM, embudo y campañas comerciales",
+                    "Cartera y cobros al día",
+                    "Contabilidad y planilla integradas",
+                ],
+            },
+        ],
+        "flujo_operacion": [
+            ("Vendes", "Cotización, punto de venta o factura con CAI."),
+            ("Se mueve el inventario", "Existencias y costos se actualizan solos."),
+            ("Se registra el cobro", "Cuentas por cobrar, recibos y bancos al día."),
+            ("Se contabiliza", "El asiento contable se genera automáticamente."),
+            ("Decides", "Reportes e indicadores con lo que realmente ocurre."),
+        ],
+        "control_puntos": [
+            ("Multiempresa real", "Cada empresa con su enlace, sus datos y sus usuarios, completamente separados."),
+            ("Roles y permisos", "Permisos por usuario y por empresa, hasta el nivel de acción: crear, editar o anular."),
+            ("Auditoría", "Registro de quién hizo qué y cuándo en los movimientos importantes."),
+            ("Respaldos", "Copias de seguridad de la información de cada empresa."),
+            ("En la nube", "Acceso desde la oficina, la casa o el celular, sin instalar nada."),
+            ("Control Maestro", "Planes, licencias y módulos administrados desde un solo panel."),
+        ],
         "servicios_destacados": [
             {
                 "titulo": "Software a medida",
-                "descripcion": "Plataformas internas, sistemas administrativos y herramientas operativas hechas exactamente para el flujo del cliente.",
+                "descripcion": "Plataformas internas y herramientas operativas construidas sobre el flujo real de tu empresa.",
             },
             {
                 "titulo": "Sitios web y portales",
-                "descripcion": "Web corporativa, paginas comerciales, portales privados y experiencias digitales que proyectan una marca solida.",
+                "descripcion": "Webs corporativas, páginas comerciales y portales privados que proyectan una marca sólida.",
             },
             {
-                "titulo": "Aplicaciones moviles",
-                "descripcion": "Apps para ventas, supervision, campo, autoservicio o continuidad operativa desde cualquier dispositivo.",
+                "titulo": "Aplicaciones móviles",
+                "descripcion": "Apps para ventas, supervisión, trabajo de campo o atención a clientes desde cualquier dispositivo.",
             },
             {
-                "titulo": "ERP, automatizacion e integraciones",
-                "descripcion": "Conectamos facturacion, contabilidad, CRM, RRHH, procesos internos y servicios externos en una sola arquitectura.",
+                "titulo": "Integraciones y automatización",
+                "descripcion": "Conectamos WhatsApp, bancos, APIs y servicios externos para que la información fluya sola.",
             },
-        ],
-        "capacidades_principales": [
-            "Analisis funcional y diseno de procesos",
-            "UX/UI para software profesional y productos digitales",
-            "Dashboards ejecutivos y paneles administrativos",
-            "Integraciones con APIs, bancos, WhatsApp y servicios externos",
-            "Infraestructura cloud, despliegue y soporte continuo",
-            "Automatizacion comercial y operativa",
         ],
         "proceso": [
-            "Entendemos la operacion, el cuello de botella y el contexto del negocio.",
-            "Disenamos la solucion con enfoque tecnico, visual y comercial.",
-            "Construimos, validamos y lanzamos con acompanamiento real.",
-            "Escalamos la plataforma contigo segun crecimiento, nuevos modulos o nuevas integraciones.",
+            ("Diagnóstico", "Entendemos tu operación, tus cuellos de botella y lo que de verdad necesitas."),
+            ("Diseño", "Definimos módulos, flujos, permisos y la configuración fiscal de tu empresa."),
+            ("Implementación", "Cargamos tu información, configuramos el sistema y capacitamos a tu equipo."),
+            ("Acompañamiento", "Soporte continuo y nuevas funciones a medida que tu empresa crece."),
+        ],
+        "preguntas_frecuentes": [
+            ("¿El sistema cumple con la facturación de Honduras?", "Sí. La facturación trabaja con CAI, rangos autorizados, fecha límite de emisión e ISV, y conserva el CAI usado en cada factura aunque después se actualice."),
+            ("¿Necesito instalar algo?", "No. DV Solutions ERP funciona en la nube desde el navegador, y la operación clínica y de facturación también tiene app móvil."),
+            ("¿Puedo manejar varias empresas?", "Sí. Cada empresa tiene su propio enlace, datos y usuarios, y una misma persona puede tener permisos distintos en cada una."),
+            ("¿Qué es Onix?", "Es el agente empresarial de DV Solutions. Le escribes en lenguaje natural para consultar facturas, cobros, clientes o productos, y puede preparar borradores que tú confirmas antes de que se guarden."),
+            ("¿Se adapta a mi rubro?", "Esa es la idea. Activamos solo los módulos que usas y, si tu operación lo necesita, desarrollamos funciones a medida."),
+            ("¿Puedo probarlo antes de contratar?", "Sí. Ofrecemos una prueba guiada de 7 días con acompañamiento de nuestro equipo. Solicítala desde el formulario."),
         ],
         "demos": demos_catalogo,
-        "estadisticas": {
-            "clientes_activos": Empresa.objects.filter(activa=True).count(),
-            "empresas_prueba": Empresa.objects.filter(estado_licencia="prueba").count(),
-            "modulos_comerciales": EmpresaModulo.objects.filter(activo=True).count(),
-        },
     }
 
 
@@ -929,6 +1020,39 @@ def public_home(request):
             "request_success": request_success,
         },
     )
+
+
+def public_robots_txt(request):
+    base_url = getattr(settings, "PUBLIC_BASE_URL", "https://dvsolutionshn.com")
+    lineas = [
+        "User-agent: *",
+        "Allow: /$",
+        "Allow: /demo/",
+        "Allow: /politica-de-privacidad/",
+        "Allow: /static/",
+        "Disallow: /",
+        "",
+        f"Sitemap: {base_url}/sitemap.xml",
+        "",
+    ]
+    return HttpResponse("\n".join(lineas), content_type="text/plain; charset=utf-8")
+
+
+def public_sitemap_xml(request):
+    base_url = getattr(settings, "PUBLIC_BASE_URL", "https://dvsolutionshn.com")
+    rutas = [reverse("public_home"), reverse("politica_privacidad")]
+    rutas += [reverse("public_demo_detail", args=[slug]) for slug in _public_demo_catalog()]
+    urls = "".join(f"<url><loc>{base_url}{ruta}</loc></url>" for ruta in rutas)
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return HttpResponse(xml, content_type="application/xml; charset=utf-8")
+
+
+def public_favicon(request):
+    return redirect(static("core/img/web/favicon.ico"), permanent=True)
 
 
 def public_access(request):
