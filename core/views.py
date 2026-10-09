@@ -850,7 +850,6 @@ def _public_site_context(form=None):
     return {
         "public_form": form or SolicitudComercialPublicaForm(),
         "erp_login_url": "/acceso/",
-        "control_login_url": "/control/login/",
         "public_whatsapp_url": whatsapp_url,
         "onix_whatsapp_url": onix_whatsapp_url,
         "public_whatsapp_display": _public_whatsapp_display(),
@@ -934,7 +933,7 @@ def _public_site_context(form=None):
             ("Auditoría", "Registro de quién hizo qué y cuándo en los movimientos importantes."),
             ("Respaldos", "Copias de seguridad de la información de cada empresa."),
             ("En la nube", "Acceso desde la oficina, la casa o el celular, sin instalar nada."),
-            ("Control Maestro", "Planes, licencias y módulos administrados desde un solo panel."),
+            ("Soporte local", "Un equipo en Honduras que conoce tu operación y te acompaña después de la implementación."),
         ],
         "servicios_destacados": [
             {
@@ -1069,7 +1068,6 @@ def public_access(request):
 
     return render(request, "core/public_access.html", {
         "erp_login_url": "/acceso/",
-        "control_login_url": "/control/login/",
     })
 
 
