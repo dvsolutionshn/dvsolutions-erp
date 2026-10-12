@@ -159,7 +159,7 @@ def construir_contexto_modulos_app(request, empresa):
     factura_rapida = acceso["modulo_pos"] and inicio_disponible
     factura_movil = factura_rapida or (acceso["facturas"] and inicio_disponible)
     factura_destino = "factura-app" if factura_rapida else "facturas-app"
-    agregar("facturacion", "Facturación", "Factura rápida y acciones fiscales actuales; cobros y reportes en próxima etapa.",
+    agregar("facturacion", "Facturación", "Factura rápida, acciones fiscales y cobros adaptados; reportes en próxima etapa.",
             "Operación", acceso["modulo_facturacion"] and (acceso["crear_facturas"] or acceso["facturas"] or acceso["modulo_pos"]),
             "parcial" if factura_movil else "pendiente", f"{inicio}#{factura_destino}")
     inventario_movil = acceso["inventario"]
@@ -173,9 +173,15 @@ def construir_contexto_modulos_app(request, empresa):
             f"{reverse('traslado_rapido_farmaceutico', args=[empresa.slug])}?app=1")
     from facturacion.mobile_receipts import recibos_disponibles_app
 
-    agregar("recibos", "Recibos y cobros", "Consultar recibos, abrir PDF y editar datos documentales; registrar abonos se adaptará por separado.",
+    agregar("recibos", "Recibos y cobros", "Consultar recibos, abrir PDF y editar datos documentales; los cobros se gestionan desde la factura autorizada.",
             "Operación", recibos_disponibles_app(request, empresa), "parcial",
             f"{reverse('recibos_dashboard', args=[empresa.slug])}?app=1")
+    from facturacion.mobile_payments import cobros_disponibles_app
+
+    agregar("cobros", "Registrar y corregir cobros", "Seleccionar una factura desde Ver Facturas, registrar abonos o corregir un pago con su autorización actual.",
+            "Operación", cobros_disponibles_app(request, empresa),
+            "parcial" if acceso["facturas"] and inicio_disponible else "pendiente",
+            f"{inicio}#facturas-app")
     for key, nombre, permiso in (
         ("compras", "Compras", acceso["compras"]),
         ("proveedores", "Proveedores", acceso["proveedores"]),

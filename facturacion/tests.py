@@ -2595,7 +2595,7 @@ class FacturacionTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Pago rapido")
+        self.assertContains(response, "<h3>Registrar pago</h3>", html=True)
         self.assertNotContains(response, "Panel Principal")
         self.assertNotContains(response, "DV Solutions ERP")
 

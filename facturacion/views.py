@@ -2966,6 +2966,8 @@ def _redirect_factura(request, empresa, factura_id=None, *, destino="ver_factura
 
 
 def _contexto_factura_app(request, empresa, factura, config_avanzada=None):
+    from .mobile_payments import contexto_pagos_factura_app
+
     config_avanzada = config_avanzada or ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     permiso = lambda nombre: request.user.tiene_permiso_erp(nombre, empresa)
     borrador_eliminable = factura.estado == "borrador" and not factura.numero_factura
@@ -3003,6 +3005,7 @@ def _contexto_factura_app(request, empresa, factura, config_avanzada=None):
         "app_void_url": "anular_factura",
     }.items():
         contexto[clave] = reverse(vista, args=[empresa.slug, factura.pk]) + "?app=1"
+    contexto.update(contexto_pagos_factura_app(request, empresa, factura))
     return contexto
 
 
@@ -8030,13 +8033,25 @@ def editar_factura(request, empresa_slug, factura_id):
 @login_required
 @xframe_options_sameorigin
 def registrar_pago(request, empresa_slug, factura_id):
+    from .mobile_payments import (
+        autorizar_cobros_app, cuentas_cobro_app, errores_numericos_cobro_app,
+        es_cobros_app, presentar_mensaje_cobro_app, render_cobro_app, validar_factura_cobro_app,
+        validar_selecciones_cobro_app, volver_cobro_app,
+    )
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_cobros_app(request, empresa)
+    if modo_app:
+        autorizar_cobros_app(request, empresa, factura_id)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
-    es_modal = request.GET.get("modal") == "1"
+    if modo_app:
+        validar_factura_cobro_app(empresa, factura)
+    es_modal = not modo_app and request.GET.get("modal") == "1"
     template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    config_avanzada = None if modo_app else ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    cuentas_financieras = cuentas_cobro_app(empresa) if modo_app else _cuentas_financieras_activas_para_pago(empresa)
+    if modo_app:
+        validar_selecciones_cobro_app(request, empresa, cuentas_financieras)
     cajas = cuentas_financieras.filter(tipo='caja')
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
@@ -8123,11 +8138,21 @@ def registrar_pago(request, empresa_slug, factura_id):
 
     if factura.estado == 'anulada':
         messages.error(request, "No se pueden registrar pagos en una factura anulada.")
+        if modo_app:
+            return render_cobro_app(request, empresa, _contexto_pago(), readonly_reason="La factura está anulada. No permite registrar cobros.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
     if factura.saldo_pendiente <= 0:
         messages.info(request, "Esta factura no tiene saldo pendiente.")
+        if modo_app:
+            return render_cobro_app(request, empresa, _contexto_pago(), readonly_reason="Esta factura no tiene saldo pendiente. No hay un nuevo cobro que registrar.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    if modo_app:
+        errores_app = errores_numericos_cobro_app(request)
+        if errores_app:
+            messages.error(request, "Revise los valores numéricos del cobro. Los datos ingresados se conservan.")
+            return render_cobro_app(request, empresa, _contexto_pago(request.POST), errores=errores_app)
 
     if request.method == "POST":
 
@@ -8136,6 +8161,8 @@ def registrar_pago(request, empresa_slug, factura_id):
         referencia = request.POST.get("referencia", "").strip()
         fecha_pago = request.POST.get("fecha")
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
+        if modo_app and cuenta_financiera_id == "":
+            cuenta_financiera_id = None
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
         separar_isv = request.POST.get("separar_isv") == "on"
@@ -8190,6 +8217,8 @@ def registrar_pago(request, empresa_slug, factura_id):
                     if monto_decimal <= 0:
                         error = f"El monto de {etiqueta} debe ser mayor que cero."
                         break
+                    if modo_app and cuenta_id == "":
+                        cuenta_id = None
                     cuenta_mixta = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo_mixto)
                     if not cuenta_mixta:
                         error = f"Selecciona la cuenta financiera para {etiqueta}."
@@ -8236,13 +8265,15 @@ def registrar_pago(request, empresa_slug, factura_id):
                                     recibos.append(pago.recibo.numero_recibo)
                         messages.success(
                             request,
-                            f"Pago mixto registrado correctamente. Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}."
+                            presentar_mensaje_cobro_app(factura, f"Pago mixto registrado correctamente. Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}.", modo_app)
                         )
                         respuesta_modal = _respuesta_modal_exito(
                             f"Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}."
                         )
                         if respuesta_modal:
                             return respuesta_modal
+                        if modo_app:
+                            return volver_cobro_app(request, empresa, factura)
                         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
                     except ValidationError as exc:
                         error = "; ".join(exc.messages)
@@ -8251,6 +8282,8 @@ def registrar_pago(request, empresa_slug, factura_id):
                         error = f"No se pudo completar el cobro: {exc}"
 
             messages.error(request, error)
+            if modo_app:
+                return render_cobro_app(request, empresa, _contexto_pago(request.POST))
             return render(request, template_name, _contexto_pago(request.POST))
 
         try:
@@ -8316,14 +8349,16 @@ def registrar_pago(request, empresa_slug, factura_id):
                     registrar_asiento_pago_cliente(pago)
                 recibo_numero = pago.recibo.numero_recibo if hasattr(pago, 'recibo') else None
                 if recibo_numero:
-                    messages.success(request, f"Pago registrado correctamente. Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.")
+                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.", modo_app))
                 else:
-                    messages.success(request, f"Pago registrado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
+                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.", modo_app))
                 respuesta_modal = _respuesta_modal_exito(
                     f"Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
                 )
                 if respuesta_modal:
                     return respuesta_modal
+                if modo_app:
+                    return volver_cobro_app(request, empresa, factura)
                 return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
         except (InvalidOperation, ValueError):
             error = "Ingrese un monto y una fecha validos."
@@ -8335,6 +8370,8 @@ def registrar_pago(request, empresa_slug, factura_id):
 
         messages.error(request, error)
 
+    if modo_app:
+        return render_cobro_app(request, empresa, _contexto_pago(request.POST if request.method == "POST" else {}))
     return render(request, template_name, _contexto_pago(request.POST if request.method == "POST" else {}))
 
 
@@ -8407,21 +8444,35 @@ def _recalcular_y_recontabilizar_pagos_factura(factura):
 @login_required
 @xframe_options_sameorigin
 def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
+    from .mobile_payments import (
+        autorizar_cobros_app, cuentas_cobro_app, errores_numericos_cobro_app,
+        es_cobros_app, presentar_mensaje_cobro_app, render_cobro_app, validar_factura_cobro_app,
+        validar_selecciones_cobro_app, volver_cobro_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_cobros_app(request, empresa)
+    if modo_app:
+        autorizar_cobros_app(request, empresa, factura_id, pago_id)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    if modo_app:
+        validar_factura_cobro_app(empresa, factura)
     pago = get_object_or_404(
         PagoFactura.objects.select_related("cuenta_financiera", "cuenta_financiera_impuesto", "proveedor_comision"),
         id=pago_id,
         factura=factura,
     )
-    es_modal = request.GET.get("modal") == "1"
+    es_modal = not modo_app and request.GET.get("modal") == "1"
     template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
 
     if factura.estado == "anulada":
         messages.error(request, "No se pueden editar pagos de una factura anulada.")
-        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        if not modo_app:
+            return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
-    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    cuentas_financieras = cuentas_cobro_app(empresa) if modo_app else _cuentas_financieras_activas_para_pago(empresa)
+    if modo_app:
+        validar_selecciones_cobro_app(request, empresa, cuentas_financieras)
     cajas = cuentas_financieras.filter(tipo='caja')
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
@@ -8535,12 +8586,22 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         """.strip()
         return HttpResponse(html)
 
+    if modo_app:
+        if factura.estado == "anulada":
+            return render_cobro_app(request, empresa, _contexto_pago(), readonly_reason="La factura está anulada. No permite corregir sus cobros.")
+        errores_app = errores_numericos_cobro_app(request)
+        if errores_app:
+            messages.error(request, "Revise los valores numéricos del cobro. Los datos ingresados se conservan.")
+            return render_cobro_app(request, empresa, _contexto_pago(request.POST), errores=errores_app)
+
     if request.method == "POST":
         monto = request.POST.get("monto", "").strip()
         metodo = request.POST.get("metodo")
         referencia = request.POST.get("referencia", "").strip()
         fecha_pago = request.POST.get("fecha")
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
+        if modo_app and cuenta_financiera_id == "":
+            cuenta_financiera_id = None
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
         separar_isv = request.POST.get("separar_isv") == "on"
@@ -8572,7 +8633,13 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 if retencion_isr < 0 or retencion_isv < 0:
                     raise ValidationError("Las retenciones no pueden ser negativas.")
 
-                pagos_validos, total_pago = _pagos_mixtos_desde_post(request.POST, cuentas_financieras)
+                datos_pagos_mixtos = request.POST
+                if modo_app:
+                    datos_pagos_mixtos = request.POST.copy()
+                    for campo_cuenta in ("cuenta_efectivo", "cuenta_tarjeta", "cuenta_transferencia"):
+                        if datos_pagos_mixtos.get(campo_cuenta) == "":
+                            datos_pagos_mixtos.pop(campo_cuenta)
+                pagos_validos, total_pago = _pagos_mixtos_desde_post(datos_pagos_mixtos, cuentas_financieras)
                 if not pagos_validos:
                     raise ValidationError("Ingresa al menos un monto valido para dividir el cobro.")
                 proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
@@ -8617,12 +8684,14 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     _recalcular_y_recontabilizar_pagos_factura(factura)
 
                 pago.refresh_from_db()
-                messages.success(request, f"Pago mixto actualizado correctamente. Cobro recibido: L. {total_pago:.2f}.")
+                messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago mixto actualizado correctamente. Cobro recibido: L. {total_pago:.2f}.", modo_app))
                 respuesta_modal = _respuesta_modal_exito(
                     f"Pago mixto actualizado. Cobro recibido: L. {total_pago:.2f}. Movimientos: {len(pagos_validos)}."
                 )
                 if respuesta_modal:
                     return respuesta_modal
+                if modo_app:
+                    return volver_cobro_app(request, empresa, factura)
                 return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
             monto_decimal = _parsear_decimal(monto, "monto recibido")
@@ -8676,12 +8745,14 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 pago.save()
                 _recalcular_y_recontabilizar_pagos_factura(factura)
 
-            messages.success(request, f"Pago actualizado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
+            messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago actualizado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.", modo_app))
             respuesta_modal = _respuesta_modal_exito(
                 f"Cobro actualizado por L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
             )
             if respuesta_modal:
                 return respuesta_modal
+            if modo_app:
+                return volver_cobro_app(request, empresa, factura)
             return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
         except (InvalidOperation, ValueError):
             error = "Ingrese un monto y una fecha validos."
@@ -8692,8 +8763,12 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             error = f"No se pudo actualizar el cobro: {exc}"
 
         messages.error(request, error)
+        if modo_app:
+            return render_cobro_app(request, empresa, _contexto_pago(request.POST))
         return render(request, template_name, _contexto_pago(request.POST))
 
+    if modo_app:
+        return render_cobro_app(request, empresa, _contexto_pago())
     return render(request, template_name, _contexto_pago())
 
 
