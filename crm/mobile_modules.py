@@ -68,9 +68,14 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("gastos_adicionales", "Gastos Adicionales", "Productos, cirugía, PDF, envío y conversión según tus permisos.",
             "Atención clínica", acceso["modulo_gastos_adicionales"], "disponible",
             f"{reverse(gastos_destino, args=[empresa.slug])}?app=1")
+    recetas_autorizadas = acceso["ver_recetas"] or acceso["crear_recetas"]
+    recetas_destino = "recetas" if acceso["ver_recetas"] else "crear_receta"
+    agregar("recetas", "Recetas", "Elige un paciente para consultar o crear recetas, abrir PDF y enviar según tus permisos.",
+            "Atención clínica", acceso["modulo_clinica"] and recetas_autorizadas,
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={recetas_destino}")
     for key, nombre, descripcion, autorizado in (
         ("expediente", "Expediente clínico", "Historias, diagnósticos y evolución del paciente.", acceso["expediente_clinico"]),
-        ("recetas", "Recetas", "Prescripciones, PDF y envío al paciente.", acceso["ver_recetas"]),
         ("anexos", "Exámenes y anexos", "Documentos y archivos del expediente.", acceso["ver_anexos_clinicos"]),
         ("tratamientos", "Tratamientos", "Planes, controles y seguimiento clínico.", acceso["tratamientos_clinicos"]),
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),

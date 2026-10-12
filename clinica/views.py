@@ -118,6 +118,15 @@ from .mobile_patients import (
     url_paciente_app,
     volver_paciente_app,
 )
+from .mobile_recipes import (
+    accesos_recetas_paciente_app,
+    autorizar_recetas_app,
+    es_recetas_app,
+    contexto_selector_recetas_app,
+    render_recetas_app,
+    respuesta_recetas_app,
+    volver_receta_app,
+)
 from crm.forms import (
     PacienteRapidoCitaForm,
     ProgramaCamaraHiperbaricaForm,
@@ -991,6 +1000,7 @@ def pacientes(request, empresa_slug):
         "cumpleaneros_mes": cumpleaneros_mes,
         "vista_premium_pacientes": vista_premium_pacientes,
         "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
+        **contexto_selector_recetas_app(request, empresa),
     })
 
 
@@ -1463,6 +1473,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "formularios_hospitalarios": interfaz_clinica_activa(empresa),
             "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
             "historia_clinica_pendiente_doctor": historia_clinica_pendiente_doctor,
+            **(accesos_recetas_paciente_app(request, empresa, paciente) if es_recetas_app(request, empresa) else {}),
         },
     )
 
@@ -2298,6 +2309,7 @@ def enviar_manual_receta_correo(request, empresa_slug, manual_id):
 @login_required
 def recetas_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_recetas_app(request, empresa, "puede_ver_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     recetas = list(
         RecetaMedica.objects.filter(empresa=empresa, paciente=paciente)
@@ -2305,14 +2317,17 @@ def recetas_paciente(request, empresa_slug, paciente_id):
         .prefetch_related("productos", "detalles_medicamentos__producto", "manuales")
         .order_by("-fecha", "-fecha_creacion")
     )
-    return render(
+    return render_recetas_app(
         request,
+        empresa,
         "clinica/recetas_paciente.html",
+        "clinica/mobile_recipe_list.html",
         {
             "empresa": empresa,
             "paciente": paciente,
             "recetas": recetas,
             "recetas_avanzadas": _recetas_avanzadas_activas(empresa),
+            "can_view_recipe_manuals": _puede_consultar_manual_receta(request.user, empresa) if es_recetas_app(request, empresa) else False,
         },
     )
 
@@ -2320,34 +2335,43 @@ def recetas_paciente(request, empresa_slug, paciente_id):
 @login_required
 def imprimir_receta_paciente(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_recetas_app(request, empresa, "puede_enviar_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     receta = _receta_con_adjuntos(empresa, paciente, receta_id)
-    return render(
+    contexto = _contexto_receta_impresion(empresa, paciente, receta)
+    if es_recetas_app(request, empresa):
+        contexto["can_view_recipe_manuals"] = _puede_consultar_manual_receta(request.user, empresa)
+    return render_recetas_app(
         request,
+        empresa,
         "clinica/receta_imprimir.html",
-        _contexto_receta_impresion(empresa, paciente, receta),
+        "clinica/mobile_recipe_preview.html",
+        contexto,
     )
 
 
 @login_required
 def descargar_receta_pdf(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_recetas_app(request, empresa, "puede_enviar_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     receta = _receta_con_adjuntos(empresa, paciente, receta_id)
     response = HttpResponse(_generar_receta_pdf_bytes(empresa, paciente, receta), content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{_nombre_receta_pdf(receta)}"'
-    return response
+    disposition = "inline" if es_recetas_app(request, empresa) else "attachment"
+    response["Content-Disposition"] = f'{disposition}; filename="{_nombre_receta_pdf(receta)}"'
+    return respuesta_recetas_app(request, empresa, response)
 
 
 @login_required
 @require_POST
 def enviar_receta_correo(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_recetas_app(request, empresa, "puede_enviar_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     receta = _receta_con_adjuntos(empresa, paciente, receta_id)
     if not paciente.correo:
         messages.error(request, "El paciente no tiene correo electrónico registrado.")
-        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+        return volver_receta_app(request, empresa, paciente, receta)
 
     total_manuales = receta.manuales.count()
     detalle_manuales = (
@@ -2385,23 +2409,24 @@ def enviar_receta_correo(request, empresa_slug, paciente_id, receta_id):
             request,
             f"Receta{f' y {total_manuales} manual(es)' if total_manuales else ''} enviada por correo a {paciente.correo}.",
         )
-    return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+    return volver_receta_app(request, empresa, paciente, receta)
 
 
 @login_required
 @require_POST
 def enviar_receta_whatsapp(request, empresa_slug, paciente_id, receta_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_recetas_app(request, empresa, "puede_enviar_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     receta = _receta_con_adjuntos(empresa, paciente, receta_id)
     config = ConfiguracionCRM.objects.filter(empresa=empresa).first()
     if not config or not config.whatsapp_activo:
         messages.error(request, "Active y configure WhatsApp Cloud API en CRM antes de enviar recetas.")
-        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+        return volver_receta_app(request, empresa, paciente, receta)
     telefono = paciente.whatsapp or paciente.telefono or ""
     if not telefono:
         messages.error(request, "El paciente no tiene teléfono o WhatsApp registrado.")
-        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+        return volver_receta_app(request, empresa, paciente, receta)
 
     try:
         with tempfile.TemporaryDirectory(prefix="receta_medica_") as directorio:
@@ -2427,7 +2452,7 @@ def enviar_receta_whatsapp(request, empresa_slug, paciente_id, receta_id):
         messages.error(request, f"No se pudo completar el envío por WhatsApp: {detalle}")
     else:
         messages.success(request, f"Receta y {receta.manuales.count()} manual(es) enviados por WhatsApp.")
-    return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+    return volver_receta_app(request, empresa, paciente, receta)
 
 
 def _config_documento_clinico(categoria):
@@ -4336,6 +4361,7 @@ def subir_examen_paciente(request, empresa_slug, paciente_id):
 @login_required
 def crear_receta_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_recetas_app(request, empresa, "puede_crear_recetas")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     avanzada = _recetas_avanzadas_activas(empresa)
     profesional_inicial = _profesional_predeterminado_usuario(empresa, request.user)
@@ -4365,7 +4391,7 @@ def crear_receta_paciente(request, empresa_slug, paciente_id):
             if lineas:
                 _guardar_detalles_receta(receta, lineas)
         messages.success(request, "Receta médica creada correctamente.")
-        return redirect("clinica_receta_imprimir", empresa_slug=empresa.slug, paciente_id=paciente.id, receta_id=receta.id)
+        return volver_receta_app(request, empresa, paciente, receta)
 
     if not avanzada:
         return render(request, "clinica/form.html", {
@@ -4380,7 +4406,7 @@ def crear_receta_paciente(request, empresa_slug, paciente_id):
         .prefetch_related("detalles__producto")
         .order_by("nombre")
     )
-    return render(request, "clinica/receta_form_avanzada.html", {
+    return render_recetas_app(request, empresa, "clinica/receta_form_avanzada.html", "clinica/mobile_recipe_form.html", {
         "empresa": empresa,
         "paciente": paciente,
         "form": form,
@@ -4388,6 +4414,8 @@ def crear_receta_paciente(request, empresa_slug, paciente_id):
         "plantillas": plantillas,
         "plantillas_json": _serializar_plantillas_receta(plantillas),
         "lineas_iniciales": _serializar_lineas_receta(lineas),
+        "recetas_avanzadas": avanzada,
+        "can_view_recipe_manuals": _puede_consultar_manual_receta(request.user, empresa) if es_recetas_app(request, empresa) else False,
     })
 
 

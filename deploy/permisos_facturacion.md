@@ -36,18 +36,18 @@ La base `facturacion/mobile_invoice_base.html` proporciona encabezado, navegaci�
 
 | Área | Estado móvil y puntos existentes que se deben reutilizar |
 | --- | --- |
-| Pacientes | Lista, perfil móvil y enlace de registro ya disponibles en `agenda_mobile`; creación/edición completa reutilizará `clinica_crear_paciente`, `clinica_editar_paciente` y sus formularios. |
+| Pacientes | Se conserva el flujo entrenado de `agenda_mobile`; acceso adicional con listado/búsqueda paginados, datos generales y creación/edición sobre los formularios clínicos existentes. |
 | Agenda | Calendario, citas y disponibilidad ya adaptados; conservar vistas y servicios de `crm`, incluida la agenda central de Hospital Mía. |
 | Facturación | Creación rápida, PDF, WhatsApp y nuevas acciones móviles sobre las vistas fiscales existentes. |
-| Inventario y productos | Hospital Mía dispone de consulta por bodega/lote, FEFO y entrada rápida; ampliaciones deben usar las vistas de inventario/productos y sus movimientos actuales. |
+| Inventario y productos | Consulta móvil de las cuatro empresas por bodega/lote y FEFO; se conserva entrada rápida de Hospital Mía. Entradas y transferencias completas para las cuatro quedan pendientes. |
 | Transferencias | Pendiente de interfaz móvil; reutilizar `traslado_inventario_farmaceutico`, `traslado_rapido_farmaceutico` y las reglas de bodegas, lotes y `transferir_inventario`. |
-| Expediente clínico | El perfil actual enlaza a la web. Próxima adaptación: `clinica_paciente_detalle`, `clinica_historias_especialidad`, `clinica_historial_clinico_consolidado` y los formularios existentes por especialidad. |
-| Recetas | Pendiente de interfaz móvil completa; reutilizar `clinica_recetas_paciente`, `clinica_crear_receta_paciente`, PDF y envío existentes, con `ver_recetas`/`crear_recetas`. |
+| Expediente clínico | Consulta móvil de historias por área/consolidado y registro de eventos ya disponibles desde el acceso adicional. Escritura de historias y controles especializados pendientes; se conservan los enlaces del perfil entrenado. |
+| Recetas | Listado, creación con medicamentos/plantillas/manuales, PDF y envíos adaptados sobre las vistas existentes. Administración de plantillas pendiente; ver/crear/enviar conservan permisos independientes. |
 | Manuales PDF | Pendiente de interfaz móvil; reutilizar `clinica_manuales_pdf`, `clinica_enviar_manuales_pdf` y permisos de ver/enviar/administrar. |
 | Tratamientos | Pendiente de interfaz móvil completa; reutilizar `clinica_planes_tratamiento_paciente`, tratamientos y controles actuales. |
 | Configuración | Adaptar solo los campos ya autorizados en `clinica_configuracion`; usar `erp_access` y los permisos granulares del rol por empresa. |
 
-Prioridad de próximas adaptaciones: expediente y recetas desde el perfil del paciente; luego manuales PDF y transferencias; finalmente tratamientos y configuración. Esta lista es una guía de implementación, no expone opciones todavía no adaptadas ni autoriza nuevas acciones al usuario.
+Prioridad de próximas adaptaciones: manuales PDF y escritura clínica autorizada; luego transferencias, tratamientos y configuración. Esta lista es una guía de implementación, no expone opciones todavía no adaptadas ni autoriza nuevas acciones al usuario.
 
 Base de módulos y Gastos Adicionales móviles
 ------------------------------------------
@@ -65,10 +65,21 @@ Una futura aplicación iOS distribuida por App Store requiere una etapa propia: 
 Pacientes, consulta del expediente e inventario para las cuatro empresas
 ---------------------------------------------------------------------
 
-El acceso adicional a Pacientes usa las rutas clínicas existentes con `app=1`: listado paginado/búsqueda, datos generales, creación/edición con el formulario general básico actual, fotografías, consulta de historias por área/consolidado y registro de un evento mediante el formulario existente. No reemplaza la tarjeta ni el perfil entrenado de Inicio. Los POST del consolidado móvil se rechazan: la consulta no concede edición de historias ni controles especializados. Las pantallas de consulta no crean preconsultas ni inicializan profesionales. La edición básica conserva los antecedentes y datos clínicos existentes y la sincronización actual con clientes. Los demás flujos clínicos completos, incluido editar historias/recetas/controles, continúan pendientes de adaptación.
+El acceso adicional a Pacientes usa las rutas clínicas existentes con `app=1`: listado paginado/búsqueda, datos generales, creación/edición con el formulario general básico actual, fotografías, consulta de historias por área/consolidado y registro de un evento mediante el formulario existente. No reemplaza la tarjeta ni el perfil entrenado de Inicio. Los POST del consolidado móvil se rechazan: la consulta no concede edición de historias ni controles especializados. Las pantallas de consulta no crean preconsultas ni inicializan profesionales. La edición básica conserva los antecedentes y datos clínicos existentes y la sincronización actual con clientes. Escritura/edición de historias y controles especializados continúan pendientes de adaptación; las recetas se describen en el bloque siguiente.
 
 `agenda_mobile_inventory` agrega consulta de productos/stock por empresa para las cuatro clínicas. `crm/mobile_inventory.py` extrae literalmente la presentación de existencias del panel original de Hospital Mía para compartir cálculos, bodegas, lotes, vencimientos y FEFO sin una versión paralela. El panel original consume el mismo helper y conserva su payload y su entrada rápida. La pantalla nueva solo admite GET; no genera movimientos ni modifica existencias. La entrada rápida original solo se enlaza para Hospital Mía cuando inventario, ajuste y acceso al inicio actual están autorizados. Entradas/transferencias móviles para las otras empresas siguen pendientes.
 
 Las rutas nuevas de consulta de inventario requieren `puede_inventario`, no permiso de calendario. El catálogo y el hub independiente `agenda_mobile_modules_screen` comprueban acceso a empresa y módulos autorizados desde sus propias vistas; únicamente muestran metadatos. Son un destino móvil seguro para roles granulares sin calendario. No se flexibiliza el permiso del inicio/calendario entrenado; las nuevas pantallas usan navegación por destinos realmente accesibles y no conceden permisos.
 
 El trabajo automático de continuación debe revisar esta guía y el catálogo antes de elegir el siguiente bloque. Priorizar recetas/manuales y escritura clínica autorizada, después transferencias/compras/entradas para las cuatro empresas, cobros y restantes documentos/reportes, y configuración por rol. La app instalada actual sigue siendo PWA; no existe todavía un binario para App Store.
+
+Recetas médicas desde la app
+---------------------------
+
+Las rutas de recetas del paciente seleccionan pantalla móvil solo con `app=1` y en las cuatro empresas clínicas. Conservan `RecetaMedicaForm`, las listas repetidas de medicamentos, su parser y guardado transaccional existentes, los catálogos autorizados (incluida la compartición intencional de Medical Spa) y las plantillas de la empresa. No crean inventario ni una segunda lógica de prescripción. La web y el template del PDF médico original permanecen sin cambios.
+
+El catálogo ofrece elegir paciente desde el listado móvil ya autorizado, con `destino=recetas` o `destino=crear_receta`. La selección no concede acceso a datos generales: respeta por separado ver pacientes, ver recetas y crear recetas. Si el rol no tiene permiso para listar pacientes, no se agrega un selector alternativo ni se habilita el acceso global; conserva los accesos del paciente que ya esté autorizado a abrir. Imprimir/PDF y correo/WhatsApp siguen exigiendo el permiso existente `puede_enviar_recetas`. Guardar una receta sin ese permiso regresa a una pantalla realmente autorizada.
+
+El PDF móvil usa los mismos bytes y nombre del documento existente, abierto en línea. Las pantallas y respuestas móviles con datos del paciente no se almacenan en caché. Los envíos usan los servicios originales y los contactos del paciente; las pruebas emplean transportes simulados y no envían documentos a pacientes reales. Los manuales adjuntos existentes se conservan; la administración móvil de plantillas y manuales es una ampliación posterior.
+
+Los roles clínicos granulares conservan los tres permisos independientes de recetas. Para roles anteriores se conserva además `puede_expediente_clinico`, el permiso del menú clínico existente, junto con el requisito `puede_pacientes` que impone el middleware a esas rutas. Se detectó que el mapper web antiguo de esas rutas es más amplio que su menú; no se usa ese desfase para conceder recetas a roles que solo pueden consultar pacientes. La revisión de ese comportamiento histórico en web queda fuera de esta adaptación móvil.

@@ -1,0 +1,17 @@
+{% extends "clinica/mobile_recipe_base.html" %}
+{% block mobile_title %}Recetas del paciente{% endblock %}
+{% block mobile_back_url %}{% if can_view_patient %}{{ app_patient_detail_url }}{% elif app_recipe_patient_picker_url %}{{ app_recipe_patient_picker_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}Recetas{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_header_actions %}{% if can_create_recipe %}<a class="mi-more mr-header-link" href="{{ app_recipe_create_url }}"><b aria-hidden="true">+</b> Nueva</a>{% endif %}{% endblock %}
+{% block mobile_content %}
+<div class="mr-list-head"><strong>{{ recetas|length }} receta{{ recetas|length|pluralize }}</strong><span>Más recientes primero</span></div>
+<section class="mr-recipe-list" aria-label="Recetas del paciente">{% for item in mobile_recipe_items %}{% with receta=item.receta %}
+  <article class="mi-card mr-recipe-card"><div class="mr-recipe-head"><div><span class="mi-kicker">Receta médica</span><h2>{{ receta.fecha|date:'d/m/Y' }}</h2>{% if receta.profesional %}<p>{{ receta.profesional.nombre }}</p>{% endif %}</div><span class="mr-rx" aria-hidden="true">Rx</span></div>
+    {% if receta.diagnostico %}<p class="mr-diagnosis">{{ receta.diagnostico }}</p>{% endif %}
+    <details class="mr-recipe-fold"><summary>Leer receta <span aria-hidden="true">⌄</span></summary><div>{% include "clinica/mobile_recipe_contents.html" with receta=receta %}</div></details>
+    <p class="mr-created">Registrada {{ receta.fecha_creacion|date:'d/m/Y H:i' }}{% if receta.creada_por %} · {{ receta.creada_por.get_full_name|default:receta.creada_por.username }}{% endif %}</p>
+    {% if can_send_recipe %}<a class="mi-button secondary" href="{{ item.preview_url }}">Ver PDF y compartir <span aria-hidden="true">›</span></a>{% endif %}
+  </article>{% endwith %}
+{% empty %}<div class="mi-card mr-empty"><span class="mr-rx" aria-hidden="true">Rx</span><h2>No hay recetas registradas</h2><p>Las recetas emitidas para este paciente aparecerán aquí.</p>{% if can_create_recipe %}<a class="mi-button" href="{{ app_recipe_create_url }}">Crear receta</a>{% endif %}</div>{% endfor %}</section>
+{% endblock %}
