@@ -1,0 +1,8 @@
+{% extends "clinica/mobile_manual_list.html" %}
+{% block mobile_title %}Administrar manuales{% endblock %}
+{% block mobile_back_url %}{% if can_view_manuals %}{{ app_manuals_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}Administrar manuales{% endblock %}
+{% block mobile_header_description %}<p>Sube documentos, edita sus datos y define cuáles estarán activos.</p>{% endblock %}
+{% block mobile_header_actions %}{% if can_admin_manuals %}<a class="mi-more mm-header-link" href="{{ app_manual_create_url }}"><b aria-hidden="true">+</b> Nuevo</a>{% endif %}{% endblock %}
+{% block mobile_manual_filters %}{{ block.super }}<div class="mm-filter-chips" aria-label="Estado de los manuales"><button type="button" class="active" data-manual-active-filter="all" aria-pressed="true">Todos</button><button type="button" data-manual-active-filter="true" aria-pressed="false">Activos</button><button type="button" data-manual-active-filter="false" aria-pressed="false">Inactivos</button></div>{% endblock %}
+{% block mobile_manual_history %}{% endblock %}

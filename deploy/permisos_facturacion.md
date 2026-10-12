@@ -43,11 +43,11 @@ La base `facturacion/mobile_invoice_base.html` proporciona encabezado, navegaci�
 | Transferencias | Pendiente de interfaz móvil; reutilizar `traslado_inventario_farmaceutico`, `traslado_rapido_farmaceutico` y las reglas de bodegas, lotes y `transferir_inventario`. |
 | Expediente clínico | Consulta móvil de historias por área/consolidado y registro de eventos ya disponibles desde el acceso adicional. Escritura de historias y controles especializados pendientes; se conservan los enlaces del perfil entrenado. |
 | Recetas | Listado, creación con medicamentos/plantillas/manuales, PDF y envíos adaptados sobre las vistas existentes. Administración de plantillas pendiente; ver/crear/enviar conservan permisos independientes. |
-| Manuales PDF | Pendiente de interfaz móvil; reutilizar `clinica_manuales_pdf`, `clinica_enviar_manuales_pdf` y permisos de ver/enviar/administrar. |
+| Manuales PDF | Consulta, selección/envío, historial y administración móvil mediante las rutas, permisos y formulario de documentos actuales; sin recrear transportes ni archivos. |
 | Tratamientos | Pendiente de interfaz móvil completa; reutilizar `clinica_planes_tratamiento_paciente`, tratamientos y controles actuales. |
 | Configuración | Adaptar solo los campos ya autorizados en `clinica_configuracion`; usar `erp_access` y los permisos granulares del rol por empresa. |
 
-Prioridad de próximas adaptaciones: manuales PDF y escritura clínica autorizada; luego transferencias, tratamientos y configuración. Esta lista es una guía de implementación, no expone opciones todavía no adaptadas ni autoriza nuevas acciones al usuario.
+Prioridad de próximas adaptaciones: escritura clínica y anexos autorizados; luego transferencias, tratamientos y configuración. Esta lista es una guía de implementación, no expone opciones todavía no adaptadas ni autoriza nuevas acciones al usuario.
 
 Base de módulos y Gastos Adicionales móviles
 ------------------------------------------
@@ -71,7 +71,7 @@ El acceso adicional a Pacientes usa las rutas clínicas existentes con `app=1`: 
 
 Las rutas nuevas de consulta de inventario requieren `puede_inventario`, no permiso de calendario. El catálogo y el hub independiente `agenda_mobile_modules_screen` comprueban acceso a empresa y módulos autorizados desde sus propias vistas; únicamente muestran metadatos. Son un destino móvil seguro para roles granulares sin calendario. No se flexibiliza el permiso del inicio/calendario entrenado; las nuevas pantallas usan navegación por destinos realmente accesibles y no conceden permisos.
 
-El trabajo automático de continuación debe revisar esta guía y el catálogo antes de elegir el siguiente bloque. Priorizar recetas/manuales y escritura clínica autorizada, después transferencias/compras/entradas para las cuatro empresas, cobros y restantes documentos/reportes, y configuración por rol. La app instalada actual sigue siendo PWA; no existe todavía un binario para App Store.
+El trabajo automático de continuación debe revisar esta guía y el catálogo antes de elegir el siguiente bloque. Recetas y Manuales PDF ya tienen adaptación móvil; priorizar escritura clínica/anexos autorizados y administración de plantillas pendientes, después transferencias/compras/entradas para las cuatro empresas, cobros y restantes documentos/reportes, y configuración por rol. La app instalada actual sigue siendo PWA; no existe todavía un binario para App Store.
 
 Recetas médicas desde la app
 ---------------------------
@@ -80,6 +80,17 @@ Las rutas de recetas del paciente seleccionan pantalla móvil solo con `app=1` y
 
 El catálogo ofrece elegir paciente desde el listado móvil ya autorizado, con `destino=recetas` o `destino=crear_receta`. La selección no concede acceso a datos generales: respeta por separado ver pacientes, ver recetas y crear recetas. Si el rol no tiene permiso para listar pacientes, no se agrega un selector alternativo ni se habilita el acceso global; conserva los accesos del paciente que ya esté autorizado a abrir. Imprimir/PDF y correo/WhatsApp siguen exigiendo el permiso existente `puede_enviar_recetas`. Guardar una receta sin ese permiso regresa a una pantalla realmente autorizada.
 
-El PDF móvil usa los mismos bytes y nombre del documento existente, abierto en línea. Las pantallas y respuestas móviles con datos del paciente no se almacenan en caché. Los envíos usan los servicios originales y los contactos del paciente; las pruebas emplean transportes simulados y no envían documentos a pacientes reales. Los manuales adjuntos existentes se conservan; la administración móvil de plantillas y manuales es una ampliación posterior.
+El PDF móvil usa los mismos bytes y nombre del documento existente, abierto en línea. Las pantallas y respuestas móviles con datos del paciente no se almacenan en caché. Los envíos usan los servicios originales y los contactos del paciente; las pruebas emplean transportes simulados y no envían documentos a pacientes reales. Los manuales adjuntos existentes se conservan; la administración móvil de plantillas es una ampliación posterior y los manuales se describen en el siguiente bloque.
 
 Los roles clínicos granulares conservan los tres permisos independientes de recetas. Para roles anteriores se conserva además `puede_expediente_clinico`, el permiso del menú clínico existente, junto con el requisito `puede_pacientes` que impone el middleware a esas rutas. Se detectó que el mapper web antiguo de esas rutas es más amplio que su menú; no se usa ese desfase para conceder recetas a roles que solo pueden consultar pacientes. La revisión de ese comportamiento histórico en web queda fuera de esta adaptación móvil.
+
+Manuales PDF: consulta, envío y administración móviles
+---------------------------------------------------
+
+Las vistas originales de consulta, administración, creación/edición y archivo seleccionan tarjetas y formularios móviles únicamente con `app=1` en las cuatro empresas. Se mantienen el módulo clínico activo, la habilitación de Manuales PDF por configuración y los permisos originales de consultar, enviar y administrar. Administrar implica consultar solamente porque el resolver original de permisos ya lo define; no autoriza enviar. `ManualRecetaForm` conserva validación de PDF, límite de 20 MB, estado activo y asociaciones históricas al reemplazar un archivo.
+
+`clinica_manuales_pdf_app_enviar` es una ruta GET de presentación para preparar el envío, también utilizable por un rol autorizado a enviar sin permiso de consulta. En ese caso muestra solo identificadores/títulos seleccionables, sin PDF, descripción ni historial. El envío sigue usando exactamente `clinica_enviar_manuales_pdf` por POST con `manuales` repetido, `paciente_id`, `canal` y `app`. La ruta POST original conserva su rechazo de GET; no existe un transporte móvil paralelo.
+
+La búsqueda del destinatario usa el buscador de pacientes ya existente y exige ver pacientes. La preselección por identificador solamente muestra nombre y contactos cuando el rol ya puede ver pacientes o datos generales. El permiso de enviar manuales no concede esas lecturas. Los estados Enviado, Parcial, Fallido y Preparado manualmente se conservan en `EnvioManualPDF` con usuario/fecha/canal/documentos actuales; no se expone el error técnico crudo del transporte.
+
+La opción manual de WhatsApp usa `wa.me` en la app, con los mismos textos, enlaces firmados, expiración y registro de preparación de la web; la web conserva su destino original. Preparado no significa enviado: el usuario debe completar el envío en WhatsApp. Los errores regresan a una pantalla móvil autorizada conservando identificadores válidos y canal, sin incluir datos clínicos/contactos en la URL. En un envío parcial se preseleccionan solamente los documentos pendientes para reintentar, utilizando el orden y contador originales; el historial original sigue conservando todos los documentos del intento. Se rechazan identificadores móviles malformados o fuera del rango de la base antes de consultar o enviar; las reglas de empresa y actividad originales permanecen intactas. Archivos y respuestas móviles protegidos usan `no-store`.

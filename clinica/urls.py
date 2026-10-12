@@ -18,6 +18,7 @@ urlpatterns = [
     path("configuracion/", views.configuracion_producto_clinico, name="clinica_configuracion"),
     path("manuales-pdf/", views.manuales_pdf, name="clinica_manuales_pdf"),
     path("manuales-pdf/enviar/", views.enviar_manuales_pdf, name="clinica_enviar_manuales_pdf"),
+    path("manuales-pdf/enviar/app/", views.manuales_pdf_app_enviar, name="clinica_manuales_pdf_app_enviar"),
     path("pacientes/", views.pacientes, name="clinica_pacientes"),
     path("pacientes/sugerencias/", views.pacientes_sugerencias, name="clinica_pacientes_sugerencias"),
     path("pacientes/crear/", views.crear_paciente, name="clinica_crear_paciente"),

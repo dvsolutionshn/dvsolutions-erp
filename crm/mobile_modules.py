@@ -74,6 +74,11 @@ def construir_contexto_modulos_app(request, empresa):
             "Atención clínica", acceso["modulo_clinica"] and recetas_autorizadas,
             "disponible" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={recetas_destino}")
+    manuales_autorizados = acceso["ver_manuales_pdf"] or acceso["enviar_manuales_pdf"] or acceso["administrar_manuales_pdf"]
+    manuales_destino = "clinica_manuales_pdf" if acceso["ver_manuales_pdf"] or acceso["administrar_manuales_pdf"] else "clinica_manuales_pdf_app_enviar"
+    agregar("manuales", "Manuales PDF", "Consultar documentos, compartir con pacientes y administrar según tus permisos.",
+            "Atención clínica", acceso["modulo_clinica"] and manuales_autorizados,
+            "disponible", f"{reverse(manuales_destino, args=[empresa.slug])}?app=1")
     for key, nombre, descripcion, autorizado in (
         ("expediente", "Expediente clínico", "Historias, diagnósticos y evolución del paciente.", acceso["expediente_clinico"]),
         ("anexos", "Exámenes y anexos", "Documentos y archivos del expediente.", acceso["ver_anexos_clinicos"]),
@@ -81,7 +86,6 @@ def construir_contexto_modulos_app(request, empresa):
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),
         ("camara", "Cámara hiperbárica", "Programas y controles de las sesiones.", acceso["ver_camara_hiperbarica"]),
         ("postquirurgicas", "Seguimiento postquirúrgico", "Controles y terapias posteriores a cirugía.", acceso["ver_postquirurgicas"]),
-        ("manuales", "Manuales PDF", "Consultar y enviar manuales autorizados.", acceso["ver_manuales_pdf"]),
     ):
         agregar(key, nombre, descripcion, "Atención clínica", acceso["modulo_clinica"] and autorizado)
 

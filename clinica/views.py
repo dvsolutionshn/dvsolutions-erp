@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from weasyprint import HTML
 
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados
@@ -126,6 +126,16 @@ from .mobile_recipes import (
     render_recetas_app,
     respuesta_recetas_app,
     volver_receta_app,
+)
+from .mobile_manuals import (
+    autorizar_manuales_app,
+    es_manuales_app,
+    id_manual_app,
+    render_manuales_app,
+    respuesta_manuales_app,
+    url_manual_app,
+    volver_manuales_app,
+    whatsapp_manual_app,
 )
 from crm.forms import (
     PacienteRapidoCitaForm,
@@ -406,6 +416,22 @@ def _puede_enviar_manuales_receta(user, empresa):
             empresa,
         )
     )
+
+
+def _permisos_manuales_app(request, empresa):
+    return {
+        "can_view": _puede_consultar_manual_receta(request.user, empresa),
+        "can_send": _puede_enviar_manuales_receta(request.user, empresa),
+        "can_admin": _puede_administrar_manuales_receta(request.user, empresa),
+    }
+
+
+def _accesos_manuales_paciente_app(request, empresa, paciente):
+    habilitado = manuales_pdf_habilitados(empresa) and empresa.tiene_modulo_activo("clinica_medica")
+    return {
+        "can_send_manuals": habilitado and _puede_enviar_manuales_receta(request.user, empresa),
+        "app_patient_manual_send_url": url_manual_app("clinica_manuales_pdf_app_enviar", empresa, paciente_id=paciente.pk),
+    }
 
 
 def _ip_cliente(request):
@@ -1474,6 +1500,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "puede_eliminar_pacientes": _puede_eliminar_pacientes(request.user, empresa),
             "historia_clinica_pendiente_doctor": historia_clinica_pendiente_doctor,
             **(accesos_recetas_paciente_app(request, empresa, paciente) if es_recetas_app(request, empresa) else {}),
+            **(_accesos_manuales_paciente_app(request, empresa, paciente) if es_manuales_app(request, empresa) else {}),
         },
     )
 
@@ -1966,6 +1993,7 @@ def _receta_con_adjuntos(empresa, paciente, receta_id):
 @login_required
 def manuales_recetas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_manuales_app(request, empresa, _puede_administrar_manuales_receta(request.user, empresa))
     if not manuales_pdf_habilitados(empresa):
         raise Http404("Manuales PDF no está habilitado para esta empresa.")
     if not _puede_administrar_manuales_receta(request.user, empresa):
@@ -1976,16 +2004,20 @@ def manuales_recetas(request, empresa_slug):
         .annotate(total_recetas=Count("recetas"))
         .order_by("-activo", "titulo")
     )
-    return render(
+    return render_manuales_app(
         request,
+        empresa,
         "clinica/manuales_recetas.html",
+        "clinica/mobile_manual_admin_list.html",
         {"empresa": empresa, "manuales": manuales},
+        **(_permisos_manuales_app(request, empresa) if es_manuales_app(request, empresa) else {}),
     )
 
 
 @login_required
 def manuales_pdf(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_manuales_app(request, empresa, _puede_consultar_manual_receta(request.user, empresa))
     if not manuales_pdf_habilitados(empresa):
         raise Http404("Manuales PDF no está habilitado para esta empresa.")
     if not _puede_consultar_manual_receta(request.user, empresa):
@@ -2000,15 +2032,36 @@ def manuales_pdf(request, empresa_slug):
         .select_related("paciente", "enviado_por")
         .prefetch_related("manuales")[:25]
     )
-    return render(
+    return render_manuales_app(
         request,
+        empresa,
         "clinica/manuales_pdf_envio.html",
+        "clinica/mobile_manual_list.html",
         {
             "empresa": empresa,
             "manuales": manuales,
             "historial": historial,
             "puede_enviar_manuales": _puede_enviar_manuales_receta(request.user, empresa),
         },
+        **(_permisos_manuales_app(request, empresa) if es_manuales_app(request, empresa) else {}),
+    )
+
+
+@login_required
+@require_GET
+def manuales_pdf_app_enviar(request, empresa_slug):
+    """Compositor de la app; el envío sigue en la vista POST original."""
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not es_manuales_app(request, empresa):
+        raise Http404("Esta pantalla está disponible únicamente desde la app clínica.")
+    autorizar_manuales_app(request, empresa, _puede_enviar_manuales_receta(request.user, empresa))
+    manuales = list(
+        ManualReceta.objects.filter(empresa=empresa, activo=True)
+        .select_related("creado_por").order_by("titulo", "id")
+    )
+    return render_manuales_app(
+        request, empresa, "clinica/manuales_pdf_envio.html", "clinica/mobile_manual_send.html",
+        {"empresa": empresa, "manuales": manuales}, **_permisos_manuales_app(request, empresa),
     )
 
 
@@ -2071,6 +2124,7 @@ def descargar_manual_pdf_publico(request, token):
 @require_POST
 def enviar_manuales_pdf(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_manuales_app(request, empresa, _puede_enviar_manuales_receta(request.user, empresa))
     if not manuales_pdf_habilitados(empresa):
         raise Http404("Manuales PDF no está habilitado para esta empresa.")
     if not _puede_enviar_manuales_receta(request.user, empresa):
@@ -2083,20 +2137,26 @@ def enviar_manuales_pdf(request, empresa_slug):
         manual_ids = set()
     if not manual_ids:
         messages.error(request, "Seleccione al menos un manual PDF para enviar.")
-        return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
+    if es_manuales_app(request, empresa) and any(id_manual_app(valor) is None for valor in manual_ids):
+        messages.error(request, "Uno de los manuales seleccionados ya no está disponible para esta empresa.")
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
 
     manuales = list(
         ManualReceta.objects.filter(id__in=manual_ids, empresa=empresa, activo=True).order_by("titulo", "id")
     )
     if len(manuales) != len(manual_ids):
         messages.error(request, "Uno de los manuales seleccionados ya no está disponible para esta empresa.")
-        return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
 
     paciente_id = request.POST.get("paciente_id")
+    if es_manuales_app(request, empresa) and paciente_id and id_manual_app(paciente_id) is None:
+        messages.error(request, "Seleccione un paciente válido antes de enviar los manuales.")
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
     paciente = Paciente.objects.filter(id=paciente_id, empresa=empresa, activo=True).first() if paciente_id else None
     if not paciente:
         messages.error(request, "Seleccione un paciente válido antes de enviar los manuales.")
-        return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
     canal = (request.POST.get("canal") or "").strip().lower()
     canales_validos = {
         EnvioManualPDF.CANAL_WHATSAPP,
@@ -2105,19 +2165,19 @@ def enviar_manuales_pdf(request, empresa_slug):
     }
     if canal not in canales_validos:
         messages.error(request, "Seleccione WhatsApp, WhatsApp Web o correo como método de envío.")
-        return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
 
     if canal == EnvioManualPDF.CANAL_CORREO:
         destinatario = (paciente.correo or "").strip()
         if not destinatario:
             messages.error(request, f"{paciente.nombre} no tiene correo electrónico registrado.")
-            return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+            return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
     else:
         telefono = paciente.whatsapp or paciente.telefono or ""
         destinatario = apply_phone_prefix(telefono, paciente.prefijo_telefono)
         if not destinatario:
             messages.error(request, f"{paciente.nombre} no tiene teléfono o WhatsApp registrado.")
-            return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+            return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
 
     envio = EnvioManualPDF.objects.create(
         empresa=empresa,
@@ -2140,7 +2200,7 @@ def enviar_manuales_pdf(request, empresa_slug):
             "Toque cada enlace para descargar el PDF. Los enlaces estarán disponibles durante 7 días."
         )
         _registrar_resultado_envio_manual(envio, EnvioManualPDF.ESTADO_PREPARADO)
-        return redirect(f"https://web.whatsapp.com/send?phone={destinatario}&text={quote(texto)}")
+        return whatsapp_manual_app(request, empresa, destinatario, texto)
 
     if canal == EnvioManualPDF.CANAL_CORREO:
         try:
@@ -2168,14 +2228,14 @@ def enviar_manuales_pdf(request, empresa_slug):
         else:
             _registrar_resultado_envio_manual(envio, EnvioManualPDF.ESTADO_ENVIADO)
             messages.success(request, f"{len(manuales)} manual(es) enviados por correo a {paciente.nombre}.")
-        return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=envio.estado == EnvioManualPDF.ESTADO_FALLIDO)
 
     config = ConfiguracionCRM.objects.filter(empresa=empresa).first()
     if not config or not config.whatsapp_activo:
         detalle = "WhatsApp Cloud API no está activo para la empresa."
         _registrar_resultado_envio_manual(envio, EnvioManualPDF.ESTADO_FALLIDO, detalle)
         messages.error(request, "Active y configure WhatsApp Cloud API antes de enviar manuales.")
-        return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), error=True)
 
     enviados = 0
     try:
@@ -2209,10 +2269,15 @@ def enviar_manuales_pdf(request, empresa_slug):
     else:
         _registrar_resultado_envio_manual(envio, EnvioManualPDF.ESTADO_ENVIADO)
         messages.success(request, f"{len(manuales)} manual(es) enviados por WhatsApp a {paciente.nombre}.")
-    return redirect("clinica_manuales_pdf", empresa_slug=empresa.slug)
+    return volver_manuales_app(
+        request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa),
+        error=envio.estado != EnvioManualPDF.ESTADO_ENVIADO,
+        pending_manual_ids=[manual.pk for manual in manuales[enviados:]] if envio.estado == EnvioManualPDF.ESTADO_PARCIAL else None,
+    )
 
 
 def _manual_receta_form_view(request, empresa, manual=None):
+    autorizar_manuales_app(request, empresa, _puede_administrar_manuales_receta(request.user, empresa))
     if not manuales_pdf_habilitados(empresa):
         raise Http404("Manuales PDF no está habilitado para esta empresa.")
     if not _puede_administrar_manuales_receta(request.user, empresa):
@@ -2230,11 +2295,14 @@ def _manual_receta_form_view(request, empresa, manual=None):
             objeto.creado_por = request.user
         objeto.save()
         messages.success(request, f"Manual «{objeto.titulo}» guardado correctamente.")
-        return redirect("clinica_manuales_recetas", empresa_slug=empresa.slug)
-    return render(
+        return volver_manuales_app(request, empresa, can_view=_puede_consultar_manual_receta(request.user, empresa), admin=True)
+    return render_manuales_app(
         request,
+        empresa,
         "clinica/manual_receta_form.html",
+        "clinica/mobile_manual_form.html",
         {"empresa": empresa, "manual": manual, "form": form},
+        **(_permisos_manuales_app(request, empresa) if es_manuales_app(request, empresa) else {}),
     )
 
 
@@ -2254,6 +2322,7 @@ def editar_manual_receta(request, empresa_slug, manual_id):
 @login_required
 def archivo_manual_receta(request, empresa_slug, manual_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_manuales_app(request, empresa, _puede_consultar_manual_receta(request.user, empresa))
     if not manuales_pdf_habilitados(empresa):
         raise Http404("Manuales PDF no está habilitado para esta empresa.")
     if not _puede_consultar_manual_receta(request.user, empresa):
@@ -2263,12 +2332,12 @@ def archivo_manual_receta(request, empresa_slug, manual_id):
         raise Http404("El manual no tiene un PDF disponible.")
     descargar = request.GET.get("descargar") == "1"
     nombre = Path(manual.archivo.name).name
-    return FileResponse(
+    return respuesta_manuales_app(request, empresa, FileResponse(
         manual.archivo.open("rb"),
         as_attachment=descargar,
         filename=nombre,
         content_type="application/pdf",
-    )
+    ))
 
 
 @login_required
