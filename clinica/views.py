@@ -148,6 +148,7 @@ from .mobile_annexes import (
     volver_anexo_app,
 )
 from .mobile_recipe_templates import autorizar_plantillas_app, es_plantillas_app, render_plantillas_app, volver_plantillas_app
+from .mobile_histories import autorizar_historias_app, es_historias_app, render_historia_app, volver_historia_app
 from crm.forms import (
     PacienteRapidoCitaForm,
     ProgramaCamaraHiperbaricaForm,
@@ -3561,6 +3562,7 @@ def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
 @login_required
 def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_historias_app(request, empresa, tipo)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     acceso_granular = bool(rol_clinico_granular(request.user, empresa))
@@ -3747,6 +3749,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         _guardar_clasificacion_alopecia(historia, form, request.user)
         _actualizar_sexo_paciente_desde_capilar(paciente, form)
         messages.success(request, f"Historia de {historia.get_tipo_display()} guardada correctamente.")
+        if es_historias_app(request, empresa):
+            return volver_historia_app(request, empresa, paciente, tipo, historia)
         if acceso_granular and not puede_ver_historia:
             return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
@@ -3759,12 +3763,11 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     )
     clasificaciones_alopecia = (
         paciente.clasificaciones_alopecia.select_related("profesional", "creado_por")[:20]
-        if tipo == "capilar"
+        if tipo == "capilar" and (not es_historias_app(request, empresa) or puede_ver_historia)
         else []
     )
-    return render(
-        request,
-        "clinica/historia_especialidad_form.html",
+    return render_historia_app(
+        request, empresa, paciente, tipo,
         {
             "empresa": empresa,
             "paciente": paciente,
@@ -3786,6 +3789,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
 @login_required
 def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_historias_app(request, empresa, editar=True)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historia = get_object_or_404(
@@ -3794,9 +3798,15 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         empresa=empresa,
         paciente=paciente,
     )
+    autorizar_historias_app(request, empresa, historia.tipo, editar=True)
+    puede_ver_historia = not es_historias_app(request, empresa) or request.user.tiene_permiso_erp(
+        "puede_ver_historia_clinica" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico", empresa,
+    )
     bloqueada = historia.bloqueada
     if bloqueada and request.method == "POST":
         messages.error(request, "La nota de enfermeria ya fue finalizada y no puede editarse.")
+        if es_historias_app(request, empresa):
+            return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     form = HistoriaClinicaEspecialidadForm(
         request.POST or None,
@@ -3808,11 +3818,11 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
     if bloqueada:
         for field in form.fields.values():
             field.disabled = True
-    preconsultas_tipo = paciente.preconsultas.filter(tipo=historia.tipo).select_related("creada_por")[:10]
+    preconsultas_tipo = paciente.preconsultas.filter(tipo=historia.tipo).select_related("creada_por")[:10] if puede_ver_historia else []
     ultima_preconsulta = (
         paciente.preconsultas.filter(estado="completada", tipo__in=[historia.tipo, "general"])
         .order_by("-fecha_completada", "-fecha_creacion")
-        .first()
+        .first() if puede_ver_historia else None
     )
     if request.method == "POST" and form.is_valid():
         historia = form.save(commit=False)
@@ -3821,21 +3831,22 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         _guardar_clasificacion_alopecia(historia, form, request.user)
         _actualizar_sexo_paciente_desde_capilar(paciente, form)
         messages.success(request, "Historia clinica actualizada correctamente.")
+        if es_historias_app(request, empresa):
+            return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
     historias_previas = (
         paciente.historias_especialidad.filter(tipo=historia.tipo)
         .exclude(plan_tratamiento="")
         .select_related("profesional", "actualizado_por")
-        .order_by("-fecha_atencion", "-id")[:12]
+        .order_by("-fecha_atencion", "-id")[:12] if puede_ver_historia else []
     )
     clasificaciones_alopecia = (
         paciente.clasificaciones_alopecia.select_related("profesional", "creado_por")[:20]
-        if historia.tipo == "capilar"
+        if historia.tipo == "capilar" and puede_ver_historia
         else []
     )
-    return render(
-        request,
-        "clinica/historia_especialidad_form.html",
+    return render_historia_app(
+        request, empresa, paciente, historia.tipo,
         {
             "empresa": empresa,
             "paciente": paciente,

@@ -1,0 +1,7 @@
+{% if field.name == 'alopecia_grado' %}{% include "clinica/mobile_history_grade.html" with field=field %}{% else %}
+<div class="mi-field mh-field{% if field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %} mh-choice-field{% endif %}{% if field.name|slice:'-6:' == '_otros' %} mh-other-field{% endif %}" data-history-field="{{ field.name }}"{% if field.name == 'capilar_patron_clinico_otros' %} data-history-pattern-other{% endif %}>
+{% if field.name|slice:'-6:' == '_otros' %}<details class="mh-other-fold"{% if field.value or field.errors %} open{% endif %}><summary>Agregar otros / detalle <span aria-hidden="true">⌄</span></summary><div>{% endif %}
+  {% if field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %}<span class="mh-field-label" id="mh-label-{{ field.html_name }}">{{ field.label }}{% if field.field.required %}<span class="mh-required"> *</span>{% endif %}</span><div role="group" aria-labelledby="mh-label-{{ field.html_name }}">{{ field }}</div>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mh-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+  {% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+{% if field.name|slice:'-6:' == '_otros' %}</div></details>{% endif %}
+</div>{% endif %}

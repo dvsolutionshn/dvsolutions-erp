@@ -91,8 +91,16 @@ def construir_contexto_modulos_app(request, empresa):
             "Atención clínica", acceso["modulo_clinica"] and anexos_autorizados,
             "disponible" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={anexos_destino}")
+    agregar("expediente", "Expediente clínico", "Consultar historias por área y editar las notas ya adaptadas según tus permisos.",
+            "Atención clínica", acceso["modulo_clinica"] and acceso["expediente_clinico"],
+            "parcial" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=historias")
+    historias_creables = acceso["crear_historia_clinica"] or acceso["escribir_enfermeria"] or acceso["escribir_terapias"]
+    agregar("registrar_historia", "Registrar nota clínica", "Historia capilar, cirugía plástica, medicina estética, enfermería y terapias según tus permisos.",
+            "Atención clínica", acceso["modulo_clinica"] and historias_creables,
+            "parcial" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=crear_historia")
     for key, nombre, descripcion, autorizado in (
-        ("expediente", "Expediente clínico", "Historias, diagnósticos y evolución del paciente.", acceso["expediente_clinico"]),
         ("tratamientos", "Tratamientos", "Planes, controles y seguimiento clínico.", acceso["tratamientos_clinicos"]),
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),
         ("camara", "Cámara hiperbárica", "Programas y controles de las sesiones.", acceso["ver_camara_hiperbarica"]),

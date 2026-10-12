@@ -60,6 +60,10 @@ def _secciones_formulario_paciente(form):
 
 
 def contexto_pacientes_app(request, empresa, paciente=None, form=None):
+    # Importación local: el helper de historias reutiliza esta base de
+    # presentación, pero el catálogo de tipos no depende de ella.
+    from .mobile_histories import tipos_historia_creables_app
+
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
     # El menú legado del expediente y el middleware de estas rutas exigen
@@ -84,6 +88,8 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_edit_patient": permiso("puede_editar_pacientes", "puede_pacientes"),
         "can_view_history": permiso("puede_ver_historia_clinica", "puede_expediente_clinico"),
         "can_create_history": permiso("puede_crear_historia_clinica", "puede_expediente_clinico"),
+        "can_edit_history": permiso("puede_editar_historia_clinica", "puede_expediente_clinico"),
+        "mobile_history_create_types": tipos_historia_creables_app(request, empresa, paciente),
         "can_view_annexes": puede_ver_anexos,
         "can_view_attachments": puede_ver_anexos,
         "can_upload_annexes": puede_subir_anexos,
@@ -92,12 +98,24 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_view_recordatorios": permiso("puede_crear_recordatorios_paciente", "puede_pacientes"),
         "can_view_gastos": gastos_adicionales_habilitados(empresa) and request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa),
     }
-    destino_anexos = request.GET.get("destino", "")
+    destino_paciente = request.GET.get("destino", "")
     if request.method == "GET" and es_pacientes_app(request, empresa) and (
-        (destino_anexos == "anexos" and puede_ver_anexos)
-        or (destino_anexos == "crear_anexo" and puede_subir_anexos)
+        (destino_paciente == "anexos" and puede_ver_anexos)
+        or (destino_paciente == "crear_anexo" and puede_subir_anexos)
     ):
-        contexto["mobile_patient_annex_mode"] = destino_anexos
+        contexto["mobile_patient_annex_mode"] = destino_paciente
+    if request.method == "GET" and es_pacientes_app(request, empresa):
+        if destino_paciente == "historias" and contexto["can_view_history"]:
+            contexto["mobile_patient_history_mode"] = "historias"
+        elif destino_paciente == "crear_historia":
+            tipos_creables = contexto["mobile_history_create_types"]
+            tipo_solicitado = request.GET.get("tipo", "")
+            tipo_elegido = next((tipo for tipo in tipos_creables if tipo["codigo"] == tipo_solicitado), None)
+            if not tipo_solicitado and tipos_creables:
+                tipo_elegido = tipos_creables[0]
+            if tipo_elegido:
+                contexto["mobile_patient_history_mode"] = "crear_historia"
+                contexto["mobile_patient_history_create_type"] = tipo_elegido
     if paciente:
         for nombre, vista in {
             "detail": "clinica_paciente_detalle", "edit": "clinica_editar_paciente",
@@ -138,9 +156,13 @@ def notas_historia_app(historias):
             contenido.append({"label": f"Examen físico · {item['label']}", "value": item["value"]})
         contenido.extend(getattr(historia, "datos_tricopigmentacion", []))
         notas.append({
+            "id": historia.pk,
             "titulo": historia.get_tipo_display(), "tipo": historia.tipo,
             "fecha": historia.fecha_atencion, "profesional": historia.profesional,
             "estado": historia.get_estado_display(), "bloqueada": historia.bloqueada,
+            "creado_por": historia.creado_por,
+            "actualizado_por": historia.actualizado_por,
+            "fecha_actualizacion": historia.fecha_actualizacion,
             "campos": contenido,
         })
     return notas
@@ -157,6 +179,13 @@ def respuesta_pacientes_app(request, empresa, response):
 def render_pacientes_app(request, empresa, web_template, mobile_template, contexto):
     if es_pacientes_app(request, empresa):
         contexto.update(contexto_pacientes_app(request, empresa, contexto.get("paciente"), contexto.get("form")))
+        from .mobile_histories import TIPOS_HISTORIA_APP
+
+        paciente = contexto.get("paciente")
+        if paciente and contexto["can_edit_history"]:
+            for nota in contexto.get("mobile_history_notes", []):
+                if nota["tipo"] in TIPOS_HISTORIA_APP and not nota["bloqueada"]:
+                    nota["edit_url"] = f"{reverse('clinica_editar_historia_especialidad', args=[empresa.slug, paciente.pk, nota['id']])}?app=1"
         template_name = mobile_template
     else:
         template_name = web_template
