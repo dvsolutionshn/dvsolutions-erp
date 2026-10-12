@@ -15,7 +15,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 from django.db.models.functions import ExtractDay, ExtractMonth
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -147,6 +147,7 @@ from .mobile_annexes import (
     respuesta_archivo_anexo_app,
     volver_anexo_app,
 )
+from .mobile_recipe_templates import autorizar_plantillas_app, es_plantillas_app, render_plantillas_app, volver_plantillas_app
 from crm.forms import (
     PacienteRapidoCitaForm,
     ProgramaCamaraHiperbaricaForm,
@@ -4535,6 +4536,7 @@ def crear_receta_paciente(request, empresa_slug, paciente_id):
 @login_required
 def plantillas_recetas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_plantillas_app(request, empresa, _recetas_avanzadas_activas(empresa), consulta=True)
     if not _recetas_avanzadas_activas(empresa):
         raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
     plantillas = list(
@@ -4543,13 +4545,14 @@ def plantillas_recetas(request, empresa_slug):
         .prefetch_related("detalles__producto")
         .order_by("nombre")
     )
-    return render(request, "clinica/plantillas_recetas.html", {
+    return render_plantillas_app(request, empresa, "clinica/plantillas_recetas.html", "clinica/mobile_recipe_template_list.html", {
         "empresa": empresa,
         "plantillas": plantillas,
     })
 
 
 def _plantilla_receta_form_view(request, empresa, plantilla=None):
+    autorizar_plantillas_app(request, empresa, _recetas_avanzadas_activas(empresa))
     form = PlantillaRecetaForm(request.POST or None, instance=plantilla, empresa=empresa)
     lineas = []
     errores_lineas = []
@@ -4575,17 +4578,26 @@ def _plantilla_receta_form_view(request, empresa, plantilla=None):
         ]
 
     if request.method == "POST" and formulario_valido and not errores_lineas:
-        with transaction.atomic():
-            objeto = form.save(commit=False)
-            objeto.empresa = empresa
-            if not objeto.creada_por_id:
-                objeto.creada_por = request.user
-            objeto.save()
-            _guardar_detalles_plantilla(objeto, lineas)
-        messages.success(request, f"Plantilla «{objeto.nombre}» guardada correctamente.")
-        return redirect("clinica_plantillas_recetas", empresa_slug=empresa.slug)
+        try:
+            with transaction.atomic():
+                objeto = form.save(commit=False)
+                objeto.empresa = empresa
+                if not objeto.creada_por_id:
+                    objeto.creada_por = request.user
+                objeto.save()
+                _guardar_detalles_plantilla(objeto, lineas)
+        except IntegrityError:
+            # La constraint original decide la colisión (incluida una carrera).
+            # Fuera del atomic fallido, la app conserva formulario y medicamentos.
+            duplicada = PlantillaReceta.objects.filter(empresa=empresa, nombre=form.cleaned_data.get("nombre")).exclude(pk=plantilla.pk if plantilla else None)
+            if not es_plantillas_app(request, empresa) or not duplicada.exists():
+                raise
+            form.add_error("nombre", "Ya existe una plantilla con este nombre en esta empresa.")
+        else:
+            messages.success(request, f"Plantilla «{objeto.nombre}» guardada correctamente.")
+            return volver_plantillas_app(request, empresa)
 
-    return render(request, "clinica/plantilla_receta_form.html", {
+    return render_plantillas_app(request, empresa, "clinica/plantilla_receta_form.html", "clinica/mobile_recipe_template_form.html", {
         "empresa": empresa,
         "plantilla": plantilla,
         "form": form,
@@ -4597,6 +4609,7 @@ def _plantilla_receta_form_view(request, empresa, plantilla=None):
 @login_required
 def crear_plantilla_receta(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_plantillas_app(request, empresa, _recetas_avanzadas_activas(empresa))
     if not _recetas_avanzadas_activas(empresa):
         raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
     return _plantilla_receta_form_view(request, empresa)
@@ -4605,6 +4618,7 @@ def crear_plantilla_receta(request, empresa_slug):
 @login_required
 def editar_plantilla_receta(request, empresa_slug, plantilla_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_plantillas_app(request, empresa, _recetas_avanzadas_activas(empresa))
     if not _recetas_avanzadas_activas(empresa):
         raise Http404("Las plantillas de recetas no están habilitadas para esta empresa.")
     plantilla = get_object_or_404(

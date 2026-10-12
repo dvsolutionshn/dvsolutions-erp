@@ -1,0 +1,15 @@
+{% extends "clinica/mobile_recipe_template_base.html" %}
+{% block mobile_title %}{% if plantilla %}Editar plantilla{% else %}Nueva plantilla{% endif %}{% endblock %}
+{% block mobile_page_title %}{% if plantilla %}Editar plantilla{% else %}Nueva plantilla{% endif %}{% endblock %}
+{% block mobile_back_url %}{{ app_recipe_templates_url }}{% endblock %}
+{% block mobile_header_description %}<p>{% if plantilla %}{{ plantilla.nombre }}{% else %}Prepara los medicamentos y textos que podrán reutilizarse al crear una receta.{% endif %}</p>{% endblock %}
+{% block mobile_content %}
+<form method="post" action="{{ app_recipe_template_form_url }}" class="mt-compose" id="mobileRecipeTemplateForm" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}
+  {% if form.errors %}<div class="mi-error-box" role="alert"><strong>No se pudo guardar la plantilla</strong><p>Los textos y medicamentos ingresados se conservan. Revisa los datos marcados.</p></div>{% endif %}{% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  <section class="mi-card"><h2>Datos de la plantilla</h2><div class="mt-fields">{% include "clinica/mobile_recipe_field.html" with field=form.nombre %}{% include "clinica/mobile_recipe_field.html" with field=form.diagnostico %}</div></section>
+  {% include "clinica/includes/receta_medicamentos_editor.html" %}
+  <section class="mi-card"><h2>Textos generales</h2><div class="mt-fields">{% include "clinica/mobile_recipe_field.html" with field=form.indicaciones_generales %}{% include "clinica/mobile_recipe_field.html" with field=form.observaciones %}</div></section>
+  <section class="mi-card"><h2>Disponibilidad</h2><div class="mt-fields">{% include "clinica/mobile_recipe_field.html" with field=form.activa %}</div><p class="mi-summary-note">Una plantilla inactiva permanece registrada, pero no aparece entre las opciones disponibles para crear una receta.</p></section>
+  <a class="mt-cancel" href="{{ app_recipe_templates_url }}">Cancelar</a><div class="mi-save-bar"><button class="mi-button" type="submit">Guardar plantilla</button></div>
+</form>
+{% endblock %}

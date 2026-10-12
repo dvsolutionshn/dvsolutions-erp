@@ -1,0 +1,7 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% load static %}
+{% block mobile_title %}Plantillas de recetas{% endblock %}
+{% block mobile_kicker %}Recetas médicas{% endblock %}
+{% block mobile_back_url %}{{ app_modules_url }}{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_recipes.css' %}"><link rel="stylesheet" href="{% static 'clinica/mobile_recipe_templates.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_recipe_templates.js' %}" defer></script>{% endblock %}

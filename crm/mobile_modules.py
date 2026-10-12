@@ -74,6 +74,12 @@ def construir_contexto_modulos_app(request, empresa):
             "Atención clínica", acceso["modulo_clinica"] and recetas_autorizadas,
             "disponible" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={recetas_destino}")
+    plantillas_autorizadas = acceso["editar_historia_clinica"] or (
+        not rol_clinico_granular(usuario, empresa) and acceso["configuracion_clinica"]
+    )
+    agregar("plantillas_recetas", "Plantillas de recetas", "Crear y editar medicamentos e indicaciones reutilizables según tus permisos.",
+            "Atención clínica", acceso["modulo_clinica"] and plantillas_autorizadas,
+            "disponible", f"{reverse('clinica_plantillas_recetas', args=[empresa.slug])}?app=1")
     manuales_autorizados = acceso["ver_manuales_pdf"] or acceso["enviar_manuales_pdf"] or acceso["administrar_manuales_pdf"]
     manuales_destino = "clinica_manuales_pdf" if acceso["ver_manuales_pdf"] or acceso["administrar_manuales_pdf"] else "clinica_manuales_pdf_app_enviar"
     agregar("manuales", "Manuales PDF", "Consultar documentos, compartir con pacientes y administrar según tus permisos.",
