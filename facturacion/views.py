@@ -65,10 +65,20 @@ EMPRESAS_CONTROL_LOTES_FEFO = {
     "luque_aestetic",
     "serviciosmedicos",
 }
+EMPRESAS_PAGO_MIXTO_PREDETERMINADO = {
+    "hospital_mia",
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+}
 
 
 def _empresa_muestra_costo_real_inventario(empresa):
     return bool(empresa and empresa.slug in EMPRESAS_COSTO_REAL_INVENTARIO)
+
+
+def _empresa_usa_pago_mixto_predeterminado(empresa):
+    return bool(empresa and empresa.slug in EMPRESAS_PAGO_MIXTO_PREDETERMINADO)
 
 
 def _registrar_cambio_costo_real(producto, costo_anterior, usuario):
@@ -7973,7 +7983,12 @@ def registrar_pago(request, empresa_slug, factura_id):
             "bancos": bancos,
             "cuentas_tarjeta": cuentas_tarjeta,
             "proveedores_comision": proveedores_comision,
-            "usa_pagos_mixtos": True,
+            "usa_pagos_mixtos": _empresa_usa_pago_mixto_predeterminado(empresa),
+            "modal_heading": (
+                "Pago rapido"
+                if _empresa_usa_pago_mixto_predeterminado(empresa)
+                else "Registrar pago"
+            ),
             "subtotal_pendiente": factura.subtotal_pendiente_cobro,
             "impuesto_pendiente": factura.impuesto_pendiente_cobro,
             "today": timezone.now().date(),
@@ -8383,7 +8398,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "bancos": bancos,
             "cuentas_tarjeta": cuentas_tarjeta,
             "proveedores_comision": proveedores_comision,
-            "usa_pagos_mixtos": True,
+            "usa_pagos_mixtos": _empresa_usa_pago_mixto_predeterminado(empresa),
             "subtotal_pendiente": factura.subtotal_pendiente_cobro,
             "impuesto_pendiente": factura.impuesto_pendiente_cobro,
             "today": timezone.now().date(),
