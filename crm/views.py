@@ -77,6 +77,10 @@ from .services import (
 from .tokens import leer_token_respuesta_cita
 from .mobile_modules import construir_contexto_modulos_app, inicio_app_disponible, url_modulos_app
 from .mobile_inventory import productos_inventario_app
+from .mobile_appointment_controls import (
+    autorizar_control_cita_app, es_control_cita_app, render_control_cita_app,
+    validar_contexto_control_cita_app, validar_control_cita_app, volver_control_cita_app,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -1565,6 +1569,7 @@ def eliminar_bloqueo_disponibilidad(request, empresa_slug, bloqueo_id):
 @login_required
 def camara_hiperbarica(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "camara_hiperbarica")
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este módulo clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1580,6 +1585,7 @@ def camara_hiperbarica(request, empresa_slug):
         return HttpResponse("Tu usuario no tiene permiso para consultar controles clínicos.", status=403)
 
     fecha_seleccionada = _fecha_agenda(request.GET.get("fecha"))
+    validar_contexto_control_cita_app(request, empresa, "camara_hiperbarica", fecha_seleccionada, _es_cita_camara_hiperbarica)
     contexto = {
         "empresa": empresa,
         "fecha_seleccionada": fecha_seleccionada,
@@ -1587,13 +1593,14 @@ def camara_hiperbarica(request, empresa_slug):
         "fecha_siguiente": fecha_seleccionada + timedelta(days=1),
     }
     contexto.update(_contexto_control_camara_hyperbarica(empresa, request, fecha_seleccionada))
-    return render(request, "crm/camara_hiperbarica.html", contexto)
+    return render_control_cita_app(request, empresa, "camara_hiperbarica", "crm/camara_hiperbarica.html", contexto)
 
 
 @login_required
 @require_POST
 def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "camara_hiperbarica", cita_id)
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este control clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1613,12 +1620,15 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
         id=cita_id,
         paciente__isnull=False,
     )
+    validar_control_cita_app(request, empresa, "camara_hiperbarica", cita, _es_cita_camara_hiperbarica)
     if not _es_cita_camara_hiperbarica(cita):
         return HttpResponse("La cita seleccionada no corresponde a cámara hiperbárica.", status=400)
 
     sesion = SesionCamaraHiperbarica.objects.filter(cita=cita).select_related("programa").first()
     if sesion and sesion.bloqueada:
         messages.warning(request, "La sesión ya fue finalizada y permanece bloqueada para proteger el historial clínico.")
+        if es_control_cita_app(request, empresa):
+            return volver_control_cita_app(request, empresa, "camara_hiperbarica", cita)
         return redirect(
             f"{reverse('agenda_camara_hiperbarica', args=[empresa.slug])}?fecha={cita.fecha_hora:%Y-%m-%d}"
             f"&control_camara={cita.id}#documento-camara"
@@ -1794,9 +1804,11 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
             "sesion_camara_form": sesion_form,
             "numero_sesion_desde_cita": numero_sesion_desde_cita,
         })
-        return render(request, "crm/camara_hiperbarica.html", contexto)
+        return render_control_cita_app(request, empresa, "camara_hiperbarica", "crm/camara_hiperbarica.html", contexto, borrador_guardado_automaticamente)
 
     fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
+    if es_control_cita_app(request, empresa):
+        return volver_control_cita_app(request, empresa, "camara_hiperbarica", cita)
     return redirect(
         f"{reverse('agenda_camara_hiperbarica', args=[empresa.slug])}?fecha={fecha}"
         f"&control_camara={cita.id}#documento-camara"
@@ -1806,6 +1818,7 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
 @login_required
 def terapias_postquirurgicas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "terapias_postquirurgicas")
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este módulo clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1817,18 +1830,20 @@ def terapias_postquirurgicas(request, empresa_slug):
     ):
         return HttpResponse("Tu usuario no tiene permiso para consultar controles clínicos.", status=403)
     fecha = _fecha_agenda(request.GET.get("fecha"))
+    validar_contexto_control_cita_app(request, empresa, "terapias_postquirurgicas", fecha, _es_cita_terapia_postquirurgica)
     contexto = {
         "empresa": empresa, "fecha_seleccionada": fecha,
         "fecha_anterior": fecha - timedelta(days=1), "fecha_siguiente": fecha + timedelta(days=1),
     }
     contexto.update(_contexto_terapias_postquirurgicas(empresa, request, fecha))
-    return render(request, "crm/terapias_postquirurgicas.html", contexto)
+    return render_control_cita_app(request, empresa, "terapias_postquirurgicas", "crm/terapias_postquirurgicas.html", contexto)
 
 
 @login_required
 @require_POST
 def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "terapias_postquirurgicas", cita_id)
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este control clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1843,6 +1858,7 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
         CitaCliente.objects.select_related("paciente", "servicio_clinico"),
         empresa=empresa, id=cita_id, paciente__isnull=False,
     )
+    validar_control_cita_app(request, empresa, "terapias_postquirurgicas", cita, _es_cita_terapia_postquirurgica)
     if not _es_cita_terapia_postquirurgica(cita):
         return HttpResponse("La cita seleccionada no corresponde a terapias post quirúrgicas.", status=400)
     sesion = SesionTerapiaPostQuirurgica.objects.filter(cita=cita).select_related("programa").first()
@@ -1853,6 +1869,8 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
     )
     if sesion and sesion.bloqueada:
         messages.warning(request, "La sesión ya fue finalizada y permanece bloqueada.")
+        if es_control_cita_app(request, empresa):
+            return volver_control_cita_app(request, empresa, "terapias_postquirurgicas", cita)
         return redirect(regreso)
     programa = sesion.programa if sesion else None
     programa_id = (request.POST.get("programa_id") or "").strip()
@@ -1930,6 +1948,8 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
             f"Sesión {guardada.numero_sesion} finalizada y vinculada al expediente."
             if finalizar else f"Borrador de la sesión {guardada.numero_sesion} guardado.",
         )
+        if es_control_cita_app(request, empresa):
+            return volver_control_cita_app(request, empresa, "terapias_postquirurgicas", cita)
         return redirect(regreso)
 
     borrador_guardado = False
@@ -1974,7 +1994,7 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
         "sesion_terapia": sesion, "sesion_terapia_form": sesion_form,
         "numero_sesion_desde_cita": numero_cita,
     })
-    return render(request, "crm/terapias_postquirurgicas.html", contexto)
+    return render_control_cita_app(request, empresa, "terapias_postquirurgicas", "crm/terapias_postquirurgicas.html", contexto, borrador_guardado)
 
 
 def agenda_mobile(request, empresa_slug):

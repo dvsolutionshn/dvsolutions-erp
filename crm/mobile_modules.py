@@ -131,6 +131,18 @@ def construir_contexto_modulos_app(request, empresa):
                 "parcial" if adaptado else "pendiente",
                 f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=control_clinico&tipo={codigo}")
 
+    # Accesos adicionales de agenda: nunca sustituyen los controles directos
+    # ni conceden calendario o pacientes por el permiso de consultar sesiones.
+    from .mobile_appointment_controls import controles_cita_disponibles_app
+
+    for control in controles_cita_disponibles_app(request, empresa):
+        key, nombre = {
+            "camara_hiperbarica": ("camara_citas", "Cámara desde citas"),
+            "terapias_postquirurgicas": ("postquirurgicas_citas", "Postquirúrgicas desde citas"),
+        }[control["codigo"]]
+        agregar(key, nombre, "Consultar y registrar sesiones ligadas a citas de Hospital Mía según tus permisos.",
+                "Atención clínica", True, "disponible", control["url"])
+
     inicio_disponible = inicio_app_disponible(request, empresa)
     factura_rapida = acceso["modulo_pos"] and inicio_disponible
     factura_movil = factura_rapida or (acceso["facturas"] and inicio_disponible)
