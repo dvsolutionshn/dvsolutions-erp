@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from core.models import RegistroAuditoria
 from facturacion.mobile_presentation import preparar_historial_factura_mobile
+from crm.mobile_modules import inicio_app_disponible, url_modulos_app
 
 
 def es_gastos_app(request):
@@ -26,7 +27,9 @@ def contexto_gastos_app(request, empresa, gasto=None):
         "modo_app": True,
         "app_base_url": app_base,
         "app_invoices_url": f"{app_base}#facturas-app",
-        "app_modules_url": f"{app_base}#mas-funciones-app",
+        "app_modules_url": url_modulos_app(request, empresa),
+        "app_home_disponible": inicio_app_disponible(request, empresa),
+        "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
         "app_gastos_url": url_gastos_app("clinica_gastos_adicionales", empresa),
         "app_gasto_create_url": url_gastos_app("clinica_gasto_adicional_crear", empresa),
         "app_gasto_patient_search_url": url_gastos_app("clinica_gastos_adicionales_pacientes_buscar", empresa),

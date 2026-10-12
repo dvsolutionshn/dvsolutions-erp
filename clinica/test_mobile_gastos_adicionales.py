@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from core.models import Empresa, EmpresaModulo, Modulo, RegistroAuditoria, RolSistema, Usuario, UsuarioEmpresaPermiso
 from crm.models import ConfiguracionCRM
+from crm import views as crm_views
 from facturacion.models import CAI, Factura, MovimientoInventario, PagoFactura, Producto, TipoImpuesto
 from .models import GastoAdicional, Paciente, ProfesionalSalud
 from .services_gastos_adicionales import convertir_gasto_adicional
@@ -460,7 +461,10 @@ class MobileGastosAdicionalesIntegrationTests(TestCase):
         self.assertNotContains(app, 'id="productos-app"')
         self.assertContains(app, 'class="mobile-home-card invoice" href="#factura-app"')
         blocked = self.client.post(endpoint, {"puede_inventario": "1", "puede_punto_venta": "1"})
-        self.assertEqual(blocked.status_code, 405)
+        self.assertIn(blocked.status_code, (302, 403, 405))
+        direct_post = RequestFactory().post(endpoint, {"puede_inventario": "1", "puede_punto_venta": "1"})
+        direct_post.user = Usuario.objects.get(pk=self.usuario.pk)
+        self.assertEqual(crm_views.agenda_mobile_modules(direct_post, self.empresa.slug).status_code, 405)
         self.rol.refresh_from_db()
         self.assertFalse(self.rol.puede_inventario)
         self.assertFalse(self.rol.puede_punto_venta)

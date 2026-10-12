@@ -9,8 +9,19 @@ from types import SimpleNamespace
 from django.urls import reverse
 
 from core.access import interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
+from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
 from core.context_processors import erp_access
+
+
+def inicio_app_disponible(request, empresa):
+    """Disponibilidad del inicio entrenado, sin cambiar su autorización."""
+    return not rol_clinico_granular(request.user, empresa) or request.user.tiene_permiso_erp("puede_ver_calendario", empresa)
+
+
+def url_modulos_app(request, empresa):
+    if inicio_app_disponible(request, empresa):
+        return f"{reverse('agenda_mobile', args=[empresa.slug])}#mas-funciones-app"
+    return reverse("agenda_mobile_modules_screen", args=[empresa.slug])
 
 
 def construir_contexto_modulos_app(request, empresa):
@@ -47,8 +58,10 @@ def construir_contexto_modulos_app(request, empresa):
                 "panel": destino[len(inicio) + 1:] if estado != "pendiente" and destino.startswith(f"{inicio}#") else "",
             })
 
-    agregar("pacientes", "Pacientes", "Directorio y perfil actuales; expediente completo en próxima etapa.",
-            "Atención clínica", acceso["pacientes"], "parcial", f"{inicio}#pacientes-app")
+    pacientes_destino = "clinica_pacientes" if acceso["pacientes"] else "clinica_crear_paciente"
+    agregar("pacientes", "Pacientes", "Consultar expediente, crear y editar datos según tus permisos.",
+            "Atención clínica", acceso["modulo_clinica"] and (acceso["pacientes"] or acceso["crear_pacientes"]),
+            "parcial", f"{reverse(pacientes_destino, args=[empresa.slug])}?app=1")
     agregar("agenda", "Agenda y citas", "Conserva la agenda móvil actual y la programación en Hospital Mía.",
             "Atención clínica", acceso["modulo_citas"], "disponible", f"{inicio}#agenda-app")
     gastos_destino = "clinica_gastos_adicionales" if acceso["ver_gastos_adicionales"] else "clinica_gasto_adicional_crear"
@@ -67,16 +80,17 @@ def construir_contexto_modulos_app(request, empresa):
     ):
         agregar(key, nombre, descripcion, "Atención clínica", acceso["modulo_clinica"] and autorizado)
 
-    factura_rapida = acceso["modulo_pos"]
-    factura_movil = factura_rapida or acceso["facturas"]
+    inicio_disponible = inicio_app_disponible(request, empresa)
+    factura_rapida = acceso["modulo_pos"] and inicio_disponible
+    factura_movil = factura_rapida or (acceso["facturas"] and inicio_disponible)
     factura_destino = "factura-app" if factura_rapida else "facturas-app"
     agregar("facturacion", "Facturación", "Factura rápida y acciones fiscales actuales; cobros y reportes en próxima etapa.",
-            "Operación", acceso["modulo_facturacion"] and (acceso["crear_facturas"] or factura_movil),
+            "Operación", acceso["modulo_facturacion"] and (acceso["crear_facturas"] or acceso["facturas"] or acceso["modulo_pos"]),
             "parcial" if factura_movil else "pendiente", f"{inicio}#{factura_destino}")
-    inventario_movil = empresa.slug == "hospital_mia" and acceso["inventario"]
+    inventario_movil = acceso["inventario"]
     agregar("inventario", "Productos y existencias", "Existencias, bodegas y lotes; ampliación progresiva a las cuatro empresas.",
             "Operación", acceso["productos"] or acceso["inventario"],
-            "parcial" if inventario_movil else "pendiente", f"{inicio}#productos-app")
+            "parcial" if inventario_movil else "pendiente", reverse("agenda_mobile_inventory", args=[empresa.slug]))
     for key, nombre, permiso in (
         ("transferencias", "Transferencias", acceso["modulo_facturacion"] and acceso["transferir_inventario"]),
         ("compras", "Compras", acceso["compras"]),

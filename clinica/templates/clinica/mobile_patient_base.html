@@ -1,0 +1,8 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Pacientes{% endblock %}
+{% block mobile_back_url %}{{ app_modules_url }}{% endblock %}
+{% block mobile_kicker %}Atención clínica{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_patients.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_patients.js' %}" defer></script>{% endblock %}

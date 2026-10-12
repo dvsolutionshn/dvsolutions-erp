@@ -29,7 +29,6 @@ from contabilidad.services import asegurar_cuentas_financieras_base_honduras
 from facturacion.models import (
     BodegaInventario,
     Cliente,
-    ExistenciaLoteBodega,
     Factura,
     PagoFactura,
     Producto,
@@ -76,7 +75,8 @@ from .services import (
     subir_media_whatsapp,
 )
 from .tokens import leer_token_respuesta_cita
-from .mobile_modules import construir_contexto_modulos_app
+from .mobile_modules import construir_contexto_modulos_app, inicio_app_disponible, url_modulos_app
+from .mobile_inventory import productos_inventario_app
 
 
 logger = logging.getLogger(__name__)
@@ -2319,121 +2319,7 @@ def agenda_mobile(request, empresa_slug):
     )
     contexto["inventario_productos_app_payload"] = []
     if puede_ver_productos_app:
-        productos_inventario = list(
-            Producto.objects.filter(
-                empresa=empresa,
-                activo=True,
-                eliminado=False,
-                controla_inventario=True,
-                tipo_item="producto",
-            )
-            .select_related("inventario")
-            .order_by("nombre")
-        )
-        producto_ids = [producto.id for producto in productos_inventario]
-        existencias_lotes = list(
-            ExistenciaLoteBodega.objects.filter(
-                empresa=empresa,
-                lote__empresa=empresa,
-                lote__producto_id__in=producto_ids,
-                lote__activo=True,
-                bodega__empresa=empresa,
-                bodega__activa=True,
-            ).select_related("bodega", "lote")
-        )
-        bodegas_por_producto = {producto_id: {} for producto_id in producto_ids}
-        lotes_por_producto = {producto_id: {} for producto_id in producto_ids}
-        for existencia in existencias_lotes:
-            producto_id = existencia.lote.producto_id
-            bodegas_producto = bodegas_por_producto.setdefault(producto_id, {})
-            bodegas_producto[existencia.bodega.nombre] = (
-                bodegas_producto.get(existencia.bodega.nombre, 0) + existencia.cantidad
-            )
-            lotes_producto = lotes_por_producto.setdefault(producto_id, {})
-            lote_payload = lotes_producto.setdefault(
-                existencia.lote_id,
-                {
-                    "numero": existencia.lote.numero_lote,
-                    "fecha_vencimiento": (
-                        existencia.lote.fecha_vencimiento.isoformat()
-                        if existencia.lote.fecha_vencimiento
-                        else ""
-                    ),
-                    "fecha_vencimiento_label": (
-                        existencia.lote.fecha_vencimiento.strftime("%d/%m/%Y")
-                        if existencia.lote.fecha_vencimiento
-                        else "Sin vencimiento"
-                    ),
-                    "cantidad": 0,
-                    "bodegas": [],
-                    "dias_para_vencer": existencia.lote.dias_para_vencer,
-                    "vencido": existencia.lote.vencido,
-                    "proximo_vencer": existencia.lote.por_vencer,
-                },
-            )
-            lote_payload["cantidad"] += existencia.cantidad
-            lote_payload["bodegas"].append(
-                {"nombre": existencia.bodega.nombre, "cantidad": float(existencia.cantidad)}
-            )
-
-        hoy = timezone.localdate()
-        inventario_payload = []
-        for producto in productos_inventario:
-            inventario = getattr(producto, "inventario", None)
-            total = inventario.existencias if inventario else 0
-            stock_minimo = inventario.stock_minimo if inventario else 0
-            lotes = list(lotes_por_producto.get(producto.id, {}).values())
-            lotes.sort(
-                key=lambda lote: (
-                    date.fromisoformat(lote["fecha_vencimiento"])
-                    if lote["fecha_vencimiento"]
-                    else date.max,
-                    lote["numero"].casefold(),
-                )
-            )
-            bodegas = [
-                {"nombre": nombre, "cantidad": float(cantidad)}
-                for nombre, cantidad in sorted(
-                    bodegas_por_producto.get(producto.id, {}).items(),
-                    key=lambda item: item[0].casefold(),
-                )
-                if cantidad != 0
-            ]
-            lotes_disponibles = [lote for lote in lotes if lote["cantidad"] > 0]
-            lote_proximo = next(
-                (lote for lote in lotes_disponibles if lote["fecha_vencimiento"]),
-                None,
-            )
-            sin_stock = total <= 0
-            stock_bajo = bool(not sin_stock and stock_minimo > 0 and total <= stock_minimo)
-            vencido = any(lote["vencido"] for lote in lotes_disponibles)
-            proximo_vencer = any(lote["proximo_vencer"] for lote in lotes_disponibles)
-            inventario_payload.append(
-                {
-                    "id": producto.id,
-                    "nombre": producto.nombre,
-                    "codigo": producto.codigo or "",
-                    "unidad": producto.get_unidad_medida_display(),
-                    "existencia": float(total),
-                    "stock_minimo": float(stock_minimo),
-                    "estado_stock": "sin_stock" if sin_stock else "stock_bajo" if stock_bajo else "normal",
-                    "stock_bajo": stock_bajo,
-                    "sin_stock": sin_stock,
-                    "proximo_vencer": proximo_vencer,
-                    "vencido": vencido,
-                    "bodegas": bodegas,
-                    "lotes": lotes,
-                    "maneja_lotes": bool(lotes),
-                    "proximo_vencimiento": lote_proximo["fecha_vencimiento"] if lote_proximo else "",
-                    "proximo_vencimiento_label": lote_proximo["fecha_vencimiento_label"] if lote_proximo else "",
-                    "dias_proximo_vencimiento": (
-                        (date.fromisoformat(lote_proximo["fecha_vencimiento"]) - hoy).days
-                        if lote_proximo
-                        else None
-                    ),
-                }
-            )
-        contexto["inventario_productos_app_payload"] = inventario_payload
+        contexto["inventario_productos_app_payload"] = productos_inventario_app(empresa)
     contexto["impuestos_app_payload"] = [
         {
             "id": impuesto.id,
@@ -2490,6 +2376,60 @@ def agenda_mobile(request, empresa_slug):
     contexto["app_scope_url"] = reverse("dashboard", args=[empresa.slug])
     contexto.update(construir_contexto_modulos_app(request, empresa))
     response = render(request, "crm/agenda_mobile.html", contexto)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
+@require_http_methods(["GET"])
+def agenda_mobile_inventory(request, empresa_slug):
+    empresa = _empresa_desde_slug(empresa_slug)
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado is not None:
+        return acceso_denegado
+    contexto = construir_contexto_modulos_app(request, empresa)
+    if not contexto["puede_ver_modulos_app"]:
+        return HttpResponse("Inventario móvil no disponible para esta empresa.", status=404)
+    if not empresa.tiene_modulo_activo("facturacion") or not request.user.tiene_permiso_erp("puede_inventario", empresa):
+        return HttpResponse("No tienes permiso para consultar inventario.", status=403)
+    inicio = reverse("agenda_mobile", args=[empresa.slug])
+    response = render(request, "crm/mobile_inventory.html", {
+        "empresa": empresa,
+        "app_base_url": inicio,
+        "app_invoices_url": f"{inicio}#facturas-app",
+        "app_modules_url": url_modulos_app(request, empresa),
+        "app_home_disponible": inicio_app_disponible(request, empresa),
+        "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
+        "productos": productos_inventario_app(empresa),
+        "app_existing_stock_entry_url": f"{inicio}#productos-app" if empresa.slug == "hospital_mia" and inicio_app_disponible(request, empresa) and request.user.tiene_permiso_erp("puede_ajustar_inventario", empresa) else "",
+    })
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
+@require_http_methods(["GET"])
+def agenda_mobile_modules_screen(request, empresa_slug):
+    """Acceso adicional sin calendario ni datos de pacientes en el catálogo."""
+    empresa = _empresa_desde_slug(empresa_slug)
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado is not None:
+        return acceso_denegado
+    contexto = construir_contexto_modulos_app(request, empresa)
+    if not contexto["puede_ver_modulos_app"]:
+        return HttpResponse("Módulos móviles no disponibles para esta empresa.", status=404)
+    inicio = reverse("agenda_mobile", args=[empresa.slug])
+    contexto.update({
+        "empresa": empresa, "app_base_url": inicio,
+        "app_invoices_url": f"{inicio}#facturas-app",
+        "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
+        "app_modules_url": reverse("agenda_mobile_modules_screen", args=[empresa.slug]),
+        "app_home_disponible": inicio_app_disponible(request, empresa),
+        "modulos_standalone": True,
+    })
+    response = render(request, "crm/mobile_modules.html", contexto)
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response["Pragma"] = "no-cache"
     response["Expires"] = "0"

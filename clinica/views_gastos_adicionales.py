@@ -19,7 +19,6 @@ from django.db.models.functions import Replace
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
-from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
@@ -36,6 +35,7 @@ from .forms_gastos_adicionales import GastoAdicionalForm, es_id_valido, validar_
 from .importes_gastos_adicionales import desglose_gasto_adicional
 from .models import GastoAdicional, LineaGastoAdicional, Paciente
 from .mobile_gastos import es_gastos_app, historial_gastos_mobile, render_gastos, respuesta_gastos_app, url_gastos_app
+from crm.mobile_modules import url_modulos_app
 from .services_gastos_adicionales import convertir_gasto_adicional
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ def _gasto(empresa, gasto_id):
 def _volver(request, empresa, gasto):
     if not request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa):
         if es_gastos_app(request):
-            return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}#mas-funciones-app")
+            return redirect(url_modulos_app(request, empresa))
         return redirect("dashboard", slug=empresa.slug)
     if es_gastos_app(request):
         return redirect(url_gastos_app("clinica_gasto_adicional_detalle", empresa, gasto.pk))

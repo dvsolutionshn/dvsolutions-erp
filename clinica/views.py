@@ -109,6 +109,15 @@ from .models import (
     asegurar_profesionales_agenda_base,
 )
 from .tokens import generar_token_preconsulta, hash_token_preconsulta
+from .mobile_patients import (
+    autorizar_pacientes_app,
+    es_pacientes_app,
+    notas_historia_app,
+    render_pacientes_app,
+    respuesta_pacientes_app,
+    url_paciente_app,
+    volver_paciente_app,
+)
 from crm.forms import (
     PacienteRapidoCitaForm,
     ProgramaCamaraHiperbaricaForm,
@@ -939,6 +948,7 @@ def configuracion_producto_clinico(request, empresa_slug):
 @login_required
 def pacientes(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
     hoy = timezone.localdate()
     q = (request.GET.get("q") or "").strip()
     pacientes_qs = (
@@ -971,7 +981,9 @@ def pacientes(request, empresa_slug):
             ]
             iniciales = "".join((parte or "").strip()[:1] for parte in partes_nombre if (parte or "").strip())
             paciente.iniciales = (iniciales or (paciente.nombre or "P")[:2]).upper()
-    return render(request, "clinica/pacientes.html", {
+    if es_pacientes_app(request, empresa):
+        pacientes_lista = Paginator(pacientes_lista, 25).get_page(request.GET.get("page"))
+    return render_pacientes_app(request, empresa, "clinica/pacientes.html", "clinica/mobile_patient_list.html", {
         "empresa": empresa,
         "pacientes": pacientes_lista,
         "q": q,
@@ -985,6 +997,7 @@ def pacientes(request, empresa_slug):
 @login_required
 def pacientes_sugerencias(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_ver_pacientes", "puede_pacientes")
     granular = bool(rol_clinico_granular(request.user, empresa))
     puede_ver_historia = request.user.tiene_permiso_erp(
         "puede_ver_historia_clinica" if granular else "puede_expediente_clinico",
@@ -992,7 +1005,7 @@ def pacientes_sugerencias(request, empresa_slug):
     )
     q = (request.GET.get("q") or "").strip()
     if len(q) < 2:
-        return JsonResponse({"results": []})
+        return respuesta_pacientes_app(request, empresa, JsonResponse({"results": []}))
 
     pacientes_qs = (
         Paciente.objects.filter(empresa=empresa, activo=True)
@@ -1015,18 +1028,21 @@ def pacientes_sugerencias(request, empresa_slug):
             "telefono": paciente.whatsapp or paciente.telefono or "",
             "correo": paciente.correo or "",
             "url": request.build_absolute_uri(
-                reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id])
+                url_paciente_app("clinica_paciente_detalle", empresa, paciente.pk)
+                if es_pacientes_app(request, empresa)
+                else reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id])
             ),
             "alergico": paciente.es_alergico if puede_ver_historia else False,
         }
         for paciente in pacientes_qs
     ]
-    return JsonResponse({"results": results})
+    return respuesta_pacientes_app(request, empresa, JsonResponse({"results": results}))
 
 
 @login_required
 def crear_paciente(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_crear_pacientes", "puede_pacientes")
     if interfaz_clinica_activa(empresa):
         preconsulta_base = PreconsultaClinica(
             empresa=empresa,
@@ -1072,10 +1088,10 @@ def crear_paciente(request, empresa_slug):
                 messages.error(request, "No se pudo crear el paciente. El formulario quedo listo para corregir o reintentar.")
             else:
                 messages.success(request, "Paciente creado correctamente con formulario general.")
-                return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
-        return render(
-            request,
-            "clinica/preconsulta_publica.html",
+                return volver_paciente_app(request, empresa, paciente)
+        return render_pacientes_app(
+            request, empresa,
+            "clinica/preconsulta_publica.html", "clinica/mobile_patient_form.html",
             {
                 "empresa": empresa,
                 "form": form,
@@ -1143,6 +1159,7 @@ def crear_paciente(request, empresa_slug):
 @login_required
 def editar_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_editar_pacientes", "puede_pacientes")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     identidad_anterior = (paciente.identidad or "").strip()
     if interfaz_clinica_activa(empresa):
@@ -1234,10 +1251,10 @@ def editar_paciente(request, empresa_slug, paciente_id):
                 messages.error(request, "No se pudo actualizar el paciente. El formulario quedo listo para corregir o reintentar.")
             else:
                 messages.success(request, "Paciente actualizado correctamente con el formulario general.")
-                return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
-        return render(
-            request,
-            "clinica/preconsulta_publica.html",
+                return volver_paciente_app(request, empresa, paciente)
+        return render_pacientes_app(
+            request, empresa,
+            "clinica/preconsulta_publica.html", "clinica/mobile_patient_form.html",
             {
                 "empresa": empresa,
                 "form": form,
@@ -1380,8 +1397,10 @@ def eliminar_paciente(request, empresa_slug, paciente_id):
 @login_required
 def paciente_detalle(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_ver_datos_generales_paciente", "puede_pacientes")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    asegurar_profesionales_agenda_base(empresa)
+    if not es_pacientes_app(request, empresa):
+        asegurar_profesionales_agenda_base(empresa)
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
     puede_historia = permiso("puede_ver_historia_clinica", "puede_expediente_clinico")
@@ -1422,9 +1441,9 @@ def paciente_detalle(request, empresa_slug, paciente_id):
         and isinstance(ultima_historia_general.datos_generales, dict)
         and ultima_historia_general.datos_generales.get("formulario_general_pendiente_doctor")
     )
-    return render(
-        request,
-        "clinica/paciente_detalle.html",
+    return render_pacientes_app(
+        request, empresa,
+        "clinica/paciente_detalle.html", "clinica/mobile_patient_detail.html",
         {
             "empresa": empresa,
             "paciente": paciente,
@@ -2540,6 +2559,7 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
 @login_required
 def historias_especialidad(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
@@ -2555,15 +2575,18 @@ def historias_especialidad(request, empresa_slug, paciente_id):
         }
         for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
     ]
-    return render(
+    return render_pacientes_app(
         request,
+        empresa,
         "clinica/historias_especialidad.html",
+        "clinica/mobile_patient_histories.html",
         {
             "empresa": empresa,
             "paciente": paciente,
             "historias": historias,
             "tipos": tipos,
             "preconsultas": preconsultas,
+            "mobile_history_notes": notas_historia_app(historias) if es_pacientes_app(request, empresa) else [],
         },
     )
 
@@ -2615,8 +2638,11 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
 @login_required
 def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    if es_pacientes_app(request, empresa) and request.method == "POST":
+        raise PermissionDenied("El historial móvil es de consulta. Registre un evento desde la acción autorizada.")
     secciones_validas = {
         "completa", "motivo_consulta", "funciones_organicas", "examen_fisico",
         "antecedentes", "diagnostico", "plan_tratamiento", "tricopigmentacion",
@@ -3089,9 +3115,11 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         if antecedente_adicional
         else AntecedenteAdicionalHistorial.objects.none()
     )
-    return render(
+    return render_pacientes_app(
         request,
+        empresa,
         "clinica/historial_clinico_consolidado.html",
+        "clinica/mobile_patient_history.html",
         {
             "empresa": empresa,
             "paciente": paciente,
@@ -3128,6 +3156,13 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             "antecedente_adicional_form": antecedente_adicional_form,
             "historial_antecedente_adicional": historial_antecedente_adicional,
             "resumen_operativo": resumen_operativo,
+            "eventos": paciente.eventos_expediente.select_related("profesional", "creado_por")[:50] if es_pacientes_app(request, empresa) else [],
+            "mobile_history_types": [
+                {"codigo": codigo, "nombre": nombre} for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
+            ] if es_pacientes_app(request, empresa) else [],
+            "mobile_history_notes": notas_historia_app(
+                [historia for historia in historias if seccion_activa != "especialidad" or not tipo_enfoque or historia.tipo == tipo_enfoque]
+            ) if es_pacientes_app(request, empresa) else [],
         },
     )
 
@@ -4214,6 +4249,7 @@ def crear_paciente_rapido_cita(request, empresa_slug):
 @login_required
 def crear_evento_expediente(request, empresa_slug, paciente_id=None):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_pacientes_app(request, empresa, "puede_crear_historia_clinica", "puede_expediente_clinico")
     paciente = None
     if paciente_id:
         paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
@@ -4224,8 +4260,13 @@ def crear_evento_expediente(request, empresa_slug, paciente_id=None):
         evento.creado_por = request.user
         evento.save()
         messages.success(request, "Evento agregado al expediente.")
-        return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=evento.paciente_id)
-    return render(request, "clinica/form.html", {"empresa": empresa, "form": form, "titulo": "Agregar evento al expediente"})
+        return volver_paciente_app(request, empresa, evento.paciente)
+    return render_pacientes_app(request, empresa, "clinica/form.html", "clinica/mobile_patient_event_form.html", {
+        "empresa": empresa,
+        "form": form,
+        "titulo": "Agregar evento al expediente",
+        "paciente": paciente,
+    })
 
 
 @login_required

@@ -1,0 +1,22 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% block mobile_title %}Pacientes{% endblock %}
+{% block mobile_page_title %}Pacientes{% endblock %}
+{% block mobile_header_description %}<p>Busca pacientes y accede a las funciones de su expediente autorizadas para tu rol.</p>{% endblock %}
+{% block mobile_header_actions %}{% if can_create_patient %}<a class="mi-more mp-header-link" href="{{ app_patient_create_url }}"><b aria-hidden="true">+</b> Nuevo</a>{% endif %}{% endblock %}
+{% block mobile_content %}
+<form class="mi-card mp-search" action="{{ app_patients_url }}" method="get"><input type="hidden" name="app" value="1"><div class="mi-field"><label for="mobilePatientSearch">Buscar paciente</label><div class="mp-search-box"><input id="mobilePatientSearch" type="search" name="q" value="{{ q }}" placeholder="Nombre, expediente, identidad o teléfono…" autocomplete="off"><button type="submit" aria-label="Buscar paciente"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button></div></div>{% if q %}<a class="mi-link" href="{{ app_patients_url }}">Limpiar búsqueda</a>{% endif %}</form>
+<div class="mp-list-label"><strong>{% if pacientes.paginator %}{{ pacientes.paginator.count }} paciente{{ pacientes.paginator.count|pluralize }}{% else %}{{ pacientes|length }} paciente{{ pacientes|length|pluralize }}{% endif %}</strong>{% if cumpleaneros_mes %}<span>{{ cumpleaneros_mes }} cumpleaños este mes</span>{% endif %}</div>
+<section class="mp-patient-list" aria-label="Listado de pacientes">
+{% for paciente in pacientes %}
+<article class="mi-card mp-patient-card">
+  {% if can_view_patient %}<a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}?app=1" class="mp-patient-main">{% else %}<div class="mp-patient-main">{% endif %}
+    <div class="mp-avatar">{% if paciente.foto_perfil %}<img src="{{ paciente.foto_perfil.url }}" alt="" loading="lazy">{% else %}{{ paciente.iniciales|default:paciente.nombre|slice:':2' }}{% endif %}</div>
+    <div class="mp-patient-copy"><strong>{{ paciente.nombre }}</strong><span>{{ paciente.expediente_codigo }}</span>{% if paciente.identidad %}<small>{{ paciente.identidad }}</small>{% endif %}</div>{% if can_view_patient %}<span class="mp-chevron" aria-hidden="true">›</span>{% endif %}
+  {% if can_view_patient %}</a>{% else %}</div>{% endif %}
+  <div class="mp-patient-meta">{% if paciente.edad != None %}<span>{{ paciente.edad }} años</span>{% endif %}{% if paciente.telefono %}<span>{{ paciente.telefono }}</span>{% endif %}{% if paciente.fecha_nacimiento.month == mes_actual.month %}<span class="mp-birthday">Cumpleaños este mes</span>{% endif %}</div>
+  {% if can_view_patient or can_edit_patient %}<div class="mp-patient-actions">{% if can_view_patient %}<a href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}?app=1">Ver expediente</a>{% endif %}{% if can_edit_patient %}<a href="{% url 'clinica_editar_paciente' empresa.slug paciente.id %}?app=1">Editar datos</a>{% endif %}</div>{% endif %}
+</article>
+{% empty %}<div class="mi-card mp-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg><h2>No se encontraron pacientes</h2><p>Prueba otro nombre, identidad o teléfono.</p>{% if can_create_patient %}<a href="{{ app_patient_create_url }}" class="mi-button">Crear paciente</a>{% endif %}</div>{% endfor %}
+</section>
+{% if pacientes.has_other_pages %}<nav class="mp-pagination" aria-label="Páginas de pacientes">{% if pacientes.has_previous %}<a class="mi-button secondary" href="?app=1&amp;q={{ q|urlencode }}&amp;page={{ pacientes.previous_page_number }}">Anterior</a>{% endif %}<span>{{ pacientes.number }} / {{ pacientes.paginator.num_pages }}</span>{% if pacientes.has_next %}<a class="mi-button secondary" href="?app=1&amp;q={{ q|urlencode }}&amp;page={{ pacientes.next_page_number }}">Siguiente</a>{% endif %}</nav>{% endif %}
+{% endblock %}

@@ -226,6 +226,12 @@ def permiso_agenda_granular(path_suffix, method="GET"):
     parts = [part for part in (path_suffix or "").strip("/").split("/") if part]
     if not parts:
         return "puede_crear_citas" if method != "GET" else "puede_ver_calendario"
+    if parts == ["app", "productos"]:
+        return "puede_inventario" if method == "GET" else "__denegar__"
+    if parts in (["app", "modules.json"], ["app", "modulos"]):
+        # Las vistas nuevas comprueban acceso a empresa y acciones existentes;
+        # los metadatos de módulos no requieren poder consultar el calendario.
+        return None if method == "GET" else "__denegar__"
     if parts[0] == "app":
         return "puede_crear_citas" if method != "GET" else "puede_ver_calendario"
     if parts[0] == "camara-hiperbarica":

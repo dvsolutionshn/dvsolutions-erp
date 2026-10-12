@@ -1,6 +1,6 @@
 {% if puede_ver_modulos_app %}
 <section class="app-panel mobile-app-screen mobile-modules-panel" id="mas-funciones-app">
-  <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Más funciones</span></div>
+  {% if not modulos_standalone %}<div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Más funciones</span></div>{% endif %}
   <header class="mobile-modules-header">
     <small>Tu app clínica</small><h2>Más funciones</h2>
     <p>Los mismos datos y permisos, con pantallas adaptadas al teléfono.</p>

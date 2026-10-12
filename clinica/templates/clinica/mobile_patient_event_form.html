@@ -1,0 +1,13 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% block mobile_title %}Registrar evento{% endblock %}
+{% block mobile_back_url %}{% if paciente and can_view_history %}{{ app_patient_history_url }}{% elif paciente and can_view_patient %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}Registrar evento{% endblock %}
+{% block mobile_header_description %}<p>{% if paciente %}{{ paciente.nombre }} · {{ paciente.expediente_codigo }}{% else %}Agrega un evento al expediente del paciente.{% endif %}</p>{% endblock %}
+{% block mobile_content %}
+<form method="post" action="{{ app_patient_event_form_url }}" id="mobilePatientEventForm" class="mp-form" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">{% for hidden in form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}
+{% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}{% if form.errors %}<div class="mi-error-box" role="alert"><strong>Revisa los datos marcados</strong><p>El contenido del evento se conserva.</p></div>{% endif %}
+<section class="mi-card"><h2 class="mi-step-label"><span>1</span>Atención</h2><div class="mp-fields">{% include "clinica/mobile_patient_field.html" with field=form.paciente %}{% include "clinica/mobile_patient_field.html" with field=form.profesional %}{% include "clinica/mobile_patient_field.html" with field=form.cita %}{% include "clinica/mobile_patient_field.html" with field=form.tratamiento %}{% include "clinica/mobile_patient_field.html" with field=form.tipo %}{% include "clinica/mobile_patient_field.html" with field=form.fecha %}</div></section>
+<section class="mi-card"><h2 class="mi-step-label"><span>2</span>Contenido del evento</h2><div class="mp-fields">{% include "clinica/mobile_patient_field.html" with field=form.titulo %}{% include "clinica/mobile_patient_field.html" with field=form.descripcion %}{% include "clinica/mobile_patient_field.html" with field=form.diagnostico %}{% include "clinica/mobile_patient_field.html" with field=form.plan %}{% include "clinica/mobile_patient_field.html" with field=form.signos_vitales %}</div></section>
+<a class="mp-cancel" href="{% if paciente and can_view_history %}{{ app_patient_history_url }}{% elif paciente and can_view_patient %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}">Cancelar</a><div class="mi-save-bar"><button class="mi-button" type="submit">Guardar evento</button></div>
+</form>
+{% endblock %}

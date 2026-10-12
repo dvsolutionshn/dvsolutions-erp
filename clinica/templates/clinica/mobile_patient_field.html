@@ -1,0 +1,10 @@
+<div class="mi-field mp-field{% if field.widget_type == 'checkbox' %} mp-single-check{% endif %}{% if field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %} mp-choice-field{% endif %}" data-patient-field="{{ field.name }}">
+{% if field.name == 'procedimientos_interes' and form.procedimientos_interes_grupos %}
+<span class="mp-field-label">{{ field.label }}</span><p class="mi-summary-note" data-procedure-empty>Selecciona el motivo de consulta para ver los procedimientos de esa área.</p>
+<div class="mp-procedure-groups">{% for grupo in form.procedimientos_interes_grupos %}<details class="mp-procedure-group" data-procedure-group="{{ grupo.codigo }}"><summary>{{ grupo.titulo }}</summary><div class="mp-procedure-options" role="group" aria-label="{{ grupo.titulo }}">{% for opcion in grupo.opciones %}<label><input type="checkbox" name="{{ field.html_name }}" value="{{ opcion.value }}"{% if opcion.selected %} checked{% endif %}><span>{{ opcion.label }}</span></label>{% endfor %}</div></details>{% endfor %}</div>
+{% elif field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %}<span class="mp-field-label" id="mp-label-{{ field.html_name }}">{{ field.label }}{% if field.field.required %}<span class="mp-required" aria-hidden="true"> *</span>{% endif %}</span><div role="group" aria-labelledby="mp-label-{{ field.html_name }}">{{ field }}</div>
+{% elif field.widget_type == 'checkbox' %}<label>{{ field }}<span>{{ field.label }}</span></label>
+{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mp-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+{% if field.name == 'foto_perfil' %}<img class="mp-photo-preview" data-patient-photo-preview alt="Vista previa de la fotografía" hidden>{% endif %}
+{% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+</div>

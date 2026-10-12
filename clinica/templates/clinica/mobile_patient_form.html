@@ -1,0 +1,15 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% block mobile_title %}{% if modo_edicion_paciente or paciente %}Editar paciente{% else %}Nuevo paciente{% endif %}{% endblock %}
+{% block mobile_back_url %}{% if paciente and can_view_patient %}{{ app_patient_detail_url }}{% elif can_view_patients %}{{ app_patients_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}{% if modo_edicion_paciente or paciente %}Editar paciente{% else %}Nuevo paciente{% endif %}{% endblock %}
+{% block mobile_header_description %}<p>{% if paciente %}{{ paciente.nombre }} · {{ paciente.expediente_codigo }}{% else %}Completa los datos del paciente para abrir su expediente.{% endif %}</p>{% endblock %}
+{% block mobile_content %}
+<form method="post" action="{{ app_patient_form_url }}" enctype="multipart/form-data" id="mobilePatientForm" class="mp-form" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">
+  {% for hidden in form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<div class="mi-error-box" role="alert">{{ error }}</div>{% endfor %}{% endfor %}
+  {% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  {% if form.errors %}<div class="mi-error-box" role="alert"><strong>Revisa los datos marcados</strong><p>Los valores ingresados se conservan para que puedas corregirlos.</p></div>{% endif %}
+  {% for seccion in mobile_patient_form_sections %}<section class="mi-card"><h2 class="mi-step-label"><span>{{ forloop.counter }}</span>{{ seccion.titulo }}</h2><div class="mp-fields">{% for field in seccion.campos %}{% include "clinica/mobile_patient_field.html" with field=field %}{% endfor %}</div></section>{% endfor %}
+  <a class="mp-cancel" href="{% if paciente and can_view_patient %}{{ app_patient_detail_url }}{% elif can_view_patients %}{{ app_patients_url }}{% else %}{{ app_modules_url }}{% endif %}">Cancelar</a>
+  <div class="mi-save-bar"><button type="submit" class="mi-button">{% if modo_edicion_paciente or paciente %}Guardar cambios{% else %}Crear paciente{% endif %}</button></div>
+</form>
+{% endblock %}
