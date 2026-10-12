@@ -6388,7 +6388,12 @@ def descargar_recibo_pdf(request, empresa_slug, recibo_id):
 
 @login_required
 def egresos_dashboard(request, empresa_slug):
+    from .mobile_egresos import autorizar_egresos_app, es_egresos_app, listar_egresos_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if es_egresos_app(request, empresa):
+        autorizar_egresos_app(request, empresa)
+        return listar_egresos_app(request, empresa)
     q = request.GET.get("q", "").strip()
     metodo = request.GET.get("metodo", "").strip()
     egresos = (
@@ -6424,13 +6429,21 @@ def egresos_dashboard(request, empresa_slug):
 
 @login_required
 def ver_comprobante_egreso(request, empresa_slug, comprobante_id):
+    from .mobile_egresos import autorizar_egresos_app, es_egresos_app, render_egreso_app, validar_egreso_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_egresos_app(request, empresa)
+    if modo_app:
+        autorizar_egresos_app(request, empresa, comprobante_id)
+        validar_egreso_app(empresa, comprobante_id)
     comprobante = get_object_or_404(
         ComprobanteEgresoCompra.objects.select_related('compra', 'proveedor', 'pago'),
         id=comprobante_id,
         empresa=empresa,
     )
 
+    if modo_app:
+        return render_egreso_app(request, empresa, {"empresa": empresa, "comprobante": comprobante})
     return render(request, "facturacion/ver_comprobante_egreso_premium.html", {
         "empresa": empresa,
         "comprobante": comprobante,
@@ -6439,7 +6452,13 @@ def ver_comprobante_egreso(request, empresa_slug, comprobante_id):
 
 @login_required
 def descargar_comprobante_egreso_pdf(request, empresa_slug, comprobante_id):
+    from .mobile_egresos import autorizar_egresos_app, es_egresos_app, respuesta_egresos_app, validar_egreso_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_egresos_app(request, empresa)
+    if modo_app:
+        autorizar_egresos_app(request, empresa, comprobante_id)
+        validar_egreso_app(empresa, comprobante_id)
     comprobante = get_object_or_404(
         ComprobanteEgresoCompra.objects.select_related('compra', 'proveedor', 'pago'),
         id=comprobante_id,
@@ -6467,6 +6486,8 @@ def descargar_comprobante_egreso_pdf(request, empresa_slug, comprobante_id):
 
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    if modo_app:
+        return respuesta_egresos_app(response)
     return response
 
 

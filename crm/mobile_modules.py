@@ -182,12 +182,16 @@ def construir_contexto_modulos_app(request, empresa):
             "Operación", cobros_disponibles_app(request, empresa),
             "parcial" if acceso["facturas"] and inicio_disponible else "pendiente",
             f"{inicio}#facturas-app")
+    from facturacion.mobile_egresos import egresos_disponibles_app
+
+    agregar("egresos", "Comprobantes de egreso", "Consultar documentos de pago a proveedores, buscar y abrir su PDF original.",
+            "Operación", egresos_disponibles_app(request, empresa), "disponible",
+            f"{reverse('egresos_dashboard', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
         ("compras", "Compras", acceso["compras"]),
         ("proveedores", "Proveedores", acceso["proveedores"]),
         ("cotizaciones", "Cotizaciones", acceso["cotizaciones"]),
         ("notas_credito", "Notas de crédito", acceso["notas_credito"]),
-        ("egresos", "Gastos y egresos", acceso["egresos"]),
         ("cxc", "Cuentas por cobrar", acceso["cxc"]),
         ("cxp", "Cuentas por pagar", acceso["cxp"]),
         ("cierres", "Cierres de caja", acceso["cierres_caja"] and acceso["usa_cierre_caja"]),
