@@ -79,9 +79,14 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("manuales", "Manuales PDF", "Consultar documentos, compartir con pacientes y administrar según tus permisos.",
             "Atención clínica", acceso["modulo_clinica"] and manuales_autorizados,
             "disponible", f"{reverse(manuales_destino, args=[empresa.slug])}?app=1")
+    anexos_autorizados = acceso["ver_anexos_clinicos"] or acceso["subir_anexos_clinicos"]
+    anexos_destino = "anexos" if acceso["ver_anexos_clinicos"] else "crear_anexo"
+    agregar("anexos", "Exámenes y anexos", "Archivos, evolución, consentimientos e incapacidades según tus permisos.",
+            "Atención clínica", acceso["modulo_clinica"] and anexos_autorizados,
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={anexos_destino}")
     for key, nombre, descripcion, autorizado in (
         ("expediente", "Expediente clínico", "Historias, diagnósticos y evolución del paciente.", acceso["expediente_clinico"]),
-        ("anexos", "Exámenes y anexos", "Documentos y archivos del expediente.", acceso["ver_anexos_clinicos"]),
         ("tratamientos", "Tratamientos", "Planes, controles y seguimiento clínico.", acceso["tratamientos_clinicos"]),
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),
         ("camara", "Cámara hiperbárica", "Programas y controles de las sesiones.", acceso["ver_camara_hiperbarica"]),

@@ -1,0 +1,5 @@
+<div class="mi-field ma-field{% if field.field.widget.input_type == 'checkbox' and field.widget_type == 'checkbox' %} ma-checkbox-field{% endif %}">
+  {% if field.widget_type == 'checkbox' %}<label for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="ma-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+  {% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+  {% if field.field.widget.input_type == 'file' %}<div class="ma-file-selection" data-annex-file-state="{{ field.auto_id }}" hidden><p data-annex-file-name></p><button type="button" data-annex-clear-file="{{ field.auto_id }}">Quitar selección</button></div>{% endif %}
+</div>

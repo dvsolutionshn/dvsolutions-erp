@@ -172,6 +172,9 @@ def permiso_clinica_granular(path_suffix, method="GET"):
     action = parts[2:]
     if not action:
         return "puede_ver_datos_generales_paciente"
+    if action[0] == "anexos":
+        # Sólo el nuevo lector de archivos; no cambia permisos de las demás rutas.
+        return "puede_ver_anexos_clinicos" if method in {"GET", "HEAD"} and len(action) == 5 and action[3] == "archivo" else "__denegar__"
     if action[0] == "editar":
         return "puede_editar_pacientes"
     if action[0] == "eliminar":

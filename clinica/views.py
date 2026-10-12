@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_safe
 from weasyprint import HTML
 
 from core.access import gastos_adicionales_habilitados, interfaz_clinica_activa, manuales_pdf_habilitados
@@ -136,6 +136,16 @@ from .mobile_manuals import (
     url_manual_app,
     volver_manuales_app,
     whatsapp_manual_app,
+)
+from .mobile_annexes import (
+    autorizar_anexos_app,
+    es_anexos_app,
+    evolucion_paciente_app,
+    permiso_anexos_app,
+    render_anexos_app,
+    respuesta_anexos_app,
+    respuesta_archivo_anexo_app,
+    volver_anexo_app,
 )
 from crm.forms import (
     PacienteRapidoCitaForm,
@@ -1501,6 +1511,7 @@ def paciente_detalle(request, empresa_slug, paciente_id):
             "historia_clinica_pendiente_doctor": historia_clinica_pendiente_doctor,
             **(accesos_recetas_paciente_app(request, empresa, paciente) if es_recetas_app(request, empresa) else {}),
             **(_accesos_manuales_paciente_app(request, empresa, paciente) if es_manuales_app(request, empresa) else {}),
+            "mobile_patient_evolution_items": evolucion_paciente_app(empresa, paciente, fotos_evolucion) if es_anexos_app(request, empresa) and permiso_anexos_app(request, empresa) else [],
         },
     )
 
@@ -1735,6 +1746,7 @@ def crear_recordatorios_tratamiento(request, empresa_slug, paciente_id):
 @login_required
 def examenes_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     examenes = list(
         ExamenPaciente.objects.filter(empresa=empresa, paciente=paciente)
@@ -1746,16 +1758,18 @@ def examenes_paciente(request, empresa_slug, paciente_id):
         "pdf": sum(1 for item in examenes if not item.es_imagen),
         "imagenes": sum(1 for item in examenes if item.es_imagen),
     }
-    return render(
-        request,
+    return render_anexos_app(
+        request, empresa, paciente, "examen",
         "clinica/examenes_paciente.html",
         {"empresa": empresa, "paciente": paciente, "examenes": examenes, "resumen": resumen},
+        registros=examenes,
     )
 
 
 @login_required
 def consentimientos_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     consentimientos = list(
         ConsentimientoClinico.objects.filter(empresa=empresa, paciente=paciente)
@@ -1769,8 +1783,8 @@ def consentimientos_paciente(request, empresa_slug, paciente_id):
         "revocados": sum(1 for item in consentimientos if item.estado == "revocado"),
         "con_pdf": sum(1 for item in consentimientos if item.archivo),
     }
-    return render(
-        request,
+    return render_anexos_app(
+        request, empresa, paciente, "consentimiento",
         "clinica/consentimientos_paciente.html",
         {
             "empresa": empresa,
@@ -1778,6 +1792,7 @@ def consentimientos_paciente(request, empresa_slug, paciente_id):
             "consentimientos": consentimientos,
             "resumen": resumen,
         },
+        registros=consentimientos,
     )
 
 
@@ -2534,6 +2549,7 @@ def _config_documento_clinico(categoria):
 @login_required
 def documentos_clinicos_paciente(request, empresa_slug, paciente_id, categoria):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     config = _config_documento_clinico(categoria)
     documentos = list(
@@ -2547,8 +2563,8 @@ def documentos_clinicos_paciente(request, empresa_slug, paciente_id, categoria):
         "imagenes": sum(1 for item in documentos if item.archivo and item.es_imagen),
         "sin_adjunto": sum(1 for item in documentos if not item.archivo),
     }
-    return render(
-        request,
+    return render_anexos_app(
+        request, empresa, paciente, "documento",
         "clinica/documentos_clinicos_paciente.html",
         {
             "empresa": empresa,
@@ -2558,12 +2574,14 @@ def documentos_clinicos_paciente(request, empresa_slug, paciente_id, categoria):
             "documentos": documentos,
             "resumen": resumen,
         },
+        registros=documentos, categoria=categoria, config=config,
     )
 
 
 @login_required
 def subir_documento_clinico_paciente(request, empresa_slug, paciente_id, categoria):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa, subir=True)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     config = _config_documento_clinico(categoria)
     form_class = IncapacidadClinicaForm if categoria == "incapacidad" else DocumentoClinicoPacienteForm
@@ -2581,14 +2599,9 @@ def subir_documento_clinico_paciente(request, empresa_slug, paciente_id, categor
             documento.titulo = "Incapacidad medica"
         documento.save()
         messages.success(request, f"{config['titulo']} actualizado correctamente en el expediente.")
-        return redirect(
-            "clinica_documentos_categoria_paciente",
-            empresa_slug=empresa.slug,
-            paciente_id=paciente.id,
-            categoria=categoria,
-        )
-    return render(
-        request,
+        return volver_anexo_app(request, empresa, paciente, "documento", categoria)
+    return render_anexos_app(
+        request, empresa, paciente, "documento",
         "clinica/form.html",
         {
             "empresa": empresa,
@@ -2596,12 +2609,14 @@ def subir_documento_clinico_paciente(request, empresa_slug, paciente_id, categor
             "titulo": f"{config['accion']}: {paciente.nombre}",
             "cancel_url": reverse("clinica_documentos_categoria_paciente", args=[empresa.slug, paciente.id, categoria]),
         },
+        form=True, categoria=categoria, config=config,
     )
 
 
 @login_required
 def imprimir_incapacidad_paciente(request, empresa_slug, paciente_id, documento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     incapacidad = get_object_or_404(
         DocumentoClinicoPaciente.objects.select_related("profesional", "creado_por"),
@@ -2610,16 +2625,17 @@ def imprimir_incapacidad_paciente(request, empresa_slug, paciente_id, documento_
         paciente=paciente,
         categoria="incapacidad",
     )
-    return render(
+    return respuesta_anexos_app(request, empresa, render(
         request,
         "clinica/incapacidad_imprimir.html",
         {"empresa": empresa, "paciente": paciente, "incapacidad": incapacidad},
-    )
+    ))
 
 
 @login_required
 def evolucion_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     registros = list(
         PacienteFotoEvolucion.objects.filter(empresa=empresa, paciente=paciente)
@@ -2635,8 +2651,8 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
         "videos": len(videos),
         "ultimo": registros[-1] if registros else None,
     }
-    return render(
-        request,
+    return render_anexos_app(
+        request, empresa, paciente, "evolucion",
         "clinica/evolucion_paciente.html",
         {
             "empresa": empresa,
@@ -2647,7 +2663,32 @@ def evolucion_paciente(request, empresa_slug, paciente_id):
             "preoperatorios": preoperatorios,
             "resumen": resumen,
         },
+        registros=registros,
     )
+
+
+@login_required
+@require_safe
+def archivo_anexo_app(request, empresa_slug, paciente_id, clase, registro_id, parte):
+    """Lectura del archivo existente, autorizada por empresa y paciente."""
+    empresa = _empresa_desde_slug(empresa_slug)
+    if not es_anexos_app(request, empresa):
+        raise Http404("Los archivos protegidos están disponibles desde la app clínica.")
+    autorizar_anexos_app(request, empresa)
+    modelos = {
+        "examen": (ExamenPaciente, {"archivo"}),
+        "evolucion": (PacienteFotoEvolucion, {"imagen", "video"}),
+        "documento": (DocumentoClinicoPaciente, {"archivo"}),
+        "consentimiento": (ConsentimientoClinico, {"archivo"}),
+    }
+    if clase not in modelos or parte not in modelos[clase][1]:
+        raise Http404("Tipo de archivo clínico no válido.")
+    paciente = get_object_or_404(Paciente, pk=paciente_id, empresa=empresa)
+    registro = get_object_or_404(modelos[clase][0], pk=registro_id, empresa=empresa, paciente=paciente)
+    archivo = getattr(registro, parte)
+    if not archivo:
+        raise Http404("Este registro no tiene el archivo solicitado.")
+    return respuesta_archivo_anexo_app(request, empresa, archivo)
 
 
 @login_required
@@ -4366,6 +4407,7 @@ def crear_evento_expediente(request, empresa_slug, paciente_id=None):
 @login_required
 def registrar_foto_evolucion(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa, subir=True)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     form = PacienteFotoEvolucionForm(request.POST or None, request.FILES or None, empresa=empresa)
     if request.method == "POST" and form.is_valid():
@@ -4376,18 +4418,19 @@ def registrar_foto_evolucion(request, empresa_slug, paciente_id):
         foto.save()
         tipo_archivo = "Video" if foto.video else "Foto"
         messages.success(request, f"{tipo_archivo} de evolucion registrada correctamente.")
-        return redirect("clinica_evolucion_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
-    return render(request, "clinica/form.html", {
+        return volver_anexo_app(request, empresa, paciente, "evolucion")
+    return render_anexos_app(request, empresa, paciente, "evolucion", "clinica/form.html", {
         "empresa": empresa,
         "form": form,
         "titulo": f"Registrar evolucion: {paciente.nombre}",
         "cancel_url": reverse("clinica_evolucion_paciente", args=[empresa.slug, paciente.id]),
-    })
+    }, form=True)
 
 
 @login_required
 def subir_consentimiento_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa, subir=True)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     form = PlanConsentimientoPDFForm(request.POST or None, request.FILES or None, empresa=empresa)
     if request.method == "POST" and form.is_valid():
@@ -4397,18 +4440,19 @@ def subir_consentimiento_paciente(request, empresa_slug, paciente_id):
         consentimiento.contenido = consentimiento.contenido or "Plan de consentimiento firmado cargado en PDF."
         consentimiento.save()
         messages.success(request, "Plan de consentimiento PDF agregado correctamente.")
-        return redirect("clinica_consentimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
-    return render(request, "clinica/form.html", {
+        return volver_anexo_app(request, empresa, paciente, "consentimiento")
+    return render_anexos_app(request, empresa, paciente, "consentimiento", "clinica/form.html", {
         "empresa": empresa,
         "form": form,
         "titulo": f"Subir plan de consentimiento: {paciente.nombre}",
         "cancel_url": reverse("clinica_consentimientos_paciente", args=[empresa.slug, paciente.id]),
-    })
+    }, form=True)
 
 
 @login_required
 def subir_examen_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_anexos_app(request, empresa, subir=True)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     form = ExamenPacienteForm(request.POST or None, request.FILES or None, empresa=empresa)
     if request.method == "POST" and form.is_valid():
@@ -4418,13 +4462,13 @@ def subir_examen_paciente(request, empresa_slug, paciente_id):
         examen.subido_por = request.user
         examen.save()
         messages.success(request, "Examen agregado correctamente al expediente.")
-        return redirect("clinica_examenes_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
-    return render(request, "clinica/form.html", {
+        return volver_anexo_app(request, empresa, paciente, "examen")
+    return render_anexos_app(request, empresa, paciente, "examen", "clinica/form.html", {
         "empresa": empresa,
         "form": form,
         "titulo": f"Subir examen: {paciente.nombre}",
         "cancel_url": reverse("clinica_examenes_paciente", args=[empresa.slug, paciente.id]),
-    })
+    }, form=True)
 
 
 @login_required

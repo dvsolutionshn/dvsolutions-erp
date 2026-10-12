@@ -1,0 +1,12 @@
+{% extends "clinica/mobile_annex_base.html" %}
+{% block mobile_title %}{{ mobile_annex_title }}{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_content %}
+{% include "clinica/mobile_annex_navigation.html" %}
+<form method="post" action="{{ app_annex_form_url }}" enctype="multipart/form-data" class="ma-compose" id="mobileAnnexForm" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}
+  {% if form.errors %}<div class="mi-error-box" role="alert"><strong>No se pudo guardar el registro</strong><p>Los datos escritos se conservan. Por seguridad, debes volver a seleccionar cualquier archivo que quieras adjuntar antes de reintentar.</p></div>{% endif %}{% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  <section class="mi-card"><h2>{% if mobile_annex_class == 'evolucion' %}Foto o video de evolución{% elif mobile_annex_class == 'consentimiento' %}Datos del consentimiento{% elif form.fecha_inicio %}Datos de la incapacidad{% else %}Datos del registro{% endif %}</h2><div class="ma-fields">{% for field in form.visible_fields %}{% include "clinica/mobile_annex_field.html" with field=field %}{% endfor %}</div></section>
+  <p class="mi-summary-note ma-form-note">{% if mobile_annex_class == 'evolucion' %}Selecciona una foto o un video por registro. Se aplican los formatos y límites actuales del sistema.{% elif form.fecha_inicio %}El adjunto es opcional. El certificado oficial se consulta con el permiso correspondiente después de guardarlo.{% else %}El archivo se adjuntará al expediente de este paciente con las validaciones actuales del sistema.{% endif %}</p>
+  <a class="ma-cancel" href="{{ app_annex_cancel_url }}">Cancelar</a><div class="mi-save-bar"><button class="mi-button" type="submit">{% if form.fecha_inicio %}Guardar incapacidad{% else %}Guardar registro{% endif %}</button></div>
+</form>
+{% endblock %}

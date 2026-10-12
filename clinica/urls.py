@@ -33,6 +33,7 @@ urlpatterns = [
     path("pacientes/<int:paciente_id>/expediente/agregar/", views.crear_evento_expediente, name="clinica_crear_evento_paciente"),
     path("pacientes/<int:paciente_id>/evolucion/", views.evolucion_paciente, name="clinica_evolucion_paciente"),
     path("pacientes/<int:paciente_id>/evolucion/registrar/", views.registrar_foto_evolucion, name="clinica_registrar_foto_evolucion"),
+    path("pacientes/<int:paciente_id>/anexos/<slug:clase>/<int:registro_id>/archivo/<slug:parte>/", views.archivo_anexo_app, name="clinica_archivo_anexo_app"),
     path("pacientes/<int:paciente_id>/examenes/", views.examenes_paciente, name="clinica_examenes_paciente"),
     path("pacientes/<int:paciente_id>/examenes/subir/", views.subir_examen_paciente, name="clinica_subir_examen_paciente"),
     path("pacientes/<int:paciente_id>/recetas/", views.recetas_paciente, name="clinica_recetas_paciente"),

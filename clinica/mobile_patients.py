@@ -62,6 +62,11 @@ def _secciones_formulario_paciente(form):
 def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
+    # El menú legado del expediente y el middleware de estas rutas exigen
+    # ambos permisos. La presentación nueva no aprovecha el mapper más amplio.
+    anexos_legados = granular or request.user.tiene_permiso_erp("puede_pacientes", empresa)
+    puede_ver_anexos = anexos_legados and permiso("puede_ver_anexos_clinicos", "puede_expediente_clinico")
+    puede_subir_anexos = anexos_legados and permiso("puede_subir_anexos_clinicos", "puede_expediente_clinico")
     inicio = reverse("agenda_mobile", args=[empresa.slug])
     contexto = {
         "modo_app": True,
@@ -79,18 +84,26 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_edit_patient": permiso("puede_editar_pacientes", "puede_pacientes"),
         "can_view_history": permiso("puede_ver_historia_clinica", "puede_expediente_clinico"),
         "can_create_history": permiso("puede_crear_historia_clinica", "puede_expediente_clinico"),
-        "can_view_annexes": permiso("puede_ver_anexos_clinicos", "puede_expediente_clinico"),
-        "can_view_attachments": permiso("puede_ver_anexos_clinicos", "puede_expediente_clinico"),
+        "can_view_annexes": puede_ver_anexos,
+        "can_view_attachments": puede_ver_anexos,
+        "can_upload_annexes": puede_subir_anexos,
         "can_view_recipes": permiso("puede_ver_recetas", "puede_expediente_clinico"),
         "can_view_plans": permiso("puede_ver_planes_tratamiento", "puede_tratamientos_clinicos"),
         "can_view_recordatorios": permiso("puede_crear_recordatorios_paciente", "puede_pacientes"),
         "can_view_gastos": gastos_adicionales_habilitados(empresa) and request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa),
     }
+    destino_anexos = request.GET.get("destino", "")
+    if request.method == "GET" and es_pacientes_app(request, empresa) and (
+        (destino_anexos == "anexos" and puede_ver_anexos)
+        or (destino_anexos == "crear_anexo" and puede_subir_anexos)
+    ):
+        contexto["mobile_patient_annex_mode"] = destino_anexos
     if paciente:
         for nombre, vista in {
             "detail": "clinica_paciente_detalle", "edit": "clinica_editar_paciente",
             "histories": "clinica_historias_especialidad", "history": "clinica_historial_clinico_consolidado",
             "event": "clinica_crear_evento_paciente",
+            "annexes": "clinica_examenes_paciente", "annex_upload": "clinica_subir_examen_paciente",
         }.items():
             contexto[f"app_patient_{nombre}_url"] = url_paciente_app(vista, empresa, paciente.pk)
         contexto["app_patient_gastos_url"] = f"{reverse('clinica_gastos_adicionales', args=[empresa.slug])}?{urlencode({'app': '1', 'paciente_id': paciente.pk})}"
