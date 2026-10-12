@@ -48,3 +48,16 @@ La base `facturacion/mobile_invoice_base.html` proporciona encabezado, navegaci�
 | Configuración | Adaptar solo los campos ya autorizados en `clinica_configuracion`; usar `erp_access` y los permisos granulares del rol por empresa. |
 
 Prioridad de próximas adaptaciones: expediente y recetas desde el perfil del paciente; luego manuales PDF y transferencias; finalmente tratamientos y configuración. Esta lista es una guía de implementación, no expone opciones todavía no adaptadas ni autoriza nuevas acciones al usuario.
+
+Base de módulos y Gastos Adicionales móviles
+------------------------------------------
+
+El inicio agrega únicamente `Más funciones` después de las tarjetas existentes. No cambia su orden, acciones, navegación inferior ni flujos entrenados. El catálogo `crm/mobile_modules.py` reutiliza `core.context_processors.erp_access` con la empresa de la URL y está limitado a Hospital Mía, Medical Spa, Luque Aestetic y Servicios Médicos. Las opciones pendientes son informativas, sin enlaces a formularios web. Las vistas de destino conservan sus controles de backend: aparecer en el catálogo no concede permisos.
+
+`agenda_mobile_modules` publica un catálogo autenticado y sin caché de presentación (`version`, empresa, módulos y destinos), sin datos de pacientes ni documentos. Es una base de descubrimiento para futuros clientes, no una API alternativa de operaciones ni un sistema de autenticación nuevo.
+
+Gastos Adicionales usa sus rutas existentes con `?app=1`: lista, filtros, creación, edición, PDF, correo, WhatsApp y conversión. Las tarjetas móviles y el adaptador visual reutilizan el formulario y `gastos_adicionales.js` actuales, incluida la búsqueda paginada, cirugía obligatoria, profesional fijado, importes y conservación de líneas tras errores. La conversión mantiene el servicio transaccional e idempotente original y abre un borrador en el editor móvil de facturas; no emite el documento ni consume CAI o inventario. La web conserva sus templates y destinos originales.
+
+Orden autorizado de ampliación: base/accesos y Gastos Adicionales; pacientes y expediente; recetas y atención clínica; inventario y transferencias para las cuatro empresas; cobros, documentos y reportes de facturación pendientes; configuración y administración autorizadas. Cada bloque debe adaptarse sobre la lógica existente y verificarse antes de publicar. No cambiar roles ni conceder permisos para facilitar una adaptación.
+
+Una futura aplicación iOS distribuida por App Store requiere una etapa propia: cliente móvil empaquetado, contratos autenticados de operaciones sobre los servicios actuales, funciones apropiadas del dispositivo, pruebas iOS, cuenta/firma y revisión de Apple. El catálogo móvil y los servicios reutilizados facilitan esa transición, pero esta implementación no incluye un binario nativo ni garantiza aprobación. No basta con apuntar un contenedor a la web. Referencias: https://capacitorjs.com/docs y https://developer.apple.com/app-store/review/guidelines/ (mínima funcionalidad).

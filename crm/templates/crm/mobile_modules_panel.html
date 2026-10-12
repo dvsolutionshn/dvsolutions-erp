@@ -1,0 +1,24 @@
+{% if puede_ver_modulos_app %}
+<section class="app-panel mobile-app-screen mobile-modules-panel" id="mas-funciones-app">
+  <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Más funciones</span></div>
+  <header class="mobile-modules-header">
+    <small>Tu app clínica</small><h2>Más funciones</h2>
+    <p>Los mismos datos y permisos, con pantallas adaptadas al teléfono.</p>
+    <div class="mobile-modules-context"><span><b>Empresa activa</b>{{ empresa.nombre }}</span><span><b>Acceso actual</b>{{ rol_app }}</span></div>
+  </header>
+  <p class="mobile-modules-note">Los accesos habituales se mantienen en Inicio. Las funciones pendientes no abren pantallas web.</p>
+  {% for grupo in grupos_modulos_app %}
+  <section class="mobile-modules-group" aria-label="{{ grupo.nombre }}">
+    <h3>{{ grupo.nombre }}</h3>
+    <div class="mobile-modules-list">
+      {% for modulo in grupo.modulos %}
+      {% if modulo.url %}<a class="mobile-modules-card" href="{{ modulo.url }}"{% if modulo.panel %} data-app-open="{{ modulo.panel }}"{% endif %}>{% else %}<article class="mobile-modules-card mobile-modules-pending">{% endif %}
+        <div class="mobile-modules-copy"><strong>{{ modulo.nombre }}</strong><p>{{ modulo.descripcion }}</p><span class="mobile-modules-state {{ modulo.estado }}">{% if modulo.estado == 'disponible' %}Disponible en app{% elif modulo.estado == 'parcial' %}Disponible · Se ampliará{% else %}Próxima adaptación{% endif %}</span></div>
+        {% if modulo.url %}<span class="mobile-modules-go" aria-hidden="true">›</span>{% endif %}
+      {% if modulo.url %}</a>{% else %}</article>{% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% empty %}<p class="mobile-modules-note">No hay módulos adicionales disponibles para tu rol en esta empresa.</p>{% endfor %}
+</section>
+{% endif %}

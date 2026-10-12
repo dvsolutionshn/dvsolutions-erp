@@ -76,6 +76,7 @@ from .services import (
     subir_media_whatsapp,
 )
 from .tokens import leer_token_respuesta_cita
+from .mobile_modules import construir_contexto_modulos_app
 
 
 logger = logging.getLogger(__name__)
@@ -2487,7 +2488,30 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
     contexto["app_scope_url"] = reverse("dashboard", args=[empresa.slug])
+    contexto.update(construir_contexto_modulos_app(request, empresa))
     response = render(request, "crm/agenda_mobile.html", contexto)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
+@require_http_methods(["GET"])
+def agenda_mobile_modules(request, empresa_slug):
+    """Capacidades de presentación, sin datos clínicos ni permisos nuevos."""
+    empresa = _empresa_desde_slug(empresa_slug)
+    response = _proteger_agenda_mobile(request, empresa)
+    if response is None:
+        contexto = construir_contexto_modulos_app(request, empresa)
+        if not contexto["puede_ver_modulos_app"]:
+            response = JsonResponse({"error": "Módulos móviles no disponibles para esta empresa."}, status=404)
+        else:
+            response = JsonResponse({
+                "version": 1,
+                "empresa": {"slug": empresa.slug, "nombre": empresa.nombre},
+                "modulos": contexto["modulos_app"],
+                "inicio_url": reverse("agenda_mobile", args=[empresa.slug]),
+            })
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response["Pragma"] = "no-cache"
     response["Expires"] = "0"

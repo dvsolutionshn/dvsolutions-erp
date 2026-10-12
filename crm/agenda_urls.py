@@ -8,6 +8,7 @@ urlpatterns = [
     path("camara-hiperbarica/", views.camara_hiperbarica, name="agenda_camara_hiperbarica"),
     path("terapias-post-quirurgicas/", views.terapias_postquirurgicas, name="agenda_terapias_postquirurgicas"),
     path("app/", views.agenda_mobile, name="agenda_mobile"),
+    path("app/modules.json", views.agenda_mobile_modules, name="agenda_mobile_modules"),
     path("app/manifest.webmanifest", views.agenda_mobile_manifest, name="agenda_mobile_manifest"),
     path("app/service-worker.js", views.agenda_mobile_service_worker, name="agenda_mobile_service_worker"),
     path("disponibilidad/bloquear/", views.guardar_bloqueo_disponibilidad, name="agenda_bloqueo_guardar"),

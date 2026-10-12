@@ -1,0 +1,43 @@
+{% extends "clinica/mobile_clinical_base.html" %}
+{% load humanize %}
+{% block mobile_title %}Gastos adicionales{% endblock %}
+{% block mobile_page_title %}Gastos adicionales{% endblock %}
+{% block mobile_header_description %}<p>Consulta los documentos del paciente y prepara sus gastos desde la app.</p>{% endblock %}
+{% block mobile_header_actions %}{% if can_create_gasto %}<a class="mi-more mg-header-link" href="{{ app_gasto_create_url }}"><b aria-hidden="true">+</b> Nuevo</a>{% endif %}{% endblock %}
+{% block mobile_content %}
+<form method="get" action="{{ app_gastos_url }}" class="mi-card mg-filters" id="mobileGastoFilters">
+  <input type="hidden" name="app" value="1"><input type="hidden" name="estado" value="{{ filtros.estado }}">
+  <div class="mi-field"><label for="gastoPatientFilter">Buscar paciente</label><div class="mg-search-input"><input type="search" id="gastoPatientFilter" name="paciente" value="{{ filtros.paciente }}" placeholder="Nombre o identidad…" autocomplete="off"><button type="submit" aria-label="Buscar gastos"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button></div></div>
+  <div class="mg-chips" aria-label="Estado del documento">
+    <button type="submit" name="estado" value="" class="mg-chip {% if not filtros.estado %}active{% endif %}">Todos</button>
+    <button type="submit" name="estado" value="pendiente" class="mg-chip {% if filtros.estado == 'pendiente' %}active{% endif %}">Pendientes</button>
+    <button type="submit" name="estado" value="facturado" class="mg-chip {% if filtros.estado == 'facturado' %}active{% endif %}">Facturados</button>
+  </div>
+  <details class="mg-filter-extra" {% if filtros.desde or filtros.hasta or filtros.numero %}open{% endif %}><summary>Fecha y número de documento</summary><div class="mi-field-grid">
+    <div class="mi-field"><label for="gastoDateFrom">Desde</label><input type="date" name="desde" id="gastoDateFrom" value="{{ filtros.desde }}"></div>
+    <div class="mi-field"><label for="gastoDateTo">Hasta</label><input type="date" name="hasta" id="gastoDateTo" value="{{ filtros.hasta }}"></div>
+    <div class="mi-field mi-wide"><label for="gastoNumberFilter">Número de gasto</label><input type="search" name="numero" id="gastoNumberFilter" value="{{ filtros.numero }}" placeholder="GA-000001"></div>
+    <button class="mi-button secondary mi-wide" type="submit">Aplicar filtros</button>
+  </div></details>
+  {% if filtros.paciente or filtros.desde or filtros.hasta or filtros.numero or filtros.estado %}<a class="mi-link" href="{{ app_gastos_url }}">Limpiar filtros</a>{% endif %}
+</form>
+<div class="mg-list-head"><strong>{{ gastos.paginator.count }} documento{{ gastos.paginator.count|pluralize:"s" }}</strong>{% if can_create_gasto %}<a href="{{ app_gasto_create_url }}">+ Nuevo gasto</a>{% endif %}</div>
+<section class="mg-document-list" aria-label="Gastos adicionales">
+{% for gasto in gastos %}
+  <article class="mi-card mg-document-card">
+    <a class="mg-document-main" href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}?app=1">
+      <div class="mg-document-top"><strong>{{ gasto.numero }}</strong><span class="mi-badge {% if gasto.estado == 'facturado' %}pagado{% else %}pendiente{% endif %}">{{ gasto.get_estado_display }}</span></div>
+      <h2>{{ gasto.paciente.nombre }}</h2>
+      <div class="mg-document-meta"><span>{{ gasto.fecha|date:"d/m/Y" }}</span>{% if gasto.paciente.identidad %}<span>{{ gasto.paciente.identidad }}</span>{% endif %}</div>
+      {% if gasto.tipo_cirugia_label %}<p class="mg-document-surgery">{{ gasto.tipo_cirugia_label }}</p>{% endif %}
+      <div class="mg-document-total"><span>Total</span><strong>L {{ gasto.total|floatformat:'2u'|intcomma:False }}</strong></div>
+      {% if gasto.factura %}<p class="mg-linked-label">{% if gasto.factura.estado == 'borrador' %}Factura en borrador vinculada{% elif gasto.factura.estado == 'anulada' %}Factura vinculada anulada{% else %}Factura {{ gasto.factura.numero_factura }}{% endif %}</p>{% endif %}
+    </a>
+    <div class="mg-document-footer"><a href="{% url 'clinica_gasto_adicional_detalle' empresa.slug gasto.id %}?app=1">Ver detalle <span aria-hidden="true">›</span></a><a href="{% url 'clinica_gasto_adicional_pdf' empresa.slug gasto.id %}?app=1" target="_blank" rel="noopener">PDF <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6ZM14 3v5h4M9 13h6M9 17h4"/></svg></a></div>
+  </article>
+{% empty %}
+  <div class="mi-card mg-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6ZM9 8h6M9 12h6M9 16h3"/></svg><h2>No hay gastos en esta búsqueda</h2><p>Ajusta los filtros para encontrar un documento.</p>{% if can_create_gasto %}<a class="mi-button" href="{{ app_gasto_create_url }}">Crear gasto adicional</a>{% endif %}</div>
+{% endfor %}
+</section>
+{% if gastos.has_other_pages %}<nav class="mg-pagination" aria-label="Páginas de gastos">{% if gastos.has_previous %}<a class="mi-button secondary" href="?page={{ gastos.previous_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}&amp;app=1">Anterior</a>{% endif %}<span>{{ gastos.number }} / {{ gastos.paginator.num_pages }}</span>{% if gastos.has_next %}<a class="mi-button secondary" href="?page={{ gastos.next_page_number }}{% if querystring %}&amp;{{ querystring }}{% endif %}&amp;app=1">Siguiente</a>{% endif %}</nav>{% endif %}
+{% endblock %}
