@@ -192,6 +192,8 @@ def permiso_clinica_granular(path_suffix, method="GET"):
             return "puede_enviar_recetas"
         return "puede_ver_recetas"
     if action[0] == "planes-tratamiento":
+        if action == ["planes-tratamiento", "crear", "app"]:
+            return "puede_editar_planes_tratamiento" if method in {"GET", "HEAD"} else "__denegar__"
         return "puede_editar_planes_tratamiento" if method != "GET" else "puede_ver_planes_tratamiento"
     if action[0] == "historias":
         if "nueva" in action:

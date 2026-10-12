@@ -1,0 +1,20 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% load static %}
+{% block mobile_title %}Registrar nuevo plan{% endblock %}
+{% block mobile_page_title %}Registrar nuevo plan{% endblock %}
+{% block mobile_kicker %}Planes e indicaciones{% endblock %}
+{% block mobile_back_url %}{{ app_plan_back_url }}{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_plans.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_plans.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<div class="mpl-context-note"><strong>Un nuevo registro del expediente</strong><p>Cada envío agrega un plan independiente con fecha y responsable. Los planes anteriores se conservan; no se reemplazan.</p></div>
+{% if can_create_plan %}<form id="mobilePlanForm" class="mpl-form" method="post" action="{{ app_plan_form_url }}" data-submit-once data-plan-unsaved="{% if form.is_bound %}1{% else %}0{% endif %}">{% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+{% if form.errors %}<div class="mi-error-box" role="alert"><strong>No se pudo registrar el plan</strong><p>El texto ingresado se conserva. Revisa el campo marcado antes de guardar.</p>{{ form.non_field_errors }}</div>{% endif %}
+<section class="mi-card mpl-editor-card">{% for field in form.visible_fields %}<div class="mi-field mpl-field" data-plan-field="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mpl-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}</div>{% endfor %}</section>
+<a class="mpl-cancel" href="{{ app_plan_back_url }}">Cancelar</a><div class="mi-save-bar"><button class="mi-button" type="button" id="planReview">Revisar y guardar nuevo plan</button></div>
+</form>
+<dialog class="mi-sheet" id="planConfirmSheet" aria-labelledby="planConfirmTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="planConfirmTitle">Guardar nuevo plan</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><p class="mi-muted">Se registrará una entrada nueva para {{ paciente.nombre }}. Los planes anteriores se conservan.</p><div class="mpl-confirm-content" id="planConfirmText" aria-label="Texto del nuevo plan"></div><div class="mpl-dialog-actions"><button class="mi-button" type="button" id="confirmPlanSave">Confirmar y registrar</button><button class="mi-button secondary" type="button" data-close-sheet>Seguir completando</button></div></dialog>
+<dialog class="mi-sheet" id="planUnsavedSheet" aria-labelledby="planUnsavedTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="planUnsavedTitle">Texto sin guardar</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><p class="mi-muted">Si sales ahora, el nuevo plan que estás preparando no se guardará. Los registros anteriores no cambian.</p><div class="mpl-dialog-actions"><button class="mi-button" type="button" data-close-sheet>Seguir completando</button><button class="mi-button secondary" type="button" id="confirmPlanLeave">Salir sin guardar</button></div></dialog>
+{% endif %}
+{% endblock %}

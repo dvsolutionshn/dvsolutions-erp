@@ -117,6 +117,13 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("tratamientos", "Tratamientos", "Consultar tratamientos asignados y registrar uno nuevo según tus permisos.",
             "Atención clínica", tratamientos["ver"] or tratamientos["crear"], "parcial",
             f"{reverse('clinica_tratamientos' if tratamientos['ver'] else 'clinica_crear_tratamiento', args=[empresa.slug])}?app=1")
+    from clinica.mobile_plans import planes_disponibles_app
+
+    planes = planes_disponibles_app(request, empresa)
+    agregar("planes_tratamiento", "Planes por paciente", "Consultar registros anteriores y guardar indicaciones nuevas sin sobrescribirlos.",
+            "Atención clínica", planes["ver"] or planes["crear"],
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={'planes' if planes['ver'] else 'crear_plan'}")
     for key, nombre, descripcion, autorizado in (
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),
     ):

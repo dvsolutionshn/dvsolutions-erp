@@ -156,6 +156,10 @@ from .mobile_special_histories import (
     url_historia_especial_app, volver_historia_especial_app,
 )
 from .mobile_controls import autorizar_control_app, render_control_app, validar_seleccion_control_app, volver_control_app
+from .mobile_plans import (
+    autorizar_planes_app, es_planes_app, listar_planes_app, paciente_plan_app,
+    render_plan_form_app, volver_planes_app,
+)
 from crm.forms import (
     PacienteRapidoCitaForm,
     ProgramaCamaraHiperbaricaForm,
@@ -2738,8 +2742,11 @@ def historias_especialidad(request, empresa_slug, paciente_id):
 @login_required
 def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    modo_app = es_planes_app(request, empresa)
+    if modo_app:
+        autorizar_planes_app(request, empresa, paciente_id)
     _requiere_interfaz_clinica(empresa)
-    paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    paciente = paciente_plan_app(empresa, paciente_id) if modo_app else get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     puede_crear_plan = request.user.tiene_permiso_erp(
         "puede_editar_planes_tratamiento" if rol_clinico_granular(request.user, empresa) else "puede_expediente_clinico",
         empresa,
@@ -2756,12 +2763,18 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
             plan.creado_por = request.user
             plan.save()
             messages.success(request, "Nuevo plan guardado en el expediente.")
+            if modo_app:
+                return volver_planes_app(request, empresa, paciente)
             return redirect(
                 "clinica_planes_tratamiento_paciente",
                 empresa_slug=empresa.slug,
                 paciente_id=paciente.id,
             )
         messages.error(request, "Revise el plan antes de guardarlo.")
+        if modo_app:
+            return render_plan_form_app(request, empresa, paciente, form)
+    if modo_app:
+        return listar_planes_app(request, empresa, paciente)
     planes = paciente.planes_tratamiento.select_related(
         "profesional",
         "creado_por",
@@ -2777,6 +2790,17 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
             "puede_crear_plan": puede_crear_plan,
         },
     )
+
+
+@login_required
+@require_safe
+def plan_tratamiento_crear_app(request, empresa_slug, paciente_id):
+    """Sólo presentación; el POST pertenece a la vista original del plan."""
+    empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_planes_app(request, empresa, paciente_id, compositor=True)
+    _requiere_interfaz_clinica(empresa)
+    paciente = paciente_plan_app(empresa, paciente_id)
+    return render_plan_form_app(request, empresa, paciente, PlanTratamientoPacienteForm())
 
 
 @login_required

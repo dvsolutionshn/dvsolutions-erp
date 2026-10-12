@@ -66,6 +66,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     from .mobile_special_histories import formularios_historia_especiales_app
     from .mobile_controls import controles_disponibles_app
     from .mobile_antecedents import antecedentes_disponibles_app, url_antecedentes_app
+    from .mobile_plans import planes_disponibles_app
 
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
@@ -105,6 +106,14 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_view_gastos": gastos_adicionales_habilitados(empresa) and request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa),
     }
     destino_paciente = request.GET.get("destino", "")
+    planes = planes_disponibles_app(request, empresa)
+    contexto["mobile_patient_plans"] = planes
+    if request.method == "GET" and es_pacientes_app(request, empresa):
+        if (destino_paciente == "planes" and planes["ver"]) or (destino_paciente == "crear_plan" and planes["crear"]):
+            contexto["mobile_patient_plan_mode"] = destino_paciente
+            if not empresa.tiene_modulo_activo("agenda_citas") or (not granular and not request.user.tiene_permiso_erp("puede_citas", empresa)):
+                contexto["app_home_disponible"] = False
+                contexto["app_modules_url"] = reverse("agenda_mobile_modules_screen", args=[empresa.slug])
     if request.method == "GET" and es_pacientes_app(request, empresa) and (
         (destino_paciente == "anexos" and puede_ver_anexos)
         or (destino_paciente == "crear_anexo" and puede_subir_anexos)
@@ -149,6 +158,8 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
                 contexto["mobile_patient_history_mode"] = "crear_historia"
                 contexto["mobile_patient_history_create_type"] = tipo_elegido
     if paciente:
+        contexto["app_patient_plans_url"] = url_paciente_app("clinica_planes_tratamiento_paciente", empresa, paciente.pk)
+        contexto["app_patient_plan_create_url"] = url_paciente_app("clinica_plan_tratamiento_crear_app", empresa, paciente.pk)
         if contexto["can_manage_antecedents"]:
             contexto["app_patient_antecedents_url"] = url_antecedentes_app(empresa, paciente)
         for nombre, vista in {
