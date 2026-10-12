@@ -206,6 +206,14 @@ class EmpresaAccessMiddleware:
                             messages.error(request, "Tu rol no tiene permiso para ejecutar esta acción de agenda.")
                             return redirect("dashboard", slug=empresa.slug)
                         return self.get_response(request)
+                    # Sólo metadatos del catálogo móvil. Crear/editar proveedores
+                    # ya tienen permisos de acción independientes; no conceden
+                    # calendario, inicio clínico ni consultas financieras.
+                    if request.method == "GET" and suffix in {"app/modules.json", "app/modulos"}:
+                        from facturacion.mobile_suppliers import proveedores_disponibles_app
+
+                        if any(proveedores_disponibles_app(request, empresa).values()):
+                            return self.get_response(request)
                     tiene_permiso_app = bool(
                         (es_app_clinica_global or es_gestion_disponibilidad_medica)
                         and (

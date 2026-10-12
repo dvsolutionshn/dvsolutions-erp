@@ -187,9 +187,15 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("egresos", "Comprobantes de egreso", "Consultar documentos de pago a proveedores, buscar y abrir su PDF original.",
             "Operación", egresos_disponibles_app(request, empresa), "disponible",
             f"{reverse('egresos_dashboard', args=[empresa.slug])}?app=1")
+    from facturacion.mobile_suppliers import proveedores_disponibles_app
+
+    proveedores = proveedores_disponibles_app(request, empresa)
+    agregar("proveedores", "Proveedores", "Consultar fichas y compras asociadas, crear o editar datos con los permisos actuales.",
+            "Operación", any(proveedores.values()),
+            "disponible" if proveedores["ver"] or proveedores["crear"] else "pendiente",
+            f"{reverse('proveedores_facturacion' if proveedores['ver'] else 'crear_proveedor_facturacion', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
         ("compras", "Compras", acceso["compras"]),
-        ("proveedores", "Proveedores", acceso["proveedores"]),
         ("cotizaciones", "Cotizaciones", acceso["cotizaciones"]),
         ("notas_credito", "Notas de crédito", acceso["notas_credito"]),
         ("cxc", "Cuentas por cobrar", acceso["cxc"]),

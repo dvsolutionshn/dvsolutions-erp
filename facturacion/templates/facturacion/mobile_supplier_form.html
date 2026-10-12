@@ -1,0 +1,46 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}{{ titulo }}{% endblock %}
+{% block mobile_page_title %}{% if modo_edicion %}Editar proveedor{% else %}Nuevo proveedor{% endif %}{% endblock %}
+{% block mobile_kicker %}Datos comerciales{% endblock %}
+{% block mobile_back_url %}{{ app_supplier_back_url }}{% endblock %}
+{% block mobile_header_description %}<p>{% if modo_edicion %}Actualiza la ficha del proveedor.{% else %}Agrega un proveedor a esta empresa.{% endif %}</p>{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_suppliers.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'facturacion/mobile_suppliers.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+{% if modo_edicion and can_edit_supplier or not modo_edicion and can_create_supplier %}
+<form id="mobileSupplierForm" class="msu-form" method="post" action="{{ app_supplier_form_url }}" data-submit-once data-supplier-unsaved="{% if form.is_bound %}1{% else %}0{% endif %}" data-supplier-edit="{% if modo_edicion %}1{% else %}0{% endif %}">
+  {% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+  {% if form.errors %}<div class="mi-error-box" role="alert" tabindex="-1" id="supplierFormErrors"><strong>No se pudo guardar el proveedor</strong><p>Los datos ingresados se conservan. Revisa los campos marcados.</p>{{ form.non_field_errors }}{% for field in form.hidden_fields %}{% for error in field.errors %}<p>{{ field.label }}: {{ error }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+  {% for section in mobile_supplier_sections %}
+  <details class="mi-card msu-form-section" open>
+    <summary>{{ section.titulo }}</summary>
+    <div class="msu-section-fields">
+    {% for field in section.campos %}
+      <div class="mi-field msu-field{% if field.field.widget.input_type == 'checkbox' %} msu-check-field{% endif %}" data-supplier-field="{{ field.name }}" data-supplier-label="{{ field.label }}">
+        {% if field.field.widget.input_type == 'checkbox' %}<div class="msu-check-control">{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label></div>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="msu-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+        {% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+        {% if field.name == 'dias_credito' and field.errors %}<small>Valor recibido: {{ field.value|default_if_none:'Sin valor' }}</small>{% endif %}
+      </div>
+    {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+  <p class="msu-form-note">Se guardan únicamente los datos del proveedor. Las condiciones se validan con las mismas reglas del sistema.</p>
+  <a class="msu-cancel" href="{{ app_supplier_back_url }}">Cancelar</a>
+  <div class="mi-save-bar"><button class="mi-button" type="submit" id="supplierReview">{{ texto_boton }}</button></div>
+</form>
+<dialog class="mi-sheet" id="supplierConfirmSheet" aria-labelledby="supplierConfirmTitle">
+  <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="supplierConfirmTitle">{% if modo_edicion %}Guardar cambios{% else %}Crear proveedor{% endif %}</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div>
+  <p class="mi-muted">Revisa los datos que se enviarán a {{ empresa.nombre }}. No se registrará una compra ni un pago.</p>
+  <dl class="msu-data msu-confirm-data" id="supplierConfirmValues"></dl>
+  <div class="msu-dialog-actions"><button class="mi-button" type="button" id="confirmSupplierSave">Confirmar y guardar</button><button class="mi-button secondary" type="button" data-close-sheet>Seguir completando</button></div>
+</dialog>
+<dialog class="mi-sheet" id="supplierUnsavedSheet" aria-labelledby="supplierUnsavedTitle">
+  <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="supplierUnsavedTitle">Cambios sin guardar</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><p class="mi-muted">Si sales ahora, los datos ingresados no se guardarán. Puedes volver al formulario sin perderlos.</p>
+  <div class="msu-dialog-actions"><button class="mi-button" type="button" data-close-sheet>Seguir completando</button><button class="mi-button secondary" type="button" id="confirmSupplierLeave">Salir sin guardar</button></div>
+</dialog>
+{% endif %}
+{% endblock %}

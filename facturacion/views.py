@@ -3369,7 +3369,12 @@ def codigos_barras_productos(request, empresa_slug):
 
 @login_required
 def proveedores_facturacion(request, empresa_slug):
+    from .mobile_suppliers import autorizar_proveedores_app, es_proveedores_app, listar_proveedores_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if es_proveedores_app(request, empresa):
+        autorizar_proveedores_app(request, empresa)
+        return listar_proveedores_app(request, empresa)
     q = request.GET.get("q", "").strip()
     estado = request.GET.get("estado", "").strip()
     proveedores = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa).order_by('nombre')
@@ -3404,8 +3409,19 @@ def proveedores_facturacion(request, empresa_slug):
 
 @login_required
 def ver_proveedor(request, empresa_slug, proveedor_id):
+    from .mobile_suppliers import (
+        autorizar_proveedores_app, es_proveedores_app, render_proveedor_app,
+        validar_compras_proveedor_app, validar_proveedor_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_proveedores_app(request, empresa)
+    if modo_app:
+        autorizar_proveedores_app(request, empresa, proveedor_id=proveedor_id)
     proveedor = get_object_or_404(Proveedor, cliente_contable__isnull=True, id=proveedor_id, empresa=empresa)
+    if modo_app:
+        validar_proveedor_app(empresa, proveedor)
+        validar_compras_proveedor_app(empresa, proveedor)
     compras = (
         CompraInventario.objects.filter(empresa=empresa, proveedor=proveedor)
         .prefetch_related('lineas', 'pagos_compra')
@@ -3421,6 +3437,10 @@ def ver_proveedor(request, empresa_slug, proveedor_id):
         "vencidas": sum(1 for compra in compras if compra.esta_vencida),
     }
 
+    if modo_app:
+        return render_proveedor_app(request, empresa, {
+            "empresa": empresa, "proveedor": proveedor, "compras": compras[:20], "resumen": resumen,
+        })
     return render(request, "facturacion/ver_proveedor_cxp_premium.html", {
         "empresa": empresa,
         "proveedor": proveedor,
@@ -3431,7 +3451,12 @@ def ver_proveedor(request, empresa_slug, proveedor_id):
 
 @login_required
 def crear_proveedor(request, empresa_slug):
+    from .mobile_suppliers import autorizar_proveedores_app, es_proveedores_app, render_proveedor_app, volver_proveedor_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_proveedores_app(request, empresa)
+    if modo_app:
+        autorizar_proveedores_app(request, empresa, "crear", campos=ProveedorForm.base_fields)
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -3445,6 +3470,8 @@ def crear_proveedor(request, empresa_slug):
                 proveedor.empresa = empresa
                 proveedor.save()
                 messages.success(request, "Proveedor creado correctamente.")
+                if modo_app:
+                    return volver_proveedor_app(request, empresa, proveedor)
                 return _redirect_seguro(request, "proveedores_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
@@ -3457,6 +3484,10 @@ def crear_proveedor(request, empresa_slug):
     else:
         form = ProveedorForm()
 
+    if modo_app:
+        return render_proveedor_app(request, empresa, {
+            "empresa": empresa, "form": form, "titulo": "Nuevo Proveedor", "texto_boton": "Guardar Proveedor",
+        }, formulario=True)
     return render(request, "facturacion/crear_proveedor.html", {
         "empresa": empresa,
         "form": form,
@@ -3468,8 +3499,18 @@ def crear_proveedor(request, empresa_slug):
 
 @login_required
 def editar_proveedor(request, empresa_slug, proveedor_id):
+    from .mobile_suppliers import (
+        autorizar_proveedores_app, errores_guardado_proveedor_app, es_proveedores_app,
+        render_proveedor_app, validar_proveedor_app, volver_proveedor_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_proveedores_app(request, empresa)
+    if modo_app:
+        autorizar_proveedores_app(request, empresa, "editar", proveedor_id, ProveedorForm.base_fields)
     proveedor = get_object_or_404(Proveedor, cliente_contable__isnull=True, id=proveedor_id, empresa=empresa)
+    if modo_app:
+        validar_proveedor_app(empresa, proveedor)
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -3477,12 +3518,25 @@ def editar_proveedor(request, empresa_slug, proveedor_id):
         post_data.setdefault('dias_credito', str(proveedor.dias_credito or 0))
         form = ProveedorForm(post_data, instance=proveedor)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Proveedor actualizado correctamente.")
-            return redirect("proveedores_facturacion", empresa_slug=empresa.slug)
+            try:
+                form.save()
+            except ValidationError as exc:
+                if not modo_app:
+                    raise
+                errores_guardado_proveedor_app(form, exc)
+            else:
+                messages.success(request, "Proveedor actualizado correctamente.")
+                if modo_app:
+                    return volver_proveedor_app(request, empresa, proveedor, editar=True)
+                return redirect("proveedores_facturacion", empresa_slug=empresa.slug)
     else:
         form = ProveedorForm(instance=proveedor)
 
+    if modo_app:
+        return render_proveedor_app(request, empresa, {
+            "empresa": empresa, "proveedor": proveedor, "form": form,
+            "titulo": "Editar Proveedor", "texto_boton": "Guardar Cambios",
+        }, formulario=True)
     return render(request, "facturacion/crear_proveedor.html", {
         "empresa": empresa,
         "form": form,

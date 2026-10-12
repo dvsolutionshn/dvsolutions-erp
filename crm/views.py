@@ -2434,10 +2434,14 @@ def agenda_mobile_inventory(request, empresa_slug):
 def agenda_mobile_modules_screen(request, empresa_slug):
     """Acceso adicional sin calendario ni datos de pacientes en el catálogo."""
     from facturacion.mobile_transfers import transferencia_disponible_app
+    from facturacion.mobile_suppliers import proveedores_disponibles_app
 
     empresa = _empresa_desde_slug(empresa_slug)
     acceso_denegado = _proteger_agenda_mobile(request, empresa)
-    if acceso_denegado is not None and not transferencia_disponible_app(request, empresa):
+    if acceso_denegado is not None and not (
+        transferencia_disponible_app(request, empresa)
+        or any(proveedores_disponibles_app(request, empresa).values())
+    ):
         return acceso_denegado
     contexto = construir_contexto_modulos_app(request, empresa)
     if not contexto["puede_ver_modulos_app"]:
@@ -2462,11 +2466,15 @@ def agenda_mobile_modules_screen(request, empresa_slug):
 def agenda_mobile_modules(request, empresa_slug):
     """Capacidades de presentación, sin datos clínicos ni permisos nuevos."""
     from facturacion.mobile_transfers import transferencia_disponible_app
+    from facturacion.mobile_suppliers import proveedores_disponibles_app
 
     empresa = _empresa_desde_slug(empresa_slug)
     response = _proteger_agenda_mobile(request, empresa)
-    acceso_transferencia = response is not None and transferencia_disponible_app(request, empresa)
-    if response is None or acceso_transferencia:
+    acceso_modulos_adicional = response is not None and (
+        transferencia_disponible_app(request, empresa)
+        or any(proveedores_disponibles_app(request, empresa).values())
+    )
+    if response is None or acceso_modulos_adicional:
         contexto = construir_contexto_modulos_app(request, empresa)
         if not contexto["puede_ver_modulos_app"]:
             response = JsonResponse({"error": "Módulos móviles no disponibles para esta empresa."}, status=404)
@@ -2475,7 +2483,7 @@ def agenda_mobile_modules(request, empresa_slug):
                 "version": 1,
                 "empresa": {"slug": empresa.slug, "nombre": empresa.nombre},
                 "modulos": contexto["modulos_app"],
-                "inicio_url": reverse("agenda_mobile_modules_screen" if acceso_transferencia else "agenda_mobile", args=[empresa.slug]),
+                "inicio_url": reverse("agenda_mobile_modules_screen" if acceso_modulos_adicional else "agenda_mobile", args=[empresa.slug]),
             })
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response["Pragma"] = "no-cache"

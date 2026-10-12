@@ -1,0 +1,76 @@
+body.msu-mobile-screen{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.msu-mobile-screen .mi-header-copy h1,.msu-mobile-screen .mi-header-copy p{overflow-wrap:anywhere}
+.msu-mobile-screen [hidden]{display:none!important}
+.msu-search-card form,.msu-list,.msu-form,.msu-section-fields{display:grid;gap:15px;min-width:0}
+.msu-search-card h2,.msu-summary-card h2{font-size:15px;color:#426b7b}
+.msu-search-card input,.msu-search-card select,.msu-field input:not([type=checkbox]),.msu-field select,.msu-field textarea{font-size:16px;max-width:100%;width:100%;min-width:0}
+.msu-help,.msu-form-note{font-size:11px!important;line-height:1.8!important;color:#7a919f;overflow-wrap:anywhere}
+.msu-clear-search,.msu-cancel{min-height:44px;display:flex;align-items:center;justify-content:center;text-decoration:none;font-weight:700;font-size:12px;color:#6b8797}
+.msu-list-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:2px 3px;font-size:11px;color:#8094a0}
+.msu-list-meta strong{font-size:12px;color:#507487}
+.msu-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
+.msu-stats>div{padding:11px 12px;border-radius:14px;background:#f0f7f8;border:1px solid #dcebee;min-width:0}
+.msu-stats dt{font-size:10px;line-height:1.6;color:#718d9c;overflow-wrap:anywhere}
+.msu-stats dd{font-size:22px;font-weight:800;color:#39827b;margin:4px 0 0;overflow-wrap:anywhere}
+.msu-supplier-card,.msu-purchase-card{display:grid;gap:15px;padding:17px;min-width:0}
+.msu-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;min-width:0}
+.msu-card-head h2,.msu-card-head h3{font-size:16px;color:#315c70;line-height:1.55;margin:0;min-width:0;flex:1;overflow-wrap:anywhere}
+.msu-card-head h3{font-size:14px}
+.msu-badge{font-size:10px;font-weight:700;line-height:1.6;padding:6px 9px;border-radius:999px;background:#edf5f7;color:#588190;flex-shrink:0;max-width:48%;overflow-wrap:anywhere}
+.msu-badge.active,.msu-badge.aplicada,.msu-badge.pagado{background:#e9f7f0;color:#278166}
+.msu-badge.inactive,.msu-badge.anulada,.msu-badge.vencida{background:#faeeee;color:#aa5860}
+.msu-badge.borrador,.msu-badge.pendiente{background:#fcf5e7;color:#9a7842}
+.msu-badge.parcial{background:#eeeffb;color:#7067a3}
+.msu-badges{display:flex;gap:7px;flex-wrap:wrap}
+.msu-data{display:grid;gap:15px;margin:0;min-width:0}
+.msu-data-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.msu-data>div{min-width:0}
+.msu-data dt{font-size:10px;line-height:1.6;color:#8398a5;margin-bottom:5px}
+.msu-data dd{font-size:13px;line-height:1.8;color:#466e80;margin:0;overflow-wrap:anywhere}
+.msu-data .msu-money{font-size:16px;font-weight:700;color:#397d74}
+.msu-text{white-space:pre-wrap}
+.msu-card-actions{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid #e2edf1;padding-top:12px}
+.msu-view-link,.msu-edit-link{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 13px;border-radius:13px;text-decoration:none;font-weight:700;font-size:12px;overflow-wrap:anywhere}
+.msu-view-link{background:#eaf8f4;color:#2b8774;border:1px solid #c8e4dc;flex:1}
+.msu-view-link span{font-size:21px;line-height:1}
+.msu-edit-link{color:#648396;border:1px solid #d6e5eb;background:#f6fafb}
+.msu-profile-card{display:grid;gap:17px}
+.msu-profile-card .msu-name{font-size:24px;line-height:1.4;color:#254f66;overflow-wrap:anywhere;margin:0}
+.msu-profile-card .mi-kicker{margin:0}
+.msu-profile-edit{margin-top:3px}
+.msu-amounts{display:grid;gap:14px;margin:0 0 18px;padding-bottom:18px;border-bottom:1px solid #e1ecf0}
+.msu-amounts dt{font-size:11px;line-height:1.6;color:#7b929f;margin-bottom:5px}
+.msu-amounts dd{margin:0;font-size:25px;font-weight:800;line-height:1.4;color:#357c72;overflow-wrap:anywhere}
+.msu-purchase-stats>div:last-child{grid-column:1/-1}
+.msu-section-heading{margin:3px 3px 15px}
+.msu-section-heading h2{font-size:17px;color:#345f72;line-height:1.5;margin:0 0 5px}
+.msu-section-heading p{font-size:11px;line-height:1.8;color:#8096a3;margin:0}
+.msu-purchase-fold{border-top:1px solid #e1edf0;padding-top:4px;min-width:0}
+.msu-purchase-fold summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#648294;font-size:12px;font-weight:700;cursor:pointer;list-style:none}
+.msu-purchase-fold summary::after{content:"＋";color:#298e81;font-size:18px}
+.msu-purchase-fold[open] summary::after{content:"−"}
+.msu-purchase-fold .msu-data{margin-top:8px}
+.msu-pagination{display:grid;gap:10px;justify-items:center;margin:8px 0}
+.msu-pagination p{margin:0;font-size:11px;color:#7b94a1;line-height:1.6}
+.msu-pagination>div{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.msu-pagination a{min-height:44px;min-width:100px;display:flex;align-items:center;justify-content:center;border:1px solid #d1e5e9;border-radius:13px;padding:9px 13px;background:#fff;color:#5c8192;font-size:12px;font-weight:700;text-decoration:none}
+.msu-empty{text-align:center;color:#8398a5;font-size:12px;line-height:1.8}
+.msu-empty h2{font-size:16px;color:#527788}
+.msu-form-section{padding:0}
+.msu-form-section>summary{padding:19px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#416b7e;font-size:15px;font-weight:800;cursor:pointer;list-style:none;min-height:56px}
+.msu-form-section>summary::-webkit-details-marker,.msu-purchase-fold summary::-webkit-details-marker{display:none}
+.msu-form-section>summary::after{content:"＋";font-size:20px;color:#278c7f}
+.msu-form-section[open]>summary::after{content:"−"}
+.msu-section-fields{padding:0 18px 20px;gap:18px}
+.msu-field>label,.msu-check-control label{font-size:12px;font-weight:800;line-height:1.7;color:#577587}
+.msu-field textarea{min-height:130px;line-height:1.8;resize:vertical}
+.msu-required{color:#a8606a}
+.msu-field:has(.mi-error){padding:12px;border:1px solid #eebdc0;border-radius:14px;background:#fff7f7}
+.msu-check-control{display:flex;gap:12px;align-items:center;min-height:50px;padding:11px 13px;background:#f2f9f6;border:1px solid #d1e8de;border-radius:13px}
+.msu-check-control input{height:22px;width:22px;flex-shrink:0;accent-color:#258b7c}
+.msu-check-control label{flex:1;cursor:pointer}
+.msu-confirm-data{max-height:43dvh;overflow:auto;overscroll-behavior:contain;background:#f4faf9;border:1px solid #d1e5df;border-radius:17px;padding:16px;margin:18px 0}
+.msu-confirm-data dd{white-space:pre-wrap}
+.msu-dialog-actions{display:grid;gap:10px;margin-top:18px}
+.msu-mobile-screen .mi-save-bar{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+@media(max-width:350px){.msu-card-head{gap:8px}.msu-supplier-card,.msu-purchase-card{padding:14px}.msu-card-head h2{font-size:15px}.msu-badge{padding:5px 8px}.msu-data-grid{gap:11px}.msu-amounts dd{font-size:23px}.msu-section-fields{padding-inline:14px}.msu-form-section>summary{padding-inline:14px}.msu-confirm-data{padding:13px}.msu-card-actions{gap:7px}.msu-view-link,.msu-edit-link{padding-inline:11px}}
