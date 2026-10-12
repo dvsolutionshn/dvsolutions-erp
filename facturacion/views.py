@@ -3944,13 +3944,32 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
 
 @login_required
 def traslado_rapido_farmaceutico(request, empresa_slug):
-    empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_bodegas_internas:
-        messages.error(request, "Los traslados internos no estan activos para esta empresa.")
-        return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+    from .mobile_transfers import (
+        es_transferencia_app, preparar_transferencia_app, render_transferencia_app,
+        validar_cantidad_transferencia_app, volver_transferencia_app,
+    )
 
-    bodegas_base = _asegurar_bodegas_farmaceuticas(empresa)
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_transferencia_app(request, empresa)
+    if modo_app:
+        preparacion = preparar_transferencia_app(request, empresa)
+        if not preparacion["ready"]:
+            return render_transferencia_app(request, {
+                "empresa": empresa, "rutas": {}, "ruta_key": "", "ruta": {},
+                "existencias": (), "bodegas": (),
+                "usar_selectores_bodega": empresa.slug == "medical_spa",
+                "mobile_transfer_ready": False,
+                "mobile_transfer_unavailable_reason": preparacion["reason"],
+            })
+        config_avanzada = preparacion["config_avanzada"]
+        bodegas_base = preparacion["bodegas_base"]
+    else:
+        config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+        if not config_avanzada.usa_bodegas_internas:
+            messages.error(request, "Los traslados internos no estan activos para esta empresa.")
+            return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+
+        bodegas_base = _asegurar_bodegas_farmaceuticas(empresa)
     usar_selectores_bodega = empresa.slug == "medical_spa"
     if usar_selectores_bodega:
         bodegas_activas = BodegaInventario.objects.filter(
@@ -3959,6 +3978,9 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         ).order_by("tipo", "nombre")
         origen_id = request.POST.get("bodega_origen") or request.GET.get("bodega_origen")
         destino_id = request.POST.get("bodega_destino") or request.GET.get("bodega_destino")
+        if modo_app and request.method == "POST":
+            origen_id = request.POST.get("bodega_origen") or None
+            destino_id = request.POST.get("bodega_destino") or None
         bodega_origen = bodegas_activas.filter(
             id=origen_id
         ).first()
@@ -4030,9 +4052,26 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         .select_related("lote", "lote__producto", "bodega")
         .order_by("lote__fecha_vencimiento", "lote__producto__nombre")
     )
+    contexto = {
+        "empresa": empresa,
+        "rutas": rutas,
+        "ruta_key": ruta_key,
+        "ruta": ruta,
+        "existencias": existencias,
+        "bodegas": bodegas_activas if usar_selectores_bodega else (),
+        "usar_selectores_bodega": usar_selectores_bodega,
+    }
 
     if request.method == "POST":
-        existencia = existencias.filter(id=request.POST.get("existencia")).first()
+        if modo_app and ruta["origen"] and ruta["destino"] and ruta["origen"].id != ruta["destino"].id:
+            error_cantidad = validar_cantidad_transferencia_app(request, contexto)
+            if error_cantidad:
+                messages.error(request, error_cantidad)
+                return render_transferencia_app(request, contexto)
+        existencia_id = request.POST.get("existencia")
+        if modo_app and not existencia_id:
+            existencia_id = None
+        existencia = existencias.filter(id=existencia_id).first()
         cantidad_raw = request.POST.get("cantidad", "").strip()
         try:
             cantidad = Decimal(cantidad_raw)
@@ -4075,21 +4114,17 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
                 request,
                 f"Traslado rapido realizado: {cantidad:.2f} unidad(es) de {existencia.lote.producto.nombre} hacia {ruta['destino'].nombre}."
             )
+            if modo_app:
+                return volver_transferencia_app(empresa, ruta, ruta_key, usar_selectores_bodega)
             if usar_selectores_bodega:
                 return redirect(
                     f"{request.path}?bodega_origen={ruta['origen'].id}&bodega_destino={ruta['destino'].id}"
                 )
             return redirect(f"{request.path}?ruta={ruta_key}")
 
-    return render(request, "facturacion/traslado_rapido_farmaceutico.html", {
-        "empresa": empresa,
-        "rutas": rutas,
-        "ruta_key": ruta_key,
-        "ruta": ruta,
-        "existencias": existencias,
-        "bodegas": bodegas_activas if usar_selectores_bodega else (),
-        "usar_selectores_bodega": usar_selectores_bodega,
-    })
+    if modo_app:
+        return render_transferencia_app(request, contexto)
+    return render(request, "facturacion/traslado_rapido_farmaceutico.html", contexto)
 
 
 def _existencias_regalia_producto(empresa, producto, bodega):

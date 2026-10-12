@@ -2433,9 +2433,11 @@ def agenda_mobile_inventory(request, empresa_slug):
 @require_http_methods(["GET"])
 def agenda_mobile_modules_screen(request, empresa_slug):
     """Acceso adicional sin calendario ni datos de pacientes en el catálogo."""
+    from facturacion.mobile_transfers import transferencia_disponible_app
+
     empresa = _empresa_desde_slug(empresa_slug)
     acceso_denegado = _proteger_agenda_mobile(request, empresa)
-    if acceso_denegado is not None:
+    if acceso_denegado is not None and not transferencia_disponible_app(request, empresa):
         return acceso_denegado
     contexto = construir_contexto_modulos_app(request, empresa)
     if not contexto["puede_ver_modulos_app"]:
@@ -2446,7 +2448,7 @@ def agenda_mobile_modules_screen(request, empresa_slug):
         "app_invoices_url": f"{inicio}#facturas-app",
         "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
         "app_modules_url": reverse("agenda_mobile_modules_screen", args=[empresa.slug]),
-        "app_home_disponible": inicio_app_disponible(request, empresa),
+        "app_home_disponible": acceso_denegado is None and inicio_app_disponible(request, empresa),
         "modulos_standalone": True,
     })
     response = render(request, "crm/mobile_modules.html", contexto)
@@ -2459,9 +2461,12 @@ def agenda_mobile_modules_screen(request, empresa_slug):
 @require_http_methods(["GET"])
 def agenda_mobile_modules(request, empresa_slug):
     """Capacidades de presentación, sin datos clínicos ni permisos nuevos."""
+    from facturacion.mobile_transfers import transferencia_disponible_app
+
     empresa = _empresa_desde_slug(empresa_slug)
     response = _proteger_agenda_mobile(request, empresa)
-    if response is None:
+    acceso_transferencia = response is not None and transferencia_disponible_app(request, empresa)
+    if response is None or acceso_transferencia:
         contexto = construir_contexto_modulos_app(request, empresa)
         if not contexto["puede_ver_modulos_app"]:
             response = JsonResponse({"error": "Módulos móviles no disponibles para esta empresa."}, status=404)
@@ -2470,7 +2475,7 @@ def agenda_mobile_modules(request, empresa_slug):
                 "version": 1,
                 "empresa": {"slug": empresa.slug, "nombre": empresa.nombre},
                 "modulos": contexto["modulos_app"],
-                "inicio_url": reverse("agenda_mobile", args=[empresa.slug]),
+                "inicio_url": reverse("agenda_mobile_modules_screen" if acceso_transferencia else "agenda_mobile", args=[empresa.slug]),
             })
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response["Pragma"] = "no-cache"

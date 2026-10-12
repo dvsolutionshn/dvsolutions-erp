@@ -154,8 +154,12 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("inventario", "Productos y existencias", "Existencias, bodegas y lotes; ampliación progresiva a las cuatro empresas.",
             "Operación", acceso["productos"] or acceso["inventario"],
             "parcial" if inventario_movil else "pendiente", reverse("agenda_mobile_inventory", args=[empresa.slug]))
+    from facturacion.mobile_transfers import transferencia_disponible_app
+
+    agregar("transferencias", "Transferencias rápidas", "Trasladar un lote entre las bodegas existentes, con el permiso y registro actuales.",
+            "Operación", transferencia_disponible_app(request, empresa), "parcial",
+            f"{reverse('traslado_rapido_farmaceutico', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
-        ("transferencias", "Transferencias", acceso["modulo_facturacion"] and acceso["transferir_inventario"]),
         ("compras", "Compras", acceso["compras"]),
         ("proveedores", "Proveedores", acceso["proveedores"]),
         ("cotizaciones", "Cotizaciones", acceso["cotizaciones"]),
