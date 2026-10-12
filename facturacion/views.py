@@ -6242,7 +6242,12 @@ def notas_credito_dashboard(request, empresa_slug):
 
 @login_required
 def recibos_dashboard(request, empresa_slug):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, listar_recibos_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if es_recibos_app(request, empresa):
+        autorizar_recibos_app(request, empresa)
+        return listar_recibos_app(request, empresa)
     q = request.GET.get("q", "").strip()
     recibos = ReciboPago.objects.filter(empresa=empresa).select_related('cliente', 'factura').order_by('-fecha_creacion')
     if q:
@@ -6272,7 +6277,13 @@ def recibos_dashboard(request, empresa_slug):
 
 @login_required
 def ver_recibo(request, empresa_slug, recibo_id):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, render_recibo_app, validar_recibo_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_recibos_app(request, empresa)
+    if modo_app:
+        autorizar_recibos_app(request, empresa, recibo_id)
+        validar_recibo_app(empresa, recibo_id, detalle=True)
     recibo = get_object_or_404(
         ReciboPago.objects.select_related('cliente', 'factura', 'pago'),
         id=recibo_id,
@@ -6285,6 +6296,11 @@ def ver_recibo(request, empresa_slug, recibo_id):
         (pago.total_aplicado for pago in pagos_factura if recibo.pago_id and pago.id != recibo.pago_id),
         Decimal("0.00"),
     )
+    if modo_app:
+        return render_recibo_app(request, empresa, {
+            "recibo": recibo, "pagos_factura": pagos_factura,
+            "total_pagos_previos": total_pagos_previos,
+        })
 
     return render(request, "facturacion/ver_recibo_premium.html", {
         "empresa": empresa,
@@ -6296,7 +6312,13 @@ def ver_recibo(request, empresa_slug, recibo_id):
 
 @login_required
 def editar_recibo(request, empresa_slug, recibo_id):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, render_recibo_app, validar_recibo_app, volver_recibo_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_recibos_app(request, empresa)
+    if modo_app:
+        autorizar_recibos_app(request, empresa, recibo_id, editar=True, campos=ReciboPagoForm.base_fields)
+        validar_recibo_app(empresa, recibo_id)
     recibo = get_object_or_404(
         ReciboPago.objects.select_related('cliente', 'factura', 'pago'),
         id=recibo_id,
@@ -6306,8 +6328,12 @@ def editar_recibo(request, empresa_slug, recibo_id):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, f"Recibo {recibo.numero_recibo} actualizado correctamente.")
+        if modo_app:
+            return volver_recibo_app(empresa, recibo)
         return redirect("ver_recibo", empresa_slug=empresa.slug, recibo_id=recibo.id)
 
+    if modo_app:
+        return render_recibo_app(request, empresa, {"recibo": recibo, "form": form}, editar=True)
     return render(request, "facturacion/editar_recibo_premium.html", {
         "empresa": empresa,
         "recibo": recibo,
@@ -6317,7 +6343,13 @@ def editar_recibo(request, empresa_slug, recibo_id):
 
 @login_required
 def descargar_recibo_pdf(request, empresa_slug, recibo_id):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, respuesta_recibos_app, validar_recibo_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_recibos_app(request, empresa)
+    if modo_app:
+        autorizar_recibos_app(request, empresa, recibo_id)
+        validar_recibo_app(empresa, recibo_id)
     recibo = get_object_or_404(
         ReciboPago.objects.select_related('cliente', 'factura', 'pago'),
         id=recibo_id,
@@ -6346,6 +6378,8 @@ def descargar_recibo_pdf(request, empresa_slug, recibo_id):
 
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    if modo_app:
+        return respuesta_recibos_app(response)
     return response
 
 

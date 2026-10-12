@@ -171,11 +171,15 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("transferencias", "Transferencias rápidas", "Trasladar un lote entre las bodegas existentes, con el permiso y registro actuales.",
             "Operación", transferencia_disponible_app(request, empresa), "parcial",
             f"{reverse('traslado_rapido_farmaceutico', args=[empresa.slug])}?app=1")
+    from facturacion.mobile_receipts import recibos_disponibles_app
+
+    agregar("recibos", "Recibos y cobros", "Consultar recibos, abrir PDF y editar datos documentales; registrar abonos se adaptará por separado.",
+            "Operación", recibos_disponibles_app(request, empresa), "parcial",
+            f"{reverse('recibos_dashboard', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
         ("compras", "Compras", acceso["compras"]),
         ("proveedores", "Proveedores", acceso["proveedores"]),
         ("cotizaciones", "Cotizaciones", acceso["cotizaciones"]),
-        ("recibos", "Recibos y cobros", acceso["recibos"]),
         ("notas_credito", "Notas de crédito", acceso["notas_credito"]),
         ("egresos", "Gastos y egresos", acceso["egresos"]),
         ("cxc", "Cuentas por cobrar", acceso["cxc"]),
