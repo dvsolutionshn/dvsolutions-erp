@@ -64,6 +64,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     # presentación, pero el catálogo de tipos no depende de ella.
     from .mobile_histories import tipos_historia_creables_app
     from .mobile_special_histories import formularios_historia_especiales_app
+    from .mobile_controls import controles_disponibles_app
 
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
@@ -92,6 +93,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_edit_history": permiso("puede_editar_historia_clinica", "puede_expediente_clinico"),
         "mobile_history_create_types": tipos_historia_creables_app(request, empresa, paciente),
         "mobile_special_history_forms": formularios_historia_especiales_app(request, empresa, paciente),
+        "mobile_patient_control_types": controles_disponibles_app(request, empresa, paciente),
         "can_view_annexes": puede_ver_anexos,
         "can_view_attachments": puede_ver_anexos,
         "can_upload_annexes": puede_subir_anexos,
@@ -107,7 +109,19 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     ):
         contexto["mobile_patient_annex_mode"] = destino_paciente
     if request.method == "GET" and es_pacientes_app(request, empresa):
-        if destino_paciente == "evaluacion_clinica":
+        if destino_paciente == "control_clinico":
+            controles = contexto["mobile_patient_control_types"]
+            tipo_solicitado = request.GET.get("tipo", "")
+            tipo_elegido = next((item for item in controles if item["codigo"] == tipo_solicitado), None)
+            if not tipo_solicitado and controles:
+                tipo_elegido = controles[0]
+            if tipo_elegido:
+                contexto["mobile_patient_control_mode"] = True
+                contexto["mobile_patient_control_type"] = tipo_elegido
+                if not granular and not request.user.tiene_permiso_erp("puede_citas", empresa):
+                    contexto["app_home_disponible"] = False
+                    contexto["app_modules_url"] = reverse("agenda_mobile_modules_screen", args=[empresa.slug])
+        elif destino_paciente == "evaluacion_clinica":
             formularios = contexto["mobile_special_history_forms"]
             formulario_solicitado = request.GET.get("formulario", "")
             formulario_elegido = next((item for item in formularios if item["codigo"] == formulario_solicitado), None)

@@ -108,10 +108,22 @@ def construir_contexto_modulos_app(request, empresa):
     for key, nombre, descripcion, autorizado in (
         ("tratamientos", "Tratamientos", "Planes, controles y seguimiento clínico.", acceso["tratamientos_clinicos"]),
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),
-        ("camara", "Cámara hiperbárica", "Programas y controles de las sesiones.", acceso["ver_camara_hiperbarica"]),
-        ("postquirurgicas", "Seguimiento postquirúrgico", "Controles y terapias posteriores a cirugía.", acceso["ver_postquirurgicas"]),
     ):
         agregar(key, nombre, descripcion, "Atención clínica", acceso["modulo_clinica"] and autorizado)
+    # Los tableros del expediente exigen escribir el control (no basta el
+    # permiso de consultar la agenda). El helper conserva esos accesos.
+    from clinica.mobile_controls import controles_disponibles_app
+
+    controles = {item["codigo"] for item in controles_disponibles_app(request, empresa)}
+    for key, codigo, nombre, consultar in (
+        ("camara", "camara_hiperbarica", "Cámara hiperbárica", acceso["ver_camara_hiperbarica"]),
+        ("postquirurgicas", "terapias_postquirurgicas", "Seguimiento postquirúrgico", acceso["ver_postquirurgicas"]),
+    ):
+        adaptado = codigo in controles and acceso["pacientes"]
+        agregar(key, nombre, "Programas y controles sin cita; las sesiones de agenda conservan su vínculo.",
+                "Atención clínica", acceso["modulo_clinica"] and (consultar or codigo in controles),
+                "parcial" if adaptado else "pendiente",
+                f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=control_clinico&tipo={codigo}")
 
     inicio_disponible = inicio_app_disponible(request, empresa)
     factura_rapida = acceso["modulo_pos"] and inicio_disponible

@@ -159,13 +159,16 @@ class MobileHistoriesIntegrationTests(TestCase):
             for tipo in ("evaluacion_integral", "tricopigmentacion", "camara_hiperbarica", "terapias_postquirurgicas")
         }
         before = self.conteos()
-        # Integral/tricopigmentación creation now has its own authorized composer;
-        # editing those structured records still cannot use the generic form.
-        for tipo in ("camara_hiperbarica", "terapias_postquirurgicas", "forged"):
-            with self.subTest(tipo=tipo):
-                self.assertEqual(self.client.get(self.url(tipo)).status_code, 404)
-                with self.assertRaises(Http404):
-                    self.directo(tipo)
+        # Structured creation has dedicated mobile flows; none of those
+        # records may fall through to the generic mobile edit form.
+        self.assertEqual(self.client.get(self.url("forged")).status_code, 404)
+        with self.assertRaises(Http404):
+            self.directo("forged")
+        for tipo in ("camara_hiperbarica", "terapias_postquirurgicas"):
+            response = self.client.get(self.url(tipo))
+            self.assertEqual(response.status_code, 200)
+            self.assertTemplateUsed(response, "clinica/mobile_control_board.html")
+            self.assertEqual(self.directo(tipo).status_code, 200)
         for tipo, historia in unsupported.items():
             self.assertEqual(self.client.get(self.url(tipo, historia)).status_code, 404)
             self.assertEqual(self.client.post(self.url(tipo, historia), self.datos(tipo)).status_code, 404)

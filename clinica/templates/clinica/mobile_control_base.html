@@ -1,0 +1,9 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% load static %}
+{% block mobile_title %}{{ mobile_control_type.nombre }}{% endblock %}
+{% block mobile_back_url %}{{ app_control_back_url }}{% endblock %}
+{% block mobile_kicker %}Control clínico{% endblock %}
+{% block mobile_page_title %}{{ mobile_control_type.nombre }}{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_controls.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_controls.js' %}" defer></script>{% endblock %}

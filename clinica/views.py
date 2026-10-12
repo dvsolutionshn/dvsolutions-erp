@@ -154,6 +154,7 @@ from .mobile_special_histories import (
     preparar_historia_especial_app, render_historia_especial_app,
     url_historia_especial_app, volver_historia_especial_app,
 )
+from .mobile_controls import autorizar_control_app, render_control_app, validar_seleccion_control_app, volver_control_app
 from crm.forms import (
     PacienteRapidoCitaForm,
     ProgramaCamaraHiperbaricaForm,
@@ -3340,10 +3341,12 @@ def _conflicto_control_especial(modelo, programa, numeros, sesion=None, *, fase=
 def registrar_control_especial_desde_historial(request, empresa_slug, paciente_id, tipo):
     """Registra cámara o terapia directamente en el expediente, sin exigir cita."""
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_app(request, empresa, tipo)
     _requiere_interfaz_clinica(empresa)
     if not request.user.puede_acceder_empresa(empresa):
         raise PermissionDenied("No tiene acceso a esta empresa.")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    validar_seleccion_control_app(request, empresa, paciente, tipo)
     configuraciones = {
         "camara_hiperbarica": {
             "nombre": "Cámara Hiperbárica",
@@ -3465,6 +3468,9 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
                     request,
                     f"Registro de sesión {' y '.join(map(str, numeros))} guardado correctamente.",
                 )
+                if es_pacientes_app(request, empresa):
+                    return volver_control_app(request, empresa, paciente, tipo, programa_guardado, sesion_guardada,
+                                              sesion_guardada.fase if es_terapia_post else None)
                 destino = reverse("clinica_crear_historia_especialidad", args=[empresa.slug, paciente.id, tipo])
                 fase_destino = f"&fase={sesion_guardada.fase}" if es_terapia_post else ""
                 return redirect(f"{destino}?programa={programa_guardado.id}{fase_destino}")
@@ -3530,7 +3536,7 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
             "sesiones_camara_completadas": completadas,
             "errores_control_camara": errores,
         })
-        return render(request, "crm/camara_hiperbarica.html", contexto)
+        return render_control_app(request, empresa, paciente, tipo, "crm/camara_hiperbarica.html", contexto)
 
     contexto.update({
         "programa_terapia": programa,
@@ -3542,18 +3548,22 @@ def registrar_control_especial_desde_historial(request, empresa_slug, paciente_i
         "sesiones_terapia_completadas": completadas,
         "errores_terapia_post": errores,
     })
-    return render(request, "crm/terapias_postquirurgicas.html", contexto)
+    return render_control_app(request, empresa, paciente, tipo, "crm/terapias_postquirurgicas.html", contexto)
 
 
 @login_required
 @require_POST
 def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_app(request, empresa, "terapias_postquirurgicas")
     _requiere_interfaz_clinica(empresa)
     if not request.user.puede_acceder_empresa(empresa):
         raise PermissionDenied("No tiene acceso a esta empresa.")
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    validar_seleccion_control_app(request, empresa, paciente, "terapias_postquirurgicas", agregar=True)
     programa_id = (request.POST.get("programa_id") or "").strip()
+    if es_pacientes_app(request, empresa) and not programa_id:
+        programa_id = None
     with transaction.atomic():
         programa = ProgramaTerapiaPostQuirurgica.objects.select_for_update().filter(
             id=programa_id, empresa=empresa, paciente=paciente
@@ -3570,6 +3580,8 @@ def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
         programa.actualizado_por = request.user
         programa.save(update_fields=["sesiones_habilitadas", "actualizado_por", "fecha_actualizacion"])
     fase = request.POST.get("fase") if request.POST.get("fase") in {"1", "2"} else "1"
+    if es_pacientes_app(request, empresa):
+        return volver_control_app(request, empresa, paciente, "terapias_postquirurgicas", programa, fase=fase)
     destino = reverse(
         "clinica_crear_historia_especialidad",
         args=[empresa.slug, paciente.id, "terapias_postquirurgicas"],
@@ -3587,9 +3599,14 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
             raise PermissionDenied("Registre esta sección desde su formulario móvil autorizado.")
         paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
         return respuesta_pacientes_app(request, empresa, redirect(url_historia_especial_app(empresa, paciente, tipo)))
-    autorizar_historias_app(request, empresa, tipo)
+    if es_historias_app(request, empresa) and tipo in {"camara_hiperbarica", "terapias_postquirurgicas"}:
+        autorizar_control_app(request, empresa, tipo, tablero=True)
+    else:
+        autorizar_historias_app(request, empresa, tipo)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    if es_historias_app(request, empresa) and tipo in {"camara_hiperbarica", "terapias_postquirurgicas"}:
+        validar_seleccion_control_app(request, empresa, paciente, tipo, tablero=True)
     acceso_granular = bool(rol_clinico_granular(request.user, empresa))
     puede_ver_historia = request.user.tiene_permiso_erp(
         "puede_ver_historia_clinica" if acceso_granular else "puede_expediente_clinico",
@@ -3651,8 +3668,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                 }
             )
 
-        return render(
-            request,
+        return render_control_app(
+            request, empresa, paciente, tipo,
             "clinica/historia_camara_hiperbarica.html",
             {
                 "empresa": empresa,
@@ -3671,6 +3688,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                     for sesion in sesiones if sesion.estado == "borrador"
                 ),
             },
+            tablero=True,
         )
     if tipo == "terapias_postquirurgicas":
         programas = list(
@@ -3708,8 +3726,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                     args=[empresa.slug, paciente.id, "terapias_postquirurgicas"],
                 ) + f"?sesion={numero}&fase={fase_actual}" + (f"&programa={programa.id}" if programa else "")
             tablero.append({"numero": numero, "registro": sesion, "abrir_url": abrir_url})
-        return render(
-            request,
+        return render_control_app(
+            request, empresa, paciente, tipo,
             "clinica/historia_terapias_postquirurgicas.html",
             {
                 "empresa": empresa, "paciente": paciente, "tipo": tipo,
@@ -3726,6 +3744,7 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
                     for item in sesiones_fase if item.estado == "borrador"
                 ),
             },
+            tablero=True,
         )
     initial = {"fecha_atencion": timezone.localtime().strftime("%Y-%m-%dT%H:%M")}
     profesional_usuario = _profesional_predeterminado_usuario(empresa, request.user)
