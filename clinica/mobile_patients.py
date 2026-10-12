@@ -63,6 +63,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     # Importación local: el helper de historias reutiliza esta base de
     # presentación, pero el catálogo de tipos no depende de ella.
     from .mobile_histories import tipos_historia_creables_app
+    from .mobile_special_histories import formularios_historia_especiales_app
 
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
@@ -90,6 +91,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_create_history": permiso("puede_crear_historia_clinica", "puede_expediente_clinico"),
         "can_edit_history": permiso("puede_editar_historia_clinica", "puede_expediente_clinico"),
         "mobile_history_create_types": tipos_historia_creables_app(request, empresa, paciente),
+        "mobile_special_history_forms": formularios_historia_especiales_app(request, empresa, paciente),
         "can_view_annexes": puede_ver_anexos,
         "can_view_attachments": puede_ver_anexos,
         "can_upload_annexes": puede_subir_anexos,
@@ -105,7 +107,16 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     ):
         contexto["mobile_patient_annex_mode"] = destino_paciente
     if request.method == "GET" and es_pacientes_app(request, empresa):
-        if destino_paciente == "historias" and contexto["can_view_history"]:
+        if destino_paciente == "evaluacion_clinica":
+            formularios = contexto["mobile_special_history_forms"]
+            formulario_solicitado = request.GET.get("formulario", "")
+            formulario_elegido = next((item for item in formularios if item["codigo"] == formulario_solicitado), None)
+            if not formulario_solicitado and formularios:
+                formulario_elegido = formularios[0]
+            if formulario_elegido:
+                contexto["mobile_patient_special_history_mode"] = True
+                contexto["mobile_patient_special_history_form"] = formulario_elegido
+        elif destino_paciente == "historias" and contexto["can_view_history"]:
             contexto["mobile_patient_history_mode"] = "historias"
         elif destino_paciente == "crear_historia":
             tipos_creables = contexto["mobile_history_create_types"]

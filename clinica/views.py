@@ -149,6 +149,11 @@ from .mobile_annexes import (
 )
 from .mobile_recipe_templates import autorizar_plantillas_app, es_plantillas_app, render_plantillas_app, volver_plantillas_app
 from .mobile_histories import autorizar_historias_app, es_historias_app, render_historia_app, volver_historia_app
+from .mobile_special_histories import (
+    autorizar_historia_especial_app, formulario_historia_especial_app,
+    preparar_historia_especial_app, render_historia_especial_app,
+    url_historia_especial_app, volver_historia_especial_app,
+)
 from crm.forms import (
     PacienteRapidoCitaForm,
     ProgramaCamaraHiperbaricaForm,
@@ -2776,10 +2781,15 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
 def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
+    formulario_especial_app = preparar_historia_especial_app(request, empresa)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
-    if es_pacientes_app(request, empresa) and request.method == "POST":
-        raise PermissionDenied("El historial móvil es de consulta. Registre un evento desde la acción autorizada.")
+    if formulario_especial_app and request.method in {"GET", "HEAD"}:
+        profesional = _profesional_predeterminado_usuario(empresa, request.user)
+        return render_historia_especial_app(
+            request, empresa, paciente, formulario_especial_app,
+            formulario_historia_especial_app(empresa, formulario_especial_app, profesional),
+        )
     secciones_validas = {
         "completa", "motivo_consulta", "funciones_organicas", "examen_fisico",
         "antecedentes", "diagnostico", "plan_tratamiento", "tricopigmentacion",
@@ -2800,7 +2810,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     antecedente_adicional = (
         AntecedenteAdicionalPaciente.objects.filter(empresa=empresa, paciente=paciente)
         .select_related("profesional", "actualizado_por")
-        .first()
+        .first() if not formulario_especial_app else None
     )
     antecedente_adicional_form = AntecedenteAdicionalPacienteForm(
         instance=antecedente_adicional,
@@ -2965,11 +2975,15 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             else:
                 mensaje = "Funciones orgánicas y examen físico guardados correctamente."
             messages.success(request, mensaje)
+            if formulario_especial_app:
+                return volver_historia_especial_app(request, empresa, paciente, formulario_especial_app)
             destino = reverse("clinica_historial_clinico_consolidado", args=[empresa.slug, paciente.id])
             if seccion_formulario:
                 destino += f"?seccion={seccion_formulario}"
             return redirect(destino)
         messages.error(request, "Revise los campos de la sección clínica.")
+        if formulario_especial_app:
+            return render_historia_especial_app(request, empresa, paciente, formulario_especial_app, evaluacion_form)
     if request.method == "POST" and request.POST.get("accion") == "guardar_tricopigmentacion":
         tricopigmentacion_form = TricopigmentacionForm(
             request.POST,
@@ -2994,8 +3008,12 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             )
             historia.save()
             messages.success(request, "Control de tricopigmentación guardado correctamente.")
+            if formulario_especial_app:
+                return volver_historia_especial_app(request, empresa, paciente, formulario_especial_app)
             return redirect("clinica_historial_clinico_consolidado", empresa_slug=empresa.slug, paciente_id=paciente.id)
         messages.error(request, "Revise los campos del control de Tricopigmentación.")
+        if formulario_especial_app:
+            return render_historia_especial_app(request, empresa, paciente, formulario_especial_app, tricopigmentacion_form)
     if request.method == "POST" and tipo_post in tipos_validos:
         form_inline = HistoriaClinicaEspecialidadForm(
             request.POST,
@@ -3562,6 +3580,13 @@ def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
 @login_required
 def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
     empresa = _empresa_desde_slug(empresa_slug)
+    if es_historias_app(request, empresa) and tipo in {"evaluacion_integral", "tricopigmentacion"}:
+        autorizar_pacientes_app(request, empresa, "puede_crear_historia_clinica", "puede_expediente_clinico")
+        autorizar_historia_especial_app(request, empresa)
+        if request.method not in {"GET", "HEAD"}:
+            raise PermissionDenied("Registre esta sección desde su formulario móvil autorizado.")
+        paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+        return respuesta_pacientes_app(request, empresa, redirect(url_historia_especial_app(empresa, paciente, tipo)))
     autorizar_historias_app(request, empresa, tipo)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)

@@ -159,14 +159,16 @@ class MobileHistoriesIntegrationTests(TestCase):
             for tipo in ("evaluacion_integral", "tricopigmentacion", "camara_hiperbarica", "terapias_postquirurgicas")
         }
         before = self.conteos()
-        for tipo in ("evaluacion_integral", "tricopigmentacion", "camara_hiperbarica", "terapias_postquirurgicas", "forged"):
+        # Integral/tricopigmentación creation now has its own authorized composer;
+        # editing those structured records still cannot use the generic form.
+        for tipo in ("camara_hiperbarica", "terapias_postquirurgicas", "forged"):
             with self.subTest(tipo=tipo):
                 self.assertEqual(self.client.get(self.url(tipo)).status_code, 404)
                 with self.assertRaises(Http404):
                     self.directo(tipo)
-                if tipo in unsupported:
-                    self.assertEqual(self.client.get(self.url(tipo, unsupported[tipo])).status_code, 404)
-                    self.assertEqual(self.client.post(self.url(tipo, unsupported[tipo]), self.datos(tipo)).status_code, 404)
+        for tipo, historia in unsupported.items():
+            self.assertEqual(self.client.get(self.url(tipo, historia)).status_code, 404)
+            self.assertEqual(self.client.post(self.url(tipo, historia), self.datos(tipo)).status_code, 404)
         for tipo, status, template in (("evaluacion_integral", 302, None), ("tricopigmentacion", 302, None),
                                        ("camara_hiperbarica", 200, "historia_camara_hiperbarica.html"),
                                        ("terapias_postquirurgicas", 200, "historia_terapias_postquirurgicas.html")):

@@ -100,6 +100,11 @@ def construir_contexto_modulos_app(request, empresa):
             "Atención clínica", acceso["modulo_clinica"] and historias_creables,
             "parcial" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=crear_historia")
+    evaluaciones_autorizadas = acceso["ver_historia_clinica"] and acceso["editar_historia_clinica"]
+    agregar("evaluaciones", "Evaluación y tricopigmentación", "Registrar evaluación integral, funciones orgánicas, examen físico y controles de tricopigmentación.",
+            "Atención clínica", acceso["modulo_clinica"] and evaluaciones_autorizadas,
+            "parcial" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=evaluacion_clinica")
     for key, nombre, descripcion, autorizado in (
         ("tratamientos", "Tratamientos", "Planes, controles y seguimiento clínico.", acceso["tratamientos_clinicos"]),
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),

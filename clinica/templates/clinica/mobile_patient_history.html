@@ -6,6 +6,7 @@
 {% block mobile_content %}
 <div class="mi-warning"><strong>Solo consulta</strong><p>Los datos corresponden al mismo expediente del sistema. Esta pantalla no modifica las historias clínicas.</p></div>
 {% if can_create_history %}<a class="mi-button secondary" href="{{ app_patient_event_url }}">+ Registrar evento del expediente</a>{% endif %}
+{% include "clinica/mobile_special_history_links.html" %}
 <section class="mi-card"><h2>Vista del historial</h2>
   <form method="get" action="{{ app_patient_history_url }}" class="mp-area-filter"><input type="hidden" name="app" value="1"><input type="hidden" name="seccion" value="especialidad">
     <div class="mi-field"><label for="mp-area-filter">Área clínica</label><select name="tipo" id="mp-area-filter"><option value="">Todas las áreas</option>{% for tipo in mobile_history_types %}<option value="{{ tipo.codigo }}"{% if tipo_enfoque == tipo.codigo %} selected{% endif %}>{{ tipo.nombre }}</option>{% endfor %}</select></div>
