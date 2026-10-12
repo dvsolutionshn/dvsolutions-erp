@@ -1,11 +1,12 @@
-"""Presentación de cinco formularios clínicos existentes, sin lógica médica."""
+"""Presentación de formularios clínicos existentes, sin lógica médica."""
 
+from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from core.access import interfaz_clinica_activa
-from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
+from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
 from .mobile_patients import (
     autorizar_pacientes_app, contexto_pacientes_app, es_pacientes_app,
     permiso_pacientes_app, respuesta_pacientes_app,
@@ -14,6 +15,7 @@ from .models import HistoriaClinicaEspecialidad
 
 
 TIPOS_HISTORIA_APP = frozenset({"capilar", "cirugia_plastica", "medicina_estetica", "enfermeria", "terapias"})
+TIPOS_HISTORIA_EDITABLES_APP = TIPOS_HISTORIA_APP | {"evaluacion_integral", "tricopigmentacion"}
 es_historias_app = es_pacientes_app
 
 
@@ -24,9 +26,23 @@ def _permiso_crear_tipo(tipo):
 def autorizar_historias_app(request, empresa, tipo=None, editar=False):
     if not es_historias_app(request, empresa):
         return
-    if tipo is not None and tipo not in TIPOS_HISTORIA_APP:
+    permitidos = TIPOS_HISTORIA_EDITABLES_APP if editar else TIPOS_HISTORIA_APP
+    if tipo is not None and tipo not in permitidos:
         raise Http404("Este formulario especializado aún no está adaptado a la app.")
     autorizar_pacientes_app(request, empresa, "puede_editar_historia_clinica" if editar else _permiso_crear_tipo(tipo), "puede_expediente_clinico")
+
+
+def validar_edicion_generica_app(request, empresa, historia, form):
+    """Estas dos ediciones sólo admiten el formulario general existente."""
+    if not es_historias_app(request, empresa) or historia.tipo not in {"evaluacion_integral", "tricopigmentacion"}:
+        return
+    if len(request.GET.getlist("app")) > 1:
+        raise PermissionDenied("El formulario móvil contiene datos no compatibles.")
+    if request.method == "POST":
+        permitidos = {"app", "csrfmiddlewaretoken"} | {form.add_prefix(nombre) for nombre in form.fields}
+        if (request.POST.getlist("app") != ["1"] or set(request.POST) - permitidos
+                or any(len(request.POST.getlist(key)) != 1 for key in request.POST)):
+            raise PermissionDenied("Esta edición móvil sólo permite los datos generales y textos del registro.")
 
 
 def url_historia_form_app(empresa, paciente, tipo, historia=None):
@@ -69,6 +85,10 @@ def _secciones_historia_app(form):
 
 def contexto_historia_app(request, empresa, paciente, tipo, form, historia=None):
     contexto = contexto_pacientes_app(request, empresa, paciente)
+    generic_only = bool(historia and tipo in {"evaluacion_integral", "tricopigmentacion"})
+    if generic_only and not rol_clinico_granular(request.user, empresa) and not request.user.tiene_permiso_erp("puede_citas", empresa):
+        contexto["app_home_disponible"] = False
+        contexto["app_modules_url"] = reverse("agenda_mobile_modules_screen", args=[empresa.slug])
     can_edit = permiso_pacientes_app(request, empresa, "puede_editar_historia_clinica", "puede_expediente_clinico")
     tipos = tipos_historia_creables_app(request, empresa, paciente)
     if contexto["can_view_history"]:
@@ -81,6 +101,7 @@ def contexto_historia_app(request, empresa, paciente, tipo, form, historia=None)
         "can_edit_history": can_edit,
         "mobile_history_create_types": tipos,
         "mobile_history_form_sections": _secciones_historia_app(form),
+        "mobile_history_generic_only": generic_only,
         "app_history_form_url": url_historia_form_app(empresa, paciente, tipo, historia),
         "app_history_back_url": regreso, "app_history_safe_cancel_url": regreso,
     })

@@ -159,8 +159,8 @@ class MobileHistoriesIntegrationTests(TestCase):
             for tipo in ("evaluacion_integral", "tricopigmentacion", "camara_hiperbarica", "terapias_postquirurgicas")
         }
         before = self.conteos()
-        # Structured creation has dedicated mobile flows; none of those
-        # records may fall through to the generic mobile edit form.
+        # Structured creation has dedicated mobile flows. Evaluation/trico
+        # now allow generic text/date editing, never editing their JSON here.
         self.assertEqual(self.client.get(self.url("forged")).status_code, 404)
         with self.assertRaises(Http404):
             self.directo("forged")
@@ -170,8 +170,14 @@ class MobileHistoriesIntegrationTests(TestCase):
             self.assertTemplateUsed(response, "clinica/mobile_control_board.html")
             self.assertEqual(self.directo(tipo).status_code, 200)
         for tipo, historia in unsupported.items():
-            self.assertEqual(self.client.get(self.url(tipo, historia)).status_code, 404)
-            self.assertEqual(self.client.post(self.url(tipo, historia), self.datos(tipo)).status_code, 404)
+            response = self.client.get(self.url(tipo, historia))
+            if tipo in {"evaluacion_integral", "tricopigmentacion"}:
+                self.assertEqual(response.status_code, 200)
+                self.assertTemplateUsed(response, "clinica/mobile_history_form.html")
+                self.assertTrue(response.context["mobile_history_generic_only"])
+            else:
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(self.client.post(self.url(tipo, historia), self.datos(tipo)).status_code, 404)
         for tipo, status, template in (("evaluacion_integral", 302, None), ("tricopigmentacion", 302, None),
                                        ("camara_hiperbarica", 200, "historia_camara_hiperbarica.html"),
                                        ("terapias_postquirurgicas", 200, "historia_terapias_postquirurgicas.html")):

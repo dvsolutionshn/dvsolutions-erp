@@ -148,7 +148,8 @@ from .mobile_annexes import (
     volver_anexo_app,
 )
 from .mobile_recipe_templates import autorizar_plantillas_app, es_plantillas_app, render_plantillas_app, volver_plantillas_app
-from .mobile_histories import autorizar_historias_app, es_historias_app, render_historia_app, volver_historia_app
+from .mobile_histories import autorizar_historias_app, es_historias_app, render_historia_app, validar_edicion_generica_app, volver_historia_app
+from .mobile_antecedents import antecedente_paciente_app, preparar_antecedentes_app, render_antecedentes_app, volver_antecedentes_app
 from .mobile_special_histories import (
     autorizar_historia_especial_app, formulario_historia_especial_app,
     preparar_historia_especial_app, render_historia_especial_app,
@@ -2782,9 +2783,14 @@ def planes_tratamiento_paciente(request, empresa_slug, paciente_id):
 def historial_clinico_consolidado(request, empresa_slug, paciente_id):
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
-    formulario_especial_app = preparar_historia_especial_app(request, empresa)
+    formulario_antecedentes_app = preparar_antecedentes_app(request, empresa)
+    formulario_especial_app = None if formulario_antecedentes_app else preparar_historia_especial_app(request, empresa)
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    if formulario_antecedentes_app and request.method in {"GET", "HEAD"}:
+        antecedente = antecedente_paciente_app(empresa, paciente)
+        form = AntecedenteAdicionalPacienteForm(instance=antecedente, prefix="antecedente_adicional")
+        return render_antecedentes_app(request, empresa, paciente, form, antecedente)
     if formulario_especial_app and request.method in {"GET", "HEAD"}:
         profesional = _profesional_predeterminado_usuario(empresa, request.user)
         return render_historia_especial_app(
@@ -2809,6 +2815,7 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
         empresa,
     )
     antecedente_adicional = (
+        antecedente_paciente_app(empresa, paciente) if formulario_antecedentes_app else
         AntecedenteAdicionalPaciente.objects.filter(empresa=empresa, paciente=paciente)
         .select_related("profesional", "actualizado_por")
         .first() if not formulario_especial_app else None
@@ -2875,6 +2882,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
                 messages.success(request, "Antecedentes adicionales actualizados correctamente.")
             else:
                 messages.info(request, "No hay cambios nuevos en los antecedentes adicionales.")
+            if formulario_antecedentes_app:
+                return volver_antecedentes_app(request, empresa, paciente)
             destino = reverse(
                 "clinica_historial_clinico_consolidado",
                 args=[empresa.slug, paciente.id],
@@ -2882,6 +2891,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             return redirect(f"{destino}?seccion=antecedentes#antecedentes-adicionales")
         seccion_activa = "antecedentes"
         messages.error(request, "Revise el texto de antecedentes adicionales.")
+        if formulario_antecedentes_app:
+            return render_antecedentes_app(request, empresa, paciente, antecedente_adicional_form, antecedente_adicional)
     if request.method == "POST" and request.POST.get("accion") == "eliminar_historia":
         if not puede_eliminar_notas_clinicas:
             messages.error(request, "Solo el dueño del ERP puede eliminar notas clínicas guardadas.")
@@ -3859,6 +3870,7 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         paciente=paciente,
         instance=historia,
     )
+    validar_edicion_generica_app(request, empresa, historia, form)
     if bloqueada:
         for field in form.fields.values():
             field.disabled = True

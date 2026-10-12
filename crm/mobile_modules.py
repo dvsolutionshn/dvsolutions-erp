@@ -105,6 +105,12 @@ def construir_contexto_modulos_app(request, empresa):
             "Atención clínica", acceso["modulo_clinica"] and evaluaciones_autorizadas,
             "parcial" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=evaluacion_clinica")
+    from clinica.mobile_antecedents import antecedentes_disponibles_app
+
+    agregar("antecedentes", "Antecedentes adicionales", "Actualizar texto y consultar sus cambios registrados, sin borrar el historial.",
+            "Atención clínica", acceso["modulo_clinica"] and antecedentes_disponibles_app(request, empresa),
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=antecedentes")
     for key, nombre, descripcion, autorizado in (
         ("tratamientos", "Tratamientos", "Planes, controles y seguimiento clínico.", acceso["tratamientos_clinicos"]),
         ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),
