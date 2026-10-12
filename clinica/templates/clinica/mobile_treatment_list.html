@@ -1,0 +1,25 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% load static %}
+{% block mobile_title %}Tratamientos{% endblock %}
+{% block mobile_page_title %}Tratamientos{% endblock %}
+{% block mobile_kicker %}Seguimiento clínico{% endblock %}
+{% block mobile_back_url %}{{ app_modules_url }}{% endblock %}
+{% block mobile_header_description %}<p>Tratamientos asignados a pacientes de la empresa activa.</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_treatments.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_treatments.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+{% if can_create_treatment %}<a class="mi-button" href="{{ app_treatment_create_url }}">Crear tratamiento</a>{% endif %}
+<section class="mi-card mtr-search-card" aria-labelledby="treatmentSearchTitle"><h2 id="treatmentSearchTitle">Buscar tratamientos</h2>
+  <form method="get" action="{{ app_treatment_search_url }}" id="mobileTreatmentSearchForm"><input type="hidden" name="app" value="1"><div class="mi-field"><label for="treatmentSearch">Paciente o tratamiento</label><input id="treatmentSearch" name="q" type="search" value="{{ mobile_treatment_query }}" placeholder="Buscar paciente o tratamiento..." autocomplete="off"></div><div class="mi-field"><label for="treatmentState">Estado</label><select id="treatmentState" name="estado"><option value="">Todos los estados</option>{% for item in mobile_treatment_states %}<option value="{{ item.codigo }}"{% if mobile_treatment_state == item.codigo %} selected{% endif %}>{{ item.nombre }}</option>{% endfor %}</select></div><button class="mi-button secondary" type="submit">Buscar</button>{% if mobile_treatment_query or mobile_treatment_state %}<a class="mtr-clear-search" href="{{ app_treatments_url }}">Limpiar filtros</a>{% endif %}</form>
+  <p class="mi-muted mtr-search-note">La búsqueda y el estado filtran todos los registros de esta empresa, no solo la página actual.</p>
+</section>
+<div class="mtr-list-meta"><strong>{{ tratamientos.paginator.count }} tratamiento{% if tratamientos.paginator.count != 1 %}s{% endif %}</strong>{% if tratamientos.paginator.count %}<span>{{ tratamientos.start_index }}–{{ tratamientos.end_index }}</span>{% endif %}</div>
+<div class="mtr-treatment-list">
+{% for item in mobile_treatment_items %}{% with tratamiento=item.tratamiento %}<article class="mi-card mtr-treatment-card"><div class="mtr-treatment-head"><span class="mtr-status mtr-status-{{ item.estado }}">{{ item.estado_label }}</span><strong>{{ item.nombre }}</strong></div>
+  <div class="mtr-patient-name"><small>Paciente</small>{% if item.patient_url %}<a href="{{ item.patient_url }}">{{ item.paciente.nombre }}</a>{% else %}<strong>{{ item.paciente.nombre }}</strong>{% endif %}</div>
+  <dl class="mtr-card-meta"><div><dt>Inicio</dt><dd>{{ tratamiento.fecha_inicio|date:'d/m/Y' }}</dd></div><div><dt>Profesional</dt><dd>{{ tratamiento.profesional.nombre|default:'Sin asignar' }}</dd></div><div><dt>Monto estimado</dt><dd class="mtr-amount">L. {{ tratamiento.monto_estimado|floatformat:2 }}</dd></div></dl>
+  <details class="mtr-card-detail"><summary><span>Ver información</span><b aria-hidden="true">⌄</b></summary><dl><div><dt>Servicio</dt><dd>{{ tratamiento.servicio.nombre|default:'No indicado' }}</dd></div><div><dt>Fin estimado</dt><dd>{{ tratamiento.fecha_fin_estimada|date:'d/m/Y'|default:'Sin fecha estimada' }}</dd></div><div><dt>Objetivo</dt><dd class="mtr-clinical-text">{{ tratamiento.objetivo|default:'Sin registrar' }}</dd></div><div><dt>Plan clínico</dt><dd class="mtr-clinical-text">{{ tratamiento.plan_clinico|default:'Sin registrar' }}</dd></div></dl></details>
+</article>{% endwith %}{% empty %}<section class="mi-card mtr-empty"><h2>Sin tratamientos</h2><p>{% if mobile_treatment_query or mobile_treatment_state %}No hay tratamientos que coincidan con estos filtros.{% else %}Todavía no hay tratamientos asignados a pacientes en esta empresa.{% endif %}</p>{% if can_create_treatment %}<a class="mi-link" href="{{ app_treatment_create_url }}">Crear tratamiento</a>{% endif %}</section>{% endfor %}
+</div>
+{% if tratamientos.paginator.num_pages > 1 %}<nav class="mtr-pagination" aria-label="Páginas de tratamientos">{% if app_treatment_previous_url %}<a href="{{ app_treatment_previous_url }}">‹ Anterior</a>{% endif %}<div>{% for page in mobile_treatment_pagination %}{% if page.active %}<span aria-current="page">{{ page.numero }}</span>{% else %}<a href="{{ page.url }}">{{ page.numero }}</a>{% endif %}{% endfor %}</div>{% if app_treatment_next_url %}<a href="{{ app_treatment_next_url }}">Siguiente ›</a>{% endif %}</nav>{% endif %}
+{% endblock %}

@@ -4698,7 +4698,12 @@ def editar_plantilla_receta(request, empresa_slug, plantilla_id):
 
 @login_required
 def tratamientos(request, empresa_slug):
+    from .mobile_treatments import autorizar_tratamientos_app, es_tratamientos_app, listar_tratamientos_app
+
     empresa = _empresa_desde_slug(empresa_slug)
+    if es_tratamientos_app(request, empresa):
+        autorizar_tratamientos_app(request, empresa)
+        return listar_tratamientos_app(request, empresa)
     puede_administrar_catalogo = _puede_administrar_catalogo_clinico(request.user, empresa)
     if request.method == "POST" and request.POST.get("accion") == "crear_opcion_agenda":
         if not puede_administrar_catalogo:
@@ -4787,9 +4792,19 @@ def eliminar_opcion_tratamiento_agenda(request, empresa_slug, opcion_id):
 
 @login_required
 def crear_tratamiento(request, empresa_slug):
+    from .mobile_treatments import (
+        autorizar_tratamientos_app, es_tratamientos_app,
+        paciente_inicial_tratamiento_app, render_tratamiento_form_app,
+        volver_tratamientos_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
+    modo_app = es_tratamientos_app(request, empresa)
     paciente_inicial = None
-    if request.method == "GET" and request.GET.get("paciente"):
+    if modo_app:
+        autorizar_tratamientos_app(request, empresa, crear=True, campos=TratamientoPacienteForm.base_fields)
+        paciente_inicial = paciente_inicial_tratamiento_app(request, empresa)
+    elif request.method == "GET" and request.GET.get("paciente"):
         paciente_inicial = get_object_or_404(Paciente, id=request.GET.get("paciente"), empresa=empresa)
     form = TratamientoPacienteForm(
         request.POST or None,
@@ -4801,7 +4816,11 @@ def crear_tratamiento(request, empresa_slug):
         tratamiento.empresa = empresa
         tratamiento.save()
         messages.success(request, "Tratamiento creado correctamente.")
+        if modo_app:
+            return volver_tratamientos_app(request, empresa)
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=tratamiento.paciente_id)
+    if modo_app:
+        return render_tratamiento_form_app(request, empresa, form)
     return render(request, "clinica/form.html", {"empresa": empresa, "form": form, "titulo": "Nuevo tratamiento"})
 
 
