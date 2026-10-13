@@ -2738,6 +2738,8 @@ def archivo_anexo_app(request, empresa_slug, paciente_id, clase, registro_id, pa
 
 @login_required
 def historias_especialidad(request, empresa_slug, paciente_id):
+    from .mobile_clinical_read_scope import validar_historias_lectura_app
+    from .mobile_patients import tipo_historia_paciente_app
     from .mobile_preconsultas import autorizar_preconsulta_app, enlaces_preconsultas_app, es_preconsultas_app
 
     empresa = _empresa_desde_slug(empresa_slug)
@@ -2747,11 +2749,18 @@ def historias_especialidad(request, empresa_slug, paciente_id):
     autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    validar_historias_lectura_app(request, empresa, paciente)
+    area_app = tipo_historia_paciente_app(request) if modo_preconsulta_app and "tipo" in request.GET else None
     mobile_preconsulta_items = enlaces_preconsultas_app(
         request, empresa, paciente, paciente.preconsultas.filter(estado="completada"),
+        tipo=area_app["codigo"] if area_app else None,
     ) if modo_preconsulta_app else []
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
-    preconsultas = paciente.preconsultas.filter(estado="completada").select_related("creada_por")[:30]
+    preconsultas = paciente.preconsultas.filter(estado="completada").select_related("creada_por")
+    if area_app:
+        historias = historias.filter(tipo=area_app["codigo"])
+        preconsultas = preconsultas.filter(tipo=area_app["codigo"])
+    preconsultas = preconsultas[:30]
     tipos = [
         {
             "codigo": codigo,
@@ -2762,7 +2771,11 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "ultima_preconsulta": paciente.preconsultas.filter(tipo=codigo, estado="completada").order_by("-fecha_completada", "-fecha_creacion").first(),
         }
         for codigo, nombre in HistoriaClinicaEspecialidad.TIPO_CHOICES
+        if not area_app or codigo == area_app["codigo"]
     ]
+    if modo_preconsulta_app:
+        for item in tipos:
+            item["url"] = url_paciente_app("clinica_historias_especialidad", empresa, paciente.pk, tipo=item["codigo"])
     return render_pacientes_app(
         request,
         empresa,
@@ -2775,6 +2788,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "tipos": tipos,
             "preconsultas": preconsultas,
             **({"mobile_preconsulta_items": mobile_preconsulta_items} if modo_preconsulta_app else {}),
+            **({"mobile_history_area": area_app} if area_app else {}),
             "mobile_history_notes": notas_historia_app(historias) if es_pacientes_app(request, empresa) else [],
         },
     )
@@ -2846,6 +2860,8 @@ def plan_tratamiento_crear_app(request, empresa_slug, paciente_id):
 
 @login_required
 def historial_clinico_consolidado(request, empresa_slug, paciente_id):
+    from .mobile_clinical_read_scope import validar_historias_lectura_app
+
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
     formulario_antecedentes_app = preparar_antecedentes_app(request, empresa)
@@ -2862,6 +2878,8 @@ def historial_clinico_consolidado(request, empresa_slug, paciente_id):
             request, empresa, paciente, formulario_especial_app,
             formulario_historia_especial_app(empresa, formulario_especial_app, profesional),
         )
+    if not formulario_antecedentes_app and not formulario_especial_app:
+        validar_historias_lectura_app(request, empresa, paciente)
     secciones_validas = {
         "completa", "motivo_consulta", "funciones_organicas", "examen_fisico",
         "antecedentes", "diagnostico", "plan_tratamiento", "tricopigmentacion",
@@ -3667,6 +3685,8 @@ def agregar_sesion_terapia_postquirurgica(request, empresa_slug, paciente_id):
 
 @login_required
 def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
+    from .mobile_clinical_read_scope import validar_historias_lectura_app
+
     empresa = _empresa_desde_slug(empresa_slug)
     if es_historias_app(request, empresa) and tipo in {"evaluacion_integral", "tricopigmentacion"}:
         autorizar_pacientes_app(request, empresa, "puede_crear_historia_clinica", "puede_expediente_clinico")
@@ -3874,9 +3894,14 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
         if acceso_granular and not puede_ver_historia:
             return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    if puede_ver_historia:
+        validar_historias_lectura_app(request, empresa, paciente)
     historias_previas = (
-        paciente.historias_especialidad.filter(tipo=tipo)
-        .exclude(plan_tratamiento="")
+        (
+            paciente.historias_especialidad.filter(tipo=tipo)
+            if es_historias_app(request, empresa)
+            else paciente.historias_especialidad.filter(tipo=tipo).exclude(plan_tratamiento="")
+        )
         .select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")[:12]
         if puede_ver_historia else []
@@ -3908,6 +3933,8 @@ def crear_historia_especialidad(request, empresa_slug, paciente_id, tipo):
 
 @login_required
 def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id):
+    from .mobile_clinical_read_scope import validar_historias_lectura_app
+
     empresa = _empresa_desde_slug(empresa_slug)
     autorizar_historias_app(request, empresa, editar=True)
     _requiere_interfaz_clinica(empresa)
@@ -3955,9 +3982,14 @@ def editar_historia_especialidad(request, empresa_slug, paciente_id, historia_id
         if es_historias_app(request, empresa):
             return volver_historia_app(request, empresa, paciente, historia.tipo, historia)
         return redirect("clinica_historias_especialidad", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    if puede_ver_historia:
+        validar_historias_lectura_app(request, empresa, paciente)
     historias_previas = (
-        paciente.historias_especialidad.filter(tipo=historia.tipo)
-        .exclude(plan_tratamiento="")
+        (
+            paciente.historias_especialidad.filter(tipo=historia.tipo).exclude(pk=historia.pk)
+            if es_historias_app(request, empresa)
+            else paciente.historias_especialidad.filter(tipo=historia.tipo).exclude(plan_tratamiento="")
+        )
         .select_related("profesional", "actualizado_por")
         .order_by("-fecha_atencion", "-id")[:12] if puede_ver_historia else []
     )

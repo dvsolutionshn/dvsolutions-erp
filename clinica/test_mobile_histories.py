@@ -556,8 +556,8 @@ class MobileHistoriesIntegrationTests(TestCase):
         hub = reverse("agenda_mobile_modules_screen", args=[self.empresa.slug])
         metadata = reverse("agenda_mobile_modules", args=[self.empresa.slug])
         for permisos, keys, state in (
-            ({"puede_ver_historia_clinica": True, "puede_ver_pacientes": True}, {"expediente"}, "parcial"),
-            ({"puede_escribir_terapias": True, "puede_ver_pacientes": True}, {"registrar_historia"}, "parcial"),
+            ({"puede_ver_historia_clinica": True, "puede_ver_pacientes": True}, {"expediente"}, "disponible"),
+            ({"puede_escribir_terapias": True, "puede_ver_pacientes": True}, {"registrar_historia"}, "disponible"),
             ({"puede_escribir_enfermeria": True}, {"registrar_historia"}, "pendiente"),
             ({"puede_ver_historia_clinica": True}, {"expediente"}, "pendiente"),
             ({"puede_ver_pacientes": True}, set(), None),

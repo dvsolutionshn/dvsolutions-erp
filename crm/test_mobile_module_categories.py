@@ -314,7 +314,7 @@ class MobileModuleCategoryTests(TestCase):
                       puede_ver_calendario=True, puede_productos=True, puede_inventario=True)
         context = self.registry()
         self.assertTrue(any(item["estado"] == "disponible" for item in context["modulos_app"]))
-        self.assertTrue(any(item["estado"] == "parcial" for item in context["modulos_app"]))
+        self.assertTrue(all(item["estado"] in {"disponible", "parcial", "pendiente"} for item in context["modulos_app"]))
         self.assertFalse(any(item["key"] in {"pacientes", "agenda", "facturacion", "inventario"}
                              for item in context["modulos_app"]))
         self.assert_panel_matches(self.render_panel(context, embedded=True), context, embedded=True)

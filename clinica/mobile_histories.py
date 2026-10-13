@@ -9,7 +9,7 @@ from core.access import interfaz_clinica_activa
 from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
 from .mobile_patients import (
     autorizar_pacientes_app, contexto_pacientes_app, es_pacientes_app,
-    permiso_pacientes_app, respuesta_pacientes_app,
+    notas_historia_app, permiso_pacientes_app, respuesta_pacientes_app,
 )
 from .models import HistoriaClinicaEspecialidad
 
@@ -104,6 +104,7 @@ def contexto_historia_app(request, empresa, paciente, tipo, form, historia=None)
         "mobile_history_generic_only": generic_only,
         "app_history_form_url": url_historia_form_app(empresa, paciente, tipo, historia),
         "app_history_back_url": regreso, "app_history_safe_cancel_url": regreso,
+        "app_history_area_url": f"{contexto['app_patient_histories_url']}&tipo={tipo}" if contexto["can_view_history"] else "",
     })
     return contexto
 
@@ -111,6 +112,7 @@ def contexto_historia_app(request, empresa, paciente, tipo, form, historia=None)
 def render_historia_app(request, empresa, paciente, tipo, contexto):
     if es_historias_app(request, empresa):
         contexto.update(contexto_historia_app(request, empresa, paciente, tipo, contexto["form"], contexto.get("historia")))
+        contexto["mobile_history_previous_notes"] = notas_historia_app(contexto.get("historias_previas", [])) if contexto["can_view_history"] else []
         template = "clinica/mobile_history_form.html"
     else:
         template = "clinica/historia_especialidad_form.html"

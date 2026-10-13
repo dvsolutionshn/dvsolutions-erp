@@ -59,13 +59,14 @@ def construir_contexto_modulos_app(request, empresa):
     inicio = reverse("agenda_mobile", args=[empresa.slug])
     modulos = []
 
-    def agregar(key, nombre, descripcion, categoria, permitido, estado="pendiente", destino=""):
+    def agregar(key, nombre, descripcion, categoria, permitido, estado="pendiente", destino="", motivo_pendiente=""):
         if permitido and key not in MODULOS_OCULTOS_APP_CLINICA:
             modulos.append({
                 "key": key, "nombre": nombre, "descripcion": descripcion,
                 "categoria": categoria, "estado": estado,
                 "url": destino if estado != "pendiente" else "",
                 "panel": destino[len(inicio) + 1:] if estado != "pendiente" and destino.startswith(f"{inicio}#") else "",
+                **({"motivo_pendiente": motivo_pendiente} if estado == "pendiente" and motivo_pendiente else {}),
             })
 
     pacientes_destino = "clinica_pacientes" if acceso["pacientes"] else "clinica_crear_paciente"
@@ -101,20 +102,23 @@ def construir_contexto_modulos_app(request, empresa):
             "Atención clínica", acceso["modulo_clinica"] and anexos_autorizados,
             "disponible" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={anexos_destino}")
-    agregar("expediente", "Expediente clínico", "Consultar historias por área y editar las notas ya adaptadas según tus permisos.",
+    agregar("expediente", "Expediente clínico", "Consultar historias y formularios por área; editar notas con la autorización actual.",
             "Atención clínica", acceso["modulo_clinica"] and acceso["expediente_clinico"],
-            "parcial" if acceso["pacientes"] else "pendiente",
-            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=historias")
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=historias",
+            "Seleccionar un expediente requiere el permiso actual de consultar pacientes.")
     historias_creables = acceso["crear_historia_clinica"] or acceso["escribir_enfermeria"] or acceso["escribir_terapias"]
     agregar("registrar_historia", "Registrar nota clínica", "Historia capilar, cirugía plástica, medicina estética, enfermería y terapias según tus permisos.",
             "Atención clínica", acceso["modulo_clinica"] and historias_creables,
-            "parcial" if acceso["pacientes"] else "pendiente",
-            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=crear_historia")
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=crear_historia&seleccionar=area",
+            "Seleccionar un paciente requiere el permiso actual de consultar pacientes.")
     evaluaciones_autorizadas = acceso["ver_historia_clinica"] and acceso["editar_historia_clinica"]
     agregar("evaluaciones", "Evaluación y tricopigmentación", "Registrar evaluación integral, funciones orgánicas, examen físico y controles de tricopigmentación.",
             "Atención clínica", acceso["modulo_clinica"] and evaluaciones_autorizadas,
-            "parcial" if acceso["pacientes"] else "pendiente",
-            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=evaluacion_clinica")
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=evaluacion_clinica&seleccionar=formulario",
+            "Seleccionar un paciente requiere el permiso actual de consultar pacientes.")
     from clinica.mobile_antecedents import antecedentes_disponibles_app
 
     agregar("antecedentes", "Antecedentes adicionales", "Actualizar texto y consultar sus cambios registrados, sin borrar el historial.",
@@ -125,7 +129,7 @@ def construir_contexto_modulos_app(request, empresa):
 
     tratamientos = tratamientos_disponibles_app(request, empresa)
     agregar("tratamientos", "Tratamientos", "Consultar tratamientos asignados y registrar uno nuevo según tus permisos.",
-            "Atención clínica", tratamientos["ver"] or tratamientos["crear"], "parcial",
+            "Atención clínica", tratamientos["ver"] or tratamientos["crear"], "disponible",
             f"{reverse('clinica_tratamientos' if tratamientos['ver'] else 'clinica_crear_tratamiento', args=[empresa.slug])}?app=1")
     from clinica.mobile_agenda_catalog import catalogo_agenda_disponible_app, url_catalogo_agenda_app
 
@@ -141,14 +145,16 @@ def construir_contexto_modulos_app(request, empresa):
             "disponible" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={'planes' if planes['ver'] else 'crear_plan'}")
     terapias_consultables = acceso["pacientes"] and acceso["ver_historia_clinica"]
-    agregar("terapias", "Terapias", "Elige un paciente y abre sus historias por área para consultar las notas de Terapias.",
+    agregar("terapias", "Terapias", "Selecciona un paciente y consulta sus notas de Terapias, sin mezclar las demás áreas.",
             "Atención clínica", acceso["modulo_clinica"] and acceso["ver_terapias"],
-            "parcial" if terapias_consultables else "pendiente",
-            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=historias" if terapias_consultables else "")
+            "disponible" if terapias_consultables else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=historias&tipo=terapias" if terapias_consultables else "",
+            "Este recorrido requiere consultar pacientes e historias clínicas; ver Terapias no concede esos permisos.")
     agregar("registrar_terapia", "Registrar terapia", "Elige un paciente para registrar una nota de Terapias con el formulario clínico existente.",
             "Atención clínica", acceso["modulo_clinica"] and acceso["escribir_terapias"],
-            "parcial" if acceso["pacientes"] else "pendiente",
-            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=crear_historia&tipo=terapias" if acceso["pacientes"] else "")
+            "disponible" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=crear_historia&tipo=terapias" if acceso["pacientes"] else "",
+            "Seleccionar un paciente requiere el permiso actual de consultar pacientes.")
     # Los tableros del expediente exigen escribir el control (no basta el
     # permiso de consultar la agenda). El helper conserva esos accesos.
     from clinica.mobile_controls import controles_disponibles_app
@@ -159,10 +165,11 @@ def construir_contexto_modulos_app(request, empresa):
         ("postquirurgicas", "terapias_postquirurgicas", "Seguimiento postquirúrgico", acceso["ver_postquirurgicas"]),
     ):
         adaptado = codigo in controles and acceso["pacientes"]
-        agregar(key, nombre, "Programas y controles sin cita; las sesiones de agenda conservan su vínculo.",
+        agregar(key, nombre, "Programas, fases y controles sin cita con los formularios actuales; las sesiones de agenda conservan su vínculo.",
                 "Atención clínica", acceso["modulo_clinica"] and (consultar or codigo in controles),
-                "parcial" if adaptado else "pendiente",
-                f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=control_clinico&tipo={codigo}")
+                "disponible" if adaptado else "pendiente",
+                f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=control_clinico&tipo={codigo}",
+                "Los controles sin cita requieren el permiso original de registrar este tipo y consultar pacientes; las atenciones con cita siguen separadas.")
 
     # Accesos adicionales de agenda: nunca sustituyen los controles directos
     # ni conceden calendario o pacientes por el permiso de consultar sesiones.

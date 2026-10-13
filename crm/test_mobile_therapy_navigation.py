@@ -132,8 +132,7 @@ class MobileTherapyNavigationTests(TestCase):
     def picker_url(self, company=None, creating=False, **filters):
         company = company or self.empresa
         params = {"app": "1", "destino": "crear_historia" if creating else "historias"}
-        if creating:
-            params["tipo"] = "terapias"
+        params["tipo"] = "terapias"
         params.update(filters)
         return reverse("clinica_pacientes", args=[company.slug]) + "?" + urlencode(params)
 
@@ -142,10 +141,10 @@ class MobileTherapyNavigationTests(TestCase):
         patient = patient or self.pacientes[company.slug]
         return reverse("clinica_crear_historia_especialidad", args=[company.slug, patient.pk, tipo]) + ("?app=1" if mobile else "")
 
-    def histories_url(self, company=None, patient=None):
+    def histories_url(self, company=None, patient=None, focused=False):
         company = company or self.empresa
         patient = patient or self.pacientes[company.slug]
-        return reverse("clinica_historias_especialidad", args=[company.slug, patient.pk]) + "?app=1"
+        return reverse("clinica_historias_especialidad", args=[company.slug, patient.pk]) + "?app=1" + ("&tipo=terapias" if focused else "")
 
     def data(self, company=None, **changes):
         company = company or self.empresa
@@ -176,19 +175,19 @@ class MobileTherapyNavigationTests(TestCase):
             self.assertFalse(entry["sql"].lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE", "REPLACE")), entry["sql"])
         return response, queries
 
-    def assert_tile(self, item, creating=False, company=None, state="parcial"):
+    def assert_tile(self, item, creating=False, company=None, state="disponible"):
         self.assertEqual(item["estado"], state)
         self.assertEqual(item["panel"], "")
-        self.assertEqual(item["url"], self.picker_url(company, creating) if state == "parcial" else "")
+        self.assertEqual(item["url"], self.picker_url(company, creating) if state == "disponible" else "")
         if item["url"]:
             parsed = urlsplit(item["url"])
             self.assertFalse(parsed.scheme or parsed.netloc or parsed.fragment)
             self.assertEqual(parse_qs(parsed.query), {
                 "app": ["1"], "destino": ["crear_historia" if creating else "historias"],
-                **({"tipo": ["terapias"]} if creating else {}),
+                "tipo": ["terapias"],
             })
 
-    def test_four_companies_both_original_role_types_have_partial_exact_mobile_tiles(self):
+    def test_four_companies_both_original_role_types_have_available_exact_mobile_tiles(self):
         for company in self.empresas.values():
             for granular in (True, False):
                 with self.subTest(company=company.slug, granular=granular):
@@ -338,11 +337,11 @@ class MobileTherapyNavigationTests(TestCase):
                 self.assertTemplateUsed(picker, "clinica/mobile_patient_list.html")
                 self.assertEqual(picker.context["mobile_patient_history_mode"], "historias")
                 links = _TherapyMarkup(picker.content.decode()).links
-                self.assertIn(self.histories_url(company), links)
+                self.assertIn(self.histories_url(company, focused=True), links)
                 for other in self.empresas.values():
                     if other.pk != company.pk:
-                        self.assertNotIn(self.histories_url(other), links)
-                history, _ = self.assert_readonly(lambda: self.client.get(self.histories_url(company)))
+                        self.assertNotIn(self.histories_url(other, focused=True), links)
+                history, _ = self.assert_readonly(lambda: self.client.get(self.histories_url(company, focused=True)))
                 self.assertEqual(history.status_code, 200)
                 self.assertTemplateUsed(history, "clinica/mobile_patient_histories.html")
                 self.assertContains(history, f"Nota sintética previa {company.slug}")

@@ -419,7 +419,7 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
     def test_special_hub_card_requires_both_permissions_and_patient_list_for_url(self):
         hub = reverse("agenda_mobile_modules_screen", args=[self.empresa.slug])
         for permisos, state in (
-            ({"puede_ver_historia_clinica": True, "puede_editar_historia_clinica": True, "puede_ver_pacientes": True}, "parcial"),
+            ({"puede_ver_historia_clinica": True, "puede_editar_historia_clinica": True, "puede_ver_pacientes": True}, "disponible"),
             ({"puede_ver_historia_clinica": True, "puede_editar_historia_clinica": True}, "pendiente"),
             ({"puede_ver_historia_clinica": True}, None),
             ({"puede_editar_historia_clinica": True}, None),
@@ -433,7 +433,7 @@ class MobileSpecialHistoriesIntegrationTests(TestCase):
                 self.assertEqual(card is not None, state is not None)
                 if card:
                     self.assertEqual(card["estado"], state)
-                    self.assertEqual(bool(card["url"]), state == "parcial")
+                    self.assertEqual(bool(card["url"]), state == "disponible")
                     if card["url"]:
                         self.assertIn("app=1&destino=evaluacion_clinica", card["url"])
                         self.assertEqual(self.client.get(card["url"]).status_code, 200)

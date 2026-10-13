@@ -541,8 +541,8 @@ class MobileControlsIntegrationTests(TestCase):
         for permisos, states in (
             ({"puede_ver_camara_hiperbarica": True, "puede_ver_postquirurgicas": True, "puede_ver_pacientes": True}, {"camara": "pendiente", "postquirurgicas": "pendiente"}),
             ({"puede_escribir_camara_hiperbarica": True}, {"camara": "pendiente"}),
-            ({"puede_escribir_camara_hiperbarica": True, "puede_ver_pacientes": True}, {"camara": "parcial"}),
-            ({"puede_escribir_postquirurgicas": True, "puede_ver_pacientes": True}, {"postquirurgicas": "parcial"}),
+            ({"puede_escribir_camara_hiperbarica": True, "puede_ver_pacientes": True}, {"camara": "disponible"}),
+            ({"puede_escribir_postquirurgicas": True, "puede_ver_pacientes": True}, {"postquirurgicas": "disponible"}),
         ):
             self.asignar_rol(**permisos)
             response = self.client.get(hub)
@@ -551,7 +551,7 @@ class MobileControlsIntegrationTests(TestCase):
             self.assertEqual(set(cards), set(states))
             for key, state in states.items():
                 self.assertEqual(cards[key]["estado"], state)
-                self.assertEqual(bool(cards[key]["url"]), state == "parcial")
+                self.assertEqual(bool(cards[key]["url"]), state == "disponible")
                 if cards[key]["url"]:
                     self.assertIn("app=1&destino=control_clinico", cards[key]["url"])
                     self.assertEqual(self.client.get(cards[key]["url"]).status_code, 200)

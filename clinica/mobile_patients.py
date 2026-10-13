@@ -95,6 +95,9 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_view_history": permiso("puede_ver_historia_clinica", "puede_expediente_clinico"),
         "can_create_history": permiso("puede_crear_historia_clinica", "puede_expediente_clinico"),
         "can_edit_history": permiso("puede_editar_historia_clinica", "puede_expediente_clinico"),
+        # La ruta canónica es historias/consolidado (lectura), no
+        # historia-clinica/completar (edición). Conservar el permiso real.
+        "can_view_consolidated_history": permiso("puede_ver_historia_clinica", "puede_expediente_clinico"),
         "can_complete_general_history": historia_general_disponible_app(request, empresa),
         "mobile_history_create_types": tipos_historia_creables_app(request, empresa, paciente),
         "mobile_special_history_forms": formularios_historia_especiales_app(request, empresa, paciente),
@@ -152,6 +155,8 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
                 contexto["mobile_patient_special_history_form"] = formulario_elegido
         elif destino_paciente == "historias" and contexto["can_view_history"]:
             contexto["mobile_patient_history_mode"] = "historias"
+            if "tipo" in request.GET:
+                contexto["mobile_patient_history_area"] = tipo_historia_paciente_app(request)
         elif destino_paciente == "crear_historia":
             tipos_creables = contexto["mobile_history_create_types"]
             tipo_solicitado = request.GET.get("tipo", "")
@@ -161,6 +166,22 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
             if tipo_elegido:
                 contexto["mobile_patient_history_mode"] = "crear_historia"
                 contexto["mobile_patient_history_create_type"] = tipo_elegido
+        # Sólo los nuevos accesos de Más funciones piden elegir explícitamente.
+        # Los enlaces entrenados sin este marcador conservan su comportamiento.
+        elegir_area = (destino_paciente == "crear_historia" and request.GET.get("seleccionar") == "area"
+                       and not request.GET.get("tipo") and contexto["mobile_history_create_types"])
+        elegir_formulario = (destino_paciente == "evaluacion_clinica" and request.GET.get("seleccionar") == "formulario"
+                             and not request.GET.get("formulario") and contexto["mobile_special_history_forms"])
+        if elegir_area or elegir_formulario:
+            contexto["mobile_patient_clinical_choice_mode"] = True
+            contexto["mobile_patient_clinical_choice_title"] = "Elige el área clínica" if elegir_area else "Elige el formulario clínico"
+            opciones = contexto["mobile_history_create_types"] if elegir_area else contexto["mobile_special_history_forms"]
+            campo = "tipo" if elegir_area else "formulario"
+            contexto["mobile_patient_clinical_choices"] = [{
+                "codigo": item["codigo"], "nombre": item["nombre"],
+                "url": url_paciente_app("clinica_pacientes", empresa, destino=destino_paciente,
+                                        q=request.GET.get("q", ""), **{campo: item["codigo"]}),
+            } for item in opciones]
     if paciente:
         contexto["app_patient_general_history_url"] = url_historia_general_app(empresa, paciente) if contexto["can_complete_general_history"] else ""
         contexto["app_patient_followups_url"] = url_paciente_app("clinica_seguimientos_paciente", empresa, paciente.pk)
@@ -175,11 +196,26 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
             "annexes": "clinica_examenes_paciente", "annex_upload": "clinica_subir_examen_paciente",
         }.items():
             contexto[f"app_patient_{nombre}_url"] = url_paciente_app(vista, empresa, paciente.pk)
+        contexto["app_patient_read_history_url"] = (
+            contexto["app_patient_history_url"] if contexto["can_view_consolidated_history"]
+            else contexto["app_patient_histories_url"]
+        )
         contexto["app_patient_gastos_url"] = f"{reverse('clinica_gastos_adicionales', args=[empresa.slug])}?{urlencode({'app': '1', 'paciente_id': paciente.pk})}"
     if form:
         contexto["mobile_patient_form_sections"] = _secciones_formulario_paciente(form)
         contexto["mobile_patient_form_groups"] = [{"titulo": item["titulo"], "fields": item["campos"]} for item in contexto["mobile_patient_form_sections"]]
     return contexto
+
+
+def tipo_historia_paciente_app(request):
+    """Filtro visual de una lectura ya autorizada; no otorga acceso por área."""
+    from .models import HistoriaClinicaEspecialidad
+
+    valores = request.GET.getlist("tipo")
+    nombres = dict(HistoriaClinicaEspecialidad.TIPO_CHOICES)
+    if len(valores) != 1 or valores[0] not in nombres:
+        raise PermissionDenied("El área clínica seleccionada no es válida.")
+    return {"codigo": valores[0], "nombre": nombres[valores[0]]}
 
 
 def notas_historia_app(historias):
@@ -230,6 +266,15 @@ def respuesta_pacientes_app(request, empresa, response):
 def render_pacientes_app(request, empresa, web_template, mobile_template, contexto):
     if es_pacientes_app(request, empresa):
         contexto.update(contexto_pacientes_app(request, empresa, contexto.get("paciente"), contexto.get("form")))
+        area = contexto.get("mobile_history_area")
+        if area:
+            # En una lectura enfocada, los accesos de registro mantienen el
+            # mismo enfoque. El botón de todas las áreas conserva la lectura
+            # general ya autorizada, sin cambiar sus permisos.
+            for clave in ("mobile_history_create_types", "mobile_special_history_forms", "mobile_patient_control_types"):
+                contexto[clave] = [item for item in contexto[clave] if item["codigo"] == area["codigo"]]
+            contexto["can_manage_antecedents"] = False
+            contexto["can_complete_general_history"] = False
         from .mobile_histories import TIPOS_HISTORIA_EDITABLES_APP
 
         paciente = contexto.get("paciente")
@@ -251,7 +296,7 @@ def volver_paciente_app(request, empresa, paciente):
     contexto = contexto_pacientes_app(request, empresa, paciente)
     for flag, destino in (
         ("can_view_patient", "app_patient_detail_url"),
-        ("can_view_history", "app_patient_history_url"),
+        ("can_view_history", "app_patient_read_history_url"),
         ("can_view_patients", "app_patients_url"),
         ("can_edit_patient", "app_patient_edit_url"),
         ("can_create_patient", "app_patient_create_url"),

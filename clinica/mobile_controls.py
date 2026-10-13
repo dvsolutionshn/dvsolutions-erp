@@ -2,11 +2,12 @@
 
 from urllib.parse import urlencode
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from core.access import interfaz_clinica_activa
 from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_granular
@@ -110,6 +111,22 @@ def validar_seleccion_control_app(request, empresa, paciente, tipo, tablero=Fals
         if sesion.empresa_id != empresa.pk or sesion.paciente_id != paciente.pk:
             raise Http404("La sesión no pertenece a este expediente.")
         get_object_or_404(Programa, pk=sesion.programa_id, empresa=empresa, paciente=paciente)
+    if tablero:
+        # El tablero original usa la fecha de la cita antes de renderizar.
+        # Comprobar IDs del programa elegido evita un acceso huérfano y no
+        # modifica la selección, sus fases ni los datos de ninguna sesión.
+        programa_tablero = programa or Programa.objects.filter(
+            empresa=empresa, paciente=paciente,
+        ).only("id").order_by("-activo", "-fecha_creacion", "-id").first()
+        if programa_tablero:
+            from crm.models import CitaCliente
+
+            sesiones_tablero = Sesion.objects.filter(programa_id=programa_tablero.pk)
+            if sesiones_tablero.exclude(empresa_id=empresa.pk, paciente_id=paciente.pk).exists():
+                raise PermissionDenied("El programa contiene un registro ajeno a este expediente.")
+            citas_propias = CitaCliente.objects.filter(empresa_id=empresa.pk, paciente_id=paciente.pk).values("pk")
+            if sesiones_tablero.filter(cita_id__isnull=False).exclude(cita_id__in=citas_propias).exists():
+                raise PermissionDenied("El programa contiene una cita no disponible en este expediente.")
     if not tablero and sesion and sesion.cita_id:
         raise PermissionDenied("Los controles asociados a citas se conservan en su circuito de agenda.")
     if request.method == "POST":
@@ -168,6 +185,31 @@ def _campos_registro(registro, tipo):
     return campos
 
 
+def _url_atencion_con_cita_app(empresa, paciente, tipo, programa, registro):
+    """Enlazar sólo la atención original propia, nunca el editor sin cita."""
+    from crm.mobile_appointment_controls import _validar_cita, url_control_cita_app
+    from crm.models import CitaCliente
+    from crm.views import _es_cita_camara_hiperbarica, _es_cita_terapia_postquirurgica
+
+    Programa = CONTROLES_APP[tipo][2]
+    if not Programa.objects.filter(pk=programa.pk, empresa_id=empresa.pk, paciente_id=paciente.pk).exists():
+        raise PermissionDenied("El programa no pertenece al expediente de esta empresa.")
+    try:
+        cita = CitaCliente.objects.only(
+            "id", "empresa_id", "paciente_id", "servicio_clinico_id",
+            "producto_id", "profesional_salud_id", "fecha_hora", "titulo",
+        ).get(pk=registro.cita_id, empresa_id=empresa.pk, paciente_id=paciente.pk)
+        # Reutilizar integridad y clasificación originales; una cita cuyo
+        # servicio cambió no debe ofrecer una atención de otro tipo.
+        _validar_cita(empresa, cita)
+        clasificador = _es_cita_camara_hiperbarica if tipo == "camara_hiperbarica" else _es_cita_terapia_postquirurgica
+        if not clasificador(cita):
+            return ""
+    except ObjectDoesNotExist as exc:
+        raise PermissionDenied("La atención vinculada contiene una relación no disponible.") from exc
+    return url_control_cita_app(empresa, tipo, fecha=timezone.localtime(cita.fecha_hora).date(), cita=cita)
+
+
 def contexto_control_app(request, empresa, paciente, tipo, contexto, tablero=False):
     base = contexto_pacientes_app(request, empresa, paciente)
     if not rol_clinico_granular(request.user, empresa) and not request.user.tiene_permiso_erp("puede_citas", empresa):
@@ -207,6 +249,8 @@ def contexto_control_app(request, empresa, paciente, tipo, contexto, tablero=Fal
     items = contexto.get("tablero_sesiones_terapia" if post else "tablero_sesiones_camara", [])
     records = {}
     cards = []
+    tipos_atencion = None
+    urls_atencion = {}
     for item in items:
         registro = item.get("registro")
         if registro and (registro.empresa_id != empresa.pk or registro.paciente_id != paciente.pk
@@ -214,9 +258,19 @@ def contexto_control_app(request, empresa, paciente, tipo, contexto, tablero=Fal
             raise PermissionDenied("El registro no pertenece al programa de este expediente.")
         ligada = bool(registro and registro.cita_id)
         url = _url_control(empresa, paciente, tipo, programa=programa.pk if programa else None, sesion=item["numero"], fase=fase) if puede_registrar and not ligada else ""
-        cards.append({"numero": item["numero"], "registro": registro, "url": url, "ligada_cita": ligada, "bloqueada": bool(registro and registro.bloqueada)})
+        appointment_url = ""
+        if ligada:
+            if tipos_atencion is None:
+                from crm.mobile_appointment_controls import controles_cita_disponibles_app
+
+                tipos_atencion = {control["codigo"] for control in controles_cita_disponibles_app(request, empresa)}
+            if tipo in tipos_atencion:
+                if registro.pk not in urls_atencion:
+                    urls_atencion[registro.pk] = _url_atencion_con_cita_app(empresa, paciente, tipo, programa, registro)
+                appointment_url = urls_atencion[registro.pk]
+        cards.append({"numero": item["numero"], "registro": registro, "url": url, "appointment_url": appointment_url, "ligada_cita": ligada, "bloqueada": bool(registro and registro.bloqueada)})
         if registro:
-            records[registro.pk] = {"registro": registro, "campos": _campos_registro(registro, tipo) if not ligada else [], "url": url, "ligada_cita": ligada, "bloqueada": registro.bloqueada}
+            records[registro.pk] = {"registro": registro, "campos": _campos_registro(registro, tipo) if not ligada or appointment_url else [], "url": url, "appointment_url": appointment_url, "ligada_cita": ligada, "bloqueada": registro.bloqueada}
     base["mobile_control_board_items"] = cards
     base["mobile_control_records"] = list(records.values())
     base["mobile_control_stats"] = {"total": len(cards), "finalizadas": contexto.get("sesiones_finalizadas", contexto.get("sesiones_terapia_completadas" if post else "sesiones_camara_completadas", 0)), "borradores": contexto.get("sesiones_borrador", sum(bool(item["registro"] and item["registro"].estado == "borrador") for item in cards))}

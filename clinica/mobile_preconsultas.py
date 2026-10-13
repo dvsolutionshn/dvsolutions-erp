@@ -56,8 +56,16 @@ def autorizar_preconsulta_app(request, empresa, paciente_id, preconsulta_id=None
         raise PermissionDenied("No tiene permiso para consultar estas preconsultas.")
     if request.POST or request.FILES or request.body:
         raise PermissionDenied("La consulta de preconsultas no admite un cuerpo de datos.")
-    if set(request.GET) != {"app"} or request.GET.getlist("app") != ["1"]:
+    # La lista de historias permite enfocar un área conservando su lectura
+    # original. El detalle de preconsulta mantiene app=1 solamente.
+    permitidos = {"app", "tipo"} if preconsulta_id is None else {"app"}
+    if (set(request.GET) - permitidos or "app" not in request.GET
+            or request.GET.getlist("app") != ["1"]):
         raise PermissionDenied("Parámetros de preconsulta móvil no válidos.")
+    if preconsulta_id is None and "tipo" in request.GET:
+        from .mobile_patients import tipo_historia_paciente_app
+
+        tipo_historia_paciente_app(request)
     paciente_numero = _identificador(paciente_id)
     preconsulta_numero = _identificador(preconsulta_id) if preconsulta_id is not None else None
     partes = request.path.strip("/").split("/")
@@ -75,11 +83,13 @@ def url_preconsulta_app(empresa, paciente, preconsulta_id):
     return f"{reverse('clinica_preconsulta_detalle', args=[empresa.slug, paciente.pk, preconsulta_id])}?app=1"
 
 
-def enlaces_preconsultas_app(request, empresa, paciente, preconsultas):
+def enlaces_preconsultas_app(request, empresa, paciente, preconsultas, tipo=None):
     """Validar el conjunto original completo antes de sus counts/JOINs/límite."""
     base = preconsultas.select_related(None)
     if base.exclude(empresa_id=empresa.pk, paciente_id=paciente.pk).exists():
         raise PermissionDenied("El expediente contiene una preconsulta de otra empresa.")
+    if tipo:
+        base = base.filter(tipo=tipo)
     permitido = preconsultas_disponibles_app(request, empresa)
     etiquetas = dict(PreconsultaClinica.TIPO_CHOICES)
     return [{
