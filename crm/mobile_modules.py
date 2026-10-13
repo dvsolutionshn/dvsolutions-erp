@@ -204,8 +204,14 @@ def construir_contexto_modulos_app(request, empresa):
         ("reportes", "Reportes", acceso["reportes"]),
     ):
         agregar(key, nombre, "Pendiente de adaptar a pantalla móvil; no abre la versión web.", "Operación", permiso)
+    from clinica.mobile_configuration import config_disponible_app
+
+    configuracion = config_disponible_app(request, empresa)
+    agregar("configuracion", "Configuración clínica", "Profesionales, servicios y accesos clínicos adaptados según tus permisos; otras opciones siguen pendientes.",
+            "Administración", acceso["configuracion_producto_clinico"],
+            "parcial" if configuracion["hub"] else "pendiente",
+            f"{reverse('clinica_configuracion', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
-        ("configuracion", "Configuración clínica", acceso["configuracion_producto_clinico"]),
         ("usuarios", "Usuarios y permisos", acceso["administrar_usuarios_clinicos"]),
         ("contabilidad", "Contabilidad", acceso["modulo_contabilidad"]),
         ("rrhh", "Recursos humanos", acceso["modulo_rrhh"]),

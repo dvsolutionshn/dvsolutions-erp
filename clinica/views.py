@@ -993,6 +993,11 @@ def clinica_dashboard(request, empresa_slug):
 def configuracion_producto_clinico(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     _requiere_interfaz_clinica(empresa)
+    from .mobile_configuration import autorizar_configuracion_app, es_configuracion_app, render_configuracion_hub_app
+
+    if es_configuracion_app(request, empresa):
+        autorizar_configuracion_app(request, empresa)
+        return render_configuracion_hub_app(request, empresa)
     return render(
         request,
         "clinica/configuracion.html",
@@ -4851,13 +4856,27 @@ def crear_tratamiento(request, empresa_slug):
 @login_required
 def profesionales(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    from .mobile_configuration import (
+        autorizar_configuracion_app, es_configuracion_app, render_catalogo_app,
+        render_catalogo_form_app, volver_catalogo_app,
+    )
+
+    modo_app = es_configuracion_app(request, empresa)
+    if modo_app:
+        autorizar_configuracion_app(request, empresa, "profesionales", campos=ProfesionalSaludForm.base_fields)
     form = ProfesionalSaludForm(request.POST or None, empresa=empresa)
     if request.method == "POST" and form.is_valid():
         profesional = form.save(commit=False)
         profesional.empresa = empresa
         profesional.save()
         messages.success(request, "Profesional guardado correctamente.")
+        if modo_app:
+            return volver_catalogo_app(empresa, "profesionales")
         return redirect("clinica_profesionales", empresa_slug=empresa.slug)
+    if modo_app:
+        if request.method == "POST":
+            return render_catalogo_form_app(request, empresa, "profesionales", form)
+        return render_catalogo_app(request, empresa, "profesionales", form)
     profesionales_qs = ProfesionalSalud.objects.filter(empresa=empresa)
     return render(
         request,
@@ -4878,6 +4897,15 @@ def profesionales(request, empresa_slug):
 @login_required
 def editar_profesional(request, empresa_slug, profesional_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    from .mobile_configuration import (
+        autorizar_configuracion_app, es_configuracion_app, render_catalogo_form_app,
+        validar_profesionales_app, volver_catalogo_app,
+    )
+
+    modo_app = es_configuracion_app(request, empresa)
+    if modo_app:
+        autorizar_configuracion_app(request, empresa, "profesionales", editar=True, objeto_id=profesional_id, campos=ProfesionalSaludForm.base_fields)
+        validar_profesionales_app(ProfesionalSalud.objects.filter(pk=profesional_id, empresa=empresa))
     profesional = get_object_or_404(ProfesionalSalud, id=profesional_id, empresa=empresa)
     if not _puede_administrar_catalogo_clinico(request.user, empresa):
         messages.error(request, "Solo administradores de la empresa pueden editar profesionales.")
@@ -4887,8 +4915,12 @@ def editar_profesional(request, empresa_slug, profesional_id):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Profesional actualizado correctamente.")
+        if modo_app:
+            return volver_catalogo_app(empresa, "profesionales")
         return redirect("clinica_profesionales", empresa_slug=empresa.slug)
 
+    if modo_app:
+        return render_catalogo_form_app(request, empresa, "profesionales", form, profesional)
     profesionales_qs = ProfesionalSalud.objects.filter(empresa=empresa)
     return render(
         request,
@@ -4910,13 +4942,27 @@ def editar_profesional(request, empresa_slug, profesional_id):
 @login_required
 def servicios(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    from .mobile_configuration import (
+        autorizar_configuracion_app, es_configuracion_app, render_catalogo_app,
+        render_catalogo_form_app, volver_catalogo_app,
+    )
+
+    modo_app = es_configuracion_app(request, empresa)
+    if modo_app:
+        autorizar_configuracion_app(request, empresa, "servicios", campos=ServicioClinicoForm.base_fields)
     form = ServicioClinicoForm(request.POST or None, empresa=empresa)
     if request.method == "POST" and form.is_valid():
         servicio = form.save(commit=False)
         servicio.empresa = empresa
         servicio.save()
         messages.success(request, "Servicio clinico guardado correctamente.")
+        if modo_app:
+            return volver_catalogo_app(empresa, "servicios")
         return redirect("clinica_servicios", empresa_slug=empresa.slug)
+    if modo_app:
+        if request.method == "POST":
+            return render_catalogo_form_app(request, empresa, "servicios", form)
+        return render_catalogo_app(request, empresa, "servicios", form)
     servicios_qs = ServicioClinico.objects.filter(empresa=empresa)
     puede_administrar = _puede_administrar_servicios_clinicos(request.user, empresa)
     return render(
@@ -4940,6 +4986,13 @@ def servicios(request, empresa_slug):
 @login_required
 def editar_servicio(request, empresa_slug, servicio_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    from .mobile_configuration import (
+        autorizar_configuracion_app, es_configuracion_app, render_catalogo_form_app, volver_catalogo_app,
+    )
+
+    modo_app = es_configuracion_app(request, empresa)
+    if modo_app:
+        autorizar_configuracion_app(request, empresa, "servicios", editar=True, objeto_id=servicio_id, campos=ServicioClinicoForm.base_fields)
     servicio = get_object_or_404(ServicioClinico, id=servicio_id, empresa=empresa)
     if not _puede_administrar_servicios_clinicos(request.user, empresa):
         messages.error(request, "Solo el propietario del ERP puede editar este catalogo clinico.")
@@ -4949,8 +5002,12 @@ def editar_servicio(request, empresa_slug, servicio_id):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Servicio clinico actualizado correctamente.")
+        if modo_app:
+            return volver_catalogo_app(empresa, "servicios")
         return redirect("clinica_servicios", empresa_slug=empresa.slug)
 
+    if modo_app:
+        return render_catalogo_form_app(request, empresa, "servicios", form, servicio)
     servicios_qs = ServicioClinico.objects.filter(empresa=empresa)
     return render(
         request,
@@ -4975,15 +5032,27 @@ def editar_servicio(request, empresa_slug, servicio_id):
 @require_POST
 def eliminar_servicio(request, empresa_slug, servicio_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    from .mobile_configuration import (
+        autorizar_configuracion_app, es_configuracion_app,
+        validar_eliminacion_servicio_app, volver_catalogo_app,
+    )
+
+    modo_app = es_configuracion_app(request, empresa)
+    if modo_app:
+        autorizar_configuracion_app(request, empresa, "servicios", eliminar=True, objeto_id=servicio_id)
     servicio = get_object_or_404(ServicioClinico, id=servicio_id, empresa=empresa)
     if not _puede_administrar_servicios_clinicos(request.user, empresa):
         messages.error(request, "Solo el propietario del ERP puede eliminar este catalogo clinico.")
         return redirect("clinica_servicios", empresa_slug=empresa.slug)
 
+    if modo_app:
+        validar_eliminacion_servicio_app(empresa, servicio)
     nombre = servicio.nombre
     servicio.delete()
     messages.success(
         request,
         f"El servicio {nombre} fue eliminado del catalogo. Los registros clinicos anteriores se conservaron.",
     )
+    if modo_app:
+        return volver_catalogo_app(empresa, "servicios")
     return redirect("clinica_servicios", empresa_slug=empresa.slug)
