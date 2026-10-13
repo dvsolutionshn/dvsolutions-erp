@@ -1,0 +1,21 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Empresas{% endblock %}
+{% block mobile_page_title %}Empresas{% endblock %}
+{% block mobile_kicker %}Configuración · Superadministración{% endblock %}
+{% block mobile_back_url %}{% if can_view_app_modules and app_modules_url %}{{ app_modules_url }}{% else %}{{ app_companies_back_url }}{% endif %}{% endblock %}
+{% block mobile_header_description %}<p>Configuración completa de las cuatro empresas clínicas actuales.</p>{% endblock %}
+{% block mobile_navigation %}{% include "core/mobile_company_navigation.html" %}{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_company.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'core/mobile_company.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mco-intro" aria-labelledby="mobileCompanyListTitle"><h2 id="mobileCompanyListTitle">Configuración por empresa</h2><p>Acceso exclusivo de superadministradores. Puede editar empresas inactivas y sus datos de licencia.</p><div class="mco-count"><strong>{{ total_empresas }}</strong><span>{% if total_empresas == 1 %}empresa clínica actual{% else %}empresas clínicas actuales{% endif %}</span></div><p class="mco-caption">Sólo se listan las cuatro empresas con su enlace y perfil clínico actuales. Si al guardar cambia el enlace o el perfil y queda fuera de este alcance, dejará de aparecer aquí.</p></section>
+<div class="mco-list" id="mobileCompanyList">
+  {% for item in mobile_company_items %}<article class="mi-card mco-company-card" data-company-id="{{ item.empresa.pk }}">
+    <div class="mco-company-heading"><div class="mco-company-avatar" aria-hidden="true">{{ item.empresa.nombre|slice:':1'|upper }}</div><div><h2>{{ item.empresa.nombre }}</h2><p>{{ item.empresa.slug }}</p></div></div>
+    <div class="mco-badges"><span class="mco-badge{% if not item.empresa.activa %} warning{% endif %}">{% if item.empresa.activa %}Empresa activa{% else %}Empresa inactiva{% endif %}</span><span class="mco-badge license-{{ item.empresa.estado_licencia }}">Licencia: {{ item.empresa.get_estado_licencia_display }}</span></div>
+    <dl class="mco-data"><div><dt>RTN</dt><dd>{{ item.empresa.rtn|default:'No registrado' }}</dd></div><div><dt>Perfil</dt><dd>{{ item.empresa.get_tipo_solucion_display }}</dd></div>{% if item.empresa.correo %}<div><dt>Correo</dt><dd>{{ item.empresa.correo }}</dd></div>{% endif %}{% if item.empresa.telefono %}<div><dt>Teléfono</dt><dd>{{ item.empresa.telefono }}</dd></div>{% endif %}{% if item.empresa.fecha_inicio_plan %}<div><dt>Inicio del servicio</dt><dd>{{ item.empresa.fecha_inicio_plan|date:'d/m/Y' }}</dd></div>{% endif %}{% if item.empresa.fecha_vencimiento_plan %}<div><dt>Vencimiento del servicio</dt><dd>{{ item.empresa.fecha_vencimiento_plan|date:'d/m/Y' }}</dd></div>{% endif %}</dl>
+    {% if can_edit_company and item.edit_url %}<a class="mi-button secondary" href="{{ item.edit_url }}">Editar configuración</a>{% endif %}
+  </article>{% empty %}<section class="mi-card mco-empty"><h2>No hay empresas clínicas en este listado</h2><p>No se crearon empresas ni se cambió su configuración. Aquí aparecen únicamente las cuatro empresas cuando conservan su enlace y perfil clínico.</p></section>{% endfor %}
+</div>
+{% endblock %}

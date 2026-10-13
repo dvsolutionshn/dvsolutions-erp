@@ -1,0 +1,4 @@
+<nav class="mi-bottom mco-navigation" aria-label="Navegación de configuración de empresas">
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Funciones</span></a>{% endif %}
+  <a class="active" href="{{ app_companies_url }}" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5l8-2v18M12 8h8v13M2 21h20M7 7v1M7 11v1M7 15v1M16 12h1M16 16h1"/></svg><span>Empresas</span></a>
+</nav>

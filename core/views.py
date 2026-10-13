@@ -1895,6 +1895,10 @@ def superadmin_empresa_generar_respaldo(request, empresa_id):
 
 @superadmin_required
 def superadmin_empresa_create(request):
+    from .mobile_company import es_empresa_app
+
+    if es_empresa_app(request):
+        raise PermissionDenied("Esta adaptación móvil sólo configura las cuatro empresas existentes.")
     form = EmpresaControlForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         empresa = form.save()
@@ -1909,14 +1913,35 @@ def superadmin_empresa_create(request):
 
 
 @superadmin_required
+def superadmin_empresas_app(request):
+    from .mobile_company import autorizar_empresa_app, render_empresas_app
+
+    autorizar_empresa_app(request)
+    return render_empresas_app(request)
+
+
+@superadmin_required
 def superadmin_empresa_edit(request, empresa_id):
+    from .mobile_company import autorizar_empresa_app, es_empresa_app, identidad_empresa_app, render_empresa_form_app, validar_relaciones_empresa_app, volver_empresas_app
+
+    modo_app = es_empresa_app(request)
+    if modo_app:
+        autorizar_empresa_app(request, empresa_id, EmpresaControlForm.base_fields)
     empresa = get_object_or_404(Empresa, id=empresa_id)
-    form = EmpresaControlForm(request.POST or None, request.FILES or None, instance=empresa)
+    if modo_app:
+        validar_relaciones_empresa_app(request, empresa)
+        empresa_original = identidad_empresa_app(empresa)
+    argumentos_app = {"inicializar_configuracion": False} if modo_app else {}
+    form = EmpresaControlForm(request.POST or None, request.FILES or None, instance=empresa, **argumentos_app)
     if request.method == "POST" and form.is_valid():
         empresa = form.save()
         messages.success(request, f"Empresa {empresa.nombre} actualizada correctamente.")
+        if modo_app:
+            return volver_empresas_app(request, empresa, empresa_original)
         return redirect("superadmin_empresas")
 
+    if modo_app:
+        return render_empresa_form_app(request, form, empresa_original)
     return render(request, "core/superadmin_empresa_form.html", {
         **_superadmin_base_context(),
         "form": form,

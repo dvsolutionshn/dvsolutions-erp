@@ -1,0 +1,43 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Configuración de empresa{% endblock %}
+{% block mobile_page_title %}Configuración de empresa{% endblock %}
+{% block mobile_kicker %}Superadministración{% endblock %}
+{% block mobile_back_url %}{{ app_company_back_url }}{% endblock %}
+{% block mobile_header_description %}<p>Editar los datos y opciones de {{ empresa_original.nombre }}.</p>{% endblock %}
+{% block mobile_navigation %}{% include "core/mobile_company_navigation.html" %}{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_company.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'core/mobile_company.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mco-intro"><h2>Configuración completa</h2><p>Se utilizan los mismos campos y reglas del sistema web. Los cambios de plan, licencia, estado, enlace y módulos pueden afectar el acceso de toda la empresa.</p><p class="mco-caption">Empresa que está editando: <strong>{{ empresa_original.nombre }}</strong> · {{ empresa_original.slug }}.</p></section>
+{% if can_edit_company %}
+<form id="mobileCompanyForm" class="mco-form" action="{{ app_company_form_url }}" method="post" enctype="multipart/form-data" data-submit-once data-company-bound="{% if form.is_bound %}true{% else %}false{% endif %}" data-company-confirmation-name="{{ mobile_company_confirmation_name }}" data-company-original-slug="{{ empresa_original.slug }}">
+  {% csrf_token %}<input type="hidden" name="app" value="1">
+  {% for hidden in form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<p class="mi-error">{{ hidden.label }}: {{ error }}</p>{% endfor %}{% endfor %}
+  {% if form.errors %}<div class="mi-error-box" id="mobileCompanyErrors" role="alert"><strong>No se pudo guardar la configuración.</strong><p>Revise los campos indicados. Los valores escritos se conservan.</p>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}{% if form.logo.errors %}{% for error in form.logo.errors %}<p>{{ error }}</p>{% endfor %}{% endif %}<p class="mco-file-reselect">Si había elegido un logo nuevo, vuelva a seleccionarlo antes de guardar: el navegador no puede restaurar un archivo después de un error.</p></div>{% endif %}
+  {% for section in mobile_company_form_sections %}
+  <details class="mi-card mco-section" id="mobileCompanySection-{{ forloop.counter }}"{% if forloop.first %} open{% endif %}>
+    <summary><span class="mco-step">{{ forloop.counter }}</span><span>{{ section.titulo }}</span><i aria-hidden="true">⌄</i></summary>
+    <div class="mco-section-body">
+      {% if forloop.counter == 1 %}<div class="mco-info warning"><strong>Enlace y perfil</strong><p>Cambiar el slug modifica el enlace privado. Cambiar el perfil puede cambiar la interfaz y los módulos esenciales. Si deja de ser una de las cuatro clínicas actuales, no aparecerá en este listado móvil.</p></div>{% endif %}
+      {% if forloop.counter == 4 %}<div class="mco-info warning"><strong>Acceso de toda la empresa</strong><p>Desactivar la empresa o cambiar su licencia y fechas puede suspender la operación. Los cambios se aplican con las reglas actuales del sistema.</p></div>{% endif %}
+      {% if forloop.counter == 5 %}<div class="mco-info warning"><strong>El perfil y el plan también habilitan módulos</strong><p>La selección es un ajuste adicional. Al guardar, el sistema sincroniza los módulos esenciales del perfil y los módulos incluidos en el plan. Desmarcar un módulo no garantiza que quede deshabilitado.</p></div>{% endif %}
+      {% if forloop.counter == 6 %}<div class="mco-info"><strong>Opciones y visibilidad</strong><p>Se conservan las opciones originales. La visibilidad clínica no sustituye los permisos ni la habilitación de módulos. No se agregan accesos contables a la navegación móvil.</p></div>{% endif %}
+      {% for field in section.campos %}
+      <div class="mco-field{% if field.errors %} has-error{% endif %}{% if field.field.widget.allow_multiple_selected or field.field.widget.input_type == 'radio' %} mco-choices{% elif field.field.widget.input_type == 'checkbox' %} mco-checkbox{% endif %}" data-company-field data-field-name="{{ field.name }}" data-field-label="{{ field.label }}">
+        {% if field.field.widget.allow_multiple_selected or field.field.widget.input_type == 'radio' %}<fieldset><legend>{{ field.label }}{% if field.field.required %}<span class="mco-required"> · Obligatorio</span>{% endif %}</legend>{{ field }}</fieldset>
+        {% elif field.field.widget.input_type == 'checkbox' %}<label class="mco-check-label" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>
+        {% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mco-required"> · Obligatorio</span>{% endif %}</label>{{ field }}{% endif %}
+        {% if field.help_text %}<small class="mco-help">{{ field.help_text }}</small>{% endif %}
+        {% if field.errors %}<div class="mi-error" data-company-field-errors>{% for error in field.errors %}<p>{{ error }}</p>{% endfor %}</div>{% if field.name == 'fecha_inicio_plan' or field.name == 'fecha_vencimiento_plan' %}{% if field.value %}<small class="mco-raw-value">Valor recibido: {{ field.value }}</small>{% endif %}{% endif %}{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+  <div class="mco-form-actions"><button class="mi-button" type="submit" id="mobileCompanyReview">Revisar cambios</button><a class="mi-button secondary" href="{{ app_company_back_url }}">Cancelar y volver a empresas</a></div>
+</form>
+<dialog class="mi-sheet mco-sheet" id="mobileCompanyConfirmSheet" aria-labelledby="mobileCompanyConfirmTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="mobileCompanyConfirmTitle">Confirmar configuración</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar confirmación">×</button></div><p class="mco-sheet-copy">Se actualizará la configuración de <strong>{{ empresa_original.nombre }}</strong>. Revise los valores que se enviarán. El sistema aplicará sus reglas de licencia y sincronización de módulos al guardar.</p><dl class="mco-review-values" id="mobileCompanyConfirmValues"></dl><div class="mco-info warning"><strong>Puede cambiar el acceso de toda la empresa</strong><p>El enlace, perfil, estado, licencia y módulos se guardarán según esta selección. Cambiar el enlace o el perfil puede sacar la empresa del listado de las cuatro clínicas.</p></div><div class="mco-field mco-confirm-field"><label for="mobileCompanyConfirmation">Para confirmar, escriba el nombre actual: <strong>{{ mobile_company_confirmation_name }}</strong></label><input id="mobileCompanyConfirmation" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nombre actual de la empresa"><small class="mco-help">El nombre de confirmación no se envía ni se guarda.</small></div><button class="mi-button" id="confirmMobileCompany" type="button" disabled>Confirmar y guardar configuración</button><button class="mi-button secondary" type="button" data-close-sheet>Volver sin guardar</button></dialog>
+<dialog class="mi-sheet mco-sheet" id="mobileCompanyUnsavedSheet" aria-labelledby="mobileCompanyUnsavedTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="mobileCompanyUnsavedTitle">Cambios sin guardar</h2><button class="mi-close" type="button" data-close-sheet aria-label="Seguir editando">×</button></div><p class="mco-sheet-copy">Si sale, se perderán los valores que está editando. La configuración guardada permanecerá sin cambios.</p><button class="mi-button secondary" type="button" data-close-sheet>Seguir editando</button><button class="mi-button" id="leaveMobileCompany" type="button">Salir sin guardar</button></dialog>
+{% endif %}
+{% endblock %}

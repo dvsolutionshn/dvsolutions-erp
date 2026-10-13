@@ -1,0 +1,75 @@
+/* Company configuration presentation only; the existing Form remains authoritative. */
+.mco-screen{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.mco-screen .mi-header-copy h1,.mco-screen .mi-header-copy p{overflow-wrap:anywhere}
+.mco-screen [hidden]{display:none!important}
+.mco-list,.mco-form{display:grid;gap:14px;min-width:0}
+.mco-intro h2{font-size:16px;color:#365f73}
+.mco-intro p,.mco-caption{font-size:12px;line-height:1.75;color:#718b9a;overflow-wrap:anywhere}
+.mco-count{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin:14px 0}
+.mco-count strong{color:#286f73;font-size:28px;line-height:1.4}
+.mco-count span{color:#7b95a1;font-size:12px}
+.mco-company-card{display:grid;gap:15px;min-width:0}
+.mco-company-heading{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.mco-company-heading>div:last-child{min-width:0;flex:1}
+.mco-company-avatar{display:grid;place-items:center;flex:0 0 43px;width:43px;height:43px;border-radius:15px;color:#247b76;background:linear-gradient(135deg,#e8faf4,#edf4ff);font-size:17px;font-weight:800}
+.mco-company-heading h2{font-size:16px;color:#365f73;line-height:1.65;overflow-wrap:anywhere;margin:0}
+.mco-company-heading p{font-size:12px;color:#7e97a3;line-height:1.8;margin:3px 0 0;overflow-wrap:anywhere}
+.mco-badges{display:flex;gap:7px;flex-wrap:wrap;min-width:0}
+.mco-badge{display:inline-block;padding:6px 9px;background:#edf8f4;color:#347c70;border-radius:11px;font-size:10px;font-weight:700;line-height:1.6;overflow-wrap:anywhere;max-width:100%}
+.mco-badge.warning,.mco-badge.license-prueba{color:#87724d;background:#faf5e9}
+.mco-badge.license-suspendida,.mco-badge.license-vencida{color:#975e5a;background:#fbefec}
+.mco-data{display:grid;gap:13px;margin:0;min-width:0}
+.mco-data>div{min-width:0}
+.mco-data dt{font-size:10px;color:#7e96a3;line-height:1.7}
+.mco-data dd{font-size:13px;color:#416b7d;line-height:1.8;font-weight:500;margin:4px 0 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.mco-empty{text-align:center;color:#7d96a2;font-size:12px;line-height:1.8}
+.mco-empty h2{color:#527988;font-size:16px}
+.mco-section{padding:0;min-width:0}
+.mco-section>summary{display:flex;gap:10px;align-items:center;list-style:none;min-height:62px;padding:16px 18px;color:#416b7d;font-weight:700;font-size:14px;line-height:1.6;cursor:pointer;overflow-wrap:anywhere}
+.mco-section>summary::-webkit-details-marker{display:none}
+.mco-section>summary>span:nth-child(2){flex:1;min-width:0}
+.mco-step{display:grid;place-items:center;width:27px;height:27px;flex-shrink:0;border-radius:10px;background:#eaf8f4;color:#2f8277;font-size:12px}
+.mco-section>summary i{font-size:21px;flex-shrink:0;font-style:normal}
+.mco-section[open]>summary i{transform:rotate(180deg)}
+.mco-section-body{display:grid;gap:17px;padding:0 18px 19px;min-width:0}
+.mco-field{display:grid;gap:8px;min-width:0;color:#416b7d;font-size:13px;line-height:1.8;overflow-wrap:anywhere}
+.mco-field>label,.mco-field legend{font-size:12px;font-weight:700;color:#527887;line-height:1.7}
+.mco-required{font-weight:500;color:#8196a1;font-size:10px}
+.mco-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]),.mco-field select,.mco-field textarea{width:100%;min-width:0;min-height:49px;border:1px solid #c9dce3;border-radius:13px;padding:12px;background:#fff;color:#3d6577;font-size:16px;line-height:1.5}
+.mco-field textarea{min-height:105px;resize:vertical}
+.mco-field input[type=file]{padding:10px;font-size:13px!important}
+.mco-field input[type=file]::file-selector-button{min-height:40px;border:0;border-radius:10px;padding:8px 11px;background:#ecf6f8;color:#446f7e;font-size:12px;margin-right:9px}
+.mco-field input[type=checkbox],.mco-field input[type=radio]{width:19px;height:19px;min-width:19px;flex-shrink:0;accent-color:#218c80;margin:0}
+.mco-check-label{display:flex;align-items:flex-start;gap:11px;min-height:44px;padding:12px 13px;border:1px solid #d9e8ed;border-radius:13px;background:#f5fafb;cursor:pointer}
+.mco-check-label input{margin-top:2px!important}
+.mco-check-label span{min-width:0;overflow-wrap:anywhere}
+.mco-help,.mco-raw-value{font-size:11px;line-height:1.8;color:#7a93a0;overflow-wrap:anywhere}
+.mco-raw-value{color:#a15c5c}
+.mco-field.has-error input:not([type=checkbox]):not([type=radio]),.mco-field.has-error select,.mco-field.has-error textarea{border-color:#d78989}
+.mco-field .mi-error p{margin:0 0 4px}
+.mco-field fieldset{min-width:0;border:0;padding:0;margin:0}
+.mco-field legend{padding:0;margin-bottom:9px}
+.mco-choices fieldset>div{display:grid;gap:8px;min-width:0}
+.mco-choices fieldset>div>div{min-width:0}
+.mco-choices label{display:flex;gap:10px;align-items:flex-start;padding:12px 13px;min-height:45px;border:1px solid #d9e8ed;border-radius:13px;background:#f5fafb;color:#527887;font-size:12px;font-weight:500;line-height:1.75;cursor:pointer;overflow-wrap:anywhere}
+.mco-choices label input{margin-top:2px!important}
+.mco-info{padding:14px 16px;border:1px solid #d5e7ed;border-radius:17px;background:#f2f8fb;color:#527d8b;font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.mco-info strong{display:block;color:#416e7e;font-size:12px;margin-bottom:4px}
+.mco-info p{margin:4px 0 0}
+.mco-info.warning{background:#fffaf0;border-color:#ecdcb8;color:#8a703b}
+.mco-info.warning strong{color:#816732}
+.mco-form-actions{display:grid;gap:9px;padding:3px 0}
+.mco-file-reselect{font-size:12px;line-height:1.8}
+.mco-sheet{overflow-y:auto;overscroll-behavior:contain}
+.mco-sheet .mi-sheet-head h2{font-size:20px;overflow-wrap:anywhere}
+.mco-sheet-copy{font-size:12px;line-height:1.8;color:#718b9a;overflow-wrap:anywhere;margin:8px 0 0}
+.mco-review-values{display:grid;gap:13px;margin:16px 0;min-width:0;max-height:30dvh;overflow-y:auto;border:1px solid #e0ecf0;border-radius:15px;background:#f7fafc;padding:14px;overscroll-behavior:contain}
+.mco-review-values>div{min-width:0}
+.mco-review-values dt{font-size:10px;line-height:1.7;color:#8097a4}
+.mco-review-values dd{font-size:13px;line-height:1.8;color:#416b7d;white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0}
+.mco-confirm-field{margin:15px 0}
+.mco-confirm-field strong{color:#336f78;overflow-wrap:anywhere}
+.mco-sheet>.mi-button{margin-top:9px}
+.mco-screen button:disabled{cursor:not-allowed}
+.mco-navigation a{max-width:50%}
+@media(max-width:350px){.mco-company-avatar{width:38px;height:38px;flex-basis:38px}.mco-company-heading{gap:10px}.mco-company-heading h2{font-size:15px}.mco-section>summary{padding:15px;font-size:13px}.mco-section-body{padding:0 15px 16px;gap:15px}.mco-sheet .mi-sheet-head h2{font-size:18px}.mco-review-values{padding:11px}.mco-info{padding:12px 13px}}

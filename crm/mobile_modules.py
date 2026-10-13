@@ -237,6 +237,11 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("usuarios", "Usuarios y permisos", "Ver usuarios vinculados y administrar su rol en esta empresa con la autorización existente.",
             "Administración", usuarios_disponibles_app(request, empresa), "disponible",
             f"{reverse('usuarios_clinicos', args=[empresa.slug])}?app=1")
+    from core.mobile_company import configuracion_empresa_disponible_app
+
+    agregar("empresa", "Configuración de empresa", "Datos, logo, plan, licencia y módulos con la autorización de superadministración existente.",
+            "Administración", configuracion_empresa_disponible_app(request, empresa), "disponible",
+            f"{reverse('superadmin_empresa_edit', args=[empresa.pk])}?app=1")
     for key, nombre, permiso in (
         ("contabilidad", "Contabilidad", acceso["modulo_contabilidad"]),
         ("rrhh", "Recursos humanos", acceso["modulo_rrhh"]),
