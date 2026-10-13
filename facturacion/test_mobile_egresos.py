@@ -498,7 +498,9 @@ class MobileEgresosIntegrationTests(TestCase):
         request.user = self.usuario
         before = self.snapshot()
         cards = {item["key"]: item for item in construir_contexto_modulos_app(request, self.empresa)["modulos_app"]}
-        self.assertEqual((cards["egresos"]["estado"], cards["egresos"]["url"]), ("disponible", self.url("egresos_dashboard")))
+        # La app clínica oculta contabilidad en navegación; el permiso y las
+        # rutas documentales protegidas permanecen operativos sin cambios.
+        self.assertNotIn("egresos", cards)
         self.assertNotIn("recibos", cards)
         self.assertNotIn("compras", cards)
         self.assertEqual(self.snapshot(), before)

@@ -642,8 +642,9 @@ class MobileConfigurationIntegrationTests(TestCase):
         before = self.snapshot()
         response = self.client.get(self.url())
         items = {item["codigo"]: item for item in response.context["mobile_configuration_items"]}
-        self.assertEqual(items["usuarios_roles"]["estado"], "pendiente")
-        self.assertEqual(items["usuarios_roles"]["url"], "")
+        self.assertEqual(items["usuarios_roles"]["estado"], "disponible")
+        self.assertEqual(items["usuarios_roles"]["url"], reverse("usuarios_clinicos", args=[self.empresa.slug]) + "?app=1")
+        self.assertFalse({"contabilidad", "rrhh", "tecnicentro"} & set(items))
         self.assertEqual(items["configuracion_facturacion"]["estado"], "pendiente")
         self.assertEqual(items["configuracion_facturacion"]["url"], "")
         for item in items.values():

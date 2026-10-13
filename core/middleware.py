@@ -169,6 +169,15 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
+                # Sólo el catálogo móvil para regresar a Usuarios. Las rutas
+                # administrativas originales no exigen agenda ni licencia;
+                # esta excepción no autoriza el inicio ni sus operaciones.
+                if request.method == "GET" and "/".join(parts[3:]) in {"app/modules.json", "app/modulos"}:
+                    from core.mobile_users import usuarios_disponibles_app
+
+                    if usuarios_disponibles_app(request, empresa):
+                        return self.get_response(request)
+
                 if not request.user.is_superuser and not empresa.licencia_operativa:
                     messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)

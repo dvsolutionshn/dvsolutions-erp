@@ -179,6 +179,7 @@ def _contexto_configuracion_app(request, empresa):
 
 
 def render_configuracion_hub_app(request, empresa):
+    from core.mobile_users import usuarios_disponibles_app
     from .mobile_recipe_templates import permiso_plantillas_app
     from .mobile_treatments import tratamientos_disponibles_app
     from .views import _puede_administrar_manuales_receta, _puede_controlar_enlaces_pacientes, _recetas_avanzadas_activas
@@ -203,13 +204,11 @@ def render_configuracion_hub_app(request, empresa):
     agregar("plantillas_recetas", "Plantillas de recetas", "Administrar medicamentos e indicaciones reutilizables.", acceso["configuracion_clinica"] and recetas and permiso_plantillas_app(request, empresa), "clinica_plantillas_recetas")
     agregar("manuales_pdf", "Manuales PDF", "Cargar, editar y activar los documentos existentes.", recetas and acceso["administrar_manuales_pdf"] and _puede_administrar_manuales_receta(request.user, empresa), "clinica_manuales_recetas")
     agregar("enlaces_registro", "Control de enlaces de registro", "Esta pantalla de administración todavía no está adaptada a móvil.", empresa.slug == "hospital_mia" and _puede_controlar_enlaces_pacientes(request.user))
+    agregar("usuarios_roles", "Usuarios y permisos", "Consultar usuarios y permisos del rol; asignarlo sólo en esta empresa.", usuarios_disponibles_app(request, empresa), "usuarios_clinicos")
+    agregar("empresa", "Configuración de empresa", "Datos generales, contacto y logo: adaptación pendiente del editor exclusivo de superadministración.", request.user.is_superuser)
     for codigo, nombre, permiso in (
-        ("usuarios_roles", "Usuarios y roles", "administrar_usuarios_clinicos"),
         ("configuracion_facturacion", "Configuración de facturación", "configuracion_facturacion"),
-        ("crm", "CRM y Marketing", "modulo_crm"),
-        ("rrhh", "Recursos Humanos", "modulo_rrhh"),
-        ("contabilidad", "Contabilidad", "modulo_contabilidad"),
-        ("tecnicentro", "Tecnicentro", "modulo_tecnicentro"),
+        ("crm", "Agenda y comunicación", "modulo_crm"),
     ):
         agregar(codigo, nombre, "Adaptación móvil pendiente; no se modifican permisos ni integraciones desde esta pantalla.", acceso[permiso])
     contexto.update({"titulo": "Configuración", "recetas_avanzadas": recetas, "mobile_configuration_items": opciones})

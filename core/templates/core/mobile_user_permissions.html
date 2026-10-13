@@ -1,0 +1,41 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Asignar rol{% endblock %}
+{% block mobile_page_title %}Asignar rol{% endblock %}
+{% block mobile_kicker %}Acceso local · {{ empresa.nombre }}{% endblock %}
+{% block mobile_back_url %}{{ app_user_permissions_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>La asignación reemplaza el acceso anterior sólo dentro de esta empresa.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_users.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'core/mobile_users.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mus-card" aria-labelledby="mobileUserAssignmentTitle">
+  <div class="mus-person"><div class="mus-avatar" aria-hidden="true">{{ usuario_gestionado.first_name|default:usuario_gestionado.username|slice:':1'|upper }}</div><div class="mus-person-copy"><h2 id="mobileUserAssignmentTitle">{{ usuario_gestionado.get_full_name|default:usuario_gestionado.username }}</h2><p>{{ usuario_gestionado.username }}</p>{% if usuario_gestionado.email %}<p>{{ usuario_gestionado.email }}</p>{% endif %}</div></div>
+  <dl class="mus-data"><div><dt>Empresa de esta asignación</dt><dd>{{ empresa.nombre }}</dd></div><div><dt>Rol actual en esta empresa</dt><dd>{% if rol_actual %}{{ rol_actual.nombre }}{% if not rol_actual.activo %} · Inactivo{% endif %}{% else %}Sin rol asignado{% endif %}</dd></div></dl>
+  {% if mobile_user_role_requires_selection %}<div class="mus-info mus-warning"><strong>El rol actual no pertenece al catálogo clínico</strong><p>No se cambiará automáticamente a “Sin rol”. Seleccione explícitamente un rol clínico o la opción “Sin rol” antes de confirmar.</p></div>{% endif %}
+  {% if not usuario_gestionado.is_active %}<p class="mus-caption">Esta cuenta está inactiva. Cambiar su rol no activa el usuario.</p>{% endif %}
+  {% if usuario_gestionado.es_administrador_empresa %}<div class="mus-info mus-warning" data-user-admin-warning><strong>Conserva autorización de administrador</strong><p>La administración de empresa es una autorización independiente de esta cuenta. Asignar “Sin rol” o un rol inactivo no revoca su administración.</p></div>{% endif %}
+</section>
+{% if can_assign_clinical_role %}
+<form class="mus-form" id="mobileUserPermissionForm" action="{{ app_user_permissions_form_url }}" method="post" data-submit-once data-user-role-bound="{% if mobile_user_role_bound %}true{% else %}false{% endif %}" data-user-name="{{ usuario_gestionado.get_full_name|default:usuario_gestionado.username }}" data-user-account="{{ usuario_gestionado.username }}" data-user-independent-admin="{% if usuario_gestionado.es_administrador_empresa %}true{% else %}false{% endif %}" data-company-name="{{ empresa.nombre }}">
+  {% csrf_token %}<input type="hidden" name="app" value="1">
+  <section class="mi-card mus-card" aria-labelledby="mobileUserSelectTitle">
+    <h2 id="mobileUserSelectTitle">Rol en {{ empresa.nombre }}</h2>
+    <div class="mi-field"><label for="mobileUserRole">Seleccionar rol</label><select id="mobileUserRole" name="rol_sistema" required aria-describedby="mobileUserSelectionNote"><option value="" disabled data-role-placeholder{% if not mobile_user_role_in_choices %} selected{% endif %}>Seleccione una opción...</option><option value="" data-role-clear data-role-name="Sin rol asignado">Sin rol asignado</option>{% for item in roles %}<option value="{{ item.pk }}" data-role-name="{{ item.nombre }}"{% if not item.activo %} data-role-inactive{% endif %}{% if mobile_user_role_in_choices and rol_actual.pk == item.pk %} selected{% endif %}>{{ item.nombre }}{% if not item.activo %} — inactivo{% endif %}</option>{% endfor %}</select><small id="mobileUserSelectionNote">“Sin rol” deja esta empresa sin un rol asignado; no altera las autorizaciones independientes de la cuenta. Los roles inactivos se conservan en el catálogo original.</small></div>
+    <div class="mus-info mus-warning"><strong>Se reemplaza la asignación anterior</strong><p>Los permisos configurados corresponden al rol seleccionado. Este cambio no modifica las autorizaciones independientes de la cuenta ni sus accesos en otras empresas.</p></div>
+    {% if app_roles_url %}<a class="mus-clear" href="{{ app_roles_url }}">Consultar el catálogo de roles compartidos</a>{% endif %}
+  </section>
+  <div class="mus-form-actions"><button class="mi-button mus-assign-submit" type="submit" id="mobileUserReview">Revisar asignación</button><a class="mi-button secondary" href="{{ app_user_permissions_back_url }}">Cancelar</a></div>
+</form>
+<dialog class="mi-sheet mus-sheet" id="mobileUserConfirmSheet" aria-labelledby="mobileUserConfirmTitle">
+  <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="mobileUserConfirmTitle">Confirmar asignación local</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar confirmación">×</button></div>
+  <p class="mus-sheet-copy">Revise el usuario, la empresa y el nuevo rol. Sólo se actualizará esta asignación; el rol compartido y las autorizaciones independientes de la cuenta no se editarán.</p>
+  <dl class="mus-sheet-values" id="mobileUserConfirmValues"></dl>
+  <div class="mus-info mus-warning" id="mobileUserClearWarning" hidden><strong>Dejar esta empresa sin un rol asignado</strong><p>Se guardará “Sin rol”. La cuenta, sus autorizaciones independientes y sus accesos en otras empresas no se eliminarán.</p></div>
+  {% if usuario_gestionado.es_administrador_empresa %}<div class="mus-info mus-warning" id="mobileUserIndependentAdminWarning" data-user-admin-warning><strong>La administración se conserva</strong><p>Esta cuenta es administradora de empresa. “Sin rol” o un rol inactivo no revoca esa autorización independiente.</p></div>{% endif %}
+  <div class="mi-field"><label for="mobileUserRoleConfirmation">Para confirmar, escriba: <span class="mus-confirm-code" id="mobileUserRoleExpected"></span></label><input id="mobileUserRoleConfirmation" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Escribir confirmación" aria-describedby="mobileUserConfirmNote"><small id="mobileUserConfirmNote">Esta confirmación no se guarda ni se envía al servidor.</small></div>
+  <button class="mi-button" id="confirmMobileUserRole" type="button" disabled>Confirmar y guardar asignación</button><button class="mi-button secondary" type="button" data-close-sheet>Volver sin guardar</button>
+</dialog>
+<dialog class="mi-sheet mus-sheet" id="mobileUserUnsavedSheet" aria-labelledby="mobileUserUnsavedTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="mobileUserUnsavedTitle">Asignación sin guardar</h2><button class="mi-close" type="button" data-close-sheet aria-label="Seguir revisando">×</button></div><p class="mus-sheet-copy">Si sale, se perderá esta selección. El rol actual permanecerá sin cambios.</p><button class="mi-button secondary" type="button" data-close-sheet>Seguir revisando</button><button class="mi-button" id="leaveMobileUserRole" type="button">Salir sin guardar</button></dialog>
+{% endif %}
+{% endblock %}

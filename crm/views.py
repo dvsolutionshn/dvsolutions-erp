@@ -2433,6 +2433,7 @@ def agenda_mobile_inventory(request, empresa_slug):
 @require_http_methods(["GET"])
 def agenda_mobile_modules_screen(request, empresa_slug):
     """Acceso adicional sin calendario ni datos de pacientes en el catálogo."""
+    from core.mobile_users import usuarios_disponibles_app
     from facturacion.mobile_transfers import transferencia_disponible_app
     from facturacion.mobile_suppliers import proveedores_disponibles_app
 
@@ -2441,6 +2442,7 @@ def agenda_mobile_modules_screen(request, empresa_slug):
     if acceso_denegado is not None and not (
         transferencia_disponible_app(request, empresa)
         or any(proveedores_disponibles_app(request, empresa).values())
+        or usuarios_disponibles_app(request, empresa)
     ):
         return acceso_denegado
     contexto = construir_contexto_modulos_app(request, empresa)
@@ -2452,7 +2454,9 @@ def agenda_mobile_modules_screen(request, empresa_slug):
         "app_invoices_url": f"{inicio}#facturas-app",
         "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
         "app_modules_url": reverse("agenda_mobile_modules_screen", args=[empresa.slug]),
-        "app_home_disponible": acceso_denegado is None and inicio_app_disponible(request, empresa),
+        "app_home_disponible": acceso_denegado is None and inicio_app_disponible(request, empresa) and (request.user.is_superuser or empresa.licencia_operativa),
+        "app_hide_agenda_navigation": usuarios_disponibles_app(request, empresa) and not (request.user.is_superuser or empresa.licencia_operativa),
+        "app_hide_patient_navigation": usuarios_disponibles_app(request, empresa) and not (request.user.is_superuser or empresa.licencia_operativa),
         "modulos_standalone": True,
     })
     response = render(request, "crm/mobile_modules.html", contexto)
@@ -2465,6 +2469,7 @@ def agenda_mobile_modules_screen(request, empresa_slug):
 @require_http_methods(["GET"])
 def agenda_mobile_modules(request, empresa_slug):
     """Capacidades de presentación, sin datos clínicos ni permisos nuevos."""
+    from core.mobile_users import usuarios_disponibles_app
     from facturacion.mobile_transfers import transferencia_disponible_app
     from facturacion.mobile_suppliers import proveedores_disponibles_app
 
@@ -2473,7 +2478,10 @@ def agenda_mobile_modules(request, empresa_slug):
     acceso_modulos_adicional = response is not None and (
         transferencia_disponible_app(request, empresa)
         or any(proveedores_disponibles_app(request, empresa).values())
+        or usuarios_disponibles_app(request, empresa)
     )
+    if usuarios_disponibles_app(request, empresa) and not (request.user.is_superuser or empresa.licencia_operativa):
+        acceso_modulos_adicional = True
     if response is None or acceso_modulos_adicional:
         contexto = construir_contexto_modulos_app(request, empresa)
         if not contexto["puede_ver_modulos_app"]:

@@ -1389,6 +1389,12 @@ def _contexto_filtros_auditoria(queryset_base, request):
 @login_required
 def usuarios_clinicos(request, slug):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import autorizar_usuarios_app, es_usuarios_app, render_usuarios_app, validar_usuarios_app
+
+    modo_app = es_usuarios_app(request, empresa)
+    if modo_app:
+        autorizar_usuarios_app(request, empresa)
+        validar_usuarios_app(empresa)
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
 
@@ -1414,6 +1420,8 @@ def usuarios_clinicos(request, slug):
             ),
         })
 
+    if modo_app:
+        return render_usuarios_app(request, empresa, filas)
     return render(request, "core/usuarios_clinicos.html", {
         "empresa": empresa,
         "filas": filas,
@@ -1424,12 +1432,19 @@ def usuarios_clinicos(request, slug):
 @login_required
 def usuario_clinico_permisos(request, slug, usuario_id):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import autorizar_usuarios_app, es_usuarios_app, render_usuario_permisos_app, respuesta_usuarios_app, url_usuarios_app, validar_usuarios_app
+
+    modo_app = es_usuarios_app(request, empresa)
+    if modo_app:
+        autorizar_usuarios_app(request, empresa, usuario_id)
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
 
     # El filtro empresarial también protege GET y POST. No se acepta un ID de
     # usuario que pertenezca a otra empresa aunque se manipule la URL/formulario.
     usuario = get_object_or_404(_usuarios_operativos_de_empresa(empresa), pk=usuario_id)
+    if modo_app:
+        validar_usuarios_app(empresa, usuario_id)
     asignacion = UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa=empresa).first()
     rol_actual = asignacion.rol_sistema if asignacion and asignacion.activo else usuario.rol_para_empresa(empresa)
     roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
@@ -1447,8 +1462,14 @@ def usuario_clinico_permisos(request, slug, usuario_id):
             request,
             f"Se asignó {rol.nombre if rol else 'Sin rol'} a {nombre_usuario} únicamente en {empresa.nombre}.",
         )
+        if modo_app:
+            return respuesta_usuarios_app(redirect(url_usuarios_app("usuarios_clinicos", empresa)))
         return redirect("usuarios_clinicos", slug=empresa.slug)
 
+    if modo_app:
+        return render_usuario_permisos_app(request, empresa, {
+            "empresa": empresa, "usuario_gestionado": usuario, "rol_actual": rol_actual, "roles": roles,
+        })
     return render(request, "core/usuario_clinico_permisos.html", {
         "empresa": empresa,
         "usuario_gestionado": usuario,
@@ -1460,15 +1481,26 @@ def usuario_clinico_permisos(request, slug, usuario_id):
 @login_required
 def roles_clinicos(request, slug):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import autorizar_usuarios_app, es_usuarios_app, render_roles_app
+
+    modo_app = es_usuarios_app(request, empresa)
+    if modo_app:
+        autorizar_usuarios_app(request, empresa)
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar roles de esta empresa."}, status=403)
     roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
+    if modo_app:
+        return render_roles_app(request, empresa, roles)
     return render(request, "core/roles_clinicos.html", {"empresa": empresa, "roles": roles})
 
 
 @login_required
 def rol_clinico_editar(request, slug, rol_id=None):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import es_usuarios_app
+
+    if es_usuarios_app(request, empresa):
+        raise PermissionDenied("Los roles compartidos sólo pueden consultarse en esta adaptación móvil.")
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar roles de esta empresa."}, status=403)
     rol = get_object_or_404(RolSistema, pk=rol_id, es_rol_clinico=True) if rol_id else None

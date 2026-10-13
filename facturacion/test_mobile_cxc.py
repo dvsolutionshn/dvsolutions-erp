@@ -493,15 +493,16 @@ class MobileCxcIntegrationTests(TestCase):
                     self.assertEqual(response.content, b"")
         self.assertEqual(self.snapshot(), before)
 
-    def test_hub_and_metadata_expose_only_authorized_mobile_cartera(self):
+    def test_hub_and_metadata_hide_financial_cartera_without_removing_backend_permission(self):
         for granular in (True, False):
             self.role(granular=granular, puede_cxc=True)
             response = self.client.get(reverse("agenda_mobile_modules_screen", args=[self.empresa.slug]))
             self.assertEqual(response.status_code, 200)
-            cxc = next(item for item in response.context["modulos_app"] if item["key"] == "cxc")
-            self.assertEqual(cxc["url"], self.url())
+            self.assertNotIn("cxc", {item["key"] for item in response.context["modulos_app"]})
             data = self.client.get(reverse("agenda_mobile_modules", args=[self.empresa.slug])).json()
-            self.assertEqual(next(item for item in data["modulos"] if item["key"] == "cxc")["url"], self.url())
+            self.assertNotIn("cxc", {item["key"] for item in data["modulos"]})
+            self.assertTrue(self.usuario.tiene_permiso_erp("puede_cxc", self.empresa))
+            self.assertEqual(self.client.get(self.url()).status_code, 200)
             self.assertFalse(any(item["key"] in {"facturacion", "agenda", "pacientes"} for item in data["modulos"]))
 
     def test_unflagged_original_web_post_keeps_its_existing_readonly_behavior(self):

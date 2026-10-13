@@ -13,6 +13,14 @@ from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_g
 from core.context_processors import erp_access
 
 
+# Alcance de navegación elegido para la doctora. No revoca autorizaciones ni
+# elimina las adaptaciones existentes: sus rutas mantienen todos sus controles.
+MODULOS_OCULTOS_APP_CLINICA = frozenset({
+    "egresos", "cxc", "cxp", "notas_credito", "cierres", "reportes",
+    "contabilidad", "rrhh", "tecnicentro", "crm", "cotizaciones",
+})
+
+
 def inicio_app_disponible(request, empresa):
     """Disponibilidad del inicio entrenado, sin cambiar su autorización."""
     return not rol_clinico_granular(request.user, empresa) or request.user.tiene_permiso_erp("puede_ver_calendario", empresa)
@@ -50,7 +58,7 @@ def construir_contexto_modulos_app(request, empresa):
     modulos = []
 
     def agregar(key, nombre, descripcion, categoria, permitido, estado="pendiente", destino=""):
-        if permitido:
+        if permitido and key not in MODULOS_OCULTOS_APP_CLINICA:
             modulos.append({
                 "key": key, "nombre": nombre, "descripcion": descripcion,
                 "categoria": categoria, "estado": estado,
@@ -178,7 +186,7 @@ def construir_contexto_modulos_app(request, empresa):
             f"{reverse('traslado_rapido_farmaceutico', args=[empresa.slug])}?app=1")
     from facturacion.mobile_receipts import recibos_disponibles_app
 
-    agregar("recibos", "Recibos y cobros", "Consultar recibos, abrir PDF y editar datos documentales; los cobros se gestionan desde la factura autorizada.",
+    agregar("recibos", "Recibos", "Consultar documentos y abrir su PDF; no es una pantalla de contabilidad.",
             "Operación", recibos_disponibles_app(request, empresa), "parcial",
             f"{reverse('recibos_dashboard', args=[empresa.slug])}?app=1")
     from facturacion.mobile_payments import cobros_disponibles_app
@@ -224,8 +232,12 @@ def construir_contexto_modulos_app(request, empresa):
             "Administración", acceso["configuracion_producto_clinico"],
             "parcial" if configuracion["hub"] else "pendiente",
             f"{reverse('clinica_configuracion', args=[empresa.slug])}?app=1")
+    from core.mobile_users import usuarios_disponibles_app
+
+    agregar("usuarios", "Usuarios y permisos", "Ver usuarios vinculados y administrar su rol en esta empresa con la autorización existente.",
+            "Administración", usuarios_disponibles_app(request, empresa), "disponible",
+            f"{reverse('usuarios_clinicos', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
-        ("usuarios", "Usuarios y permisos", acceso["administrar_usuarios_clinicos"]),
         ("contabilidad", "Contabilidad", acceso["modulo_contabilidad"]),
         ("rrhh", "Recursos humanos", acceso["modulo_rrhh"]),
         ("crm", "CRM y comunicación", acceso["modulo_crm"]),
@@ -234,6 +246,11 @@ def construir_contexto_modulos_app(request, empresa):
         agregar(key, nombre, "Solo estará disponible con los permisos actuales de esta empresa.", "Administración", permiso)
 
     rol = usuario.rol_para_empresa(empresa)
+    # El permiso administrativo original no depende de licencia. Cuando el
+    # catálogo se abre sólo por esa excepción, no ofrecer destinos operativos
+    # bloqueados: cada operación conserva su comprobación de licencia.
+    if not usuario.is_superuser and not empresa.licencia_operativa:
+        modulos = [item for item in modulos if item["key"] == "usuarios"]
     contexto.update({
         "puede_ver_modulos_app": True,
         "modulos_app": modulos,
