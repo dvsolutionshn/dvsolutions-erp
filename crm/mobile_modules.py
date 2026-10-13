@@ -249,6 +249,11 @@ def construir_contexto_modulos_app(request, empresa):
             "Administración", any(avanzadas.values()), "disponible",
             (f"{reverse('configuracion_avanzada_empresa_app', args=[empresa.pk])}?app=1" if avanzadas["ver"]
              else f"{reverse('configuracion_avanzada_empresas_app')}?app=1"))
+    from .mobile_crm_configuration import configuracion_crm_disponible_app
+
+    agregar("configuracion_crm", "Agenda y comunicación", "Ajustes, plantillas y textos existentes de esta empresa; la credencial se mantiene fuera del formulario.",
+            "Administración", configuracion_crm_disponible_app(request, empresa), "disponible",
+            f"{reverse('crm_configuracion', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
         ("contabilidad", "Contabilidad", acceso["modulo_contabilidad"]),
         ("rrhh", "Recursos humanos", acceso["modulo_rrhh"]),

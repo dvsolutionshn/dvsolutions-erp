@@ -1094,13 +1094,33 @@ def crm_dashboard(request, empresa_slug):
 
 @login_required
 def configuracion_crm(request, empresa_slug):
+    from .mobile_crm_configuration import (
+        adaptar_formulario_crm_app, autorizar_configuracion_crm_app,
+        contexto_configuracion_crm_app, es_configuracion_crm_app,
+        render_configuracion_crm_app, volver_configuracion_crm_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
-    config = _configuracion_crm(empresa)
+    modo_app = es_configuracion_crm_app(request)
+    if modo_app:
+        autorizar_configuracion_crm_app(request, empresa)
+    if modo_app and request.method in {"GET", "HEAD"}:
+        config = ConfiguracionCRM.objects.filter(empresa=empresa).first() or ConfiguracionCRM(empresa=empresa)
+    else:
+        # POST conserva el inicializador original, incluso antes de validar.
+        config = _configuracion_crm(empresa)
+    contexto_app = contexto_configuracion_crm_app(request, empresa, config) if modo_app else None
     form = ConfiguracionCRMForm(request.POST or None, instance=config)
+    if modo_app:
+        adaptar_formulario_crm_app(form)
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Configuracion CRM actualizada correctamente.")
+        if modo_app:
+            return volver_configuracion_crm_app(empresa)
         return redirect("crm_dashboard", empresa_slug=empresa.slug)
+    if modo_app:
+        return render_configuracion_crm_app(request, form, contexto_app)
     response = render(
         request,
         "crm/form.html",
@@ -1125,6 +1145,9 @@ def configuracion_crm(request, empresa_slug):
 @login_required
 @require_POST
 def conectar_whatsapp_meta(request, empresa_slug):
+    from .mobile_crm_configuration import denegar_accion_crm_no_adaptada_app
+
+    denegar_accion_crm_no_adaptada_app(request)
     empresa = _empresa_desde_slug(empresa_slug)
     if not settings.META_WHATSAPP_APP_SECRET:
         return JsonResponse(
@@ -1137,6 +1160,7 @@ def conectar_whatsapp_meta(request, empresa_slug):
     except (UnicodeDecodeError, json.JSONDecodeError):
         return JsonResponse({"ok": False, "error": "Respuesta de Meta no valida."}, status=400)
 
+    denegar_accion_crm_no_adaptada_app(request, payload)
     code = str(payload.get("code") or "").strip()
     waba_id = str(payload.get("waba_id") or "").strip()
     phone_number_id = str(payload.get("phone_number_id") or "").strip()
@@ -1214,6 +1238,9 @@ def conectar_whatsapp_meta(request, empresa_slug):
 @login_required
 @require_POST
 def enviar_prueba_whatsapp(request, empresa_slug):
+    from .mobile_crm_configuration import denegar_accion_crm_no_adaptada_app
+
+    denegar_accion_crm_no_adaptada_app(request)
     empresa = _empresa_desde_slug(empresa_slug)
     config = _configuracion_crm(empresa)
     if not config.whatsapp_activo:

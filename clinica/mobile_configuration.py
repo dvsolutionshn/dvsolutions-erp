@@ -182,6 +182,7 @@ def render_configuracion_hub_app(request, empresa):
     from core.mobile_advanced_configuration import configuracion_avanzada_disponible_app
     from core.mobile_company import configuracion_empresa_disponible_app
     from core.mobile_users import usuarios_disponibles_app
+    from crm.mobile_crm_configuration import configuracion_crm_disponible_app
     from .mobile_recipe_templates import permiso_plantillas_app
     from .mobile_treatments import tratamientos_disponibles_app
     from .views import _puede_administrar_manuales_receta, _puede_controlar_enlaces_pacientes, _recetas_avanzadas_activas
@@ -223,11 +224,9 @@ def render_configuracion_hub_app(request, empresa):
             "url": (f"{reverse('configuracion_avanzada_empresa_app', args=[empresa.pk])}?app=1" if avanzadas["ver"]
                     else f"{reverse('configuracion_avanzada_empresas_app')}?app=1"),
         })
-    for codigo, nombre, permiso in (
-        ("configuracion_facturacion", "Configuración de facturación", "configuracion_facturacion"),
-        ("crm", "Agenda y comunicación", "modulo_crm"),
-    ):
-        agregar(codigo, nombre, "Adaptación móvil pendiente; no se modifican permisos ni integraciones desde esta pantalla.", acceso[permiso])
+    agregar("configuracion_facturacion", "Configuración de facturación", "Adaptación móvil pendiente; no se modifican permisos ni integraciones desde esta pantalla.", acceso["configuracion_facturacion"])
+    agregar("crm", "Agenda y comunicación", "Configurar plantillas, textos y avisos con el permiso CRM existente, sin editar credenciales ni enviar pruebas.",
+            configuracion_crm_disponible_app(request, empresa), "crm_configuracion")
     contexto.update({"titulo": "Configuración", "recetas_avanzadas": recetas, "mobile_configuration_items": opciones})
     return respuesta_configuracion_app(render(request, "clinica/mobile_configuration_hub.html", contexto))
 
