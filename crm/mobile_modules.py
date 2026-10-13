@@ -194,8 +194,12 @@ def construir_contexto_modulos_app(request, empresa):
             "Operación", any(proveedores.values()),
             "disponible" if proveedores["ver"] or proveedores["crear"] else "pendiente",
             f"{reverse('proveedores_facturacion' if proveedores['ver'] else 'crear_proveedor_facturacion', args=[empresa.slug])}?app=1")
+    from facturacion.mobile_purchases import compras_disponibles_app
+
+    agregar("compras", "Compras", "Consultar documentos, productos, pagos registrados, movimientos y PDF; las operaciones siguen pendientes.",
+            "Operación", compras_disponibles_app(request, empresa), "parcial",
+            f"{reverse('compras_dashboard', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
-        ("compras", "Compras", acceso["compras"]),
         ("cotizaciones", "Cotizaciones", acceso["cotizaciones"]),
         ("notas_credito", "Notas de crédito", acceso["notas_credito"]),
         ("cxc", "Cuentas por cobrar", acceso["cxc"]),

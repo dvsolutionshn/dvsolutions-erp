@@ -4777,6 +4777,14 @@ def ver_entrada_inventario(request, empresa_slug, entrada_id):
 @login_required
 def compras_dashboard(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_purchases import (
+        autorizar_compras_app, es_compras_app, render_compras_app, validar_relaciones_compras_app,
+    )
+
+    modo_app = es_compras_app(request, empresa)
+    if modo_app:
+        autorizar_compras_app(request, empresa)
+        validar_relaciones_compras_app(empresa, CompraInventario.objects.filter(empresa=empresa))
     q = request.GET.get("q", "").strip()
     estado_filtro = request.GET.get("estado", "").strip()
     pago_filtro = request.GET.get("pago", "").strip()
@@ -4810,6 +4818,11 @@ def compras_dashboard(request, empresa_slug):
         "por_pagar": sum(1 for compra in compras_lista if compra.saldo_pendiente > 0),
     }
 
+    if modo_app:
+        return render_compras_app(request, empresa, {
+            "empresa": empresa, "compras": compras_lista, "resumen": resumen,
+            "q": q, "estado_filtro": estado_filtro, "pago_filtro": pago_filtro,
+        })
     return render(request, "facturacion/compras_cxp_premium.html", {
         "empresa": empresa,
         "compras": compras_lista,
@@ -5728,6 +5741,12 @@ def revertir_pago_comision_proveedor(request, empresa_slug, pago_factura_id, pag
 @login_required
 def ver_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_purchases import autorizar_compras_app, es_compras_app, render_compra_app, validar_compra_app
+
+    modo_app = es_compras_app(request, empresa)
+    if modo_app:
+        autorizar_compras_app(request, empresa, compra_id)
+        validar_compra_app(empresa, compra_id)
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related('lineas__producto', 'pagos_compra'),
         id=compra_id,
@@ -5736,6 +5755,8 @@ def ver_compra(request, empresa_slug, compra_id):
     movimientos = MovimientoInventario.objects.filter(compra_documento=compra).select_related('producto')
     pagos = compra.pagos_compra.select_related('comprobante').all()
 
+    if modo_app:
+        return render_compra_app(request, empresa, {"empresa": empresa, "compra": compra, "movimientos": movimientos, "pagos": pagos})
     return render(request, "facturacion/ver_compra_cxp_premium.html", {
         "empresa": empresa,
         "compra": compra,
@@ -5748,6 +5769,12 @@ def ver_compra(request, empresa_slug, compra_id):
 @login_required
 def descargar_compra_pdf(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_purchases import autorizar_compras_app, es_compras_app, respuesta_compras_app, validar_compra_app
+
+    modo_app = es_compras_app(request, empresa)
+    if modo_app:
+        autorizar_compras_app(request, empresa, compra_id)
+        validar_compra_app(empresa, compra_id)
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related(
             'lineas__producto',
@@ -5791,6 +5818,8 @@ def descargar_compra_pdf(request, empresa_slug, compra_id):
 
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{nombre_archivo}"'
+    if modo_app:
+        return respuesta_compras_app(response)
     return response
 
 

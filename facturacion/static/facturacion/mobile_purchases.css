@@ -1,0 +1,13 @@
+/* Purchase cards extend the existing read-only mobile document components. */
+.mpu-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:16px 0;min-width:0}
+.mpu-stats>div{padding:13px;border:1px solid #d5e8ec;border-radius:15px;background:#f0f8fa;min-width:0}
+.mpu-stats dt{color:#8099a5;font-size:11px;line-height:1.6}.mpu-stats dd{margin:6px 0 0;color:#348477;font-size:22px;font-weight:700;line-height:1.6;overflow-wrap:anywhere}
+.mpu-badge{display:inline-flex;align-items:center;max-width:100%;padding:6px 9px;border-radius:999px;background:#eef5f8;color:#607f91;font-size:10px;font-weight:700;line-height:1.7;overflow-wrap:anywhere}
+.mpu-badge.aplicada,.mpu-badge.pagado{background:#e8f8ee;color:#2f8269}.mpu-badge.borrador,.mpu-badge.parcial{background:#fff6df;color:#967843}.mpu-badge.anulada,.mpu-badge.pendiente{background:#faebef;color:#a66b77}
+.mpu-card .meg-card-head .mpu-badge{max-width:45%;flex-shrink:0}.mpu-card>span.mpu-badge{justify-self:start}
+.mpu-fold{border-top:1px solid #dbe9ee;margin-top:16px;padding-top:12px}.mpu-fold summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:#6a8a99;font-size:12px;font-weight:700;overflow-wrap:anywhere}.mpu-fold p{margin-bottom:0}
+.mpu-section{display:grid;gap:12px;min-width:0}.mpu-section>h2{font-size:16px;color:#436b7e;line-height:1.7;margin:7px 3px;overflow-wrap:anywhere}
+.mpu-item-card{display:grid;gap:15px;min-width:0}.mpu-item-card h3{font-size:15px;color:#3a6a7a;line-height:1.7;margin:0;overflow-wrap:anywhere}.mpu-item-card>span.mpu-badge{justify-self:start}.mpu-money{font-weight:700;color:#317e70!important;overflow-wrap:anywhere}
+.mpu-comment{border-left:2px solid #c8e5dd;padding-left:11px;margin:0;font-size:12px}.mpu-reference-space{margin-top:16px}
+.mpu-document-links{display:flex;align-items:center;gap:9px;flex-wrap:wrap;border-top:1px solid #deebee;padding-top:12px}.mpu-document-links>p{width:100%}
+@media(max-width:350px){.mpu-stats{gap:9px}.mpu-stats>div{padding:11px}.mpu-stats dd{font-size:19px}.mpu-item-card h3{font-size:14px}}
