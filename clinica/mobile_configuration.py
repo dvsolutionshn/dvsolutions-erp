@@ -185,8 +185,9 @@ def render_configuracion_hub_app(request, empresa):
     from crm.mobile_crm_configuration import configuracion_crm_disponible_app
     from .mobile_agenda_catalog import catalogo_agenda_disponible_app, url_catalogo_agenda_app
     from .mobile_recipe_templates import permiso_plantillas_app
+    from .mobile_registration_control import control_enlaces_disponible_app
     from .mobile_treatments import tratamientos_disponibles_app
-    from .views import _puede_administrar_manuales_receta, _puede_controlar_enlaces_pacientes, _recetas_avanzadas_activas
+    from .views import _puede_administrar_manuales_receta, _recetas_avanzadas_activas
 
     contexto = _contexto_configuracion_app(request, empresa)
     acceso = contexto["erp_access"]
@@ -214,7 +215,7 @@ def render_configuracion_hub_app(request, empresa):
     recetas = _recetas_avanzadas_activas(empresa)
     agregar("plantillas_recetas", "Plantillas de recetas", "Administrar medicamentos e indicaciones reutilizables.", acceso["configuracion_clinica"] and recetas and permiso_plantillas_app(request, empresa), "clinica_plantillas_recetas")
     agregar("manuales_pdf", "Manuales PDF", "Cargar, editar y activar los documentos existentes.", recetas and acceso["administrar_manuales_pdf"] and _puede_administrar_manuales_receta(request.user, empresa), "clinica_manuales_recetas")
-    agregar("enlaces_registro", "Control de enlaces de registro", "Esta pantalla de administración todavía no está adaptada a móvil.", empresa.slug == "hospital_mia" and _puede_controlar_enlaces_pacientes(request.user))
+    agregar("enlaces_registro", "Control de enlaces de registro", "Consultar estados, avance y actividad de los enlaces sin generar ni modificar registros.", control_enlaces_disponible_app(request, empresa), "clinica_control_enlaces_registro_paciente")
     agregar("usuarios_roles", "Usuarios y permisos", "Consultar usuarios y permisos del rol; asignarlo sólo en esta empresa.", usuarios_disponibles_app(request, empresa), "usuarios_clinicos")
     if configuracion_empresa_disponible_app(request, empresa):
         opciones.append({

@@ -1,0 +1,92 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Control de enlaces{% endblock %}
+{% block mobile_page_title %}Control de enlaces{% endblock %}
+{% block mobile_kicker %}Seguimiento privado{% endblock %}
+{% block mobile_back_url %}{{ app_registration_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="mrc-header-description">Consulta privada del registro de nuevos pacientes de {{ empresa.nombre }}.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'clinica/mobile_registration_control.css' %}">{% endblock %}
+{% block mobile_navigation %}
+{% if can_view_app_modules or can_view_clinical_configuration %}
+<nav class="mi-bottom mrc-navigation" aria-label="Navegación del control de enlaces">
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>{% endif %}
+  {% if can_view_clinical_configuration and app_configuration_url %}<a href="{{ app_configuration_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg><span>Configuración clínica</span></a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}
+{% block mobile_content %}
+<div id="mobileRegistrationControl" class="mrc-control">
+  <section class="mi-card mrc-intro">
+    <span class="mi-kicker">Solo consulta</span>
+    <h2>Seguimiento de registros</h2>
+    <p>“No abierto” indica que no hay una apertura registrada; “En progreso” indica actividad sin envío final; “Completado” confirma el registro del expediente.</p>
+    <p class="mi-muted">Esta pantalla no genera, envía ni modifica enlaces. La actividad registrada no confirma por sí sola la entrega de un mensaje de WhatsApp.</p>
+  </section>
+  <section class="mrc-kpis" aria-label="Resumen del seguimiento">
+    <article class="mi-card mrc-kpi"><span>Total</span><strong>{{ conteos.total }}</strong><small>Enlaces registrados</small></article>
+    <article class="mi-card mrc-kpi completed"><span>Completados</span><strong>{{ conteos.completado }}</strong><small>Expedientes creados</small></article>
+    <article class="mi-card mrc-kpi progress"><span>En progreso</span><strong>{{ conteos.en_progreso }}</strong><small>Sin envío final</small></article>
+    <article class="mi-card mrc-kpi review"><span>Requieren revisión</span><strong>{{ requieren_revision }}</strong><small>Validación o error técnico</small></article>
+  </section>
+  <p class="mrc-summary-note">El resumen aplica la búsqueda y las fechas, antes de filtrar por estado; no se limita a esta página.</p>
+  <section class="mi-card mrc-filters">
+    <h2>Buscar registros</h2>
+    <form id="mobileRegistrationControlFilters" method="get" action="{{ app_registration_search_url }}">
+      <input type="hidden" name="app" value="1">
+      <div class="mi-field mrc-wide"><label for="registrationSearch">Buscar</label><input id="registrationSearch" type="search" name="q" value="{{ consulta }}" placeholder="Paciente, identidad, creador o código" autocomplete="off"></div>
+      <div class="mi-field mrc-wide"><label for="registrationState">Estado</label><select id="registrationState" name="estado">
+        <option value=""{% if not estado_filtro %} selected{% endif %}>Todos</option>
+        {% for estado in mobile_registration_states %}<option value="{{ estado.codigo }}"{% if estado_filtro == estado.codigo %} selected{% endif %}>{{ estado.nombre }}</option>{% endfor %}
+      </select></div>
+      <div class="mi-field"><label for="registrationFrom">Generado desde</label><input id="registrationFrom" type="date" name="desde" value="{{ fecha_desde }}"></div>
+      <div class="mi-field"><label for="registrationUntil">Generado hasta</label><input id="registrationUntil" type="date" name="hasta" value="{{ fecha_hasta }}"></div>
+      <button class="mi-button mrc-wide" type="submit">Aplicar filtros</button>
+      {% if consulta or estado_filtro or fecha_desde or fecha_hasta %}<a class="mrc-clear mrc-wide" href="{{ app_registration_url }}">Limpiar filtros</a>{% endif %}
+    </form>
+    <p class="mi-muted">La búsqueda incluye todos los registros autorizados, no solo los visibles.</p>
+  </section>
+  <div class="mrc-list-meta"><strong>{{ pagina.paginator.count }} registro{% if pagina.paginator.count != 1 %}s{% endif %}</strong>{% if pagina.paginator.count %}<span>{{ pagina.start_index }}–{{ pagina.end_index }}</span>{% endif %}</div>
+  <section class="mrc-list" aria-label="Registros de enlaces">
+    {% for registro in mobile_registration_items %}
+    {% with enlace=registro.invitacion %}
+    <article class="mi-card mrc-record" data-registration-state="{{ registro.estado_codigo }}">
+      <div class="mrc-record-head">
+        <div class="mrc-person">
+          {% if enlace.paciente %}<h2>{{ enlace.paciente.nombre }}</h2><p>{{ enlace.paciente.identidad|default:'Sin identidad' }}{% if enlace.paciente.expediente_codigo %} · {{ enlace.paciente.expediente_codigo }}{% endif %}</p>
+          {% else %}<h2>Paciente aún no identificado</h2>{% endif %}
+          <span class="mrc-code">Código {{ enlace.code_masked }}</span>
+        </div>
+        <span class="mrc-state state-{{ registro.estado_codigo }}">{{ registro.estado_etiqueta }}</span>
+      </div>
+      <p class="mrc-explanation">{{ registro.estado_explicacion }}</p>
+      <div class="mrc-progress">
+        <label for="registrationProgress{{ forloop.counter }}">Paso {{ registro.progreso }} de 3</label>
+        <progress id="registrationProgress{{ forloop.counter }}" max="3" value="{{ registro.progreso }}">Paso {{ registro.progreso }} de 3</progress>
+      </div>
+      <dl class="mrc-activity-counts"><div><dt>Aperturas</dt><dd>{{ enlace.cantidad_aperturas }}</dd></div><div><dt>Intentos de envío</dt><dd>{{ enlace.intentos_envio }}</dd></div></dl>
+      <p class="mrc-generated">Generado {{ enlace.fecha_creacion|date:'d/m/Y H:i' }}</p>
+      <details class="mrc-activity">
+        <summary>Actividad y fechas</summary>
+        <dl>
+          <div><dt>Primera apertura</dt><dd>{% if enlace.fecha_primera_apertura %}{{ enlace.fecha_primera_apertura|date:'d/m/Y H:i' }}{% else %}Sin apertura registrada{% endif %}</dd></div>
+          <div><dt>Última actividad</dt><dd>{% if enlace.fecha_ultima_actividad %}{{ enlace.fecha_ultima_actividad|date:'d/m/Y H:i' }}{% else %}Sin actividad registrada{% endif %}</dd></div>
+          <div><dt>Último intento de envío</dt><dd>{% if enlace.fecha_ultimo_intento %}{{ enlace.fecha_ultimo_intento|date:'d/m/Y H:i' }}{% else %}Sin intento registrado{% endif %}</dd></div>
+          <div><dt>Vencimiento</dt><dd>{{ enlace.fecha_expiracion|date:'d/m/Y H:i' }}</dd></div>
+          {% if enlace.fecha_completada %}<div><dt>Completado</dt><dd>{{ enlace.fecha_completada|date:'d/m/Y H:i' }}</dd></div>{% endif %}
+          {% if enlace.creada_por %}<div><dt>Creado por</dt><dd>{{ enlace.creada_por.nombre }}</dd></div>{% endif %}
+        </dl>
+      </details>
+    </article>
+    {% endwith %}
+    {% empty %}
+    <article class="mi-card mrc-empty"><h2>Sin registros con estos filtros</h2><p>Ajuste la búsqueda, las fechas o el estado para consultar otros registros.</p></article>
+    {% endfor %}
+  </section>
+  {% if pagina.paginator.num_pages > 1 %}
+  <nav class="mrc-pagination" aria-label="Páginas del control de enlaces">
+    <p>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</p>
+    <div>{% if mobile_registration_previous_url %}<a href="{{ mobile_registration_previous_url }}">‹ Anterior</a>{% endif %}{% if mobile_registration_next_url %}<a href="{{ mobile_registration_next_url }}">Siguiente ›</a>{% endif %}</div>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

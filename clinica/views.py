@@ -4136,7 +4136,15 @@ def generar_enlace_registro_paciente(request, empresa_slug):
 
 @login_required
 def control_enlaces_registro_paciente(request, empresa_slug):
+    from .mobile_registration_control import (
+        autorizar_control_enlaces_app, consulta_control_enlaces_app,
+        es_control_enlaces_app, render_control_enlaces_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
+    modo_app = es_control_enlaces_app(request)
+    if modo_app:
+        autorizar_control_enlaces_app(request, empresa)
     if empresa.slug != "hospital_mia" or not _puede_controlar_enlaces_pacientes(request.user):
         raise PermissionDenied("Este control es privado para el propietario del ERP.")
 
@@ -4144,6 +4152,8 @@ def control_enlaces_registro_paciente(request, empresa_slug):
         "paciente",
         "creada_por",
     )
+    if modo_app:
+        invitaciones_qs = consulta_control_enlaces_app(invitaciones_qs)
     consulta = (request.GET.get("q") or "").strip()
     estado_filtro = (request.GET.get("estado") or "").strip()
     fecha_desde = (request.GET.get("desde") or "").strip()
@@ -4202,21 +4212,24 @@ def control_enlaces_registro_paciente(request, empresa_slug):
     pagina = Paginator(registros, 40).get_page(request.GET.get("pagina"))
     parametros = request.GET.copy()
     parametros.pop("pagina", None)
-    return render(
-        request,
-        "clinica/control_enlaces_registro.html",
-        {
-            "empresa": empresa,
-            "pagina": pagina,
-            "conteos": conteos,
-            "consulta": consulta,
-            "estado_filtro": estado_filtro,
-            "fecha_desde": fecha_desde,
-            "fecha_hasta": fecha_hasta,
-            "requieren_revision": conteos["validacion"] + conteos["error_tecnico"],
-            "querystring": parametros.urlencode(),
-        },
-    )
+    contexto = {
+        "empresa": empresa,
+        "pagina": pagina,
+        "conteos": conteos,
+        "consulta": consulta,
+        "estado_filtro": estado_filtro,
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "requieren_revision": conteos["validacion"] + conteos["error_tecnico"],
+        "querystring": parametros.urlencode(),
+    }
+    if modo_app:
+        # Sólo presentación de los DateInput nativos; la aceptación y el
+        # filtrado son los mismos strptime originales, también sin padding.
+        contexto["fecha_desde"] = fecha_desde_valida.isoformat() if fecha_desde_valida else ""
+        contexto["fecha_hasta"] = fecha_hasta_valida.isoformat() if fecha_hasta_valida else ""
+        return render_control_enlaces_app(request, empresa, contexto)
+    return render(request, "clinica/control_enlaces_registro.html", contexto)
 
 
 @login_required
