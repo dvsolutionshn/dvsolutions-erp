@@ -10222,8 +10222,15 @@ def resumen_diario_caja(request, empresa_slug):
 @login_required
 def reporte_cxc(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_cxc import autorizar_cxc_app, es_cxc_app, render_cxc_app, validar_relaciones_cxc_app
+    modo_app = es_cxc_app(request, empresa)
+    if modo_app:
+        autorizar_cxc_app(request, empresa)
+        validar_relaciones_cxc_app(empresa)
     contexto = _construir_reporte_cxc(empresa, request.GET)
     contexto["empresa"] = empresa
+    if modo_app:
+        return render_cxc_app(request, empresa, contexto)
     return render(request, "facturacion/reporte_cxc_premium.html", contexto)
 
 

@@ -199,10 +199,14 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("compras", "Compras", "Consultar documentos, productos, pagos registrados, movimientos y PDF; las operaciones siguen pendientes.",
             "Operación", compras_disponibles_app(request, empresa), "parcial",
             f"{reverse('compras_dashboard', args=[empresa.slug])}?app=1")
+    from facturacion.mobile_cxc import cxc_disponible_app
+
+    agregar("cxc", "Cuentas por cobrar", "Consultar cartera por cliente, saldos y antigüedad del reporte actual, sin modificar pagos.",
+            "Operación", cxc_disponible_app(request, empresa), "disponible",
+            f"{reverse('reporte_cxc', args=[empresa.slug])}?app=1")
     for key, nombre, permiso in (
         ("cotizaciones", "Cotizaciones", acceso["cotizaciones"]),
         ("notas_credito", "Notas de crédito", acceso["notas_credito"]),
-        ("cxc", "Cuentas por cobrar", acceso["cxc"]),
         ("cxp", "Cuentas por pagar", acceso["cxp"]),
         ("cierres", "Cierres de caja", acceso["cierres_caja"] and acceso["usa_cierre_caja"]),
         ("reportes", "Reportes", acceso["reportes"]),
