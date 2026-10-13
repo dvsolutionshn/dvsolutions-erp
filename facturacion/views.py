@@ -5826,6 +5826,13 @@ def descargar_compra_pdf(request, empresa_slug, compra_id):
 @login_required
 def kardex_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_kardex import autorizar_kardex_app, es_kardex_app, render_kardex_app, validar_relaciones_kardex_app
+
+    modo_app = es_kardex_app(request, empresa)
+    producto_seleccionado_app = None
+    if modo_app:
+        autorizar_kardex_app(request, empresa)
+        producto_seleccionado_app = validar_relaciones_kardex_app(empresa, request.GET.get("producto"))
     producto_id = request.GET.get("producto")
     tipo = request.GET.get("tipo", "").strip()
     fecha_desde = request.GET.get("fecha_desde", "").strip()
@@ -5921,6 +5928,13 @@ def kardex_inventario(request, empresa_slug):
         if valor in {'traslado_salida', 'traslado_entrada'} and valor not in tipos_existentes
     )
 
+    if modo_app:
+        return render_kardex_app(request, empresa, {
+            "empresa": empresa, "productos": productos, "movimientos": movimientos,
+            "resumen": resumen, "producto_id": str(producto_id or ""), "tipo": tipo,
+            "fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta,
+            "tipos_movimiento": tipos_movimiento,
+        }, producto_seleccionado_app)
     return render(request, "facturacion/kardex_premium.html", {
         "empresa": empresa,
         "productos": productos,

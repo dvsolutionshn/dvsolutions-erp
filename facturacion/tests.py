@@ -4782,7 +4782,8 @@ class FacturacionTests(TestCase):
         self.assertContains(response, "Traslado salida")
         self.assertContains(response, "Traslado entrada")
         self.assertContains(response, "HIST-TRAS-1", count=2)
-        self.assertContains(response, fecha_historica.strftime("%d/%m/%Y"), count=2)
+        # El template original muestra la zona local, no el día UTC del modelo.
+        self.assertContains(response, timezone.localtime(fecha_historica).strftime("%d/%m/%Y"), count=2)
         self.assertEqual(response.context["resumen"]["entradas"], 1)
         self.assertEqual(response.context["resumen"]["salidas"], 1)
 

@@ -1,0 +1,85 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Kardex de inventario{% endblock %}
+{% block mobile_page_title %}Movimientos de inventario{% endblock %}
+{% block mobile_kicker %}Kardex · Solo consulta{% endblock %}
+{% block mobile_back_url %}{{ app_kardex_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>Entradas, salidas y movimientos registrados en la empresa activa.</p>{% endblock %}
+{% block mobile_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'facturacion/mobile_egresos.css' %}">
+<link rel="stylesheet" href="{% static 'facturacion/mobile_kardex.css' %}">
+{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'facturacion/mobile_egresos.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mkd-summary" aria-labelledby="kardexSummaryTitle">
+  <h2 id="kardexSummaryTitle">Resumen de movimientos</h2>
+  <dl class="mkd-summary-grid">
+    <div><dt>Movimientos</dt><dd>{{ resumen.total_movimientos }}</dd></div>
+    <div><dt>Entradas</dt><dd>{{ resumen.entradas }}</dd></div>
+    <div><dt>Salidas</dt><dd>{{ resumen.salidas }}</dd></div>
+  </dl>
+  <p class="mkd-caption">Son cantidades de registros, no unidades de producto. El resumen incluye todos los resultados de los filtros, no solo esta página.</p>
+</section>
+<section class="mi-card meg-search-card" aria-labelledby="kardexFilterTitle">
+  <h2 id="kardexFilterTitle">Filtrar movimientos</h2>
+  <form id="mobileKardexFilterForm" action="{{ app_kardex_search_url }}" method="get">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field">
+      <label for="kardexProduct">Producto</label>
+      <select id="kardexProduct" name="producto">
+        <option value="">Todos los productos</option>
+        {% if producto_seleccionado and not producto_seleccionado.controla_inventario %}<option value="{{ producto_seleccionado.pk }}" selected>{{ producto_seleccionado.nombre }} · Fuera del selector actual</option>{% endif %}
+        {% for producto in productos %}<option value="{{ producto.pk }}"{% if producto_id == producto.pk|stringformat:'s' %} selected{% endif %}>{{ producto.nombre }}</option>{% endfor %}
+      </select>
+      {% if producto_seleccionado and not producto_seleccionado.controla_inventario %}<small>Se conserva la selección histórica de este producto, aunque ya no pertenezca al selector de productos con control de inventario.</small>{% endif %}
+    </div>
+    <div class="mi-field">
+      <label for="kardexType">Tipo de movimiento</label>
+      <select id="kardexType" name="tipo"><option value="">Todos los tipos</option>{% for codigo, nombre in tipos_movimiento %}<option value="{{ codigo }}"{% if tipo == codigo %} selected{% endif %}>{{ nombre }}</option>{% endfor %}</select>
+    </div>
+    <div class="mi-field-grid mkd-date-grid">
+      <div class="mi-field"><label for="kardexDateFrom">Fecha desde</label><input id="kardexDateFrom" type="date" name="fecha_desde" value="{{ fecha_desde }}"></div>
+      <div class="mi-field"><label for="kardexDateTo">Fecha hasta</label><input id="kardexDateTo" type="date" name="fecha_hasta" value="{{ fecha_hasta }}"></div>
+    </div>
+    <button class="mi-button secondary" type="submit">Filtrar</button>
+    {% if producto_id or tipo or fecha_desde or fecha_hasta %}<a class="meg-clear-search" href="{{ app_kardex_url }}">Limpiar filtros</a>{% endif %}
+  </form>
+  <p class="meg-search-note">Los filtros consultan todo el historial de esta empresa. Esta vista móvil pagina el resultado completo.</p>
+</section>
+<div class="meg-list-meta"><strong>{{ mobile_kardex_total }} movimiento{% if mobile_kardex_total != 1 %}s{% endif %}</strong>{% if mobile_kardex_total %}<span>{{ movimientos.start_index }}–{{ movimientos.end_index }}</span>{% endif %}</div>
+<div class="meg-list mkd-list" aria-label="Historial cronológico de movimientos">
+  {% for item in mobile_kardex_items %}
+  {% with movimiento=item.movimiento %}
+  <article class="mi-card meg-card mkd-movement" id="kardex-{{ item.origen }}-{{ movimiento.pk }}" data-kardex-origin="{{ item.origen }}">
+    <div class="mkd-card-top"><time datetime="{{ movimiento.fecha|date:'c' }}">{{ movimiento.fecha|date:'d/m/Y H:i' }}</time><span class="mkd-type">{{ movimiento.get_tipo_display }}</span></div>
+    <div class="meg-provider"><small>Producto</small><h2>{{ movimiento.producto_kardex.nombre }}</h2>{% if movimiento.producto_kardex.codigo %}<p class="mkd-product-code">{{ movimiento.producto_kardex.codigo }}</p>{% endif %}</div>
+    <div class="mkd-origin {% if item.origen == 'lote' %}mkd-origin-lot{% endif %}">{{ item.origen_label }}</div>
+    <dl class="meg-card-meta">
+      <div><dt>Bodega</dt><dd>{% if movimiento.bodega %}{{ movimiento.bodega.nombre }}{% else %}General{% endif %}</dd></div>
+      <div><dt>Cantidad registrada</dt><dd class="mkd-quantity">{{ movimiento.cantidad|floatformat:2|intcomma }}</dd></div>
+      {% if movimiento.lote_kardex %}
+      <div><dt>Lote</dt><dd>{{ movimiento.lote_kardex.numero_lote }}</dd></div>
+      <div><dt>Vencimiento del lote</dt><dd>{% if movimiento.lote_kardex.fecha_vencimiento %}{{ movimiento.lote_kardex.fecha_vencimiento|date:'d/m/Y' }}{% else %}Sin vencimiento registrado{% endif %}</dd></div>
+      {% endif %}
+    </dl>
+    <div class="mkd-snapshot">
+      <h3>Existencia registrada · {{ item.origen_label }}</h3>
+      <dl><div><dt>Antes</dt><dd>{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</dd></div><div><dt>Después</dt><dd>{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</dd></div></dl>
+    </div>
+    {% if movimiento.referencia or movimiento.observacion %}
+    <details class="mkd-notes">
+      <summary>Referencia y observación <span aria-hidden="true">⌄</span></summary>
+      <dl class="meg-data"><div><dt>Referencia</dt><dd class="meg-text">{{ movimiento.referencia|default:'Sin referencia registrada' }}</dd></div><div><dt>Observación completa</dt><dd class="meg-text">{{ movimiento.observacion|default:'Sin observación registrada' }}</dd></div></dl>
+    </details>
+    {% else %}<p class="mkd-caption">Sin referencia ni observación registradas.</p>{% endif %}
+  </article>
+  {% endwith %}
+  {% empty %}
+  <section class="mi-card meg-empty"><h2>Sin movimientos{% if producto_id or tipo or fecha_desde or fecha_hasta %} para estos filtros{% endif %}</h2><p>{% if producto_id or tipo or fecha_desde or fecha_hasta %}No hay registros que coincidan con la selección.{% else %}Todavía no hay movimientos de inventario registrados en esta empresa.{% endif %}</p></section>
+  {% endfor %}
+</div>
+{% if mobile_kardex_num_pages > 1 %}<nav class="meg-pagination" aria-label="Páginas de movimientos de inventario"><div>{% if mobile_kardex_previous_url %}<a href="{{ mobile_kardex_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_kardex_page }} / {{ mobile_kardex_num_pages }}</span>{% if mobile_kardex_next_url %}<a href="{{ mobile_kardex_next_url }}">Siguiente ›</a>{% endif %}</div></nav>{% endif %}
+<div class="meg-info-note"><strong>Valores históricos · Solo consulta</strong><p>La cantidad y las existencias antes/después son los valores guardados en cada movimiento. Se distingue inventario general de lote y bodega; esta pantalla no recalcula existencias, no aplica FEFO ni modifica inventario.</p></div>
+{% endblock %}
