@@ -18,6 +18,8 @@ from core.context_processors import erp_access
 MODULOS_OCULTOS_APP_CLINICA = frozenset({
     "egresos", "cxc", "cxp", "notas_credito", "cierres", "reportes",
     "contabilidad", "rrhh", "tecnicentro", "crm", "cotizaciones",
+    # Accesos ya presentes en Inicio: ocultar sólo su tarjeta en Más funciones.
+    "pacientes", "agenda", "facturacion", "inventario",
 })
 
 

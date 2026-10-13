@@ -453,10 +453,8 @@ class MobileGastosAdicionalesIntegrationTests(TestCase):
         self.rol.save()
         endpoint = reverse("agenda_mobile_modules", args=[self.empresa.slug])
         modulos = {modulo["key"]: modulo for modulo in self.client.get(endpoint).json()["modulos"]}
-        self.assertEqual(modulos["inventario"]["estado"], "pendiente")
-        self.assertFalse(modulos["inventario"]["url"])
-        self.assertEqual(modulos["facturacion"]["estado"], "pendiente")
-        self.assertFalse(modulos["facturacion"]["url"])
+        self.assertNotIn("inventario", modulos)
+        self.assertNotIn("facturacion", modulos)
         app = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
         self.assertNotContains(app, 'id="productos-app"')
         self.assertContains(app, 'class="mobile-home-card invoice" href="#factura-app"')

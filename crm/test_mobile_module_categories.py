@@ -18,7 +18,7 @@ from django.urls import reverse
 
 from core.models import Empresa, EmpresaModulo, Modulo, RolSistema, Usuario, UsuarioEmpresaPermiso
 from . import views
-from .mobile_modules import construir_contexto_modulos_app
+from .mobile_modules import MODULOS_OCULTOS_APP_CLINICA, construir_contexto_modulos_app
 
 
 class _CategoryNode:
@@ -309,14 +309,77 @@ class MobileModuleCategoryTests(TestCase):
             self.assertNotIn("data-app-open", node.attrs)
             self.assertIn(item["descripcion"], node.text())
 
-    def test_available_partial_and_embedded_panel_destinations_remain_registry_values(self):
+    def test_available_partial_and_remaining_destinations_match_registry_values(self):
         self.role_for(puede_ver_pacientes=True, puede_ver_historia_clinica=True, puede_ver_terapias=True,
                       puede_ver_calendario=True, puede_productos=True, puede_inventario=True)
         context = self.registry()
         self.assertTrue(any(item["estado"] == "disponible" for item in context["modulos_app"]))
         self.assertTrue(any(item["estado"] == "parcial" for item in context["modulos_app"]))
-        self.assertTrue(any(item["panel"] == "agenda-app" for item in context["modulos_app"]))
+        self.assertFalse(any(item["key"] in {"pacientes", "agenda", "facturacion", "inventario"}
+                             for item in context["modulos_app"]))
         self.assert_panel_matches(self.render_panel(context, embedded=True), context, embedded=True)
+
+    def test_four_duplicate_entries_are_the_only_items_removed_for_all_companies_and_roles(self):
+        duplicates = {"pacientes", "agenda", "facturacion", "inventario"}
+        for company in self.empresas.values():
+            for granular in (True, False):
+                flags = {"puede_ver_pacientes": True, "puede_ver_calendario": True} if granular else {
+                    "puede_pacientes": True, "puede_citas": True,
+                }
+                self.role_for(company, granular, puede_productos=True, puede_inventario=True,
+                              puede_facturas=True, puede_crear_facturas=True,
+                              puede_configuracion_clinica=True, **flags)
+                with self.subTest(company=company.slug, granular=granular):
+                    with patch("crm.mobile_modules.MODULOS_OCULTOS_APP_CLINICA",
+                               MODULOS_OCULTOS_APP_CLINICA - duplicates):
+                        before = self.registry(company)
+                    self.assertTrue(duplicates.issubset(item["key"] for item in before["modulos_app"]))
+                    after, _ = self.readonly(lambda: self.registry(company))
+                    self.assertEqual(after["modulos_app"], [item for item in before["modulos_app"]
+                                                            if item["key"] not in duplicates])
+                    self.assert_registry_groups(after)
+                    self.assertEqual(after["modulos_disponibles_app"],
+                                     sum(bool(item["url"]) for item in after["modulos_app"]))
+                    self.assertEqual(after["rol_app"], before["rol_app"])
+                    self.assertEqual(after["puede_ver_modulos_app"], before["puede_ver_modulos_app"])
+
+    def test_duplicates_absent_from_standalone_embedded_and_json_but_home_accesses_remain(self):
+        names = {"Pacientes", "Agenda y citas", "Facturación", "Productos y existencias"}
+        for company in self.empresas.values():
+            with self.subTest(company=company.slug):
+                request = self.request(company)
+                context = self.registry(company)
+                context.update(empresa=company, request=request, puede_ver_productos_app=True,
+                               hospital_mia_app_premium=True, erp_access={"facturas": True})
+                for template in ("crm/mobile_modules.html", "crm/agenda_mobile.html"):
+                    context["modulos_standalone"] = template == "crm/mobile_modules.html"
+                    html, _ = self.readonly(lambda: render_to_string(template, context))
+                    markup, root = self.assert_panel_matches(html, context, embedded=template == "crm/agenda_mobile.html")
+                    cards = markup.nodes(class_name="mobile-modules-card", within=root)
+                    self.assertTrue(names.isdisjoint(markup.nodes(tag="strong", within=card)[0].text().strip()
+                                                    for card in cards))
+                    if template == "crm/agenda_mobile.html":
+                        home = markup.nodes(attr="id", value="inicio")[0]
+                        for panel in ("pacientes-app", "factura-app", "facturas-app", "productos-app", "agenda-app"):
+                            self.assertEqual(len(markup.nodes(tag="a", attr="data-app-open", value=panel, within=home)), 1)
+                            self.assertEqual(len(markup.nodes(attr="id", value=panel)), 1)
+                response, _ = self.readonly(lambda: self.client.get(self.url(company, json=True)))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["modulos"], context["modulos_app"])
+                self.assertTrue(names.isdisjoint(item["nombre"] for item in response.json()["modulos"]))
+
+    def test_patient_only_role_keeps_existing_directory_navigation_without_duplicate_category(self):
+        for company in self.empresas.values():
+            self.role_for(company, puede_ver_pacientes=True)
+            with self.subTest(company=company.slug):
+                response, _ = self.readonly(lambda: self.client.get(self.url(company)))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["modulos_app"], [])
+                self.assertEqual(response.context["grupos_modulos_app"], [])
+                self.assertContains(response, 'No hay módulos adicionales disponibles')
+                self.assertContains(response, f'href="{reverse("clinica_pacientes", args=[company.slug])}?app=1"')
+                markup = _CategoryMarkup(response.content.decode())
+                self.assertEqual(markup.nodes(attr="data-modules-category-target"), [])
 
     def test_company_role_overrides_change_groups_without_global_role_or_membership_updates(self):
         target = self.empresas["medical_spa"]

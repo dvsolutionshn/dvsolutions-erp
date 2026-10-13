@@ -414,13 +414,13 @@ class MobilePatientsIntegrationTests(TestCase):
         self.assertTemplateUsed(hub, "crm/mobile_modules.html")
         self.assertNotContains(hub, self.paciente.identidad)
         self.assertNotContains(hub, self.paciente.correo)
-        self.assertEqual({module["key"] for module in hub.context["modulos_app"]}, {"pacientes"})
-        self.assertEqual(hub.context["modulos_app"][0]["url"], self.url("clinica_crear_paciente"))
+        self.assertEqual(hub.context["modulos_app"], [])
+        self.assertContains(hub, "No hay módulos adicionales disponibles")
         response = self.client.post(self.url("clinica_crear_paciente", mobile=False), self.datos())
         self.assertRedirects(response, self.url("clinica_crear_paciente"), fetch_redirect_response=False)
         self.assertTrue(Paciente.objects.filter(empresa=self.empresa, identidad="0801199912345").exists())
 
-    def test_new_hub_patient_entry_is_additive_and_does_not_replace_trained_home(self):
+    def test_hidden_duplicate_patient_entry_does_not_replace_trained_home(self):
         response = self.client.get(reverse("agenda_mobile", args=[self.empresa.slug]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'href="#pacientes-app"')
@@ -429,8 +429,7 @@ class MobilePatientsIntegrationTests(TestCase):
         self.assertContains(response, 'id="mas-funciones-app"')
         for panel in ("factura-app", "facturas-app", "agenda-app"):
             self.assertContains(response, f'id="{panel}"')
-        module = next(item for item in response.context["modulos_app"] if item["key"] == "pacientes")
-        self.assertEqual(module["url"], self.url("clinica_pacientes"))
-        self.assertEqual(module["panel"], "")
+        self.assertNotIn("pacientes", {item["key"] for item in response.context["modulos_app"]})
         registry = self.client.get(reverse("agenda_mobile_modules", args=[self.empresa.slug])).json()
-        self.assertEqual(next(item for item in registry["modulos"] if item["key"] == "pacientes")["url"], self.url("clinica_pacientes"))
+        self.assertNotIn("pacientes", {item["key"] for item in registry["modulos"]})
+        self.assertEqual(self.client.get(self.url("clinica_pacientes")).status_code, 200)

@@ -79,8 +79,8 @@ class MobileInventoryTests(TestCase):
         self.rol.puede_productos = True
         self.rol.save(update_fields=["puede_inventario", "puede_productos"])
         self.assertEqual(self.client.get(url).status_code, 403)
-        modulo = next(m for m in self.client.get(reverse("agenda_mobile_modules", args=[empresa.slug])).json()["modulos"] if m["key"] == "inventario")
-        self.assertFalse(modulo["url"])
+        modulos = self.client.get(reverse("agenda_mobile_modules", args=[empresa.slug])).json()["modulos"]
+        self.assertNotIn("inventario", {modulo["key"] for modulo in modulos})
         self.rol.puede_inventario = True
         self.rol.save(update_fields=["puede_inventario"])
         EmpresaModulo.objects.filter(empresa=empresa, modulo__codigo="facturacion").update(activo=False)
@@ -103,9 +103,8 @@ class MobileInventoryTests(TestCase):
         self.assertNotContains(self.client.get(reverse("agenda_mobile_inventory", args=[self.empresas[1].slug])), "Entrada rápida")
         for empresa in self.empresas:
             modulos = self.client.get(reverse("agenda_mobile_modules", args=[empresa.slug])).json()["modulos"]
-            inventario = next(m for m in modulos if m["key"] == "inventario")
-            self.assertEqual(inventario["url"], reverse("agenda_mobile_inventory", args=[empresa.slug]))
-            self.assertEqual(inventario["estado"], "parcial")
+            self.assertNotIn("inventario", {modulo["key"] for modulo in modulos})
+            self.assertEqual(self.client.get(reverse("agenda_mobile_inventory", args=[empresa.slug])).status_code, 200)
 
     def test_granular_inventory_only_role_does_not_require_calendar_or_grant_other_actions(self):
         self.rol.es_rol_clinico = True
