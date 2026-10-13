@@ -68,6 +68,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     from .mobile_antecedents import antecedentes_disponibles_app, url_antecedentes_app
     from .mobile_plans import planes_disponibles_app
     from .mobile_followups import seguimientos_disponibles_app
+    from .mobile_general_history import historia_general_disponible_app, url_historia_general_app
 
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
@@ -94,6 +95,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_view_history": permiso("puede_ver_historia_clinica", "puede_expediente_clinico"),
         "can_create_history": permiso("puede_crear_historia_clinica", "puede_expediente_clinico"),
         "can_edit_history": permiso("puede_editar_historia_clinica", "puede_expediente_clinico"),
+        "can_complete_general_history": historia_general_disponible_app(request, empresa),
         "mobile_history_create_types": tipos_historia_creables_app(request, empresa, paciente),
         "mobile_special_history_forms": formularios_historia_especiales_app(request, empresa, paciente),
         "mobile_patient_control_types": controles_disponibles_app(request, empresa, paciente),
@@ -160,6 +162,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
                 contexto["mobile_patient_history_mode"] = "crear_historia"
                 contexto["mobile_patient_history_create_type"] = tipo_elegido
     if paciente:
+        contexto["app_patient_general_history_url"] = url_historia_general_app(empresa, paciente) if contexto["can_complete_general_history"] else ""
         contexto["app_patient_followups_url"] = url_paciente_app("clinica_seguimientos_paciente", empresa, paciente.pk)
         contexto["app_patient_plans_url"] = url_paciente_app("clinica_planes_tratamiento_paciente", empresa, paciente.pk)
         contexto["app_patient_plan_create_url"] = url_paciente_app("clinica_plan_tratamiento_crear_app", empresa, paciente.pk)

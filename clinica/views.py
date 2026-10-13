@@ -1536,9 +1536,22 @@ def paciente_detalle(request, empresa_slug, paciente_id):
 
 @login_required
 def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
+    from .mobile_general_history import (
+        autorizar_historia_general_app, es_historia_general_app, identidad_historia_general_app,
+        render_historia_general_app, validar_datos_generales_app, validar_generales_paciente_app,
+        validar_relaciones_guardado_app, volver_historia_general_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
+    modo_app = es_historia_general_app(request, empresa)
+    if modo_app:
+        autorizar_historia_general_app(request, empresa, paciente_id, PreconsultaClinicaPublicaForm)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    if modo_app:
+        validar_generales_paciente_app(empresa, paciente, paciente.preconsultas.filter(tipo="general"))
     preconsulta = paciente.preconsultas.filter(tipo="general").order_by("-fecha_creacion").first()
+    if modo_app and request.method == "POST":
+        validar_relaciones_guardado_app(paciente, preconsulta)
     if preconsulta is None:
         token_raw, token_hash, token_preview = generar_token_preconsulta()
         preconsulta = PreconsultaClinica.objects.create(
@@ -1551,6 +1564,9 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
             creada_por=request.user,
             datos_generales={"formulario_general_pendiente_doctor": True},
         )
+    if modo_app:
+        validar_datos_generales_app(preconsulta, PreconsultaClinicaPublicaForm)
+        identidad_app = identidad_historia_general_app(empresa, paciente, preconsulta)
     form = PreconsultaClinicaPublicaForm(
         request.POST or None,
         request.FILES or None,
@@ -1570,7 +1586,11 @@ def completar_historia_clinica_paciente(request, empresa_slug, paciente_id):
         preconsulta.save()
         _actualizar_paciente_desde_preconsulta(paciente, form)
         messages.success(request, "Historia clinica completada correctamente.")
+        if modo_app:
+            return volver_historia_general_app(request, empresa, paciente)
         return redirect("clinica_paciente_detalle", empresa_slug=empresa.slug, paciente_id=paciente.id)
+    if modo_app:
+        return render_historia_general_app(request, empresa, paciente, preconsulta, form, identidad_app)
     return render(
         request,
         "clinica/preconsulta_publica.html",
