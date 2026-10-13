@@ -3251,7 +3251,15 @@ def eliminar_cliente(request, empresa_slug, cliente_id):
 
 @login_required
 def productos_facturacion(request, empresa_slug):
+    from .mobile_products import (
+        autorizar_productos_app, es_productos_app, render_productos_app,
+        validar_relaciones_productos_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_productos_app(request, empresa)
+    if modo_app:
+        autorizar_productos_app(request, empresa)
     q = request.GET.get("q", "").strip()
     categoria_id = request.GET.get("categoria", "").strip()
     tipo_item = request.GET.get("tipo", "todos").strip().lower()
@@ -3261,6 +3269,8 @@ def productos_facturacion(request, empresa_slug):
         'impuesto_predeterminado',
         'perfil_farmaceutico__categoria',
     ).order_by('nombre')
+    if modo_app:
+        categoria_seleccionada = validar_relaciones_productos_app(empresa, productos, categoria_id)
     if q:
         productos = productos.filter(
             Q(nombre__icontains=q) |
@@ -3288,6 +3298,12 @@ def productos_facturacion(request, empresa_slug):
         "controlados": productos_filtrados.filter(perfil_farmaceutico__producto_controlado=True).count(),
         "refrigerados": productos_filtrados.filter(perfil_farmaceutico__requiere_refrigeracion=True).count(),
     }
+
+    if modo_app:
+        return render_productos_app(
+            request, empresa, productos_filtrados, resumen, q, categoria_id,
+            tipo_item, categoria_seleccionada,
+        )
 
     productos_filtrados = _anotar_existencias_por_bodega(productos_filtrados, empresa)
 

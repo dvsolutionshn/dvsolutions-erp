@@ -1,0 +1,52 @@
+.mcat-header-description,.mcat-intro,.mcat-product,.mcat-empty{overflow-wrap:anywhere}
+.mcat-intro h2{font-size:16px;line-height:1.5;margin-top:12px}
+.mcat-intro p,.mcat-empty p{font-size:13px;line-height:1.7;color:#617f90}
+.mcat-readonly{display:inline-flex;padding:6px 10px;border-radius:999px;background:#eaf7f2;color:#277b66;font-size:11px;font-weight:800}
+.mcat-intro .mcat-caption,.mcat-search-card .mcat-caption{font-size:11px;line-height:1.7;color:#7b93a1;margin-bottom:0}
+.mcat-intro .mcat-tax-note{font-size:11px;line-height:1.7;color:#397c73;padding:10px 12px;background:#f0faf6;border:1px solid #d8ede4;border-radius:12px;margin:13px 0 0}
+.mcat-search-card form,.mcat-product-list{display:grid;gap:14px;min-width:0}
+.mcat-search-card input,.mcat-search-card select{width:100%;min-width:0;max-width:100%;min-height:50px;font-size:16px}
+.mcat-types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:18px}
+.mcat-types a{display:flex;align-items:center;justify-content:center;text-align:center;min-height:44px;min-width:0;padding:9px 6px;border:1px solid #d4e6e9;border-radius:13px;color:#577e8c;background:#f8fbfc;text-decoration:none;font-size:11px;font-weight:800;line-height:1.5;overflow-wrap:anywhere}
+.mcat-types a.active{background:#eaf8f2;border-color:#b6ded3;color:#287b68}
+.mcat-filter-fields{display:grid;gap:14px;min-width:0}
+.mcat-filter-note{display:block;color:#8b7454;font-size:11px;line-height:1.7;margin-top:7px;overflow-wrap:anywhere}
+.mcat-clear-search{display:flex;align-items:center;justify-content:center;min-height:44px;color:#397d80;font-size:12px;font-weight:700;text-decoration:none;overflow-wrap:anywhere}
+.mcat-list-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:2px 3px;font-size:11px;color:#7b93a1}
+.mcat-list-meta strong{font-size:12px;color:#456e80}
+.mcat-product{min-width:0;padding:18px}
+.mcat-product-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.mcat-product-head h2{flex:1;min-width:0;font-size:15px;line-height:1.6;margin:0;color:#294e66}
+.mcat-status{flex:0 0 auto;max-width:40%;padding:6px 9px;border-radius:999px;background:#e7f7ef;color:#287857;font-size:10px;font-weight:800;line-height:1.6;text-align:center;overflow-wrap:anywhere}
+.mcat-status.inactive{background:#f2f4f8;color:#7a8191}
+.mcat-type{display:inline-block;max-width:100%;border-radius:9px;padding:5px 8px;margin-top:9px;font-size:10px;font-weight:800;line-height:1.6;color:#4f738a;background:#edf4f9;overflow-wrap:anywhere}
+.mcat-identity{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin:16px 0;min-width:0}
+.mcat-identity>div,.mcat-classification>div{min-width:0}
+.mcat-identity dt,.mcat-classification dt{font-size:10px;line-height:1.6;color:#7b93a1;margin-bottom:4px}
+.mcat-identity dd,.mcat-classification dd{margin:0;font-size:13px;line-height:1.7;color:#426b7d;overflow-wrap:anywhere}
+.mcat-price-row{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;border:1px solid #dcece5;border-radius:14px;padding:12px;background:#f5fbf8}
+.mcat-price-row>span{font-size:11px;color:#608b7b}
+.mcat-price{font-size:20px;line-height:1.5;color:#2b7e69;overflow-wrap:anywhere;max-width:100%}
+.mcat-details{border-top:1px solid #e1ecf0;margin-top:15px;padding-top:6px;min-width:0}
+.mcat-details>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;list-style:none;font-size:12px;font-weight:800;color:#527e8e;cursor:pointer;overflow-wrap:anywhere}
+.mcat-details>summary::-webkit-details-marker{display:none}
+.mcat-details>summary>span{font-size:16px;flex:0 0 auto}
+.mcat-details[open]>summary>span{transform:rotate(180deg)}
+.mcat-details-body h3{font-size:12px;color:#527e8e;margin:16px 0 7px}
+.mcat-description{font-size:13px;line-height:1.8;color:#365d72;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.mcat-classification{display:grid;gap:14px;margin:0}
+.mcat-pharmacy-flags{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+.mcat-pharmacy-flags>span{max-width:100%;padding:6px 9px;border-radius:9px;background:#fff6e8;color:#927543;font-size:11px;font-weight:700;line-height:1.5;overflow-wrap:anywhere}
+.mcat-tax-label{display:grid;gap:5px;margin-top:16px}
+.mcat-tax-label span{font-size:10px;color:#7b93a1}
+.mcat-tax-label strong{font-size:12px;line-height:1.7;color:#527e8e;overflow-wrap:anywhere}
+.mcat-empty{text-align:center;padding:28px 20px}
+.mcat-empty h2{font-size:16px;color:#4b7588}
+.mcat-pagination{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:9px;margin-top:6px;font-size:11px;color:#708c9b}
+.mcat-pagination a,.mcat-pagination>span{display:flex;align-items:center;justify-content:center;min-height:44px;padding:10px 14px;border:1px solid #d3e5e9;border-radius:12px;background:#fff;color:#4f7d8a;text-decoration:none}
+.mcat-pagination>span{background:#eff8f5;color:#287e6d;font-weight:800}
+.mcat-navigation{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+.mcat-navigation a{min-width:0}
+.mcat-navigation span{overflow-wrap:anywhere}
+@media(min-width:640px){.mcat-filter-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mcat-classification{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:350px){.mcat-product{padding:15px}.mcat-product-head{flex-wrap:wrap;gap:9px}.mcat-product-head h2{flex-basis:100%;font-size:14px}.mcat-status{max-width:100%}.mcat-identity{gap:12px}.mcat-price{font-size:19px}.mcat-empty{padding:25px 17px}}

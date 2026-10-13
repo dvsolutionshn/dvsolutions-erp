@@ -180,6 +180,10 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("inventario", "Productos y existencias", "Existencias, bodegas y lotes; ampliación progresiva a las cuatro empresas.",
             "Operación", acceso["productos"] or acceso["inventario"],
             "parcial" if inventario_movil else "pendiente", reverse("agenda_mobile_inventory", args=[empresa.slug]))
+    from facturacion.mobile_products import productos_disponibles_app, url_productos_app
+
+    agregar("catalogo_productos", "Catálogo de productos", "Consultar productos y servicios, código, unidad y precio registrado; no modifica existencias.",
+            "Operación", productos_disponibles_app(request, empresa), "disponible", url_productos_app(empresa))
     from facturacion.mobile_kardex import kardex_disponible_app
 
     agregar("kardex", "Historial de inventario", "Consultar movimientos generales y por lote, con las existencias registradas antes y después.",

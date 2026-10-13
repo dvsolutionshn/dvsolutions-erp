@@ -1,0 +1,45 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Catálogo de productos{% endblock %}
+{% block mobile_page_title %}Catálogo de productos{% endblock %}
+{% block mobile_kicker %}Productos y servicios{% endblock %}
+{% block mobile_back_url %}{{ app_products_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="mcat-header-description">Consulta el catálogo registrado en {{ empresa.nombre }}.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_product_catalog.css' %}">{% endblock %}
+{% block mobile_navigation %}
+<nav class="mi-bottom mcat-navigation" aria-label="Navegación del catálogo">
+  <a class="active" href="{{ app_products_url }}" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8-4 8 4-8 4Z"/><path d="m4 8 8 4 8-4v9l-8 4-8-4Z"/><path d="M12 12v9"/></svg><span>Catálogo</span></a>
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>{% endif %}
+</nav>
+{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mcat-intro" aria-labelledby="catalogScopeTitle"><span class="mcat-readonly">Solo consulta</span><h2 id="catalogScopeTitle">Productos y servicios registrados</h2><p>Consulta nombres, códigos y precios de esta empresa. Las existencias se mantienen en su pantalla actual, separada de este catálogo.</p><p class="mcat-caption">Aquí no se crean, modifican ni eliminan productos. Los artículos inactivos se muestran con su estado registrado.</p>{% if mobile_product_price_includes_tax %}<p class="mcat-tax-note">Precio final, impuesto incluido. Se muestra el precio registrado, sin recalcularlo.</p>{% endif %}</section>
+<section class="mi-card mcat-search-card" aria-labelledby="catalogSearchTitle">
+  <h2 id="catalogSearchTitle">Buscar en el catálogo</h2>
+  <nav class="mcat-types" aria-label="Filtrar por tipo de artículo">{% for tipo in mobile_product_types %}<a href="{{ tipo.url }}"{% if tipo.activo %} class="active" aria-current="page"{% endif %}>{{ tipo.nombre }}</a>{% endfor %}</nav>
+  <form method="get" action="{{ app_products_search_url }}" id="mobileProductCatalogSearchForm">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field"><label for="mobileCatalogSearch">Nombre, código o descripción</label><input id="mobileCatalogSearch" type="search" name="q" value="{{ mobile_product_query }}" placeholder="Buscar producto o servicio..." autocomplete="off"></div>
+    <div class="mcat-filter-fields">
+      <div class="mi-field"><label for="mobileCatalogCategory">Categoría farmacéutica</label><select id="mobileCatalogCategory" name="categoria"><option value="">Todas las categorías</option>{% for categoria in categorias_farmaceuticas %}<option value="{{ categoria.pk }}"{% if categoria_id == categoria.pk|stringformat:'s' %} selected{% endif %}>{{ categoria.nombre }}</option>{% endfor %}{% if categoria_seleccionada and not categoria_seleccionada.activa %}<option value="{{ categoria_seleccionada.pk }}" selected>{{ categoria_seleccionada.nombre }} · Inactiva</option>{% endif %}</select>{% if categoria_seleccionada and not categoria_seleccionada.activa %}<small class="mcat-filter-note">Se conserva la categoría inactiva seleccionada para consultar sus registros.</small>{% endif %}</div>
+      <div class="mi-field"><label for="mobileCatalogType">Tipo de artículo</label><select id="mobileCatalogType" name="tipo">{% for tipo in mobile_product_types %}<option value="{{ tipo.codigo }}"{% if tipo.activo %} selected{% endif %}>{{ tipo.nombre }}</option>{% endfor %}</select></div>
+    </div>
+    <button class="mi-button secondary" type="submit">Buscar</button>
+    {% if mobile_product_query or categoria_id or tipo_item != 'todos' %}<a class="mcat-clear-search" href="{{ app_products_url }}">Limpiar filtros</a>{% endif %}
+  </form>
+  <p class="mcat-caption">La búsqueda incluye todo el catálogo de esta empresa, no solo la página actual. También puede encontrar información farmacéutica registrada.</p>
+</section>
+<div class="mcat-list-meta"><strong>{{ mobile_product_total }} artículo{% if mobile_product_total != 1 %}s{% endif %} encontrado{% if mobile_product_total != 1 %}s{% endif %}</strong>{% if mobile_product_total %}<span>{{ page_obj.start_index }}–{{ page_obj.end_index }}</span>{% endif %}</div>
+<section class="mcat-product-list" aria-label="Catálogo registrado">
+  {% for item in mobile_product_items %}
+  <article class="mi-card mcat-product" id="mobile-catalog-product-{{ item.id }}">
+    <div class="mcat-product-head"><h2>{{ item.nombre }}</h2><span class="mcat-status{% if not item.activo %} inactive{% endif %}">{% if item.activo %}Activo{% else %}Inactivo{% endif %}</span></div>
+    <span class="mcat-type">{{ item.tipo_label }}</span>
+    <dl class="mcat-identity"><div><dt>Código / SKU</dt><dd>{{ item.codigo|default:'Sin código' }}</dd></div><div><dt>Unidad</dt><dd>{{ item.unidad_label }}</dd></div></dl>
+    <div class="mcat-price-row"><span>Precio registrado</span><strong class="mcat-price">L. {{ item.precio|floatformat:2|intcomma }}</strong></div>
+    <details class="mcat-details"><summary>Descripción y clasificación <span aria-hidden="true">⌄</span></summary><div class="mcat-details-body"><h3>Descripción</h3><p class="mcat-description">{{ item.descripcion|default:'Sin descripción registrada.' }}</p><h3>Clasificación registrada</h3><dl class="mcat-classification"><div><dt>Categoría</dt><dd>{{ item.categoria|default:'No indicada' }}</dd></div><div><dt>Principio activo</dt><dd>{{ item.principio_activo|default:'No indicado' }}</dd></div></dl>{% if item.controlado or item.refrigerado %}<div class="mcat-pharmacy-flags">{% if item.controlado %}<span>Controlado</span>{% endif %}{% if item.refrigerado %}<span>Refrigerado</span>{% endif %}</div>{% endif %}{% if item.impuesto_label %}<div class="mcat-tax-label"><span>Impuesto registrado</span><strong>{{ item.impuesto_label }}</strong></div>{% endif %}</div></details>
+  </article>
+  {% empty %}<section class="mi-card mcat-empty"><h2>Sin artículos para esta vista</h2><p>{% if mobile_product_query or categoria_id or tipo_item != 'todos' %}No se encontraron productos o servicios con los filtros seleccionados.{% else %}Esta empresa todavía no tiene productos o servicios en su catálogo.{% endif %}</p>{% if mobile_product_query or categoria_id or tipo_item != 'todos' %}<a class="mcat-clear-search" href="{{ app_products_url }}">Ver todo el catálogo</a>{% endif %}</section>{% endfor %}
+</section>
+{% if mobile_product_num_pages > 1 %}<nav class="mcat-pagination" aria-label="Páginas del catálogo">{% if mobile_product_previous_url %}<a href="{{ mobile_product_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_product_page }} / {{ mobile_product_num_pages }}</span>{% if mobile_product_next_url %}<a href="{{ mobile_product_next_url }}">Siguiente ›</a>{% endif %}</nav>{% endif %}
+{% endblock %}
