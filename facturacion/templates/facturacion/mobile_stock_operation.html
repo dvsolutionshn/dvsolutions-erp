@@ -1,0 +1,23 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}{{ mobile_stock_title }}{% endblock %}
+{% block mobile_page_title %}{{ mobile_stock_title }}{% endblock %}
+{% block mobile_kicker %}Operación de inventario{% endblock %}
+{% block mobile_back_url %}{{ app_stock_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="msop-header-description">{{ empresa.nombre }}</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_stock_operations.css' %}">{% endblock %}
+{% block mobile_scripts %}{% if not readiness_reason %}<script src="{% static 'facturacion/mobile_stock_operations.js' %}" defer></script>{% endif %}{% endblock %}
+{% block mobile_navigation %}{% include 'facturacion/mobile_product_management_navigation.html' %}{% endblock %}
+{% block mobile_content %}
+<section class="mi-card msop-intro"><span class="msop-scope">Inventario de esta empresa</span><h2>{% if mobile_stock_operation == 'transferencia' %}Mover un lote registrado{% else %}Registrar una entrada{% endif %}</h2><p>{% if mobile_stock_operation == 'transferencia' %}El origen corresponde a la existencia que seleccione. Revise el lote, la bodega de destino y la cantidad antes de confirmar.{% else %}Seleccione el producto y la bodega y complete los datos del lote. El vencimiento rápido mantiene las reglas del formulario original.{% endif %}</p><p class="msop-caption">Se utiliza la operación existente de inventario. Esta pantalla no calcula existencias ni aplica una selección automática FEFO.</p></section>
+{% if readiness_reason %}<section class="mi-card msop-unavailable" role="status"><h2>Operación no disponible</h2><p>{{ readiness_reason }}</p><a class="mi-button secondary" href="{{ app_stock_back_url }}">Volver</a></section>
+{% else %}
+<form method="post" action="{{ app_stock_form_url }}" id="mobileStockOperationForm" class="msop-form" data-submit-once data-mobile-operation-form data-operation-label="Datos de inventario" data-operation-title="Confirmar operación de inventario" data-operation-confirmation="{{ mobile_stock_confirmation_name }}" data-operation-caption="Se registrará esta operación con las reglas actuales de inventario."{% if mobile_stock_bound %} data-operation-unsaved="1"{% endif %}>
+  {% csrf_token %}<input type="hidden" name="app" value="1">
+  {% if mobile_stock_errors %}<div class="mi-error-box msop-error-summary" role="alert" tabindex="-1"><strong>Revise los datos indicados</strong>{% for name,error in mobile_stock_errors.items %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+  {% for section in mobile_stock_sections %}<details class="mi-card msop-section" data-stock-section="{{ section.key }}"{% if forloop.first or mobile_stock_bound %} open{% endif %}><summary><span><small>Sección {{ forloop.counter }}</small><strong>{{ section.titulo }}</strong></span><i aria-hidden="true">⌄</i></summary><div class="msop-fields">{% for field in section.campos %}{% include 'facturacion/mobile_stock_operation_field.html' %}{% endfor %}</div></details>{% endfor %}
+  <a class="msop-cancel" href="{{ app_stock_back_url }}">Volver sin guardar</a><div class="mi-save-bar"><button class="mi-button" type="submit">Revisar y guardar</button></div>
+</form>
+{% include 'facturacion/mobile_stock_operation_dialogs.html' %}
+{% endif %}
+{% endblock %}

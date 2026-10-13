@@ -184,6 +184,17 @@ def construir_contexto_modulos_app(request, empresa):
 
     agregar("catalogo_productos", "Catálogo de productos", "Consultar productos y servicios, código, unidad y precio registrado; no modifica existencias.",
             "Operación", productos_disponibles_app(request, empresa), "disponible", url_productos_app(empresa))
+    from facturacion.mobile_product_management import gestion_productos_disponible_app, url_gestion_producto_app
+    from facturacion.mobile_stock_operations import stock_disponible_app, url_stock_app
+
+    gestion_productos = gestion_productos_disponible_app(request, empresa)
+    agregar("crear_producto", "Crear producto", "Registrar un producto o servicio con el formulario y los permisos actuales.",
+            "Operación", gestion_productos["crear"], "disponible", url_gestion_producto_app("crear_producto_facturacion", empresa))
+    gestionar_stock = stock_disponible_app(request, empresa)
+    agregar("entradas_lotes", "Agregar existencia por lote", "Producto, bodega, lote y vencimiento con el control FEFO existente.",
+            "Operación", gestionar_stock, "disponible", url_stock_app(empresa))
+    agregar("traslado_avanzado", "Traslado entre bodegas", "Elegir una existencia y trasladar su lote a una bodega de esta empresa.",
+            "Operación", gestionar_stock, "disponible", url_stock_app(empresa, "transferencia"))
     from facturacion.mobile_kardex import kardex_disponible_app
 
     agregar("kardex", "Historial de inventario", "Consultar movimientos generales y por lote, con las existencias registradas antes y después.",

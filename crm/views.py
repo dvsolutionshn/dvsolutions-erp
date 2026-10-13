@@ -2461,6 +2461,9 @@ def agenda_mobile(request, empresa_slug):
 
 @require_http_methods(["GET"])
 def agenda_mobile_inventory(request, empresa_slug):
+    from facturacion.mobile_product_management import gestion_productos_disponible_app, url_gestion_producto_app
+    from facturacion.mobile_stock_operations import acciones_stock_app, url_stock_app
+
     empresa = _empresa_desde_slug(empresa_slug)
     acceso_denegado = _proteger_agenda_mobile(request, empresa)
     if acceso_denegado is not None:
@@ -2471,6 +2474,17 @@ def agenda_mobile_inventory(request, empresa_slug):
     if not empresa.tiene_modulo_activo("facturacion") or not request.user.tiene_permiso_erp("puede_inventario", empresa):
         return HttpResponse("No tienes permiso para consultar inventario.", status=403)
     inicio = reverse("agenda_mobile", args=[empresa.slug])
+    gestion = gestion_productos_disponible_app(request, empresa)
+    acciones = acciones_stock_app(request, empresa)
+    productos_app = productos_inventario_app(empresa)
+    filas_productos_app = []
+    for producto in productos_app:
+        fila = {"producto": producto}
+        if acciones:
+            fila["app_stock_entry_url"] = url_stock_app(empresa, producto=producto["id"])
+        if gestion["editar"]:
+            fila["app_product_edit_url"] = url_gestion_producto_app("editar_producto_facturacion", empresa, {"id": producto["id"]})
+        filas_productos_app.append(fila)
     response = render(request, "crm/mobile_inventory.html", {
         "empresa": empresa,
         "app_base_url": inicio,
@@ -2478,7 +2492,10 @@ def agenda_mobile_inventory(request, empresa_slug):
         "app_modules_url": url_modulos_app(request, empresa),
         "app_home_disponible": inicio_app_disponible(request, empresa),
         "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
-        "productos": productos_inventario_app(empresa),
+        "productos": productos_app,
+        "mobile_inventory_rows": filas_productos_app,
+        **acciones,
+        "app_product_create_url": url_gestion_producto_app("crear_producto_facturacion", empresa) if gestion["crear"] else "",
         "app_existing_stock_entry_url": f"{inicio}#productos-app" if empresa.slug == "hospital_mia" and inicio_app_disponible(request, empresa) and request.user.tiene_permiso_erp("puede_ajustar_inventario", empresa) else "",
     })
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"

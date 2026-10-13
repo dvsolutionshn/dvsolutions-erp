@@ -3868,7 +3868,16 @@ def ver_bodega_inventario(request, empresa_slug, bodega_id):
 
 @login_required
 def crear_lote_inventario(request, empresa_slug):
+    from .mobile_stock_operations import (
+        autorizar_stock_app, errores_estructura_stock_app, es_stock_app,
+        render_stock_app, validar_relaciones_stock_app, volver_stock_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_stock_app(request, empresa)
+    if modo_app:
+        autorizar_stock_app(request, empresa, "entrada_lote")
+        validar_relaciones_stock_app(empresa)
     if not _empresa_usa_inventario_por_lotes(empresa):
         messages.error(request, "El control de inventario por lotes no esta activo para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
@@ -3878,6 +3887,12 @@ def crear_lote_inventario(request, empresa_slug):
     proveedores = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
     producto_preseleccionado = productos.filter(id=request.GET.get("producto")).first()
     next_url = request.POST.get("next") or request.GET.get("next") or ""
+    if modo_app:
+        errores_app = errores_estructura_stock_app(request, empresa, "entrada_lote")
+        if errores_app:
+            return render_stock_app(request, empresa, "entrada_lote", productos=productos,
+                proveedores=proveedores, bodegas=BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
+                bodega_principal=bodegas["principal"], errores=errores_app)
     if request.method == "POST":
         producto = productos.filter(id=request.POST.get("producto")).first()
         bodega = BodegaInventario.objects.filter(empresa=empresa, id=request.POST.get("bodega")).first()
@@ -3885,7 +3900,8 @@ def crear_lote_inventario(request, empresa_slug):
         cantidad_raw = request.POST.get("cantidad", "").strip()
         fecha_vencimiento = request.POST.get("fecha_vencimiento") or None
         vencimiento_rapido = request.POST.get("fecha_vencimiento_rapida", "").strip()
-        proveedor = proveedores.filter(id=request.POST.get("proveedor")).first()
+        proveedor_id = (request.POST.get("proveedor") or None) if modo_app else request.POST.get("proveedor")
+        proveedor = proveedores.filter(id=proveedor_id).first()
         try:
             cantidad = Decimal(cantidad_raw)
         except InvalidOperation:
@@ -3935,10 +3951,16 @@ def crear_lote_inventario(request, empresa_slug):
                 observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
             )
             messages.success(request, "Lote registrado correctamente.")
+            if modo_app:
+                return volver_stock_app(empresa)
             if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
                 return redirect(next_url)
             return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
 
+    if modo_app:
+        return render_stock_app(request, empresa, "entrada_lote", productos=productos,
+            proveedores=proveedores, bodegas=BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
+            bodega_principal=bodegas["principal"])
     return render(request, "facturacion/crear_lote_inventario.html", {
         "empresa": empresa,
         "productos": productos,
@@ -3954,9 +3976,20 @@ def crear_lote_inventario(request, empresa_slug):
 
 @login_required
 def traslado_inventario_farmaceutico(request, empresa_slug):
+    from .mobile_stock_operations import (
+        autorizar_stock_app, errores_estructura_stock_app, es_stock_app,
+        render_stock_app, validar_relaciones_stock_app, volver_stock_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_stock_app(request, empresa)
+    if modo_app:
+        autorizar_stock_app(request, empresa, "transferencia")
+        validar_relaciones_stock_app(empresa)
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     if not config_avanzada.usa_bodegas_internas:
+        if modo_app:
+            return render_stock_app(request, empresa, "transferencia", readiness_reason="Los traslados internos no están habilitados. Revise la configuración existente con un administrador autorizado.")
         messages.error(request, "Los traslados internos no estan activos para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
@@ -3968,6 +4001,10 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
         .order_by("lote__producto__nombre", "lote__fecha_vencimiento")
     )
 
+    if modo_app:
+        errores_app = errores_estructura_stock_app(request, empresa, "transferencia")
+        if errores_app:
+            return render_stock_app(request, empresa, "transferencia", bodegas=bodegas, existencias=existencias, errores=errores_app)
     if request.method == "POST":
         existencia = existencias.filter(id=request.POST.get("existencia")).first()
         bodega_destino = bodegas.filter(id=request.POST.get("bodega_destino")).first()
@@ -4006,8 +4043,12 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
                     observacion=observacion,
                 )
             messages.success(request, "Traslado registrado correctamente.")
+            if modo_app:
+                return volver_stock_app(empresa)
             return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
 
+    if modo_app:
+        return render_stock_app(request, empresa, "transferencia", bodegas=bodegas, existencias=existencias)
     return render(request, "facturacion/traslado_inventario_farmaceutico.html", {
         "empresa": empresa,
         "existencias": existencias,
@@ -4509,9 +4550,17 @@ def ajustar_inventario(request, empresa_slug):
 
 @login_required
 def entrada_inventario(request, empresa_slug):
+    from .mobile_stock_operations import autorizar_stock_app, es_stock_app, url_stock_app, validar_relaciones_stock_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_stock_app(request, empresa)
+    if modo_app:
+        autorizar_stock_app(request, empresa, "entrada")
+        validar_relaciones_stock_app(empresa)
     if _empresa_usa_control_lotes_fefo(empresa):
         messages.info(request, "Registra la entrada con su lote y vencimiento para mantener el control FEFO.")
+        if modo_app:
+            return redirect(url_stock_app(empresa, **({"producto": request.GET["producto"]} if "producto" in request.GET else {})))
         return redirect("crear_lote_inventario", empresa_slug=empresa.slug)
     if empresa.slug in {"hospital_mia", "medical_spa"}:
         _asegurar_bodegas_farmaceuticas(empresa)
@@ -6133,7 +6182,17 @@ def editar_impuesto(request, empresa_slug, impuesto_id):
 @login_required
 @xframe_options_sameorigin
 def crear_producto(request, empresa_slug):
+    from .mobile_product_management import (
+        autorizar_gestion_producto_app, es_gestion_producto_app,
+        render_gestion_producto_app, validar_formulario_producto_app,
+        validar_preparacion_bodegas_producto_app, volver_gestion_producto_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_gestion_producto_app(request, empresa)
+    if modo_app:
+        autorizar_gestion_producto_app(request, empresa, "crear")
+        validar_preparacion_bodegas_producto_app(empresa)
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     if config_avanzada.usa_bodegas_internas:
@@ -6141,6 +6200,8 @@ def crear_producto(request, empresa_slug):
 
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, empresa=empresa)
+        if modo_app:
+            validar_formulario_producto_app(request, form)
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -6169,6 +6230,8 @@ def crear_producto(request, empresa_slug):
                         },
                     })
                 messages.success(request, "Producto creado correctamente.")
+                if modo_app:
+                    return volver_gestion_producto_app(request, empresa, producto)
                 return _redirect_seguro(request, "productos_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
@@ -6184,6 +6247,8 @@ def crear_producto(request, empresa_slug):
         if nombre_prefill:
             form.fields["nombre"].initial = nombre_prefill
 
+    if modo_app:
+        return render_gestion_producto_app(request, empresa, form)
     template_name = "facturacion/crear_producto_rapido_modal.html" if quick_mode else "facturacion/crear_producto.html"
     return render(request, template_name, {
         "empresa": empresa,
@@ -6201,12 +6266,26 @@ def crear_producto(request, empresa_slug):
 
 @login_required
 def editar_producto(request, empresa_slug, producto_id):
+    from .mobile_product_management import (
+        autorizar_gestion_producto_app, es_gestion_producto_app, identidad_producto_app,
+        render_gestion_producto_app, validar_formulario_producto_app,
+        validar_relaciones_gestion_producto_app, volver_gestion_producto_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_gestion_producto_app(request, empresa)
+    if modo_app:
+        autorizar_gestion_producto_app(request, empresa, "editar", producto_id)
     producto = get_object_or_404(Producto, id=producto_id, empresa=empresa, eliminado=False)
+    if modo_app:
+        validar_relaciones_gestion_producto_app(empresa, producto)
+        producto_original = identidad_producto_app(producto)
     costo_real_anterior = producto.costo_real_inventario
 
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, instance=producto, empresa=empresa)
+        if modo_app:
+            validar_formulario_producto_app(request, form)
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -6217,6 +6296,8 @@ def editar_producto(request, empresa_slug, producto_id):
                         form.guardar_perfil_farmaceutico(producto)
                     _aplicar_distribucion_bodegas_producto(producto, form)
                 messages.success(request, "Producto actualizado correctamente.")
+                if modo_app:
+                    return volver_gestion_producto_app(request, empresa, producto)
                 return redirect("productos_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
@@ -6229,6 +6310,8 @@ def editar_producto(request, empresa_slug, producto_id):
     else:
         form = ProductoForm(instance=producto, empresa=empresa)
 
+    if modo_app:
+        return render_gestion_producto_app(request, empresa, form, producto_original)
     lotes_producto = (
         ExistenciaLoteBodega.objects.filter(
             empresa=empresa,
@@ -6255,11 +6338,30 @@ def editar_producto(request, empresa_slug, producto_id):
 @login_required
 @require_POST
 def eliminar_producto(request, empresa_slug, producto_id):
+    from .mobile_product_management import (
+        autorizar_gestion_producto_app, es_gestion_producto_app,
+        gestion_productos_disponible_app, identidad_producto_app,
+        render_gestion_producto_app, validar_relaciones_gestion_producto_app,
+        volver_gestion_producto_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_gestion_producto_app(request, empresa)
+    if modo_app:
+        autorizar_gestion_producto_app(request, empresa, "eliminar", producto_id)
     producto = get_object_or_404(Producto, id=producto_id, empresa=empresa, eliminado=False)
+    if modo_app:
+        validar_relaciones_gestion_producto_app(empresa, producto)
     form = EliminarProductoForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Indica un motivo claro para dejar registrada la baja del producto.")
+        if modo_app:
+            if gestion_productos_disponible_app(request, empresa)["editar"]:
+                return render_gestion_producto_app(
+                    request, empresa, ProductoForm(instance=producto, empresa=empresa),
+                    identidad_producto_app(producto), delete_form=form,
+                )
+            return volver_gestion_producto_app(request, empresa)
         return redirect("productos_facturacion", empresa_slug=empresa.slug)
 
     motivo = form.cleaned_data["motivo"].strip()
@@ -6290,6 +6392,8 @@ def eliminar_producto(request, empresa_slug, producto_id):
         ])
 
     messages.success(request, f"Producto {producto.nombre} eliminado del catalogo operativo y registrado en bitacora.")
+    if modo_app:
+        return volver_gestion_producto_app(request, empresa)
     return redirect("productos_facturacion", empresa_slug=empresa.slug)
 
 

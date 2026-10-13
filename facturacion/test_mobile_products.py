@@ -1,4 +1,4 @@
-"""Synthetic, independent coverage for the read-only mobile product catalogue.
+"""Synthetic, independent coverage for mobile catalogue reads and their actions.
 
 The existing catalogue filters and eleven summaries remain authoritative.
 APP reads must never initialize or consult inventory, lots or financial data.
@@ -406,13 +406,30 @@ class MobileProductsIntegrationTests(TestCase):
         for key in ("productos_sugeridos", "ultimas_bajas", "form", "inventario", "bodegas", "lotes"):
             self.assertNotIn(key, response.context)
 
-    def test_native_get_filters_only_no_forms_for_crud_or_desktop_destinations(self):
+    def test_native_get_filters_and_only_original_authorized_baja_posts(self):
         response = self.read(); nodes = _ProductMarkup(response.content.decode()).nodes
         forms = [attrs for tag, attrs in nodes if tag == "form"]
-        self.assertTrue(forms); self.assertTrue(all(attrs.get("method", "get").lower() == "get" for attrs in forms))
+        self.assertEqual(len(forms), 1 + len(self.items(response)))
+        self.assertEqual(forms[0].get("method", "get").lower(), "get")
+        self.assertEqual(forms[0]["id"], "mobileProductCatalogSearchForm")
+        self.assertEqual(forms[0]["action"], response.context["app_products_search_url"])
+        self.assertTrue(response.context["can_delete_product"])
+        self.assertFalse(response.context["can_create_product"])
+        self.assertFalse(response.context["can_edit_product"])
+        fields_by_form = []
+        for tag, attrs in nodes:
+            if tag == "form":
+                fields_by_form.append([])
+            elif fields_by_form and tag in {"input", "select", "textarea"} and attrs.get("name"):
+                fields_by_form[-1].append(attrs["name"])
+        self.assertEqual(sorted(fields_by_form[0]), ["app", "categoria", "q", "tipo"])
+        for item, attrs, names in zip(self.items(response), forms[1:], fields_by_form[1:]):
+            self.assertEqual(attrs.get("method", "get").lower(), "post")
+            self.assertEqual(attrs["action"], reverse("eliminar_producto_facturacion", args=[self.empresa.slug, item["id"]]) + "?app=1")
+            self.assertEqual(attrs["data-operation-kind"], "baja")
+            self.assertEqual(attrs["data-operation-confirmation"], "ELIMINAR")
+            self.assertEqual(sorted(names), ["app", "csrfmiddlewaretoken", "motivo"])
         self.assertNotContains(response, "<table"); self.assertNotContains(response, 'rel="manifest"')
-        names = [attrs["name"] for tag, attrs in nodes if tag in {"input", "select", "textarea"} and attrs.get("name")]
-        self.assertEqual(sorted(names), ["app", "categoria", "q", "tipo"])
         forbidden = [reverse(name, args=[self.empresa.slug]) for name in ("crear_producto_facturacion", "categorias_farmaceuticas", "codigos_barras_productos", "inventario_facturacion", "productos_facturacion")]
         for tag, attrs in nodes:
             if tag == "a" and attrs.get("href"):

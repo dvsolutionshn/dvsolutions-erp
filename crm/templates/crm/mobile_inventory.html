@@ -15,8 +15,16 @@
   <small class="mi-muted" id="mobileInventoryCount" aria-live="polite">{{ productos|length }} productos</small>
 </section>
 {% if app_existing_stock_entry_url %}<a class="mi-button secondary" href="{{ app_existing_stock_entry_url }}">Entrada rápida · Flujo actual</a>{% endif %}
+{% if app_stock_entry_url or app_stock_transfer_url or app_product_create_url %}
+<section class="mi-card" aria-label="Gestionar productos e inventario">
+  <h2>Gestionar inventario</h2><p class="mi-muted">Operaciones de la empresa activa con tus permisos actuales.</p>
+  {% if app_stock_entry_url %}<p><a class="mi-button" href="{{ app_stock_entry_url }}">Agregar existencia por lote</a></p>{% endif %}
+  {% if app_stock_transfer_url %}<p><a class="mi-button secondary" href="{{ app_stock_transfer_url }}">Traslado entre bodegas</a></p>{% endif %}
+  {% if app_product_create_url %}<p><a class="mi-button secondary" href="{{ app_product_create_url }}">Crear producto</a></p>{% endif %}
+</section>
+{% endif %}
 <section class="mv-products" aria-label="Productos y existencias">
-  {% for producto in productos %}
+  {% for fila in mobile_inventory_rows %}{% with producto=fila.producto %}
   <button type="button" class="mi-card mv-product" data-open-sheet="mobileInventoryDetail{{ producto.id }}" data-stock-product data-search="{{ producto.nombre }} {{ producto.codigo }}" data-stock-low="{{ producto.stock_bajo|yesno:'1,0' }}" data-stock-empty="{{ producto.sin_stock|yesno:'1,0' }}" data-stock-expiry="{{ producto.proximo_vencer|yesno:'1,0' }}">
     <div class="mv-product-top"><strong>{{ producto.nombre }}</strong><span aria-hidden="true">›</span></div>
     {% if producto.codigo %}<small class="mi-muted">{{ producto.codigo }}</small>{% endif %}
@@ -25,19 +33,21 @@
     {% if producto.bodegas %}<p class="mv-caption">Bodega: {% for bodega in producto.bodegas %}{{ bodega.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
     {% if producto.proximo_vencimiento_label %}<p class="mv-caption">Vencimiento más próximo: {{ producto.proximo_vencimiento_label }}</p>{% endif %}
   </button>
-  {% endfor %}
+  {% endwith %}{% endfor %}
 </section>
 <section class="mi-card mv-empty" id="mobileInventoryEmpty"{% if productos %} hidden{% endif %}><h2>No hay productos en esta búsqueda</h2><p class="mi-muted">Prueba otro nombre o filtro.</p></section>
-{% for producto in productos %}
+{% for fila in mobile_inventory_rows %}{% with producto=fila.producto %}
 <dialog class="mi-sheet mv-detail" id="mobileInventoryDetail{{ producto.id }}" aria-labelledby="mobileInventoryTitle{{ producto.id }}">
   <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><div><span class="mi-kicker">Productos</span><h2 id="mobileInventoryTitle{{ producto.id }}">{{ producto.nombre }}</h2></div><button type="button" class="mi-close" data-close-sheet aria-label="Cerrar">×</button></div>
   <div class="mi-row total"><span>Existencia total</span><strong>{{ producto.existencia|floatformat:'-2u' }}</strong></div><div class="mi-row"><span>Stock mínimo</span><strong>{{ producto.stock_minimo|floatformat:'-2u' }}</strong></div>
   <h3>Existencia por bodega</h3>{% for bodega in producto.bodegas %}<div class="mi-row"><span>{{ bodega.nombre }}</span><strong>{{ bodega.cantidad|floatformat:'-2u' }}</strong></div>{% empty %}<p class="mi-muted">No hay existencias por lote/bodega registradas.</p>{% endfor %}
   <h3>Lotes y vencimientos</h3><p class="mi-muted">Ordenados por vencimiento más próximo (FEFO).</p>
   <div class="mv-lots">{% for lote in producto.lotes %}<article class="mv-lot"><div class="mv-product-top"><strong>Lote {{ lote.numero }}</strong><strong>{{ lote.cantidad|floatformat:'-2u' }}</strong></div><p class="mv-caption">Vencimiento: {{ lote.fecha_vencimiento_label }}</p>{% if lote.vencido %}<span class="mi-badge anulada">Vencido</span>{% elif lote.proximo_vencer %}<span class="mi-badge pendiente">Próximo a vencer</span>{% endif %}{% for bodega in lote.bodegas %}<div class="mi-row"><span>{{ bodega.nombre }}</span><strong>{{ bodega.cantidad|floatformat:'-2u' }}</strong></div>{% endfor %}</article>{% empty %}<p class="mi-muted">Este producto no tiene lotes registrados.</p>{% endfor %}</div>
+  {% if fila.app_stock_entry_url %}<p><a class="mi-button" href="{{ fila.app_stock_entry_url }}">Agregar existencia a este producto</a></p>{% endif %}
+  {% if fila.app_product_edit_url %}<p><a class="mi-button secondary" href="{{ fila.app_product_edit_url }}">Editar producto</a></p>{% endif %}
   <button type="button" class="mi-button secondary" data-close-sheet>Volver a productos</button>
 </dialog>
-{% endfor %}
+{% endwith %}{% endfor %}
 {% endblock %}
 {% block mobile_scripts %}{{ block.super }}<script src="{% static 'crm/mobile_inventory.js' %}" defer></script>{% endblock %}
 {% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}

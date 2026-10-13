@@ -1,0 +1,9 @@
+<dialog class="mi-sheet msop-confirm" id="mobileOperationConfirmSheet" aria-labelledby="mobileOperationConfirmTitle">
+  <div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="mobileOperationConfirmTitle">Revisar operación</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div>
+  <p class="mi-muted" id="mobileOperationConfirmCaption"></p><div class="msop-review-values" id="mobileOperationConfirmValues"></div>
+  <div class="msop-other-drafts" id="mobileOperationOtherDrafts" role="alert" hidden></div>
+  <div class="mi-field msop-field"><label for="mobileOperationConfirmation" id="mobileOperationConfirmationLabel">Confirmación</label><input id="mobileOperationConfirmation" autocomplete="off" spellcheck="false"><small id="mobileOperationConfirmationHint"></small></div>
+  <p class="msop-status" id="mobileOperationConfirmStatus" role="status" aria-live="polite"></p>
+  <div class="msop-dialog-actions"><button class="mi-button" type="button" id="confirmMobileOperation" disabled>Confirmar operación</button><button class="mi-button secondary" type="button" data-close-sheet>Seguir revisando</button></div>
+</dialog>
+<dialog class="mi-sheet msop-unsaved" id="mobileOperationUnsavedSheet" aria-labelledby="mobileOperationUnsavedTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="mobileOperationUnsavedTitle">Datos sin guardar</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><p class="mi-muted">Los datos que cambió no se han enviado. Si sale ahora, se perderán los cambios de esta pantalla.</p><div class="msop-dialog-actions"><button class="mi-button secondary" type="button" data-close-sheet>Continuar aquí</button><button class="mi-button danger" type="button" id="leaveMobileOperation">Salir sin guardar</button></div></dialog>

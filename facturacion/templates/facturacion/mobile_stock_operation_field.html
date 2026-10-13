@@ -1,0 +1,9 @@
+<div class="mi-field msop-field" data-operation-field="{{ field.name }}">
+  <label class="msop-label" for="mobile-stock-{{ field.name }}">{{ field.label }}{% if field.required %}<span class="msop-required" aria-hidden="true"> *</span>{% endif %}</label>
+  {% if field.type == 'select' %}<select id="mobile-stock-{{ field.name }}" name="{{ field.name }}"{% if field.required %} required{% endif %}><option value="">{% if field.required %}Seleccionar...{% else %}Sin seleccionar{% endif %}</option>{% for option in field.choices %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}</select>
+  {% elif field.type == 'textarea' %}<textarea id="mobile-stock-{{ field.name }}" name="{{ field.name }}" rows="3"{% if field.required %} required{% endif %}>{{ field.value }}</textarea>
+  {% else %}<input id="mobile-stock-{{ field.name }}" name="{{ field.name }}" type="{{ field.type }}" value="{{ field.value }}"{% if field.required %} required{% endif %}{% if field.step %} step="{{ field.step }}" inputmode="decimal"{% endif %}>{% endif %}
+  {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+  {% if mobile_stock_bound and field.value and field.type == 'date' %}<small class="msop-received">Valor recibido: {{ field.value }}</small>{% elif mobile_stock_bound and field.value and field.type == 'number' %}<small class="msop-received">Valor recibido: {{ field.value }}</small>{% elif field.errors and field.value %}<small class="msop-received">Valor recibido: {{ field.value }}</small>{% endif %}
+  {% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+</div>

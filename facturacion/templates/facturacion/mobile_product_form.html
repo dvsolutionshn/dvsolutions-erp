@@ -1,0 +1,32 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}{{ titulo }}{% endblock %}
+{% block mobile_page_title %}{{ titulo }}{% endblock %}
+{% block mobile_kicker %}Administrar productos{% endblock %}
+{% block mobile_back_url %}{{ app_product_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="mpm-header-description">{{ empresa.nombre }} · {% if mobile_product_editing %}Producto registrado{% else %}Nuevo producto o servicio{% endif %}</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_stock_operations.css' %}"><link rel="stylesheet" href="{% static 'facturacion/mobile_product_management.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'facturacion/mobile_stock_operations.js' %}" defer></script>{% endblock %}
+{% block mobile_navigation %}{% include 'facturacion/mobile_product_management_navigation.html' %}{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mpm-intro"><span class="msop-scope">Producto de esta empresa</span><h2>{% if mobile_product_editing %}Revisar datos del producto{% else %}Registrar producto o servicio{% endif %}</h2><p>Los campos y las opciones son los del formulario original. El guardado conserva sus reglas de producto, perfil farmacéutico e inventario.</p>{% if mobile_product_editing %}<p class="mpm-current"><strong>{{ producto_actual.nombre }}</strong>{% if producto_actual.codigo %}<span>{{ producto_actual.codigo }}</span>{% endif %}</p>{% endif %}<p class="msop-caption">Las cantidades por bodega, cuando aparecen, pueden ajustar las existencias al guardar. La pantalla no incorpora cálculos ni selectores de lotes nuevos; el guardado conserva las reglas originales de distribución.</p></section>
+<form method="post" enctype="multipart/form-data" action="{{ app_product_form_url }}" id="mobileProductForm" class="msop-form" data-submit-once data-mobile-operation-form data-operation-label="Datos del producto" data-operation-title="Confirmar producto" data-operation-confirmation="{{ empresa.nombre }}" data-operation-caption="Se guardarán los campos de este producto con las reglas actuales del sistema."{% if form.is_bound %} data-operation-unsaved="1"{% endif %}>
+  {% csrf_token %}<input type="hidden" name="app" value="1">
+  {% for field in mobile_product_hidden_fields %}{{ field }}{% for error in field.errors %}<div class="mi-error-box" role="alert">{{ field.label }}: {{ error }}</div>{% endfor %}{% endfor %}
+  {% if form.errors %}<div class="mi-error-box msop-error-summary" role="alert" tabindex="-1"><strong>Revise los datos indicados</strong><p>Los valores ingresados se mantienen para que pueda corregirlos.</p></div>{% endif %}
+  {% if form.non_field_errors %}<div class="mi-error-box msop-error-summary" role="alert" tabindex="-1">{{ form.non_field_errors }}</div>{% endif %}
+  {% for section in mobile_product_sections %}<details class="mi-card msop-section" data-product-section="{{ section.key }}"{% if forloop.first or form.errors %} open{% endif %}><summary><span><small>Sección {{ forloop.counter }}</small><strong>{{ section.titulo }}</strong></span><i aria-hidden="true">⌄</i></summary><div class="msop-fields">{% for field in section.campos %}{% include 'facturacion/mobile_product_management_field.html' %}{% endfor %}</div></details>{% endfor %}
+  <a class="msop-cancel" href="{{ app_product_back_url }}">Volver sin guardar</a><div class="mi-save-bar"><button class="mi-button" type="submit">{{ texto_boton }}</button></div>
+</form>
+{% if can_delete_product and app_product_delete_url and delete_form %}
+<details class="mi-card mpm-delete"{% if mobile_product_delete_bound %} open{% endif %}><summary>Dar de baja este producto <span aria-hidden="true">⌄</span></summary><div class="mpm-delete-body"><p>Esta acción retira <strong>{{ producto_actual.nombre }}</strong> del catálogo operativo y registra el motivo en la bitácora original. No es una eliminación física del registro.</p>
+  <form method="post" action="{{ app_product_delete_url }}" id="mobileProductDeleteForm" class="msop-form" data-submit-once data-mobile-operation-form data-operation-label="Motivo de baja" data-operation-kind="baja" data-operation-title="Confirmar baja del producto" data-operation-confirmation="ELIMINAR" data-operation-caption="Se dará de baja {{ producto_actual.nombre }} del catálogo operativo y se registrará el motivo indicado."{% if mobile_product_delete_bound %} data-operation-unsaved="1"{% endif %}>
+    {% csrf_token %}<input type="hidden" name="app" value="1">{% for field in delete_form.hidden_fields %}{{ field }}{% endfor %}
+    {% if delete_form.non_field_errors %}<div class="mi-error-box" role="alert">{{ delete_form.non_field_errors }}</div>{% endif %}
+    {% for field in delete_form.visible_fields %}{% include 'facturacion/mobile_product_management_field.html' with form=delete_form %}{% endfor %}
+    <button class="mi-button danger" type="submit" disabled data-operation-requires-js>Revisar baja del producto</button><noscript><p class="msop-caption">Active JavaScript para revisar y confirmar la baja. No se ha enviado esta acción.</p></noscript>
+  </form>
+</div></details>
+{% endif %}
+{% include 'facturacion/mobile_stock_operation_dialogs.html' %}
+{% endblock %}
