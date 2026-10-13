@@ -67,6 +67,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
     from .mobile_controls import controles_disponibles_app
     from .mobile_antecedents import antecedentes_disponibles_app, url_antecedentes_app
     from .mobile_plans import planes_disponibles_app
+    from .mobile_followups import seguimientos_disponibles_app
 
     granular = bool(rol_clinico_granular(request.user, empresa))
     permiso = lambda nuevo, legado: request.user.tiene_permiso_erp(nuevo if granular else legado, empresa)
@@ -103,6 +104,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
         "can_view_recipes": permiso("puede_ver_recetas", "puede_expediente_clinico"),
         "can_view_plans": permiso("puede_ver_planes_tratamiento", "puede_tratamientos_clinicos"),
         "can_view_recordatorios": permiso("puede_crear_recordatorios_paciente", "puede_pacientes"),
+        "can_view_followups": seguimientos_disponibles_app(request, empresa),
         "can_view_gastos": gastos_adicionales_habilitados(empresa) and request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa),
     }
     destino_paciente = request.GET.get("destino", "")
@@ -158,6 +160,7 @@ def contexto_pacientes_app(request, empresa, paciente=None, form=None):
                 contexto["mobile_patient_history_mode"] = "crear_historia"
                 contexto["mobile_patient_history_create_type"] = tipo_elegido
     if paciente:
+        contexto["app_patient_followups_url"] = url_paciente_app("clinica_seguimientos_paciente", empresa, paciente.pk)
         contexto["app_patient_plans_url"] = url_paciente_app("clinica_planes_tratamiento_paciente", empresa, paciente.pk)
         contexto["app_patient_plan_create_url"] = url_paciente_app("clinica_plan_tratamiento_crear_app", empresa, paciente.pk)
         if contexto["can_manage_antecedents"]:

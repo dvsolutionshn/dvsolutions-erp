@@ -1,0 +1,48 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% load static %}
+{% block mobile_title %}Seguimientos del paciente{% endblock %}
+{% block mobile_page_title %}Seguimientos{% endblock %}
+{% block mobile_kicker %}Consulta clínica{% endblock %}
+{% block mobile_back_url %}{{ app_followups_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="mfu-header-description">{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_followups.css' %}">{% endblock %}
+{% block mobile_navigation %}
+{% if can_view_app_modules or can_view_patient %}
+<nav class="mi-bottom mfu-navigation" aria-label="Navegación de seguimientos">
+  {% if can_view_patient and app_patient_detail_url %}<a href="{{ app_patient_detail_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg><span>Expediente</span></a>{% endif %}
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}" class="active" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mfu-intro" aria-labelledby="followupScopeTitle">
+  <span class="mfu-readonly">Solo consulta</span>
+  <h2 id="followupScopeTitle">Seguimientos de {{ paciente.nombre }}</h2>
+  <p>Registros del paciente en <strong>{{ empresa.nombre }}</strong>.</p>
+  <p class="mfu-caption">Esta pantalla no programa, modifica ni elimina seguimientos. Tampoco envía mensajes.</p>
+</section>
+<section class="mi-card mfu-search-card" aria-labelledby="followupSearchTitle">
+  <h2 id="followupSearchTitle">Buscar seguimiento</h2>
+  <form method="get" action="{{ app_followups_search_url }}" id="mobileFollowupSearchForm">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field"><label for="mobileFollowupSearch">Buscar en los registros</label><input id="mobileFollowupSearch" type="search" name="q" value="{{ mobile_followup_query }}" placeholder="Buscar seguimiento..." autocomplete="off"></div>
+    <button class="mi-button secondary" type="submit">Buscar</button>
+    {% if mobile_followup_query %}<a class="mfu-clear-search" href="{{ app_followups_url }}">Limpiar búsqueda</a>{% endif %}
+  </form>
+  <p class="mfu-caption">La búsqueda incluye todos los seguimientos de este paciente, no solo esta página. Ordenados por fecha, del más antiguo al más reciente.</p>
+</section>
+<div class="mfu-list-meta"><strong>{{ mobile_followup_total }} seguimiento{% if mobile_followup_total != 1 %}s{% endif %}</strong>{% if mobile_followup_total %}<span>{{ page_obj.start_index }}–{{ page_obj.end_index }}</span>{% endif %}</div>
+<section class="mfu-followup-list" aria-label="Seguimientos registrados">
+  {% for item in mobile_followup_items %}
+  <article class="mi-card mfu-card" id="mobile-followup-{{ item.id }}">
+    <div class="mfu-card-head"><h2>{{ item.tratamiento }}</h2><span class="mfu-state" data-state="{{ item.estado }}">{{ item.estado_label }}</span></div>
+    <div class="mfu-date"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 11h16"/></svg><time datetime="{{ item.fecha_hora|date:'c' }}"><strong>{{ item.fecha_hora|date:'d/m/Y' }}</strong><span>{{ item.fecha_hora|date:'h:i A' }}</span></time></div>
+    {% if item.profesional %}<div class="mfu-professional"><span>Profesional</span><strong>{{ item.profesional }}</strong></div>{% endif %}
+    {% if item.observaciones %}<details class="mfu-note-fold"><summary>Ver nota registrada <span aria-hidden="true">⌄</span></summary><p class="mfu-note">{{ item.observaciones }}</p></details>{% else %}<p class="mfu-no-note">Sin nota registrada.</p>{% endif %}
+  </article>
+  {% empty %}
+  <section class="mi-card mfu-empty"><h2>{% if mobile_followup_query %}Sin coincidencias{% else %}Sin seguimientos registrados{% endif %}</h2><p>{% if mobile_followup_query %}No se encontraron seguimientos del paciente con esta búsqueda.{% else %}Este paciente todavía no tiene recordatorios de seguimiento registrados en {{ empresa.nombre }}.{% endif %}</p>{% if mobile_followup_query %}<a class="mfu-clear-search" href="{{ app_followups_url }}">Ver todos los seguimientos</a>{% endif %}</section>
+  {% endfor %}
+</section>
+{% if mobile_followup_num_pages > 1 %}<nav class="mfu-pagination" aria-label="Páginas de seguimientos">{% if mobile_followup_previous_url %}<a href="{{ mobile_followup_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_followup_page }} / {{ mobile_followup_num_pages }}</span>{% if mobile_followup_next_url %}<a href="{{ mobile_followup_next_url }}">Siguiente ›</a>{% endif %}</nav>{% endif %}
+{% endblock %}

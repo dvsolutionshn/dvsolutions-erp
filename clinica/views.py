@@ -1607,8 +1607,20 @@ def _fecha_hora_recordatorio_desde_post(fecha_texto, hora_texto, periodo):
 
 @login_required
 def seguimientos_paciente(request, empresa_slug, paciente_id):
+    from .mobile_followups import autorizar_seguimientos_app, es_seguimientos_app, render_seguimientos_app
+
     empresa = _empresa_desde_slug(empresa_slug)
+    modo_app = es_seguimientos_app(request, empresa)
+    if modo_app:
+        autorizar_seguimientos_app(request, empresa, paciente_id)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    recordatorios = (
+        paciente.citas.filter(es_recordatorio_tratamiento=True)
+        .select_related("profesional", "servicio")
+        .order_by("fecha_hora", "id")
+    )
+    if modo_app:
+        return render_seguimientos_app(request, empresa, paciente, recordatorios)
     asegurar_profesionales_agenda_base(empresa)
     profesionales = ProfesionalSalud.objects.filter(empresa=empresa, activo=True).order_by("nombre")
 
@@ -1660,11 +1672,6 @@ def seguimientos_paciente(request, empresa_slug, paciente_id):
                 messages.success(request, "Seguimiento actualizado correctamente.")
             return redirect("clinica_seguimientos_paciente", empresa_slug=empresa.slug, paciente_id=paciente.id)
 
-    recordatorios = (
-        paciente.citas.filter(es_recordatorio_tratamiento=True)
-        .select_related("profesional", "servicio")
-        .order_by("fecha_hora", "id")
-    )
     return render(
         request,
         "clinica/seguimientos_paciente.html",
