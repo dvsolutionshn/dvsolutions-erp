@@ -652,6 +652,10 @@ class MobileConfigurationIntegrationTests(TestCase):
         for item in items.values():
             if item["estado"] == "pendiente":
                 self.assertEqual(item["url"], "")
+            elif item["codigo"] == "catalogo_tratamientos":
+                self.assertEqual(item["estado"], "disponible")
+                self.assertEqual(urlsplit(item["url"]).path, reverse("clinica_tratamientos", args=[self.empresa.slug]))
+                self.assertEqual(parse_qs(urlsplit(item["url"]).query), {"app": ["1"], "catalogo": ["agenda"]})
             else:
                 self.assertEqual(parse_qs(urlsplit(item["url"]).query), {"app": ["1"]})
         self.assertEqual(self.snapshot(), before)

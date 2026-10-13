@@ -183,6 +183,7 @@ def render_configuracion_hub_app(request, empresa):
     from core.mobile_company import configuracion_empresa_disponible_app
     from core.mobile_users import usuarios_disponibles_app
     from crm.mobile_crm_configuration import configuracion_crm_disponible_app
+    from .mobile_agenda_catalog import catalogo_agenda_disponible_app, url_catalogo_agenda_app
     from .mobile_recipe_templates import permiso_plantillas_app
     from .mobile_treatments import tratamientos_disponibles_app
     from .views import _puede_administrar_manuales_receta, _puede_controlar_enlaces_pacientes, _recetas_avanzadas_activas
@@ -202,7 +203,14 @@ def render_configuracion_hub_app(request, empresa):
 
     agregar("profesionales", "Profesionales", "Configurar el personal y sus datos profesionales.", permisos["profesionales"], "clinica_profesionales")
     agregar("servicios", "Servicios clínicos", "Configurar categoría, duración, color y estado.", permisos["servicios"], "clinica_servicios")
-    agregar("tratamientos", "Tratamientos de pacientes", "Consultar los tratamientos asignados; el catálogo de agenda sigue pendiente.", acceso["tratamientos_clinicos"] and tratamientos_disponibles_app(request, empresa)["ver"], "clinica_tratamientos")
+    agregar("tratamientos", "Tratamientos de pacientes", "Consultar los tratamientos asignados; el catálogo de agenda tiene su pantalla independiente.", acceso["tratamientos_clinicos"] and tratamientos_disponibles_app(request, empresa)["ver"], "clinica_tratamientos")
+    catalogo_agenda = catalogo_agenda_disponible_app(request, empresa)
+    if catalogo_agenda["ver"]:
+        opciones.append({
+            "codigo": "catalogo_tratamientos", "nombre": "Catálogo de tratamientos de agenda",
+            "descripcion": "Consultar las opciones de esta empresa; sólo sus administradores autorizados pueden modificarlas.",
+            "estado": "disponible", "url": url_catalogo_agenda_app(empresa),
+        })
     recetas = _recetas_avanzadas_activas(empresa)
     agregar("plantillas_recetas", "Plantillas de recetas", "Administrar medicamentos e indicaciones reutilizables.", acceso["configuracion_clinica"] and recetas and permiso_plantillas_app(request, empresa), "clinica_plantillas_recetas")
     agregar("manuales_pdf", "Manuales PDF", "Cargar, editar y activar los documentos existentes.", recetas and acceso["administrar_manuales_pdf"] and _puede_administrar_manuales_receta(request.user, empresa), "clinica_manuales_recetas")

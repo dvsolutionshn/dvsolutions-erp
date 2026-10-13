@@ -125,6 +125,12 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("tratamientos", "Tratamientos", "Consultar tratamientos asignados y registrar uno nuevo según tus permisos.",
             "Atención clínica", tratamientos["ver"] or tratamientos["crear"], "parcial",
             f"{reverse('clinica_tratamientos' if tratamientos['ver'] else 'clinica_crear_tratamiento', args=[empresa.slug])}?app=1")
+    from clinica.mobile_agenda_catalog import catalogo_agenda_disponible_app, url_catalogo_agenda_app
+
+    catalogo_agenda = catalogo_agenda_disponible_app(request, empresa)
+    agregar("catalogo_tratamientos", "Catálogo de tratamientos de agenda",
+            "Opciones de esta empresa para citas; administración sólo con la autorización existente.",
+            "Administración", catalogo_agenda["ver"], "disponible", url_catalogo_agenda_app(empresa))
     from clinica.mobile_plans import planes_disponibles_app
 
     planes = planes_disponibles_app(request, empresa)

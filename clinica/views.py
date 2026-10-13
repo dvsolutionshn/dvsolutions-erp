@@ -4727,10 +4727,17 @@ def editar_plantilla_receta(request, empresa_slug, plantilla_id):
 
 @login_required
 def tratamientos(request, empresa_slug):
+    from .mobile_agenda_catalog import (
+        autorizar_catalogo_agenda_app, es_catalogo_agenda_app,
+        render_catalogo_agenda_app, volver_catalogo_agenda_app,
+    )
     from .mobile_treatments import autorizar_tratamientos_app, es_tratamientos_app, listar_tratamientos_app
 
     empresa = _empresa_desde_slug(empresa_slug)
-    if es_tratamientos_app(request, empresa):
+    catalogo_app = es_catalogo_agenda_app(request)
+    if catalogo_app:
+        autorizar_catalogo_agenda_app(request, empresa, accion="crear" if request.method == "POST" else None)
+    elif es_tratamientos_app(request, empresa):
         autorizar_tratamientos_app(request, empresa)
         return listar_tratamientos_app(request, empresa)
     puede_administrar_catalogo = _puede_administrar_catalogo_clinico(request.user, empresa)
@@ -4741,12 +4748,16 @@ def tratamientos(request, empresa_slug):
         nombre = " ".join((request.POST.get("nombre") or "").split())
         if len(nombre) < 3 or len(nombre) > 180:
             messages.error(request, "Escriba un nombre de tratamiento entre 3 y 180 caracteres.")
+            if catalogo_app:
+                return render_catalogo_agenda_app(request, empresa, modo="crear", status=400)
         elif OpcionServicioAgenda.objects.filter(
             empresa=empresa,
             categoria="tratamientos",
             nombre__iexact=nombre,
         ).exists():
             messages.warning(request, "Ese tratamiento ya existe en el catálogo de citas.")
+            if catalogo_app:
+                return render_catalogo_agenda_app(request, empresa, modo="crear", status=400)
         else:
             OpcionServicioAgenda.objects.create(
                 empresa=empresa,
@@ -4755,8 +4766,12 @@ def tratamientos(request, empresa_slug):
                 creado_por=request.user,
             )
             messages.success(request, f"{nombre} fue agregado al catálogo de citas.")
+        if catalogo_app:
+            return volver_catalogo_agenda_app(empresa)
         return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
 
+    if catalogo_app:
+        return render_catalogo_agenda_app(request, empresa)
     tratamientos_qs = TratamientoPaciente.objects.filter(empresa=empresa).select_related("paciente", "profesional", "servicio")
     opciones_agenda = OpcionServicioAgenda.objects.filter(
         empresa=empresa,
@@ -4773,7 +4788,15 @@ def tratamientos(request, empresa_slug):
 @login_required
 @require_POST
 def editar_opcion_tratamiento_agenda(request, empresa_slug, opcion_id):
+    from .mobile_agenda_catalog import (
+        autorizar_catalogo_agenda_app, es_catalogo_agenda_app,
+        render_catalogo_agenda_app, volver_catalogo_agenda_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
+    catalogo_app = es_catalogo_agenda_app(request, ruta_accion=True)
+    if catalogo_app:
+        autorizar_catalogo_agenda_app(request, empresa, accion="editar", opcion_id=opcion_id)
     if not _puede_administrar_catalogo_clinico(request.user, empresa):
         messages.error(request, "Solo administradores de la empresa pueden editar este catálogo.")
         return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
@@ -4786,24 +4809,35 @@ def editar_opcion_tratamiento_agenda(request, empresa_slug, opcion_id):
     nombre = " ".join((request.POST.get("nombre") or "").split())
     if len(nombre) < 3 or len(nombre) > 180:
         messages.error(request, "Escriba un nombre de tratamiento entre 3 y 180 caracteres.")
+        if catalogo_app:
+            return render_catalogo_agenda_app(request, empresa, modo="editar", opcion=opcion, status=400)
     elif OpcionServicioAgenda.objects.filter(
         empresa=empresa,
         categoria="tratamientos",
         nombre__iexact=nombre,
     ).exclude(id=opcion.id).exists():
         messages.error(request, "Ya existe otro tratamiento con ese nombre.")
+        if catalogo_app:
+            return render_catalogo_agenda_app(request, empresa, modo="editar", opcion=opcion, status=400)
     else:
         opcion.nombre = nombre
         opcion.activo = request.POST.get("activo") == "on"
         opcion.save(update_fields=["nombre", "activo"])
         messages.success(request, "Tratamiento actualizado correctamente.")
+    if catalogo_app:
+        return volver_catalogo_agenda_app(empresa)
     return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
 
 
 @login_required
 @require_POST
 def eliminar_opcion_tratamiento_agenda(request, empresa_slug, opcion_id):
+    from .mobile_agenda_catalog import autorizar_catalogo_agenda_app, es_catalogo_agenda_app, volver_catalogo_agenda_app
+
     empresa = _empresa_desde_slug(empresa_slug)
+    catalogo_app = es_catalogo_agenda_app(request, ruta_accion=True)
+    if catalogo_app:
+        autorizar_catalogo_agenda_app(request, empresa, accion="eliminar", opcion_id=opcion_id)
     if not _puede_administrar_catalogo_clinico(request.user, empresa):
         messages.error(request, "Solo administradores de la empresa pueden eliminar este catálogo.")
         return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
@@ -4816,6 +4850,8 @@ def eliminar_opcion_tratamiento_agenda(request, empresa_slug, opcion_id):
     nombre = opcion.nombre
     opcion.delete()
     messages.success(request, f"{nombre} fue eliminado del catálogo de citas.")
+    if catalogo_app:
+        return volver_catalogo_agenda_app(empresa)
     return redirect("clinica_tratamientos", empresa_slug=empresa.slug)
 
 

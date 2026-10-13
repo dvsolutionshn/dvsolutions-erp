@@ -820,7 +820,7 @@
         <div class="field {% if field.name == 'observacion' or field.name == 'cirugia_detalle' or field.name == 'fotos_cirugia' %}wide{% endif %}" data-field-name="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.name == "paciente" %}<button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>{% endif %}<div class="errors">{{ field.errors }}</div></div>
         {% endif %}
       {% endfor %}
-      {% if detalles_agenda_hospital_mia %}{{ form.detalles_agenda }}{% include "crm/_detalles_agenda_hospital_mia.html" %}{% endif %}
+      {% if detalles_agenda_hospital_mia %}{{ form.detalles_agenda }}{% if empresa.tipo_solucion == 'clinica' %}{% include "crm/_detalles_agenda_hospital_mia.html" with detalles_agenda_app_segura=True %}{% else %}{% include "crm/_detalles_agenda_hospital_mia.html" %}{% endif %}{% endif %}
       </div>
       {% if not cita_editando %}<div class="mobile-series-preview" data-mobile-series-preview></div>{% endif %}
       <button class="save" type="submit">{% if cita_editando %}Guardar cambios{% else %}Crear cita{% endif %}</button>
