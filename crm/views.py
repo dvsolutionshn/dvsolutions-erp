@@ -1498,8 +1498,15 @@ def agenda_citas(request, empresa_slug):
 @login_required
 @require_POST
 def guardar_bloqueo_disponibilidad(request, empresa_slug):
+    from .mobile_availability import (
+        es_disponibilidad_app, preparar_disponibilidad_app,
+        render_disponibilidad_app, validar_citas_disponibilidad_app,
+        volver_disponibilidad_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
-    empresa_agenda = _empresa_origen_agenda(empresa)
+    modo_app = es_disponibilidad_app(request, empresa)
+    empresa_agenda = preparar_disponibilidad_app(request, empresa) if modo_app else _empresa_origen_agenda(empresa)
     bloqueo_id = (request.POST.get("bloqueo_id") or "").strip()
     bloqueo = None
     if bloqueo_id:
@@ -1522,6 +1529,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
         profesional = form.cleaned_data["profesional"]
         if not _puede_gestionar_bloqueo(request.user, empresa_agenda, profesional):
             return HttpResponse("No tiene permiso para gestionar bloqueos de este profesional.", status=403)
+        if modo_app:
+            validar_citas_disponibilidad_app(empresa_agenda, profesional)
         afectadas = citas_afectadas_por_bloqueo(
             empresa=empresa_agenda,
             profesional=profesional,
@@ -1532,6 +1541,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
             hora_fin=form.cleaned_data.get("hora_fin"),
         )
         if afectadas and request.POST.get("confirmar_conflictos") != "1":
+            if modo_app:
+                return render_disponibilidad_app(request, empresa, empresa_agenda, form, bloqueo, afectadas)
             return render(
                 request,
                 "crm/bloqueo_disponibilidad_form.html",
@@ -1552,6 +1563,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
             request,
             "Bloqueo de disponibilidad actualizado." if bloqueo else "Horario marcado como No disponible.",
         )
+        if modo_app:
+            return volver_disponibilidad_app(request, empresa, registro.fecha)
         if request.POST.get("regresar_a") == "app":
             return redirect(
                 f"{reverse('agenda_mobile', args=[empresa.slug])}?vista=dia&fecha={registro.fecha.isoformat()}#disponibilidad-medica"
@@ -1559,6 +1572,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
         return redirect(
             f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={registro.fecha.isoformat()}#disponibilidad-medica"
         )
+    if modo_app:
+        return render_disponibilidad_app(request, empresa, empresa_agenda, form, bloqueo, status=400)
     return render(
         request,
         "crm/bloqueo_disponibilidad_form.html",
@@ -1576,8 +1591,13 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
 @login_required
 @require_POST
 def eliminar_bloqueo_disponibilidad(request, empresa_slug, bloqueo_id):
+    from .mobile_availability import es_disponibilidad_app, preparar_disponibilidad_app, volver_disponibilidad_app
+
     empresa = _empresa_desde_slug(empresa_slug)
-    empresa_agenda = _empresa_origen_agenda(empresa)
+    modo_app = es_disponibilidad_app(request, empresa)
+    empresa_agenda = preparar_disponibilidad_app(
+        request, empresa, eliminar=True, bloqueo_id=bloqueo_id,
+    ) if modo_app else _empresa_origen_agenda(empresa)
     bloqueo = get_object_or_404(
         BloqueoDisponibilidadMedica.objects.select_related("profesional"),
         empresa=empresa_agenda,
@@ -1588,6 +1608,8 @@ def eliminar_bloqueo_disponibilidad(request, empresa_slug, bloqueo_id):
     fecha = bloqueo.fecha.isoformat()
     bloqueo.delete()
     messages.success(request, "Bloqueo de disponibilidad eliminado.")
+    if modo_app:
+        return volver_disponibilidad_app(request, empresa, fecha)
     if request.POST.get("regresar_a") == "app":
         return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?vista=dia&fecha={fecha}#disponibilidad-medica")
     return redirect(f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={fecha}#disponibilidad-medica")
@@ -2053,6 +2075,14 @@ def agenda_mobile(request, empresa_slug):
         vista_predeterminada="dia",
         empresa_agenda=empresa_agenda,
     )
+    from .mobile_availability import disponibilidad_disponible_app
+    from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
+
+    if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES and interfaz_clinica_activa(empresa):
+        contexto["puede_gestionar_bloqueos"] = bool(
+            contexto.get("puede_gestionar_bloqueos")
+            and disponibilidad_disponible_app(request, empresa, empresa_agenda)
+        )
     contexto["empresas_app_switch"] = [
         {
             "id": empresa_disponible.id,
