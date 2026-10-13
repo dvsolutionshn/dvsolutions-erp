@@ -1,0 +1,40 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Respuestas de preconsulta{% endblock %}
+{% block mobile_page_title %}Respuestas de preconsulta{% endblock %}
+{% block mobile_kicker %}Consulta privada{% endblock %}
+{% block mobile_back_url %}{{ app_preconsulta_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="mpre-header-description">{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'clinica/mobile_preconsultas.css' %}">{% endblock %}
+{% block mobile_navigation %}
+<nav class="mi-bottom mpre-navigation" aria-label="Navegación de la preconsulta">
+  {% if can_view_history and app_patient_histories_url %}<a href="{{ app_patient_histories_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6ZM9 8h6M9 12h6M9 16h3"/></svg><span>Historias</span></a>{% endif %}
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>{% endif %}
+</nav>
+{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mpre-intro" id="mobilePreconsultaDetail" aria-labelledby="preconsultaDetailTitle">
+  <span class="mpre-readonly">Solo consulta</span>
+  <h2 id="preconsultaDetailTitle">{{ paciente.nombre }}</h2>
+  <p class="mpre-expediente">Expediente {{ paciente.expediente_codigo }}</p>
+  <div class="mpre-badges"><span class="mpre-type">{{ preconsulta.tipo_label }}</span><span class="mpre-state" data-state="{{ preconsulta.estado }}">{{ preconsulta.estado_label }}</span></div>
+  {% if preconsulta.estado == 'completada' and preconsulta.fecha_completada %}<p class="mpre-completed-date">Completado <time>{{ preconsulta.fecha_completada|date:'d/m/Y H:i' }}</time></p>{% endif %}
+</section>
+<section class="mi-card mpre-confidential" aria-labelledby="preconsultaPrivacyTitle"><h2 id="preconsultaPrivacyTitle">Información privada y confidencial</h2><p>Revise y confirme las respuestas registradas durante la atención con el profesional autorizado.</p><p class="mpre-caption">Esta pantalla permite leer el formulario registrado. No modifica las respuestas ni crea una nota clínica.</p></section>
+{% if preconsulta.estado == 'completada' %}
+  <section class="mpre-sections" aria-label="Respuestas registradas">
+    {% for seccion in secciones_preconsulta %}
+    <details class="mi-card mpre-section"{% if forloop.first %} open{% endif %}>
+      <summary><span><strong>{{ seccion.titulo }}</strong><small>{{ seccion.descripcion }}</small></span><i aria-hidden="true">⌄</i></summary>
+      <div class="mpre-fields">
+        {% for campo in seccion.campos %}
+        <div class="mpre-field"><span class="mpre-label">{{ campo.label }}</span>{% if campo.type == 'chips' %}<div class="mpre-chips{% if 'Alergia' in campo.label or 'alergia' in campo.label %} allergy{% endif %}">{% for valor in campo.value %}<span>{{ valor }}</span>{% empty %}<span class="mpre-not-indicated">No indicado</span>{% endfor %}</div>{% else %}<p class="mpre-value">{{ campo.value }}</p>{% endif %}</div>
+        {% endfor %}
+      </div>
+    </details>
+    {% empty %}<section class="mi-card mpre-empty"><h2>Sin respuestas disponibles</h2><p>No hay datos disponibles para mostrar.</p></section>{% endfor %}
+  </section>
+{% else %}
+  <section class="mi-card mpre-empty"><h2>Formulario {{ preconsulta.estado_label }}</h2><p>El paciente todavía no ha completado este formulario.</p></section>
+{% endif %}
+{% endblock %}

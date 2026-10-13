@@ -2718,10 +2718,18 @@ def archivo_anexo_app(request, empresa_slug, paciente_id, clase, registro_id, pa
 
 @login_required
 def historias_especialidad(request, empresa_slug, paciente_id):
+    from .mobile_preconsultas import autorizar_preconsulta_app, enlaces_preconsultas_app, es_preconsultas_app
+
     empresa = _empresa_desde_slug(empresa_slug)
+    modo_preconsulta_app = es_preconsultas_app(request, empresa)
+    if modo_preconsulta_app:
+        autorizar_preconsulta_app(request, empresa, paciente_id)
     autorizar_pacientes_app(request, empresa, "puede_ver_historia_clinica", "puede_expediente_clinico")
     _requiere_interfaz_clinica(empresa)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
+    mobile_preconsulta_items = enlaces_preconsultas_app(
+        request, empresa, paciente, paciente.preconsultas.filter(estado="completada"),
+    ) if modo_preconsulta_app else []
     historias = paciente.historias_especialidad.select_related("profesional", "actualizado_por")
     preconsultas = paciente.preconsultas.filter(estado="completada").select_related("creada_por")[:30]
     tipos = [
@@ -2746,6 +2754,7 @@ def historias_especialidad(request, empresa_slug, paciente_id):
             "historias": historias,
             "tipos": tipos,
             "preconsultas": preconsultas,
+            **({"mobile_preconsulta_items": mobile_preconsulta_items} if modo_preconsulta_app else {}),
             "mobile_history_notes": notas_historia_app(historias) if es_pacientes_app(request, empresa) else [],
         },
     )
@@ -4241,8 +4250,19 @@ def control_enlaces_registro_paciente(request, empresa_slug):
 
 @login_required
 def preconsulta_detalle(request, empresa_slug, paciente_id, preconsulta_id):
+    from .mobile_preconsultas import autorizar_preconsulta_app, es_preconsultas_app, render_preconsulta_app
+
     empresa = _empresa_desde_slug(empresa_slug)
+    modo_app = es_preconsultas_app(request, empresa)
+    if modo_app:
+        autorizar_preconsulta_app(request, empresa, paciente_id, preconsulta_id)
     _requiere_interfaz_clinica(empresa)
+    if modo_app:
+        paciente = get_object_or_404(
+            Paciente.objects.only("id", "empresa_id", "nombre", "expediente_codigo"),
+            id=paciente_id, empresa=empresa,
+        )
+        return render_preconsulta_app(request, empresa, paciente, preconsulta_id, _secciones_preconsulta)
     paciente = get_object_or_404(Paciente, id=paciente_id, empresa=empresa)
     preconsulta = get_object_or_404(
         PreconsultaClinica,
