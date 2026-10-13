@@ -1,4 +1,5 @@
 from django.urls import path
+from .mobile_advanced_configuration import configuracion_avanzada_empresa_app, configuracion_avanzada_empresas_app
 from .views import (
     public_access,
     public_demo_detail,
@@ -59,6 +60,8 @@ urlpatterns = [
     path('control/solicitudes/', superadmin_solicitudes, name='superadmin_solicitudes'),
     path('control/empresas/', superadmin_empresas, name='superadmin_empresas'),
     path('control/empresas/app/', superadmin_empresas_app, name='superadmin_empresas_app'),
+    path('control/empresas/configuracion-avanzada/app/', configuracion_avanzada_empresas_app, name='configuracion_avanzada_empresas_app'),
+    path('control/empresas/<int:empresa_id>/configuracion-avanzada/app/', configuracion_avanzada_empresa_app, name='configuracion_avanzada_empresa_app'),
     path('control/empresas/nueva/', superadmin_empresa_create, name='superadmin_empresa_create'),
     path('control/empresas/<int:empresa_id>/', superadmin_empresa_detail, name='superadmin_empresa_detail'),
     path('control/empresas/<int:empresa_id>/editar/', superadmin_empresa_edit, name='superadmin_empresa_edit'),

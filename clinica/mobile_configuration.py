@@ -179,6 +179,7 @@ def _contexto_configuracion_app(request, empresa):
 
 
 def render_configuracion_hub_app(request, empresa):
+    from core.mobile_advanced_configuration import configuracion_avanzada_disponible_app
     from core.mobile_company import configuracion_empresa_disponible_app
     from core.mobile_users import usuarios_disponibles_app
     from .mobile_recipe_templates import permiso_plantillas_app
@@ -212,6 +213,15 @@ def render_configuracion_hub_app(request, empresa):
             "descripcion": "Datos, logo, plan, licencia y módulos mediante el editor existente de superadministración.",
             "estado": "disponible",
             "url": f"{reverse('superadmin_empresa_edit', args=[empresa.pk])}?app=1",
+        })
+    avanzadas = configuracion_avanzada_disponible_app(request, empresa)
+    if any(avanzadas.values()):
+        opciones.append({
+            "codigo": "configuracion_avanzada", "nombre": "Opciones avanzadas",
+            "descripcion": "Inventario, bodegas, manuales y parámetros originales según permisos del administrador de Django.",
+            "estado": "disponible",
+            "url": (f"{reverse('configuracion_avanzada_empresa_app', args=[empresa.pk])}?app=1" if avanzadas["ver"]
+                    else f"{reverse('configuracion_avanzada_empresas_app')}?app=1"),
         })
     for codigo, nombre, permiso in (
         ("configuracion_facturacion", "Configuración de facturación", "configuracion_facturacion"),

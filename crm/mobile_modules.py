@@ -242,6 +242,13 @@ def construir_contexto_modulos_app(request, empresa):
     agregar("empresa", "Configuración de empresa", "Datos, logo, plan, licencia y módulos con la autorización de superadministración existente.",
             "Administración", configuracion_empresa_disponible_app(request, empresa), "disponible",
             f"{reverse('superadmin_empresa_edit', args=[empresa.pk])}?app=1")
+    from core.mobile_advanced_configuration import configuracion_avanzada_disponible_app
+
+    avanzadas = configuracion_avanzada_disponible_app(request, empresa)
+    agregar("configuracion_avanzada", "Opciones avanzadas", "Consultar o configurar inventario, bodegas, manuales y opciones existentes con los permisos administrativos de Django.",
+            "Administración", any(avanzadas.values()), "disponible",
+            (f"{reverse('configuracion_avanzada_empresa_app', args=[empresa.pk])}?app=1" if avanzadas["ver"]
+             else f"{reverse('configuracion_avanzada_empresas_app')}?app=1"))
     for key, nombre, permiso in (
         ("contabilidad", "Contabilidad", acceso["modulo_contabilidad"]),
         ("rrhh", "Recursos humanos", acceso["modulo_rrhh"]),
