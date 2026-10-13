@@ -12,7 +12,7 @@ from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo
 
 class SuperAdminLoginForm(forms.Form):
     username = forms.CharField(label="Usuario")
-    password = forms.CharField(label="Contrasena", widget=forms.PasswordInput)
+    password = forms.CharField(label="Contrasena", widget=forms.PasswordInput, strip=False)
 
     error_messages = {
         "invalid_login": "Credenciales invalidas.",
@@ -291,11 +291,13 @@ class UsuarioControlCreateForm(forms.ModelForm):
     password1 = forms.CharField(
         required=False,
         label="Contrasena inicial",
+        strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
     password2 = forms.CharField(
         required=False,
         label="Confirmar contrasena",
+        strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
     groups = forms.ModelMultipleChoiceField(
@@ -414,12 +416,14 @@ class UsuarioControlCreateForm(forms.ModelForm):
 
 class UsuarioControlUpdateForm(forms.ModelForm):
     password1 = forms.CharField(
+        strip=False,
         required=False,
         label="Nueva contrasena",
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         help_text="Dejala vacia si no deseas cambiar la contrasena actual.",
     )
     password2 = forms.CharField(
+        strip=False,
         required=False,
         label="Confirmar nueva contrasena",
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),

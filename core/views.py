@@ -15,6 +15,7 @@ from django.db import OperationalError, transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.functions import TruncDate
 from django.http import FileResponse, Http404, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -22,6 +23,7 @@ from django.utils.crypto import get_random_string
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import slugify
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from .assistant import responder_consulta
@@ -649,6 +651,7 @@ def _flash_session_expired_message(request):
         messages.warning(request, mensaje)
 
 
+@never_cache
 def csrf_failure(request, reason=""):
     request.session[SESSION_EXPIRED_MESSAGE_KEY] = SESSION_EXPIRED_MESSAGE
     path = request.path or ""
@@ -668,6 +671,13 @@ def csrf_failure(request, reason=""):
     return redirect("public_access")
 
 
+@never_cache
+@require_GET
+def login_csrf_token(request):
+    # Otra pestaña puede haber rotado la cookie desde que se abrió el login.
+    return JsonResponse({"csrfToken": get_token(request)})
+
+
 def _redirect_dashboard_empresa(request, empresa):
     if _usa_host_empresa(request, empresa):
         return redirect("dashboard_host")
@@ -684,6 +694,7 @@ def _es_perfil_clinico(empresa):
     return interfaz_clinica_activa(empresa)
 
 
+@never_cache
 def empresa_login(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
     if empresa.tipo_solucion == "tecnicentro":
@@ -1686,6 +1697,7 @@ def superadmin_required(view_func):
     return _wrapped_view
 
 
+@never_cache
 def superadmin_login(request):
     _flash_session_expired_message(request)
     if request.user.is_authenticated and request.user.is_superuser:
