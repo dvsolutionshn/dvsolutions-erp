@@ -179,6 +179,7 @@ def _contexto_configuracion_app(request, empresa):
 
 
 def render_configuracion_hub_app(request, empresa):
+    from core.mobile_audit import auditoria_disponible_app
     from core.mobile_advanced_configuration import configuracion_avanzada_disponible_app
     from core.mobile_company import configuracion_empresa_disponible_app
     from core.mobile_users import usuarios_disponibles_app
@@ -217,6 +218,7 @@ def render_configuracion_hub_app(request, empresa):
     agregar("manuales_pdf", "Manuales PDF", "Cargar, editar y activar los documentos existentes.", recetas and acceso["administrar_manuales_pdf"] and _puede_administrar_manuales_receta(request.user, empresa), "clinica_manuales_recetas")
     agregar("enlaces_registro", "Control de enlaces de registro", "Consultar estados, avance y actividad de los enlaces sin generar ni modificar registros.", control_enlaces_disponible_app(request, empresa), "clinica_control_enlaces_registro_paciente")
     agregar("usuarios_roles", "Usuarios y permisos", "Consultar usuarios y permisos del rol; asignarlo sólo en esta empresa.", usuarios_disponibles_app(request, empresa), "usuarios_clinicos")
+    agregar("bitacora_clinica", "Bitácora clínica", "Consultar acciones resumidas de clínica, administración e inventario, sin datos privados ni documentos monetarios.", auditoria_disponible_app(request, empresa), "auditoria_empresa")
     if configuracion_empresa_disponible_app(request, empresa):
         opciones.append({
             "codigo": "empresa", "nombre": "Configuración de empresa",

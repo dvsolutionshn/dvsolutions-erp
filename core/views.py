@@ -1549,12 +1549,18 @@ def rol_clinico_editar(request, slug, rol_id=None):
 
 @login_required
 def auditoria_empresa(request, slug):
+    from .mobile_audit import autorizar_auditoria_app, base_auditoria_app, es_auditoria_app, render_auditoria_app
+
     empresa = _resolver_empresa_request(request, slug)
+    modo_app = es_auditoria_app(request)
+    fechas_app = autorizar_auditoria_app(request, empresa) if modo_app else None
     if not request.user.is_superuser and (
         not request.user.puede_acceder_empresa(empresa) or not request.user.es_administrador_empresa
     ):
         return JsonResponse({"error": "Solo el administrador de la empresa puede consultar la bitacora."}, status=403)
     base = RegistroAuditoria.objects.filter(empresa=empresa).select_related("usuario")
+    if modo_app:
+        base = base_auditoria_app(base, empresa)
     registros = _aplicar_filtros_auditoria(base, request)
     page = Paginator(registros, 50).get_page(request.GET.get("page"))
     context = {
@@ -1563,6 +1569,8 @@ def auditoria_empresa(request, slug):
         "total_registros": registros.count(),
         **_contexto_filtros_auditoria(base, request),
     }
+    if modo_app:
+        return render_auditoria_app(request, empresa, context, fechas_app)
     return render(request, "core/auditoria_empresa.html", context)
 
 
