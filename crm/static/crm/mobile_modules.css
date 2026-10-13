@@ -1,6 +1,6 @@
 /* Additive module hub only. Existing app screens/navigation keep their styles. */
 .mobile-home-card.more-modules .mobile-home-icon{background:linear-gradient(135deg,#185d68,#22b8ad)}
-.mobile-modules-panel{gap:16px}
+.mobile-modules-panel{gap:16px;min-width:0}
 .mobile-modules-header{padding:20px;border:1px solid #cfe4ed;border-radius:24px;background:linear-gradient(135deg,#fff,#edf9f7)}
 .mobile-modules-header small{color:#185d68;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
 .mobile-modules-header h2{margin:6px 0 8px;font-size:25px;line-height:1.15}
@@ -18,4 +18,26 @@
 .mobile-modules-state.parcial{background:#edf5fc;color:#185d68}
 .mobile-modules-go{width:32px;height:36px;display:grid;place-items:center;flex-shrink:0;border-radius:12px;color:#185d68;background:#edf8f7;font-weight:900;font-size:22px}
 .mobile-modules-pending{background:#f8fbfd;box-shadow:none}
+.mobile-modules-panel [hidden]{display:none!important}
+.mobile-modules-header,.mobile-modules-note,.mobile-modules-group h3{overflow-wrap:anywhere}
+.mobile-modules-header-compact{padding:14px 18px}
+.mobile-modules-header-compact .mobile-modules-context{margin-top:12px;padding-top:10px}
+.mobile-modules-panel[data-modules-enhanced="1"] .mobile-modules-group h3{font-size:20px;line-height:1.4;margin-bottom:14px}
+.mobile-modules-categories{margin-top:18px;min-width:0}
+.mobile-modules-categories h3{margin:0 0 6px;font-size:17px;line-height:1.5;color:#185d68;overflow-wrap:anywhere}
+.mobile-modules-category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+.mobile-modules-category{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-width:0;min-height:150px;padding:18px 12px;border:1px solid #cfe4ed;border-radius:23px;background:linear-gradient(145deg,#fff,#f4fbfa);box-shadow:0 9px 22px rgba(18,50,74,.05);color:#14283b;font:inherit;text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mobile-modules-category-icon{display:grid;place-items:center;flex:0 0 54px;width:54px;height:54px;border-radius:18px;background:#e4f6f1;color:#16877e}
+.mobile-modules-category[data-modules-category="operation"] .mobile-modules-category-icon{background:#edf4fc;color:#3f739c}
+.mobile-modules-category[data-modules-category="administrative"] .mobile-modules-category-icon{background:#f2eefb;color:#7961a4}
+.mobile-modules-category-icon svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.mobile-modules-category strong{max-width:100%;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.mobile-modules-category-count{font-size:11px;line-height:1.5;color:#6e8191}
+.mobile-modules-category:hover{border-color:#8abebc;background:#f4fbf9}
+.mobile-modules-category:active{background:#eaf7f3}
+.mobile-modules-group-navigation{display:flex;align-items:center;margin:16px 0 12px;min-width:0}
+.mobile-modules-back{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:46px;padding:10px 14px;border:1px solid #cfe4ed;border-radius:14px;background:#fff;color:#185d68;font:inherit;font-size:12px;font-weight:800;line-height:1.5;overflow-wrap:anywhere;cursor:pointer}
+.mobile-modules-back svg{flex:0 0 18px;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mobile-modules-category:focus-visible,.mobile-modules-back:focus-visible,.mobile-modules-categories h3:focus-visible,.mobile-modules-group h3:focus-visible{outline:3px solid #185d68;outline-offset:3px}
+@media(min-width:600px){.mobile-modules-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(min-width:700px){.mobile-modules-list{grid-template-columns:repeat(2,minmax(0,1fr))}}

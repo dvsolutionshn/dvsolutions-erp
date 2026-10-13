@@ -12,7 +12,8 @@
   <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}" crossorigin="use-credentials">
   <link rel="icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
   <link rel="apple-touch-icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
-  {% if puede_ver_modulos_app %}<link rel="stylesheet" href="{% static 'crm/mobile_modules.css' %}">{% endif %}
+  {% if puede_ver_modulos_app %}<link rel="stylesheet" href="{% static 'crm/mobile_modules.css' %}?v=categories-20261013">{% endif %}
+  {% if puede_ver_modulos_app %}<script src="{% static 'crm/mobile_modules.js' %}" defer></script>{% endif %}
   <style>
   :root{--navy:#12324a;--navy2:#185d68;--teal:#22b8ad;--pink:#e675a0;--ink:#14283b;--muted:#6e8191;--line:#dbe6ed;--bg:#f2f7fa;--white:#fff;--danger:#b94343;--safe-bottom:env(safe-area-inset-bottom,0px)}
   .appointment.is-courtesy{overflow:hidden}.appointment.is-courtesy:before{content:"CORTESÍA";position:absolute;top:0;right:0;padding:3px 9px;border-bottom-left-radius:10px;background:linear-gradient(135deg,#7c3aed,#d97706);color:#fff;font-size:8px;font-weight:900;letter-spacing:.1em}.status.courtesy{background:#f3e8ff;color:#7e22ce}
