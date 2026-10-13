@@ -138,10 +138,15 @@ def construir_contexto_modulos_app(request, empresa):
             "Atención clínica", planes["ver"] or planes["crear"],
             "disponible" if acceso["pacientes"] else "pendiente",
             f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino={'planes' if planes['ver'] else 'crear_plan'}")
-    for key, nombre, descripcion, autorizado in (
-        ("terapias", "Terapias", "Registro y seguimiento de terapias.", acceso["ver_terapias"]),
-    ):
-        agregar(key, nombre, descripcion, "Atención clínica", acceso["modulo_clinica"] and autorizado)
+    terapias_consultables = acceso["pacientes"] and acceso["ver_historia_clinica"]
+    agregar("terapias", "Terapias", "Elige un paciente y abre sus historias por área para consultar las notas de Terapias.",
+            "Atención clínica", acceso["modulo_clinica"] and acceso["ver_terapias"],
+            "parcial" if terapias_consultables else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=historias" if terapias_consultables else "")
+    agregar("registrar_terapia", "Registrar terapia", "Elige un paciente para registrar una nota de Terapias con el formulario clínico existente.",
+            "Atención clínica", acceso["modulo_clinica"] and acceso["escribir_terapias"],
+            "parcial" if acceso["pacientes"] else "pendiente",
+            f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1&destino=crear_historia&tipo=terapias" if acceso["pacientes"] else "")
     # Los tableros del expediente exigen escribir el control (no basta el
     # permiso de consultar la agenda). El helper conserva esos accesos.
     from clinica.mobile_controls import controles_disponibles_app
