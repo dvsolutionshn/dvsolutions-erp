@@ -9,9 +9,9 @@
 {% block mobile_head %}<link rel="stylesheet" href="{% static 'clinica/mobile_configuration.css' %}">{% endblock %}
 {% block mobile_scripts %}<script src="{% static 'clinica/mobile_configuration.js' %}" defer></script>{% endblock %}
 {% block mobile_content %}
-<section class="mi-card mcfg-intro"><small class="mi-kicker">Configuración por empresa</small><h2>Preparar la operación clínica</h2><p>Los mismos catálogos, datos y permisos, con pantallas adaptadas al teléfono. Las opciones pendientes no abren la versión web.</p></section>
+<section class="mi-card mcfg-intro"><small class="mi-kicker">Configuración por empresa</small><h2>Preparar la operación clínica</h2><p>Los mismos catálogos, datos y permisos, con pantallas adaptadas al teléfono.</p></section>
 {% if mobile_configuration_items %}
-<div class="mcfg-filter-chips" role="group" aria-label="Opciones de configuración"><button type="button" class="active" data-configuration-state-filter="todos" aria-pressed="true">Todas</button><button type="button" data-configuration-state-filter="disponible" aria-pressed="false">Disponibles</button><button type="button" data-configuration-state-filter="pendiente" aria-pressed="false">Pendientes</button></div>
+<div class="mcfg-filter-chips" role="group" aria-label="Opciones de configuración"><button type="button" class="active" data-configuration-state-filter="todos" aria-pressed="true">Todas</button><button type="button" data-configuration-state-filter="disponible" aria-pressed="false">Disponibles</button>{% if mobile_configuration_has_pending %}<button type="button" data-configuration-state-filter="pendiente" aria-pressed="false">Pendientes</button>{% endif %}</div>
 <div class="mcfg-hub-list">
 {% for item in mobile_configuration_items %}
   {% if item.url %}<a class="mi-card mcfg-hub-card" href="{{ item.url }}" data-configuration-state="{{ item.estado }}"><span class="mcfg-hub-icon" aria-hidden="true">{% if item.codigo == 'profesionales' %}P{% elif item.codigo == 'servicios' %}S{% elif item.codigo == 'plantillas_recetas' %}Rx{% elif item.codigo == 'manuales_pdf' %}PDF{% else %}＋{% endif %}</span><div><h2>{{ item.nombre }}</h2><p>{{ item.descripcion }}</p><span class="mcfg-badge available">Disponible en app</span></div><span class="mcfg-go" aria-hidden="true">›</span></a>

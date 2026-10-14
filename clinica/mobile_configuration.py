@@ -218,6 +218,7 @@ def render_configuracion_hub_app(request, empresa):
     agregar("manuales_pdf", "Manuales PDF", "Cargar, editar y activar los documentos existentes.", recetas and acceso["administrar_manuales_pdf"] and _puede_administrar_manuales_receta(request.user, empresa), "clinica_manuales_recetas")
     agregar("enlaces_registro", "Control de enlaces de registro", "Consultar estados, avance y actividad de los enlaces sin generar ni modificar registros.", control_enlaces_disponible_app(request, empresa), "clinica_control_enlaces_registro_paciente")
     agregar("usuarios_roles", "Usuarios y permisos", "Consultar usuarios y permisos del rol; asignarlo sólo en esta empresa.", usuarios_disponibles_app(request, empresa), "usuarios_clinicos")
+    agregar("roles_clinicos", "Roles clínicos", "Consultar los roles clínicos compartidos y sus permisos. El catálogo global es sólo de consulta.", usuarios_disponibles_app(request, empresa), "roles_clinicos")
     agregar("bitacora_clinica", "Bitácora clínica", "Consultar acciones resumidas de clínica, administración e inventario, sin datos privados ni documentos monetarios.", auditoria_disponible_app(request, empresa), "auditoria_empresa")
     if configuracion_empresa_disponible_app(request, empresa):
         opciones.append({
@@ -235,10 +236,12 @@ def render_configuracion_hub_app(request, empresa):
             "url": (f"{reverse('configuracion_avanzada_empresa_app', args=[empresa.pk])}?app=1" if avanzadas["ver"]
                     else f"{reverse('configuracion_avanzada_empresas_app')}?app=1"),
         })
-    agregar("configuracion_facturacion", "Configuración de facturación", "Adaptación móvil pendiente; no se modifican permisos ni integraciones desde esta pantalla.", acceso["configuracion_facturacion"])
     agregar("crm", "Agenda y comunicación", "Configurar plantillas, textos y avisos con el permiso CRM existente, sin editar credenciales ni enviar pruebas.",
             configuracion_crm_disponible_app(request, empresa), "crm_configuracion")
-    contexto.update({"titulo": "Configuración", "recetas_avanzadas": recetas, "mobile_configuration_items": opciones})
+    contexto.update({
+        "titulo": "Configuración", "recetas_avanzadas": recetas, "mobile_configuration_items": opciones,
+        "mobile_configuration_has_pending": any(item["estado"] == "pendiente" for item in opciones),
+    })
     return respuesta_configuracion_app(render(request, "clinica/mobile_configuration_hub.html", contexto))
 
 

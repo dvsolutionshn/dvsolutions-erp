@@ -624,7 +624,7 @@ class MobileConfigurationIntegrationTests(TestCase):
             self.no_catalog_queries(queries)
             cards = {item["key"]: item for item in context["modulos_app"]}
             if permissions:
-                self.assertEqual((cards["configuracion"]["estado"], cards["configuracion"]["url"]), ("parcial", self.url()))
+                self.assertEqual((cards["configuracion"]["estado"], cards["configuracion"]["url"]), ("disponible", self.url()))
             else:
                 self.assertNotIn("configuracion", cards)
             hub = self.client.get(self.url())
@@ -635,7 +635,7 @@ class MobileConfigurationIntegrationTests(TestCase):
                 else:
                     self.assertNotContains(hub, self.url(route))
 
-    def test_configuration_hub_pending_administration_cards_have_no_desktop_fallback_actions(self):
+    def test_configuration_hub_administration_cards_have_no_billing_or_desktop_fallback_actions(self):
         self.use_user(self.supervisor)
         billing, _ = Modulo.objects.get_or_create(codigo="facturacion", defaults={"nombre": "Facturación"})
         EmpresaModulo.objects.create(empresa=self.empresa, modulo=billing)
@@ -647,8 +647,9 @@ class MobileConfigurationIntegrationTests(TestCase):
         self.assertEqual(items["empresa"]["estado"], "disponible")
         self.assertEqual(items["empresa"]["url"], reverse("superadmin_empresa_edit", args=[self.empresa.pk]) + "?app=1")
         self.assertFalse({"contabilidad", "rrhh", "tecnicentro"} & set(items))
-        self.assertEqual(items["configuracion_facturacion"]["estado"], "pendiente")
-        self.assertEqual(items["configuracion_facturacion"]["url"], "")
+        self.assertNotIn("configuracion_facturacion", items)
+        self.assertEqual(items["roles_clinicos"]["estado"], "disponible")
+        self.assertEqual(items["roles_clinicos"]["url"], reverse("roles_clinicos", args=[self.empresa.slug]) + "?app=1")
         for item in items.values():
             if item["estado"] == "pendiente":
                 self.assertEqual(item["url"], "")
