@@ -574,7 +574,7 @@ class MobileReceiptsIntegrationTests(TestCase):
         response = self.client.get(hub)
         self.assertEqual(response.status_code, 200)
         card = next(item for item in response.context["modulos_app"] if item["key"] == "recibos")
-        self.assertEqual(card["estado"], "parcial")
+        self.assertEqual(card["estado"], "disponible")
         self.assertEqual(card["url"], self.url("recibos_dashboard"))
         for view in ("recibos_dashboard", "ver_recibo", "editar_recibo"):
             page = self.client.get(self.url(view))

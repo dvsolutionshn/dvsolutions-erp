@@ -151,7 +151,6 @@ def url_compra_app(vista, empresa, compra=None, **parametros):
 
 def _contexto_compras_app(request, empresa, compra=None):
     from crm.mobile_modules import inicio_app_disponible, url_modulos_app
-    from .mobile_egresos import egresos_disponibles_app
     from .mobile_suppliers import proveedores_disponibles_app
 
     inicio = reverse("agenda_mobile", args=[empresa.slug])
@@ -169,7 +168,7 @@ def _contexto_compras_app(request, empresa, compra=None):
         "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
         "can_view_purchases": True, "can_view_purchase": True, "can_download_purchase": True,
         "can_view_supplier": puede_proveedor,
-        "can_view_egresos": egresos_disponibles_app(request, empresa),
+        "can_view_egresos": False,
         "app_purchases_url": listado, "app_purchases_search_url": listado,
         "app_purchase_back_url": listado if compra is not None else modulos,
         "app_purchase_supplier_url": url_compra_app("ver_proveedor_facturacion", empresa, proveedor) if puede_proveedor else "",
@@ -217,18 +216,13 @@ def render_compras_app(request, empresa, contexto):
 
 
 def render_compra_app(request, empresa, contexto):
-    from .mobile_egresos import url_egreso_app
-
     compra = contexto["compra"]
     contexto = {**contexto, **_contexto_compras_app(request, empresa, compra)}
     pagos = []
     for pago in contexto["pagos"]:
-        comprobante = getattr(pago, "comprobante", None)
-        puede_egreso = comprobante is not None and contexto["can_view_egresos"]
         pagos.append({
-            "pago": pago, "comprobante_numero": comprobante.numero_comprobante if puede_egreso else "",
-            "comprobante_url": url_egreso_app("ver_comprobante_egreso", empresa, comprobante) if puede_egreso else "",
-            "comprobante_pdf_url": url_egreso_app("descargar_comprobante_egreso_pdf", empresa, comprobante) if puede_egreso else "",
+            "pago": pago, "comprobante_numero": "",
+            "comprobante_url": "", "comprobante_pdf_url": "",
         })
     contexto.update({
         "mobile_purchase_lines": [{"linea": linea} for linea in compra.lineas.all()],

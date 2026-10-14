@@ -25,14 +25,16 @@
 <section class="msu-purchase-section" aria-labelledby="supplierPurchasesTitle">
   <div class="msu-section-heading"><h2 id="supplierPurchasesTitle">Compras asociadas</h2><p>Se muestran hasta las 20 compras más recientes. Solo consulta.</p></div>
   <div class="msu-list">
-  {% for compra in compras %}
+  {% for item in mobile_supplier_purchase_items %}{% with compra=item.compra %}
     <article class="mi-card msu-purchase-card">
       <div class="msu-card-head"><h3>{{ compra.numero_compra|default:'Compra sin número' }}</h3><span class="msu-badge {{ compra.estado }}">{{ compra.get_estado_display }}</span></div>
       <dl class="msu-data msu-data-grid"><div><dt>Fecha del documento</dt><dd>{{ compra.fecha_documento|date:'d/m/Y' }}</dd></div><div><dt>Vencimiento</dt><dd>{% if compra.fecha_vencimiento %}{{ compra.fecha_vencimiento|date:'d/m/Y' }}{% else %}Sin fecha{% endif %}</dd></div><div><dt>Total</dt><dd class="msu-money">L. {{ compra.total_documento|floatformat:2|intcomma }}</dd></div><div><dt>Saldo pendiente</dt><dd class="msu-money">L. {{ compra.saldo_pendiente|floatformat:2|intcomma }}</dd></div></dl>
       <div class="msu-badges"><span class="msu-badge {{ compra.estado_pago }}">{% if compra.estado_pago == 'pagado' %}Pagada{% elif compra.estado_pago == 'parcial' %}Pago parcial{% else %}Pago pendiente{% endif %}</span>{% if compra.esta_vencida %}<span class="msu-badge vencida">Vencida</span>{% endif %}</div>
       <details class="msu-purchase-fold"><summary>Datos de la compra</summary><dl class="msu-data"><div><dt>Referencia</dt><dd class="msu-text">{{ compra.referencia_documento|default:'Sin referencia' }}</dd></div><div><dt>Condición de pago</dt><dd>{{ compra.get_condicion_pago_display }}</dd></div><div><dt>Unidades</dt><dd>{{ compra.total_unidades|floatformat:2|intcomma }}</dd></div></dl></details>
+      {% if item.detalle_url %}<a class="mi-button secondary mi-status-space" href="{{ item.detalle_url }}">Ver compra</a>{% endif %}
+      {% if item.pdf_url %}<a class="mi-button secondary mi-status-space" href="{{ item.pdf_url }}" target="_blank" rel="noopener">Abrir PDF original de la compra</a>{% endif %}
     </article>
-  {% empty %}<section class="mi-card msu-empty"><h2>Sin compras registradas</h2><p>Este proveedor todavía no tiene compras asociadas.</p></section>{% endfor %}
+  {% endwith %}{% empty %}<section class="mi-card msu-empty"><h2>Sin compras registradas</h2><p>Este proveedor todavía no tiene compras asociadas.</p></section>{% endfor %}
   </div>
 </section>
 {% endblock %}

@@ -2,23 +2,26 @@
 
 from datetime import date
 
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 
-from facturacion.models import ExistenciaLoteBodega, Producto
+from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
+from facturacion.models import ExistenciaLoteBodega, InventarioProducto, Producto
 
 
 def productos_inventario_app(empresa):
-    productos_inventario = list(
-        Producto.objects.filter(
-            empresa=empresa,
-            activo=True,
-            eliminado=False,
-            controla_inventario=True,
-            tipo_item="producto",
-        )
-        .select_related("inventario")
-        .order_by("nombre")
+    productos_mostrados = Producto.objects.filter(
+        empresa=empresa,
+        activo=True,
+        eliminado=False,
+        controla_inventario=True,
+        tipo_item="producto",
     )
+    if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES and InventarioProducto.objects.filter(
+        producto_id__in=productos_mostrados.values("pk"),
+    ).exclude(empresa_id=empresa.pk).exists():
+        raise PermissionDenied("Las existencias del producto no corresponden a la empresa activa.")
+    productos_inventario = list(productos_mostrados.select_related("inventario").order_by("nombre"))
     producto_ids = [producto.id for producto in productos_inventario]
     existencias_lotes = list(
         ExistenciaLoteBodega.objects.filter(

@@ -486,10 +486,17 @@ class MobileSuppliersIntegrationTests(TestCase):
         self.assertEqual(app.context["resumen"]["saldo_pendiente"], Decimal("34"))
         self.assertEqual(self.snapshot(), before)
 
-    def test_detail_does_not_link_purchase_or_payment_web_even_if_user_can_access_them(self):
+    def test_detail_links_only_authorized_mobile_purchase_and_never_payment_web(self):
         self.asignar_rol(puede_proveedores=True, puede_compras=True, puede_registrar_pagos_proveedores=True)
         page = self.client.get(self.url())
-        self.assertNotContains(page, reverse("ver_compra", args=[self.empresa.slug, self.compras[self.empresa.slug].pk]))
+        purchase = self.compras[self.empresa.slug]
+        detail_url = reverse("ver_compra", args=[self.empresa.slug, purchase.pk])+"?app=1"
+        pdf_url = reverse("descargar_compra_pdf", args=[self.empresa.slug, purchase.pk])+"?app=1"
+        self.assertTrue(page.context["can_view_purchase"])
+        self.assertEqual(page.context["mobile_supplier_purchase_items"][0], {"compra": purchase, "detalle_url": detail_url, "pdf_url": pdf_url})
+        self.assertContains(page, f'href="{detail_url}"')
+        self.assertContains(page, f'href="{pdf_url}"')
+        self.assertNotContains(page, f'href="{reverse("ver_compra", args=[self.empresa.slug, purchase.pk])}"')
         self.assertNotContains(page, reverse("registrar_pago_compra", args=[self.empresa.slug, self.compras[self.empresa.slug].pk]))
         self.assertNotContains(page, "<table")
 

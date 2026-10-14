@@ -38,5 +38,5 @@
 {% empty %}<section class="mi-card meg-empty"><h2>Sin compras que coincidan</h2><p>No hay documentos con estos filtros para la empresa activa.</p></section>{% endfor %}
 </div>
 {% if mobile_purchase_num_pages > 1 %}<nav class="meg-pagination" aria-label="Páginas de compras"><div>{% if mobile_purchase_previous_url %}<a href="{{ mobile_purchase_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_purchase_page }} / {{ mobile_purchase_num_pages }}</span>{% if mobile_purchase_next_url %}<a href="{{ mobile_purchase_next_url }}">Siguiente ›</a>{% endif %}</div></nav>{% endif %}
-<div class="meg-info-note"><strong>Consulta desde la app</strong><p>Crear, modificar, aplicar, anular y pagar compras todavía no están habilitados en esta pantalla. Los documentos y saldos mantienen la lógica del sistema actual.</p></div>
+<div class="meg-info-note"><strong>Solo consulta</strong><p>Esta pantalla muestra compras, pagos registrados y movimientos. No modifica documentos, pagos, inventario ni contabilidad. Los importes y estados conservan las reglas del sistema actual.</p></div>
 {% endblock %}

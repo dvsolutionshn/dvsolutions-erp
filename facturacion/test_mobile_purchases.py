@@ -325,7 +325,7 @@ class MobilePurchasesIntegrationTests(TestCase):
         MovimientoInventario.objects.filter(pk=self.movements[self.empresa.slug].pk).update(bodega=None, usuario=None)
         self.assertEqual(self.client.get(self.url()).status_code, 200)
 
-    def test_supplier_and_egreso_links_require_their_actual_read_permission_and_stay_mobile(self):
+    def test_supplier_link_requires_read_permission_and_egreso_navigation_stays_hidden_in_app_only(self):
         document = self.payments[self.empresa.slug].comprobante
         initial = self.client.get(self.url())
         self.assertFalse(initial.context["can_view_supplier"])
@@ -336,13 +336,21 @@ class MobilePurchasesIntegrationTests(TestCase):
         before = self.snapshot()
         authorized = self.client.get(self.url())
         self.assertTrue(authorized.context["can_view_supplier"])
-        self.assertTrue(authorized.context["can_view_egresos"])
+        self.assertFalse(authorized.context["can_view_egresos"])
         supplier_url = reverse("ver_proveedor_facturacion", args=[self.empresa.slug, self.suppliers[self.empresa.slug].pk])+"?app=1"
-        egreso_url = reverse("ver_comprobante_egreso", args=[self.empresa.slug, document.pk])+"?app=1"
+        egreso_path = reverse("ver_comprobante_egreso", args=[self.empresa.slug, document.pk])
+        egreso_pdf_path = reverse("descargar_comprobante_egreso_pdf", args=[self.empresa.slug, document.pk])
         self.assertEqual(authorized.context["app_purchase_supplier_url"], supplier_url)
-        self.assertEqual(authorized.context["mobile_purchase_payments"][0]["comprobante_url"], egreso_url)
+        payment = authorized.context["mobile_purchase_payments"][0]
+        for field in ("comprobante_numero", "comprobante_url", "comprobante_pdf_url"):
+            self.assertEqual(payment[field], "")
         self.assertContains(authorized, supplier_url)
-        self.assertContains(authorized, egreso_url)
+        self.assertNotContains(authorized, egreso_path)
+        self.assertNotContains(authorized, egreso_pdf_path)
+        web = self.client.get(self.url(mobile=False))
+        self.assertTemplateUsed(web, "facturacion/ver_compra_cxp_premium.html")
+        self.assertContains(web, f'href="{egreso_path}"')
+        self.assertContains(web, f'href="{egreso_pdf_path}"')
         self.assertEqual(self.snapshot(), before)
 
     def test_foreign_or_orphan_supplier_is_denied_before_filters_detail_or_pdf(self):
@@ -492,7 +500,7 @@ class MobilePurchasesIntegrationTests(TestCase):
             self.assertEqual(response.status_code, 200)
             cards = {item["key"]: item for item in response.json()["modulos"]}
             self.assertEqual(cards["compras"]["url"], self.url(self.ROUTES[0]))
-            self.assertEqual(cards["compras"]["estado"], "parcial")
+            self.assertEqual(cards["compras"]["estado"], "disponible")
             for forbidden in ("egresos", "proveedores", "cobros", "recibos", "pacientes", "agenda"):
                 self.assertNotIn(forbidden, cards)
             page = self.client.get(self.url())

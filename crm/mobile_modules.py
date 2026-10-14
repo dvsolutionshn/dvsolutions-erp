@@ -217,12 +217,12 @@ def construir_contexto_modulos_app(request, empresa):
     from facturacion.mobile_transfers import transferencia_disponible_app
 
     agregar("transferencias", "Transferencias rápidas", "Trasladar un lote entre las bodegas existentes, con el permiso y registro actuales.",
-            "Operación", transferencia_disponible_app(request, empresa), "parcial",
+            "Operación", transferencia_disponible_app(request, empresa), "disponible",
             f"{reverse('traslado_rapido_farmaceutico', args=[empresa.slug])}?app=1")
     from facturacion.mobile_receipts import recibos_disponibles_app
 
-    agregar("recibos", "Recibos", "Consultar documentos y abrir su PDF; no es una pantalla de contabilidad.",
-            "Operación", recibos_disponibles_app(request, empresa), "parcial",
+    agregar("recibos", "Recibos", "Consultar y editar los datos del recibo, abrir o compartir su PDF; sin modificar cobros ni contabilidad.",
+            "Operación", recibos_disponibles_app(request, empresa), "disponible",
             f"{reverse('recibos_dashboard', args=[empresa.slug])}?app=1")
     from facturacion.mobile_payments import cobros_disponibles_app
 
@@ -244,8 +244,8 @@ def construir_contexto_modulos_app(request, empresa):
             f"{reverse('proveedores_facturacion' if proveedores['ver'] else 'crear_proveedor_facturacion', args=[empresa.slug])}?app=1")
     from facturacion.mobile_purchases import compras_disponibles_app
 
-    agregar("compras", "Compras", "Consultar documentos, productos, pagos registrados, movimientos y PDF; las operaciones siguen pendientes.",
-            "Operación", compras_disponibles_app(request, empresa), "parcial",
+    agregar("compras", "Compras", "Sólo consulta de documentos, productos, pagos registrados, movimientos y PDF; no realiza operaciones contables.",
+            "Operación", compras_disponibles_app(request, empresa), "disponible",
             f"{reverse('compras_dashboard', args=[empresa.slug])}?app=1")
     from facturacion.mobile_cxc import cxc_disponible_app
 

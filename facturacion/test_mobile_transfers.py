@@ -538,7 +538,7 @@ class MobileTransfersIntegrationTests(TestCase):
             response = self.client.get(hub)
             self.assertEqual(response.status_code, 200)
             card = next(item for item in response.context["modulos_app"] if item["key"] == "transferencias")
-            self.assertEqual(card["estado"], "parcial")
+            self.assertEqual(card["estado"], "disponible")
             self.assertEqual(card["url"], self.url(empresa))
             self.assertEqual(self.client.get(card["url"]).status_code, 200)
             self.assertFalse(response.context["app_home_disponible"])

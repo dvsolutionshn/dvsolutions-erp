@@ -145,6 +145,7 @@ def url_proveedor_app(vista, empresa, proveedor=None, **parametros):
 
 def _contexto_proveedores_app(request, empresa, proveedor=None):
     from crm.mobile_modules import inicio_app_disponible, url_modulos_app
+    from .mobile_purchases import compras_disponibles_app
 
     permisos = proveedores_disponibles_app(request, empresa)
     inicio = reverse("agenda_mobile", args=[empresa.slug])
@@ -156,13 +157,14 @@ def _contexto_proveedores_app(request, empresa, proveedor=None):
     detalle = url_proveedor_app("ver_proveedor_facturacion", empresa, proveedor) if proveedor and permisos["ver"] else ""
     edicion = url_proveedor_app("editar_proveedor_facturacion", empresa, proveedor) if proveedor and permisos["editar"] else ""
     creacion = url_proveedor_app("crear_proveedor_facturacion", empresa) if permisos["crear"] else ""
+    puede_compra = bool(proveedor is not None and permisos["ver"] and compras_disponibles_app(request, empresa))
     return {
         "empresa": empresa, "modo_app": True, "app_base_url": inicio,
         "app_home_disponible": home, "app_modules_url": modulos,
         "app_invoices_url": f"{inicio}#facturas-app",
         "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
         "can_view_suppliers": permisos["ver"], "can_create_supplier": permisos["crear"],
-        "can_edit_supplier": permisos["editar"], "can_view_purchase": False,
+        "can_edit_supplier": permisos["editar"], "can_view_purchase": puede_compra,
         "app_supplier_purchase_url": "", "app_suppliers_url": listado,
         "app_suppliers_search_url": listado, "app_supplier_create_url": creacion,
         "app_supplier_detail_url": detalle, "app_supplier_edit_url": edicion,
@@ -227,7 +229,14 @@ def render_proveedor_app(request, empresa, contexto, formulario=False):
         ]
         contexto["modo_edicion"] = proveedor is not None
     else:
+        from .mobile_purchases import url_compra_app
+
         contexto["app_supplier_back_url"] = contexto["app_suppliers_url"]
+        contexto["mobile_supplier_purchase_items"] = [{
+            "compra": compra,
+            "detalle_url": url_compra_app("ver_compra", empresa, compra) if contexto["can_view_purchase"] else "",
+            "pdf_url": url_compra_app("descargar_compra_pdf", empresa, compra) if contexto["can_view_purchase"] else "",
+        } for compra in contexto["compras"]]
     template = "facturacion/mobile_supplier_form.html" if formulario else "facturacion/mobile_supplier_detail.html"
     return respuesta_proveedores_app(render(request, template, contexto))
 

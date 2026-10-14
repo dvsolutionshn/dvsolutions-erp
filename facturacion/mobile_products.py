@@ -103,11 +103,13 @@ def url_productos_app(empresa, **parametros):
 
 def render_productos_app(request, empresa, productos, resumen, q, categoria_id, tipo_item, categoria_seleccionada=None):
     from .forms import EliminarProductoForm
+    from .mobile_kardex import kardex_disponible_app, url_kardex_app
     from .mobile_product_management import gestion_productos_disponible_app, url_gestion_producto_app
     from .mobile_stock_operations import acciones_stock_app, url_stock_app
 
     permisos_gestion = gestion_productos_disponible_app(request, empresa)
     acciones_stock = acciones_stock_app(request, empresa)
+    consultar_inventario = kardex_disponible_app(request, empresa)
     pagina = Paginator(productos.order_by("nombre", "id"), 20).get_page(request.GET.get("page", "1"))
     filtros = {"q": q, "categoria": categoria_id, "tipo": tipo_item}
     url_pagina = lambda numero: url_productos_app(empresa, **filtros, page=numero)
@@ -133,6 +135,7 @@ def render_productos_app(request, empresa, productos, resumen, q, categoria_id, 
             "delete_url": url_gestion_producto_app("eliminar_producto_facturacion", empresa, producto) if permisos_gestion["eliminar"] else "",
             "delete_form": EliminarProductoForm(auto_id=f"productDelete{producto.pk}_%s") if permisos_gestion["eliminar"] else None,
             "stock_entry_url": url_stock_app(empresa, producto=producto.pk) if acciones_stock and producto.activo and producto.controla_inventario else "",
+            "kardex_url": url_kardex_app(empresa, producto=producto.pk) if consultar_inventario else "",
         }})
     # Los bucles del contexto también reciben la proyección, no los modelos
     # completos. La paginación conserva sus índices y totales originales.
@@ -148,6 +151,7 @@ def render_productos_app(request, empresa, productos, resumen, q, categoria_id, 
         "app_modules_url": modulos, "app_products_back_url": modulos,
         "app_products_url": url_productos_app(empresa),
         "app_products_search_url": url_productos_app(empresa),
+        "app_inventory_url": reverse("agenda_mobile_inventory", args=[empresa.slug]) if consultar_inventario else "",
         "productos": pagina, "page_obj": pagina, "mobile_product_items": items,
         "mobile_product_rows": filas,
         "resumen": resumen, "q": q, "categoria_id": categoria_id, "tipo_item": tipo_item,
