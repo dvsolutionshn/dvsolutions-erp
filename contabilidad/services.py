@@ -2,8 +2,10 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from .models import AsientoContable, ClasificacionMovimientoBanco, ConfiguracionContableEmpresa, CuentaContable, CuentaFinanciera, LineaAsientoContable, MovimientoBancario, ReglaClasificacionBanco
+from .moneda import convertir_a_lempiras, convertir_partidas_balanceadas, distribuir_conversion, importe_historico_parcial, redondear_importe, validar_moneda_tipo_cambio
 
 
 CUENTAS_BASE = {
@@ -12,6 +14,7 @@ CUENTAS_BASE = {
     "clientes": {"codigo": "111001", "nombre": "Clientes Nacionales", "tipo": "activo"},
     "isr_retenido_clientes": {"codigo": "113003", "nombre": "ISR Retenido por Clientes", "tipo": "activo"},
     "isv_retenido_clientes": {"codigo": "113005", "nombre": "ISV Retenido por Clientes", "tipo": "activo"},
+    "isv_acreditable": {"codigo": "113001", "nombre": "ISV Acreditable en Compras", "tipo": "activo"},
     "inventario": {"codigo": "112001", "nombre": "Inventario de Mercaderia", "tipo": "activo"},
     "isv_por_pagar": {"codigo": "210201", "nombre": "ISV Cobrado 15%", "tipo": "pasivo"},
     "isv_15_por_pagar": {"codigo": "210201", "nombre": "ISV Cobrado 15%", "tipo": "pasivo"},
@@ -33,6 +36,10 @@ CUENTAS_BASE = {
     "isr_por_pagar": {"codigo": "210203", "nombre": "ISR por Pagar", "tipo": "pasivo"},
     "otras_deducciones_por_pagar": {"codigo": "210304", "nombre": "Otras Deducciones por Pagar", "tipo": "pasivo"},
     "anticipos_empleados": {"codigo": "114002", "nombre": "Anticipos a Empleados", "tipo": "activo"},
+    "ganancia_cambiaria": {"codigo": "420101", "nombre": "Ganancia por Diferencia Cambiaria", "tipo": "ingreso"},
+    "perdida_cambiaria": {"codigo": "610203", "nombre": "Pérdida por Diferencia Cambiaria", "tipo": "gasto"},
+    "ajustes_positivos_inventario": {"codigo": "420102", "nombre": "Diferencias Positivas de Inventario", "tipo": "ingreso"},
+    "ajustes_negativos_inventario": {"codigo": "610114", "nombre": "Pérdidas y Ajustes Negativos de Inventario", "tipo": "gasto"},
 }
 
 
@@ -112,6 +119,8 @@ CATALOGO_BASE_HONDURAS = [
     ("410201", "Descuentos sobre Ventas", "ingreso", "4102", True),
     ("410202", "Devoluciones sobre Ventas", "ingreso", "4102", True),
     ("4201", "Otros Ingresos", "ingreso", "4", True),
+    ("420101", "Ganancia por Diferencia Cambiaria", "ingreso", "4201", True),
+    ("420102", "Diferencias Positivas de Inventario", "ingreso", "4201", True),
     ("5", "COSTOS", "costo", "", False),
     ("5101", "Costo de Ventas", "costo", "5", True),
     ("5102", "Compras", "costo", "5", True),
@@ -132,6 +141,7 @@ CATALOGO_BASE_HONDURAS = [
     ("610111", "Gastos de Viaje y Viaticos", "gasto", "6101", True),
     ("610112", "Impuestos y Tasas Municipales", "gasto", "6101", True),
     ("610113", "Depreciaciones", "gasto", "6101", True),
+    ("610114", "Pérdidas y Ajustes Negativos de Inventario", "gasto", "6101", True),
     ("6102", "Gastos Financieros", "gasto", "6", False),
     ("610201", "Comisiones Bancarias", "gasto", "6102", True),
     ("610202", "Intereses Bancarios", "gasto", "6102", True),
@@ -355,6 +365,8 @@ def asegurar_cuenta_contable_cliente(cliente):
     if not cliente or not getattr(cliente, "empresa_id", None):
         return None
     if getattr(cliente, "cuenta_contable_id", None):
+        if cliente.cuenta_contable.empresa_id != cliente.empresa_id or cliente.cuenta_contable.tipo != 'activo':
+            raise ValidationError('La cuenta del cliente debe ser de activo y pertenecer a su empresa.')
         return cliente.cuenta_contable
 
     cuenta_padre = obtener_o_crear_cuenta_base(cliente.empresa, "clientes")
@@ -389,6 +401,8 @@ def asegurar_cuenta_contable_proveedor(proveedor):
     if not proveedor or not getattr(proveedor, "empresa_id", None):
         return None
     if getattr(proveedor, "cuenta_contable_id", None):
+        if proveedor.cuenta_contable.empresa_id != proveedor.empresa_id or proveedor.cuenta_contable.tipo != 'pasivo':
+            raise ValidationError('La cuenta del proveedor debe ser de pasivo y pertenecer a su empresa.')
         return proveedor.cuenta_contable
 
     cuenta_padre = obtener_o_crear_cuenta_base(proveedor.empresa, "proveedores")
@@ -453,6 +467,9 @@ def registrar_asiento_documento(
     creado_por=None,
     lineas=None,
     actualizar_borrador=False,
+    moneda_origen="HNL",
+    tipo_cambio=1,
+    conversion_verificada=True,
 ):
     if not lineas:
         return None
@@ -466,6 +483,7 @@ def registrar_asiento_documento(
     if asiento_existente and not (actualizar_borrador and asiento_existente.estado == "borrador"):
         return asiento_existente
 
+    moneda_origen, tipo_cambio = validar_moneda_tipo_cambio(moneda_origen, tipo_cambio)
     lineas_normalizadas = []
     total_debe = Decimal("0.00")
     total_haber = Decimal("0.00")
@@ -504,12 +522,18 @@ def registrar_asiento_documento(
                 asiento.referencia = referencia
                 asiento.origen_modulo = origen_modulo
                 asiento.creado_por = creado_por
+                asiento.moneda_origen = moneda_origen
+                asiento.tipo_cambio = tipo_cambio
+                asiento.conversion_verificada = conversion_verificada
                 asiento.save(update_fields=[
                     "fecha",
                     "descripcion",
                     "referencia",
                     "origen_modulo",
                     "creado_por",
+                    "moneda_origen",
+                    "tipo_cambio",
+                    "conversion_verificada",
                 ])
             else:
                 asiento = AsientoContable.objects.create(
@@ -523,6 +547,9 @@ def registrar_asiento_documento(
                     evento=evento,
                     creado_por=creado_por,
                     estado="borrador",
+                    moneda_origen=moneda_origen,
+                    tipo_cambio=tipo_cambio,
+                    conversion_verificada=conversion_verificada,
                 )
 
             for linea in lineas_normalizadas:
@@ -535,6 +562,10 @@ def registrar_asiento_documento(
                     detalle=linea.get("detalle"),
                     debe=linea["debe"],
                     haber=linea["haber"],
+                    moneda_origen=linea.get("moneda_origen", "HNL"),
+                    tipo_cambio=linea.get("tipo_cambio", 1),
+                    debe_origen=linea.get("debe_origen", linea["debe"]),
+                    haber_origen=linea.get("haber_origen", linea["haber"]),
                 )
                 movimiento.full_clean()
                 movimiento.save()
@@ -555,12 +586,136 @@ def registrar_asiento_documento(
         raise
 
 
+def _asiento_documento_existente(empresa, documento_tipo, documento_id, evento):
+    return AsientoContable.objects.filter(
+        empresa=empresa, documento_tipo=documento_tipo, documento_id=documento_id, evento=evento,
+    ).first()
+
+
+def _revision_moneda_factura(factura, asiento_origen=None):
+    from .models import RegularizacionMonedaFactura
+
+    revisiones = RegularizacionMonedaFactura.objects.filter(
+        empresa=factura.empresa, factura=factura,
+        asiento_origen__empresa=factura.empresa, asiento_origen__documento_tipo="factura",
+        asiento_origen__documento_id=factura.pk, asiento_origen__evento="emision",
+        asiento_origen__estado="contabilizado", cuenta_cliente__empresa=factura.empresa,
+    ).select_related("cuenta_cliente", "asiento_ajuste")
+    if asiento_origen:
+        revisiones = revisiones.filter(asiento_origen=asiento_origen)
+    revision = revisiones.first()
+    if not revision:
+        return None
+    if revision.asiento_ajuste_id and (
+        revision.asiento_ajuste.empresa_id != factura.empresa_id
+        or revision.asiento_ajuste.estado != "contabilizado"
+    ):
+        raise ValidationError("El asiento que respalda la regularización monetaria requiere revisión.")
+    if revision.total_original <= 0 or revision.total_hnl <= 0:
+        raise ValidationError("La regularización monetaria no conserva los importes completos de la factura.")
+    validar_moneda_tipo_cambio("USD", revision.tipo_cambio)
+    return revision
+
+
+def _fuente_historica_factura(factura):
+    """Lee el respaldo publicado, sin recalcular ni modificar el asiento original."""
+    asiento = _asiento_documento_existente(factura.empresa, "factura", factura.pk, "emision")
+    if not asiento and factura.estado == "emitida":
+        # Una aplicación no puede crear un saldo negativo por faltar la emisión.
+        # Si el mes original está cerrado, las protecciones del registro impiden
+        # reconstruirlo y exigen regularizar la fuente en un período abierto.
+        asiento = registrar_asiento_factura_emitida(factura)
+    if asiento and asiento.estado != "contabilizado":
+        raise ValidationError("Primero contabiliza la factura de origen antes de registrar su aplicación.")
+    if not asiento:
+        raise ValidationError("La aplicación contable requiere una factura de origen emitida y contabilizada.")
+    revision = _revision_moneda_factura(factura, asiento)
+    if revision:
+        moneda, tasa = validar_moneda_tipo_cambio("USD", revision.tipo_cambio)
+        return moneda, tasa, revision.cuenta_cliente, revision.total_original, revision.total_hnl
+    linea = asiento.lineas.filter(detalle__startswith="Cobro a cliente").select_related("cuenta").first()
+    if not linea:
+        linea = asiento.lineas.filter(cuenta_id=factura.cliente.cuenta_contable_id, debe__gt=0).select_related("cuenta").first()
+    if not linea:
+        raise ValidationError("La cuenta por cobrar de la factura requiere revisión contable.")
+    if not asiento.conversion_verificada or (factura.moneda == "USD" and asiento.moneda_origen != "USD"):
+        raise ValidationError(
+            "La factura en dólares tiene un asiento histórico sin conversión documentada. "
+            "Revisa y regulariza su saldo en un período abierto antes de aplicar cobros o notas de crédito."
+        )
+    moneda, tasa = validar_moneda_tipo_cambio(asiento.moneda_origen, asiento.tipo_cambio)
+    if moneda == "USD" and linea.debe_origen <= 0:
+        raise ValidationError("El asiento en dólares no conserva el importe original de la factura; requiere revisión.")
+    original = linea.debe_origen or redondear_importe(factura.total)
+    return moneda, tasa, linea.cuenta, original, linea.debe
+
+
+def _aplicaciones_historicas_factura(factura, cuenta, *, pago_actual=None, nota_actual=None, incluir_pagos=True):
+    from django.db.models import Q
+
+    pagos = factura.pagos_facturacion.exclude(pk=pago_actual)
+    notas = factura.notas_credito.exclude(pk=nota_actual)
+    documentos = Q(asiento__documento_tipo="nota_credito", asiento__documento_id__in=notas.values_list("pk", flat=True))
+    if incluir_pagos:
+        documentos |= Q(asiento__documento_tipo="pago_factura", asiento__documento_id__in=pagos.values_list("pk", flat=True))
+    lineas = LineaAsientoContable.objects.filter(
+        documentos,
+        asiento__empresa=factura.empresa, asiento__estado="contabilizado", cuenta=cuenta,
+    )
+    original = Decimal("0.00")
+    lempiras = Decimal("0.00")
+    revision = _revision_moneda_factura(factura)
+    importes_documentos = {
+        ("nota_credito", pk): importe for pk, importe in notas.values_list("pk", "total")
+    }
+    if incluir_pagos:
+        importes_documentos.update({
+            ("pago_factura", pk): monto + isr + isv
+            for pk, monto, isr, isv in pagos.values_list("pk", "monto", "retencion_isr", "retencion_isv")
+        })
+    lineas = lineas.select_related("asiento")
+    for linea in lineas:
+        if linea.moneda_origen != "USD" and (factura.moneda == "USD" or revision):
+            # El legado guarda lempiras en las columnas de origen; el documento
+            # conserva los dólares que realmente aplicó el cliente.
+            importe = importes_documentos[(linea.asiento.documento_tipo, linea.asiento.documento_id)]
+            original += importe if linea.haber > linea.debe else -importe
+        else:
+            original += (
+                linea.haber_origen - linea.debe_origen
+                if linea.debe_origen or linea.haber_origen else linea.haber - linea.debe
+            )
+        lempiras += linea.haber - linea.debe
+    if revision:
+        if incluir_pagos:
+            lempiras += revision.aplicado_hnl_corregido - revision.aplicado_hnl_anterior
+        else:
+            lempiras += revision.notas_hnl_corregido - revision.notas_hnl_anterior
+    return original, lempiras
+
+
+def _linea_diferencia_cambiaria(diferencia):
+    diferencia = redondear_importe(diferencia)
+    if diferencia > 0:
+        return {"cuenta": "ganancia_cambiaria", "detalle": "Ganancia por diferencia cambiaria realizada", "debe": 0, "haber": diferencia}
+    if diferencia < 0:
+        return {"cuenta": "perdida_cambiaria", "detalle": "Pérdida por diferencia cambiaria realizada", "debe": -diferencia, "haber": 0}
+    return None
+
+
+@transaction.atomic
 def registrar_asiento_factura_emitida(factura):
+    from facturacion.costos_inventario import valor_contable_linea_inventario
     if factura.estado != "emitida":
         return None
+    type(factura.empresa).objects.select_for_update().get(pk=factura.empresa_id)
+    existente = _asiento_documento_existente(factura.empresa, "factura", factura.pk, "emision")
+    if existente:
+        return existente
+    moneda, tasa = validar_moneda_tipo_cambio(factura.moneda, factura.tipo_cambio)
     costo_ventas = sum(
         (
-            Decimal(linea.costo_unitario or 0) * Decimal(linea.cantidad or 0)
+            valor_contable_linea_inventario(linea)
             for linea in factura.lineas.select_related("producto").all()
             if linea.producto_id and linea.producto.controla_inventario
         ),
@@ -587,6 +742,7 @@ def registrar_asiento_factura_emitida(factura):
         monto = Decimal(resumen.get(clave, 0) or 0).quantize(Decimal("0.01"))
         if monto > 0:
             lineas.append({"cuenta": cuenta, "detalle": detalle, "debe": 0, "haber": monto})
+    lineas = convertir_partidas_balanceadas(lineas, moneda, tasa)
     if costo_ventas > 0:
         lineas.extend([
             {"cuenta": "costo_ventas", "detalle": "Costo de mercaderia vendida", "debe": costo_ventas, "haber": 0},
@@ -603,10 +759,19 @@ def registrar_asiento_factura_emitida(factura):
         origen_modulo="facturacion",
         creado_por=factura.vendedor,
         lineas=lineas,
+        moneda_origen=moneda,
+        tipo_cambio=tasa,
     )
 
 
+@transaction.atomic
 def registrar_asiento_pago_cliente(pago):
+    type(pago.factura.empresa).objects.select_for_update().get(pk=pago.factura.empresa_id)
+    existente = _asiento_documento_existente(pago.factura.empresa, "pago_factura", pago.pk, "cobro")
+    if existente:
+        return existente
+    moneda, tasa_historica, cuenta_cliente, total_original, total_historico = _fuente_historica_factura(pago.factura)
+    _, tasa_cobro = validar_moneda_tipo_cambio(moneda, pago.tipo_cambio if pago.tipo_cambio is not None else tasa_historica)
     cuenta_caja = pago.cuenta_financiera.cuenta_contable if pago.cuenta_financiera_id else metodo_a_clave_cuenta(pago.metodo)
     lineas = []
 
@@ -661,19 +826,40 @@ def registrar_asiento_pago_cliente(pago):
             }
         )
 
-    cuenta_cliente = asegurar_cuenta_contable_cliente(pago.factura.cliente)
+    originales_debe = [linea["debe"] for linea in lineas]
+    convertidos_debe = distribuir_conversion(originales_debe, moneda, tasa_cobro)
+    lineas = [
+        {**linea, "debe": convertidos_debe[indice], "moneda_origen": moneda,
+         "tipo_cambio": tasa_cobro, "debe_origen": redondear_importe(linea["debe"]), "haber_origen": Decimal("0.00")}
+        for indice, linea in enumerate(lineas)
+    ]
+    aplicado_original, aplicado_historico = _aplicaciones_historicas_factura(
+        pago.factura, cuenta_cliente, pago_actual=pago.pk,
+    )
+    cancelacion_historica = importe_historico_parcial(
+        total_origen=total_original, total_lempiras=total_historico,
+        aplicado_origen=aplicado_original, aplicado_lempiras=aplicado_historico,
+        importe_origen=pago.total_aplicado,
+    )
     lineas.append(
         {
             "cuenta": cuenta_cliente,
             "detalle": f"Aplicacion a cliente {pago.factura.cliente.nombre}",
             "debe": Decimal("0.00"),
-            "haber": pago.total_aplicado,
+            "haber": cancelacion_historica,
+            "moneda_origen": moneda,
+            "tipo_cambio": tasa_historica,
+            "debe_origen": Decimal("0.00"),
+            "haber_origen": pago.total_aplicado,
         }
     )
+    diferencia = _linea_diferencia_cambiaria(sum(convertidos_debe, Decimal("0")) - cancelacion_historica)
+    if diferencia:
+        lineas.append(diferencia)
 
     if pago.monto_comision > 0:
         cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.proveedor_comision)
-        lineas.extend(
+        lineas.extend(convertir_partidas_balanceadas(
             [
                 {
                     "cuenta": "gasto_comisiones_ventas",
@@ -687,8 +873,8 @@ def registrar_asiento_pago_cliente(pago):
                     "debe": Decimal("0.00"),
                     "haber": pago.monto_comision,
                 },
-            ]
-        )
+            ], moneda, tasa_cobro,
+        ))
 
     return registrar_asiento_documento(
         empresa=pago.factura.empresa,
@@ -701,22 +887,99 @@ def registrar_asiento_pago_cliente(pago):
         origen_modulo="facturacion",
         creado_por=pago.factura.vendedor,
         lineas=lineas,
+        moneda_origen=moneda,
+        tipo_cambio=tasa_cobro,
     )
 
 
+@transaction.atomic
+def registrar_asiento_movimiento_inventario_manual(movimiento):
+    """Enlaza variaciones manuales valoradas, sin duplicar compras ni ventas."""
+    if movimiento.tipo not in {"entrada", "ajuste_entrada", "ajuste_salida", "regalia"}:
+        return None
+    empresa = movimiento.empresa
+    if not contabilidad_activa_para_empresa(empresa):
+        return None
+    if not movimiento.pk:
+        raise ValidationError("Guarda el movimiento de inventario antes de registrar su asiento.")
+    type(empresa).objects.select_for_update().get(pk=empresa.pk)
+    existente = _asiento_documento_existente(empresa, "movimiento_inventario", movimiento.pk, "ajuste")
+    if existente:
+        return existente
+    if movimiento.producto.empresa_id != empresa.pk:
+        raise ValidationError("El producto y el movimiento de inventario deben pertenecer a la misma empresa.")
+    if movimiento.entrada_documento_id:
+        if movimiento.entrada_documento.empresa_id != empresa.pk:
+            raise ValidationError("El documento de entrada debe pertenecer a la empresa del movimiento.")
+        fecha = movimiento.entrada_documento.fecha_documento
+    else:
+        fecha = timezone.localdate(movimiento.fecha)
+    from .models import validar_fecha_contable_abierta
+    validar_fecha_contable_abierta(empresa.pk, fecha)
+    if movimiento.valor_contable is None:
+        raise ValidationError("El movimiento de inventario requiere capturar su valoración en lempiras.")
+    valor = redondear_importe(movimiento.valor_contable)
+    if valor < 0:
+        raise ValidationError("La valoración del movimiento de inventario no puede ser negativa.")
+    if not valor:
+        return None
+    if movimiento.tipo == "entrada":
+        contrapartida = obtener_configuracion_contable(empresa).cuenta_entradas_inventario
+        if not contrapartida or not contrapartida.activa or not contrapartida.acepta_movimientos or contrapartida.empresa_id != empresa.pk:
+            raise ValidationError(
+                "Configura la contrapartida de entradas de inventario en Contabilidad antes de aplicar esta entrada. "
+                "Para adquisiciones a proveedores utiliza el módulo de Compras."
+            )
+    else:
+        contrapartida = "ajustes_positivos_inventario" if movimiento.tipo == "ajuste_entrada" else "ajustes_negativos_inventario"
+    entrada = movimiento.tipo in {"entrada", "ajuste_entrada"}
+    lineas = [
+        {"cuenta": "inventario", "detalle": f"Variación de inventario: {movimiento.producto.nombre}"[:200],
+         "debe": valor if entrada else 0, "haber": 0 if entrada else valor},
+        {"cuenta": contrapartida, "detalle": movimiento.get_tipo_display(),
+         "debe": 0 if entrada else valor, "haber": valor if entrada else 0},
+    ]
+    return registrar_asiento_documento(
+        empresa=empresa, documento_tipo="movimiento_inventario", documento_id=movimiento.pk,
+        evento="ajuste", fecha=fecha,
+        descripcion=f"{movimiento.get_tipo_display()}: {movimiento.producto.nombre}"[:255],
+        referencia=movimiento.referencia or str(movimiento.pk), origen_modulo="inventario",
+        creado_por=movimiento.usuario, lineas=lineas,
+    )
+
+
+@transaction.atomic
 def registrar_asiento_compra_aplicada(compra):
     if compra.estado != "aplicada":
         return None
-    total_inventario = sum(
-        (Decimal(linea.total_linea) for linea in compra.lineas.select_related("producto") if linea.producto.controla_inventario),
-        Decimal("0.00"),
-    ).quantize(Decimal("0.01"))
-    total_gasto = (Decimal(compra.total_documento) - total_inventario).quantize(Decimal("0.01"))
+    from facturacion.costos_inventario import valorar_linea_compra
+    from .models import bloquear_empresas_contables, validar_fecha_contable_abierta
+
+    bloquear_empresas_contables([compra.empresa_id])
+
+    existente = AsientoContable.objects.filter(
+        empresa=compra.empresa, documento_tipo="compra", documento_id=compra.id, evento="aplicacion",
+    ).first()
+    if existente:
+        return existente
+    validar_fecha_contable_abierta(compra.empresa_id, compra.fecha_documento)
+    total_inventario = Decimal("0.00")
+    total_gasto = Decimal("0.00")
+    total_isv_acreditable = Decimal("0.00")
+    for linea in compra.lineas.select_related("producto", "compra", "impuesto"):
+        valor = valorar_linea_compra(linea, capturar=True)
+        if linea.producto.controla_inventario:
+            total_inventario += valor["costo_total"]
+        else:
+            total_gasto += valor["costo_total"]
+        total_isv_acreditable += valor["isv_acreditable"]
     lineas = []
     if total_inventario > 0:
         lineas.append({"cuenta": "inventario", "detalle": f"Inventario comprado a {compra.proveedor_nombre}", "debe": total_inventario, "haber": 0})
     if total_gasto > 0:
         lineas.append({"cuenta": "compras", "detalle": f"Compra no inventariable a {compra.proveedor_nombre}", "debe": total_gasto, "haber": 0})
+    if total_isv_acreditable > 0:
+        lineas.append({"cuenta": "isv_acreditable", "detalle": "ISV recuperable según la política de esta empresa", "debe": total_isv_acreditable, "haber": 0})
     cuenta_proveedor = asegurar_cuenta_contable_proveedor(compra.proveedor) if compra.proveedor_id else "proveedores"
     lineas.append({"cuenta": cuenta_proveedor, "detalle": "Obligacion con proveedor", "debe": 0, "haber": compra.total_documento})
     return registrar_asiento_documento(
@@ -761,9 +1024,55 @@ def registrar_asiento_pago_proveedor(pago):
     )
 
 
+@transaction.atomic
 def registrar_asiento_pago_comision_proveedor(pago):
+    type(pago.empresa).objects.select_for_update().get(pk=pago.empresa.pk)
+    existente = _asiento_documento_existente(pago.empresa, "pago_comision_proveedor", pago.pk, "egreso")
+    if existente:
+        return existente
     cuenta_salida = pago.cuenta_financiera.cuenta_contable
     cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.proveedor)
+    origen = pago.comision_origen
+    asiento_origen = _asiento_documento_existente(pago.empresa, "pago_factura", origen.pk, "cobro")
+    if not asiento_origen:
+        asiento_origen = registrar_asiento_pago_cliente(origen)
+    if asiento_origen.estado != "contabilizado":
+        raise ValidationError("Primero contabiliza el cobro que genera la comisión antes de pagarla.")
+    if not asiento_origen.conversion_verificada or (origen.factura.moneda == "USD" and asiento_origen.moneda_origen != "USD"):
+        raise ValidationError("La comisión en dólares requiere regularizar su conversión histórica antes de pagarla.")
+    linea_origen = asiento_origen.lineas.filter(cuenta=cuenta_proveedor, haber__gt=0).first()
+    if not linea_origen:
+        raise ValidationError("No se encontró la obligación contable que respalda la comisión.")
+    moneda, tasa_historica = validar_moneda_tipo_cambio(linea_origen.moneda_origen, linea_origen.tipo_cambio)
+    if moneda == "USD" and linea_origen.haber_origen <= 0:
+        raise ValidationError("La obligación en dólares no conserva el importe original de la comisión; requiere revisión.")
+    total_original = linea_origen.haber_origen or redondear_importe(origen.monto_comision)
+    total_historico = linea_origen.haber
+    _, tasa_pago = validar_moneda_tipo_cambio(moneda, pago.tipo_cambio if pago.tipo_cambio is not None else tasa_historica)
+    pagos_anteriores = origen.pagos_comision_proveedor.exclude(pk=pago.pk).values_list("pk", flat=True)
+    lineas_anteriores = LineaAsientoContable.objects.filter(
+        asiento__empresa=pago.empresa, asiento__documento_tipo="pago_comision_proveedor",
+        asiento__documento_id__in=pagos_anteriores, asiento__estado="contabilizado", cuenta=cuenta_proveedor,
+    )
+    aplicado_original = sum((linea.debe_origen - linea.haber_origen if linea.debe_origen or linea.haber_origen else linea.debe - linea.haber for linea in lineas_anteriores), Decimal("0"))
+    aplicado_historico = sum((linea.debe - linea.haber for linea in lineas_anteriores), Decimal("0"))
+    cancelacion = importe_historico_parcial(
+        total_origen=total_original, total_lempiras=total_historico,
+        aplicado_origen=aplicado_original, aplicado_lempiras=aplicado_historico,
+        importe_origen=pago.monto,
+    )
+    salida = convertir_a_lempiras(pago.monto, moneda, tasa_pago)
+    lineas = [
+        {"cuenta": cuenta_proveedor, "detalle": f"Cancelación de comisión por pagar a {pago.proveedor.nombre}",
+         "debe": cancelacion, "haber": 0, "moneda_origen": moneda, "tipo_cambio": tasa_historica,
+         "debe_origen": pago.monto, "haber_origen": 0},
+        {"cuenta": cuenta_salida, "detalle": "Salida de caja o banco por pago de comisión",
+         "debe": 0, "haber": salida, "moneda_origen": moneda, "tipo_cambio": tasa_pago,
+         "debe_origen": 0, "haber_origen": pago.monto},
+    ]
+    diferencia = _linea_diferencia_cambiaria(cancelacion - salida)
+    if diferencia:
+        lineas.append(diferencia)
     return registrar_asiento_documento(
         empresa=pago.empresa,
         documento_tipo="pago_comision_proveedor",
@@ -774,35 +1083,47 @@ def registrar_asiento_pago_comision_proveedor(pago):
         referencia=pago.referencia or f"COMISION-{pago.comision_origen_id}",
         origen_modulo="cuentas_por_pagar",
         creado_por=pago.registrado_por,
-        lineas=[
-            {
-                "cuenta": cuenta_proveedor,
-                "detalle": f"Cancelacion de comision por pagar a {pago.proveedor.nombre}",
-                "debe": pago.monto,
-                "haber": Decimal("0.00"),
-            },
-            {
-                "cuenta": cuenta_salida,
-                "detalle": "Salida de caja o banco por pago de comision",
-                "debe": Decimal("0.00"),
-                "haber": pago.monto,
-            },
-        ],
+        lineas=lineas,
+        moneda_origen=moneda,
+        tipo_cambio=tasa_pago,
     )
 
 
+@transaction.atomic
 def registrar_asiento_nota_credito(nota):
     if nota.estado != "emitida":
         return None
+    type(nota.empresa).objects.select_for_update().get(pk=nota.empresa_id)
+    existente = _asiento_documento_existente(nota.empresa, "nota_credito", nota.pk, "emision")
+    if existente:
+        return existente
+    from facturacion.costos_inventario import capturar_costos_devolucion, validar_devoluciones_nota, valor_contable_linea_inventario
+    validar_devoluciones_nota(nota)
+    if nota.factura_origen_id:
+        moneda, tasa, cuenta_cliente, total_original, total_historico = _fuente_historica_factura(nota.factura_origen)
+        aplicado_original, aplicado_historico = _aplicaciones_historicas_factura(
+            nota.factura_origen, cuenta_cliente, nota_actual=nota.pk, incluir_pagos=False,
+        )
+        cancelacion_historica = importe_historico_parcial(
+            total_origen=total_original, total_lempiras=total_historico,
+            aplicado_origen=aplicado_original, aplicado_lempiras=aplicado_historico,
+            importe_origen=nota.total,
+        )
+        if nota.moneda != moneda:
+            raise ValidationError("La nota de crédito debe usar la moneda original de la factura.")
+    else:
+        moneda, tasa = validar_moneda_tipo_cambio(nota.moneda, nota.tipo_cambio)
+        cuenta_cliente = asegurar_cuenta_contable_cliente(nota.cliente)
+        cancelacion_historica = convertir_a_lempiras(nota.total, moneda, tasa)
+    capturar_costos_devolucion(nota)
     costo_devuelto = sum(
         (
-            Decimal(linea.costo_unitario or 0) * Decimal(linea.cantidad or 0)
+            valor_contable_linea_inventario(linea)
             for linea in nota.lineas.select_related("producto").all()
             if linea.producto_id and linea.producto.controla_inventario
         ),
         Decimal("0.00"),
     ).quantize(Decimal("0.01"))
-    cuenta_cliente = asegurar_cuenta_contable_cliente(nota.cliente)
     resumen = nota.resumen_fiscal()
     lineas = [
         {"cuenta": "devoluciones_ventas", "detalle": f"Devolucion cliente {nota.cliente.nombre}", "debe": nota.subtotal, "haber": 0},
@@ -815,6 +1136,7 @@ def registrar_asiento_nota_credito(nota):
         monto = Decimal(resumen.get(clave, 0) or 0).quantize(Decimal("0.01"))
         if monto > 0:
             lineas.append({"cuenta": cuenta, "detalle": detalle, "debe": monto, "haber": 0})
+    lineas = convertir_partidas_balanceadas(lineas, moneda, tasa, total_lempiras=cancelacion_historica)
     if costo_devuelto > 0:
         lineas.extend([
             {"cuenta": "inventario", "detalle": "Reintegro contable de inventario", "debe": costo_devuelto, "haber": 0},
@@ -831,6 +1153,8 @@ def registrar_asiento_nota_credito(nota):
         origen_modulo="facturacion",
         creado_por=nota.vendedor,
         lineas=lineas,
+        moneda_origen=moneda,
+        tipo_cambio=tasa,
     )
 
 
@@ -891,6 +1215,10 @@ def registrar_reversion_documento(*, empresa, documento_tipo, documento_id, even
             "detalle": f"Reversion {linea.detalle or asiento_origen.descripcion}",
             "debe": linea.haber,
             "haber": linea.debe,
+            "moneda_origen": linea.moneda_origen,
+            "tipo_cambio": linea.tipo_cambio,
+            "debe_origen": linea.haber_origen or (linea.haber if linea.moneda_origen == "HNL" else 0),
+            "haber_origen": linea.debe_origen or (linea.debe if linea.moneda_origen == "HNL" else 0),
         })
 
     return registrar_asiento_documento(
@@ -904,4 +1232,7 @@ def registrar_reversion_documento(*, empresa, documento_tipo, documento_id, even
         origen_modulo=origen_modulo,
         creado_por=creado_por,
         lineas=lineas,
+        moneda_origen=asiento_origen.moneda_origen,
+        tipo_cambio=asiento_origen.tipo_cambio,
+        conversion_verificada=asiento_origen.conversion_verificada,
     )

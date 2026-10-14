@@ -155,6 +155,11 @@ class CuentaContable(models.Model):
     codigo = models.CharField(max_length=30)
     nombre = models.CharField(max_length=200)
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    actividad_flujo = models.CharField(
+        max_length=20, default="auto", blank=True,
+        choices=[("auto", "Clasificación automática"), ("operacion", "Operación"),
+                 ("inversion", "Inversión"), ("financiamiento", "Financiamiento")],
+    )
     descripcion = models.TextField(blank=True, null=True)
     acepta_movimientos = models.BooleanField(default=True)
     activa = models.BooleanField(default=True)
@@ -258,6 +263,20 @@ class ConfiguracionContableEmpresa(models.Model):
         blank=True,
         related_name="configuraciones_devoluciones_ventas",
     )
+    isv_compras_recuperable = models.BooleanField(
+        default=False,
+        verbose_name="ISV de compras recuperable",
+        help_text="Active esta opción únicamente cuando esta empresa pueda recuperar el ISV de sus compras. "
+        "El impuesto se registrará como crédito fiscal y se excluirá del costo del inventario.",
+    )
+    cuenta_isv_acreditable = models.ForeignKey(
+        CuentaContable, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="configuraciones_isv_acreditable",
+    )
+    cuenta_entradas_inventario = models.ForeignKey(
+        CuentaContable, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="configuraciones_entradas_inventario",
+    )
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -266,6 +285,30 @@ class ConfiguracionContableEmpresa(models.Model):
 
     def __str__(self):
         return f"Configuracion contable - {self.empresa.nombre}"
+
+    def clean(self):
+        super().clean()
+        tipos = {
+            'cuenta_caja': 'activo', 'cuenta_bancos': 'activo', 'cuenta_clientes': 'activo',
+            'cuenta_inventario': 'activo', 'cuenta_isv_acreditable': 'activo',
+            'cuenta_proveedores': 'pasivo', 'cuenta_isv_por_pagar': 'pasivo',
+            'cuenta_ventas': 'ingreso', 'cuenta_devoluciones_ventas': 'ingreso',
+        }
+        for campo in self._meta.fields:
+            if isinstance(campo, models.ForeignKey) and campo.related_model is CuentaContable:
+                cuenta = getattr(self, campo.name, None)
+                if cuenta and cuenta.empresa_id != self.empresa_id:
+                    raise ValidationError({campo.name: "La cuenta debe pertenecer a esta empresa."})
+                if cuenta and campo.name in tipos and cuenta.tipo != tipos[campo.name]:
+                    raise ValidationError({campo.name: f"Seleccione una cuenta de tipo {tipos[campo.name]} para esta operación."})
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            empresa_anterior = type(self).objects.filter(pk=self.pk).values_list("empresa_id", flat=True).first()
+            if empresa_anterior and empresa_anterior != self.empresa_id:
+                raise ValidationError("No se puede trasladar la configuración contable a otra empresa.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class PeriodoContable(models.Model):
@@ -447,6 +490,9 @@ class AsientoContable(RegistroFechaContableMixin, models.Model):
     documento_id = models.PositiveIntegerField(blank=True, null=True)
     evento = models.CharField(max_length=80, blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="borrador")
+    moneda_origen = models.CharField(max_length=3, choices=[("HNL", "Lempiras"), ("USD", "Dólares")], default="HNL")
+    tipo_cambio = models.DecimalField(max_digits=14, decimal_places=6, default=1)
+    conversion_verificada = models.BooleanField(default=True, editable=False)
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -525,7 +571,63 @@ class AsientoContable(RegistroFechaContableMixin, models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk and RegularizacionMonedaFactura.objects.filter(
+            models.Q(asiento_origen_id=self.pk) | models.Q(asiento_ajuste_id=self.pk)
+        ).exists():
+            campos = ['empresa_id', 'fecha', 'estado', 'moneda_origen', 'tipo_cambio', 'documento_tipo', 'documento_id', 'evento']
+            anterior = type(self).objects.filter(pk=self.pk).values(*campos).first()
+            if anterior and any(anterior[campo] != getattr(self, campo) for campo in campos):
+                raise ValidationError('El asiento respalda una regularización monetaria. Conserve su estado, fecha y documento original.')
+        from .moneda import validar_moneda_tipo_cambio
+        self.moneda_origen, self.tipo_cambio = validar_moneda_tipo_cambio(self.moneda_origen, self.tipo_cambio)
         self._validar_periodos(self._state.db or router.db_for_write(type(self), instance=self))
+
+
+class RegularizacionMonedaFactura(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.PROTECT)
+    factura = models.OneToOneField('facturacion.Factura', on_delete=models.PROTECT, related_name='regularizacion_moneda')
+    asiento_origen = models.OneToOneField(AsientoContable, on_delete=models.PROTECT, related_name='regularizacion_moneda')
+    asiento_ajuste = models.OneToOneField(AsientoContable, on_delete=models.PROTECT, null=True, blank=True, related_name='revision_moneda_aplicada')
+    cuenta_cliente = models.ForeignKey(CuentaContable, on_delete=models.PROTECT)
+    fecha = models.DateField()
+    tipo_cambio = models.DecimalField(max_digits=14, decimal_places=6)
+    total_original = models.DecimalField(max_digits=14, decimal_places=2)
+    total_hnl = models.DecimalField(max_digits=14, decimal_places=2)
+    saldo_original = models.DecimalField(max_digits=14, decimal_places=2)
+    saldo_hnl_anterior = models.DecimalField(max_digits=14, decimal_places=2)
+    saldo_hnl_corregido = models.DecimalField(max_digits=14, decimal_places=2)
+    aplicado_original = models.DecimalField(max_digits=14, decimal_places=2)
+    aplicado_hnl_anterior = models.DecimalField(max_digits=14, decimal_places=2)
+    aplicado_hnl_corregido = models.DecimalField(max_digits=14, decimal_places=2)
+    notas_original = models.DecimalField(max_digits=14, decimal_places=2)
+    notas_hnl_anterior = models.DecimalField(max_digits=14, decimal_places=2)
+    notas_hnl_corregido = models.DecimalField(max_digits=14, decimal_places=2)
+    motivo = models.TextField()
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Regularización de moneda de factura'
+        verbose_name_plural = 'Regularizaciones de moneda de facturas'
+
+    def clean(self):
+        super().clean()
+        from .moneda import validar_moneda_tipo_cambio
+        _moneda, self.tipo_cambio = validar_moneda_tipo_cambio('USD', self.tipo_cambio)
+        validar_fecha_contable_abierta(self.empresa_id, self.fecha)
+        if (self.factura.empresa_id != self.empresa_id or self.asiento_origen.empresa_id != self.empresa_id
+                or self.cuenta_cliente.empresa_id != self.empresa_id):
+            raise ValidationError('La factura, el asiento y la cuenta deben pertenecer a esta empresa.')
+        if self.asiento_origen.documento_tipo != 'factura' or self.asiento_origen.documento_id != self.factura_id:
+            raise ValidationError('La revisión debe corresponder al asiento original de esta factura.')
+        if self.asiento_ajuste_id and self.asiento_ajuste.empresa_id != self.empresa_id:
+            raise ValidationError('El asiento de ajuste debe pertenecer a esta empresa.')
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError('La regularización conserva sus datos originales. Registre un nuevo ajuste contable para corregirla.')
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class LineaAsientoContable(models.Model):
@@ -534,6 +636,10 @@ class LineaAsientoContable(models.Model):
     detalle = models.CharField(max_length=200, blank=True, null=True)
     debe = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     haber = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    moneda_origen = models.CharField(max_length=3, choices=[("HNL", "Lempiras"), ("USD", "Dólares")], default="HNL")
+    tipo_cambio = models.DecimalField(max_digits=14, decimal_places=6, default=1)
+    debe_origen = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    haber_origen = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     objects = RegistrosContablesQuerySet.as_manager()
 
     class Meta:
@@ -541,6 +647,18 @@ class LineaAsientoContable(models.Model):
         verbose_name_plural = "Lineas de asiento"
 
     def clean(self):
+        if self.asiento_id and RegularizacionMonedaFactura.objects.filter(
+            models.Q(asiento_origen_id=self.asiento_id) | models.Q(asiento_ajuste_id=self.asiento_id)
+        ).exists():
+            raise ValidationError('La partida respalda una regularización monetaria. Registre un ajuste nuevo para conservar el saldo revisado.')
+        from .moneda import validar_moneda_tipo_cambio
+        self.moneda_origen, self.tipo_cambio = validar_moneda_tipo_cambio(self.moneda_origen, self.tipo_cambio)
+        if self.moneda_origen == "HNL":
+            self.debe_origen, self.haber_origen = self.debe, self.haber
+        if self.debe_origen < 0 or self.haber_origen < 0:
+            raise ValidationError("Los importes de origen no pueden ser negativos.")
+        if self.debe_origen > 0 and self.haber_origen > 0:
+            raise ValidationError("El importe de origen debe estar en una sola columna.")
         self._validar_asientos(self._state.db or router.db_for_write(type(self), instance=self))
         if self.debe < 0 or self.haber < 0:
             raise ValidationError("Los valores contables no pueden ser negativos.")
@@ -579,6 +697,10 @@ class LineaAsientoContable(models.Model):
 
     def validar_eliminacion(self, using=None):
         using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        if self.asiento_id and RegularizacionMonedaFactura.objects.using(using).filter(
+            models.Q(asiento_origen_id=self.asiento_id) | models.Q(asiento_ajuste_id=self.asiento_id)
+        ).exists():
+            raise ValidationError('La partida respalda una regularización monetaria y conserva sus importes originales.')
         asiento_id = self._asiento_anterior_id(using)
         asiento = AsientoContable.objects.using(using).filter(pk=asiento_id).values("empresa_id", "fecha").first()
         if asiento:
@@ -629,6 +751,12 @@ class CuentaFinanciera(models.Model):
             raise ValidationError("La cuenta contable debe pertenecer a la misma empresa.")
         if self.cuenta_contable_id and not self.cuenta_contable.acepta_movimientos:
             raise ValidationError("La cuenta contable debe aceptar movimientos.")
+        if self.cuenta_contable_id:
+            tipo_requerido = "pasivo" if self.tipo == "tarjeta_credito" else "activo"
+            if self.cuenta_contable.tipo != tipo_requerido:
+                raise ValidationError({
+                    "cuenta_contable": "Una tarjeta de crédito debe usar una cuenta de pasivo; caja y banco deben usar cuentas de activo."
+                })
 
     def __str__(self):
         return self.nombre

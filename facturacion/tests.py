@@ -7001,8 +7001,8 @@ class FacturacionTests(TestCase):
         LineaNotaCredito.objects.create(
             nota_credito=nota,
             producto=self.producto,
-            cantidad=Decimal("2.00"),
-            precio_unitario=Decimal("100.00"),
+            cantidad=Decimal("1.00"),
+            precio_unitario=Decimal("200.00"),
             impuesto=self.impuesto,
         )
         nota.calcular_totales()

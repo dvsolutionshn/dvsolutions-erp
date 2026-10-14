@@ -5,8 +5,9 @@ from decimal import Decimal
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce
 from django.urls import reverse
+from django.utils import timezone
 
-from facturacion.models import CompraInventario, Factura, NotaCredito, PagoCompra, PagoComisionProveedor, PagoFactura
+from facturacion.models import CompraInventario, Factura, MovimientoInventario, NotaCredito, PagoCompra, PagoComisionProveedor, PagoFactura
 from rrhh.models import PeriodoPlanilla
 
 from .models import AsientoContable, LineaAsientoContable, MovimientoBancario
@@ -45,6 +46,20 @@ def _documentos_sin_asiento(empresa, periodo):
     for compra in CompraInventario.objects.filter(empresa=empresa, estado="aplicada", fecha_documento__range=rango).prefetch_related("lineas"):
         if compra.total_documento > 0:
             agregar(compra, "compra", "aplicacion", compra.fecha_documento, compra.numero_compra, "ver_compra")
+    movimientos_manuales = MovimientoInventario.objects.filter(
+        empresa=empresa, tipo__in=["entrada", "ajuste_entrada", "ajuste_salida", "regalia"], valor_contable__gt=0,
+    ).filter(
+        Q(entrada_documento__fecha_documento__range=rango)
+        | Q(entrada_documento__isnull=True, fecha__date__range=rango)
+    ).select_related("entrada_documento", "producto")
+    for movimiento in movimientos_manuales:
+        if ("movimiento_inventario", movimiento.pk, "ajuste") not in registrados:
+            pendientes.append({
+                "fecha": movimiento.entrada_documento.fecha_documento if movimiento.entrada_documento_id else timezone.localdate(movimiento.fecha),
+                "tipo": "Ajuste de inventario", "referencia": movimiento.referencia or str(movimiento.pk),
+                "descripcion": f"{movimiento.get_tipo_display()}: {movimiento.producto.nombre}",
+                "url": reverse("kardex_inventario", args=[empresa.slug]),
+            })
     for pago in PagoCompra.objects.filter(compra__empresa=empresa, monto__gt=0, fecha__range=rango).select_related("compra"):
         agregar(pago, "pago_compra", "egreso", pago.fecha, pago.compra.numero_compra, "ver_compra", pago.compra_id)
     for pago in PagoComisionProveedor.objects.filter(
@@ -68,6 +83,23 @@ def revisar_cierre_periodo(empresa, periodo):
     rango = {"fecha__gte": periodo.fecha_inicio, "fecha__lte": periodo.fecha_fin}
     asientos = AsientoContable.objects.filter(empresa=empresa, **rango)
     borradores = asientos.filter(estado="borrador").order_by("fecha", "id")
+    conversiones_pendientes = asientos.filter(estado="contabilizado", conversion_verificada=False).filter(
+        Q(regularizacion_moneda__isnull=True)
+        | Q(regularizacion_moneda__asiento_ajuste__isnull=False) & ~Q(regularizacion_moneda__asiento_ajuste__estado="contabilizado")
+    ).order_by("fecha", "id")
+    # Una operación y su reversión completa dentro del mismo mes no dejan
+    # importes por convertir. La advertencia histórica se conserva en el asiento.
+    neutralizados = Q(pk__in=[])
+    for tipo, documento_id in conversiones_pendientes.order_by().values_list('documento_tipo', 'documento_id').distinct():
+        if not tipo or documento_id is None:
+            continue
+        saldos = LineaAsientoContable.objects.filter(
+            asiento__empresa=empresa, asiento__estado='contabilizado', asiento__fecha__range=(periodo.fecha_inicio, periodo.fecha_fin),
+            asiento__documento_tipo=tipo, asiento__documento_id=documento_id,
+        ).values('cuenta_id').annotate(debe=Sum('debe'), haber=Sum('haber'))
+        if saldos and all((fila['debe'] - fila['haber']).quantize(Decimal('0.01')) == 0 for fila in saldos):
+            neutralizados |= Q(documento_tipo=tipo, documento_id=documento_id)
+    conversiones_pendientes = conversiones_pendientes.exclude(neutralizados)
     contabilizados = asientos.filter(estado="contabilizado").annotate(
         suma_debe=Coalesce(Sum("lineas__debe"), Decimal("0.00")),
         suma_haber=Coalesce(Sum("lineas__haber"), Decimal("0.00")),
@@ -97,14 +129,16 @@ def revisar_cierre_periodo(empresa, periodo):
     documentos = _documentos_sin_asiento(empresa, periodo)
     control = {
         "asientos_borrador": borradores.count(), "asientos_invalidos": invalidos.count(),
+        "conversiones_pendientes": conversiones_pendientes.count(),
         "movimientos_bancarios": no_contabilizados.count(), "movimientos_sin_conciliar": no_conciliados.count(),
         "movimientos_sin_asiento": sin_asiento, "documentos_sin_asiento": len(documentos),
         "debe": debe, "haber": haber, "balance_cuadrado": debe == haber,
     }
     control["total"] = sum(control[clave] for clave in (
-        "asientos_borrador", "asientos_invalidos", "movimientos_bancarios",
+        "asientos_borrador", "asientos_invalidos", "conversiones_pendientes", "movimientos_bancarios",
         "movimientos_sin_conciliar", "movimientos_sin_asiento", "documentos_sin_asiento",
     )) + (0 if control["balance_cuadrado"] else 1)
     return {"control": control, "asientos_borrador": borradores, "asientos_invalidos": invalidos,
+            "conversiones_pendientes": conversiones_pendientes,
             "movimientos_no_contabilizados": no_contabilizados, "movimientos_sin_conciliar": no_conciliados,
             "documentos_sin_asiento": documentos}

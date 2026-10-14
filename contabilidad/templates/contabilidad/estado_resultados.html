@@ -7,14 +7,15 @@
 
 {% block topbar_actions %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
-<a href="{% url 'balance_comprobacion' empresa.slug %}" class="erp-action-link">Balance</a>
-<a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
+<a href="{% url 'balance_comprobacion' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Balance</a>
+<a href="{% url 'libro_diario' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Libro Diario</a>
 <a href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Flujo de Efectivo</a>
 <a href="{% url 'exportar_estado_resultados_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
 <button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
 {% endblock %}
 
 {% block content %}
+{% include "contabilidad/nota_moneda_reportes.html" %}
 <section class="erp-card erp-report-filter-card">
     <div class="erp-toolbar">
         <div>

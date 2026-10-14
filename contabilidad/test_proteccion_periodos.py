@@ -14,7 +14,7 @@ from .models import (
     AsientoContable, CuentaContable, CuentaFinanciera, LineaAsientoContable,
     MovimientoBancario, PeriodoContable,
 )
-from .services import registrar_asiento_documento, registrar_asiento_pago_cliente
+from .services import asegurar_cuenta_contable_cliente, registrar_asiento_documento, registrar_asiento_pago_cliente
 
 
 class ProteccionPeriodoContableTests(TestCase):
@@ -238,6 +238,11 @@ class ProteccionPeriodoContableTests(TestCase):
         )
         factura.refresh_from_db()
         asiento = self.crear_asiento(date(2026, 4, 10), documento_tipo="factura", documento_id=factura.pk, evento="emision")
+        cuenta_cliente = asegurar_cuenta_contable_cliente(cliente)
+        LineaAsientoContable.objects.create(
+            asiento=asiento, cuenta=cuenta_cliente, detalle="Cobro a cliente histórico", debe=100,
+        )
+        LineaAsientoContable.objects.create(asiento=asiento, cuenta=self.contrapartida, haber=100)
         self.periodo.cambiar_estado("cerrado")
         return factura, linea, asiento
 

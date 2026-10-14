@@ -33,6 +33,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from .captura_rapida import calcular_importes, captura_rapida
+from .costos_inventario import actualizar_valor_inventario, cantidad_disponible_para_linea, capturar_costos_devolucion, costo_reversion_compra, validar_devoluciones_nota, valor_actual_inventario, valor_contable_linea_inventario, valorar_linea_compra
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
@@ -52,7 +53,7 @@ from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaP
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoComisionProveedorForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from .mobile_presentation import preparar_historial_factura_mobile
-from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
+from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera, bloquear_empresas_contables, validar_fecha_contable_abierta
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_documento_whatsapp
 
@@ -1195,16 +1196,13 @@ def _decimal_reporte(valor):
 
 
 def _tasa_factura_reporte(factura):
-    if factura.moneda != "USD":
-        return Decimal("1.0000")
-    tasa = _decimal_reporte(factura.tipo_cambio)
-    return tasa if tasa > 0 else Decimal("1.0000")
+    from contabilidad.moneda import validar_moneda_tipo_cambio
+    return validar_moneda_tipo_cambio(factura.moneda, factura.tipo_cambio)[1]
 
 
 def _convertir_factura_a_lempiras(factura, valor):
-    return (_decimal_reporte(valor) * _tasa_factura_reporte(factura)).quantize(
-        Decimal("0.01")
-    )
+    from contabilidad.moneda import convertir_a_lempiras
+    return convertir_a_lempiras(valor, factura.moneda, factura.tipo_cambio)
 
 
 def _preparar_factura_para_reporte(factura):
@@ -2496,6 +2494,7 @@ def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None
             raise ValidationError(f"No hay suficiente inventario en Vitrina para {linea.producto.nombre}.")
 
 
+@transaction.atomic
 def _registrar_movimiento_inventario(
     *,
     empresa,
@@ -2510,22 +2509,57 @@ def _registrar_movimiento_inventario(
     compra_documento=None,
     bodega=None,
     usuario=None,
+    valor_contable=None,
 ):
+    from contabilidad.services import contabilidad_activa_para_empresa, registrar_asiento_movimiento_inventario_manual
+
+    bloquear_empresas_contables([empresa.pk])
+    if producto.empresa_id != empresa.pk:
+        raise ValidationError('El producto del movimiento debe pertenecer a la misma empresa.')
     if not producto.controla_inventario:
         return None
+    manual = tipo in ['entrada', 'ajuste_entrada', 'ajuste_salida', 'regalia']
+    fecha_efectiva = entrada_documento.fecha_documento if entrada_documento else timezone.localdate()
+    if manual and contabilidad_activa_para_empresa(empresa):
+        validar_fecha_contable_abierta(empresa.pk, fecha_efectiva)
+
+    producto_guardado = Producto.objects.select_for_update().get(pk=producto.pk, empresa=empresa)
+    producto.costo_promedio = producto_guardado.costo_promedio
 
     inventario = _obtener_inventario_producto(producto)
     existencia_anterior = inventario.existencias
+    es_entrada = tipo in ['entrada', 'entrada_compra', 'ajuste_entrada', 'devolucion_nota_credito', 'reversion_factura']
+    valor_anterior = valor_actual_inventario(inventario, producto)
+    if valor_contable is not None:
+        inventario.valor_contable = actualizar_valor_inventario(
+            producto, existencia_anterior, cantidad, valor_contable,
+            entrada=es_entrada, permitir_saldo_negativo=tipo == 'salida_factura',
+            valor_anterior=valor_anterior,
+        )
+    else:
+        # Los ajustes y entradas sin factura conservan el promedio vigente y
+        # actualizan el saldo monetario; nunca dejan una captura obsoleta.
+        importe = (
+            valor_anterior * Decimal(cantidad) / Decimal(existencia_anterior)
+            if existencia_anterior > 0 else Decimal(cantidad) * Decimal(producto.costo_promedio or 0)
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        inventario.valor_contable = valor_anterior + importe if es_entrada else valor_anterior - importe
+        if manual:
+            valor_contable = importe
+            inventario.valor_contable = actualizar_valor_inventario(
+                producto, existencia_anterior, cantidad, importe,
+                entrada=es_entrada, valor_anterior=valor_anterior,
+            )
 
-    if tipo in ['entrada', 'entrada_compra', 'ajuste_entrada', 'devolucion_nota_credito', 'reversion_factura']:
+    if es_entrada:
         existencia_resultante = existencia_anterior + cantidad
     else:
         existencia_resultante = existencia_anterior - cantidad
 
     inventario.existencias = existencia_resultante
-    inventario.save(update_fields=['existencias', 'fecha_actualizacion'])
+    inventario.save(update_fields=['existencias', 'valor_contable', 'fecha_actualizacion'])
 
-    return MovimientoInventario.objects.create(
+    movimiento = MovimientoInventario.objects.create(
         empresa=empresa,
         producto=producto,
         bodega=bodega,
@@ -2540,19 +2574,58 @@ def _registrar_movimiento_inventario(
         entrada_documento=entrada_documento,
         compra_documento=compra_documento,
         usuario=usuario if getattr(usuario, "is_authenticated", False) else None,
+        valor_contable=valor_contable,
+        fecha=timezone.make_aware(datetime.combine(fecha_efectiva, datetime.min.time())) if entrada_documento else timezone.now(),
     )
+    if manual:
+        registrar_asiento_movimiento_inventario_manual(movimiento)
+    return movimiento
 
 
 @transaction.atomic
 def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
+    bloquear_empresas_contables([factura.empresa_id])
     if not forzar and MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
+    validar_fecha_contable_abierta(factura.empresa_id, factura.fecha_emision)
+
+    asiento_publicado = AsientoContable.objects.filter(
+        empresa=factura.empresa, documento_tipo='factura', documento_id=factura.pk,
+        evento='emision', estado='contabilizado',
+    ).exists()
+    lineas = list(factura.lineas.select_related('producto'))
+    if not asiento_publicado:
+        costos = dict(Producto.objects.select_for_update().filter(
+            empresa=factura.empresa, pk__in=[linea.producto_id for linea in lineas if linea.producto_id],
+        ).values_list('pk', 'costo_promedio'))
+        grupos = {}
+        for linea in lineas:
+            if linea.producto_id and linea.producto.controla_inventario:
+                grupos.setdefault(linea.producto_id, []).append(linea)
+        for producto_id, lineas_producto in grupos.items():
+            costo = costos.get(producto_id, Decimal('0.00')) or Decimal('0.00')
+            producto = lineas_producto[0].producto
+            producto.costo_promedio = costo
+            inventario = _obtener_inventario_producto(producto)
+            cantidad_stock = Decimal(inventario.existencias or 0)
+            costo_exacto = valor_actual_inventario(inventario, producto) / cantidad_stock if cantidad_stock > 0 else Decimal(costo)
+            total_cantidad = sum((Decimal(linea.cantidad) for linea in lineas_producto), Decimal('0.00'))
+            costo_total = (total_cantidad * costo_exacto).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            acumulado = Decimal('0.00')
+            cantidad_acumulada = Decimal('0.00')
+            for linea in lineas_producto:
+                linea.costo_unitario = costo
+                cantidad_acumulada += Decimal(linea.cantidad)
+                objetivo_acumulado = (costo_total * cantidad_acumulada / total_cantidad).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                linea.costo_contable_total = objetivo_acumulado - acumulado
+                acumulado += linea.costo_contable_total
+                linea.save(update_fields=['costo_unitario', 'costo_contable_total'])
 
     observacion = observacion or 'Salida generada automaticamente por emision de factura.'
     if not _registrar_salida_fefo_factura(factura, forzar=forzar, observacion=observacion):
         _registrar_salida_vitrina_factura(factura, forzar=forzar, observacion=observacion)
 
-    for linea in factura.lineas.select_related('producto').all():
+    for linea in lineas:
         if not linea.producto_id or not linea.producto:
             continue
         if not linea.producto.controla_inventario:
@@ -2565,12 +2638,16 @@ def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
             referencia=factura.numero_factura or f"Factura {factura.id}",
             observacion=observacion,
             factura=factura,
+            valor_contable=valor_contable_linea_inventario(linea),
         )
 
 
+@transaction.atomic
 def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
+    bloquear_empresas_contables([factura.empresa_id])
     if not MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
+    validar_fecha_contable_abierta(factura.empresa_id, factura.fecha_emision)
 
     observacion = observacion or 'Reversion automatica por anulacion de factura.'
 
@@ -2607,6 +2684,8 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
         .annotate(
             salida=Sum("cantidad", filter=Q(tipo="salida_factura")),
             reversion=Sum("cantidad", filter=Q(tipo="reversion_factura")),
+            valor_salida=Sum("valor_contable", filter=Q(tipo="salida_factura")),
+            valor_reversion=Sum("valor_contable", filter=Q(tipo="reversion_factura")),
         )
     )
     for resumen in movimientos_producto:
@@ -2624,15 +2703,25 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
             referencia=factura.numero_factura or f"Factura {factura.id}",
             observacion=observacion,
             factura=factura,
+            valor_contable=(
+                Decimal(resumen['valor_salida']) - Decimal(resumen.get('valor_reversion') or 0)
+                if resumen.get('valor_salida') is not None else None
+            ),
         )
 
 
+@transaction.atomic
 def _registrar_entrada_nota_credito(nota):
+    bloquear_empresas_contables([nota.empresa_id])
     if MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').exists():
         return
+    validar_fecha_contable_abierta(nota.empresa_id, nota.fecha_emision)
 
+    validar_devoluciones_nota(nota)
+    if not AsientoContable.objects.filter(empresa=nota.empresa, documento_tipo='nota_credito', documento_id=nota.pk, evento='emision', estado='contabilizado').exists():
+        capturar_costos_devolucion(nota)
     for linea in nota.lineas.select_related('producto').all():
-        if not linea.producto.controla_inventario:
+        if not linea.producto_id or not linea.producto.controla_inventario:
             continue
         _registrar_movimiento_inventario(
             empresa=nota.empresa,
@@ -2642,30 +2731,37 @@ def _registrar_entrada_nota_credito(nota):
             referencia=nota.numero_nota or f"NC {nota.id}",
             observacion='Entrada generada automaticamente por nota de credito emitida.',
             nota_credito=nota,
+            valor_contable=valor_contable_linea_inventario(linea),
         )
 
 
+@transaction.atomic
 def _revertir_entrada_nota_credito(nota):
+    bloquear_empresas_contables([nota.empresa_id])
     if not MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').exists():
         return
     if MovimientoInventario.objects.filter(nota_credito=nota, tipo='reversion_nota_credito').exists():
         return
+    validar_fecha_contable_abierta(nota.empresa_id, nota.fecha_emision)
 
-    for linea in nota.lineas.select_related('producto').all():
-        if not linea.producto.controla_inventario:
+    for movimiento in MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').select_related('producto'):
+        if not movimiento.producto.controla_inventario:
             continue
         _registrar_movimiento_inventario(
             empresa=nota.empresa,
-            producto=linea.producto,
+            producto=movimiento.producto,
             tipo='reversion_nota_credito',
-            cantidad=linea.cantidad,
+            cantidad=movimiento.cantidad,
             referencia=nota.numero_nota or f"NC {nota.id}",
             observacion='Reversion automatica por anulacion de nota de credito.',
             nota_credito=nota,
+            valor_contable=movimiento.valor_contable,
         )
 
 
+@transaction.atomic
 def _reconstruir_nota_credito_emitida(nota):
+    _revertir_entrada_nota_credito(nota)
     MovimientoInventario.objects.filter(
         nota_credito=nota,
         tipo__in=["devolucion_nota_credito", "reversion_nota_credito"],
@@ -2680,7 +2776,9 @@ def _reconstruir_nota_credito_emitida(nota):
     registrar_asiento_nota_credito(nota)
 
 
+@transaction.atomic
 def _aplicar_entrada_documento(entrada):
+    bloquear_empresas_contables([entrada.empresa_id])
     if MovimientoInventario.objects.filter(entrada_documento=entrada).exists():
         return
 
@@ -2705,25 +2803,18 @@ def _aplicar_entrada_documento(entrada):
         )
 
 
+@transaction.atomic
 def _aplicar_compra_documento(compra):
+    bloquear_empresas_contables([compra.empresa_id])
     if MovimientoInventario.objects.filter(compra_documento=compra).exists():
         return
+    validar_fecha_contable_abierta(compra.empresa_id, compra.fecha_documento)
 
     bodega_destino = _obtener_bodega_destino_compra(compra.empresa)
-    for linea in compra.lineas.select_related('producto').all():
+    for linea in compra.lineas.select_related('producto', 'compra', 'impuesto').all():
+        valor = valorar_linea_compra(linea, capturar=True)
         if not linea.producto.controla_inventario:
             continue
-        inventario = _obtener_inventario_producto(linea.producto)
-        cantidad_anterior = Decimal(inventario.existencias or 0)
-        valor_anterior = cantidad_anterior * Decimal(linea.producto.costo_promedio or 0)
-        cantidad_nueva = cantidad_anterior + Decimal(linea.cantidad or 0)
-        if cantidad_nueva > 0:
-            costo_nuevo = (
-                (valor_anterior + (Decimal(linea.cantidad) * Decimal(linea.costo_unitario)))
-                / cantidad_nueva
-            ).quantize(Decimal("0.0001"))
-            Producto.objects.filter(pk=linea.producto_id).update(costo_promedio=costo_nuevo)
-            linea.producto.costo_promedio = costo_nuevo
         _registrar_movimiento_inventario(
             empresa=compra.empresa,
             producto=linea.producto,
@@ -2733,6 +2824,7 @@ def _aplicar_compra_documento(compra):
             observacion=linea.comentario or compra.observacion or f'Ingreso por compra a {compra.proveedor_nombre}.',
             compra_documento=compra,
             bodega=bodega_destino,
+            valor_contable=valor['costo_total'],
         )
         _entrada_farmaceutica_generica(
             empresa=compra.empresa,
@@ -2744,28 +2836,18 @@ def _aplicar_compra_documento(compra):
         )
 
 
+@transaction.atomic
 def _revertir_compra_documento(compra):
+    bloquear_empresas_contables([compra.empresa_id])
     if not MovimientoInventario.objects.filter(compra_documento=compra, tipo='entrada_compra').exists():
         return
     if MovimientoInventario.objects.filter(compra_documento=compra, tipo='reversion_compra').exists():
         return
+    validar_fecha_contable_abierta(compra.empresa_id, compra.fecha_documento)
 
     for linea in compra.lineas.select_related('producto').all():
         if not linea.producto.controla_inventario:
             continue
-        inventario = _obtener_inventario_producto(linea.producto)
-        cantidad_anterior = Decimal(inventario.existencias or 0)
-        cantidad_nueva = cantidad_anterior - Decimal(linea.cantidad or 0)
-        valor_nuevo = (
-            (cantidad_anterior * Decimal(linea.producto.costo_promedio or 0))
-            - (Decimal(linea.cantidad or 0) * Decimal(linea.costo_unitario or 0))
-        )
-        costo_nuevo = (
-            max(valor_nuevo, Decimal("0.00")) / cantidad_nueva
-            if cantidad_nueva > 0 else Decimal("0.00")
-        ).quantize(Decimal("0.0001"))
-        Producto.objects.filter(pk=linea.producto_id).update(costo_promedio=costo_nuevo)
-        linea.producto.costo_promedio = costo_nuevo
         _registrar_movimiento_inventario(
             empresa=compra.empresa,
             producto=linea.producto,
@@ -2774,6 +2856,7 @@ def _revertir_compra_documento(compra):
             referencia=compra.numero_compra or compra.referencia_documento or f"Compra {compra.id}",
             observacion=f'Reversion automatica por anulacion de compra a {compra.proveedor_nombre}.',
             compra_documento=compra,
+            valor_contable=costo_reversion_compra(linea),
         )
 
 
@@ -3900,7 +3983,7 @@ def crear_lote_inventario(request, empresa_slug):
         cantidad_raw = request.POST.get("cantidad", "").strip()
         fecha_vencimiento = request.POST.get("fecha_vencimiento") or None
         vencimiento_rapido = request.POST.get("fecha_vencimiento_rapida", "").strip()
-        proveedor_id = (request.POST.get("proveedor") or None) if modo_app else request.POST.get("proveedor")
+        proveedor_id = request.POST.get("proveedor") or None
         proveedor = proveedores.filter(id=proveedor_id).first()
         try:
             cantidad = Decimal(cantidad_raw)
@@ -3919,43 +4002,49 @@ def crear_lote_inventario(request, empresa_slug):
         elif not producto or not bodega or not numero_lote or cantidad <= 0:
             messages.error(request, "Completa producto, bodega, lote y cantidad mayor que cero.")
         else:
-            lote, _ = LoteInventario.objects.get_or_create(
-                empresa=empresa,
-                producto=producto,
-                numero_lote=numero_lote,
-                defaults={
-                    "fecha_vencimiento": fecha_vencimiento,
-                    "proveedor": proveedor,
-                    "activo": True,
-                },
-            )
-            lote.fecha_vencimiento = fecha_vencimiento
-            lote.proveedor = proveedor
-            lote.activo = True
-            lote.save(update_fields=["fecha_vencimiento", "proveedor", "activo"])
-            _registrar_movimiento_lote_bodega(
-                empresa=empresa,
-                bodega=bodega,
-                lote=lote,
-                tipo="entrada",
-                cantidad=cantidad,
-                referencia=f"Lote {numero_lote}",
-                observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
-            )
-            _registrar_movimiento_inventario(
-                empresa=empresa,
-                producto=producto,
-                tipo="entrada",
-                cantidad=cantidad,
-                referencia=f"Lote {numero_lote}",
-                observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
-            )
-            messages.success(request, "Lote registrado correctamente.")
-            if modo_app:
-                return volver_stock_app(empresa)
-            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-                return redirect(next_url)
-            return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
+            try:
+                with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
+                    lote, _ = LoteInventario.objects.get_or_create(
+                        empresa=empresa,
+                        producto=producto,
+                        numero_lote=numero_lote,
+                        defaults={
+                            "fecha_vencimiento": fecha_vencimiento,
+                            "proveedor": proveedor,
+                            "activo": True,
+                        },
+                    )
+                    lote.fecha_vencimiento = fecha_vencimiento
+                    lote.proveedor = proveedor
+                    lote.activo = True
+                    lote.save(update_fields=["fecha_vencimiento", "proveedor", "activo"])
+                    _registrar_movimiento_lote_bodega(
+                        empresa=empresa,
+                        bodega=bodega,
+                        lote=lote,
+                        tipo="entrada",
+                        cantidad=cantidad,
+                        referencia=f"Lote {numero_lote}",
+                        observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
+                    )
+                    _registrar_movimiento_inventario(
+                        empresa=empresa,
+                        producto=producto,
+                        tipo="entrada",
+                        cantidad=cantidad,
+                        referencia=f"Lote {numero_lote}",
+                        observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
+                    )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                messages.success(request, "Lote registrado correctamente.")
+                if modo_app:
+                    return volver_stock_app(empresa)
+                if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                    return redirect(next_url)
+                return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
 
     if modo_app:
         return render_stock_app(request, empresa, "entrada_lote", productos=productos,
@@ -4404,6 +4493,7 @@ def regalias_inventario(request, empresa_slug):
             referencia = f"Regalia {timezone.localtime():%Y%m%d-%H%M%S-%f}"
             try:
                 with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
                     inventarios = {
                         inventario.producto_id: inventario
                         for inventario in InventarioProducto.objects.select_for_update().filter(
@@ -4511,6 +4601,7 @@ def ajustar_inventario(request, empresa_slug):
             observacion_final = observacion or 'Ajuste manual de inventario.'
             try:
                 with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
                     inventario = _obtener_inventario_producto(producto)
                     if stock_minimo is not None:
                         inventario.stock_minimo = stock_minimo
@@ -4575,31 +4666,36 @@ def entrada_inventario(request, empresa_slug):
             observacion = form.cleaned_data['observacion']
             stock_minimo = form.cleaned_data['stock_minimo']
 
-            with transaction.atomic():
-                inventario = _obtener_inventario_producto(producto)
-                if stock_minimo is not None:
-                    inventario.stock_minimo = stock_minimo
-                    inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
+            try:
+                with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
+                    inventario = _obtener_inventario_producto(producto)
+                    if stock_minimo is not None:
+                        inventario.stock_minimo = stock_minimo
+                        inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
 
-                _registrar_movimiento_inventario(
-                    empresa=empresa,
-                    producto=producto,
-                    bodega=bodega,
-                    tipo='entrada',
-                    cantidad=cantidad,
-                    referencia=referencia,
-                    observacion=observacion or 'Entrada formal de inventario.',
-                )
-                if bodega:
-                    _registrar_movimiento_lote_bodega(
+                    _registrar_movimiento_inventario(
                         empresa=empresa,
+                        producto=producto,
                         bodega=bodega,
-                        lote=_obtener_lote_generico(producto),
                         tipo='entrada',
                         cantidad=cantidad,
                         referencia=referencia,
                         observacion=observacion or 'Entrada formal de inventario.',
                     )
+                    if bodega:
+                        _registrar_movimiento_lote_bodega(
+                            empresa=empresa,
+                            bodega=bodega,
+                            lote=_obtener_lote_generico(producto),
+                            tipo='entrada',
+                            cantidad=cantidad,
+                            referencia=referencia,
+                            observacion=observacion or 'Entrada formal de inventario.',
+                        )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return render(request, "facturacion/entrada_inventario.html", {"empresa": empresa, "form": form})
             destino = f" en {bodega.nombre}" if bodega else ""
             messages.success(request, f"Entrada de inventario registrada correctamente{destino}.")
             return redirect("inventario_facturacion", empresa_slug=empresa.slug)
@@ -4669,6 +4765,7 @@ def entrada_inventario_rapida_app(request, empresa_slug):
     observacion_final = observacion or "Entrada rápida registrada desde la app móvil."
     try:
         with transaction.atomic():
+            bloquear_empresas_contables([empresa.pk])
             lote, creado = LoteInventario.objects.get_or_create(
                 empresa=empresa,
                 producto=producto,
@@ -4785,23 +4882,29 @@ def crear_entrada_inventario_documento(request, empresa_slug):
                 lineas_validas.append(f)
 
         if form.is_valid() and lineas_validas:
-            with transaction.atomic():
-                estado_destino = form.cleaned_data['estado']
-                entrada = form.save(commit=False)
-                entrada.empresa = empresa
-                entrada.estado = 'borrador'
-                entrada.save()
+            try:
+                with transaction.atomic():
+                    estado_destino = form.cleaned_data['estado']
+                    entrada = form.save(commit=False)
+                    entrada.empresa = empresa
+                    entrada.estado = 'borrador'
+                    entrada.save()
 
-                for f in lineas_validas:
-                    linea = f.save(commit=False)
-                    linea.entrada = entrada
-                    linea.save()
+                    for f in lineas_validas:
+                        linea = f.save(commit=False)
+                        linea.entrada = entrada
+                        linea.save()
 
-                if estado_destino == 'aplicada':
-                    _aplicar_entrada_documento(entrada)
-                    entrada.estado = 'aplicada'
-                    entrada.save(update_fields=['estado'])
+                    if estado_destino == 'aplicada':
+                        _aplicar_entrada_documento(entrada)
+                        entrada.estado = 'aplicada'
+                        entrada.save(update_fields=['estado'])
 
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return render(request, "facturacion/crear_entrada_inventario_premium.html", {
+                    "empresa": empresa, "form": form, "formset": formset, "productos": productos_qs,
+                })
             messages.success(request, "Entrada de inventario guardada correctamente.")
             return redirect("ver_entrada_inventario", empresa_slug=empresa.slug, entrada_id=entrada.id)
         elif form.is_valid():
@@ -5765,6 +5868,7 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
             initial={
                 'fecha': timezone.localdate(),
                 'monto': comision.saldo_comision_pendiente,
+                'tipo_cambio': comision.tipo_cambio or comision.factura.tipo_cambio,
                 'metodo': 'transferencia',
                 'cuenta_financiera': cuenta_defecto.id if cuenta_defecto else None,
             },
@@ -6720,10 +6824,15 @@ def detalle_factura_para_nota_credito(request, empresa_slug, factura_id):
 
     lineas = []
     for linea in factura.lineas.all():
+        disponible = cantidad_disponible_para_linea(linea)
+        if disponible <= 0:
+            continue
         lineas.append({
+            "linea_factura_origen_id": linea.pk,
             "producto_id": linea.producto_id,
             "producto_nombre": linea.descripcion_visual,
-            "cantidad": str(linea.cantidad),
+            "cantidad": str(disponible),
+            "cantidad_original": str(linea.cantidad),
             "precio_unitario": str(linea.precio_unitario),
             "descuento_porcentaje": str(linea.descuento_porcentaje or 0),
             "comentario": linea.comentario or "",
@@ -6762,6 +6871,7 @@ def crear_nota_credito(request, empresa_slug):
         NotaCredito,
         LineaNotaCredito,
         fields=[
+            'linea_factura_origen',
             'producto',
             'cantidad',
             'precio_unitario',
@@ -6770,7 +6880,8 @@ def crear_nota_credito(request, empresa_slug):
             'impuesto'
         ],
         extra=1,
-        can_delete=True
+        can_delete=True,
+        widgets={'linea_factura_origen': forms.HiddenInput()},
     )
 
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
@@ -6785,6 +6896,7 @@ def crear_nota_credito(request, empresa_slug):
         formset = LineaFormSet(request.POST, instance=nota_temp)
 
         for f in formset.forms:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -6857,6 +6969,7 @@ def crear_nota_credito(request, empresa_slug):
         formset = LineaFormSet()
 
         for f in formset:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -6897,6 +7010,7 @@ def editar_nota_credito(request, empresa_slug, nota_id):
         NotaCredito,
         LineaNotaCredito,
         fields=[
+            'linea_factura_origen',
             'producto',
             'cantidad',
             'precio_unitario',
@@ -6905,7 +7019,8 @@ def editar_nota_credito(request, empresa_slug, nota_id):
             'impuesto'
         ],
         extra=0,
-        can_delete=True
+        can_delete=True,
+        widgets={'linea_factura_origen': forms.HiddenInput()},
     )
 
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
@@ -6919,6 +7034,7 @@ def editar_nota_credito(request, empresa_slug, nota_id):
         formset = LineaFormSet(request.POST, instance=nota)
 
         for f in formset.forms:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -6977,6 +7093,7 @@ def editar_nota_credito(request, empresa_slug, nota_id):
         formset = LineaFormSet(instance=nota)
 
         for f in formset:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -7068,10 +7185,14 @@ def generar_nota_credito_desde_factura(request, empresa_slug, factura_id):
     )
 
     for linea in factura.lineas.all():
+        cantidad_disponible = cantidad_disponible_para_linea(linea)
+        if cantidad_disponible <= 0:
+            continue
         LineaNotaCredito.objects.create(
             nota_credito=nota,
+            linea_factura_origen=linea,
             producto=linea.producto,
-            cantidad=linea.cantidad,
+            cantidad=cantidad_disponible,
             precio_unitario=linea.precio_unitario,
             precio_incluye_impuesto=linea.precio_incluye_impuesto,
             costo_unitario=linea.costo_unitario,
@@ -7091,31 +7212,28 @@ def generar_nota_credito_desde_factura(request, empresa_slug, factura_id):
 @require_POST
 def anular_nota_credito(request, empresa_slug, nota_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    nota = get_object_or_404(NotaCredito, id=nota_id, empresa=empresa)
-
-    if nota.estado == 'anulada':
-        messages.info(request, "La nota de crédito ya estaba anulada.")
-    else:
-        if nota.estado == 'emitida':
-            _revertir_entrada_nota_credito(nota)
-            registrar_reversion_documento(
-                empresa=nota.empresa,
-                documento_tipo='nota_credito',
-                documento_id=nota.id,
-                evento_origen='emision',
-                evento_reversion='anulacion',
-                fecha=timezone.now().date(),
-                descripcion=f"Reversion nota de credito {nota.numero_nota or nota.id}",
-                referencia=nota.numero_nota or str(nota.id),
-                origen_modulo='facturacion',
-                creado_por=nota.vendedor,
-            )
-        nota.estado = 'anulada'
-        nota.save(update_fields=['estado'])
-        nota.factura_origen.actualizar_estado_pago()
-        messages.success(request, "Nota de crédito anulada correctamente.")
-
-    return redirect("ver_nota_credito", empresa_slug=empresa.slug, nota_id=nota.id)
+    try:
+        with transaction.atomic():
+            bloquear_empresas_contables([empresa.pk])
+            nota = get_object_or_404(NotaCredito.objects.select_for_update(), id=nota_id, empresa=empresa)
+            if nota.estado == 'anulada':
+                messages.info(request, "La nota de crédito ya estaba anulada.")
+            else:
+                if nota.estado == 'emitida':
+                    _revertir_entrada_nota_credito(nota)
+                    registrar_reversion_documento(
+                        empresa=nota.empresa, documento_tipo='nota_credito', documento_id=nota.id,
+                        evento_origen='emision', evento_reversion='anulacion', fecha=timezone.localdate(),
+                        descripcion=f"Reversión de nota de crédito {nota.numero_nota or nota.id}",
+                        referencia=nota.numero_nota or str(nota.id), origen_modulo='facturacion', creado_por=request.user,
+                    )
+                nota.estado = 'anulada'
+                nota.save(update_fields=['estado'])
+                nota.factura_origen.actualizar_estado_pago()
+                messages.success(request, "Nota de crédito anulada correctamente.")
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+    return redirect("ver_nota_credito", empresa_slug=empresa.slug, nota_id=nota_id)
 
 
 # =====================================================
@@ -8277,6 +8395,8 @@ def registrar_pago(request, empresa_slug, factura_id):
         validar_selecciones_cobro_app, volver_cobro_app,
     )
 
+    from contabilidad.moneda import validar_moneda_tipo_cambio
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     modo_app = es_cobros_app(request, empresa)
     if modo_app:
@@ -8296,9 +8416,12 @@ def registrar_pago(request, empresa_slug, factura_id):
     cuentas_tarjeta = tarjetas if tarjetas.exists() else cuentas_financieras
     proveedores_comision = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
 
+    simbolo_moneda = "$" if factura.moneda == "USD" else "L."
+
     def _contexto_pago(form_data=None):
         return {
             "factura": factura,
+            "tipo_cambio_cobro": factura.tipo_cambio,
             "empresa": empresa,
             "cuentas_financieras": cuentas_financieras,
             "cajas": cajas,
@@ -8419,6 +8542,16 @@ def registrar_pago(request, empresa_slug, factura_id):
             except InvalidOperation as exc:
                 raise ValidationError(f"El valor de {etiqueta} no es valido.") from exc
 
+        try:
+            _moneda, tasa_cobro = validar_moneda_tipo_cambio(
+                factura.moneda, request.POST.get("tipo_cambio") or factura.tipo_cambio
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            if modo_app:
+                return render_cobro_app(request, empresa, _contexto_pago(request.POST))
+            return render(request, template_name, _contexto_pago(request.POST))
+
         if usa_pago_mixto:
             try:
                 fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
@@ -8484,6 +8617,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                             for indice, (metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta) in enumerate(pagos_validos, start=1):
                                 pago = PagoFactura.objects.create(
                                     factura=factura,
+                                    tipo_cambio=tasa_cobro,
                                     monto=monto_decimal,
                                     retencion_isr=retencion_isr if indice == 1 else Decimal('0.00'),
                                     retencion_isv=retencion_isv if indice == 1 else Decimal('0.00'),
@@ -8503,10 +8637,10 @@ def registrar_pago(request, empresa_slug, factura_id):
                                     recibos.append(pago.recibo.numero_recibo)
                         messages.success(
                             request,
-                            presentar_mensaje_cobro_app(factura, f"Pago mixto registrado correctamente. Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}.", modo_app)
+                            presentar_mensaje_cobro_app(factura, f"Pago mixto registrado correctamente. Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}.", modo_app)
                         )
                         respuesta_modal = _respuesta_modal_exito(
-                            f"Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}."
+                            f"Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {(total_pago + retencion_isr + retencion_isv):.2f}."
                         )
                         if respuesta_modal:
                             return respuesta_modal
@@ -8545,6 +8679,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                 cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                 pago_borrador = PagoFactura(
                     factura=factura,
+                    tipo_cambio=tasa_cobro,
                     monto=monto_decimal,
                     retencion_isr=retencion_isr,
                     retencion_isv=retencion_isv,
@@ -8570,6 +8705,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                 with transaction.atomic():
                     pago = PagoFactura.objects.create(
                         factura=factura,
+                        tipo_cambio=tasa_cobro,
                         monto=monto_decimal,
                         retencion_isr=retencion_isr,
                         retencion_isv=retencion_isv,
@@ -8587,11 +8723,11 @@ def registrar_pago(request, empresa_slug, factura_id):
                     registrar_asiento_pago_cliente(pago)
                 recibo_numero = pago.recibo.numero_recibo if hasattr(pago, 'recibo') else None
                 if recibo_numero:
-                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.", modo_app))
+                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Cobro recibido: {simbolo_moneda} {monto_decimal:.2f}. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.", modo_app))
                 else:
-                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.", modo_app))
+                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}.", modo_app))
                 respuesta_modal = _respuesta_modal_exito(
-                    f"Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
+                    f"Cobro recibido: {simbolo_moneda} {monto_decimal:.2f}. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}."
                 )
                 if respuesta_modal:
                     return respuesta_modal
@@ -8629,15 +8765,27 @@ def _recalcular_y_recontabilizar_pagos_factura(factura):
     subtotal_pendiente = Decimal(factura.subtotal_documento_ajustado or 0).quantize(Decimal("0.01"))
     impuesto_pendiente = Decimal(factura.impuesto_documento_ajustado or 0).quantize(Decimal("0.01"))
     ids_pagos = [p.id for p in pagos]
+    from contabilidad.models import RegularizacionMonedaFactura
+    revision = RegularizacionMonedaFactura.objects.filter(factura=factura, empresa=factura.empresa).first()
+    preservados = set()
+    if revision:
+        preservados = set(AsientoContable.objects.filter(
+            empresa=factura.empresa, documento_tipo='pago_factura', documento_id__in=ids_pagos,
+            evento='cobro', fecha_creacion__lte=revision.fecha_creacion, estado='contabilizado',
+        ).values_list('documento_id', flat=True))
 
     AsientoContable.objects.filter(
         empresa=factura.empresa,
         documento_tipo="pago_factura",
         documento_id__in=ids_pagos,
         evento="cobro",
-    ).delete()
+    ).exclude(documento_id__in=preservados).delete()
 
     for pago in pagos:
+        if pago.pk in preservados:
+            subtotal_pendiente = max(subtotal_pendiente - pago.subtotal_aplicado, Decimal('0.00'))
+            impuesto_pendiente = max(impuesto_pendiente - pago.impuesto_aplicado, Decimal('0.00'))
+            continue
         total_aplicado = Decimal(pago.total_aplicado or 0).quantize(Decimal("0.01"))
         total_pendiente = (subtotal_pendiente + impuesto_pendiente).quantize(Decimal("0.01"))
 
@@ -8688,6 +8836,8 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         validar_selecciones_cobro_app, volver_cobro_app,
     )
 
+    from contabilidad.moneda import validar_moneda_tipo_cambio
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     modo_app = es_cobros_app(request, empresa)
     if modo_app:
@@ -8721,6 +8871,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         data = {
             "fecha": pago.fecha.isoformat() if pago.fecha else timezone.now().date().isoformat(),
             "monto": f"{Decimal(pago.monto or 0):.2f}",
+            "tipo_cambio": str(pago.tipo_cambio or factura.tipo_cambio),
             "metodo": pago.metodo,
             "cuenta_financiera": str(pago.cuenta_financiera_id or ""),
             "referencia": pago.referencia or "",
@@ -8747,9 +8898,12 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         data[f"referencia_{metodo}"] = pago.referencia or ""
         return data
 
+    simbolo_moneda = "$" if factura.moneda == "USD" else "L."
+
     def _contexto_pago(form_data=None):
         return {
             "factura": factura,
+            "tipo_cambio_cobro": (pago.tipo_cambio or factura.tipo_cambio),
             "empresa": empresa,
             "cuentas_financieras": cuentas_financieras,
             "cajas": cajas,
@@ -8860,6 +9014,9 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         )
 
         try:
+            _moneda, tasa_cobro = validar_moneda_tipo_cambio(
+                factura.moneda, request.POST.get("tipo_cambio") or (pago.tipo_cambio or factura.tipo_cambio)
+            )
             if usa_pago_mixto:
                 try:
                     fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
@@ -8891,6 +9048,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                 with transaction.atomic():
                     metodo_principal, monto_principal, referencia_principal, cuenta_principal = pagos_validos[0]
+                    pago.tipo_cambio = tasa_cobro
                     pago.fecha = fecha_convertida
                     pago.monto = monto_principal
                     pago.retencion_isr = retencion_isr
@@ -8908,6 +9066,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     for metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta in pagos_validos[1:]:
                         PagoFactura.objects.create(
                             factura=factura,
+                            tipo_cambio=tasa_cobro,
                             monto=monto_decimal,
                             retencion_isr=Decimal("0.00"),
                             retencion_isv=Decimal("0.00"),
@@ -8922,9 +9081,9 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     _recalcular_y_recontabilizar_pagos_factura(factura)
 
                 pago.refresh_from_db()
-                messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago mixto actualizado correctamente. Cobro recibido: L. {total_pago:.2f}.", modo_app))
+                messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago mixto actualizado correctamente. Cobro recibido: {simbolo_moneda} {total_pago:.2f}.", modo_app))
                 respuesta_modal = _respuesta_modal_exito(
-                    f"Pago mixto actualizado. Cobro recibido: L. {total_pago:.2f}. Movimientos: {len(pagos_validos)}."
+                    f"Pago mixto actualizado. Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Movimientos: {len(pagos_validos)}."
                 )
                 if respuesta_modal:
                     return respuesta_modal
@@ -8944,6 +9103,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             pago_borrador = PagoFactura(
                 pk=pago.pk,
                 factura=factura,
+                tipo_cambio=tasa_cobro,
                 monto=monto_decimal,
                 retencion_isr=retencion_isr,
                 retencion_isv=retencion_isv,
@@ -8968,6 +9128,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
 
             with transaction.atomic():
+                pago.tipo_cambio = tasa_cobro
                 pago.fecha = fecha_convertida
                 pago.monto = monto_decimal
                 pago.retencion_isr = retencion_isr
@@ -8983,9 +9144,9 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 pago.save()
                 _recalcular_y_recontabilizar_pagos_factura(factura)
 
-            messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago actualizado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.", modo_app))
+            messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago actualizado correctamente. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}.", modo_app))
             respuesta_modal = _respuesta_modal_exito(
-                f"Cobro actualizado por L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
+                f"Cobro actualizado por {simbolo_moneda} {monto_decimal:.2f}. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}."
             )
             if respuesta_modal:
                 return respuesta_modal

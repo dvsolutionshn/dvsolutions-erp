@@ -4,9 +4,10 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models.signals import pre_delete, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from .models import (
-    AsientoContable, LineaAsientoContable, MovimientoBancario, PeriodoContable,
+    AsientoContable, LineaAsientoContable, MovimientoBancario, PeriodoContable, RegularizacionMonedaFactura,
     bloquear_empresas_contables, validar_fecha_contable_abierta,
 )
 
@@ -20,6 +21,11 @@ def proteger_eliminacion_contable(sender, instance, using, **kwargs):
     instance.validar_eliminacion(using=using)
 
 
+@receiver(pre_delete, sender=RegularizacionMonedaFactura)
+def proteger_regularizacion_monetaria(sender, instance, using, **kwargs):
+    raise ValidationError('La regularización monetaria conserva el respaldo de los saldos. Registre un nuevo ajuste para corregirla.')
+
+
 DOCUMENTOS_CONTABLES = {
     "Factura": ("factura", "empresa_id"),
     "NotaCredito": ("nota_credito", "empresa_id"),
@@ -28,6 +34,7 @@ DOCUMENTOS_CONTABLES = {
     "PagoCompra": ("pago_compra", "compra__empresa_id"),
     "PagoComisionProveedor": ("pago_comision_proveedor", "comision_origen__factura__empresa_id"),
     "PeriodoPlanilla": ("planilla", "empresa_id"),
+    "MovimientoInventario": ("movimiento_inventario", "empresa_id"),
 }
 
 
@@ -96,7 +103,7 @@ CAMPOS_PAGO = {
     "fecha", "monto", "factura_id", "compra_id", "comision_origen_id", "metodo",
     "cuenta_financiera_id", "cuenta_financiera_impuesto_id", "retencion_isr", "retencion_isv",
     "porcentaje_comision", "monto_comision", "proveedor_comision_id", "separar_isv",
-    "subtotal_aplicado", "impuesto_aplicado",
+    "subtotal_aplicado", "impuesto_aplicado", "tipo_cambio",
 }
 
 
@@ -178,6 +185,37 @@ def registrar_protecciones_documentos():
                 proteger_linea_documento, sender=getattr(facturacion, nombre),
                 dispatch_uid=f"contabilidad.proteger_linea.{nombre_senal}.{nombre}",
             )
+    pre_save.connect(
+        proteger_movimiento_inventario_manual, sender=facturacion.MovimientoInventario,
+        dispatch_uid="contabilidad.proteger_movimiento_inventario_manual",
+    )
+
+
+def proteger_movimiento_inventario_manual(sender, instance, using, raw=False, update_fields=None, **kwargs):
+    if raw:
+        return
+    campos = {"empresa_id", "producto_id", "tipo", "cantidad", "valor_contable", "fecha", "entrada_documento_id"}
+    anterior = sender.objects.using(using).filter(pk=instance.pk).values(*campos).first() if instance.pk else None
+    tipos_manuales = {"entrada", "ajuste_entrada", "ajuste_salida", "regalia"}
+    if instance.tipo not in tipos_manuales and (not anterior or anterior["tipo"] not in tipos_manuales):
+        return
+    if anterior and not any(anterior[campo] != getattr(instance, campo) for campo in campos):
+        return
+    with transaction.atomic(using=using):
+        bloquear_empresas_contables([instance.empresa_id, anterior["empresa_id"] if anterior else None], using=using)
+        if anterior:
+            _validar_documento_sin_asientos_cerrados(sender, instance, using)
+            if AsientoContable.objects.using(using).filter(
+                empresa_id=anterior["empresa_id"], documento_tipo="movimiento_inventario",
+                documento_id=instance.pk, estado="contabilizado",
+            ).exists():
+                raise ValidationError("El movimiento de inventario tiene un asiento contabilizado. Registre un nuevo ajuste para conservar su trazabilidad.")
+            if anterior["empresa_id"] != instance.empresa_id:
+                raise ValidationError("No se puede trasladar un movimiento de inventario a otra empresa.")
+        fecha = instance.entrada_documento.fecha_documento if instance.entrada_documento_id else instance.fecha
+        if hasattr(fecha, 'hour'):
+            fecha = timezone.localdate(fecha) if timezone.is_aware(fecha) else fecha.date()
+        validar_fecha_contable_abierta(instance.empresa_id, fecha, using)
 
 
 registrar_protecciones_documentos()

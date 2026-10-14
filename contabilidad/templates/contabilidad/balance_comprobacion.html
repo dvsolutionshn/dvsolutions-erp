@@ -14,6 +14,7 @@
 {% endblock %}
 
 {% block content %}
+{% include "contabilidad/nota_moneda_reportes.html" %}
 <section class="erp-card erp-report-filter-card">
     <div class="erp-toolbar">
         <div>
@@ -59,8 +60,8 @@
     <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
     <article class="erp-card">
         <div class="erp-kpi-label">Estado</div>
-        <p class="erp-stat-value">{% if resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p>
-        <p class="erp-card-muted">{% if resumen.cuadrado %}Debe y haber coinciden.{% else %}Hay diferencia entre debe y haber.{% endif %}</p>
+        <p class="erp-stat-value">{% if resumen.vista_parcial %}Vista parcial{% elif resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p>
+        <p class="erp-card-muted">{% if resumen.vista_parcial %}Selecciona todos los tipos para comprobar la ecuación completa.{% elif resumen.cuadrado %}Debe, haber y saldos finales coinciden.{% else %}Hay diferencias en movimientos o saldos finales.{% endif %}</p>
     </article>
 </section>
 
@@ -68,7 +69,7 @@
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title">Saldos por cuenta</h3>
-            <p class="erp-card-muted">Incluye solo partidas contabilizadas dentro del periodo seleccionado.</p>
+            <p class="erp-card-muted">Incluye la apertura anterior a «Desde», el movimiento del período y los saldos al cierre, también de cuentas inactivas con historia.</p>
         </div>
     </div>
     <div class="erp-table-wrap">
@@ -77,10 +78,12 @@
                 <tr>
                     <th>Cuenta</th>
                     <th>Tipo</th>
-                    <th>Debe</th>
-                    <th>Haber</th>
-                    <th>Saldo deudor</th>
-                    <th>Saldo acreedor</th>
+                    <th>Apertura deudora</th>
+                    <th>Apertura acreedora</th>
+                    <th>Debe del período</th>
+                    <th>Haber del período</th>
+                    <th>Saldo final deudor</th>
+                    <th>Saldo final acreedor</th>
                 </tr>
             </thead>
             <tbody>
@@ -88,18 +91,22 @@
                 <tr>
                     <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
                     <td>{{ fila.cuenta.get_tipo_display }}</td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_deudora }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_acreedora }}</span></td>
                     <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
                     <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
                     <td class="amount"><span class="erp-money">L. {{ fila.saldo_deudor }}</span></td>
                     <td class="amount"><span class="erp-money">L. {{ fila.saldo_acreedor }}</span></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="erp-empty">No hay movimientos contabilizados con estos filtros.</td></tr>
+                <tr><td colspan="8" class="erp-empty">No hay movimientos contabilizados con estos filtros.</td></tr>
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr>
                     <th colspan="2">Totales</th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_deudora_total }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_acreedora_total }}</span></th>
                     <th class="amount"><span class="erp-money">L. {{ resumen.debe_total }}</span></th>
                     <th class="amount"><span class="erp-money">L. {{ resumen.haber_total }}</span></th>
                     <th class="amount"><span class="erp-money">L. {{ resumen.saldo_deudor_total }}</span></th>

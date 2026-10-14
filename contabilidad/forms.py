@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.forms import inlineformset_factory
 
@@ -9,7 +11,7 @@ from .models import AsientoContable, ClasificacionCompraFiscal, ClasificacionMov
 class CuentaContableForm(forms.ModelForm):
     class Meta:
         model = CuentaContable
-        fields = ["codigo", "nombre", "tipo", "cuenta_padre", "descripcion", "acepta_movimientos", "activa"]
+        fields = ["codigo", "nombre", "tipo", "cuenta_padre", "actividad_flujo", "descripcion", "acepta_movimientos", "activa"]
 
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop("empresa", None)
@@ -29,6 +31,7 @@ class CuentaContableForm(forms.ModelForm):
             "nombre": ("Nombre de la cuenta", ""),
             "tipo": ("Tipo de cuenta", ""),
             "cuenta_padre": ("Cuenta padre", "Usala para crear subcuentas y reportes agrupados."),
+            "actividad_flujo": ("Actividad en el flujo de efectivo", "Puede indicar operación, inversión o financiamiento para cuentas propias. La opción automática usa la clasificación de la cuenta o de su cuenta padre."),
             "descripcion": ("Descripcion", ""),
             "acepta_movimientos": ("Acepta movimientos", "Desmarca si quieres dejarla solo como cuenta agrupadora."),
             "activa": ("Cuenta activa", ""),
@@ -256,6 +259,16 @@ class ReglaClasificacionBancoForm(forms.ModelForm):
 
 class EnlazarMovimientoFacturaForm(forms.Form):
     factura = forms.ModelChoiceField(queryset=Factura.objects.none(), label="Factura pendiente")
+    tipo_cambio_cobro = forms.DecimalField(
+        max_digits=14, decimal_places=6, required=False, min_value=Decimal('0.000001'),
+        label="Tipo de cambio del depósito (HNL por USD)",
+        help_text="Para facturas en dólares indique la tasa efectiva. Si lo deja vacío se usa la tasa de la factura.",
+    )
+    importe_moneda_factura = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False, min_value=Decimal('0.01'),
+        label="Importe en la moneda de la factura",
+        help_text="Opcional. La conversión debe coincidir exactamente con el depósito en lempiras.",
+    )
 
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop("empresa", None)
@@ -271,11 +284,30 @@ class EnlazarMovimientoFacturaForm(forms.Form):
             self.fields["factura"].queryset = facturas
         self.fields["factura"].help_text = "El deposito se aplicara como pago de esta factura."
 
-    def clean_factura(self):
-        factura = self.cleaned_data["factura"]
-        if self.movimiento and factura.saldo_pendiente < self.movimiento.credito:
-            raise forms.ValidationError("La factura seleccionada tiene un saldo menor que el deposito. Usa una factura con saldo suficiente.")
-        return factura
+    def datos_aplicacion(self, factura, movimiento=None):
+        from .moneda import convertir_a_lempiras, redondear_importe, validar_moneda_tipo_cambio
+        movimiento = movimiento or self.movimiento
+        if movimiento.empresa_id != factura.empresa_id:
+            raise forms.ValidationError("El depósito y la factura deben pertenecer a la misma empresa.")
+        _moneda, tasa = validar_moneda_tipo_cambio(
+            factura.moneda, self.cleaned_data.get("tipo_cambio_cobro") or factura.tipo_cambio,
+        )
+        importe = self.cleaned_data.get("importe_moneda_factura")
+        if importe is None:
+            importe = redondear_importe(movimiento.credito / tasa)
+        if convertir_a_lempiras(importe, factura.moneda, tasa) != movimiento.credito:
+            raise forms.ValidationError(
+                "La conversión no coincide con el depósito en lempiras. Indique el importe original y la tasa efectiva del cobro."
+            )
+        if importe <= 0 or importe > factura.saldo_pendiente:
+            raise forms.ValidationError("La factura seleccionada tiene un saldo menor que el depósito. Use una factura con saldo suficiente.")
+        return importe, tasa
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get("factura") and self.movimiento and not self.errors:
+            self.datos_aplicacion(datos["factura"])
+        return datos
 
 
 class EnlazarMovimientoCompraForm(forms.Form):
@@ -360,6 +392,9 @@ class ConfiguracionContableEmpresaForm(forms.ModelForm):
             "cuenta_proveedores",
             "cuenta_ventas",
             "cuenta_devoluciones_ventas",
+            "isv_compras_recuperable",
+            "cuenta_isv_acreditable",
+            "cuenta_entradas_inventario",
         ]
 
     def __init__(self, *args, empresa=None, **kwargs):
@@ -381,13 +416,29 @@ class ConfiguracionContableEmpresaForm(forms.ModelForm):
             "cuenta_proveedores": ("Cuentas por pagar proveedores", "Cuenta que recibe compras aplicadas y se reduce con pagos a proveedores."),
             "cuenta_ventas": ("Ventas", "Cuenta de ingresos para las facturas emitidas."),
             "cuenta_devoluciones_ventas": ("Devoluciones sobre ventas", "Cuenta usada para notas de credito emitidas."),
+            "cuenta_isv_acreditable": ("ISV acreditable de compras", "Crédito fiscal utilizado únicamente si el ISV de compras es recuperable para esta empresa."),
+            "cuenta_entradas_inventario": ("Contrapartida de entradas manuales de inventario", "Seleccione la cuenta según el origen: saldo inicial, aporte o deuda documentada. Para compras reales utilice el módulo de Compras. Es obligatoria al aplicar entradas manuales con costo."),
         }
         for field_name, (label, help_text) in textos.items():
             self.fields[field_name].queryset = cuentas
+            tipo = {
+                'cuenta_caja': 'activo', 'cuenta_bancos': 'activo', 'cuenta_clientes': 'activo',
+                'cuenta_inventario': 'activo', 'cuenta_isv_acreditable': 'activo',
+                'cuenta_proveedores': 'pasivo', 'cuenta_isv_por_pagar': 'pasivo',
+                'cuenta_ventas': 'ingreso', 'cuenta_devoluciones_ventas': 'ingreso',
+            }.get(field_name)
+            if tipo:
+                self.fields[field_name].queryset = cuentas.filter(tipo=tipo)
             self.fields[field_name].required = False
             self.fields[field_name].label = label
             self.fields[field_name].help_text = help_text
             self.fields[field_name].empty_label = "Usar cuenta automatica por defecto"
+        self.fields['cuenta_entradas_inventario'].empty_label = 'Sin configurar; sólo entradas sin costo'
+        self.fields["isv_compras_recuperable"].label = "Esta empresa recupera el ISV de compras"
+        self.fields["isv_compras_recuperable"].help_text = (
+            "Al activarlo, el ISV se separa como crédito fiscal. Si se deja desactivado, "
+            "forma parte del costo. Se aplica a nuevas compras; conserva la valoración de compras ya aplicadas."
+        )
 
 
 class LineaAsientoContableForm(forms.ModelForm):

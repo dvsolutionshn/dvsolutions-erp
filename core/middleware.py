@@ -80,6 +80,10 @@ class EmpresaAccessMiddleware:
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de facturacion.")
                         return redirect("dashboard", slug=empresa.slug)
 
+                with translation.override("es-ni"):
+                    request.LANGUAGE_CODE = "es-ni"
+                    return self.get_response(request)
+
         if len(parts) >= 3 and parts[1] == "dashboard" and parts[2] == "contabilidad":
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()

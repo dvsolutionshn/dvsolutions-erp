@@ -3,10 +3,10 @@
 {% block title %}Reportes Contables{% endblock %}
 {% block header_kicker %}Contabilidad{% endblock %}
 {% block header_title %}Reportes Contables{% endblock %}
-{% block header_description %}Libros oficiales, estados financieros, impuestos, auditoria y lectura ejecutiva desde los asientos contabilizados del ERP.{% endblock %}
+{% block header_description %}Libros contables y estados financieros en lempiras (HNL), con impuestos y documentos enlazados para revisar las operaciones de esta empresa.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'dashboard_bi_financiero' empresa.slug %}" class="erp-action-link">Dashboard BI</a>
+<a href="{% url 'dashboard_bi_financiero' empresa.slug %}" class="erp-action-link">Panel financiero</a>
 <a href="{% url 'auditoria_contable' empresa.slug %}" class="erp-action-link">Auditoria</a>
 <a href="{% url 'reporte_impuestos' empresa.slug %}" class="erp-action-link">Impuestos</a>
 <a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
@@ -35,10 +35,10 @@
         <a class="erp-btn-secondary" href="{% url 'resumen_ejecutivo_contable' empresa.slug %}">Abrir Resumen</a>
     </article>
     <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Business Intelligence</div>
-        <h3>Dashboard BI Financiero</h3>
+        <div class="erp-kpi-label">Análisis financiero</div>
+        <h3>Panel financiero</h3>
         <p>Lectura gerencial de compras, pagos, bancos y cuentas por pagar desde un tablero visual construido dentro del ERP.</p>
-        <a class="erp-btn-secondary" href="{% url 'dashboard_bi_financiero' empresa.slug %}">Abrir Dashboard BI</a>
+        <a class="erp-btn-secondary" href="{% url 'dashboard_bi_financiero' empresa.slug %}">Abrir Panel financiero</a>
     </article>
     <article class="erp-card erp-module-card">
         <div class="erp-kpi-label">Trazabilidad</div>
@@ -61,7 +61,7 @@
     <article class="erp-card erp-module-card">
         <div class="erp-kpi-label">Libro oficial</div>
         <h3>Libro Mayor General</h3>
-        <p>Consulta todas las cuentas con movimientos, partidas y saldos acumulados sin entrar cuenta por cuenta.</p>
+        <p>Consulta apertura, movimientos y saldos finales de todas las cuentas con historia, incluidas las inactivas.</p>
         <a class="erp-btn-secondary" href="{% url 'libro_mayor_general' empresa.slug %}">Abrir Mayor General</a>
     </article>
     <article class="erp-card erp-module-card">
@@ -85,7 +85,7 @@
     <article class="erp-card erp-module-card">
         <div class="erp-kpi-label">Financiero</div>
         <h3>Balance de Situacion Financiera</h3>
-        <p>Consulta activos, pasivos y patrimonio a una fecha de corte para validar la posicion financiera.</p>
+        <p>Consulta activos, pasivos, patrimonio registrado y resultado pendiente de traspaso a una fecha de corte.</p>
         <a class="erp-btn-secondary" href="{% url 'balance_general' empresa.slug %}">Abrir Balance de Situacion</a>
     </article>
     <article class="erp-card erp-module-card">

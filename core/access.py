@@ -258,7 +258,7 @@ def permiso_contabilidad_accion(path_suffix):
             return "puede_crear_asientos"
         if len(parts) > 2 and parts[2] in {"editar", "duplicar"}:
             return "puede_crear_asientos"
-        if len(parts) > 2 and parts[2] in {"contabilizar", "reversar", "regresar-borrador"}:
+        if len(parts) > 2 and parts[2] in {"contabilizar", "reversar", "regresar-borrador", "regularizar-moneda"}:
             return "puede_contabilizar_asientos"
         return None
     return None

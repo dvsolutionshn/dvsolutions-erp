@@ -42,22 +42,22 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Total Factura</div>
-        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total|floatformat:2|intcomma }}</p>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {% endif %}{{ factura.total|floatformat:2|intcomma }}</p>
         <p class="erp-card-muted">Valor original del documento.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Saldo Pendiente</div>
-        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</p>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</p>
         <p class="erp-card-muted">Monto disponible para aplicar pago.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Base Pendiente</div>
-        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ subtotal_pendiente|floatformat:2|intcomma }}</p>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {% endif %}{{ subtotal_pendiente|floatformat:2|intcomma }}</p>
         <p class="erp-card-muted">Saldo comercial sin impuesto.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">ISV Pendiente</div>
-        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ impuesto_pendiente|floatformat:2|intcomma }}</p>
+        <p class="erp-stat-value erp-money">{% if factura.moneda == "USD" %}$ {% else %}{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {% endif %}{{ impuesto_pendiente|floatformat:2|intcomma }}</p>
         <p class="erp-card-muted">Impuesto aun pendiente de aplicar.</p>
     </article>
     <article class="erp-card">
@@ -84,6 +84,7 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
 
     <form method="post" class="erp-form-shell" style="margin-top:0;">
         {% csrf_token %}
+        {% include "facturacion/_tipo_cambio_cobro.html" %}
 
         {% if usa_pagos_mixtos %}
         <div class="erp-form-grid two">
@@ -168,13 +169,13 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
             </article>
         </div>
         <div class="erp-soft-panel">
-            <strong>Total capturado:</strong> <span id="total-mixto">L. 0.00</span>
-            <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+            <strong>Total capturado:</strong> <span id="total-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</span>
+            <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: {% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
         </div>
         <div class="erp-soft-panel" style="margin-top:12px;">
             <strong>Proyeccion del cobro:</strong>
-            <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">L. 0.00</strong></span>
-            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-mixto">L. 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
         </div>
         <details class="erp-payment-advanced">
             <summary>Opciones avanzadas</summary>
@@ -255,13 +256,13 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
             </div>
         </div>
         <div class="erp-soft-panel">
-            <strong>Total aplicado:</strong> <span id="total-aplicado-simple">L. 0.00</span>
-            <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+            <strong>Total aplicado:</strong> <span id="total-aplicado-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</span>
+            <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: {% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
         </div>
         <div class="erp-soft-panel" style="margin-top:12px;">
             <strong>Proyeccion del cobro:</strong>
-            <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">L. 0.00</strong></span>
-            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-simple">L. 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
+            <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
         </div>
         <details class="erp-payment-advanced">
             <summary>Opciones avanzadas</summary>
@@ -324,7 +325,7 @@ const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente }}");
 const comisionSobreTotalFactura = {{ comision_sobre_total_factura|yesno:"true,false" }};
 const baseComisionFactura = parseFloat("{{ base_comision }}");
 function moneyHN(value){
-    return "L. " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
+    return "{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function calcularDistribucion(totalAplicado){
     const subtotalPendiente = Number.isFinite(subtotalPendienteCobro) ? subtotalPendienteCobro : 0;
@@ -619,6 +620,7 @@ actualizarTotalAplicadoSimple();
 
     <form method="POST">
         {% csrf_token %}
+        {% include "facturacion/_tipo_cambio_cobro.html" %}
 
     <div class="form-group">
         <label>Fecha de Pago</label>

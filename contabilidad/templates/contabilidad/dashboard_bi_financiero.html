@@ -1,9 +1,9 @@
 {% extends "core/erp_base.html" %}
 {% load humanize %}
 
-{% block title %}Dashboard BI Financiero - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Business Intelligence{% endblock %}
-{% block header_title %}Dashboard BI Financiero{% endblock %}
+{% block title %}Panel financiero - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Análisis financiero{% endblock %}
+{% block header_title %}Panel financiero{% endblock %}
 {% block header_description %}Panel gerencial construido desde compras, pagos y bancos para entender egresos, cartera por pagar y movimiento financiero sin salir del ERP.{% endblock %}
 
 {% block topbar_actions %}
@@ -86,6 +86,7 @@
 {% endblock %}
 
 {% block content %}
+<section class="erp-card"><p class="erp-card-muted">Importes en lempiras (HNL). Se incluyen compras aplicadas y pagos registrados hasta hoy. Los movimientos bancarios pendientes se muestran por separado para su revisión.</p>{% if compras_borrador %}<p class="erp-card-muted">{{ compras_borrador }} compra{{ compras_borrador|pluralize }} en borrador pendiente{{ compras_borrador|pluralize }} de aplicar.</p>{% endif %}</section>
 <section class="erp-bi-shell">
     <section class="erp-card erp-bi-header">
         <div class="erp-bi-header-copy">
@@ -189,7 +190,7 @@
 
     <section class="erp-bi-compact-grid">
         <article class="erp-bi-card">
-            <h4>Top proveedores por compra</h4>
+            <h4>Proveedores con mayor volumen de compra</h4>
             <p>Detecta rapidamente quienes concentran el mayor volumen de abastecimiento del negocio.</p>
             <div class="erp-bi-ranking">
                 {% for item in top_proveedores %}
@@ -208,7 +209,7 @@
         </article>
 
         <article class="erp-bi-card">
-            <h4>Pagado vs comprado</h4>
+            <h4>Pagado y comprado</h4>
             <p>Comparativo rapido del ultimo tramo visible para validar disciplina de pago frente al abastecimiento.</p>
             <div class="erp-bi-compare">
                 {% for item in compras_por_mes %}

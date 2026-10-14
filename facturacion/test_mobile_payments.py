@@ -16,10 +16,10 @@ from django.utils import timezone
 
 from core.models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, RegistroAuditoria, Usuario
 from contabilidad.models import AsientoContable, CuentaContable, CuentaFinanciera
-from contabilidad.services import asegurar_cuenta_contable_cliente, cargar_catalogo_base_honduras
+from contabilidad.services import asegurar_cuenta_contable_cliente, cargar_catalogo_base_honduras, registrar_asiento_factura_emitida, registrar_asiento_pago_cliente
 from . import test_mobile_receipts as receipt_fixtures
 from . import views
-from .models import CAI, Cliente, Factura, LineaFactura, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoComisionProveedor, PagoFactura, Producto, Proveedor, ReciboPago
+from .models import CAI, Cliente, Factura, LineaFactura, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoComisionProveedor, PagoFactura, Producto, Proveedor, ReciboPago, TipoImpuesto
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
@@ -40,10 +40,29 @@ class MobilePaymentsIntegrationTests(TestCase):
         cls.rol.puede_registrar_pagos_clientes = True
         cls.rol.save(update_fields=["puede_recibos", "puede_registrar_pagos_clientes"])
         cls.cais = {}
+        cls.impuestos = {}
+        for porcentaje in (Decimal("15"), Decimal("0")):
+            cls.impuestos[porcentaje], _ = TipoImpuesto.objects.get_or_create(
+                nombre=f"Impuesto cobros móviles QA {porcentaje}", defaults={"porcentaje": porcentaje},
+            )
         for empresa in cls.empresas.values():
             cls.cais[empresa.slug] = CAI.objects.create(empresa=empresa, numero_cai=f"CAI-MPAY-{empresa.slug}", establecimiento="001", punto_emision="001", tipo_documento="01", rango_inicial=1, rango_final=100000, correlativo_actual=0, fecha_activacion=date(2020, 1, 1), fecha_limite=date(2030, 12, 31))
             cargar_catalogo_base_honduras(empresa)
             asegurar_cuenta_contable_cliente(cls.clientes[empresa.slug])
+            # Estos casos ejercitan cobros contables; la factura y los pagos de
+            # preparación deben tener su respaldo publicado antes de comenzar.
+            factura = cls.facturas[empresa.slug]
+            LineaFactura.objects.create(
+                factura=factura, descripcion_manual="Servicio de cobros móviles QA",
+                cantidad=1, precio_unitario=Decimal("1000"), impuesto=cls.impuestos[Decimal("15")],
+            )
+            factura.calcular_totales()
+            factura.numero_factura = None
+            factura.estado = "emitida"
+            factura.save()
+            registrar_asiento_factura_emitida(factura)
+            for pago in factura.pagos_facturacion.order_by("pk"):
+                registrar_asiento_pago_cliente(pago)
 
     def setUp(self):
         receipt_fixtures.MobileReceiptsIntegrationTests.setUp(self)
@@ -83,7 +102,20 @@ class MobilePaymentsIntegrationTests(TestCase):
         return tuple(list(model.objects.order_by("pk").values()) for model in (CAI, Producto, LineaFactura, MovimientoInventario, MovimientoLoteBodega))
 
     def new_invoice(self, impuesto=Decimal("15")):
-        return Factura.objects.create(empresa=self.empresa, cliente=self.clientes[self.empresa.slug], estado="borrador", subtotal=Decimal("100"), impuesto=impuesto, total=Decimal("100")+impuesto, total_lempiras=Decimal("100")+impuesto)
+        factura = Factura.objects.create(
+            empresa=self.empresa, cliente=self.clientes[self.empresa.slug],
+            estado="borrador", fecha_emision=date(2026, 10, 1),
+        )
+        LineaFactura.objects.create(
+            factura=factura, descripcion_manual="Servicio de cobros móviles QA",
+            cantidad=1, precio_unitario=Decimal("100"), impuesto=self.impuestos[impuesto],
+        )
+        factura.calcular_totales()
+        factura.estado = "emitida"
+        factura.save()
+        # El cobro crea la emisión faltante en un mes abierto. Así los casos
+        # que cambian la moneda a USD conservan su propósito sin reescribirla.
+        return factura
 
     def test_four_company_mobile_get_edit_and_original_web_modal_templates(self):
         for empresa in self.empresas.values():

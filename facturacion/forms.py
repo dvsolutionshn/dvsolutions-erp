@@ -27,7 +27,7 @@ class PagoFacturaForm(forms.ModelForm):
     class Meta:
         model = PagoFactura
         fields = [
-            'monto', 'retencion_isr', 'retencion_isv', 'metodo', 'referencia',
+            'monto', 'tipo_cambio', 'retencion_isr', 'retencion_isv', 'metodo', 'referencia',
             'proveedor_comision', 'porcentaje_comision', 'monto_comision',
         ]
 
@@ -221,7 +221,7 @@ class PagoCompraForm(forms.ModelForm):
 class PagoComisionProveedorForm(forms.ModelForm):
     class Meta:
         model = PagoComisionProveedor
-        fields = ['fecha', 'monto', 'metodo', 'cuenta_financiera', 'referencia', 'observacion']
+        fields = ['fecha', 'monto', 'tipo_cambio', 'metodo', 'cuenta_financiera', 'referencia', 'observacion']
         widgets = {
             'fecha': forms.DateInput(attrs={'type': 'date'}),
             'monto': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01'}),
@@ -231,6 +231,9 @@ class PagoComisionProveedorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
+        self.fields['tipo_cambio'].label = 'Tipo de cambio del pago (HNL por USD)'
+        self.fields['tipo_cambio'].help_text = 'Para una comisión en dólares, indique la tasa efectiva del pago. En lempiras se usa 1.'
+        self.fields['tipo_cambio'].widget = forms.NumberInput(attrs={'step': '0.000001', 'min': '0.000001'})
         self.fields['cuenta_financiera'].required = True
         self.fields['cuenta_financiera'].empty_label = 'Seleccione banco, caja o tarjeta'
         if empresa:

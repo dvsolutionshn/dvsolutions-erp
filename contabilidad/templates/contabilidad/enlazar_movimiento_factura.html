@@ -4,7 +4,7 @@
 {% block title %}Enlazar Deposito a Factura - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Bancos{% endblock %}
 {% block header_title %}Enlazar Deposito a Factura{% endblock %}
-{% block header_description %}Convierte un credito bancario importado en pago de cliente y asiento contable automatico.{% endblock %}
+{% block header_description %}Enlaza un depósito en lempiras al cobro del cliente. Para facturas en dólares, conserva el importe original y reconoce la diferencia cambiaria.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'movimientos_bancarios' empresa.slug %}" class="erp-action-link">Volver a Movimientos</a>
@@ -48,7 +48,7 @@
             {% endfor %}
         </div>
         <div class="erp-form-actions" style="margin-top:22px;">
-            <div class="erp-field-help">El monto del deposito debe coincidir con el saldo disponible de la factura seleccionada.</div>
+            <div class="erp-field-help">El importe convertido debe coincidir con el depósito en HNL y no superar el saldo de la factura.</div>
             <div class="erp-actions-right">
                 <a class="erp-btn-secondary" href="{% url 'movimientos_bancarios' empresa.slug %}">Cancelar</a>
                 <button type="submit" class="erp-btn">Registrar Pago y Contabilizar</button>

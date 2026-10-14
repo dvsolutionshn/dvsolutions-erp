@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from . import regularizacion_views
 
 urlpatterns = [
     path("", views.contabilidad_dashboard, name="contabilidad_dashboard"),
@@ -46,6 +47,7 @@ urlpatterns = [
     path("asientos/<int:asiento_id>/reversar/", views.reversar_asiento_contable, name="reversar_asiento_contable"),
     path("asientos/<int:asiento_id>/regresar-borrador/", views.regresar_asiento_borrador, name="regresar_asiento_borrador"),
     path("asientos/<int:asiento_id>/contabilizar/", views.contabilizar_asiento_contable, name="contabilizar_asiento_contable"),
+    path("asientos/<int:asiento_id>/regularizar-moneda/", regularizacion_views.regularizar_moneda_factura, name="regularizar_moneda_factura"),
     path("reportes/", views.reportes_contables, name="reportes_contables"),
     path("reportes/dashboard-bi/", views.dashboard_bi_financiero, name="dashboard_bi_financiero"),
     path("reportes/auditoria/", views.auditoria_contable, name="auditoria_contable"),

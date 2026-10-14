@@ -13,6 +13,15 @@
 {% endblock %}
 
 {% block content %}
+{% if control.conversiones_pendientes %}
+<section class="erp-card" role="alert">
+    <h3 class="erp-panel-title">Conversiones históricas pendientes de revisión</h3>
+    <p>Hay {{ control.conversiones_pendientes }} asientos de documentos en dólares cuya conversión a lempiras debe comprobarse antes del cierre. Los importes registrados se conservan.</p>
+    {% for asiento in conversiones_pendientes %}
+    <p><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">{{ asiento.numero|default:"Ver asiento" }} · {{ asiento.descripcion }}</a></p>
+    {% endfor %}
+</section>
+{% endif %}
 <section class="erp-grid">
     <article class="erp-card">
         <div class="erp-kpi-label">Asientos Borrador</div>

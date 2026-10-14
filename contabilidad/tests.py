@@ -1550,9 +1550,9 @@ class ContabilidadTests(TestCase):
         response = self.client.get(reverse("dashboard_bi_financiero", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Dashboard BI Financiero")
-        self.assertContains(response, "Top proveedores por compra")
-        self.assertContains(response, "Pagado vs comprado")
+        self.assertContains(response, "Panel financiero")
+        self.assertContains(response, "Proveedores con mayor volumen de compra")
+        self.assertContains(response, "Pagado y comprado")
         self.assertContains(response, "Banco Atlantida HNL")
         self.assertContains(response, self.proveedor.nombre)
 

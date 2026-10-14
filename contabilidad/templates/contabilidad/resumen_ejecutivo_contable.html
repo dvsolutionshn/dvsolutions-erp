@@ -7,13 +7,14 @@
 
 {% block topbar_actions %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
-<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Perdidas y Ganancias</a>
-<a href="{% url 'balance_general' empresa.slug %}" class="erp-action-link">Balance de Situacion</a>
-<a href="{% url 'estado_flujo_efectivo' empresa.slug %}" class="erp-action-link">Flujo de Efectivo</a>
+<a href="{% url 'estado_resultados' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Perdidas y Ganancias</a>
+<a href="{% url 'balance_general' empresa.slug %}?fecha_corte={{ filtros.fecha_fin|urlencode }}" class="erp-action-link">Balance de Situacion</a>
+<a href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Flujo de Efectivo</a>
 <button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
 {% endblock %}
 
 {% block content %}
+{% include "contabilidad/nota_moneda_reportes.html" %}
 <section class="erp-card erp-report-filter-card">
     <div class="erp-toolbar">
         <div>
@@ -48,7 +49,7 @@
     <article class="erp-card"><div class="erp-kpi-label">Flujo neto de efectivo</div><p class="erp-stat-value">L. {{ resumen.flujo_neto }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Activos</div><p class="erp-stat-value">L. {{ resumen.total_activos }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Pasivos</div><p class="erp-stat-value">L. {{ resumen.total_pasivos }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Patrimonio</div><p class="erp-stat-value">L. {{ resumen.total_patrimonio }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Patrimonio</div><p class="erp-stat-value">L. {{ resumen.total_patrimonio }}</p><p class="erp-card-muted">Incluye L. {{ resumen.resultado_no_traspasado }} de resultado acumulado pendiente de traspaso.</p></article>
     <article class="erp-card">
         <div class="erp-kpi-label">Balance</div>
         <p class="erp-stat-value">{% if resumen.diferencia_balance == 0 %}Cuadrado{% else %}Revisar{% endif %}</p>
@@ -68,7 +69,10 @@
         <div class="erp-kpi-label">Caja y bancos</div>
         <h3>Lectura de efectivo</h3>
         <p>Operacion: <strong>L. {{ resumen.flujo_operacion }}</strong>.</p>
-        <p>Variacion neta de efectivo: <strong>L. {{ resumen.flujo_neto }}</strong>.</p>
+        <p>Efectivo inicial: <strong>L. {{ resumen.efectivo_inicial }}</strong>.</p>
+        <p>Efectivo final: <strong>L. {{ resumen.efectivo_final }}</strong>.</p>
+        <p>Diferencia por revisar: <strong>L. {{ resumen.diferencia_flujo }}</strong>.</p>
+        <p>Variación neta de efectivo: <strong>L. {{ resumen.flujo_neto }}</strong>.</p>
         <a class="erp-btn-secondary" href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}">Abrir detalle</a>
     </article>
 </section>

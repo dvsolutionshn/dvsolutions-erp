@@ -12,6 +12,10 @@
 {% endblock %}
 
 {% block content %}
+<section class="erp-card">
+    <p class="erp-card-muted">Moneda del reporte: lempiras (HNL). Las facturas y notas en dólares se convierten usando el tipo de cambio del documento; las compras fiscales se registran en HNL.</p>
+    {% if conversiones_pendientes %}<p class="erp-badge danger">Hay {{ conversiones_pendientes }} asiento{{ conversiones_pendientes|pluralize }} histórico{{ conversiones_pendientes|pluralize }} con conversión pendiente. Revisa la conciliación entre documentos fiscales y contabilidad antes del cierre.</p>{% endif %}
+</section>
 <section class="erp-card erp-report-filter-card">
     <div class="erp-toolbar">
         <div>
@@ -159,7 +163,7 @@
             <tbody>
                 {% for compra in compras %}
                 <tr>
-                    <td>{{ compra.fecha_documento|date:"F j, Y" }}</td>
+                    <td>{{ compra.fecha_documento|date:"d/m/Y" }}</td>
                     <td>{{ compra.numero_factura }}</td>
                     <td>{{ compra.proveedor_nombre }}</td>
                     <td class="amount"><span class="erp-money">L. {{ compra.base_15 }}</span></td>
@@ -198,12 +202,12 @@
             <tbody>
                 {% for factura in facturas %}
                 <tr>
-                    <td>{{ factura.fecha_emision|date:"F j, Y" }}</td>
+                    <td>{{ factura.fecha_emision|date:"d/m/Y" }}</td>
                     <td>{{ factura.numero_factura|default:"Sin numero" }}</td>
                     <td>{{ factura.cliente.nombre }}</td>
-                    <td class="amount"><span class="erp-money">L. {{ factura.subtotal }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ factura.impuesto }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ factura.total }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ factura.fiscal_lempiras.subtotal }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ factura.fiscal_lempiras.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ factura.fiscal_lempiras.total }}</span></td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="6" class="erp-empty">No hay facturas emitidas con estos filtros.</td></tr>
@@ -236,13 +240,13 @@
             <tbody>
                 {% for nota in notas_credito %}
                 <tr>
-                    <td>{{ nota.fecha_emision|date:"F j, Y" }}</td>
+                    <td>{{ nota.fecha_emision|date:"d/m/Y" }}</td>
                     <td>{{ nota.numero_nota|default:"Sin numero" }}</td>
                     <td>{{ nota.factura_origen.numero_factura|default:"-" }}</td>
                     <td>{{ nota.cliente.nombre }}</td>
-                    <td class="amount"><span class="erp-money">L. {{ nota.subtotal }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ nota.impuesto }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ nota.total }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ nota.fiscal_lempiras.subtotal }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ nota.fiscal_lempiras.impuesto }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ nota.fiscal_lempiras.total }}</span></td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="7" class="erp-empty">No hay notas de credito emitidas con estos filtros.</td></tr>
