@@ -578,6 +578,8 @@ class AsientoContable(RegistroFechaContableMixin, models.Model):
             anterior = type(self).objects.filter(pk=self.pk).values(*campos).first()
             if anterior and any(anterior[campo] != getattr(self, campo) for campo in campos):
                 raise ValidationError('El asiento respalda una regularización monetaria. Conserve su estado, fecha y documento original.')
+        from .proteccion_conversion import validar_asiento_revisado
+        validar_asiento_revisado(self, self._state.db or "default")
         from .moneda import validar_moneda_tipo_cambio
         self.moneda_origen, self.tipo_cambio = validar_moneda_tipo_cambio(self.moneda_origen, self.tipo_cambio)
         self._validar_periodos(self._state.db or router.db_for_write(type(self), instance=self))
@@ -647,6 +649,10 @@ class LineaAsientoContable(models.Model):
         verbose_name_plural = "Lineas de asiento"
 
     def clean(self):
+        from .proteccion_conversion import validar_partida_revisada
+        validar_partida_revisada(
+            [self.asiento_id, self._asiento_anterior_id(self._state.db or "default")], self._state.db or "default",
+        )
         if self.asiento_id and RegularizacionMonedaFactura.objects.filter(
             models.Q(asiento_origen_id=self.asiento_id) | models.Q(asiento_ajuste_id=self.asiento_id)
         ).exists():
@@ -697,6 +703,8 @@ class LineaAsientoContable(models.Model):
 
     def validar_eliminacion(self, using=None):
         using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        from .proteccion_conversion import validar_partida_revisada
+        validar_partida_revisada([self.asiento_id, self._asiento_anterior_id(using)], using)
         if self.asiento_id and RegularizacionMonedaFactura.objects.using(using).filter(
             models.Q(asiento_origen_id=self.asiento_id) | models.Q(asiento_ajuste_id=self.asiento_id)
         ).exists():
@@ -926,3 +934,95 @@ class MovimientoBancario(RegistroFechaContableMixin, models.Model):
 
     def __str__(self):
         return f"{self.fecha} - {self.descripcion} - {self.monto}"
+
+
+class RevisionesConversionQuerySet(models.QuerySet):
+    """La evidencia confirmada no se reemplaza ni elimina mediante escrituras en lote."""
+
+    def update(self, **kwargs):
+        raise ValidationError("La revisión de conversión es inmutable. Registre un ajuste nuevo para corregirla.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("La revisión de conversión es inmutable. Registre un ajuste nuevo para corregirla.")
+
+    def bulk_create(self, objs, **kwargs):
+        raise ValidationError("Registre cada revisión de conversión mediante el servicio autorizado y su vista previa.")
+
+    def delete(self):
+        raise ValidationError("Conserve la revisión de conversión y su respaldo contable original.")
+
+
+class RevisionConversionAsiento(models.Model):
+    empresa = models.ForeignKey(Empresa, on_delete=models.PROTECT)
+    origen = models.OneToOneField(AsientoContable, on_delete=models.PROTECT, related_name="revision_conversion")
+    ajuste = models.OneToOneField(
+        AsientoContable, on_delete=models.PROTECT, related_name="revision_conversion_aplicada",
+        null=True, blank=True,
+    )
+    fecha = models.DateField()
+    partidas = models.JSONField()
+    firma_fuente = models.CharField(max_length=64)
+    cuenta_contrapartida = models.ForeignKey(CuentaContable, on_delete=models.PROTECT, null=True, blank=True)
+    motivo = models.TextField()
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    objects = RevisionesConversionQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = "Revisión integral de conversión histórica"
+        verbose_name_plural = "Revisiones integrales de conversión histórica"
+
+    def clean(self):
+        super().clean()
+        if not self.origen_id or not self.empresa_id or not self.fecha:
+            raise ValidationError("Indique el asiento original, la empresa y la fecha de la revisión.")
+        validar_fecha_contable_abierta(self.empresa_id, self.fecha)
+        if self.origen.empresa_id != self.empresa_id:
+            raise ValidationError("El asiento original debe pertenecer a la empresa de la revisión.")
+        if self.cuenta_contrapartida_id and self.cuenta_contrapartida.empresa_id != self.empresa_id:
+            raise ValidationError("La contrapartida debe pertenecer a la empresa de la revisión.")
+        if self.ajuste_id and (
+            self.ajuste.empresa_id != self.empresa_id or self.ajuste.estado != "contabilizado"
+            or self.ajuste.fecha != self.fecha or self.ajuste.documento_tipo != "revision_conversion"
+            or self.ajuste.documento_id != self.origen_id or self.ajuste.evento != "revision_integral"
+        ):
+            raise ValidationError("El ajuste debe corresponder a este asiento y estar contabilizado en la fecha y empresa autorizadas.")
+        if not isinstance(self.partidas, list):
+            raise ValidationError("La revisión debe conservar el detalle completo de sus partidas confirmadas.")
+        if not 10 <= len((self.motivo or "").strip()) <= 2000:
+            raise ValidationError("Describa el motivo y respaldo de la revisión entre 10 y 2,000 caracteres.")
+        from .revision_conversion import vista_previa_revision
+
+        previa = vista_previa_revision(self.origen, self.partidas, self.cuenta_contrapartida)
+        if self.partidas != previa["partidas"] or self.firma_fuente != previa["firma_fuente"]:
+            raise ValidationError("Las partidas confirmadas deben coincidir con el documento y su vista previa vigente.")
+        if self.fecha < previa["fecha_minima"]:
+            raise ValidationError("La revisión no puede anticipar la fecha del asiento original ni sus ajustes previos.")
+        if previa["requiere_contrapartida"] and not self.cuenta_contrapartida_id:
+            raise ValidationError("La revisión requiere una contrapartida autorizada para quedar balanceada.")
+        if bool(previa["lineas_ajuste"]) != bool(self.ajuste_id):
+            raise ValidationError("La revisión debe conservar el asiento que publica todas las diferencias confirmadas.")
+        if self.ajuste_id:
+            esperadas = {
+                linea["cuenta_id"]: Decimal(linea["debe"]) - Decimal(linea["haber"])
+                for linea in previa["lineas_ajuste"]
+            }
+            publicadas = {}
+            for linea in self.ajuste.lineas.select_related("cuenta"):
+                if linea.cuenta.empresa_id != self.empresa_id:
+                    raise ValidationError("Todas las cuentas del ajuste deben pertenecer a esta empresa.")
+                publicadas[linea.cuenta_id] = publicadas.get(linea.cuenta_id, Decimal("0")) + linea.debe - linea.haber
+            if publicadas != esperadas or not self.ajuste.esta_balanceado:
+                raise ValidationError("Las partidas publicadas del ajuste no coinciden con la revisión confirmada.")
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            bloquear_empresas_contables([self.empresa_id], using=using)
+            if self.pk and type(self).objects.using(using).filter(pk=self.pk).exists():
+                raise ValidationError("La revisión de conversión es inmutable. Registre un ajuste nuevo para corregirla.")
+            self.full_clean()
+            return super().save(*args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        raise ValidationError("Conserve la revisión de conversión y su respaldo contable original.")

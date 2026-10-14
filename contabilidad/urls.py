@@ -2,6 +2,7 @@ from django.urls import path
 
 from . import views
 from . import regularizacion_views
+from . import revision_conversion_views
 
 urlpatterns = [
     path("", views.contabilidad_dashboard, name="contabilidad_dashboard"),
@@ -48,10 +49,13 @@ urlpatterns = [
     path("asientos/<int:asiento_id>/regresar-borrador/", views.regresar_asiento_borrador, name="regresar_asiento_borrador"),
     path("asientos/<int:asiento_id>/contabilizar/", views.contabilizar_asiento_contable, name="contabilizar_asiento_contable"),
     path("asientos/<int:asiento_id>/regularizar-moneda/", regularizacion_views.regularizar_moneda_factura, name="regularizar_moneda_factura"),
+    path("asientos/<int:asiento_id>/revisar-conversion/", revision_conversion_views.revisar_conversion_asiento, name="revisar_conversion_asiento"),
     path("reportes/", views.reportes_contables, name="reportes_contables"),
     path("reportes/dashboard-bi/", views.dashboard_bi_financiero, name="dashboard_bi_financiero"),
     path("reportes/auditoria/", views.auditoria_contable, name="auditoria_contable"),
     path("reportes/auditoria/excel/", views.exportar_auditoria_contable_excel, name="exportar_auditoria_contable_excel"),
+    path("reportes/historicos-usd/", revision_conversion_views.historicos_usd, name="historicos_usd"),
+    path("reportes/historicos-usd/csv/", revision_conversion_views.exportar_historicos_usd_csv, name="exportar_historicos_usd_csv"),
     path("reportes/impuestos/", views.reporte_impuestos, name="reporte_impuestos"),
     path("reportes/impuestos/excel/", views.exportar_reporte_impuestos_excel, name="exportar_reporte_impuestos_excel"),
     path("reportes/libro-diario/", views.libro_diario, name="libro_diario"),

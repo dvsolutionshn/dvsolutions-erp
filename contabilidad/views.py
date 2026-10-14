@@ -1353,10 +1353,13 @@ def editar_asiento_contable(request, empresa_slug, asiento_id):
 def ver_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
     asiento = get_object_or_404(AsientoContable.objects.prefetch_related("lineas__cuenta"), id=asiento_id, empresa=empresa)
-    from .models import RegularizacionMonedaFactura
+    from .models import RegularizacionMonedaFactura, RevisionConversionAsiento
     revision_moneda = RegularizacionMonedaFactura.objects.filter(empresa=empresa, asiento_origen=asiento).select_related("asiento_ajuste").first()
+    revision_integral = RevisionConversionAsiento.objects.filter(empresa=empresa).filter(
+        Q(origen=asiento) | Q(ajuste=asiento)
+    ).select_related("origen", "ajuste", "creado_por").first()
     puede_regularizar_moneda = (
-        not revision_moneda and asiento.estado == "contabilizado" and not asiento.conversion_verificada
+        not revision_moneda and not revision_integral and asiento.estado == "contabilizado" and not asiento.conversion_verificada
         and asiento.documento_tipo == "factura" and asiento.evento == "emision"
         and Factura.objects.filter(pk=asiento.documento_id, empresa=empresa, cliente__empresa=empresa, moneda="USD", estado="emitida").exists()
     )
@@ -1364,6 +1367,7 @@ def ver_asiento_contable(request, empresa_slug, asiento_id):
         "empresa": empresa,
         "asiento": asiento,
         "revision_moneda": revision_moneda,
+        "revision_integral": revision_integral,
         "puede_regularizar_moneda": puede_regularizar_moneda,
     })
 
@@ -1439,6 +1443,10 @@ def reversar_asiento_contable(request, empresa_slug, asiento_id):
     with transaction.atomic():
         Empresa.objects.select_for_update().get(pk=empresa.pk)
         asiento_origen = AsientoContable.objects.select_for_update().get(pk=asiento_origen.pk, empresa=empresa)
+        from .proteccion_conversion import asiento_tiene_revision
+        if asiento_tiene_revision(asiento_origen.pk):
+            messages.error(request, "El asiento respalda una revisión integral documentada. Registre un nuevo ajuste para conservar su respaldo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.pk)
         if asiento_origen.estado != "contabilizado" or AsientoContable.objects.filter(
             empresa=empresa, documento_tipo="asiento_contable", documento_id=asiento_origen.pk,
             evento="reversion", estado="contabilizado",
@@ -2115,9 +2123,12 @@ def _filtros_reportes(request):
 
 
 def _conversiones_pendientes_reporte(empresa, filtros):
-    asientos = AsientoContable.objects.filter(empresa=empresa, estado="contabilizado", conversion_verificada=False)
-    if filtros.get("fecha_fin") or filtros.get("fecha_corte"):
-        asientos = asientos.filter(fecha__lte=filtros.get("fecha_fin") or filtros["fecha_corte"])
+    from datetime import date
+    from .estado_conversion import asientos_conversion_pendiente
+    corte = filtros.get("fecha_fin") or filtros.get("fecha_corte") or None
+    if isinstance(corte, str):
+        corte = date.fromisoformat(corte)
+    asientos = asientos_conversion_pendiente(empresa, fecha_corte=corte)
     # La apertura también forma parte del mayor y del balance; no se oculta por «Desde».
     return asientos.count()
 
@@ -2327,7 +2338,9 @@ def exportar_estado_flujo_efectivo_excel(request, empresa_slug):
             sheet.append([etiquetas[clave], movimiento["asiento"].fecha, movimiento["asiento"].numero or "Sin número", f"{movimiento['cuenta'].codigo} - {movimiento['cuenta'].nombre}", movimiento["detalle"], movimiento["entrada"], movimiento["salida"], movimiento["neto"]])
         sheet.append([f"Neto {etiquetas[clave].lower()}", "", "", "", "", grupo["entradas"], grupo["salidas"], grupo["neto"]])
     sheet.append([])
-    for etiqueta, clave in (("Efectivo al inicio", "saldo_inicial"), ("Variación neta de efectivo", "total_neto"), ("Efectivo al cierre", "saldo_final"), ("Diferencia por revisar", "diferencia")):
+    for ajuste in data["ajustes_historicos"]:
+        sheet.append(["Ajuste histórico de saldo", ajuste["asiento"].fecha, ajuste["asiento"].numero, "", "Corrección documentada; no es un cobro ni un pago nuevo", "", "", ajuste["neto"]])
+    for etiqueta, clave in (("Efectivo al inicio", "saldo_inicial"), ("Variación neta de efectivo", "total_neto"), ("Ajustes históricos del saldo", "ajustes_historicos"), ("Efectivo al cierre", "saldo_final"), ("Diferencia por revisar", "diferencia")):
         sheet.append([etiqueta, "", "", "", "", "", "", data["resumen"][clave]])
     if data["resumen"]["cuentas_financieras_incompatibles"]:
         sheet.append(["Cuentas financieras por revisar", data["resumen"]["cuentas_financieras_incompatibles"], "Su tipo financiero y cuenta contable no coinciden; se conservan los saldos de bancos configurados."])
@@ -2357,6 +2370,7 @@ def resumen_ejecutivo_contable(request, empresa_slug):
         diferencia_balance=resumen["diferencia"], flujo_neto=flujo["resumen"]["total_neto"],
         flujo_operacion=flujo["resumen"]["operacion"], efectivo_inicial=flujo["resumen"]["saldo_inicial"],
         efectivo_final=flujo["resumen"]["saldo_final"], diferencia_flujo=flujo["resumen"]["diferencia"],
+        ajustes_historicos_efectivo=flujo["resumen"]["ajustes_historicos"],
         asientos_contabilizados=asientos.count(),
         asientos_pendientes=AsientoContable.objects.filter(empresa=empresa, estado="borrador").count(),
         cuentas_efectivo=flujo["cuentas_efectivo"].count(),

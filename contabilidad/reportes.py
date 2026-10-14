@@ -226,6 +226,7 @@ def clasificar_contrapartida(cuenta):
 
 
 def datos_flujo_efectivo(empresa, fecha_inicio="", fecha_fin=""):
+    from .models import RevisionConversionAsiento
     ids = cuentas_efectivo_ids(empresa)
     grupos = {clave: {"entradas": CERO, "salidas": CERO, "neto": CERO, "movimientos": []} for clave in ("operacion", "inversion", "financiamiento")}
     partidas = partidas_empresa(empresa).filter(cuenta_id__in=ids)
@@ -240,12 +241,21 @@ def datos_flujo_efectivo(empresa, fecha_inicio="", fecha_fin=""):
     if fecha_fin:
         asientos = asientos.filter(fecha__lte=fecha_fin)
     diferencias_partidas = CERO
+    ajustes_historicos = CERO
+    detalle_ajustes = []
+    ids_ajustes = set(RevisionConversionAsiento.objects.filter(
+        empresa=empresa, origen__empresa=empresa, ajuste__empresa=empresa, ajuste__estado="contabilizado",
+    ).values_list("ajuste_id", flat=True))
     for asiento in asientos.prefetch_related("lineas__cuenta").order_by("fecha", "numero", "id"):
         lineas = [linea for linea in asiento.lineas.all() if linea.cuenta.empresa_id == empresa.pk]
         efectivo = [linea for linea in lineas if linea.cuenta_id in ids]
         neto_efectivo = sum((linea.debe - linea.haber for linea in efectivo), CERO)
         if not neto_efectivo:
             continue  # Transferencias internas y operaciones sin variación de efectivo.
+        if asiento.pk in ids_ajustes:
+            ajustes_historicos += neto_efectivo
+            detalle_ajustes.append({"asiento": asiento, "neto": neto_efectivo})
+            continue
         categorias = defaultdict(lambda: CERO)
         for linea in lineas:
             if linea.cuenta_id not in ids:
@@ -264,7 +274,7 @@ def datos_flujo_efectivo(empresa, fecha_inicio="", fecha_fin=""):
                 "detalle": asiento.descripcion, "entrada": max(neto, CERO), "salida": max(-neto, CERO), "neto": neto,
             })
     total_neto = sum((grupo["neto"] for grupo in grupos.values()), CERO)
-    diferencia = saldo_final - saldo_inicial - total_neto
+    diferencia = saldo_final - saldo_inicial - total_neto - ajustes_historicos
     incompatibles = CuentaFinanciera.objects.filter(empresa=empresa).filter(
         Q(tipo="tarjeta_credito") & ~Q(cuenta_contable__tipo="pasivo")
         | Q(tipo__in=("caja", "banco")) & ~Q(cuenta_contable__tipo="activo")
@@ -272,11 +282,13 @@ def datos_flujo_efectivo(empresa, fecha_inicio="", fecha_fin=""):
     ).count()
     return {
         "flujo": grupos,
+        "ajustes_historicos": detalle_ajustes,
         "cuentas_efectivo": CuentaContable.objects.filter(empresa=empresa, id__in=ids).order_by("codigo", "nombre"),
         "resumen": {
             "total_neto": total_neto, "operacion": grupos["operacion"]["neto"],
             "inversion": grupos["inversion"]["neto"], "financiamiento": grupos["financiamiento"]["neto"],
             "saldo_inicial": saldo_inicial, "saldo_final": saldo_final, "diferencia": diferencia,
+            "ajustes_historicos": ajustes_historicos,
             "diferencia_partidas": diferencias_partidas, "conciliado": diferencia == 0,
             "cuentas_financieras_incompatibles": incompatibles,
             "movimientos": sum((len(grupo["movimientos"]) for grupo in grupos.values()), 0),

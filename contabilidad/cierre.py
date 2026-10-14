@@ -83,9 +83,9 @@ def revisar_cierre_periodo(empresa, periodo):
     rango = {"fecha__gte": periodo.fecha_inicio, "fecha__lte": periodo.fecha_fin}
     asientos = AsientoContable.objects.filter(empresa=empresa, **rango)
     borradores = asientos.filter(estado="borrador").order_by("fecha", "id")
-    conversiones_pendientes = asientos.filter(estado="contabilizado", conversion_verificada=False).filter(
-        Q(regularizacion_moneda__isnull=True)
-        | Q(regularizacion_moneda__asiento_ajuste__isnull=False) & ~Q(regularizacion_moneda__asiento_ajuste__estado="contabilizado")
+    from .estado_conversion import asientos_conversion_pendiente
+    conversiones_pendientes = asientos_conversion_pendiente(
+        empresa, fecha_corte=periodo.fecha_fin, asientos=asientos,
     ).order_by("fecha", "id")
     # Una operación y su reversión completa dentro del mismo mes no dejan
     # importes por convertir. La advertencia histórica se conserva en el asiento.

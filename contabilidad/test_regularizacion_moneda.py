@@ -161,7 +161,7 @@ class RegularizacionMonedaInterfazTests(TestCase):
         self.asiento.refresh_from_db()
         self.assertFalse(self.asiento.conversion_verificada)
         detalle = self.client.get(reverse("ver_asiento_contable", args=[self.empresa.slug, self.asiento.pk]))
-        self.assertContains(detalle, "Conversión histórica revisada")
+        self.assertContains(detalle, "Saldo de cliente regularizado")
         self.assertNotContains(detalle, "Regularizar moneda de factura")
         self.client.post(self.url, self.datos(accion="registrar", confirmar="1", revision_token=token))
         self.assertEqual(RegularizacionMonedaFactura.objects.filter(asiento_origen=self.asiento).count(), 1)

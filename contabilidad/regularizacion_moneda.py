@@ -1,5 +1,7 @@
 """Regulariza saldos de clientes del legado USD mediante un ajuste documentado."""
 from decimal import Decimal
+from hashlib import sha256
+import json
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -8,12 +10,14 @@ from django.db.models import Max, Q
 from core.audit_context import audit_scope
 from facturacion.models import Factura
 
-from .models import AsientoContable, RegularizacionMonedaFactura, bloquear_empresas_contables, validar_fecha_contable_abierta
+from .models import AsientoContable, CuentaContable, RegularizacionMonedaFactura, RevisionConversionAsiento, bloquear_empresas_contables, validar_fecha_contable_abierta
 from .moneda import convertir_a_lempiras, redondear_importe, validar_moneda_tipo_cambio
 from .services import _aplicaciones_historicas_factura, registrar_asiento_documento
 
 
 def vista_previa_regularizacion(asiento, tipo_cambio=None):
+    if RevisionConversionAsiento.objects.filter(origen=asiento).exists():
+        raise ValidationError('El asiento ya tiene una revisión integral de moneda. Consulte el respaldo de esa revisión.')
     if asiento.documento_tipo != 'factura' or asiento.evento != 'emision' or asiento.estado != 'contabilizado':
         raise ValidationError('Seleccione el asiento original contabilizado de una factura.')
     factura = Factura.objects.select_related('cliente').filter(pk=asiento.documento_id, empresa_id=asiento.empresa_id).first()
@@ -56,7 +60,22 @@ def vista_previa_regularizacion(asiento, tipo_cambio=None):
     notas_corregidas = redondear_importe(total_hnl * notas_original / total_original)
     saldo_anterior = redondear_importe(cargo.debe - cargo.haber - aplicado_hnl)
     saldo_corregido = total_hnl - aplicado_corregido
+    fuentes = AsientoContable.objects.filter(
+        Q(pk=asiento.pk)
+        | Q(documento_tipo='pago_factura', documento_id__in=factura.pagos_facturacion.values('pk'))
+        | Q(documento_tipo='nota_credito', documento_id__in=factura.notas_credito.values('pk')),
+        empresa_id=asiento.empresa_id,
+    )
+    respaldo = {
+        'factura': list(Factura.objects.filter(pk=factura.pk).values()),
+        'pagos': list(factura.pagos_facturacion.order_by('pk').values()),
+        'notas': list(factura.notas_credito.order_by('pk').values()),
+        'asientos': list(fuentes.order_by('pk').values()),
+        'partidas': list(asiento.lineas.model.objects.filter(asiento__in=fuentes).order_by('pk').values()),
+    }
+    firma_fuente = sha256(json.dumps(respaldo, default=str, sort_keys=True).encode('utf-8')).hexdigest()
     return {
+        'firma_fuente': firma_fuente,
         'factura': factura, 'cuenta_cliente': cargo.cuenta, 'tipo_cambio': tasa,
         'total_original': total_original, 'total_hnl': total_hnl,
         'saldo_original': total_original - aplicado_original,
@@ -79,6 +98,11 @@ def regularizar_factura_historica(*, asiento, fecha, tipo_cambio, cuenta_contrap
         return existente
     Factura.objects.select_for_update().get(pk=asiento.documento_id, empresa_id=asiento.empresa_id)
     validar_fecha_contable_abierta(asiento.empresa_id, fecha)
+    cuenta_contrapartida = CuentaContable.objects.select_for_update().filter(
+        pk=cuenta_contrapartida.pk, empresa_id=asiento.empresa_id,
+    ).first()
+    if cuenta_contrapartida is None:
+        raise ValidationError('La contrapartida debe pertenecer a esta empresa.')
     if cuenta_contrapartida.empresa_id != asiento.empresa_id or not cuenta_contrapartida.activa or not cuenta_contrapartida.acepta_movimientos:
         raise ValidationError('La contrapartida debe ser una cuenta activa de esta empresa que acepte movimientos.')
     motivo = (motivo or '').strip()
@@ -87,12 +111,14 @@ def regularizar_factura_historica(*, asiento, fecha, tipo_cambio, cuenta_contrap
     datos = vista_previa_regularizacion(asiento, tipo_cambio)
     if vista_previa_esperada is not None:
         campos = [
+            'firma_fuente', 'cuenta_cliente',
             'total_original', 'total_hnl', 'saldo_original', 'saldo_hnl_anterior', 'saldo_hnl_corregido', 'diferencia',
             'aplicado_original', 'aplicado_hnl_anterior', 'aplicado_hnl_corregido',
             'notas_original', 'notas_hnl_anterior', 'notas_hnl_corregido', 'aplicaciones_pendientes', 'fecha_minima',
         ]
         if any(datos[campo] != vista_previa_esperada.get(campo) for campo in campos):
             raise ValidationError('El saldo cambió durante la confirmación. Revise la nueva vista previa antes de registrar el ajuste.')
+    datos.pop('firma_fuente')
     if fecha < datos.pop('fecha_minima'):
         raise ValidationError('La fecha del ajuste debe ser igual o posterior al documento original y a sus aplicaciones contabilizadas.')
     if cuenta_contrapartida.pk == datos['cuenta_cliente'].pk:

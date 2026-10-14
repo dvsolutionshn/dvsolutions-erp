@@ -67,9 +67,24 @@
 
 <section class="erp-card">
     <h3 class="erp-panel-title">Comprobación del efectivo</h3>
-    <p>Efectivo inicial + flujo neto = efectivo final. Diferencia: <strong>L. {{ resumen.diferencia }}</strong>.</p>
+    <p>Efectivo inicial + flujo neto + ajustes históricos = efectivo final. Diferencia: <strong>L. {{ resumen.diferencia }}</strong>.</p>
+    <p>Correcciones documentadas del saldo histórico de caja y bancos: <strong>L. {{ resumen.ajustes_historicos }}</strong>. Se muestran separadas porque no representan cobros ni pagos nuevos.</p>
     {% if resumen.conciliado %}<span class="erp-badge success">Cuadrado con el mayor de caja y bancos</span>{% else %}<span class="erp-badge danger">Revisar partidas contables y rango de fechas</span>{% endif %}
 </section>
+
+{% if ajustes_historicos %}
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Ajustes históricos de caja y bancos</h3>
+    <div class="erp-table-wrap"><table class="erp-table">
+        <thead><tr><th>Fecha</th><th>Asiento de ajuste</th><th>Corrección del saldo HNL</th></tr></thead>
+        <tbody>{% for ajuste in ajustes_historicos %}<tr>
+            <td>{{ ajuste.asiento.fecha|date:"d/m/Y" }}</td>
+            <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug ajuste.asiento.pk %}">{{ ajuste.asiento.numero }}</a></td>
+            <td>L. {{ ajuste.neto }}</td>
+        </tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% endif %}
 
 {% for clave, grupo in flujo.items %}
 <section class="erp-card erp-table-card">

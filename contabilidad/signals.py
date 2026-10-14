@@ -3,11 +3,12 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models.signals import pre_delete, pre_save
+from django.db.models import Q
 from django.dispatch import receiver
 from django.utils import timezone
 
 from .models import (
-    AsientoContable, LineaAsientoContable, MovimientoBancario, PeriodoContable, RegularizacionMonedaFactura,
+    AsientoContable, CuentaContable, LineaAsientoContable, MovimientoBancario, PeriodoContable, RegularizacionMonedaFactura, RevisionConversionAsiento,
     bloquear_empresas_contables, validar_fecha_contable_abierta,
 )
 
@@ -17,6 +18,9 @@ from .models import (
 @receiver(pre_delete, sender=MovimientoBancario)
 @receiver(pre_delete, sender=PeriodoContable)
 def proteger_eliminacion_contable(sender, instance, using, **kwargs):
+    if sender is AsientoContable:
+        from .proteccion_conversion import validar_asiento_revisado
+        validar_asiento_revisado(instance, using, eliminar=True)
     # El recolector de Django no llama al método delete() durante las cascadas.
     instance.validar_eliminacion(using=using)
 
@@ -24,6 +28,19 @@ def proteger_eliminacion_contable(sender, instance, using, **kwargs):
 @receiver(pre_delete, sender=RegularizacionMonedaFactura)
 def proteger_regularizacion_monetaria(sender, instance, using, **kwargs):
     raise ValidationError('La regularización monetaria conserva el respaldo de los saldos. Registre un nuevo ajuste para corregirla.')
+
+
+@receiver(pre_save, sender=CuentaContable)
+def proteger_cuenta_conversion(sender, instance, using, raw=False, **kwargs):
+    if raw or not instance.pk:
+        return
+    anterior = sender.objects.using(using).filter(pk=instance.pk).values("empresa_id", "tipo").first()
+    if not anterior or (anterior["empresa_id"] == instance.empresa_id and anterior["tipo"] == instance.tipo):
+        return
+    if RevisionConversionAsiento.objects.using(using).filter(
+        Q(origen__lineas__cuenta_id=instance.pk) | Q(ajuste__lineas__cuenta_id=instance.pk)
+    ).exists():
+        raise ValidationError("La cuenta respalda una revisión integral. Conserve su empresa y su tipo para mantener los saldos documentados.")
 
 
 DOCUMENTOS_CONTABLES = {
@@ -44,6 +61,11 @@ def _validar_documento_sin_asientos_cerrados(sender, instance, using):
     if empresa_id is None:
         return
     bloquear_empresas_contables([empresa_id], using=using)
+    from .proteccion_conversion import asiento_tiene_revision
+    if any(asiento_tiene_revision(pk, using) for pk in AsientoContable.objects.using(using).filter(
+        empresa_id=empresa_id, documento_tipo=tipo, documento_id=instance.pk,
+    ).values_list("pk", flat=True)):
+        raise ValidationError("El documento respalda una revisión integral de moneda. Conserve el original y registre un nuevo ajuste.")
     for asiento in AsientoContable.objects.using(using).filter(
         empresa_id=empresa_id, documento_tipo=tipo, documento_id=instance.pk
     ).values("empresa_id", "fecha"):

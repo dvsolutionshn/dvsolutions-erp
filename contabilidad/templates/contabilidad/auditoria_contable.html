@@ -7,6 +7,7 @@
 
 {% block topbar_actions %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'historicos_usd' empresa.slug %}" class="erp-action-link">Revisar históricos USD</a>
 <a href="{% url 'exportar_auditoria_contable_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
 <button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
 {% endblock %}

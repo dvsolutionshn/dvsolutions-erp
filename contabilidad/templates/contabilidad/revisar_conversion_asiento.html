@@ -1,0 +1,62 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Revisión integral de moneda - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad de {{ empresa.nombre }}{% endblock %}
+{% block header_title %}Revisar todas las partidas históricas{% endblock %}
+{% block header_description %}Comprueba cada importe y su respaldo antes de registrar diferencias en un período abierto.{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'historicos_usd' empresa.slug %}" class="erp-action-link">Volver a revisión histórica</a>
+<a href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Ver asiento original</a>
+{% if fuente.url %}<a href="{{ fuente.url }}" class="erp-action-link">Ver documento de origen</a>{% endif %}
+{% endblock %}
+{% block content %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">{{ asiento.numero|default:asiento.id }} · {{ asiento.fecha|date:"d/m/Y" }}</h3>
+    <p>{{ asiento.descripcion }}</p>
+    {% if fuente %}<p>Documento {{ fuente.referencia }} · {{ fuente.nombre }} · importe {{ fuente.moneda }} {{ fuente.importe_original }} · tasa registrada del documento {{ fuente.tipo_cambio }} HNL por {{ fuente.moneda }}.</p>{% endif %}
+    <p class="erp-card-muted">Cada partida inicia conservando su importe en HNL. Cambia a USD únicamente cuando el documento o comprobante respalde ese tratamiento, e indica su importe original y tasa. Comprueba particularmente bancos, impuestos, inventario y obligaciones con proveedores.</p>
+    <p class="erp-card-muted">En clientes y obligaciones en dólares, indica el importe original USD y la tasa respaldada aunque el saldo registrado en HNL ya sea correcto. En costos, inventario y otros importes documentados en HNL, conserva la moneda HNL, el importe registrado y la tasa 1.</p>
+    <p class="erp-card-muted">El asiento original y los cierres anteriores se conservan. La revisión deja el respaldo de cada partida y registra las diferencias necesarias en la fecha autorizada.</p>
+</section>
+{% if error_fuente %}<section class="erp-card" role="alert"><h3 class="erp-panel-title">Resolver los vínculos del documento</h3><p>{{ error_fuente }}</p></section>{% endif %}
+{% if revision_existente and not error_fuente %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">Revisión integral registrada</h3>
+    <p>Fecha autorizada {{ revision_existente.fecha|date:"d/m/Y" }} · registrada por {{ revision_existente.creado_por.username }}.</p>
+    <p>{{ revision_existente.motivo }}</p>
+    {% if revision_existente.ajuste_id %}<a class="erp-btn-secondary" href="{% url 'ver_asiento_contable' empresa.slug revision_existente.ajuste_id %}">Ver asiento de ajuste</a>{% else %}<p>La revisión no necesitó un asiento de ajuste.</p>{% endif %}
+    <div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Partida</th><th>Moneda respaldada</th><th>Importe original</th><th>Tipo de cambio</th></tr></thead><tbody>{% for partida in revision_existente.partidas %}<tr><td>{{ partida.linea_id }}</td><td>{{ partida.moneda }}</td><td>{{ partida.importe_original }}</td><td>{{ partida.tipo_cambio }}</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% elif not error_fuente %}
+<form method="post">
+    {% csrf_token %}
+    <section class="erp-card erp-table-card">
+        <h3 class="erp-panel-title">Respaldo monetario de todas las partidas</h3>
+        {{ formset.management_form }}<div role="alert">{{ formset.non_form_errors }}</div>
+        <div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Cuenta y lado registrado</th><th>Importe registrado HNL</th><th>Tratamiento</th><th>Importe según respaldo</th><th>HNL por unidad de origen</th></tr></thead><tbody>
+        {% for partida in partidas_contexto %}<tr><td>{{ partida.form.linea_id }}{{ partida.form.linea_id.errors }}{% if partida.linea %}{{ partida.linea.cuenta }}<div>{% if partida.linea.debe %}Debe{% else %}Haber{% endif %} · {{ partida.linea.detalle|default:"Sin detalle" }}</div>{% else %}Partida inválida{% endif %}</td><td>HNL {% if partida.linea.debe %}{{ partida.linea.debe }}{% else %}{{ partida.linea.haber }}{% endif %}</td><td>{{ partida.form.moneda }}{{ partida.form.moneda.errors }}</td><td>{{ partida.form.importe_original }}{{ partida.form.importe_original.errors }}</td><td>{{ partida.form.tipo_cambio }}{{ partida.form.tipo_cambio.errors }}</td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+    <section class="erp-card">
+        <h3 class="erp-panel-title">Fecha y autorización contable</h3><div role="alert">{{ form.non_field_errors }}{{ form.confirmar.errors }}</div>
+        <div class="erp-form-grid">{% for campo in form %}{% if campo.name != "confirmar" and campo.name != "revision_token" %}<div class="erp-form-field"><label for="{{ campo.id_for_label }}">{{ campo.label }}</label>{{ campo }}{% if campo.help_text %}<p class="erp-card-muted">{{ campo.help_text }}</p>{% endif %}{{ campo.errors }}</div>{% endif %}{% endfor %}</div>
+    </section>
+    {% if vista_previa %}<section class="erp-card">
+        <h3 class="erp-panel-title">Diferencias revisadas en HNL</h3>
+        {% for advertencia in vista_previa.advertencias %}<p role="alert">{{ advertencia }}</p>{% endfor %}
+        <div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Cuenta</th><th>Lado</th><th>Registro anterior HNL</th><th>Respaldo original</th><th>Objetivo revisado HNL</th></tr></thead><tbody>{% for partida in partidas_vista %}<tr><td>{{ partida.cuenta }}</td><td>{% if partida.lado == 'debe' %}Debe{% else %}Haber{% endif %}</td><td>{% if partida.lado == 'debe' %}{{ partida.debe_anterior }}{% else %}{{ partida.haber_anterior }}{% endif %}</td><td>{{ partida.moneda }} {{ partida.importe_original }} · tasa {{ partida.tipo_cambio }}</td><td>{% if partida.lado == 'debe' %}{{ partida.debe_hnl }}{% else %}{{ partida.haber_hnl }}{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+        <p>Total objetivo del asiento revisado: Debe HNL {{ vista_previa.total_debe_hnl }} · Haber HNL {{ vista_previa.total_haber_hnl }}.</p>
+        <p>Diferencia de partidas al Debe: <strong>HNL {{ vista_previa.diferencia_debe }}</strong> · al Haber: <strong>HNL {{ vista_previa.diferencia_haber }}</strong>.</p>
+        <p>{% if vista_previa.requiere_contrapartida %}La revisión requiere la contrapartida autorizada para balancear sus diferencias.{% else %}Las diferencias revisadas quedan balanceadas sin contrapartida adicional.{% endif %}</p>
+        <div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Cuenta</th><th>Debe ajuste HNL</th><th>Haber ajuste HNL</th><th>Detalle</th></tr></thead><tbody>{% for linea in ajustes_vista %}<tr><td>{{ linea.cuenta|default:linea.cuenta_id }}</td><td>{{ linea.debe }}</td><td>{{ linea.haber }}</td><td>{{ linea.detalle }}</td></tr>{% empty %}<tr><td colspan="4">Los importes registrados coinciden con la revisión respaldada.</td></tr>{% endfor %}</tbody></table></div>
+    </section>{% endif %}
+    {% if lista_para_confirmar %}<section class="erp-card">
+        <h3 class="erp-panel-title">Confirmar las partidas revisadas</h3>
+        <p>Fecha {{ form.cleaned_data.fecha|date:"d/m/Y" }} · contrapartida {{ form.cleaned_data.cuenta_contrapartida|default:"Sin contrapartida" }}.</p>
+        <p>Respaldo: {{ form.cleaned_data.motivo }}</p><input type="hidden" name="revision_token" value="{{ revision_token }}">
+        <label>{{ form.confirmar }} {{ form.confirmar.label }}</label>
+        <button type="submit" name="accion" value="registrar" class="erp-btn">Registrar revisión integral</button>
+    </section>{% endif %}
+    <div class="erp-form-actions"><button type="submit" name="accion" value="revisar" class="erp-btn-secondary">Revisar partidas y diferencias</button><a class="erp-btn-secondary" href="{% url 'historicos_usd' empresa.slug %}">Cancelar</a></div>
+</form>
+{% endif %}
+{% endblock %}

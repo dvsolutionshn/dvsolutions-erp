@@ -20,6 +20,8 @@ FIRMA_REVISION_MONEDA = "contabilidad.regularizacion-moneda-factura.v1"
 def _firma_datos_revision(request, asiento, datos, vista_previa):
     return {
         "empresa": asiento.empresa_id, "asiento": asiento.pk, "usuario": request.user.pk,
+        "cuenta_cliente": vista_previa["cuenta_cliente"].pk,
+        "firma_fuente": vista_previa["firma_fuente"],
         "fecha": datos["fecha"].isoformat(), "tipo_cambio": str(datos["tipo_cambio"]),
         "fecha_minima": str(vista_previa.get("fecha_minima", asiento.fecha)),
         "cuenta": datos["cuenta_contrapartida"].pk, "motivo": datos["motivo"],

@@ -71,6 +71,7 @@
         <p>Operacion: <strong>L. {{ resumen.flujo_operacion }}</strong>.</p>
         <p>Efectivo inicial: <strong>L. {{ resumen.efectivo_inicial }}</strong>.</p>
         <p>Efectivo final: <strong>L. {{ resumen.efectivo_final }}</strong>.</p>
+        <p>Ajustes históricos del saldo: <strong>L. {{ resumen.ajustes_historicos_efectivo }}</strong>.</p>
         <p>Diferencia por revisar: <strong>L. {{ resumen.diferencia_flujo }}</strong>.</p>
         <p>Variación neta de efectivo: <strong>L. {{ resumen.flujo_neto }}</strong>.</p>
         <a class="erp-btn-secondary" href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}">Abrir detalle</a>

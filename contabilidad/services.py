@@ -595,6 +595,11 @@ def _asiento_documento_existente(empresa, documento_tipo, documento_id, evento):
 def _revision_moneda_factura(factura, asiento_origen=None):
     from .models import RegularizacionMonedaFactura
 
+    fuente = asiento_origen or _asiento_documento_existente(factura.empresa, "factura", factura.pk, "emision")
+    if fuente and _revision_conversion(fuente):
+        # La revisión integral ya compensa el ajuste parcial anterior.
+        return None
+
     revisiones = RegularizacionMonedaFactura.objects.filter(
         empresa=factura.empresa, factura=factura,
         asiento_origen__empresa=factura.empresa, asiento_origen__documento_tipo="factura",
@@ -617,8 +622,91 @@ def _revision_moneda_factura(factura, asiento_origen=None):
     return revision
 
 
-def _fuente_historica_factura(factura):
+def _revision_conversion(asiento):
+    from .revision_conversion import revision_conversion_vigente
+
+    return revision_conversion_vigente(asiento)
+
+
+def _validar_fecha_aplicacion_revision(revision, fecha_aplicacion):
+    if revision and fecha_aplicacion and fecha_aplicacion < revision.fecha:
+        raise ValidationError("La nueva aplicación debe tener una fecha igual o posterior a la revisión integral que respalda su saldo.")
+
+
+def _fuente_documento_revisada(asiento, lineas, importe_documento, *, lado, nombre, fecha_aplicacion=None):
+    """Obtiene una obligación de la revisión, sin convertir otra vez el legado."""
+    revision = _revision_conversion(asiento)
+    if not revision:
+        return None
+    _validar_fecha_aplicacion_revision(revision, fecha_aplicacion)
+    lineas = list(lineas)
+    if not lineas or len({linea.cuenta_id for linea in lineas}) != 1:
+        raise ValidationError(f"La cuenta de {nombre} no tiene un respaldo único; revise sus partidas.")
+    cuenta = lineas[0].cuenta
+    tipo_cuenta = "activo" if lado == "debe" else "pasivo"
+    if cuenta.empresa_id != asiento.empresa_id or cuenta.tipo != tipo_cuenta:
+        raise ValidationError(f"La cuenta de {nombre} debe pertenecer a esta empresa.")
+    ids = {linea.pk for linea in lineas}
+    partidas = [partida for partida in revision.partidas if partida["linea_id"] in ids]
+    if len(partidas) != len(ids) or any(partida["moneda"] != "USD" or partida.get("lado", lado) != lado for partida in partidas):
+        raise ValidationError(f"Documente en dólares las partidas originales de {nombre} antes de aplicar movimientos.")
+    tasas = {validar_moneda_tipo_cambio("USD", partida["tipo_cambio"])[1] for partida in partidas}
+    original = sum((Decimal(partida["importe_original"]) for partida in partidas), Decimal("0"))
+    importe_documento = redondear_importe(importe_documento)
+    if len(tasas) != 1 or redondear_importe(original) != importe_documento or importe_documento <= 0:
+        raise ValidationError(f"Los dólares y el tipo de cambio revisados de {nombre} no coinciden con el documento original.")
+    lempiras = sum((Decimal(partida[f"{lado}_hnl"]) for partida in partidas), Decimal("0"))
+    if lempiras <= 0:
+        raise ValidationError(f"El importe revisado de {nombre} debe ser mayor que cero.")
+    return "USD", tasas.pop(), cuenta, importe_documento, redondear_importe(lempiras)
+
+
+def _importes_aplicacion_revisada(asiento, lineas, importe_documento, *, moneda_documento, debe_es_aplicacion=False, exigir_revision=False, fecha_aplicacion=None):
+    """Suma una vez por asiento, con el signo de la aplicación o su reversión."""
+    lineas = list(lineas)
+    factor = Decimal("1") if debe_es_aplicacion else Decimal("-1")
+    revision = _revision_conversion(asiento)
+    if revision:
+        _validar_fecha_aplicacion_revision(revision, fecha_aplicacion)
+        ids = {linea.pk for linea in lineas}
+        partidas = [partida for partida in revision.partidas if partida["linea_id"] in ids]
+        if len(partidas) != len(ids) or any(partida["moneda"] != moneda_documento for partida in partidas):
+            raise ValidationError("La aplicación revisada debe conservar la moneda original del documento.")
+        original = Decimal("0")
+        lempiras = Decimal("0")
+        for partida in partidas:
+            debe = Decimal(partida["debe_hnl"])
+            haber = Decimal(partida["haber_hnl"])
+            lado = partida.get("lado") or ("debe" if debe > haber else "haber")
+            signo = factor if lado == "debe" else -factor
+            original += signo * Decimal(partida["importe_original"])
+            lempiras += factor * (debe - haber)
+        if abs(redondear_importe(original)) != redondear_importe(importe_documento):
+            raise ValidationError("La aplicación revisada no coincide con el importe original del cobro, pago o nota de crédito.")
+        return redondear_importe(original), redondear_importe(lempiras)
+    if exigir_revision and (
+        not asiento.conversion_verificada
+        or asiento.moneda_origen != moneda_documento
+        or any(linea.moneda_origen != moneda_documento for linea in lineas)
+    ):
+        raise ValidationError("Hay un cobro, pago o nota de crédito histórico en dólares pendiente de revisión integral. Revise sus partidas antes de registrar una nueva aplicación.")
+    lempiras = sum((factor * (linea.debe - linea.haber) for linea in lineas), Decimal("0"))
+    if moneda_documento == "USD" and any(linea.moneda_origen != "USD" for linea in lineas):
+        # En el legado las columnas de origen contienen HNL. El documento
+        # conserva los USD; se cuenta una sola vez aunque tenga varias partidas.
+        original = redondear_importe(importe_documento) * (1 if lempiras > 0 else -1 if lempiras < 0 else 0)
+    else:
+        original = sum((factor * (
+            linea.debe_origen - linea.haber_origen
+            if linea.debe_origen or linea.haber_origen else linea.debe - linea.haber
+        ) for linea in lineas), Decimal("0"))
+    return redondear_importe(original), redondear_importe(lempiras)
+
+
+def _fuente_historica_factura(factura, fecha_aplicacion=None):
     """Lee el respaldo publicado, sin recalcular ni modificar el asiento original."""
+    if factura.cliente.empresa_id != factura.empresa_id:
+        raise ValidationError("El cliente de la factura debe pertenecer a esta empresa.")
     asiento = _asiento_documento_existente(factura.empresa, "factura", factura.pk, "emision")
     if not asiento and factura.estado == "emitida":
         # Una aplicación no puede crear un saldo negativo por faltar la emisión.
@@ -629,6 +717,12 @@ def _fuente_historica_factura(factura):
         raise ValidationError("Primero contabiliza la factura de origen antes de registrar su aplicación.")
     if not asiento:
         raise ValidationError("La aplicación contable requiere una factura de origen emitida y contabilizada.")
+    lineas_cliente = list(asiento.lineas.filter(detalle__startswith="Cobro a cliente", debe__gt=0).select_related("cuenta"))
+    if not lineas_cliente:
+        lineas_cliente = list(asiento.lineas.filter(cuenta_id=factura.cliente.cuenta_contable_id, debe__gt=0).select_related("cuenta"))
+    revisada = _fuente_documento_revisada(asiento, lineas_cliente, factura.total, lado="debe", nombre="la cuenta por cobrar", fecha_aplicacion=fecha_aplicacion)
+    if revisada:
+        return revisada
     revision = _revision_moneda_factura(factura, asiento)
     if revision:
         moneda, tasa = validar_moneda_tipo_cambio("USD", revision.tipo_cambio)
@@ -650,11 +744,13 @@ def _fuente_historica_factura(factura):
     return moneda, tasa, linea.cuenta, original, linea.debe
 
 
-def _aplicaciones_historicas_factura(factura, cuenta, *, pago_actual=None, nota_actual=None, incluir_pagos=True):
+def _aplicaciones_historicas_factura(factura, cuenta, *, pago_actual=None, nota_actual=None, incluir_pagos=True, fecha_aplicacion=None):
     from django.db.models import Q
 
     pagos = factura.pagos_facturacion.exclude(pk=pago_actual)
     notas = factura.notas_credito.exclude(pk=nota_actual)
+    if notas.exclude(moneda=factura.moneda).exists():
+        raise ValidationError("Hay una nota de crédito histórica cuya moneda no coincide con la factura de origen. Revise la moneda y el respaldo del documento antes de usar sus importes.")
     documentos = Q(asiento__documento_tipo="nota_credito", asiento__documento_id__in=notas.values_list("pk", flat=True))
     if incluir_pagos:
         documentos |= Q(asiento__documento_tipo="pago_factura", asiento__documento_id__in=pagos.values_list("pk", flat=True))
@@ -673,19 +769,37 @@ def _aplicaciones_historicas_factura(factura, cuenta, *, pago_actual=None, nota_
             ("pago_factura", pk): monto + isr + isv
             for pk, monto, isr, isv in pagos.values_list("pk", "monto", "retencion_isr", "retencion_isv")
         })
-    lineas = lineas.select_related("asiento")
-    for linea in lineas:
-        if linea.moneda_origen != "USD" and (factura.moneda == "USD" or revision):
-            # El legado guarda lempiras en las columnas de origen; el documento
-            # conserva los dólares que realmente aplicó el cliente.
-            importe = importes_documentos[(linea.asiento.documento_tipo, linea.asiento.documento_id)]
-            original += importe if linea.haber > linea.debe else -importe
-        else:
-            original += (
-                linea.haber_origen - linea.debe_origen
-                if linea.debe_origen or linea.haber_origen else linea.haber - linea.debe
-            )
-        lempiras += linea.haber - linea.debe
+    fuente = _asiento_documento_existente(factura.empresa, "factura", factura.pk, "emision")
+    exigir_revision = bool(fuente and _revision_conversion(fuente))
+    if exigir_revision and factura.moneda == "USD":
+        pendientes = [("nota_credito", pk, "emision") for pk in notas.filter(estado="emitida").values_list("pk", flat=True)]
+        pendientes.extend(("pago_factura", pk, "cobro") for pk in pagos.values_list("pk", flat=True))
+        fuentes_aplicaciones = list(AsientoContable.objects.filter(
+            empresa=factura.empresa, estado="contabilizado",
+            documento_tipo__in={documento[0] for documento in pendientes},
+            documento_id__in={documento[1] for documento in pendientes},
+            evento__in={documento[2] for documento in pendientes},
+        ))
+        fuentes = {(asiento.documento_tipo, asiento.documento_id, asiento.evento) for asiento in fuentes_aplicaciones}
+        if any(documento not in fuentes for documento in pendientes):
+            raise ValidationError("Hay un cobro o nota de crédito histórico sin asiento contabilizado. Complete su respaldo antes de aplicar un nuevo movimiento.")
+        for aplicacion in fuentes_aplicaciones:
+            revision_aplicacion = _revision_conversion(aplicacion)
+            if not revision_aplicacion and (not aplicacion.conversion_verificada or aplicacion.moneda_origen != "USD"):
+                raise ValidationError("Hay un cobro, pago o nota de crédito histórico en dólares pendiente de revisión integral. Revise sus partidas antes de registrar una nueva aplicación.")
+            _validar_fecha_aplicacion_revision(revision_aplicacion, fecha_aplicacion)
+    grupos = {}
+    for linea in lineas.select_related("asiento"):
+        grupos.setdefault(linea.asiento_id, []).append(linea)
+    for partidas in grupos.values():
+        asiento = partidas[0].asiento
+        clave = (asiento.documento_tipo, asiento.documento_id)
+        aplicado_original, aplicado_hnl = _importes_aplicacion_revisada(
+            asiento, partidas, importes_documentos[clave], moneda_documento=factura.moneda,
+            exigir_revision=exigir_revision, fecha_aplicacion=fecha_aplicacion,
+        )
+        original += aplicado_original
+        lempiras += aplicado_hnl
     if revision:
         if incluir_pagos:
             lempiras += revision.aplicado_hnl_corregido - revision.aplicado_hnl_anterior
@@ -770,7 +884,7 @@ def registrar_asiento_pago_cliente(pago):
     existente = _asiento_documento_existente(pago.factura.empresa, "pago_factura", pago.pk, "cobro")
     if existente:
         return existente
-    moneda, tasa_historica, cuenta_cliente, total_original, total_historico = _fuente_historica_factura(pago.factura)
+    moneda, tasa_historica, cuenta_cliente, total_original, total_historico = _fuente_historica_factura(pago.factura, fecha_aplicacion=pago.fecha)
     _, tasa_cobro = validar_moneda_tipo_cambio(moneda, pago.tipo_cambio if pago.tipo_cambio is not None else tasa_historica)
     cuenta_caja = pago.cuenta_financiera.cuenta_contable if pago.cuenta_financiera_id else metodo_a_clave_cuenta(pago.metodo)
     lineas = []
@@ -835,6 +949,7 @@ def registrar_asiento_pago_cliente(pago):
     ]
     aplicado_original, aplicado_historico = _aplicaciones_historicas_factura(
         pago.factura, cuenta_cliente, pago_actual=pago.pk,
+        fecha_aplicacion=pago.fecha,
     )
     cancelacion_historica = importe_historico_parcial(
         total_origen=total_original, total_lempiras=total_historico,
@@ -1033,29 +1148,63 @@ def registrar_asiento_pago_comision_proveedor(pago):
     cuenta_salida = pago.cuenta_financiera.cuenta_contable
     cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.proveedor)
     origen = pago.comision_origen
+    if origen.factura.empresa_id != pago.empresa.pk or pago.proveedor.empresa_id != pago.empresa.pk or cuenta_salida.empresa_id != pago.empresa.pk:
+        raise ValidationError("La comisión, el proveedor y la cuenta financiera deben pertenecer a esta empresa.")
     asiento_origen = _asiento_documento_existente(pago.empresa, "pago_factura", origen.pk, "cobro")
     if not asiento_origen:
         asiento_origen = registrar_asiento_pago_cliente(origen)
     if asiento_origen.estado != "contabilizado":
         raise ValidationError("Primero contabiliza el cobro que genera la comisión antes de pagarla.")
-    if not asiento_origen.conversion_verificada or (origen.factura.moneda == "USD" and asiento_origen.moneda_origen != "USD"):
-        raise ValidationError("La comisión en dólares requiere regularizar su conversión histórica antes de pagarla.")
-    linea_origen = asiento_origen.lineas.filter(cuenta=cuenta_proveedor, haber__gt=0).first()
-    if not linea_origen:
+    lineas_origen = list(asiento_origen.lineas.filter(detalle__startswith="Comision por pagar", haber__gt=0).select_related("cuenta"))
+    if not lineas_origen:
+        lineas_origen = list(asiento_origen.lineas.filter(cuenta=cuenta_proveedor, haber__gt=0).select_related("cuenta"))
+    if not lineas_origen:
         raise ValidationError("No se encontró la obligación contable que respalda la comisión.")
-    moneda, tasa_historica = validar_moneda_tipo_cambio(linea_origen.moneda_origen, linea_origen.tipo_cambio)
-    if moneda == "USD" and linea_origen.haber_origen <= 0:
-        raise ValidationError("La obligación en dólares no conserva el importe original de la comisión; requiere revisión.")
-    total_original = linea_origen.haber_origen or redondear_importe(origen.monto_comision)
-    total_historico = linea_origen.haber
+    if len({linea.cuenta_id for linea in lineas_origen}) != 1 or any(linea.cuenta.empresa_id != pago.empresa.pk or linea.cuenta.tipo != "pasivo" for linea in lineas_origen):
+        raise ValidationError("La obligación de comisión requiere una sola cuenta por pagar de esta empresa.")
+    cuenta_proveedor = lineas_origen[0].cuenta
+    revisada = _fuente_documento_revisada(asiento_origen, lineas_origen, origen.monto_comision, lado="haber", nombre="la comisión por pagar", fecha_aplicacion=pago.fecha)
+    if revisada:
+        moneda, tasa_historica, cuenta_proveedor, total_original, total_historico = revisada
+    else:
+        if not asiento_origen.conversion_verificada or (origen.factura.moneda == "USD" and asiento_origen.moneda_origen != "USD"):
+            raise ValidationError("La comisión en dólares requiere una revisión integral de su conversión histórica antes de pagarla.")
+        tasas = {validar_moneda_tipo_cambio(linea.moneda_origen, linea.tipo_cambio) for linea in lineas_origen}
+        if len(tasas) != 1:
+            raise ValidationError("La obligación de comisión debe conservar una sola moneda y un solo tipo de cambio.")
+        moneda, tasa_historica = tasas.pop()
+        if moneda == "USD" and any(linea.haber_origen <= 0 for linea in lineas_origen):
+            raise ValidationError("La obligación en dólares no conserva el importe original de la comisión; requiere revisión.")
+        total_original = sum((linea.haber_origen or linea.haber for linea in lineas_origen), Decimal("0"))
+        total_historico = sum((linea.haber for linea in lineas_origen), Decimal("0"))
+        if redondear_importe(total_original) != redondear_importe(origen.monto_comision):
+            raise ValidationError("La obligación contable de comisión no coincide con su documento original.")
     _, tasa_pago = validar_moneda_tipo_cambio(moneda, pago.tipo_cambio if pago.tipo_cambio is not None else tasa_historica)
-    pagos_anteriores = origen.pagos_comision_proveedor.exclude(pk=pago.pk).values_list("pk", flat=True)
+    pagos_anteriores = dict(origen.pagos_comision_proveedor.exclude(pk=pago.pk).values_list("pk", "monto"))
+    if moneda == "USD":
+        respaldados = set(AsientoContable.objects.filter(
+            empresa=pago.empresa, documento_tipo="pago_comision_proveedor", documento_id__in=pagos_anteriores,
+            evento="egreso", estado="contabilizado",
+        ).values_list("documento_id", flat=True))
+        if set(pagos_anteriores) - respaldados:
+            raise ValidationError("Hay un pago histórico de comisión sin asiento contabilizado. Complete su respaldo antes de pagar el saldo restante.")
     lineas_anteriores = LineaAsientoContable.objects.filter(
         asiento__empresa=pago.empresa, asiento__documento_tipo="pago_comision_proveedor",
         asiento__documento_id__in=pagos_anteriores, asiento__estado="contabilizado", cuenta=cuenta_proveedor,
-    )
-    aplicado_original = sum((linea.debe_origen - linea.haber_origen if linea.debe_origen or linea.haber_origen else linea.debe - linea.haber for linea in lineas_anteriores), Decimal("0"))
-    aplicado_historico = sum((linea.debe - linea.haber for linea in lineas_anteriores), Decimal("0"))
+    ).select_related("asiento")
+    grupos = {}
+    for linea in lineas_anteriores:
+        grupos.setdefault(linea.asiento_id, []).append(linea)
+    aplicado_original = Decimal("0")
+    aplicado_historico = Decimal("0")
+    for partidas in grupos.values():
+        asiento_anterior = partidas[0].asiento
+        importe_original, importe_hnl = _importes_aplicacion_revisada(
+            asiento_anterior, partidas, pagos_anteriores[asiento_anterior.documento_id],
+            moneda_documento=moneda, debe_es_aplicacion=True, exigir_revision=moneda == "USD", fecha_aplicacion=pago.fecha,
+        )
+        aplicado_original += importe_original
+        aplicado_historico += importe_hnl
     cancelacion = importe_historico_parcial(
         total_origen=total_original, total_lempiras=total_historico,
         aplicado_origen=aplicado_original, aplicado_lempiras=aplicado_historico,
@@ -1100,9 +1249,10 @@ def registrar_asiento_nota_credito(nota):
     from facturacion.costos_inventario import capturar_costos_devolucion, validar_devoluciones_nota, valor_contable_linea_inventario
     validar_devoluciones_nota(nota)
     if nota.factura_origen_id:
-        moneda, tasa, cuenta_cliente, total_original, total_historico = _fuente_historica_factura(nota.factura_origen)
+        moneda, tasa, cuenta_cliente, total_original, total_historico = _fuente_historica_factura(nota.factura_origen, fecha_aplicacion=nota.fecha_emision)
         aplicado_original, aplicado_historico = _aplicaciones_historicas_factura(
             nota.factura_origen, cuenta_cliente, nota_actual=nota.pk, incluir_pagos=False,
+            fecha_aplicacion=nota.fecha_emision,
         )
         cancelacion_historica = importe_historico_parcial(
             total_origen=total_original, total_lempiras=total_historico,
@@ -1197,7 +1347,12 @@ def registrar_asiento_planilla_pagada(periodo, usuario=None):
     )
 
 
+@transaction.atomic
 def registrar_reversion_documento(*, empresa, documento_tipo, documento_id, evento_origen, evento_reversion, fecha, descripcion, referencia, origen_modulo, creado_por=None):
+    from .models import bloquear_empresas_contables
+    from .proteccion_conversion import asiento_tiene_revision
+
+    bloquear_empresas_contables([empresa.pk])
     asiento_origen = AsientoContable.objects.filter(
         empresa=empresa,
         documento_tipo=documento_tipo,
@@ -1207,6 +1362,18 @@ def registrar_reversion_documento(*, empresa, documento_tipo, documento_id, even
     ).prefetch_related("lineas").first()
     if not asiento_origen:
         return None
+    if asiento_tiene_revision(asiento_origen.pk):
+        raise ValidationError("El documento tiene una revisión integral documentada. Registre un nuevo ajuste para conservar su respaldo.")
+    if documento_tipo == "factura":
+        from django.db.models import Q
+        from facturacion.models import NotaCredito, PagoFactura
+
+        aplicaciones_revisadas = AsientoContable.objects.filter(empresa=empresa, revision_conversion__isnull=False).filter(
+            Q(documento_tipo="pago_factura", documento_id__in=PagoFactura.objects.filter(factura_id=documento_id).values("pk"))
+            | Q(documento_tipo="nota_credito", documento_id__in=NotaCredito.objects.filter(factura_origen_id=documento_id).values("pk"))
+        )
+        if aplicaciones_revisadas.exists():
+            raise ValidationError("El documento tiene una revisión integral documentada. Registre un nuevo ajuste para conservar su respaldo.")
 
     lineas = []
     for linea in asiento_origen.lineas.all():

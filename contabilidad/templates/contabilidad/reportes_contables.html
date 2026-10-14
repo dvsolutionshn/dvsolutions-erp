@@ -8,6 +8,7 @@
 {% block topbar_actions %}
 <a href="{% url 'dashboard_bi_financiero' empresa.slug %}" class="erp-action-link">Panel financiero</a>
 <a href="{% url 'auditoria_contable' empresa.slug %}" class="erp-action-link">Auditoria</a>
+<a href="{% url 'historicos_usd' empresa.slug %}" class="erp-action-link">Revisión histórica USD</a>
 <a href="{% url 'reporte_impuestos' empresa.slug %}" class="erp-action-link">Impuestos</a>
 <a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
 <a href="{% url 'mayor_cuenta' empresa.slug %}" class="erp-action-link">Mayor por Cuenta</a>
