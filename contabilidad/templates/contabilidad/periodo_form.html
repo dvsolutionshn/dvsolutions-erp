@@ -3,15 +3,17 @@
 {% block title %}{{ titulo }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Contabilidad{% endblock %}
 {% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Define el estado del mes contable. Si lo cierras, el ERP bloqueara asientos con fecha dentro de ese periodo.{% endblock %}
+{% block header_description %}Registra el mes contable y sus observaciones. El cierre se realiza desde la revisión del período y la reapertura requiere un motivo.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'periodos_contables' empresa.slug %}" class="erp-action-link">Volver a Periodos</a>
+<a href="{% url 'periodos_contables' empresa.slug %}" class="erp-action-link">Volver a períodos</a>
 {% endblock %}
 
 {% block content %}
 <form method="post" class="erp-form-shell">
     {% csrf_token %}
+    {{ form.non_field_errors }}
+    <p class="erp-card-muted">Estado: <strong>{{ form.instance.get_estado_display }}</strong>.{% if form.instance.pk %} El año y el mes permanecen fijos para proteger el historial contable.{% else %} El nuevo período se guarda abierto.{% endif %}</p>
     <section class="erp-form-card">
         <div class="erp-form-grid">
             {% for field in form %}
@@ -26,7 +28,7 @@
     </section>
     <div class="erp-form-actions">
         <a href="{% url 'periodos_contables' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Periodo</button>
+        <button type="submit" class="erp-btn">Guardar período</button>
     </div>
 </form>
 {% endblock %}

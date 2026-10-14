@@ -59,6 +59,14 @@
                 <option value="ingreso" {% if filtros.tipo == "ingreso" %}selected{% endif %}>Creditos / ingresos</option>
             </select>
         </div>
+        <div class="erp-filter-field">
+            <label for="desde">Desde</label>
+            <input type="date" id="desde" name="desde" value="{{ filtros.desde }}">
+        </div>
+        <div class="erp-filter-field">
+            <label for="hasta">Hasta</label>
+            <input type="date" id="hasta" name="hasta" value="{{ filtros.hasta }}">
+        </div>
         <div class="erp-filter-actions">
             <button class="erp-btn-secondary" type="submit">Filtrar</button>
             <a class="erp-btn-secondary" href="{% url 'movimientos_bancarios' empresa.slug %}">Limpiar</a>
@@ -76,7 +84,7 @@
                 <p class="erp-card-muted">Selecciona cuentas en varias lineas y guarda todo en lote. Los movimientos contabilizados quedan bloqueados para proteger los asientos.</p>
             </div>
             <div class="erp-actions-right">
-                <a class="erp-btn-secondary" href="{% url 'aplicar_reglas_bancarias' empresa.slug %}">Aplicar Reglas</a>
+                <button class="erp-btn-secondary" type="submit" formaction="{% url 'aplicar_reglas_bancarias' empresa.slug %}">Aplicar reglas</button>
                 <button class="erp-btn" type="submit">Guardar Clasificaciones</button>
             </div>
         </div>

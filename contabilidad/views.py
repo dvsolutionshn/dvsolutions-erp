@@ -1,8 +1,10 @@
 from collections import defaultdict
+from functools import wraps
 
+from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from decimal import Decimal
 from django.utils import timezone
@@ -11,12 +13,14 @@ from django.utils.dateparse import parse_date
 from django.http import HttpResponse
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 from core.models import Empresa, Usuario
+from core.audit_context import audit_scope
 from facturacion.models import CompraInventario, Factura, NotaCredito, PagoCompra, PagoFactura, RegistroCompraFiscal
 
 from .forms import (
@@ -37,12 +41,54 @@ from .forms import (
     ReglaClasificacionBancoForm,
 )
 from .importadores import importar_catalogo_cuentas_desde_excel, importar_movimientos_bancarios_desde_excel
+from .cierre import revisar_cierre_periodo
 from .models import AsientoContable, ClasificacionCompraFiscal, ClasificacionMovimientoBanco, ConfiguracionContableEmpresa, CuentaContable, CuentaFinanciera, LineaAsientoContable, MovimientoBancario, PeriodoContable, ReglaClasificacionBanco
 from .services import aplicar_reglas_clasificacion_bancaria, asegurar_clasificaciones_bancarias_base_honduras, cargar_catalogo_base_honduras, registrar_asiento_pago_cliente, registrar_asiento_pago_proveedor
 
 
 def _empresa_desde_slug(empresa_slug):
     return get_object_or_404(Empresa, slug=empresa_slug, activa=True)
+
+
+def _verificar_permiso_contable(request, empresa, permiso):
+    usuario = request.user
+    if not (
+        usuario.is_authenticated and usuario.is_active
+        and usuario.puede_acceder_empresa(empresa)
+        and usuario.tiene_permiso_erp("puede_contabilidad", empresa)
+        and usuario.tiene_permiso_erp(permiso, empresa)
+    ):
+        raise PermissionDenied("Tu usuario no tiene permiso para realizar esta operación contable en esta empresa.")
+
+
+def _verificar_contabilizacion_solicitada(request, empresa):
+    if request.method == "POST" and (
+        request.POST.get("estado") == "contabilizado"
+        or request.POST.get("contabilizar_ahora", "").lower() not in {"", "false", "0"}
+    ):
+        _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+
+
+def _manejar_validacion_contable(vista):
+    @wraps(vista)
+    def protegida(request, empresa_slug, *args, **kwargs):
+        try:
+            return vista(request, empresa_slug, *args, **kwargs)
+        except ValidationError as error:
+            messages.error(request, "No se pudo completar la operación: " + "; ".join(error.messages))
+            destino = "asientos_contables" if "asiento" in vista.__name__ else "periodos_contables" if "periodo" in vista.__name__ else "movimientos_bancarios"
+            return redirect(destino, empresa_slug=empresa_slug)
+    return protegida
+
+
+def _retorno_bancario(request, empresa, vista="movimientos_bancarios"):
+    destino = request.POST.get("next", "")
+    prefijo = f"/{empresa.slug}/dashboard/contabilidad/"
+    if destino.startswith(prefijo) and url_has_allowed_host_and_scheme(
+        destino, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+    ):
+        return destino
+    return redirect(vista, empresa_slug=empresa.slug).url
 
 
 def _resumen_contabilidad(empresa):
@@ -58,65 +104,11 @@ def _resumen_contabilidad(empresa):
 
 
 def _pendientes_cierre_periodo(empresa, periodo):
-    rango = {"fecha__gte": periodo.fecha_inicio, "fecha__lte": periodo.fecha_fin}
-    asientos_borrador = AsientoContable.objects.filter(
-        empresa=empresa,
-        estado="borrador",
-        **rango,
-    ).count()
-    movimientos_bancarios = MovimientoBancario.objects.filter(
-        empresa=empresa,
-        fecha__gte=periodo.fecha_inicio,
-        fecha__lte=periodo.fecha_fin,
-    ).exclude(estado="contabilizado").count()
-    movimientos_sin_conciliar = MovimientoBancario.objects.filter(
-        empresa=empresa,
-        estado="contabilizado",
-        conciliado=False,
-        fecha__gte=periodo.fecha_inicio,
-        fecha__lte=periodo.fecha_fin,
-    ).count()
-    lineas = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-        asiento__fecha__gte=periodo.fecha_inicio,
-        asiento__fecha__lte=periodo.fecha_fin,
-    ).aggregate(debe=Sum("debe"), haber=Sum("haber"))
-    total_debe = lineas["debe"] or Decimal("0.00")
-    total_haber = lineas["haber"] or Decimal("0.00")
-    return {
-        "asientos_borrador": asientos_borrador,
-        "movimientos_bancarios": movimientos_bancarios,
-        "movimientos_sin_conciliar": movimientos_sin_conciliar,
-        "debe": total_debe,
-        "haber": total_haber,
-        "balance_cuadrado": total_debe == total_haber,
-        "total": asientos_borrador + movimientos_bancarios + movimientos_sin_conciliar + (0 if total_debe == total_haber else 1),
-    }
+    return revisar_cierre_periodo(empresa, periodo)["control"]
 
 
 def _detalle_cierre_periodo(empresa, periodo):
-    return {
-        "control": _pendientes_cierre_periodo(empresa, periodo),
-        "asientos_borrador": AsientoContable.objects.filter(
-            empresa=empresa,
-            estado="borrador",
-            fecha__gte=periodo.fecha_inicio,
-            fecha__lte=periodo.fecha_fin,
-        ).order_by("fecha", "id"),
-        "movimientos_no_contabilizados": MovimientoBancario.objects.filter(
-            empresa=empresa,
-            fecha__gte=periodo.fecha_inicio,
-            fecha__lte=periodo.fecha_fin,
-        ).exclude(estado="contabilizado").select_related("cuenta_financiera", "clasificacion").order_by("fecha", "id"),
-        "movimientos_sin_conciliar": MovimientoBancario.objects.filter(
-            empresa=empresa,
-            estado="contabilizado",
-            conciliado=False,
-            fecha__gte=periodo.fecha_inicio,
-            fecha__lte=periodo.fecha_fin,
-        ).select_related("cuenta_financiera", "asiento").order_by("fecha", "id"),
-    }
+    return revisar_cierre_periodo(empresa, periodo)
 
 
 def _preparar_excel(titulo):
@@ -349,15 +341,15 @@ def periodos_contables(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def crear_periodo_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
     form = PeriodoContableForm(request.POST or None, empresa=empresa)
     if request.method == "POST" and form.is_valid():
         periodo = form.save(commit=False)
         periodo.empresa = empresa
-        if periodo.estado == "cerrado":
-            periodo.cerrado_por = request.user
-            periodo.fecha_cierre = timezone.now()
+        periodo.estado = "abierto"
         periodo.save()
         messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} guardado correctamente.")
         return redirect("periodos_contables", empresa_slug=empresa.slug)
@@ -369,20 +361,15 @@ def crear_periodo_contable(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def editar_periodo_contable(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
     periodo = get_object_or_404(PeriodoContable, id=periodo_id, empresa=empresa)
-    estado_original = periodo.estado
     form = PeriodoContableForm(request.POST or None, instance=periodo, empresa=empresa)
     if request.method == "POST" and form.is_valid():
         periodo = form.save(commit=False)
         periodo.empresa = empresa
-        if periodo.estado == "cerrado" and estado_original != "cerrado":
-            periodo.cerrado_por = request.user
-            periodo.fecha_cierre = timezone.now()
-        if periodo.estado == "abierto":
-            periodo.cerrado_por = None
-            periodo.fecha_cierre = None
         periodo.save()
         messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} actualizado correctamente.")
         return redirect("periodos_contables", empresa_slug=empresa.slug)
@@ -396,27 +383,32 @@ def editar_periodo_contable(request, empresa_slug, periodo_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def cerrar_periodo_contable(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    periodo = get_object_or_404(PeriodoContable, id=periodo_id, empresa=empresa)
-    pendientes = _pendientes_cierre_periodo(empresa, periodo)
-    if pendientes["total"]:
-        messages.error(
-            request,
-            (
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        periodo = get_object_or_404(PeriodoContable.objects.select_for_update(), id=periodo_id, empresa=empresa)
+        if periodo.esta_cerrado:
+            messages.info(request, "Este período ya está cerrado; se conserva su cierre original.")
+            return redirect("periodos_contables", empresa_slug=empresa.slug)
+        pendientes = _pendientes_cierre_periodo(empresa, periodo)
+        if pendientes["total"]:
+            messages.error(request, (
                 f"No se puede cerrar {periodo.mes}/{periodo.anio}: "
-                f"hay {pendientes['asientos_borrador']} asientos borrador y "
+                f"hay {pendientes['asientos_borrador']} asientos borrador, "
                 f"{pendientes['movimientos_bancarios']} movimientos bancarios sin contabilizar, "
-                f"{pendientes['movimientos_sin_conciliar']} movimientos sin conciliar"
-                f"{' y el balance del periodo no cuadra.' if not pendientes['balance_cuadrado'] else '.'}"
-            ),
-        )
-        return redirect("periodos_contables", empresa_slug=empresa.slug)
-    periodo.estado = "cerrado"
-    periodo.cerrado_por = request.user
-    periodo.fecha_cierre = timezone.now()
-    periodo.save(update_fields=["estado", "cerrado_por", "fecha_cierre"])
-    messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} cerrado correctamente.")
+                f"{pendientes['movimientos_sin_conciliar']} movimientos sin conciliar, "
+                f"{pendientes['asientos_invalidos']} asientos inválidos, "
+                f"{pendientes['movimientos_sin_asiento']} movimientos sin asiento válido y "
+                f"{pendientes['documentos_sin_asiento']} documentos sin asiento"
+                f"{' y el balance del período no cuadra.' if not pendientes['balance_cuadrado'] else '.'}"
+            ))
+            return redirect("checklist_cierre_periodo", empresa_slug=empresa.slug, periodo_id=periodo.pk)
+        with audit_scope(user=request.user, reason=f"Cierre del período {periodo.mes:02d}/{periodo.anio}"):
+            periodo.cambiar_estado("cerrado", cerrado_por=request.user, fecha_cierre=timezone.now())
+    messages.success(request, f"Período {periodo.mes}/{periodo.anio} cerrado correctamente.")
     return redirect("periodos_contables", empresa_slug=empresa.slug)
 
 
@@ -434,14 +426,23 @@ def checklist_cierre_periodo(request, empresa_slug, periodo_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def abrir_periodo_contable(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    periodo = get_object_or_404(PeriodoContable, id=periodo_id, empresa=empresa)
-    periodo.estado = "abierto"
-    periodo.cerrado_por = None
-    periodo.fecha_cierre = None
-    periodo.save(update_fields=["estado", "cerrado_por", "fecha_cierre"])
-    messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} abierto nuevamente.")
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        periodo = get_object_or_404(PeriodoContable.objects.select_for_update(), id=periodo_id, empresa=empresa)
+        if not periodo.esta_cerrado:
+            messages.info(request, "Este período ya está abierto.")
+            return redirect("periodos_contables", empresa_slug=empresa.slug)
+        motivo = request.POST.get("motivo_reapertura", "").strip()
+        if not motivo or len(motivo) > 400:
+            messages.error(request, "Indica el motivo de la reapertura, con un máximo de 400 caracteres.")
+            return redirect("periodos_contables", empresa_slug=empresa.slug)
+        with audit_scope(user=request.user, reason=f"Reapertura del período {periodo.mes:02d}/{periodo.anio}: {motivo}"):
+            periodo.cambiar_estado("abierto")
+    messages.success(request, f"Período {periodo.mes}/{periodo.anio} reabierto. El motivo quedó registrado en el historial.")
     return redirect("periodos_contables", empresa_slug=empresa.slug)
 
 
@@ -659,14 +660,19 @@ def editar_regla_bancaria(request, empresa_slug, regla_id):
 
 
 @login_required
+@require_POST
+@_manejar_validacion_contable
 def aplicar_reglas_bancarias_view(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    resultado = aplicar_reglas_clasificacion_bancaria(empresa)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        resultado = aplicar_reglas_clasificacion_bancaria(empresa)
     if resultado["actualizados"]:
         messages.success(request, f"{resultado['actualizados']} movimientos clasificados automaticamente.")
     else:
         messages.info(request, "No se encontraron movimientos pendientes que coincidan con las reglas activas.")
-    return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
+    return redirect(_retorno_bancario(request, empresa))
 
 
 @login_required
@@ -677,7 +683,18 @@ def movimientos_bancarios(request, empresa_slug):
     estado = request.GET.get("estado") or ""
     tipo = request.GET.get("tipo") or ""
     q = request.GET.get("q") or ""
+    desde = request.GET.get("desde", "").strip()
+    hasta = request.GET.get("hasta", "").strip()
     movimientos = MovimientoBancario.objects.filter(empresa=empresa).select_related("cuenta_financiera", "clasificacion", "asiento").order_by("-fecha", "-id")
+    for valor, comparador in ((desde, "fecha__gte"), (hasta, "fecha__lte")):
+        if valor:
+            try:
+                fecha = forms.DateField().clean(valor)
+            except ValidationError:
+                messages.error(request, "Indica fechas válidas para filtrar los movimientos bancarios.")
+                movimientos = movimientos.none()
+            else:
+                movimientos = movimientos.filter(**{comparador: fecha})
     if cuenta_id:
         movimientos = movimientos.filter(cuenta_financiera_id=cuenta_id)
     if estado:
@@ -707,14 +724,16 @@ def movimientos_bancarios(request, empresa_slug):
         "cuentas": CuentaFinanciera.objects.filter(empresa=empresa).order_by("nombre"),
         "clasificaciones": clasificaciones,
         "resumen": resumen,
-        "filtros": {"cuenta": cuenta_id, "estado": estado, "tipo": tipo, "q": q},
+        "filtros": {"cuenta": cuenta_id, "estado": estado, "tipo": tipo, "q": q, "desde": desde, "hasta": hasta},
     })
 
 
 @login_required
+@_manejar_validacion_contable
 def clasificar_movimientos_bancarios_lote(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    redirect_url = request.POST.get("next") or redirect("movimientos_bancarios", empresa_slug=empresa.slug).url
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    redirect_url = _retorno_bancario(request, empresa)
     if request.method != "POST":
         return redirect(redirect_url)
 
@@ -726,6 +745,7 @@ def clasificar_movimientos_bancarios_lote(request, empresa_slug):
     actualizados = 0
 
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
         for movimiento in movimientos:
             valor = request.POST.get(f"clasificacion_{movimiento.id}") or ""
             if valor:
@@ -754,11 +774,13 @@ def clasificar_movimientos_bancarios_lote(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def clasificar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
     movimiento = get_object_or_404(MovimientoBancario, id=movimiento_id, empresa=empresa)
     form = MovimientoBancarioClasificacionForm(request.POST or None, instance=movimiento, empresa=empresa)
-    redirect_url = request.POST.get("next") or redirect("movimientos_bancarios", empresa_slug=empresa.slug).url
+    redirect_url = _retorno_bancario(request, empresa)
     if request.method == "POST" and form.is_valid():
         movimiento = form.save(commit=False)
         movimiento.estado = "clasificado" if movimiento.clasificacion_id else "pendiente"
@@ -807,8 +829,10 @@ def editar_movimiento_bancario(request, empresa_slug, movimiento_id):
 
 
 @login_required
+@_manejar_validacion_contable
 def enlazar_movimiento_factura(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(
         MovimientoBancario.objects.select_related("cuenta_financiera", "pago_factura", "asiento"),
         id=movimiento_id,
@@ -825,6 +849,15 @@ def enlazar_movimiento_factura(request, empresa_slug, movimiento_id):
     if request.method == "POST" and form.is_valid():
         factura = form.cleaned_data["factura"]
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+            factura = Factura.objects.select_for_update().get(pk=factura.pk, empresa=empresa)
+            if movimiento.estado == "contabilizado" or movimiento.asiento_id or movimiento.pago_factura_id:
+                messages.error(request, "El movimiento ya fue enlazado. Vuelve a revisarlo.")
+                return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
+            if factura.saldo_pendiente < movimiento.credito:
+                messages.error(request, "El saldo de la factura cambió. Revisa el importe antes de enlazar el depósito.")
+                return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
             pago = PagoFactura.objects.create(
                 factura=factura,
                 fecha=movimiento.fecha,
@@ -849,8 +882,10 @@ def enlazar_movimiento_factura(request, empresa_slug, movimiento_id):
 
 
 @login_required
+@_manejar_validacion_contable
 def enlazar_movimiento_compra(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(
         MovimientoBancario.objects.select_related("cuenta_financiera", "pago_compra", "asiento"),
         id=movimiento_id,
@@ -867,6 +902,15 @@ def enlazar_movimiento_compra(request, empresa_slug, movimiento_id):
     if request.method == "POST" and form.is_valid():
         compra = form.cleaned_data["compra"]
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+            compra = CompraInventario.objects.select_for_update().get(pk=compra.pk, empresa=empresa)
+            if movimiento.estado == "contabilizado" or movimiento.asiento_id or movimiento.pago_compra_id:
+                messages.error(request, "El movimiento ya fue enlazado. Vuelve a revisarlo.")
+                return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
+            if compra.saldo_pendiente < movimiento.debito:
+                messages.error(request, "El saldo de la compra cambió. Revisa el importe antes de enlazar el débito.")
+                return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
             pago = PagoCompra.objects.create(
                 compra=compra,
                 fecha=movimiento.fecha,
@@ -893,9 +937,11 @@ def enlazar_movimiento_compra(request, empresa_slug, movimiento_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def contabilizar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    redirect_url = request.POST.get("next") or redirect("movimientos_bancarios", empresa_slug=empresa.slug).url
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+    redirect_url = _retorno_bancario(request, empresa)
     movimiento = get_object_or_404(
         MovimientoBancario.objects.select_related("cuenta_financiera", "clasificacion__cuenta_contable"),
         id=movimiento_id,
@@ -912,6 +958,11 @@ def contabilizar_movimiento_bancario(request, empresa_slug, movimiento_id):
         return redirect(redirect_url)
 
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+        if movimiento.estado == "contabilizado" or movimiento.asiento_id:
+            messages.warning(request, "El movimiento ya tiene un asiento; vuelve a revisarlo.")
+            return redirect(redirect_url)
         asiento = AsientoContable.objects.create(
             empresa=empresa,
             fecha=movimiento.fecha,
@@ -1030,10 +1081,12 @@ def conciliacion_bancaria(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def conciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(MovimientoBancario, id=movimiento_id, empresa=empresa)
-    redirect_url = request.POST.get("next") or redirect("conciliacion_bancaria", empresa_slug=empresa.slug).url
+    redirect_url = _retorno_bancario(request, empresa, "conciliacion_bancaria")
 
     if request.method != "POST":
         return redirect(redirect_url)
@@ -1041,27 +1094,44 @@ def conciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
         messages.error(request, "Solo se pueden conciliar movimientos ya contabilizados.")
         return redirect(redirect_url)
 
-    movimiento.conciliado = True
-    movimiento.fecha_conciliacion = timezone.now()
-    movimiento.conciliado_por = request.user
-    movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+        if PeriodoContable.fecha_bloqueada(empresa, movimiento.fecha):
+            messages.error(request, "No se puede conciliar un movimiento de un período cerrado. Primero solicita su reapertura.")
+            return redirect(redirect_url)
+        if movimiento.estado != "contabilizado" or not movimiento.asiento_id or movimiento.asiento.empresa_id != empresa.pk or movimiento.asiento.estado != "contabilizado":
+            messages.error(request, "El movimiento debe tener un asiento contabilizado de esta empresa antes de conciliarse.")
+            return redirect(redirect_url)
+        movimiento.conciliado = True
+        movimiento.fecha_conciliacion = timezone.now()
+        movimiento.conciliado_por = request.user
+        movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
     messages.success(request, "Movimiento conciliado correctamente.")
     return redirect(redirect_url)
 
 
 @login_required
+@_manejar_validacion_contable
 def desconciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(MovimientoBancario, id=movimiento_id, empresa=empresa)
-    redirect_url = request.POST.get("next") or redirect("conciliacion_bancaria", empresa_slug=empresa.slug).url
+    redirect_url = _retorno_bancario(request, empresa, "conciliacion_bancaria")
 
     if request.method != "POST":
         return redirect(redirect_url)
 
-    movimiento.conciliado = False
-    movimiento.fecha_conciliacion = None
-    movimiento.conciliado_por = None
-    movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+        if PeriodoContable.fecha_bloqueada(empresa, movimiento.fecha):
+            messages.error(request, "No se puede desconciliar un movimiento de un período cerrado. Primero solicita su reapertura.")
+            return redirect(redirect_url)
+        movimiento.conciliado = False
+        movimiento.fecha_conciliacion = None
+        movimiento.conciliado_por = None
+        movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
     messages.success(request, "Movimiento marcado como no conciliado.")
     return redirect(redirect_url)
 
@@ -1263,10 +1333,13 @@ def _contexto_form_asiento(empresa, form, formset, titulo, cuentas_disponibles):
 
 
 @login_required
+@_manejar_validacion_contable
 def crear_asiento_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_crear_asientos")
+    _verificar_contabilizacion_solicitada(request, empresa)
     asiento = AsientoContable(empresa=empresa, creado_por=request.user)
-    form = AsientoContableForm(request.POST or None, instance=asiento)
+    form = AsientoContableForm(request.POST or None, instance=asiento, usuario=request.user, empresa=empresa)
     cuentas_disponibles = CuentaContable.objects.filter(
         empresa=empresa,
         activa=True,
@@ -1288,6 +1361,7 @@ def crear_asiento_contable(request, empresa_slug):
             return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Nuevo Asiento Contable", cuentas_disponibles))
 
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
             asiento = form.save(commit=False)
             asiento.empresa = empresa
             asiento.creado_por = request.user
@@ -1314,14 +1388,17 @@ def crear_asiento_contable(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def editar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_crear_asientos")
+    _verificar_contabilizacion_solicitada(request, empresa)
     asiento = get_object_or_404(AsientoContable.objects.prefetch_related("lineas"), id=asiento_id, empresa=empresa)
     if asiento.estado != "borrador":
         messages.error(request, "Solo se pueden editar asientos en borrador. Para corregir un asiento contabilizado, reversalo o duplicalo.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
-    form = AsientoContableForm(request.POST or None, instance=asiento)
+    form = AsientoContableForm(request.POST or None, instance=asiento, usuario=request.user, empresa=empresa)
     cuentas_disponibles = CuentaContable.objects.filter(
         empresa=empresa,
         activa=True,
@@ -1343,6 +1420,11 @@ def editar_asiento_contable(request, empresa_slug, asiento_id):
             return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Editar Asiento Contable", cuentas_disponibles))
 
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            actual = AsientoContable.objects.select_for_update().get(pk=asiento.pk, empresa=empresa)
+            if actual.estado != "borrador":
+                messages.error(request, "El asiento cambió mientras lo editabas. Vuelve a revisarlo.")
+                return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.pk)
             asiento = form.save(commit=False)
             asiento.empresa = empresa
             asiento.estado = "borrador"
@@ -1379,18 +1461,21 @@ def ver_asiento_contable(request, empresa_slug, asiento_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def duplicar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_crear_asientos")
     asiento_origen = get_object_or_404(
         AsientoContable.objects.prefetch_related("lineas"),
         id=asiento_id,
         empresa=empresa,
     )
-    fecha = timezone.now().date()
+    fecha = timezone.localdate()
     if PeriodoContable.fecha_bloqueada(empresa, fecha):
         messages.error(request, "No se puede duplicar el asiento porque el periodo actual esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.id)
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
         nuevo = AsientoContable.objects.create(
             empresa=empresa,
             fecha=fecha,
@@ -1399,7 +1484,7 @@ def duplicar_asiento_contable(request, empresa_slug, asiento_id):
             origen_modulo=asiento_origen.origen_modulo or "manual",
             documento_tipo="asiento_duplicado",
             documento_id=asiento_origen.id,
-            evento="duplicado",
+            evento=None,
             creado_por=request.user,
             estado="borrador",
         )
@@ -1417,8 +1502,10 @@ def duplicar_asiento_contable(request, empresa_slug, asiento_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def reversar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     asiento_origen = get_object_or_404(
         AsientoContable.objects.prefetch_related("lineas"),
         id=asiento_id,
@@ -1436,11 +1523,19 @@ def reversar_asiento_contable(request, empresa_slug, asiento_id):
     ).exists():
         messages.warning(request, "Este asiento ya tiene una reversion contabilizada.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.id)
-    fecha = timezone.now().date()
+    fecha = timezone.localdate()
     if PeriodoContable.fecha_bloqueada(empresa, fecha):
         messages.error(request, "No se puede reversar el asiento porque el periodo actual esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.id)
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        asiento_origen = AsientoContable.objects.select_for_update().get(pk=asiento_origen.pk, empresa=empresa)
+        if asiento_origen.estado != "contabilizado" or AsientoContable.objects.filter(
+            empresa=empresa, documento_tipo="asiento_contable", documento_id=asiento_origen.pk,
+            evento="reversion", estado="contabilizado",
+        ).exists():
+            messages.warning(request, "El asiento cambió o ya fue reversado. Vuelve a revisarlo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.pk)
         reversion = AsientoContable.objects.create(
             empresa=empresa,
             fecha=fecha,
@@ -1470,8 +1565,10 @@ def reversar_asiento_contable(request, empresa_slug, asiento_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def regresar_asiento_borrador(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     asiento = get_object_or_404(AsientoContable, id=asiento_id, empresa=empresa)
     if asiento.estado != "contabilizado":
         messages.warning(request, "Solo los asientos contabilizados pueden regresar a borrador.")
@@ -1480,16 +1577,24 @@ def regresar_asiento_borrador(request, empresa_slug, asiento_id):
         messages.error(request, "No se puede regresar a borrador porque el periodo contable esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
-    asiento.estado = "borrador"
-    asiento.save(update_fields=["estado"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        asiento = AsientoContable.objects.select_for_update().get(pk=asiento.pk, empresa=empresa)
+        if asiento.estado != "contabilizado" or PeriodoContable.fecha_bloqueada(empresa, asiento.fecha):
+            messages.error(request, "El asiento cambió o su período está cerrado. Vuelve a revisarlo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.pk)
+        asiento.estado = "borrador"
+        asiento.save(update_fields=["estado"])
     messages.success(request, f"Asiento {asiento.numero or asiento.id} regresado a borrador. Ya puedes editarlo y volver a contabilizarlo.")
     return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def contabilizar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     asiento = get_object_or_404(AsientoContable, id=asiento_id, empresa=empresa)
     if asiento.estado != "borrador":
         messages.warning(request, "Solo los asientos en borrador pueden contabilizarse.")
@@ -1500,9 +1605,15 @@ def contabilizar_asiento_contable(request, empresa_slug, asiento_id):
     if PeriodoContable.fecha_bloqueada(empresa, asiento.fecha):
         messages.error(request, "No se puede contabilizar porque el periodo contable esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
-    asiento.generar_numero()
-    asiento.estado = "contabilizado"
-    asiento.save(update_fields=["numero", "estado"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        asiento = AsientoContable.objects.select_for_update().get(pk=asiento.pk, empresa=empresa)
+        if asiento.estado != "borrador" or not asiento.esta_balanceado or PeriodoContable.fecha_bloqueada(empresa, asiento.fecha):
+            messages.error(request, "El asiento cambió o su período está cerrado. Vuelve a revisarlo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.pk)
+        asiento.generar_numero()
+        asiento.estado = "contabilizado"
+        asiento.save(update_fields=["numero", "estado"])
     messages.success(request, f"Asiento {asiento.numero} contabilizado correctamente.")
     return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 

@@ -3,10 +3,12 @@
 {% block title %}Asientos Contables{% endblock %}
 {% block header_kicker %}Contabilidad{% endblock %}
 {% block header_title %}Asientos Contables{% endblock %}
-{% block header_description %}Gestiona borradores, contabilizacion y detalle de partidas con una lectura clara y profesional.{% endblock %}
+{% block header_description %}Consulta las partidas contables, revisa sus borradores y contabiliza las operaciones autorizadas.{% endblock %}
 
 {% block topbar_actions %}
+{% if erp_access.asientos_contables %}
 <a href="{% url 'crear_asiento_contable' empresa.slug %}" class="erp-action-link">Nuevo Asiento</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -20,7 +22,7 @@
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title">Filtros de asientos</h3>
-            <p class="erp-card-muted">Busca por numero, descripcion, referencia u origen para auditoria rapida.</p>
+            <p class="erp-card-muted">Busca por número, descripción, referencia u origen.</p>
         </div>
     </div>
     <form method="get" class="erp-filters">
@@ -57,9 +59,9 @@
         <table class="erp-table">
             <thead>
                 <tr>
-                    <th>Numero</th>
+                    <th>Número</th>
                     <th>Fecha</th>
-                    <th>Descripcion</th>
+                    <th>Descripción</th>
                     <th>Referencia</th>
                     <th>Estado</th>
                     <th>Debe</th>
@@ -70,17 +72,28 @@
             <tbody>
                 {% for asiento in asientos %}
                 <tr>
-                    <td>{{ asiento.numero|default:"Sin numero" }}</td>
-                    <td>{{ asiento.fecha|date:"F j, Y" }}</td>
+                    <td>{{ asiento.numero|default:"Sin número" }}</td>
+                    <td>{{ asiento.fecha|date:"d/m/Y" }}</td>
                     <td>{{ asiento.descripcion }}</td>
                     <td>{{ asiento.referencia|default:"-" }}</td>
                     <td><span class="erp-badge {% if asiento.estado == 'contabilizado' %}success{% elif asiento.estado == 'borrador' %}warning{% else %}danger{% endif %}">{{ asiento.get_estado_display }}</span></td>
                     <td>L. {{ asiento.total_debe }}</td>
                     <td>L. {{ asiento.total_haber }}</td>
-                    <td class="actions"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a>{% if asiento.estado == "borrador" %}<a class="erp-link" href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}">Editar</a>{% elif asiento.estado == "contabilizado" and erp_access.contabilizar_asientos %}<form method="post" action="{% url 'regresar_asiento_borrador' empresa.slug asiento.id %}" style="display:inline;">{% csrf_token %}<button class="erp-link" type="submit">A borrador</button></form>{% endif %}</td>
+                    <td class="actions">
+                        <a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a>
+                        {% if asiento.estado == "borrador" and erp_access.asientos_contables %}
+                        <a class="erp-link" href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}">Editar</a>
+                        {% endif %}
+                        {% if asiento.estado == "contabilizado" and erp_access.contabilizar_asientos %}
+                        <form method="post" action="{% url 'regresar_asiento_borrador' empresa.slug asiento.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button class="erp-link" type="submit">Regresar a borrador</button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" class="erp-empty">Todavia no hay asientos creados.</td></tr>
+                <tr><td colspan="8" class="erp-empty">Todavía no hay asientos creados.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

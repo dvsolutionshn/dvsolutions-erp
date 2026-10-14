@@ -3,7 +3,7 @@
 {% block title %}{{ titulo }}{% endblock %}
 {% block header_kicker %}Contabilidad{% endblock %}
 {% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Registra operaciones del diario con una captura mas agil: busca cuentas por codigo o nombre, arma contrapartidas rapido y deja el asiento balanceado sin friccion.{% endblock %}
+{% block header_description %}Registra operaciones del diario, busca cuentas por código o nombre y revisa las contrapartidas antes de contabilizar.{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'asientos_contables' empresa.slug %}" class="erp-action-link">Volver a Asientos</a>
@@ -378,11 +378,15 @@
 
 <form method="post" class="erp-form-shell erp-asiento-shell" autocomplete="off">
     {% csrf_token %}
+    <input type="hidden" name="{{ form.estado.html_name }}" value="borrador">
+    {{ form.non_field_errors }}
+    {{ form.estado.errors }}
+    {{ form.contabilizar_ahora.errors }}
     <section class="erp-asiento-header">
         <article class="erp-form-card">
             <div class="erp-asiento-header-copy">
                 <h3>Cabecera del asiento</h3>
-                <p>Completa la referencia contable del periodo y deja la captura lista para trabajar el mes con mayor velocidad.</p>
+                <p>Completa los datos del asiento y revisa el período al que corresponde.</p>
             </div>
             <div class="erp-form-grid">
                 <div class="erp-field">
@@ -398,31 +402,19 @@
                     {{ form.descripcion.errors }}
                 </div>
                 <div class="erp-field">
-                    <label for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
-                    {{ form.estado }}
-                    {% if form.estado.help_text %}<div class="erp-field-help">{{ form.estado.help_text }}</div>{% endif %}
-                    {{ form.estado.errors }}
-                </div>
-                <div class="erp-field">
                     <label for="{{ form.referencia.id_for_label }}">{{ form.referencia.label }}</label>
                     {{ form.referencia }}
                     {% if form.referencia.help_text %}<div class="erp-field-help">{{ form.referencia.help_text }}</div>{% endif %}
                     {{ form.referencia.errors }}
                 </div>
                 <div class="erp-field">
-                    <label for="{{ form.origen.id_for_label }}">{{ form.origen.label }}</label>
-                    {{ form.origen }}
-                    {% if form.origen.help_text %}<div class="erp-field-help">{{ form.origen.help_text }}</div>{% endif %}
-                    {{ form.origen.errors }}
+                    <label for="{{ form.origen_modulo.id_for_label }}">{{ form.origen_modulo.label }}</label>
+                    {{ form.origen_modulo }}
+                    {% if form.origen_modulo.help_text %}<div class="erp-field-help">{{ form.origen_modulo.help_text }}</div>{% endif %}
+                    {{ form.origen_modulo.errors }}
                 </div>
-                <div class="erp-field erp-asiento-inline-check">
-                    <label for="{{ form.contabilizar_ahora.id_for_label }}">{{ form.contabilizar_ahora.label }}</label>
-                    <div class="erp-asiento-toggle">
-                        <span>Listo para contabilizar</span>
-                        {{ form.contabilizar_ahora }}
-                    </div>
-                    {% if form.contabilizar_ahora.help_text %}<div class="erp-field-help">{{ form.contabilizar_ahora.help_text }}</div>{% endif %}
-                    {{ form.contabilizar_ahora.errors }}
+                <div class="erp-field erp-field-span-full">
+                    <p class="erp-field-help">Guarda el asiento como borrador para revisarlo.{% if form.puede_contabilizar %} Usa «Guardar y contabilizar» cuando esté listo.{% else %} Un usuario autorizado debe contabilizarlo después de la revisión.{% endif %}</p>
                 </div>
             </div>
         </article>
@@ -432,17 +424,17 @@
                 <div class="erp-asiento-kpi">
                     <div class="erp-kpi-label">Debe acumulado</div>
                     <strong id="erpAsientoDebe">L. 0.00</strong>
-                    <small>Suma en vivo de todas las lineas en debe.</small>
+                    <small>Suma de todas las líneas en el Debe.</small>
                 </div>
                 <div class="erp-asiento-kpi">
                     <div class="erp-kpi-label">Haber acumulado</div>
                     <strong id="erpAsientoHaber">L. 0.00</strong>
-                    <small>Suma en vivo de todas las lineas en haber.</small>
+                    <small>Suma de todas las líneas en el Haber.</small>
                 </div>
                 <div class="erp-asiento-kpi is-alert">
                     <div class="erp-kpi-label">Diferencia</div>
                     <strong id="erpAsientoDiferencia">L. 0.00</strong>
-                    <small id="erpAsientoEstado">Cuando llegue a cero, el asiento queda listo para contabilizarse.</small>
+                    <small id="erpAsientoEstado">Revisa las cuentas y los importes antes de contabilizar.</small>
                 </div>
             </div>
         </article>
@@ -451,10 +443,10 @@
     <section class="erp-form-card erp-asiento-lines">
         <div class="erp-asiento-toolbar">
             <div class="erp-asiento-toolbar-copy">
-                <h3>Lineas del asiento</h3>
-                <p>Busca cuentas por codigo o nombre, completa la operacion y deja que el sistema te ayude a preparar la contrapartida y la siguiente linea.</p>
+                <h3>Líneas del asiento</h3>
+                <p>Busca cuentas por código o nombre. El sistema prepara la siguiente contrapartida para que puedas revisarla.</p>
             </div>
-            <button type="button" class="erp-btn erp-asiento-add" id="erpAddAsientoLine">Agregar linea</button>
+            <button type="button" class="erp-btn erp-asiento-add" id="erpAddAsientoLine">Agregar línea</button>
         </div>
 
         {{ formset.management_form }}
@@ -480,14 +472,14 @@
                                 class="erp-account-search"
                                 data-role="cuenta-search"
                                 data-target-id="{{ linea_form.cuenta.id_for_label }}"
-                                placeholder="Codigo o nombre de la cuenta"
+                                placeholder="Código o nombre de la cuenta"
                                 autocomplete="off"
                                 spellcheck="false"
                             >
                             <span class="erp-account-caret">▾</span>
                             <div class="erp-account-results" data-role="cuenta-results"></div>
                         </div>
-                        <div class="erp-asiento-pair">Tip: escribe <strong>1101</strong>, <strong>banco</strong> o parte del nombre para filtrar al instante.</div>
+                        <div class="erp-asiento-pair">Sugerencia: escribe <strong>1101</strong>, <strong>banco</strong> o parte del nombre para filtrar.</div>
                         {{ linea_form.cuenta.errors }}
                     </div>
                 </div>
@@ -512,7 +504,7 @@
                 <div class="erp-asiento-cell">
                     <div class="erp-asiento-delete">
                         {% if linea_form.DELETE %}{{ linea_form.DELETE }}{% endif %}
-                        <button type="button" class="erp-asiento-remove" data-role="remove-line" aria-label="Eliminar linea">&times;</button>
+                        <button type="button" class="erp-asiento-remove" data-role="remove-line" aria-label="Eliminar línea">&times;</button>
                     </div>
                 </div>
             </div>
@@ -531,14 +523,14 @@
                                 class="erp-account-search"
                                 data-role="cuenta-search"
                                 data-target-id="{{ formset.empty_form.cuenta.id_for_label }}"
-                                placeholder="Codigo o nombre de la cuenta"
+                                placeholder="Código o nombre de la cuenta"
                                 autocomplete="off"
                                 spellcheck="false"
                             >
                             <span class="erp-account-caret">▾</span>
                             <div class="erp-account-results" data-role="cuenta-results"></div>
                         </div>
-                        <div class="erp-asiento-pair">Tip: escribe <strong>1101</strong>, <strong>banco</strong> o parte del nombre para filtrar al instante.</div>
+                        <div class="erp-asiento-pair">Sugerencia: escribe <strong>1101</strong>, <strong>banco</strong> o parte del nombre para filtrar.</div>
                     </div>
                 </div>
                 <div class="erp-asiento-cell">
@@ -559,7 +551,7 @@
                 <div class="erp-asiento-cell">
                     <div class="erp-asiento-delete">
                         {% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE }}{% endif %}
-                        <button type="button" class="erp-asiento-remove" data-role="remove-line" aria-label="Eliminar linea">&times;</button>
+                        <button type="button" class="erp-asiento-remove" data-role="remove-line" aria-label="Eliminar línea">&times;</button>
                     </div>
                 </div>
             </div>
@@ -569,15 +561,18 @@
 
         <div class="erp-asiento-actions">
             <div class="erp-asiento-actions-copy">
-                Puedes trabajar el mes completo dentro de un solo asiento. Cuando cierres una pareja Debe/Haber, el sistema prepara la siguiente linea para que sigas sin detenerte.
+                Revisa cada operación y su respaldo. Al completar una pareja Debe/Haber, el sistema prepara la siguiente línea.
             </div>
-            <button type="button" class="erp-btn-secondary erp-asiento-add" id="erpAddAsientoLineBottom">Agregar linea</button>
+            <button type="button" class="erp-btn-secondary erp-asiento-add" id="erpAddAsientoLineBottom">Agregar línea</button>
         </div>
     </section>
 
     <div class="erp-form-actions">
         <a href="{% url 'asientos_contables' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Asiento</button>
+        <button type="submit" class="erp-btn-secondary">Guardar borrador</button>
+        {% if form.puede_contabilizar %}
+        <button type="submit" class="erp-btn" name="contabilizar_ahora" value="1">Guardar y contabilizar</button>
+        {% endif %}
     </div>
 </form>
 
@@ -663,9 +658,9 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("erpAsientoDiferencia").textContent = formatMoney(Math.abs(diff));
         const estado = document.getElementById("erpAsientoEstado");
         if (diff === 0 && totalDebe > 0) {
-            estado.textContent = "Asiento balanceado. Ya puedes contabilizarlo cuando quieras.";
+            estado.textContent = "Asiento cuadrado. Listo para la revisión y contabilización por un usuario autorizado.";
         } else if (totalDebe === 0 && totalHaber === 0) {
-            estado.textContent = "Agrega lineas para empezar a construir el asiento del mes.";
+            estado.textContent = "Agrega líneas para empezar a construir el asiento.";
         } else if (diff > 0) {
             estado.textContent = "Falta contrapartida en Haber para cerrar las operaciones capturadas.";
         } else {

@@ -71,7 +71,7 @@ class ImportarCatalogoCuentasForm(forms.Form):
 class PeriodoContableForm(forms.ModelForm):
     class Meta:
         model = PeriodoContable
-        fields = ["anio", "mes", "estado", "observacion"]
+        fields = ["anio", "mes", "observacion"]
         widgets = {
             "observacion": forms.Textarea(attrs={"rows": 3}),
         }
@@ -81,10 +81,34 @@ class PeriodoContableForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if empresa:
             self.instance.empresa = empresa
-        self.fields["anio"].label = "Anio"
+        self._estado_original = self.instance.estado
+        self._periodo_original = (self.instance.anio, self.instance.mes)
+        self.fields["anio"].label = "Año"
         self.fields["mes"].label = "Mes"
-        self.fields["estado"].label = "Estado"
-        self.fields["observacion"].label = "Observacion"
+        self.fields["observacion"].label = "Observación"
+        if self.instance.pk:
+            for nombre in ("anio", "mes"):
+                self.fields[nombre].disabled = True
+                self.fields[nombre].help_text = "El año y el mes de un período existente no se pueden cambiar."
+
+    def clean(self):
+        cleaned_data = super().clean()
+        estado_enviado = self.data.get(self.add_prefix("estado"))
+        if estado_enviado is not None and estado_enviado != self._estado_original:
+            raise forms.ValidationError(
+                "El estado no se modifica desde este formulario. Usa la revisión del cierre o la reapertura con motivo."
+            )
+        if self.instance.pk:
+            for nombre, original in zip(("anio", "mes"), self._periodo_original):
+                enviado = self.data.get(self.add_prefix(nombre))
+                if enviado is not None:
+                    try:
+                        coincide = int(enviado) == original
+                    except (TypeError, ValueError):
+                        coincide = False
+                    if not coincide:
+                        self.add_error(nombre, "El año y el mes de un período existente no se pueden cambiar.")
+        return cleaned_data
 
 
 class ClasificacionCompraFiscalForm(forms.ModelForm):
@@ -189,7 +213,7 @@ class MovimientoBancarioEdicionForm(forms.ModelForm):
         model = MovimientoBancario
         fields = ["fecha", "descripcion", "referencia", "debito", "credito", "saldo", "clasificacion"]
         widgets = {
-            "fecha": forms.DateInput(attrs={"type": "date"}),
+            "fecha": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "descripcion": forms.TextInput(),
             "referencia": forms.TextInput(),
             "debito": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
@@ -284,10 +308,44 @@ class AsientoContableForm(forms.ModelForm):
         fields = ["fecha", "descripcion", "referencia", "origen_modulo", "estado"]
 
     def __init__(self, *args, **kwargs):
+        usuario = kwargs.pop("usuario", None)
+        empresa = kwargs.pop("empresa", None)
+        puede_contabilizar = kwargs.pop("puede_contabilizar", None)
         super().__init__(*args, **kwargs)
-        self.fields["fecha"].widget = forms.DateInput(attrs={"type": "date"})
-        self.fields["estado"].help_text = "Puedes guardarlo en borrador o dejarlo listo para contabilizar."
+        if empresa:
+            self.instance.empresa = empresa
+        if puede_contabilizar is None:
+            empresa = empresa or getattr(self.instance, "empresa", None)
+            puede_contabilizar = bool(
+                usuario
+                and usuario.tiene_permiso_erp("puede_contabilizar_asientos", empresa)
+            )
+        self.puede_contabilizar = bool(puede_contabilizar)
+        self.fields["fecha"].widget = forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+        self.fields["fecha"].label = "Fecha"
+        self.fields["descripcion"].label = "Descripción"
+        self.fields["referencia"].label = "Referencia"
+        self.fields["estado"].choices = [
+            opcion for opcion in AsientoContable.ESTADO_CHOICES
+            if opcion[0] == "borrador" or (self.puede_contabilizar and opcion[0] == "contabilizado")
+        ]
+        self.fields["estado"].required = False
+        self.fields["estado"].widget = forms.HiddenInput()
+        self.fields["estado"].initial = "borrador"
+        self.fields["contabilizar_ahora"].disabled = not self.puede_contabilizar
+        self.fields["contabilizar_ahora"].widget = forms.HiddenInput()
         self.fields["origen_modulo"].label = "Origen"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        estado_enviado = self.data.get(self.add_prefix("estado"))
+        contabilizar_enviado = forms.BooleanField(required=False).to_python(
+            self.data.get(self.add_prefix("contabilizar_ahora"))
+        )
+        if not self.puede_contabilizar and (estado_enviado == "contabilizado" or contabilizar_enviado):
+            raise forms.ValidationError("Tu rol no tiene permiso para contabilizar asientos.")
+        cleaned_data["estado"] = cleaned_data.get("estado") or "borrador"
+        return cleaned_data
 
 
 class ConfiguracionContableEmpresaForm(forms.ModelForm):

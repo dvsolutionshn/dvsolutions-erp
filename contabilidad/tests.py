@@ -192,7 +192,7 @@ class ContabilidadTests(TestCase):
         response = self.client.get(reverse("checklist_cierre_periodo", args=[self.empresa.slug, periodo.id]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Checklist de Cierre")
+        self.assertContains(response, "Revisión del cierre")
         self.assertContains(response, "Asientos Borrador")
         self.assertContains(response, "Sin Conciliar")
 
@@ -713,7 +713,7 @@ class ContabilidadTests(TestCase):
         )
 
         self.client.login(username="contador", password="pass12345")
-        response = self.client.get(reverse("aplicar_reglas_bancarias", args=[self.empresa.slug]))
+        response = self.client.post(reverse("aplicar_reglas_bancarias", args=[self.empresa.slug]))
 
         self.assertRedirects(response, reverse("movimientos_bancarios", args=[self.empresa.slug]))
         movimiento.refresh_from_db()
@@ -1244,7 +1244,7 @@ class ContabilidadTests(TestCase):
         response = self.client.get(reverse("crear_asiento_contable", args=[self.empresa.slug]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Codigo o nombre de la cuenta")
+        self.assertContains(response, "Código o nombre de la cuenta")
         self.assertContains(response, "Caja General")
 
     def test_libro_diario_responde_con_partidas(self):

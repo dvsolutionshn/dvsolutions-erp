@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.utils import translation
 
 from core.access import (
     gastos_adicionales_habilitados,
@@ -108,6 +109,11 @@ class EmpresaAccessMiddleware:
                     if not suffix and not request.user.tiene_alguna_permision_contabilidad_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de contabilidad.")
                         return redirect("dashboard", slug=empresa.slug)
+
+                # Español y formato numérico centroamericano: 1,234.56.
+                with translation.override("es-ni"):
+                    request.LANGUAGE_CODE = "es-ni"
+                    return self.get_response(request)
 
         if len(parts) >= 3 and parts[1] == "dashboard" and parts[2] == "rrhh":
             empresa_slug = parts[0]

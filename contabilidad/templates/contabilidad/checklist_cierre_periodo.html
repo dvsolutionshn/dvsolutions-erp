@@ -1,15 +1,15 @@
 {% extends "core/erp_base.html" %}
 {% load humanize %}
 
-{% block title %}Checklist Cierre {{ periodo.mes }}/{{ periodo.anio }} - {{ empresa.nombre }}{% endblock %}
+{% block title %}Revisión del cierre {{ periodo.mes }}/{{ periodo.anio }} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Cierre Contable{% endblock %}
-{% block header_title %}Checklist de Cierre {{ periodo.mes }}/{{ periodo.anio }}{% endblock %}
-{% block header_description %}Revisa si el periodo esta listo antes de cerrar: asientos, bancos, conciliacion y balance del mes.{% endblock %}
+{% block header_title %}Revisión del cierre {{ periodo.mes }}/{{ periodo.anio }}{% endblock %}
+{% block header_description %}Revisa los documentos, asientos, bancos, conciliaciones y balance del mes de esta empresa antes de cerrar.{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'periodos_contables' empresa.slug %}" class="erp-action-link">Volver a Periodos</a>
-<a href="{% url 'conciliacion_bancaria' empresa.slug %}?desde={{ periodo.fecha_inicio|date:'Y-m-d' }}&hasta={{ periodo.fecha_fin|date:'Y-m-d' }}" class="erp-action-link">Ir a Conciliacion</a>
-<a href="{% url 'asientos_contables' empresa.slug %}" class="erp-action-link">Ver Asientos</a>
+<a href="{% url 'periodos_contables' empresa.slug %}" class="erp-action-link">Volver a períodos</a>
+<a href="{% url 'conciliacion_bancaria' empresa.slug %}?desde={{ periodo.fecha_inicio|date:'Y-m-d' }}&hasta={{ periodo.fecha_fin|date:'Y-m-d' }}" class="erp-action-link">Ir a conciliación</a>
+<a href="{% url 'asientos_contables' empresa.slug %}?fecha_inicio={{ periodo.fecha_inicio|date:'Y-m-d' }}&fecha_fin={{ periodo.fecha_fin|date:'Y-m-d' }}" class="erp-action-link">Ver asientos del mes</a>
 {% endblock %}
 
 {% block content %}
@@ -22,7 +22,7 @@
     <article class="erp-card">
         <div class="erp-kpi-label">Bancos sin Contabilizar</div>
         <p class="erp-stat-value">{{ control.movimientos_bancarios }}</p>
-        <p class="erp-card-muted">Pendientes o clasificados que aun no tienen asiento.</p>
+        <p class="erp-card-muted">Pendientes o clasificados que aún no tienen asiento.</p>
     </article>
     <article class="erp-card">
         <div class="erp-kpi-label">Sin Conciliar</div>
@@ -30,9 +30,27 @@
         <p class="erp-card-muted">Movimientos contabilizados no confirmados contra banco.</p>
     </article>
     <article class="erp-card">
-        <div class="erp-kpi-label">Balance del Periodo</div>
+        <div class="erp-kpi-label">Balance del período</div>
         <p class="erp-stat-value">{% if control.balance_cuadrado %}Cuadrado{% else %}Diferencia{% endif %}</p>
         <p class="erp-card-muted">Debe L. {{ control.debe|floatformat:2|intcomma }} / Haber L. {{ control.haber|floatformat:2|intcomma }}</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Asientos con errores</div>
+        <p class="erp-stat-value">{{ control.asientos_invalidos }}</p>
+        <p class="erp-card-muted">Partidas contabilizadas sin líneas suficientes, descuadradas o con cuentas de otra empresa.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Documentos sin asiento</div>
+        <p class="erp-stat-value">{{ control.documentos_sin_asiento }}</p>
+        <p class="erp-card-muted">Operaciones confirmadas de facturación, compras y nómina sin su partida contabilizada.</p>
+    </article>
+    <article class="erp-card">
+        <div class="erp-kpi-label">Bancos sin asiento válido</div>
+        <p class="erp-stat-value">{{ control.movimientos_sin_asiento }}</p>
+        <p class="erp-card-muted">Movimientos marcados como contabilizados sin una partida contabilizada de esta empresa.</p>
+        {% if control.movimientos_sin_asiento %}
+        <a class="erp-link" href="{% url 'movimientos_bancarios' empresa.slug %}?estado=contabilizado&desde={{ periodo.fecha_inicio|date:'Y-m-d' }}&hasta={{ periodo.fecha_fin|date:'Y-m-d' }}">Revisar movimientos</a>
+        {% endif %}
     </article>
 </section>
 
@@ -40,17 +58,69 @@
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title">Resultado de cierre</h3>
-            <p class="erp-card-muted">El cierre se permite solamente cuando todos los controles estan listos.</p>
+            <p class="erp-card-muted">El cierre se permite solamente cuando todos los controles están listos.</p>
         </div>
         <div class="erp-actions-right">
-            {% if control.total == 0 and periodo.estado != "cerrado" %}
-            <a class="erp-btn" href="{% url 'cerrar_periodo_contable' empresa.slug periodo.id %}">Cerrar Periodo</a>
-            {% elif periodo.estado == "cerrado" %}
-            <span class="erp-badge success">Periodo cerrado</span>
+            {% if periodo.estado == "cerrado" %}
+            <span class="erp-badge success">Período cerrado</span>
+            {% elif control.total == 0 and erp_access.contabilizar_asientos %}
+            <form method="post" action="{% url 'cerrar_periodo_contable' empresa.slug periodo.id %}">
+                {% csrf_token %}
+                <button class="erp-btn" type="submit">Cerrar período</button>
+            </form>
+            {% elif control.total == 0 %}
+            <span class="erp-badge">Listo para cierre por un usuario autorizado</span>
             {% else %}
-            <span class="erp-badge warning">Pendiente de revision</span>
+            <span class="erp-badge warning">Pendiente de revisión</span>
             {% endif %}
         </div>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Asientos contabilizados con errores</h3>
+    <p class="erp-card-muted">Revisa las cuentas, las líneas y la igualdad entre Debe y Haber de cada partida.</p>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Fecha</th><th>Número</th><th>Descripción</th><th>Debe</th><th>Haber</th><th>Acción</th></tr></thead>
+            <tbody>
+                {% for asiento in asientos_invalidos %}
+                <tr>
+                    <td>{{ asiento.fecha|date:"d/m/Y" }}</td>
+                    <td>{{ asiento.numero|default:"Sin número" }}</td>
+                    <td>{{ asiento.descripcion }}</td>
+                    <td class="amount">L. {{ asiento.total_debe|floatformat:2|intcomma }}</td>
+                    <td class="amount">L. {{ asiento.total_haber|floatformat:2|intcomma }}</td>
+                    <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Revisar asiento</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="erp-empty">No hay asientos contabilizados con errores detectados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Documentos pendientes de contabilización</h3>
+    <p class="erp-card-muted">Cada documento confirmado debe conservar su vínculo con una partida contabilizada dentro de esta empresa.</p>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Referencia</th><th>Descripción</th><th>Acción</th></tr></thead>
+            <tbody>
+                {% for documento in documentos_sin_asiento %}
+                <tr>
+                    <td>{{ documento.fecha|date:"d/m/Y" }}</td>
+                    <td>{{ documento.tipo }}</td>
+                    <td>{{ documento.referencia|default:"-" }}</td>
+                    <td>{{ documento.descripcion }}</td>
+                    <td>{% if documento.url %}<a class="erp-link" href="{{ documento.url }}">Revisar documento</a>{% else %}Revisar respaldo{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="erp-empty">No hay documentos pendientes de contabilización detectados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </section>
 
@@ -58,11 +128,11 @@
     <h3 class="erp-panel-title">Asientos en borrador</h3>
     <div class="erp-table-wrap">
         <table class="erp-table">
-            <thead><tr><th>Fecha</th><th>Descripcion</th><th>Referencia</th><th>Debe</th><th>Haber</th><th>Accion</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Descripción</th><th>Referencia</th><th>Debe</th><th>Haber</th><th>Acción</th></tr></thead>
             <tbody>
                 {% for asiento in asientos_borrador %}
                 <tr>
-                    <td>{{ asiento.fecha }}</td>
+                    <td>{{ asiento.fecha|date:"d/m/Y" }}</td>
                     <td>{{ asiento.descripcion }}</td>
                     <td>{{ asiento.referencia|default:"-" }}</td>
                     <td class="amount">L. {{ asiento.total_debe|floatformat:2|intcomma }}</td>
@@ -70,7 +140,7 @@
                     <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Revisar</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="erp-empty">No hay asientos borrador en este periodo.</td></tr>
+                <tr><td colspan="6" class="erp-empty">No hay asientos en borrador en este período.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -81,11 +151,11 @@
     <h3 class="erp-panel-title">Movimientos bancarios sin contabilizar</h3>
     <div class="erp-table-wrap">
         <table class="erp-table">
-            <thead><tr><th>Fecha</th><th>Cuenta</th><th>Descripcion</th><th>Debito</th><th>Credito</th><th>Estado</th><th>Accion</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Cuenta</th><th>Descripción</th><th>Débito</th><th>Crédito</th><th>Estado</th><th>Acción</th></tr></thead>
             <tbody>
                 {% for movimiento in movimientos_no_contabilizados %}
                 <tr>
-                    <td>{{ movimiento.fecha }}</td>
+                    <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
                     <td>{{ movimiento.cuenta_financiera.nombre }}</td>
                     <td>{{ movimiento.descripcion }}</td>
                     <td class="amount">L. {{ movimiento.debito|floatformat:2|intcomma }}</td>
@@ -105,11 +175,11 @@
     <h3 class="erp-panel-title">Movimientos contabilizados sin conciliar</h3>
     <div class="erp-table-wrap">
         <table class="erp-table">
-            <thead><tr><th>Fecha</th><th>Cuenta</th><th>Descripcion</th><th>Monto</th><th>Asiento</th><th>Accion</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Cuenta</th><th>Descripción</th><th>Monto</th><th>Asiento</th><th>Acción</th></tr></thead>
             <tbody>
                 {% for movimiento in movimientos_sin_conciliar %}
                 <tr>
-                    <td>{{ movimiento.fecha }}</td>
+                    <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
                     <td>{{ movimiento.cuenta_financiera.nombre }}</td>
                     <td>{{ movimiento.descripcion }}</td>
                     <td class="amount">L. {{ movimiento.monto|floatformat:2|intcomma }}</td>

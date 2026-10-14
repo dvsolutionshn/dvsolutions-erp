@@ -3,9 +3,135 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import models, router, transaction
 
 from core.models import Empresa
+
+
+def bloquear_empresas_contables(empresa_ids, using="default"):
+    """Comparte con el cierre mensual el bloqueo por empresa, en orden estable."""
+    ids = sorted({empresa_id for empresa_id in empresa_ids if empresa_id is not None})
+    list(Empresa.objects.using(using).select_for_update().filter(pk__in=ids).order_by("pk"))
+
+
+def validar_fecha_contable_abierta(empresa_id, fecha, using="default"):
+    if empresa_id and fecha and PeriodoContable.objects.using(using).filter(
+        empresa_id=empresa_id, anio=fecha.year, mes=fecha.month, estado="cerrado"
+    ).exists():
+        raise ValidationError(
+            "El período contable está cerrado. No se pueden modificar sus registros; "
+            "registre el ajuste en un período abierto o solicite una reapertura autorizada."
+        )
+
+
+class RegistrosContablesQuerySet(models.QuerySet):
+    """Las escrituras en lote conservan las mismas reglas que la edición individual."""
+
+    def _empresas(self):
+        campo = "asiento__empresa_id" if self.model.__name__ == "LineaAsientoContable" else "empresa_id"
+        return self.values_list(campo, flat=True)
+
+    def update(self, **kwargs):
+        if self.query.is_sliced:
+            raise TypeError("No se puede actualizar una consulta después de limitar sus resultados.")
+        if any(hasattr(valor, "resolve_expression") for valor in kwargs.values()):
+            raise ValidationError("Actualice los registros contables con valores explícitos para validar el período.")
+        with transaction.atomic(using=self.db):
+            bloquear_empresas_contables(self._empresas(), using=self.db)
+            registros = list(self.model.objects.using(self.db).filter(pk__in=self.values("pk")))
+            for registro in registros:
+                for campo, valor in kwargs.items():
+                    setattr(registro, campo, valor)
+                registro.save(using=self.db, update_fields=list(kwargs))
+            self._result_cache = None
+            return len(registros)
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        objs = list(objs)
+        if not fields:
+            raise ValueError("La actualización debe indicar al menos un campo.")
+        if any(obj.pk is None for obj in objs):
+            raise ValueError("Todos los registros deben tener identificador para actualizarlos.")
+        with transaction.atomic(using=self.db):
+            originales = self.filter(pk__in=[obj.pk for obj in objs])
+            bloquear_empresas_contables(originales._empresas(), using=self.db)
+            existentes = set(originales.values_list("pk", flat=True))
+            for obj in objs:
+                if obj.pk in existentes:
+                    obj.save(using=self.db, update_fields=fields)
+            return len(existentes)
+
+    def bulk_create(self, objs, batch_size=None, ignore_conflicts=False, update_conflicts=False,
+                    update_fields=None, unique_fields=None):
+        if update_conflicts:
+            raise ValidationError(
+                "No se pueden reemplazar registros contables por conflicto. Use la actualización validada del registro existente."
+            )
+        objs = list(objs)
+        with transaction.atomic(using=self.db):
+            if self.model.__name__ == "LineaAsientoContable":
+                ids = AsientoContable.objects.using(self.db).filter(
+                    pk__in=[obj.asiento_id for obj in objs]
+                ).values_list("empresa_id", flat=True)
+            else:
+                ids = [obj.empresa_id for obj in objs]
+            bloquear_empresas_contables(ids, using=self.db)
+            for obj in objs:
+                obj.full_clean()
+            return super().bulk_create(
+                objs, batch_size=batch_size, ignore_conflicts=ignore_conflicts,
+                update_conflicts=update_conflicts, update_fields=update_fields, unique_fields=unique_fields,
+            )
+
+    def delete(self):
+        with transaction.atomic(using=self.db):
+            bloquear_empresas_contables(self._empresas(), using=self.db)
+            for registro in self:
+                registro.validar_eliminacion(using=self.db)
+            return super().delete()
+
+
+class RegistroFechaContableMixin:
+    """Protege tanto la fecha guardada como la nueva, sin confiar en el formulario."""
+
+    def _datos_guardados(self, using):
+        if self.pk:
+            return type(self).objects.using(using).filter(pk=self.pk).values("empresa_id", "fecha").first()
+        return None
+
+    def _validar_periodos(self, using):
+        anterior = self._datos_guardados(using)
+        if anterior:
+            validar_fecha_contable_abierta(anterior["empresa_id"], anterior["fecha"], using)
+            if anterior["empresa_id"] != self.empresa_id:
+                raise ValidationError("No se puede trasladar un registro contable a otra empresa.")
+        validar_fecha_contable_abierta(self.empresa_id, self.fecha, using)
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            anterior = self._datos_guardados(using)
+            bloquear_empresas_contables(
+                [self.empresa_id, anterior["empresa_id"] if anterior else None], using=using
+            )
+            self._validar_periodos(using)
+            self.full_clean()
+            return super().save(*args, **kwargs)
+
+    def validar_eliminacion(self, using=None):
+        using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        anterior = self._datos_guardados(using)
+        if anterior:
+            bloquear_empresas_contables([anterior["empresa_id"]], using=using)
+            anterior = self._datos_guardados(using)
+            if anterior:
+                validar_fecha_contable_abierta(anterior["empresa_id"], anterior["fecha"], using)
+
+    def delete(self, using=None, keep_parents=False):
+        using = using or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            self.validar_eliminacion(using=using)
+            return super().delete(using=using, keep_parents=keep_parents)
 
 
 class CuentaContable(models.Model):
@@ -162,6 +288,7 @@ class PeriodoContable(models.Model):
     )
     fecha_cierre = models.DateTimeField(null=True, blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
+    objects = RegistrosContablesQuerySet.as_manager()
 
     class Meta:
         ordering = ["-anio", "-mes"]
@@ -170,8 +297,80 @@ class PeriodoContable(models.Model):
         verbose_name_plural = "Periodos contables"
 
     def clean(self):
+        if not isinstance(self.anio, int) or not 1 <= self.anio <= 9999:
+            raise ValidationError({"anio": "El año debe estar entre 1 y 9999."})
         if self.mes < 1 or self.mes > 12:
             raise ValidationError("El mes debe estar entre 1 y 12.")
+        anterior = self._datos_guardados()
+        if anterior and any(
+            anterior[campo] != getattr(self, campo) for campo in ("empresa_id", "anio", "mes")
+        ):
+            raise ValidationError("La empresa, el año y el mes de un período existente no se pueden modificar.")
+
+    def _datos_guardados(self, using=None):
+        using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        if self.pk:
+            return type(self).objects.using(using).filter(pk=self.pk).values(
+                "empresa_id", "anio", "mes", "estado", "cerrado_por_id", "fecha_cierre"
+            ).first()
+        return None
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            anterior = self._datos_guardados(using)
+            bloquear_empresas_contables(
+                [self.empresa_id, anterior["empresa_id"] if anterior else None], using=using
+            )
+            anterior = self._datos_guardados(using)
+            if anterior and not getattr(self, "_transicion_estado_autorizada", False) and any(
+                anterior[campo] != getattr(self, campo)
+                for campo in ("estado", "cerrado_por_id", "fecha_cierre")
+            ):
+                raise ValidationError("Use la acción autorizada de cierre o reapertura para cambiar el estado del período.")
+            self.full_clean()
+            return super().save(*args, **kwargs)
+
+    def cambiar_estado(self, estado, *, cerrado_por=None, fecha_cierre=None):
+        """Persistencia de la transición; el servicio autorizado verifica los pendientes."""
+        if estado not in dict(self.ESTADO_CHOICES):
+            raise ValidationError("El estado del período no es válido.")
+        if not self.pk:
+            raise ValidationError("Guarde el período antes de cerrarlo o reabrirlo.")
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            bloquear_empresas_contables([self.empresa_id], using=using)
+            anterior = self._datos_guardados(using)
+            if not anterior:
+                raise ValidationError("El período contable ya no existe.")
+            if anterior["estado"] == estado:
+                self.estado = anterior["estado"]
+                self.cerrado_por_id = anterior["cerrado_por_id"]
+                self.fecha_cierre = anterior["fecha_cierre"]
+                return self
+            self.estado = estado
+            self.cerrado_por = cerrado_por if estado == "cerrado" else None
+            self.fecha_cierre = fecha_cierre if estado == "cerrado" else None
+            self._transicion_estado_autorizada = True
+            try:
+                self.save(using=using, update_fields=["estado", "cerrado_por", "fecha_cierre"])
+            finally:
+                self._transicion_estado_autorizada = False
+            return self
+
+    def validar_eliminacion(self, using=None):
+        using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        anterior = self._datos_guardados(using)
+        if anterior:
+            bloquear_empresas_contables([anterior["empresa_id"]], using=using)
+            if self._datos_guardados(using)["estado"] == "cerrado":
+                raise ValidationError("No se puede eliminar un período cerrado. Use la reapertura autorizada.")
+
+    def delete(self, using=None, keep_parents=False):
+        using = using or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            self.validar_eliminacion(using=using)
+            return super().delete(using=using, keep_parents=keep_parents)
 
     @property
     def fecha_inicio(self):
@@ -231,7 +430,7 @@ class ClasificacionCompraFiscal(models.Model):
         return f"{self.nombre} -> {self.cuenta_contable}"
 
 
-class AsientoContable(models.Model):
+class AsientoContable(RegistroFechaContableMixin, models.Model):
     ESTADO_CHOICES = [
         ("borrador", "Borrador"),
         ("contabilizado", "Contabilizado"),
@@ -256,6 +455,7 @@ class AsientoContable(models.Model):
         related_name="asientos_creados",
     )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
+    objects = RegistrosContablesQuerySet.as_manager()
 
     class Meta:
         ordering = ["-fecha", "-id"]
@@ -325,12 +525,7 @@ class AsientoContable(models.Model):
 
     def clean(self):
         super().clean()
-        if self.empresa_id and self.fecha and PeriodoContable.fecha_bloqueada(self.empresa, self.fecha):
-            raise ValidationError("No se puede registrar un asiento en un periodo contable cerrado.")
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+        self._validar_periodos(self._state.db or router.db_for_write(type(self), instance=self))
 
 
 class LineaAsientoContable(models.Model):
@@ -339,12 +534,14 @@ class LineaAsientoContable(models.Model):
     detalle = models.CharField(max_length=200, blank=True, null=True)
     debe = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     haber = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    objects = RegistrosContablesQuerySet.as_manager()
 
     class Meta:
         verbose_name = "Linea de asiento"
         verbose_name_plural = "Lineas de asiento"
 
     def clean(self):
+        self._validar_asientos(self._state.db or router.db_for_write(type(self), instance=self))
         if self.debe < 0 or self.haber < 0:
             raise ValidationError("Los valores contables no pueden ser negativos.")
         if self.debe == 0 and self.haber == 0:
@@ -353,6 +550,50 @@ class LineaAsientoContable(models.Model):
             raise ValidationError("Una misma linea no puede tener debe y haber al mismo tiempo.")
         if self.asiento_id and self.cuenta_id and self.asiento.empresa_id != self.cuenta.empresa_id:
             raise ValidationError("La cuenta contable debe pertenecer a la misma empresa del asiento.")
+
+    def _asiento_anterior_id(self, using):
+        if self.pk:
+            return type(self).objects.using(using).filter(pk=self.pk).values_list("asiento_id", flat=True).first()
+        return None
+
+    def _asientos_guardados(self, using):
+        return AsientoContable.objects.using(using).filter(
+            pk__in=[pk for pk in (self.asiento_id, self._asiento_anterior_id(using)) if pk]
+        ).values("empresa_id", "fecha")
+
+    def _validar_asientos(self, using):
+        asientos = list(self._asientos_guardados(using))
+        if len({asiento["empresa_id"] for asiento in asientos}) > 1:
+            raise ValidationError("No se puede trasladar una línea contable a otra empresa.")
+        for asiento in asientos:
+            validar_fecha_contable_abierta(asiento["empresa_id"], asiento["fecha"], using)
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            bloquear_empresas_contables(
+                [asiento["empresa_id"] for asiento in self._asientos_guardados(using)], using=using
+            )
+            self.full_clean()
+            return super().save(*args, **kwargs)
+
+    def validar_eliminacion(self, using=None):
+        using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        asiento_id = self._asiento_anterior_id(using)
+        asiento = AsientoContable.objects.using(using).filter(pk=asiento_id).values("empresa_id", "fecha").first()
+        if asiento:
+            bloquear_empresas_contables([asiento["empresa_id"]], using=using)
+            asiento = AsientoContable.objects.using(using).filter(
+                pk=self._asiento_anterior_id(using)
+            ).values("empresa_id", "fecha").first()
+            if asiento:
+                validar_fecha_contable_abierta(asiento["empresa_id"], asiento["fecha"], using)
+
+    def delete(self, using=None, keep_parents=False):
+        using = using or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            self.validar_eliminacion(using=using)
+            return super().delete(using=using, keep_parents=keep_parents)
 
     def __str__(self):
         return f"{self.cuenta} - D {self.debe} / H {self.haber}"
@@ -470,7 +711,7 @@ class ReglaClasificacionBanco(models.Model):
         return f"{self.nombre}: {self.texto_busqueda} -> {self.clasificacion}"
 
 
-class MovimientoBancario(models.Model):
+class MovimientoBancario(RegistroFechaContableMixin, models.Model):
     ESTADO_CHOICES = [
         ("pendiente", "Pendiente"),
         ("clasificado", "Clasificado"),
@@ -519,6 +760,7 @@ class MovimientoBancario(models.Model):
     )
     origen_importacion = models.CharField(max_length=160, blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
+    objects = RegistrosContablesQuerySet.as_manager()
 
     class Meta:
         ordering = ["-fecha", "-id"]
@@ -528,10 +770,17 @@ class MovimientoBancario(models.Model):
 
     def clean(self):
         super().clean()
+        self._validar_periodos(self._state.db or router.db_for_write(type(self), instance=self))
         if self.cuenta_financiera_id and self.cuenta_financiera.empresa_id != self.empresa_id:
             raise ValidationError("La cuenta financiera debe pertenecer a la misma empresa.")
         if self.clasificacion_id and self.clasificacion.empresa_id != self.empresa_id:
             raise ValidationError("La clasificacion debe pertenecer a la misma empresa.")
+        if self.asiento_id and self.asiento.empresa_id != self.empresa_id:
+            raise ValidationError("El asiento debe pertenecer a la misma empresa del movimiento bancario.")
+        if self.pago_factura_id and self.pago_factura.factura.empresa_id != self.empresa_id:
+            raise ValidationError("El cobro debe pertenecer a la misma empresa del movimiento bancario.")
+        if self.pago_compra_id and self.pago_compra.compra.empresa_id != self.empresa_id:
+            raise ValidationError("El pago debe pertenecer a la misma empresa del movimiento bancario.")
         if self.debito < 0 or self.credito < 0:
             raise ValidationError("Debito y credito no pueden ser negativos.")
         if self.debito > 0 and self.credito > 0:

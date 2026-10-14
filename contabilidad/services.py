@@ -486,6 +486,14 @@ def registrar_asiento_documento(
 
     try:
         with transaction.atomic():
+            # El cierre y todas las partidas de la empresa toman este mismo bloqueo.
+            # Siempre se bloquea la empresa antes que el asiento para evitar invertir el orden.
+            type(empresa).objects.select_for_update().get(pk=empresa.pk)
+            asiento_existente = AsientoContable.objects.select_for_update().filter(
+                empresa=empresa, documento_tipo=documento_tipo, documento_id=documento_id, evento=evento,
+            ).first()
+            if asiento_existente and not (actualizar_borrador and asiento_existente.estado == "borrador"):
+                return asiento_existente
             if asiento_existente:
                 asiento = AsientoContable.objects.select_for_update().get(pk=asiento_existente.pk)
                 if asiento.estado != "borrador":
