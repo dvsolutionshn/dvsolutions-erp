@@ -20,10 +20,14 @@ class CuentaContableForm(forms.ModelForm):
             self.instance.empresa = empresa
         cuentas_padre = CuentaContable.objects.none()
         if empresa:
-            from django.db.models import Q
-            cuentas_padre = CuentaContable.objects.filter(empresa=empresa).filter(
-                Q(activa=True) | Q(tipo="orden") | Q(pk=self.instance.cuenta_padre_id),
-            ).order_by("codigo", "nombre")
+            from .alcance_catalogo import es_empresa_rumi
+            if es_empresa_rumi(empresa):
+                from django.db.models import Q
+                cuentas_padre = CuentaContable.objects.filter(empresa=empresa).filter(
+                    Q(activa=True) | Q(tipo="orden") | Q(pk=self.instance.cuenta_padre_id),
+                ).order_by("codigo", "nombre")
+            else:
+                cuentas_padre = CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre")
             if self.instance and self.instance.pk:
                 cuentas_padre = cuentas_padre.exclude(pk=self.instance.pk)
         self.fields["cuenta_padre"].queryset = cuentas_padre
@@ -32,7 +36,7 @@ class CuentaContableForm(forms.ModelForm):
         textos = {
             "codigo": ("Codigo contable", "Ejemplo: 1.1.01 o 1101 segun tu estructura."),
             "nombre": ("Nombre de la cuenta", ""),
-            "tipo": ("Tipo de cuenta", "Los controles extracontables se conservan inactivos para consulta y no admiten asientos financieros."),
+            "tipo": ("Tipo de cuenta", ""),
             "cuenta_padre": ("Cuenta padre", "Usala para crear subcuentas y reportes agrupados."),
             "actividad_flujo": ("Actividad en el flujo de efectivo", "Puede indicar operación, inversión o financiamiento para cuentas propias. La opción automática usa la clasificación de la cuenta o de su cuenta padre."),
             "descripcion": ("Descripcion", ""),
@@ -43,6 +47,19 @@ class CuentaContableForm(forms.ModelForm):
             self.fields[field_name].label = label
             if help_text:
                 self.fields[field_name].help_text = help_text
+        from .alcance_catalogo import es_empresa_rumi
+        if es_empresa_rumi(empresa):
+            self.fields["tipo"].help_text = "Los controles extracontables se conservan inactivos para consulta y no admiten asientos financieros."
+        else:
+            self.fields["tipo"].choices = [(clave, etiqueta) for clave, etiqueta in self.fields["tipo"].choices if clave != "orden"]
+            if self.instance.pk and self.instance.tipo == "orden":
+                # Conserva una eventual cuenta importada antes de restringir el alcance.
+                self.fields["tipo"].choices += [("orden", "Control extracontable existente")]
+                self.fields["tipo"].disabled = True
+                self.fields["cuenta_padre"].disabled = True
+                self.fields["cuenta_padre"].queryset = CuentaContable.objects.filter(
+                    empresa=empresa, pk=self.instance.cuenta_padre_id,
+                )
 
     def clean_codigo(self):
         codigo = (self.cleaned_data.get("codigo") or "").strip()
@@ -55,6 +72,26 @@ class CuentaContableForm(forms.ModelForm):
 
 
 class ImportarCatalogoCuentasForm(forms.Form):
+    archivo = forms.FileField(
+        label="Archivo Excel",
+        help_text="Formato esperado: codigo, nombre, tipo, codigo_padre, acepta_movimientos, activa, descripcion.",
+    )
+    actualizar_existentes = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Actualizar cuentas existentes",
+        help_text="Si el codigo ya existe para esta empresa, actualiza nombre, tipo, padre y estado.",
+    )
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data["archivo"]
+        nombre = archivo.name.lower()
+        if not nombre.endswith((".xlsx", ".xlsm")):
+            raise forms.ValidationError("Sube un archivo Excel valido en formato .xlsx o .xlsm.")
+        return archivo
+
+
+class ImportarCatalogoCuentasRumiForm(forms.Form):
     archivo = forms.FileField(
         label="Archivo Excel",
         help_text="Acepta .xlsx o .xlsm: formato estándar, catálogos jerárquicos y propuestas como RUMI, incluso con títulos antes del encabezado.",

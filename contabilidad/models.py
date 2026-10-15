@@ -189,6 +189,11 @@ class CuentaContable(models.Model):
         return f"{'-- ' * self.nivel}{self.codigo} - {self.nombre}"
 
     def clean(self):
+        if self.tipo == "orden":
+            from .alcance_catalogo import es_empresa_rumi
+            existente = self.pk and type(self).objects.filter(pk=self.pk, empresa_id=self.empresa_id, tipo="orden").exists()
+            if not es_empresa_rumi(self.empresa) and not existente:
+                raise ValidationError("Las cuentas de control extracontable están disponibles únicamente para la empresa RUMI.")
         if self.tipo == "orden" and (self.acepta_movimientos or self.activa):
             raise ValidationError("Las cuentas de control extracontable se conservan inactivas y no admiten asientos financieros.")
         if self.cuenta_padre_id:
@@ -204,6 +209,11 @@ class CuentaContable(models.Model):
                 if self.pk and cuenta.id == self.pk:
                     raise ValidationError("La jerarquia de cuentas no puede tener ciclos.")
                 cuenta = cuenta.cuenta_padre
+
+    def save(self, *args, **kwargs):
+        if self.tipo == "orden":
+            self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class ConfiguracionContableEmpresa(models.Model):

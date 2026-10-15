@@ -24,7 +24,7 @@ class ImportacionCatalogoInterfazTests(TestCase):
         plan = PlanComercial.objects.create(nombre="Plan catálogo", codigo="plan-catalogo", precio_mensual="100.00")
         PlanModulo.objects.create(plan=plan, modulo=modulo, activo=True)
         cls.empresa = Empresa.objects.create(
-            nombre="Empresa catálogo", slug="empresa-catalogo", rtn="08011999102001",
+            nombre="RUMI", slug="rumi", rtn="08011999102001",
             estado_licencia="activa", plan_comercial=plan,
         )
         cls.otra_empresa = Empresa.objects.create(
@@ -87,7 +87,7 @@ class ImportacionCatalogoInterfazTests(TestCase):
     def test_revisar_muestra_empresa_y_jerarquia_sin_guardar(self):
         respuesta = self._revisar()
         self.assertEqual(respuesta.context["vista_previa"]["creadas"], 2)
-        self.assertContains(respuesta, "Empresa catálogo")
+        self.assertContains(respuesta, "RUMI")
         self.assertContains(respuesta, "Confirmar importación")
         self.assertContains(respuesta, "Admite asientos")
         self.assertEqual(respuesta.context["vista_previa"]["filas"][1]["codigo_padre"], "100")
@@ -134,8 +134,9 @@ class ImportacionCatalogoInterfazTests(TestCase):
             reverse("importar_catalogo_cuentas", args=[self.otra_empresa.slug]),
             {"accion": "importar", "revision_token": revision.context["revision_token"], "confirmar": "on"},
         )
-        self.assertContains(respuesta, "Esta revisión pertenece a otra empresa o usuario")
-        self.assertIsNone(respuesta.context["vista_previa"])
+        self.assertTemplateUsed(respuesta, "contabilidad/importar_catalogo_cuentas.html")
+        self.assertIn("archivo", respuesta.context["form"].errors)
+        self.assertNotIn("vista_previa", respuesta.context)
         self.assertFalse(CuentaContable.objects.exists())
 
     def test_revision_no_se_reutiliza_por_otro_usuario(self):
@@ -201,3 +202,67 @@ class ImportacionCatalogoInterfazTests(TestCase):
     def test_solo_get_y_post_estan_permitidos(self):
         respuesta = self.client.put(self.url)
         self.assertEqual(respuesta.status_code, 405)
+
+
+class ImportacionCatalogoAnteriorInterfazTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        ImportacionCatalogoInterfazTests.setUpTestData.__func__(cls)
+        cls.empresa_nombre_rumi = Empresa.objects.create(
+            nombre="RUMI", slug="rumi-otra", rtn="08011999102003",
+            estado_licencia="activa", plan_comercial=cls.empresa.plan_comercial,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+        self.url = reverse("importar_catalogo_cuentas", args=[self.otra_empresa.slug])
+
+    def _archivo(self, *args, **kwargs):
+        return ImportacionCatalogoInterfazTests._archivo(self, *args, **kwargs)
+
+    def test_otras_empresas_tienen_formulario_anterior_y_actualizacion_predeterminada(self):
+        respuesta = self.client.get(self.url)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(respuesta, "contabilidad/importar_catalogo_cuentas.html")
+        self.assertEqual(set(respuesta.context["form"].fields), {"archivo", "actualizar_existentes"})
+        self.assertTrue(respuesta.context["form"]["actualizar_existentes"].value())
+        self.assertContains(respuesta, "Importar Catalogo")
+        self.assertNotContains(respuesta, "Revisar archivo")
+        self.assertNotContains(respuesta, "Conservar controles extracontables")
+        self.assertNotIn("vista_previa", respuesta.context)
+
+    def test_otras_empresas_importan_formato_estandar_en_un_solo_paso(self):
+        respuesta = self.client.post(self.url, {"archivo": self._archivo(), "actualizar_existentes": "on"})
+        self.assertRedirects(respuesta, reverse("catalogo_cuentas", args=[self.otra_empresa.slug]))
+        caja = CuentaContable.objects.get(empresa=self.otra_empresa, codigo="101")
+        self.assertEqual(caja.cuenta_padre.codigo, "100")
+        self.assertFalse(CuentaContable.objects.filter(empresa=self.empresa).exists())
+
+    def test_otras_empresas_rechazan_encabezados_adelantados_como_antes(self):
+        libro = Workbook()
+        hoja = libro.active
+        hoja.append(["RUMI: propuesta de catálogo"])
+        hoja.append(["codigo", "nombre", "tipo"])
+        hoja.append(["100", "Activos", "activo"])
+        contenido = BytesIO()
+        libro.save(contenido)
+        respuesta = self.client.post(self.url, {"archivo": SimpleUploadedFile("RUMI.xlsx", contenido.getvalue())})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(respuesta, "contabilidad/importar_catalogo_cuentas.html")
+        self.assertFalse(CuentaContable.objects.exists())
+        self.assertNotIn("vista_previa", respuesta.context)
+
+    def test_nombre_rumi_y_slug_similar_no_habilitan_importador_especial(self):
+        respuesta = self.client.get(reverse("importar_catalogo_cuentas", args=[self.empresa_nombre_rumi.slug]))
+        self.assertTemplateUsed(respuesta, "contabilidad/importar_catalogo_cuentas.html")
+        self.assertEqual(set(respuesta.context["form"].fields), {"archivo", "actualizar_existentes"})
+
+    def test_otras_empresas_actualizan_cuentas_en_el_post_original(self):
+        cuenta = CuentaContable.objects.create(
+            empresa=self.otra_empresa, codigo="100", nombre="Anterior", tipo="activo", acepta_movimientos=False,
+        )
+        respuesta = self.client.post(self.url, {"archivo": self._archivo(), "actualizar_existentes": "on"})
+        self.assertEqual(respuesta.status_code, 302)
+        cuenta.refresh_from_db()
+        self.assertEqual(cuenta.nombre, "Activos")
+        self.assertFalse(CuentaContable.objects.filter(empresa=self.empresa).exists())

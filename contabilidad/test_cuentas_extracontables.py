@@ -13,7 +13,7 @@ from .reportes import datos_balance_general, datos_estado_resultados
 class CuentasExtracontablesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.empresa = Empresa.objects.create(nombre="Empresa de controles", slug="controles-importacion", rtn="08011999166337")
+        cls.empresa = Empresa.objects.create(nombre="RUMI", slug="rumi", rtn="08011999166337")
         cls.padre = CuentaContable.objects.create(
             empresa=cls.empresa, codigo="7", nombre="Cuentas de orden", tipo="orden", activa=False, acepta_movimientos=False,
         )

@@ -79,7 +79,7 @@ class ImportacionCatalogoTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.empresa = Empresa.objects.create(
-            nombre="Catálogo A", slug="catalogo-a", rtn="08011999111221",
+            nombre="RUMI", slug="rumi", rtn="08011999111221",
             estado_licencia="activa",
         )
         cls.otra = Empresa.objects.create(

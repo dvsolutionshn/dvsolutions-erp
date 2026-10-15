@@ -1,0 +1,104 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Importar catálogo de cuentas - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad de {{ empresa.nombre }}{% endblock %}
+{% block header_title %}Importar catálogo de cuentas{% endblock %}
+{% block header_description %}Revisá el Excel, sus cuentas y su jerarquía antes de confirmar la importación en esta empresa.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-action-link">Volver al catálogo</a>
+{% endblock %}
+
+{% block content %}
+{% if error_importacion %}
+<section class="erp-card" role="alert"><h3 class="erp-panel-title">Revisá la importación</h3><p>{{ error_importacion }}</p></section>
+{% endif %}
+
+{% if vista_previa %}
+<section class="erp-card">
+    <div class="erp-kpi-label">Vista previa · {{ empresa.nombre }}</div>
+    <h3 class="erp-panel-title">{{ vista_previa.archivo_nombre }}</h3>
+    <p>Hoja: <strong>{{ vista_previa.hoja }}</strong>{% if vista_previa.fila_encabezado %} · encabezado en la fila <strong>{{ vista_previa.fila_encabezado }}</strong>{% endif %} · formato: <strong>{{ vista_previa.formato_nombre }}</strong>.</p>
+    <p class="erp-card-muted">La revisión todavía no guardó cuentas. Al confirmar, se aplicará el catálogo completo con estas opciones.</p>
+    <p><strong>Cuentas existentes:</strong> {% if vista_previa.opciones.actualizar_existentes %}actualizar sus datos según el archivo{% else %}conservar sus datos actuales{% endif %}.</p>
+    <p><strong>Controles extracontables:</strong> {% if vista_previa.opciones.incluir_controles %}conservar para consulta{% else %}excluir del catálogo{% endif %}. Son cuentas de orden que no admiten asientos ni afectan los estados financieros.</p>
+    {% if vista_previa.opciones.prefijo_codigos %}<p><strong>Prefijo de códigos:</strong> {{ vista_previa.opciones.prefijo_codigos }}. Se aplica también a las cuentas padre.</p>{% endif %}
+</section>
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas a crear</div><p class="erp-stat-value">{{ vista_previa.creadas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas a actualizar</div><p class="erp-stat-value">{{ vista_previa.actualizadas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas conservadas</div><p class="erp-stat-value">{{ vista_previa.sin_cambios }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas omitidas</div><p class="erp-stat-value">{{ vista_previa.omitidas }}</p><p class="erp-card-muted">Incluye las indicadas como «No cargar» y los controles si elegiste excluirlos.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Controles identificados</div><p class="erp-stat-value">{{ vista_previa.controles }}</p><p class="erp-card-muted">Referencia para consulta.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas condicionadas</div><p class="erp-stat-value">{{ vista_previa.condicionadas }}</p><p class="erp-card-muted">Se crean inactivas para revisarlas antes de utilizarlas.</p></article>
+</section>
+<section class="erp-card erp-table-card">
+    <div class="erp-toolbar"><div><h3 class="erp-panel-title">Cuentas y jerarquía</h3><p class="erp-card-muted">{{ vista_previa.total }} cuentas incluidas en la importación.{% if vista_previa.no_mostradas %} Se muestran primero 50; abrí la lista de cuentas restantes para revisar el catálogo completo antes de confirmar.{% endif %}</p></div></div>
+    <div class="erp-table-wrap">
+        <table class="erp-table">
+            <thead><tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Cuenta padre</th><th>Activa</th><th>Admite asientos</th></tr></thead>
+            {% include "contabilidad/_filas_catalogo_importacion.html" with filas_catalogo=vista_previa.filas only %}
+        </table>
+    </div>
+    {% if vista_previa.filas_adicionales %}
+    <details>
+        <summary>Ver las {{ vista_previa.no_mostradas }} cuentas restantes</summary>
+        <div class="erp-table-wrap">
+            <table class="erp-table">
+                <thead><tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Cuenta padre</th><th>Activa</th><th>Admite asientos</th></tr></thead>
+                {% include "contabilidad/_filas_catalogo_importacion.html" with filas_catalogo=vista_previa.filas_adicionales only %}
+            </table>
+        </div>
+    </details>
+    {% endif %}
+</section>
+<section class="erp-form-card">
+    <h3 class="erp-panel-title">Confirmar el catálogo revisado</h3>
+    <p>Se importarán <strong>{{ vista_previa.total }} cuentas</strong> en <strong>{{ empresa.nombre }}</strong>. La revisión vence en 30 minutos.</p>
+    <p class="erp-card-muted">Después de importar, revisá la <a href="{% url 'configuracion_contable' empresa.slug %}" class="erp-link">configuración contable</a> para enlazar caja, bancos, ventas e inventario con las cuentas de esta empresa.</p>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="revision_token" value="{{ revision_token }}">
+        <label><input type="checkbox" name="confirmar" required> Revisé las cuentas y las opciones; confirmo la importación en {{ empresa.nombre }}.</label>
+        <div class="erp-form-actions">
+            <a href="{% url 'importar_catalogo_cuentas' empresa.slug %}" class="erp-btn-secondary">Revisar otro archivo o cambiar opciones</a>
+            <button type="submit" name="accion" value="importar" class="erp-btn">Confirmar importación</button>
+        </div>
+    </form>
+</section>
+{% else %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Archivo</div><p class="erp-stat-value">Excel</p><p class="erp-card-muted">.xlsx o .xlsm, con títulos y encabezados en distintas filas.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Formatos compatibles</div><p class="erp-stat-value">Catálogos</p><p class="erp-card-muted">Estándar, jerárquico y propuestas como RUMI.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Empresa de destino</div><p class="erp-stat-value">{{ empresa.nombre }}</p><p class="erp-card-muted">Las cuentas se guardan únicamente en esta empresa.</p></article>
+</section>
+<form method="post" enctype="multipart/form-data" class="erp-form-shell">
+    {% csrf_token %}
+    <section class="erp-form-card">
+        <h3 class="erp-panel-title">1. Subir y revisar el archivo</h3>
+        <p class="erp-card-muted">El sistema detecta el formato y muestra lo que se creará, actualizará u omitirá. Podés desmarcar los controles extracontables antes de revisar.</p>
+        {% if form.non_field_errors %}<div role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="erp-form-grid">
+            {% for field in form %}
+            <div class="erp-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    <section class="erp-card">
+        <h3 class="erp-panel-title">Formatos reconocidos</h3>
+        <p><strong>Formato estándar:</strong> código, nombre y tipo; opcionalmente cuenta padre, acepta movimientos, activa y descripción.</p>
+        <p><strong>Formato de propuesta:</strong> código ERP, nombre de cuenta, nivel, cuenta padre, tipo de registro y activación; el sistema conserva los códigos y la jerarquía del archivo.</p>
+        <p class="erp-card-muted">Las filas marcadas «No cargar» se omiten. Las cuentas condicionadas se crean inactivas para su revisión.</p>
+    </section>
+    <div class="erp-form-actions">
+        <a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
+        <button type="submit" name="accion" value="revisar" class="erp-btn">Revisar archivo</button>
+    </div>
+</form>
+{% endif %}
+{% endblock %}

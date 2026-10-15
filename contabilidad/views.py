@@ -34,6 +34,7 @@ from .forms import (
     EnlazarMovimientoFacturaForm,
     EnlazarMovimientoCompraForm,
     ImportarCatalogoCuentasForm,
+    ImportarCatalogoCuentasRumiForm,
     ImportarMovimientosBancoForm,
     LineaAsientoFormSet,
     MovimientoBancarioClasificacionForm,
@@ -41,7 +42,8 @@ from .forms import (
     PeriodoContableForm,
     ReglaClasificacionBancoForm,
 )
-from .importadores import analizar_catalogo_cuentas_desde_excel, aplicar_catalogo_cuentas, importar_movimientos_bancarios_desde_excel
+from .importadores import analizar_catalogo_cuentas_desde_excel, aplicar_catalogo_cuentas, importar_catalogo_cuentas_desde_excel, importar_movimientos_bancarios_desde_excel
+from .alcance_catalogo import es_empresa_rumi
 from .cierre import revisar_cierre_periodo
 from .moneda import convertir_a_lempiras, distribuir_conversion
 from .reportes import (
@@ -1144,12 +1146,40 @@ def _vista_previa_catalogo(datos_firmados):
 def importar_catalogo_cuentas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     _verificar_permiso_contable(request, empresa, "puede_catalogo_cuentas")
-    accion = request.POST.get("accion", "revisar") if request.method == "POST" else "revisar"
+    if es_empresa_rumi(empresa):
+        return _importar_catalogo_rumi(request, empresa)
+
     form = ImportarCatalogoCuentasForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            resultado = importar_catalogo_cuentas_desde_excel(
+                empresa,
+                form.cleaned_data["archivo"],
+                actualizar_existentes=form.cleaned_data["actualizar_existentes"],
+            )
+        except ValidationError as error:
+            mensajes = error.messages if hasattr(error, "messages") else [str(error)]
+            for mensaje in mensajes:
+                messages.error(request, mensaje)
+        else:
+            messages.success(
+                request,
+                f"Catalogo importado: {resultado['creadas']} creadas, {resultado['actualizadas']} actualizadas.",
+            )
+            return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
+    return render(request, "contabilidad/importar_catalogo_cuentas.html", {
+        "empresa": empresa,
+        "form": form,
+    })
+
+
+def _importar_catalogo_rumi(request, empresa):
+    accion = request.POST.get("accion", "revisar") if request.method == "POST" else "revisar"
+    form = ImportarCatalogoCuentasRumiForm(request.POST or None, request.FILES or None)
     vista_previa, revision_token, error_importacion = None, "", ""
 
     if request.method == "POST" and accion == "importar":
-        form = ImportarCatalogoCuentasForm()
+        form = ImportarCatalogoCuentasRumiForm()
         try:
             try:
                 datos_firmados = signing.loads(
@@ -1168,7 +1198,7 @@ def importar_catalogo_cuentas(request, empresa_slug):
             ):
                 raise ValidationError("Esta revisión pertenece a otra empresa o usuario. Revisa el archivo desde esta empresa.")
 
-            form = ImportarCatalogoCuentasForm(initial=datos_firmados["opciones"])
+            form = ImportarCatalogoCuentasRumiForm(initial=datos_firmados["opciones"])
             vista_previa = _vista_previa_catalogo(datos_firmados)
             revision_token = request.POST["revision_token"]
             if not forms.BooleanField(required=False).clean(request.POST.get("confirmar")):
@@ -1218,7 +1248,7 @@ def importar_catalogo_cuentas(request, empresa_slug):
     elif request.method == "POST" and accion != "revisar":
         error_importacion = "Elige revisar el archivo o confirmar una revisión válida."
 
-    return render(request, "contabilidad/importar_catalogo_cuentas.html", {
+    return render(request, "contabilidad/importar_catalogo_cuentas_rumi.html", {
         "empresa": empresa,
         "form": form,
         "vista_previa": vista_previa,
