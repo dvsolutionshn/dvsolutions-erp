@@ -84,16 +84,13 @@
               <li><kbd>Enter</kbd><span>Elige la cuenta y pasa al importe. Desde un importe válido, avanza y propone el saldo pendiente.</span></li>
               <li><kbd>Tab</kbd><span>Pasa de Debe a Haber o recorre todos los campos, incluido el detalle opcional.</span></li>
               <li><kbd>Mayús</kbd> + <kbd>Tab</kbd><span>Vuelve al campo anterior.</span></li>
-              <li><kbd>Alt</kbd> + <kbd>N</kbd><span>Prepara otra línea con el restante, si está activado.</span></li>
+              <li><kbd>Alt</kbd> + <kbd>N</kbd><span>Prepara otra línea con el restante.</span></li>
               <li><kbd>Alt</kbd> + <kbd>C</kbd><span>Completa el importe de la contrapartida; tú eliges su cuenta.</span></li>
               <li class="ae-keyboard-note">Para guardar, utiliza los botones al final del formulario.</li>
             </ul>
           </details>
         </div>
-        <label class="ae-auto-remainder" data-auto-remainder-control for="ae-auto-remainder" hidden>
-          <input type="checkbox" id="ae-auto-remainder" data-auto-remainder checked aria-describedby="ae-auto-remainder-help">
-          <span><strong>Restante automático</strong><small id="ae-auto-remainder-help">Al terminar un importe, prepara el saldo pendiente en otra línea. Tú eliges la cuenta y puedes cambiar el monto.</small></span>
-        </label>
+        <input type="checkbox" data-auto-remainder checked hidden aria-hidden="true" tabindex="-1">
         <p class="ae-hint" id="ae-account-help">Busca por código o nombre. Solo se muestran las cuentas activas de {{ empresa.nombre }} que aceptan movimientos.</p>
         <div class="ae-lines" id="erpAsientoTable">
           <div class="ae-lines__head" aria-hidden="true"><span>N.º</span><span>Cuenta contable</span><span>Detalle</span><span>Debe · L</span><span>Haber · L</span><span></span></div>
