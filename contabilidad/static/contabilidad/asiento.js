@@ -305,6 +305,64 @@
       search.setCustomValidity("");
       closeResults(row);
       updateTotals();
+      focusAmount(row);
+    }
+
+    function focusAmount(row, preferred) {
+      const debe = field(row, "debe");
+      const haber = field(row, "haber");
+      const target = preferred || (amount(debe) === null ? debe
+        : amount(haber) === null || amount(haber) > 0n ? haber : debe);
+      if (!target || target.disabled) return;
+      target.focus();
+      if (amount(target) === 0n && typeof target.select === "function") target.select();
+    }
+
+    function skipNavigation(event) {
+      return event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey
+        || (typeof event.getModifierState === "function" && event.getModifierState("AltGraph"));
+    }
+
+    function focusAccount(row, message) {
+      const search = row.querySelector('[data-role="cuenta-search"]');
+      if (search && !search.disabled) search.focus();
+      if (message) announce(message);
+    }
+
+    function continueFromAmount(row, currentInput) {
+      if (isDeleted(row)) return;
+      updateTotals();
+      const account = field(row, "cuenta");
+      if (!account || !accountsById.has(account.value)) {
+        focusAccount(row, "Selecciona una cuenta de la lista antes de continuar.");
+        return;
+      }
+      const debeInput = field(row, "debe");
+      const haberInput = field(row, "haber");
+      const debe = amount(debeInput);
+      const haber = amount(haberInput);
+      if (debe === null || haber === null) {
+        focusAmount(row, debe === null ? debeInput : haberInput);
+        announce("Revisa el importe: usa un valor positivo con un máximo de dos decimales.");
+        return;
+      }
+      if (debe > 0n && haber > 0n) {
+        focusAmount(row, currentInput);
+        announce("Usa el Debe o el Haber en esta línea. Conservamos ambos importes para que puedas corregirlos.");
+        return;
+      }
+      if (debe === 0n && haber === 0n) {
+        focusAmount(row, currentInput);
+        announce("Ingresa un importe en el Debe o en el Haber antes de continuar.");
+        return;
+      }
+      const activeRows = getRows().filter(function (item) {
+        const search = item.querySelector('[data-role="cuenta-search"]');
+        const selected = field(item, "cuenta");
+        return !isDeleted(item) && search && !search.disabled && selected && !selected.disabled;
+      });
+      const next = activeRows[activeRows.indexOf(row) + 1] || addLine();
+      if (next) focusAccount(next, "Continúa con la cuenta de la siguiente línea.");
     }
 
     function renderResults(row, query) {
@@ -434,6 +492,7 @@
           updateTotals();
         });
         search.addEventListener("keydown", function (event) {
+          if (skipNavigation(event)) return;
           const open = search.getAttribute("aria-expanded") === "true";
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
@@ -442,11 +501,16 @@
               const current = Number.parseInt(row.dataset.focusedOption || "-1", 10);
               focusOption(row, current + (event.key === "ArrowDown" ? 1 : -1));
             }
-          } else if (event.key === "Enter" && open) {
+          } else if (event.key === "Enter") {
             event.preventDefault();
-            const options = results.querySelectorAll('[role="option"]');
-            const index = Number.parseInt(row.dataset.focusedOption || "-1", 10);
-            if (options[index]) options[index].click();
+            if (event.repeat) return;
+            if (open) {
+              const options = results.querySelectorAll('[role="option"]');
+              const index = Number.parseInt(row.dataset.focusedOption || "-1", 10);
+              if (options[index]) options[index].click();
+              else announce("No hay coincidencias. Escribe otro código o nombre para buscar la cuenta.");
+            } else if (accountsById.has(account.value)) focusAmount(row);
+            else renderResults(row, search.value);
           } else if (event.key === "Escape") {
             if (open) event.preventDefault();
             closeResults(row);
@@ -462,9 +526,25 @@
         input.setAttribute("min", "0");
         input.setAttribute("inputmode", "decimal");
         input.addEventListener("input", updateTotals);
+        input.addEventListener("keydown", function (event) {
+          if (skipNavigation(event)) return;
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          if (!event.repeat) continueFromAmount(row, input);
+        });
       });
       const detail = field(row, "detalle");
-      if (detail) detail.addEventListener("input", updateTotals);
+      if (detail) {
+        detail.addEventListener("input", updateTotals);
+        detail.addEventListener("keydown", function (event) {
+          if (skipNavigation(event)) return;
+          if (event.key !== "Enter" || detail.tagName === "TEXTAREA") return;
+          event.preventDefault();
+          if (event.repeat) return;
+          if (account && accountsById.has(account.value)) focusAmount(row);
+          else focusAccount(row, "Selecciona la cuenta de esta línea para continuar con el importe.");
+        });
+      }
       const deleteField = field(row, "DELETE");
       if (deleteField) deleteField.addEventListener("change", updateTotals);
       if (remove && deleteField) {
@@ -539,9 +619,36 @@
         if (!picker || !picker.contains(event.target)) closeResults(row);
       });
     });
+    form.addEventListener("keydown", function (event) {
+      if (event.defaultPrevented || event.isComposing) return;
+      const key = String(event.key || "").toLowerCase();
+      const altGraph = typeof event.getModifierState === "function" && event.getModifierState("AltGraph");
+      if (!altGraph && event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && key !== "enter") {
+        if (key === "n") {
+          event.preventDefault();
+          if (!event.repeat && addButtons[0]) addButtons[0].click();
+        } else if (key === "c") {
+          event.preventDefault();
+          if (event.repeat) return;
+          if (counterpartButton && !counterpartButton.disabled) counterpartButton.click();
+          else announce(totals.invalid ? "Corrige los avisos antes de completar la contrapartida."
+            : "No hay una diferencia disponible para completar en una contrapartida.");
+        }
+        return;
+      }
+      if (key !== "enter") return;
+      const target = event.target;
+      if (!target || !["INPUT", "SELECT"].includes(target.tagName)) return;
+      if (["button", "submit", "reset", "image"].includes(String(target.type).toLowerCase())) return;
+      event.preventDefault();
+      if (!event.repeat) announce("Usa Tab para continuar. Al terminar, guarda con los botones del asiento.");
+    });
     form.addEventListener("submit", function () { getRows().forEach(closeResults); });
     getRows().forEach(initializeRow);
     form.dataset.entryReady = "true";
+    form.querySelectorAll("[data-keyboard-guide]").forEach(function (guide) { guide.hidden = false; });
+    addButtons.forEach(function (button) { button.setAttribute("aria-keyshortcuts", "Alt+n"); });
+    if (counterpartButton) counterpartButton.setAttribute("aria-keyshortcuts", "Alt+c");
     updateTotals();
   }
 

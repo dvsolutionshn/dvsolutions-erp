@@ -73,6 +73,23 @@
           <div><h2 class="ae-panel__title" id="ae-lines-title">Líneas del asiento <span class="ae-line-count" data-asiento-line-count>{{ formset.total_form_count }} líneas</span></h2><p class="ae-panel__text">Usa al menos dos líneas e ingresa cada importe en el Debe o en el Haber.</p></div>
           <button type="button" class="ae-btn ae-btn--primary ae-btn--small" id="erpAddAsientoLine" hidden>{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Agregar línea</button>
         </div>
+        <div class="ae-keyboard-guide" data-keyboard-guide hidden>
+          <div class="ae-keyboard-guide__copy">
+            <span class="ae-keyboard-guide__label">Captura rápida</span>
+            <p class="ae-keyboard-guide__flow"><strong>Cuenta</strong><span aria-hidden="true">→</span><strong>Importe</strong><span aria-hidden="true">→</span><kbd>Enter</kbd><span>Siguiente línea</span></p>
+          </div>
+          <details class="ae-keyboard-shortcuts">
+            <summary>Ver atajos de teclado</summary>
+            <ul>
+              <li><kbd>Enter</kbd><span>Elige la cuenta y pasa al importe. Desde un importe válido, avanza a la siguiente línea.</span></li>
+              <li><kbd>Tab</kbd><span>Pasa de Debe a Haber o recorre todos los campos, incluido el detalle opcional.</span></li>
+              <li><kbd>Mayús</kbd> + <kbd>Tab</kbd><span>Vuelve al campo anterior.</span></li>
+              <li><kbd>Alt</kbd> + <kbd>N</kbd><span>Agrega una línea vacía.</span></li>
+              <li><kbd>Alt</kbd> + <kbd>C</kbd><span>Completa el importe de la contrapartida; tú eliges su cuenta.</span></li>
+              <li class="ae-keyboard-note">Para guardar, utiliza los botones al final del formulario.</li>
+            </ul>
+          </details>
+        </div>
         <p class="ae-hint" id="ae-account-help">Busca por código o nombre. Solo se muestran las cuentas activas de {{ empresa.nombre }} que aceptan movimientos.</p>
         <div class="ae-lines" id="erpAsientoTable">
           <div class="ae-lines__head" aria-hidden="true"><span>N.º</span><span>Cuenta contable</span><span>Detalle</span><span>Debe · L</span><span>Haber · L</span><span></span></div>
