@@ -1,4 +1,5 @@
 from decimal import Decimal
+from functools import wraps
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -175,7 +176,42 @@ def contabilidad_activa_para_empresa(empresa):
     return bool(empresa and empresa.tiene_modulo_activo("contabilidad"))
 
 
+def _serializar_catalogo_rumi(funcion):
+    """Coordina la creación automática con la instalación del catálogo propio."""
+    @wraps(funcion)
+    def ejecutada(empresa, *args, **kwargs):
+        from core.models import Empresa
+
+        from .alcance_catalogo import es_empresa_rumi
+
+        if not es_empresa_rumi(empresa):
+            return funcion(empresa, *args, **kwargs)
+        with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            return funcion(empresa, *args, **kwargs)
+
+    return ejecutada
+
+
+def _serializar_auxiliar_rumi(funcion):
+    @wraps(funcion)
+    def ejecutada(entidad, *args, **kwargs):
+        if not entidad or not getattr(entidad, "empresa_id", None):
+            return funcion(entidad, *args, **kwargs)
+        return _serializar_catalogo_rumi(
+            lambda empresa: funcion(entidad, *args, **kwargs)
+        )(entidad.empresa)
+
+    return ejecutada
+
+
+@_serializar_catalogo_rumi
 def asegurar_cuentas_financieras_base_honduras(empresa):
+    from .catalogo_rumi_roles import usa_catalogo_rumi
+
+    if usa_catalogo_rumi(empresa):
+        return {"creadas": 0, "existentes": 0}
+
     creadas = 0
     existentes = 0
 
@@ -222,7 +258,13 @@ def asegurar_cuentas_financieras_base_honduras(empresa):
     return {"creadas": creadas, "existentes": existentes}
 
 
+@_serializar_catalogo_rumi
 def asegurar_clasificaciones_bancarias_base_honduras(empresa):
+    from .catalogo_rumi_roles import usa_catalogo_rumi
+
+    if usa_catalogo_rumi(empresa):
+        return {"creadas": 0, "existentes": 0}
+
     creadas = 0
     existentes = 0
 
@@ -294,7 +336,13 @@ def aplicar_reglas_clasificacion_bancaria(empresa, *, movimiento_ids=None):
     return {"actualizados": actualizados, "sin_regla": sin_regla}
 
 
+@_serializar_catalogo_rumi
 def obtener_o_crear_cuenta_base(empresa, clave):
+    from .catalogo_rumi_roles import resolver_cuenta_rumi, usa_catalogo_rumi
+
+    if usa_catalogo_rumi(empresa):
+        return resolver_cuenta_rumi(empresa, clave)
+
     definicion = CUENTAS_BASE[clave]
     cuenta, _ = CuentaContable.objects.get_or_create(
         empresa=empresa,
@@ -309,7 +357,15 @@ def obtener_o_crear_cuenta_base(empresa, clave):
     return cuenta
 
 
+@_serializar_catalogo_rumi
 def cargar_catalogo_base_honduras(empresa):
+    from .catalogo_rumi_roles import usa_catalogo_rumi
+
+    if usa_catalogo_rumi(empresa):
+        raise ValidationError(
+            "RUMI ya utiliza su catálogo propio. No se puede volver a cargar el catálogo base de Honduras."
+        )
+
     creadas = 0
     existentes = 0
     cuentas_por_codigo = {
@@ -361,9 +417,100 @@ def cargar_catalogo_base_honduras(empresa):
 
 
 
+def _siguiente_codigo_auxiliar(cuenta_padre):
+    prefijo = f"{cuenta_padre.codigo}."
+    longitud_maxima = CuentaContable._meta.get_field("codigo").max_length
+    if len(prefijo) + 4 > longitud_maxima:
+        raise ValidationError(
+            "El código de la cuenta padre es demasiado largo para crear una cuenta auxiliar. "
+            "Seleccione una cuenta padre con un código de hasta 25 caracteres."
+        )
+    usados = set(
+        CuentaContable.objects.filter(
+            empresa_id=cuenta_padre.empresa_id, codigo__startswith=prefijo
+        ).values_list("codigo", flat=True)
+    )
+    consecutivo = 1
+    while True:
+        codigo = f"{prefijo}{consecutivo:04d}"
+        if len(codigo) > longitud_maxima:
+            raise ValidationError("La cuenta padre ya no admite nuevos códigos auxiliares.")
+        if codigo not in usados:
+            return codigo
+        consecutivo += 1
+
+
+def _validar_auxiliar_rumi(entidad, tipo, etiqueta):
+    cuenta = CuentaContable.objects.filter(pk=entidad.cuenta_contable_id).first()
+    if not cuenta or cuenta.empresa_id != entidad.empresa_id or cuenta.tipo != tipo:
+        raise ValidationError(
+            f"La cuenta del {etiqueta} debe ser de {tipo} y pertenecer a su empresa."
+        )
+    if not cuenta.activa or not cuenta.acepta_movimientos:
+        raise ValidationError(
+            f"La cuenta del {etiqueta} está inactiva o no admite movimientos. "
+            "Revise su enlace contable antes de registrar una nueva operación."
+        )
+    return cuenta
+
+
+def _asegurar_auxiliar_rumi(entidad, clave, tipo, etiqueta):
+    from core.models import Empresa
+
+    from .catalogo_rumi_roles import resolver_cuenta_rumi
+
+    if getattr(entidad, "cuenta_contable_id", None):
+        return _validar_auxiliar_rumi(entidad, tipo, etiqueta)
+    if not entidad.pk:
+        raise ValidationError(f"Guarde el {etiqueta} antes de crear su cuenta auxiliar.")
+
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=entidad.empresa_id, slug="rumi")
+        entidad_guardada = (
+            type(entidad).objects.select_for_update().get(pk=entidad.pk, empresa_id=entidad.empresa_id)
+        )
+        if entidad_guardada.cuenta_contable_id:
+            cuenta = _validar_auxiliar_rumi(entidad_guardada, tipo, etiqueta)
+            entidad.cuenta_contable = cuenta
+            return cuenta
+        cuenta_padre = resolver_cuenta_rumi(entidad.empresa, clave)
+        # El padre se bloquea antes de elegir el consecutivo compartido por sus auxiliares.
+        cuenta_padre = CuentaContable.objects.select_for_update().get(
+            pk=cuenta_padre.pk, empresa_id=entidad.empresa_id
+        )
+        if cuenta_padre.tipo != tipo or not cuenta_padre.activa or not cuenta_padre.acepta_movimientos:
+            raise ValidationError(
+                f"La cuenta configurada para {clave} debe estar activa, admitir movimientos y ser de {tipo}."
+            )
+        codigo = _siguiente_codigo_auxiliar(cuenta_padre)
+        es_cliente = clave == "clientes"
+        cuenta = CuentaContable(
+            empresa=entidad.empresa,
+            cuenta_padre=cuenta_padre,
+            codigo=codigo,
+            nombre=f"{'Cliente' if es_cliente else 'Proveedor'} - {entidad.nombre}"[:200],
+            tipo=tipo,
+            descripcion=(
+                f"Cuenta por {'cobrar' if es_cliente else 'pagar'} individual del {etiqueta} {entidad.nombre}."
+            ),
+            acepta_movimientos=True,
+            activa=True,
+        )
+        cuenta.full_clean()
+        cuenta.save()
+        type(entidad).objects.filter(pk=entidad.pk, empresa_id=entidad.empresa_id).update(cuenta_contable=cuenta)
+        entidad.cuenta_contable = cuenta
+        return cuenta
+
+
+@_serializar_auxiliar_rumi
 def asegurar_cuenta_contable_cliente(cliente):
     if not cliente or not getattr(cliente, "empresa_id", None):
         return None
+    from .catalogo_rumi_roles import usa_catalogo_rumi
+
+    if usa_catalogo_rumi(cliente.empresa):
+        return _asegurar_auxiliar_rumi(cliente, "clientes", "activo", "cliente")
     if getattr(cliente, "cuenta_contable_id", None):
         if cliente.cuenta_contable.empresa_id != cliente.empresa_id or cliente.cuenta_contable.tipo != 'activo':
             raise ValidationError('La cuenta del cliente debe ser de activo y pertenecer a su empresa.')
@@ -397,9 +544,14 @@ def asegurar_cuenta_contable_cliente(cliente):
     return cuenta
 
 
+@_serializar_auxiliar_rumi
 def asegurar_cuenta_contable_proveedor(proveedor):
     if not proveedor or not getattr(proveedor, "empresa_id", None):
         return None
+    from .catalogo_rumi_roles import usa_catalogo_rumi
+
+    if usa_catalogo_rumi(proveedor.empresa):
+        return _asegurar_auxiliar_rumi(proveedor, "proveedores", "pasivo", "proveedor")
     if getattr(proveedor, "cuenta_contable_id", None):
         if proveedor.cuenta_contable.empresa_id != proveedor.empresa_id or proveedor.cuenta_contable.tipo != 'pasivo':
             raise ValidationError('La cuenta del proveedor debe ser de pasivo y pertenecer a su empresa.')
@@ -437,7 +589,13 @@ def obtener_configuracion_contable(empresa):
     return configuracion
 
 
+@_serializar_catalogo_rumi
 def obtener_cuenta_operativa(empresa, clave):
+    from .catalogo_rumi_roles import resolver_cuenta_rumi, usa_catalogo_rumi
+
+    if usa_catalogo_rumi(empresa):
+        return resolver_cuenta_rumi(empresa, clave)
+
     alias_configuracion = {
         "ventas_15": "ventas", "ventas_18": "ventas", "ventas_exentas": "ventas", "ventas_exoneradas": "ventas",
         "isv_15_por_pagar": "isv_por_pagar", "isv_18_por_pagar": "isv_por_pagar",

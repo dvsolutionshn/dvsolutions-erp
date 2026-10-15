@@ -18,6 +18,18 @@
     <article class="erp-card"><div class="erp-kpi-label">Agrupadoras</div><p class="erp-stat-value">{{ resumen.agrupadoras }}</p></article>
 </section>
 
+{% if es_rumi %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">Catálogo propio de RUMI</h3>
+    {% if catalogo_rumi_instalado %}
+    <p class="erp-card-muted">RUMI utiliza sus cuentas y enlaces operativos. Puede agregar cuentas y completar las operaciones pendientes.</p>
+    <a class="erp-btn" href="{% url 'configuracion_contable' empresa.slug %}">Revisar enlaces contables</a>
+    {% else %}
+    <p class="erp-card-muted">Sustituya la plantilla Honduras por el catálogo RUMI. Primero se revisan las cuentas sin uso y los enlaces que conservan historial.</p>
+    <a class="erp-btn" href="{% url 'sustituir_catalogo_rumi' empresa.slug %}">Reemplazar catálogo Honduras en RUMI</a>
+    {% endif %}
+</section>
+{% else %}
 <section class="erp-card">
     <div class="erp-toolbar">
         <div>
@@ -31,6 +43,7 @@
         </form>
     </div>
 </section>
+{% endif %}
 
 <section class="erp-card erp-table-card">
     <div class="erp-table-wrap">

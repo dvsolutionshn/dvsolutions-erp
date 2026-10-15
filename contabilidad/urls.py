@@ -3,6 +3,7 @@ from django.urls import path
 from . import views
 from . import regularizacion_views
 from . import revision_conversion_views
+from . import catalogo_rumi_views
 
 urlpatterns = [
     path("", views.contabilidad_dashboard, name="contabilidad_dashboard"),
@@ -39,6 +40,8 @@ urlpatterns = [
     path("cuentas/catalogo-base-honduras/", views.cargar_catalogo_base_honduras_view, name="cargar_catalogo_base_honduras"),
     path("cuentas/crear/", views.crear_cuenta_contable, name="crear_cuenta_contable"),
     path("cuentas/importar/", views.importar_catalogo_cuentas, name="importar_catalogo_cuentas"),
+    path("cuentas/sustituir-rumi/", catalogo_rumi_views.sustituir_catalogo_rumi, name="sustituir_catalogo_rumi"),
+    path("cuentas/respaldo-rumi/<int:registro_id>/", catalogo_rumi_views.respaldo_catalogo_rumi, name="respaldo_catalogo_rumi"),
     path("cuentas/<int:cuenta_id>/editar/", views.editar_cuenta_contable, name="editar_cuenta_contable"),
     path("asientos/", views.asientos_contables, name="asientos_contables"),
     path("asientos/crear/", views.crear_asiento_contable, name="crear_asiento_contable"),

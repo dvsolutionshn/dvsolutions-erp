@@ -222,6 +222,10 @@ class ConfiguracionContableEmpresa(models.Model):
         on_delete=models.CASCADE,
         related_name="configuracion_contable",
     )
+    catalogo_rumi_instalado = models.BooleanField(
+        default=False,
+        verbose_name="Catálogo propio de RUMI instalado",
+    )
     cuenta_caja = models.ForeignKey(
         CuentaContable,
         on_delete=models.SET_NULL,
@@ -303,6 +307,23 @@ class ConfiguracionContableEmpresa(models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk and not self.catalogo_rumi_instalado:
+            using = self._state.db or router.db_for_write(type(self), instance=self)
+            if type(self).objects.using(using).filter(
+                pk=self.pk, empresa__slug="rumi", catalogo_rumi_instalado=True,
+            ).exists():
+                raise ValidationError(
+                    "RUMI ya utiliza su catálogo propio. "
+                    "No se puede desactivar su instalación ni volver al catálogo base de Honduras. "
+                    "Vuelva a abrir la configuración para revisar los enlaces actuales."
+                )
+        if self.catalogo_rumi_instalado:
+            from .alcance_catalogo import es_empresa_rumi
+
+            if not self.empresa_id or not es_empresa_rumi(self.empresa):
+                raise ValidationError({
+                    "catalogo_rumi_instalado": "El catálogo propio de RUMI solo puede instalarse en la empresa RUMI.",
+                })
         tipos = {
             'cuenta_caja': 'activo', 'cuenta_bancos': 'activo', 'cuenta_clientes': 'activo',
             'cuenta_inventario': 'activo', 'cuenta_isv_acreditable': 'activo',
@@ -318,6 +339,16 @@ class ConfiguracionContableEmpresa(models.Model):
                     raise ValidationError({campo.name: f"Seleccione una cuenta de tipo {tipos[campo.name]} para esta operación."})
 
     def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        if self.empresa_id and Empresa.objects.using(using).filter(pk=self.empresa_id, slug="rumi").exists():
+            with transaction.atomic(using=using):
+                bloquear_empresas_contables([self.empresa_id], using=using)
+                if self.pk:
+                    empresa_anterior = type(self).objects.using(using).filter(pk=self.pk).values_list("empresa_id", flat=True).first()
+                    if empresa_anterior and empresa_anterior != self.empresa_id:
+                        raise ValidationError("No se puede trasladar la configuración contable a otra empresa.")
+                self.full_clean()
+                return super().save(*args, **kwargs)
         if self.pk:
             empresa_anterior = type(self).objects.filter(pk=self.pk).values_list("empresa_id", flat=True).first()
             if empresa_anterior and empresa_anterior != self.empresa_id:
@@ -1043,3 +1074,113 @@ class RevisionConversionAsiento(models.Model):
 
     def delete(self, using=None, keep_parents=False):
         raise ValidationError("Conserve la revisión de conversión y su respaldo contable original.")
+
+
+class VinculoCuentaOperativaRumi(models.Model):
+    empresa = models.ForeignKey(
+        Empresa, on_delete=models.PROTECT, related_name="vinculos_cuentas_operativas_rumi",
+    )
+    clave = models.CharField(max_length=70)
+    cuenta = models.ForeignKey(
+        CuentaContable, on_delete=models.PROTECT, related_name="vinculos_operativos_rumi",
+    )
+
+    class Meta:
+        ordering = ["clave"]
+        constraints = [models.UniqueConstraint(
+            fields=["empresa", "clave"], name="rumi_vinculo_empresa_clave_unico",
+        )]
+        verbose_name = "Enlace de cuenta operativa de RUMI"
+        verbose_name_plural = "Enlaces de cuentas operativas de RUMI"
+
+    def __str__(self):
+        from .catalogo_rumi_roles import ROLES
+
+        etiqueta = ROLES.get(self.clave, {}).get("etiqueta", self.clave)
+        return f"{etiqueta}: {self.cuenta}"
+
+    def clean(self):
+        super().clean()
+        from .alcance_catalogo import SLUG_EMPRESA_CATALOGO_RUMI
+        from .catalogo_rumi_roles import ALIAS, validar_cuenta_rol_rumi
+
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        if not self.empresa_id or not Empresa.objects.using(using).filter(
+            pk=self.empresa_id, slug=SLUG_EMPRESA_CATALOGO_RUMI,
+        ).exists():
+            raise ValidationError("Los enlaces de este catálogo están disponibles únicamente para la empresa RUMI.")
+        self.clave = ALIAS.get(self.clave, self.clave)
+        cuenta = CuentaContable.objects.using(using).filter(pk=self.cuenta_id).first() if self.cuenta_id else None
+        validar_cuenta_rol_rumi(self.empresa_id, self.clave, cuenta)
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            bloquear_empresas_contables([self.empresa_id], using=using)
+            empresa_anterior = type(self).objects.using(using).filter(pk=self.pk).values_list(
+                "empresa_id", flat=True,
+            ).first() if self.pk else None
+            if empresa_anterior and empresa_anterior != self.empresa_id:
+                raise ValidationError("No se puede trasladar un enlace contable de RUMI a otra empresa.")
+            self.full_clean()
+            return super().save(*args, **kwargs)
+
+
+class SustitucionesCatalogoRumiQuerySet(models.QuerySet):
+    """Conserva el respaldo de las sustituciones ya confirmadas."""
+
+    def update(self, **kwargs):
+        raise ValidationError("El respaldo de la sustitución del catálogo es inmutable.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("El respaldo de la sustitución del catálogo es inmutable.")
+
+    def bulk_create(self, objs, **kwargs):
+        raise ValidationError("Registre la sustitución de RUMI mediante su confirmación y respaldo individual.")
+
+    def delete(self):
+        raise ValidationError("Conserve el respaldo original de la sustitución del catálogo de RUMI.")
+
+
+class RegistroSustitucionCatalogoRumi(models.Model):
+    empresa = models.ForeignKey(
+        Empresa, on_delete=models.PROTECT, related_name="sustituciones_catalogo_rumi",
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sustituciones_catalogo_rumi_registradas",
+    )
+    respaldo = models.JSONField(default=dict, blank=True)
+    resumen = models.JSONField(default=dict, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    objects = SustitucionesCatalogoRumiQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-fecha_creacion", "-pk"]
+        verbose_name = "Registro de sustitución del catálogo de RUMI"
+        verbose_name_plural = "Registros de sustitución del catálogo de RUMI"
+
+    def __str__(self):
+        return f"Sustitución del catálogo de RUMI del {self.fecha_creacion}"
+
+    def clean(self):
+        super().clean()
+        from .alcance_catalogo import SLUG_EMPRESA_CATALOGO_RUMI
+
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        if not self.empresa_id or not Empresa.objects.using(using).filter(
+            pk=self.empresa_id, slug=SLUG_EMPRESA_CATALOGO_RUMI,
+        ).exists():
+            raise ValidationError("La sustitución de este catálogo pertenece exclusivamente a la empresa RUMI.")
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            bloquear_empresas_contables([self.empresa_id], using=using)
+            if self.pk and type(self).objects.using(using).filter(pk=self.pk).exists():
+                raise ValidationError("El respaldo de la sustitución del catálogo es inmutable.")
+            self.full_clean()
+            return super().save(*args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        raise ValidationError("Conserve el respaldo original de la sustitución del catálogo de RUMI.")

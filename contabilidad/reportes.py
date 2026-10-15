@@ -10,6 +10,7 @@ import unicodedata
 
 from django.db.models import Q, Sum
 
+from .alcance_catalogo import es_empresa_rumi
 from .models import AsientoContable, ConfiguracionContableEmpresa, CuentaContable, CuentaFinanciera, LineaAsientoContable
 
 
@@ -187,9 +188,11 @@ def cuentas_efectivo_ids(empresa):
     ).values_list("cuenta_contable_id", flat=True))
     explicitas = ids.copy()
     # Incluye cuentas históricas inactivas: desactivarlas no elimina su efectivo.
+    criterios_efectivo = Q(nombre__icontains="caja") | Q(nombre__icontains="banco") | Q(nombre__icontains="efectivo")
+    if not es_empresa_rumi(empresa):
+        criterios_efectivo |= Q(codigo__startswith="1101") | Q(codigo__startswith="1102")
     ids.update(CuentaContable.objects.filter(empresa=empresa, tipo="activo").filter(
-        Q(nombre__icontains="caja") | Q(nombre__icontains="banco") | Q(nombre__icontains="efectivo")
-        | Q(codigo__startswith="1101") | Q(codigo__startswith="1102")
+        criterios_efectivo
     ).values_list("id", flat=True))
     tarjetas = set(CuentaFinanciera.objects.filter(empresa=empresa, tipo="tarjeta_credito").values_list("cuenta_contable_id", flat=True))
     # Un vínculo antiguo incorrecto de tarjeta no elimina un banco configurado:
@@ -201,7 +204,7 @@ def _texto_normalizado(texto):
     return "".join(letra for letra in unicodedata.normalize("NFKD", texto.lower()) if not unicodedata.combining(letra))
 
 
-def clasificar_contrapartida(cuenta):
+def clasificar_contrapartida(cuenta, *, empresa=None):
     actual, visitadas = cuenta, set()
     while actual is not None and actual.pk not in visitadas:
         visitadas.add(actual.pk)
@@ -212,13 +215,16 @@ def clasificar_contrapartida(cuenta):
     nombre = _texto_normalizado(cuenta.nombre)
     if cuenta.tipo == "patrimonio":
         return "financiamiento"
+    usar_prefijos_honduras = not es_empresa_rumi(
+        empresa if empresa is not None and empresa.pk == cuenta.empresa_id else cuenta.empresa
+    )
     if cuenta.tipo == "pasivo" and (
-        cuenta.codigo.startswith(("2104", "2201"))
+        (usar_prefijos_honduras and cuenta.codigo.startswith(("2104", "2201")))
         or any(palabra in nombre for palabra in ("prestamo", "tarjeta", "deuda financiera", "obligacion financiera", "financiamiento", "hipoteca", "bonos por pagar"))
     ):
         return "financiamiento"
     if cuenta.tipo == "activo" and (
-        cuenta.codigo.startswith("12")
+        (usar_prefijos_honduras and cuenta.codigo.startswith("12"))
         or any(palabra in nombre for palabra in ("equipo", "mobiliario", "vehiculo", "propiedad", "planta", "maquinaria", "activo fijo", "terreno", "edificio", "inversion financiera"))
     ):
         return "inversion"
@@ -259,7 +265,7 @@ def datos_flujo_efectivo(empresa, fecha_inicio="", fecha_fin=""):
         categorias = defaultdict(lambda: CERO)
         for linea in lineas:
             if linea.cuenta_id not in ids:
-                categorias[clasificar_contrapartida(linea.cuenta)] += linea.haber - linea.debe
+                categorias[clasificar_contrapartida(linea.cuenta, empresa=empresa)] += linea.haber - linea.debe
         # Los asientos antiguos descuadrados conservan una diferencia visible.
         diferencias_partidas += neto_efectivo - sum(categorias.values(), CERO)
         for categoria, neto in categorias.items():

@@ -44,6 +44,7 @@ from .forms import (
 )
 from .importadores import analizar_catalogo_cuentas_desde_excel, aplicar_catalogo_cuentas, importar_catalogo_cuentas_desde_excel, importar_movimientos_bancarios_desde_excel
 from .alcance_catalogo import es_empresa_rumi
+from .catalogo_rumi_roles import usa_catalogo_rumi
 from .cierre import revisar_cierre_periodo
 from .moneda import convertir_a_lempiras, distribuir_conversion
 from .reportes import (
@@ -201,6 +202,9 @@ def contabilidad_dashboard(request, empresa_slug):
 @login_required
 def configuracion_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    if usa_catalogo_rumi(empresa):
+        from .catalogo_rumi_views import configuracion_rumi
+        return configuracion_rumi(request, empresa)
     configuracion, _ = ConfiguracionContableEmpresa.objects.get_or_create(empresa=empresa)
     form = ConfiguracionContableEmpresaForm(
         request.POST or None,
@@ -208,9 +212,13 @@ def configuracion_contable(request, empresa_slug):
         empresa=empresa,
     )
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Configuracion contable actualizada correctamente.")
-        return redirect("contabilidad_dashboard", empresa_slug=empresa.slug)
+        try:
+            form.save()
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(request, "Configuracion contable actualizada correctamente.")
+            return redirect("contabilidad_dashboard", empresa_slug=empresa.slug)
     return render(request, "contabilidad/configuracion_contable.html", {
         "empresa": empresa,
         "form": form,
@@ -1045,6 +1053,8 @@ def catalogo_cuentas(request, empresa_slug):
     cuentas = CuentaContable.objects.filter(empresa=empresa).select_related("cuenta_padre").order_by("codigo", "nombre")
     context = {
         "empresa": empresa,
+        "es_rumi": es_empresa_rumi(empresa),
+        "catalogo_rumi_instalado": usa_catalogo_rumi(empresa),
         "cuentas": cuentas,
         "resumen": {
             "total": cuentas.count(),
@@ -1062,7 +1072,11 @@ def cargar_catalogo_base_honduras_view(request, empresa_slug):
     if request.method != "POST":
         return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
 
-    resultado = cargar_catalogo_base_honduras(empresa)
+    try:
+        resultado = cargar_catalogo_base_honduras(empresa)
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+        return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
     if resultado["creadas"] or resultado["cuentas_financieras_creadas"]:
         messages.success(
             request,

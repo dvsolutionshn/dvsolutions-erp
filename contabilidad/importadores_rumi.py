@@ -471,7 +471,7 @@ def _firma_cuentas(cuentas, referencias):
     return hashlib.sha256(contenido.encode("utf-8")).hexdigest()
 
 
-def _validar_propuesta(empresa, datos, existentes, usadas, actualizar_existentes):
+def _validar_propuesta(empresa, datos, existentes, usadas, actualizar_existentes, *, validar_unicidad=True):
     _exigir_empresa_rumi(empresa)
     if not isinstance(datos, list) or not datos:
         raise ValidationError("No se encontraron cuentas para importar con las opciones elegidas.")
@@ -586,7 +586,7 @@ def _validar_propuesta(empresa, datos, existentes, usadas, actualizar_existentes
         # Las relaciones se enlazan tras validar el grafo; todavía no hay padres nuevos guardados.
         cuenta.cuenta_padre = objetos.get(item["codigo_padre"])
         try:
-            cuenta.full_clean(exclude=["cuenta_padre"])
+            cuenta.full_clean(exclude=["cuenta_padre"], validate_unique=validar_unicidad)
         except ValidationError as exc:
             errores.extend(f"{_ubicacion(item)}: {mensaje}" for mensaje in exc.messages)
     if errores:

@@ -202,11 +202,21 @@ def _desglose_metodo_caja(pagos, metodo_pago):
 
 
 def _cuentas_financieras_activas_para_pago(empresa):
-    asegurar_cuentas_financieras_base_honduras(empresa)
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
+    modo_catalogo_rumi = usa_catalogo_rumi(empresa)
+    if not modo_catalogo_rumi:
+        asegurar_cuentas_financieras_base_honduras(empresa)
     cuentas = CuentaFinanciera.objects.filter(
         empresa=empresa,
         activa=True,
     ).select_related("cuenta_contable").order_by("nombre")
+    if modo_catalogo_rumi:
+        return cuentas.filter(
+            cuenta_contable__empresa=empresa,
+            cuenta_contable__activa=True,
+            cuenta_contable__acepta_movimientos=True,
+        )
     if not cuentas.exists():
         cargar_catalogo_base_honduras(empresa)
         cuentas = CuentaFinanciera.objects.filter(
@@ -214,6 +224,19 @@ def _cuentas_financieras_activas_para_pago(empresa):
             activa=True,
         ).select_related("cuenta_contable").order_by("nombre")
     return cuentas
+
+
+def _avisar_configuracion_cuentas_financieras_rumi(request, empresa, cuentas):
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
+    modo_catalogo_rumi = usa_catalogo_rumi(empresa)
+    if modo_catalogo_rumi and not cuentas.exists():
+        messages.warning(
+            request,
+            "RUMI no tiene una caja o cuenta financiera activa enlazada a su catálogo. "
+            "Configure las cuentas financieras en Contabilidad antes de registrar cobros o pagos.",
+        )
+    return modo_catalogo_rumi
 
 
 def _form_data_pago_por_defecto(cuentas_financieras):
@@ -501,6 +524,9 @@ def punto_venta(request, empresa_slug):
     impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")
     impuesto_default = impuestos_qs.first()
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
     cliente_obligatorio = _pos_cliente_obligatorio(empresa)
     bodegas_pos = []
     if empresa.slug in POS_CLIENTE_OBLIGATORIO_SLUGS:
@@ -531,6 +557,10 @@ def punto_venta(request, empresa_slug):
         fecha_venta = _parsear_fecha_latam(fecha_venta_raw) if fecha_venta_raw else timezone.localdate()
 
         try:
+            if modo_catalogo_rumi and not cuentas_financieras.exists():
+                raise ValidationError(
+                    "Configure una caja o cuenta financiera de RUMI enlazada a su catálogo antes de cobrar esta venta."
+                )
             if fecha_venta_raw and not fecha_venta:
                 raise ValidationError("Selecciona una fecha de factura valida.")
             if not usa_pago_mixto_pos and metodo not in dict(PagoFactura.METODOS):
@@ -3234,6 +3264,8 @@ def clientes_facturacion(request, empresa_slug):
 @login_required
 @xframe_options_sameorigin
 def crear_cliente(request, empresa_slug):
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
 
@@ -3244,7 +3276,8 @@ def crear_cliente(request, empresa_slug):
                 cliente = form.save(commit=False)
                 cliente.empresa = empresa
                 cliente.save()
-                asegurar_cuenta_contable_cliente(cliente)
+                if not usa_catalogo_rumi(empresa):
+                    asegurar_cuenta_contable_cliente(cliente)
                 if quick_mode:
                     return render(request, "facturacion/crear_cliente_rapido_modal.html", {
                         "empresa": empresa,
@@ -3287,6 +3320,8 @@ def crear_cliente(request, empresa_slug):
 
 @login_required
 def editar_cliente(request, empresa_slug, cliente_id):
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     cliente = get_object_or_404(Cliente, id=cliente_id, empresa=empresa)
 
@@ -3295,7 +3330,8 @@ def editar_cliente(request, empresa_slug, cliente_id):
         if form.is_valid():
             try:
                 cliente = form.save()
-                asegurar_cuenta_contable_cliente(cliente)
+                if not usa_catalogo_rumi(empresa):
+                    asegurar_cuenta_contable_cliente(cliente)
                 messages.success(request, "Cliente actualizado correctamente.")
                 return redirect("clientes_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
@@ -5727,6 +5763,9 @@ def eliminar_compra_anulada(request, empresa_slug, compra_id):
 def registrar_pago_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related('pagos_compra'),
         id=compra_id,
@@ -5748,6 +5787,8 @@ def registrar_pago_compra(request, empresa_slug, compra_id):
                 post_data["cuenta_financiera"] = str(cuenta_defecto.id)
 
         form = PagoCompraForm(post_data, empresa=empresa)
+        if modo_catalogo_rumi:
+            form.fields["cuenta_financiera"].queryset = cuentas_financieras
         form.instance.compra = compra
         if form.is_valid():
             try:
@@ -5780,6 +5821,8 @@ def registrar_pago_compra(request, empresa_slug, compra_id):
             },
             empresa=empresa,
         )
+        if modo_catalogo_rumi:
+            form.fields["cuenta_financiera"].queryset = cuentas_financieras
 
     historial = compra.pagos_compra.all()
     return render(request, "facturacion/registrar_pago_compra.html", {
@@ -5836,6 +5879,7 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
         return redirect("reporte_cxp", empresa_slug=empresa.slug)
 
     cuentas = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(request, empresa, cuentas)
     if request.method == 'POST':
         post_data = request.POST.copy()
         if not post_data.get('cuenta_financiera'):
@@ -5843,6 +5887,8 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
             if cuenta_defecto:
                 post_data['cuenta_financiera'] = str(cuenta_defecto.id)
         form = PagoComisionProveedorForm(post_data, empresa=empresa)
+        if modo_catalogo_rumi:
+            form.fields["cuenta_financiera"].queryset = cuentas
         form.instance.comision_origen = comision
         form.instance.registrado_por = request.user
         if form.is_valid():
@@ -5874,6 +5920,9 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
             },
             empresa=empresa,
         )
+
+    if modo_catalogo_rumi:
+        form.fields["cuenta_financiera"].queryset = cuentas
 
     return render(request, 'facturacion/registrar_pago_comision_proveedor.html', {
         'empresa': empresa,
@@ -8409,6 +8458,13 @@ def registrar_pago(request, empresa_slug, factura_id):
     config_avanzada = None if modo_app else ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     cuentas_financieras = cuentas_cobro_app(empresa) if modo_app else _cuentas_financieras_activas_para_pago(empresa)
     if modo_app:
+        from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+        if usa_catalogo_rumi(empresa):
+            cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
+    if modo_app:
         validar_selecciones_cobro_app(request, empresa, cuentas_financieras)
     cajas = cuentas_financieras.filter(tipo='caja')
     bancos = cuentas_financieras.filter(tipo='banco')
@@ -8522,7 +8578,7 @@ def registrar_pago(request, empresa_slug, factura_id):
         referencia = request.POST.get("referencia", "").strip()
         fecha_pago = request.POST.get("fecha")
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
-        if modo_app and cuenta_financiera_id == "":
+        if (modo_app or modo_catalogo_rumi) and cuenta_financiera_id == "":
             cuenta_financiera_id = None
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
@@ -8588,7 +8644,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                     if monto_decimal <= 0:
                         error = f"El monto de {etiqueta} debe ser mayor que cero."
                         break
-                    if modo_app and cuenta_id == "":
+                    if (modo_app or modo_catalogo_rumi) and cuenta_id == "":
                         cuenta_id = None
                     cuenta_mixta = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo_mixto)
                     if not cuenta_mixta:
@@ -8697,6 +8753,10 @@ def registrar_pago(request, empresa_slug, factura_id):
                 requiere_cuenta_principal = pago_borrador.subtotal_recibido > 0 or (
                     pago_borrador.impuesto_recibido > 0 and not cuenta_financiera_impuesto
                 )
+                if requiere_cuenta_principal and not cuenta_financiera and modo_catalogo_rumi:
+                    raise ValidationError(
+                        "Configure una caja o cuenta financiera de RUMI enlazada a su catálogo antes de registrar este cobro."
+                    )
                 if requiere_cuenta_principal and not cuenta_financiera:
                     raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el dinero recibido.")
 
@@ -8860,7 +8920,13 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
 
     cuentas_financieras = cuentas_cobro_app(empresa) if modo_app else _cuentas_financieras_activas_para_pago(empresa)
     if modo_app:
+        from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+        if usa_catalogo_rumi(empresa):
+            cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
         validar_selecciones_cobro_app(request, empresa, cuentas_financieras)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
     cajas = cuentas_financieras.filter(tipo='caja')
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
@@ -8992,7 +9058,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         referencia = request.POST.get("referencia", "").strip()
         fecha_pago = request.POST.get("fecha")
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
-        if modo_app and cuenta_financiera_id == "":
+        if (modo_app or modo_catalogo_rumi) and cuenta_financiera_id == "":
             cuenta_financiera_id = None
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
@@ -9029,7 +9095,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     raise ValidationError("Las retenciones no pueden ser negativas.")
 
                 datos_pagos_mixtos = request.POST
-                if modo_app:
+                if modo_app or modo_catalogo_rumi:
                     datos_pagos_mixtos = request.POST.copy()
                     for campo_cuenta in ("cuenta_efectivo", "cuenta_tarjeta", "cuenta_transferencia"):
                         if datos_pagos_mixtos.get(campo_cuenta) == "":
@@ -9122,6 +9188,10 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             requiere_cuenta_principal = pago_borrador.subtotal_recibido > 0 or (
                 pago_borrador.impuesto_recibido > 0 and not cuenta_financiera_impuesto
             )
+            if requiere_cuenta_principal and not cuenta_financiera and modo_catalogo_rumi:
+                raise ValidationError(
+                    "Configure una caja o cuenta financiera de RUMI enlazada a su catálogo antes de actualizar este cobro."
+                )
             if requiere_cuenta_principal and not cuenta_financiera:
                 raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el dinero recibido.")
 

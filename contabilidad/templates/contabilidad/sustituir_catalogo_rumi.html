@@ -1,0 +1,47 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Instalar catálogo RUMI{% endblock %}
+{% block header_kicker %}Contabilidad · RUMI{% endblock %}
+{% block header_title %}Reemplazar catálogo Honduras{% endblock %}
+{% block header_description %}Revise el catálogo y sus enlaces antes de instalarlo exclusivamente en RUMI.{% endblock %}
+{% block content %}
+{% if error %}<div class="erp-alert danger" role="alert">{{ error }}</div>{% endif %}
+<section class="erp-card">
+    <p>Se retiran las cuentas base generadas por el sistema que no tienen uso. Las cuentas propias y las que respaldan registros conservan su historial. La sustitución guarda un respaldo descargable.</p>
+    <p class="erp-card-muted">Las cuentas condicionadas quedan inactivas. Los controles extracontables se conservan para consulta. Los bancos deben identificarse antes de usarlos.</p>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="erp-field">{{ form.archivo.label_tag }} {{ form.archivo }} {{ form.archivo.errors }}<div class="erp-field-help">{{ form.archivo.help_text }}</div></div>
+        <input type="hidden" name="accion" value="revisar">
+        <button class="erp-btn" type="submit">Revisar sustitución</button>
+    </form>
+</section>
+{% if plan %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas a importar</div><p class="erp-stat-value">{{ plan.importables }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Base sin uso a retirar</div><p class="erp-stat-value">{{ plan.eliminadas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Históricas a conservar</div><p class="erp-stat-value">{{ plan.conservadas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Operaciones pendientes</div><p class="erp-stat-value">{{ plan.pendientes }}</p></article>
+</section>
+<section class="erp-card">
+    <h3 class="erp-panel-title">{{ plan.archivo }}</h3><p>Hoja: {{ plan.hoja }}. {{ plan.condicionadas }} cuentas condicionadas y {{ plan.controles }} controles de consulta.</p>
+    <details><summary>Ver cuentas base revisadas</summary><div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Código</th><th>Cuenta</th><th>Acción</th></tr></thead><tbody>
+    {% for cuenta in plan.cuentas_base %}<tr><td>{{ cuenta.codigo }}</td><td>{{ cuenta.nombre }}</td><td>{{ cuenta.accion }}</td></tr>{% empty %}<tr><td colspan="3">No se identificaron cuentas generadas por la plantilla Honduras.</td></tr>{% endfor %}
+    </tbody></table></div></details>
+</section>
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Enlaces con la configuración contable</h3>
+    <p>Se enlazan los equivalentes claros que estén activos. Las operaciones sin cuenta requieren una elección antes de contabilizar. Capital e intereses de préstamos conservan su función contable.</p>
+    <div class="erp-table-wrap"><table class="erp-table"><thead><tr><th>Operación</th><th>Referencia RUMI</th><th>Resultado</th></tr></thead><tbody>
+    {% for rol in plan.roles %}<tr><td>{{ rol.etiqueta }}</td><td>{% if rol.codigo %}{{ rol.codigo }} · {{ rol.nombre }}{% else %}Por definir{% endif %}</td><td>{{ rol.estado }}</td></tr>{% endfor %}
+    </tbody></table></div>
+</section>
+<section class="erp-card">
+    <form method="post">
+        {% csrf_token %}<input type="hidden" name="accion" value="aplicar"><input type="hidden" name="revision_token" value="{{ revision_token }}">
+        <div class="erp-field"><label><input type="checkbox" name="confirmar" required> Revisé las cuentas que se retirarán, el historial que se conservará y los enlaces pendientes en RUMI.</label></div>
+        <div class="erp-form-actions"><a class="erp-btn-secondary" href="{% url 'catalogo_cuentas' empresa.slug %}">Cancelar</a><button class="erp-btn" type="submit">Aplicar catálogo RUMI y guardar respaldo</button></div>
+    </form>
+</section>
+{% endif %}
+{% endblock %}
