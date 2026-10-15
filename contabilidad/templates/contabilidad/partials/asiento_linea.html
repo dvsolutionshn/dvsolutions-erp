@@ -1,0 +1,37 @@
+<div class="ae-line erp-asiento-row{% if linea_form.errors %} has-errors{% endif %}" data-line-index="{{ indice }}">
+  <span class="ae-line-number" data-line-number aria-label="Línea {{ numero }}">{{ numero }}</span>
+  <div class="ae-cell ae-cell--account">
+    {{ linea_form.id }}
+    <label class="ae-mobile-label" data-account-label for="{{ linea_form.cuenta.id_for_label }}">Cuenta contable <span class="ae-sr-only">de la línea {{ numero }}</span></label>
+    <div class="ae-native-account" data-native-account>{{ linea_form.cuenta }}</div>
+    <div class="erp-account-picker" data-account-picker hidden>
+      <input type="text" class="erp-account-search" id="{{ linea_form.cuenta.id_for_label }}_search" data-role="cuenta-search" data-target-id="{{ linea_form.cuenta.id_for_label }}" placeholder="Código o nombre de la cuenta" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="{{ linea_form.cuenta.id_for_label }}_results" aria-describedby="ae-account-help{% if linea_form.cuenta.errors %} {{ linea_form.cuenta.id_for_label }}_error{% endif %}">
+      <span class="erp-account-caret" aria-hidden="true">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}</span>
+      <div class="erp-account-results" data-role="cuenta-results" id="{{ linea_form.cuenta.id_for_label }}_results" role="listbox" aria-label="Cuentas disponibles" hidden></div>
+    </div>
+    <p class="ae-account-selection" data-account-selection hidden></p>
+    {{ linea_form.cuenta.errors }}
+    {{ linea_form.non_field_errors }}
+    <p class="ae-row-warning" data-row-warning hidden></p>
+  </div>
+  <div class="ae-cell ae-cell--detail">
+    <label class="ae-mobile-label" for="{{ linea_form.detalle.id_for_label }}">Detalle <span class="ae-sr-only">de la línea {{ numero }}</span></label>
+    {{ linea_form.detalle }}
+    {{ linea_form.detalle.errors }}
+  </div>
+  <div class="ae-cell ae-cell--debe">
+    <label class="ae-mobile-label" for="{{ linea_form.debe.id_for_label }}">Debe <span class="ae-sr-only">de la línea {{ numero }}</span></label>
+    {{ linea_form.debe }}
+    {{ linea_form.debe.errors }}
+  </div>
+  <div class="ae-cell ae-cell--haber">
+    <label class="ae-mobile-label" for="{{ linea_form.haber.id_for_label }}">Haber <span class="ae-sr-only">de la línea {{ numero }}</span></label>
+    {{ linea_form.haber }}
+    {{ linea_form.haber.errors }}
+  </div>
+  <div class="ae-cell ae-cell--remove">
+    {{ linea_form.DELETE }}
+    <label class="ae-native-delete" data-native-delete for="{{ linea_form.DELETE.id_for_label }}">Eliminar línea {{ numero }}</label>
+    <button type="button" class="erp-asiento-remove" data-role="remove-line" aria-label="Quitar línea {{ numero }}" title="Quitar línea" hidden>{% include "contabilidad/partials/dashboard_icon.html" with icon="close" only %}</button>
+  </div>
+</div>

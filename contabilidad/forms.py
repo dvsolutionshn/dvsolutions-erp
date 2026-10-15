@@ -1,7 +1,8 @@
 from decimal import Decimal
 
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms import BaseInlineFormSet, inlineformset_factory
+from django.utils import timezone
 
 from facturacion.models import CompraInventario, Factura
 
@@ -420,9 +421,23 @@ class AsientoContableForm(forms.ModelForm):
             )
         self.puede_contabilizar = bool(puede_contabilizar)
         self.fields["fecha"].widget = forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+        if (
+            not self.is_bound and not self.instance.pk
+            and not self.instance.fecha and not self.initial.get("fecha")
+        ):
+            self.initial["fecha"] = timezone.localdate()
         self.fields["fecha"].label = "Fecha"
         self.fields["descripcion"].label = "Descripción"
+        self.fields["descripcion"].widget = forms.Textarea(attrs={
+            "rows": 2,
+            "maxlength": 255,
+            "placeholder": "Describe la operación que estás registrando",
+        })
         self.fields["referencia"].label = "Referencia"
+        self.fields["referencia"].widget.attrs.update({
+            "placeholder": "Ej.: recibo, transferencia o documento",
+            "autocomplete": "off",
+        })
         self.fields["estado"].choices = [
             opcion for opcion in AsientoContable.ESTADO_CHOICES
             if opcion[0] == "borrador" or (self.puede_contabilizar and opcion[0] == "contabilizado")
@@ -433,6 +448,10 @@ class AsientoContableForm(forms.ModelForm):
         self.fields["contabilizar_ahora"].disabled = not self.puede_contabilizar
         self.fields["contabilizar_ahora"].widget = forms.HiddenInput()
         self.fields["origen_modulo"].label = "Origen"
+        self.fields["origen_modulo"].widget.attrs.update({
+            "placeholder": "Ej.: manual",
+            "autocomplete": "off",
+        })
 
     def clean(self):
         cleaned_data = super().clean()
@@ -512,11 +531,45 @@ class LineaAsientoContableForm(forms.ModelForm):
         model = LineaAsientoContable
         fields = ["cuenta", "detalle", "debe", "haber"]
 
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if empresa is None and self.instance.asiento_id:
+            empresa = self.instance.asiento.empresa
+        self.fields["cuenta"].queryset = (
+            CuentaContable.objects.filter(empresa=empresa, activa=True, acepta_movimientos=True)
+            .order_by("codigo", "nombre")
+            if empresa else CuentaContable.objects.none()
+        )
+        self.fields["cuenta"].label = "Cuenta contable"
+        self.fields["cuenta"].empty_label = "Selecciona una cuenta"
+        self.fields["detalle"].label = "Detalle"
+        self.fields["detalle"].widget.attrs.update({
+            "placeholder": "Detalle de esta partida (opcional)",
+            "autocomplete": "off",
+        })
+        for nombre in ("debe", "haber"):
+            self.fields[nombre].label = nombre.capitalize()
+            self.fields[nombre].widget.attrs.update({
+                "inputmode": "decimal",
+                "placeholder": "0.00",
+                "autocomplete": "off",
+            })
+
+
+class LineasAsientoEmpresaFormSet(BaseInlineFormSet):
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        # También se ejecuta al construir empty_form; la plantilla y las
+        # partidas agregadas conservan el mismo catálogo de la empresa.
+        kwargs["empresa"] = self.instance.empresa if self.instance.empresa_id else None
+        return kwargs
+
 
 LineaAsientoFormSet = inlineformset_factory(
     AsientoContable,
     LineaAsientoContable,
     form=LineaAsientoContableForm,
+    formset=LineasAsientoEmpresaFormSet,
     extra=2,
     can_delete=True,
 )
