@@ -46,6 +46,7 @@ from .importadores import analizar_catalogo_cuentas_desde_excel, aplicar_catalog
 from .alcance_catalogo import es_empresa_rumi
 from .catalogo_rumi_roles import usa_catalogo_rumi
 from .cierre import revisar_cierre_periodo
+from .dashboard import datos_dashboard_contable
 from .moneda import convertir_a_lempiras, distribuir_conversion
 from .reportes import (
     saldo_natural, saldos_financieros, datos_mayor, datos_balance_comprobacion,
@@ -184,17 +185,9 @@ def _calcular_flujo_efectivo(empresa, fecha_inicio="", fecha_fin=""):
 @login_required
 def contabilidad_dashboard(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    ultimos_asientos = AsientoContable.objects.filter(empresa=empresa).order_by("-fecha", "-id")[:8]
     context = {
         "empresa": empresa,
-        "resumen": _resumen_contabilidad(empresa),
-        "ultimos_asientos": ultimos_asientos,
-        "cuentas_por_tipo": (
-            CuentaContable.objects.filter(empresa=empresa)
-            .values("tipo")
-            .annotate(total=Count("id"))
-            .order_by("tipo")
-        ),
+        **datos_dashboard_contable(empresa),
     }
     return render(request, "contabilidad/dashboard_contabilidad.html", context)
 

@@ -1,109 +1,195 @@
 {% extends "core/erp_base.html" %}
+{% load static humanize l10n %}
 
-{% block title %}Contabilidad - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Finanzas{% endblock %}
+{% block title %}Contabilidad · {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} accounting-dashboard-page{% endblock %}
+{% block header_kicker %}Centro financiero{% endblock %}
 {% block header_title %}Contabilidad{% endblock %}
-{% block header_description %}Base contable institucional para construir asientos, partidas y reportes con una estructura preparada para integrarse con el resto del ERP.{% endblock %}
+{% block header_description %}Resumen de tu empresa y accesos para el trabajo de cada día.{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'contabilidad/dashboard.css' %}">{% endblock %}
 
 {% block topbar_actions %}
-{% if erp_access.contabilidad %}<a href="{% url 'configuracion_contable' empresa.slug %}" class="erp-action-link">Configurar Cuentas</a>{% endif %}
-{% if erp_access.contabilidad %}<a href="{% url 'periodos_contables' empresa.slug %}" class="erp-action-link">Periodos</a>{% endif %}
-{% if erp_access.contabilidad %}<a href="{% url 'clasificaciones_compras_fiscales' empresa.slug %}" class="erp-action-link">Clasif. Compras</a>{% endif %}
-{% if erp_access.contabilidad %}<a href="{% url 'bancos_dashboard' empresa.slug %}" class="erp-action-link">Bancos</a>{% endif %}
-{% if erp_access.catalogo_cuentas %}<a href="{% url 'crear_cuenta_contable' empresa.slug %}" class="erp-action-link">Nueva Cuenta</a>{% endif %}
-{% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="erp-action-link">Nuevo Asiento</a>{% endif %}
+{% if erp_access.reportes_contables %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ac-btn">Ver reportes</a>{% endif %}
+{% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="ac-btn ac-btn--primary">Nuevo asiento</a>{% endif %}
 {% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Cuentas</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Cuentas activas</div><p class="erp-stat-value">{{ resumen.cuentas_activas }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Asientos</div><p class="erp-stat-value">{{ resumen.asientos }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Contabilizados</div><p class="erp-stat-value">{{ resumen.contabilizados }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Borradores</div><p class="erp-stat-value">{{ resumen.borradores }}</p></article>
-</section>
+<div class="accounting-dashboard" data-accounting-dashboard>
+  {% include "contabilidad/partials/dashboard_icons.html" %}
+  <section class="ac-hero" aria-labelledby="ac-dashboard-title">
+    <div class="ac-hero__content">
+      <div class="ac-hero__kicker">Una visión más clara</div>
+      <h1 class="ac-hero__title" id="ac-dashboard-title">Tu contabilidad,<br>en un solo lugar.</h1>
+      <p class="ac-hero__text">Organiza tus cuentas, registra cada operación y mantén el control de tus períodos.</p>
+    </div>
+    <div class="ac-hero__visual" aria-hidden="true">
+      <svg viewBox="0 0 210 166" fill="none" focusable="false">
+        <circle cx="106" cy="85" r="72" fill="#E2E9F8"/>
+        <circle cx="173" cy="36" r="11" fill="#D0EEE5"/>
+        <rect x="48" y="27" width="117" height="129" rx="12" fill="#D1DAEE" transform="rotate(-8 48 27)"/>
+        <rect x="48" y="16" width="117" height="132" rx="12" fill="white" stroke="#CBD7EB"/>
+        <rect x="64" y="33" width="30" height="7" rx="3.5" fill="#7774D5"/>
+        <rect x="64" y="49" width="69" height="4" rx="2" fill="#DBE3EF"/>
+        <rect x="64" y="65" width="15" height="15" rx="4" fill="#E8F5F1"/>
+        <path d="m68 72 3 3 5-6" stroke="#27A68D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="87" y="67" width="57" height="4" rx="2" fill="#CDD8E8"/>
+        <rect x="87" y="75" width="36" height="3" rx="1.5" fill="#E4EAF3"/>
+        <rect x="64" y="89" width="15" height="15" rx="4" fill="#EEEDFA"/>
+        <path d="M68 96h7m-3-3v6" stroke="#7774D5" stroke-width="1.6" stroke-linecap="round"/>
+        <rect x="87" y="91" width="48" height="4" rx="2" fill="#CDD8E8"/>
+        <rect x="87" y="99" width="38" height="3" rx="1.5" fill="#E4EAF3"/>
+        <path d="M64 119h69" stroke="#E7ECF4" stroke-width="2"/>
+        <rect x="64" y="128" width="32" height="4" rx="2" fill="#CDD8E8"/>
+        <rect x="147" y="103" width="43" height="43" rx="13" fill="#21A68E"/>
+        <path d="m158 124 7 7 13-15" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="31" cy="103" r="6" fill="#B7D9ED"/>
+      </svg>
+    </div>
+    <div class="ac-hero__meta">
+      <span class="ac-hero__company">{{ empresa.nombre }}</span>
+      <span class="ac-hero__date">{% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %} {{ fecha_hoy|date:"d/m/Y" }}</span>
+      <div class="ac-hero__actions">
+        {% if erp_access.asientos_contables %}<a class="ac-btn ac-btn--primary" href="{% url 'crear_asiento_contable' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear asiento</a>{% endif %}
+        {% if erp_access.reportes_contables %}<a class="ac-btn" href="{% url 'estado_resultados' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %} Estado de resultados</a>{% endif %}
+      </div>
+    </div>
+  </section>
 
-<section class="erp-grid">
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Catalogo</div>
-        <h3>Cuentas Contables</h3>
-        <p>Construye tu plan de cuentas institucional por empresa, tipo contable y cuentas de movimiento.</p>
-        <a class="erp-btn-secondary" href="{% url 'catalogo_cuentas' empresa.slug %}">Ver Catalogo</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Operacion</div>
-        <h3>Asientos Contables</h3>
-        <p>Registra partidas balanceadas en borrador o contabilizadas para llevar control financiero con trazabilidad.</p>
-        <a class="erp-btn-secondary" href="{% url 'asientos_contables' empresa.slug %}">Ver Asientos</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Automatizacion</div>
-        <h3>Configuracion Contable</h3>
-        <p>Define las cuentas que usara esta empresa para ventas, cobros, compras, pagos, inventario e impuestos.</p>
-        <a class="erp-btn-secondary" href="{% url 'configuracion_contable' empresa.slug %}">Configurar Cuentas</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Cierre mensual</div>
-        <h3>Periodos Contables</h3>
-        <p>Abre o cierra meses contables para proteger asientos y reportes cuando el periodo ya fue revisado.</p>
-        <a class="erp-btn-secondary" href="{% url 'periodos_contables' empresa.slug %}">Ver Periodos</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Compras fiscales</div>
-        <h3>Clasificaciones Contables</h3>
-        <p>Define si una compra fiscal ira a combustible, alquiler, servicios, inventario u otra cuenta contable.</p>
-        <a class="erp-btn-secondary" href="{% url 'clasificaciones_compras_fiscales' empresa.slug %}">Configurar Clasificaciones</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Tesoreria</div>
-        <h3>Bancos y Tarjetas</h3>
-        <p>Importa estados de cuenta, clasifica movimientos y genera asientos desde dinero real.</p>
-        <a class="erp-btn-secondary" href="{% url 'bancos_dashboard' empresa.slug %}">Abrir Bancos</a>
-    </article>
-    <article class="erp-card erp-module-card">
-        <div class="erp-kpi-label">Analitica</div>
-        <h3>Reportes</h3>
-        <p>Lectura ejecutiva del estado contable mientras preparamos balance, mayor y auxiliares mas avanzados.</p>
-        <a class="erp-btn-secondary" href="{% url 'reportes_contables' empresa.slug %}">Ver Reportes</a>
-    </article>
-</section>
+  <section class="ac-kpis" aria-label="Resumen histórico de contabilidad">
+    <a class="ac-kpi" data-tone="indigo" href="{% url 'asientos_contables' empresa.slug %}">
+      <span class="ac-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span>
+      <div><p class="ac-kpi__label">Asientos registrados</p><p class="ac-kpi__value">{{ resumen.asientos|intcomma }}</p><p class="ac-kpi__detail">Todo el historial de la empresa</p></div>
+    </a>
+    <a class="ac-kpi" data-tone="teal" href="{% url 'asientos_contables' empresa.slug %}?estado=contabilizado">
+      <span class="ac-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}</span>
+      <div><p class="ac-kpi__label">Contabilizados</p><p class="ac-kpi__value">{{ resumen.contabilizados|intcomma }}</p><p class="ac-kpi__detail">Asientos publicados en tus libros</p></div>
+    </a>
+    <a class="ac-kpi" data-tone="amber" href="{% url 'asientos_contables' empresa.slug %}?estado=borrador">
+      <span class="ac-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="clock" only %}</span>
+      <div><p class="ac-kpi__label">Por revisar</p><p class="ac-kpi__value">{{ resumen.borradores|intcomma }}</p><p class="ac-kpi__detail">Borradores pendientes de publicar</p></div>
+    </a>
+    {% if erp_access.catalogo_cuentas %}<a class="ac-kpi" data-tone="blue" href="{% url 'catalogo_cuentas' empresa.slug %}">{% else %}<article class="ac-kpi" data-tone="blue">{% endif %}
+      <span class="ac-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span>
+      <div><p class="ac-kpi__label">Cuentas activas</p><p class="ac-kpi__value">{{ resumen.cuentas_activas|intcomma }}</p><p class="ac-kpi__detail">De {{ resumen.cuentas|intcomma }} cuentas en tu catálogo</p></div>
+    {% if erp_access.catalogo_cuentas %}</a>{% else %}</article>{% endif %}
+  </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Ultimos asientos</h3>
-            <p class="erp-card-muted">Resumen rapido de la actividad contable reciente.</p>
+  <div class="ac-workspace">
+    <section class="ac-modules" aria-labelledby="ac-modules-title">
+      <div class="ac-modules__head">
+        <div><p class="ac-eyebrow">Tu espacio de trabajo</p><h2 class="ac-section-title" id="ac-modules-title">¿Qué necesitas hacer?</h2></div>
+      </div>
+      <div class="ac-controls" data-module-controls hidden>
+        <div class="ac-search">
+          {% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}
+          <input type="search" id="ac-module-query" data-module-search placeholder="Buscar un módulo…" aria-label="Buscar accesos de contabilidad" autocomplete="off">
+          <button type="button" data-search-clear hidden aria-label="Limpiar búsqueda">{% include "contabilidad/partials/dashboard_icon.html" with icon="close" only %}</button>
         </div>
+        <div class="ac-filter" role="group" aria-label="Filtrar accesos">
+          <button type="button" data-module-filter="all" aria-pressed="true">Todos</button>
+          <button type="button" data-module-filter="operacion" aria-pressed="false">Operación</button>
+          <button type="button" data-module-filter="tesoreria" aria-pressed="false">Tesorería</button>
+          <button type="button" data-module-filter="control" aria-pressed="false">Control</button>
+        </div>
+      </div>
+      <div class="ac-modules-grid">
+        {% if erp_access.catalogo_cuentas %}
+        {% url 'catalogo_cuentas' empresa.slug as destino_catalogo %}
+        {% include "contabilidad/partials/dashboard_module.html" with destino=destino_catalogo categoria="operacion" tono="teal" icono="book" area="Catálogo" titulo="Catálogo de cuentas" descripcion="Organiza las cuentas y la estructura contable de tu empresa." valor=resumen.cuentas detalle="cuentas registradas" accion="Ver catálogo" palabras="plan estructura importar excel" only %}
+        {% endif %}
+        {% if erp_access.contabilidad %}
+        {% url 'asientos_contables' empresa.slug as destino_asientos %}
+        {% include "contabilidad/partials/dashboard_module.html" with destino=destino_asientos categoria="operacion" tono="indigo" icono="entry" area="Operación" titulo="Asientos contables" descripcion="Consulta tus partidas, revisa borradores y sigue cada movimiento." valor=resumen.asientos detalle="asientos registrados" accion="Ver asientos" palabras="diario partidas debe haber registros" only %}
+        {% url 'bancos_dashboard' empresa.slug as destino_bancos %}
+        {% include "contabilidad/partials/dashboard_module.html" with destino=destino_bancos categoria="tesoreria" tono="blue" icono="bank" area="Tesorería" titulo="Bancos y tarjetas" descripcion="Consulta tus cuentas financieras y organiza los movimientos bancarios." valor=bancos_resumen.cuentas_activas detalle="cuentas financieras activas" accion="Abrir bancos" palabras="caja efectivo conciliación depósitos transferencias" only %}
+        {% url 'periodos_contables' empresa.slug as destino_periodos %}
+        {% include "contabilidad/partials/dashboard_module.html" with destino=destino_periodos categoria="control" tono="amber" icono="calendar" area="Cierre mensual" titulo="Períodos contables" descripcion="Revisa el mes y protege tus registros cuando termines el cierre." valor="" detalle=estado_periodo accion="Ver períodos" palabras="cierre mensual abrir cerrado mes" only %}
+        {% url 'configuracion_contable' empresa.slug as destino_configuracion %}
+        {% include "contabilidad/partials/dashboard_module.html" with destino=destino_configuracion categoria="control" tono="violet" icono="settings" area="Automatización" titulo="Configuración contable" descripcion="Enlaza las cuentas que utiliza cada operación de tu empresa." valor="" detalle="Enlaces por operación" accion="Configurar" palabras="enlaces integración configuración ventas cobros pagos inventario impuestos" only %}
+        {% url 'clasificaciones_compras_fiscales' empresa.slug as destino_clasificaciones %}
+        {% include "contabilidad/partials/dashboard_module.html" with destino=destino_clasificaciones categoria="operacion" tono="rose" icono="receipt" area="Compras fiscales" titulo="Clasificaciones de compras" descripcion="Asigna cada compra fiscal a la cuenta contable que le corresponde." valor="" detalle="Compras organizadas" accion="Clasificar" palabras="gastos impuestos fiscal combustible alquiler" only %}
+        {% endif %}
+        {% if erp_access.reportes_contables %}
+        {% url 'reportes_contables' empresa.slug as destino_reportes %}
+        {% include "contabilidad/partials/dashboard_module.html" with destino=destino_reportes categoria="control" tono="cyan" icono="chart" area="Análisis" titulo="Reportes financieros" descripcion="Consulta tus libros, balances y estados financieros desde un solo lugar." valor="" detalle="Resultados y balances" accion="Ver reportes" palabras="balance general resultados mayor libros flujo efectivo auxiliares" only %}
+        {% endif %}
+      </div>
+      <div class="ac-no-results" data-module-empty hidden>
+        <strong>No encontramos ese acceso</strong>
+        <p>Prueba con bancos, asientos o reportes.</p>
+        <button class="ac-btn ac-btn--text" type="button" data-module-reset>Mostrar todos</button>
+      </div>
+      <p class="ac-module-results" data-module-result role="status" aria-live="polite">Accesos según tus permisos.</p>
+    </section>
+
+    <aside class="ac-sidebar" aria-label="Seguimiento contable">
+      <section class="ac-panel ac-month" aria-labelledby="ac-month-title">
+        <div class="ac-panel__head">
+          <div><h2 class="ac-panel__title" id="ac-month-title">Actividad del mes</h2><p class="ac-panel__text">{{ actividad_mes.etiqueta }}</p></div>
+          {% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}
+        </div>
+        <div class="ac-ring" role="img" aria-label="{{ actividad_mes.total }} asientos este mes; {{ actividad_mes.porcentaje_contabilizado }} por ciento contabilizados">
+          <svg class="ac-ring__svg" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+            <circle class="ac-ring__track" cx="60" cy="60" r="48"/>
+            {% if actividad_mes.porcentaje_contabilizado %}<circle class="ac-ring__progress" cx="60" cy="60" r="48" pathLength="100" stroke-dasharray="{{ actividad_mes.porcentaje_contabilizado|unlocalize }} 100"/>{% endif %}
+          </svg>
+          <div class="ac-ring__center"><span class="ac-month__total">{{ actividad_mes.total|intcomma }}</span><span class="ac-month__caption">asientos este mes</span></div>
+        </div>
+        <div class="ac-month-stats">
+          <div><span><i class="ac-dot" aria-hidden="true"></i> Contabilizados</span><strong>{{ actividad_mes.contabilizados|intcomma }}</strong></div>
+          <div><span><i class="ac-dot ac-dot--amber" aria-hidden="true"></i> Borradores</span><strong>{{ actividad_mes.borradores|intcomma }}</strong></div>
+          {% if actividad_mes.anulados %}<div><span><i class="ac-dot ac-dot--slate" aria-hidden="true"></i> Anulados</span><strong>{{ actividad_mes.anulados|intcomma }}</strong></div>{% endif %}
+        </div>
+        {% if actividad_mes.total %}
+        <div class="ac-progress" aria-hidden="true"><span style="width:{{ actividad_mes.porcentaje_contabilizado|unlocalize }}%"></span></div>
+        <p class="ac-month__note">{{ actividad_mes.porcentaje_contabilizado }}% de los asientos del mes están contabilizados.</p>
+        {% else %}
+        <p class="ac-month__note">Aún no hay asientos este mes. Aquí verás el avance de tu actividad.</p>
+        {% endif %}
+      </section>
+      <section class="ac-panel" aria-labelledby="ac-period-title">
+        <div class="ac-panel__head"><h2 class="ac-panel__title" id="ac-period-title">Control del período</h2>{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}</div>
+        <div class="ac-period-status" data-state="{% if periodo_actual.estado == 'cerrado' %}closed{% elif periodo_actual %}open{% else %}none{% endif %}"><span class="ac-period-status__dot" aria-hidden="true"></span>{{ estado_periodo }}</div>
+        <p class="ac-panel__text">{% if periodo_actual.estado == 'cerrado' %}Los registros de este mes están protegidos por el cierre.{% elif periodo_actual %}Este mes está abierto para registrar tus operaciones.{% else %}Revisa el período del mes antes de preparar su cierre.{% endif %}</p>
+        <a class="ac-btn ac-btn--text" href="{% url 'periodos_contables' empresa.slug %}">Revisar períodos {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>
+        {% if bancos_resumen.movimientos_pendientes %}<a class="ac-bank-pending" href="{% url 'movimientos_bancarios' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="bank" only %} {{ bancos_resumen.movimientos_pendientes|intcomma }} movimientos bancarios pendientes {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>{% endif %}
+      </section>
+    </aside>
+  </div>
+
+  <section class="ac-panel ac-activity" aria-labelledby="ac-activity-title">
+    <div class="ac-panel__head">
+      <div><p class="ac-eyebrow">Tu actividad reciente</p><h2 class="ac-panel__title" id="ac-activity-title">Últimos asientos</h2></div>
+      <a class="ac-btn ac-btn--text" href="{% url 'asientos_contables' empresa.slug %}">Ver todos {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>
     </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Numero</th>
-                    <th>Fecha</th>
-                    <th>Descripcion</th>
-                    <th>Estado</th>
-                    <th>Debe</th>
-                    <th>Haber</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for asiento in ultimos_asientos %}
-                <tr>
-                    <td>{{ asiento.numero|default:"Sin numero" }}</td>
-                    <td>{{ asiento.fecha|date:"F j, Y" }}</td>
-                    <td>{{ asiento.descripcion }}</td>
-                    <td><span class="erp-badge {% if asiento.estado == 'contabilizado' %}success{% elif asiento.estado == 'borrador' %}warning{% else %}danger{% endif %}">{{ asiento.get_estado_display }}</span></td>
-                    <td>L. {{ asiento.total_debe }}</td>
-                    <td>L. {{ asiento.total_haber }}</td>
-                    <td class="actions"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="7" class="erp-empty">Todavia no hay asientos contables registrados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% if ultimos_asientos %}
+    <div class="ac-table-wrap">
+      <table class="ac-table">
+        <caption class="ac-sr-only">Últimos asientos de {{ empresa.nombre }}. Importes en lempiras.</caption>
+        <thead><tr><th scope="col">Número y descripción</th><th scope="col">Fecha</th><th scope="col">Estado</th><th scope="col" class="ac-table__amount">Debe</th><th scope="col" class="ac-table__amount">Haber</th><th scope="col"><span class="ac-sr-only">Detalle</span></th></tr></thead>
+        <tbody>
+          {% for asiento in ultimos_asientos %}
+          <tr>
+            <td><a class="ac-entry-title" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">{{ asiento.numero|default:"Sin número" }}</a><span class="ac-entry-description">{{ asiento.descripcion }}</span></td>
+            <td>{{ asiento.fecha|date:"d/m/Y" }}</td>
+            <td><span class="ac-status" data-state="{% if asiento.estado == 'contabilizado' %}posted{% elif asiento.estado == 'borrador' %}draft{% else %}cancelled{% endif %}">{{ asiento.get_estado_display }}</span></td>
+            <td class="ac-table__amount">L {{ asiento.importe_debe|floatformat:2|intcomma }}</td>
+            <td class="ac-table__amount">L {{ asiento.importe_haber|floatformat:2|intcomma }}</td>
+            <td><a class="ac-row-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}" aria-label="Ver asiento {{ asiento.numero|default:asiento.pk }}">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-</section>
+    {% else %}
+    <div class="ac-empty">
+      <span class="ac-empty__icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span>
+      <h3 class="ac-empty__title">Tu próximo movimiento empieza aquí</h3>
+      <p class="ac-empty__text">Cuando registres tus primeros asientos, podrás seguir su estado y consultar sus detalles desde este espacio.</p>
+      {% if erp_access.asientos_contables %}<a class="ac-btn ac-btn--primary" href="{% url 'crear_asiento_contable' empresa.slug %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear primer asiento</a>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}
+{% block extra_js %}<script src="{% static 'contabilidad/dashboard.js' %}" defer></script>{% endblock %}

@@ -1,0 +1,786 @@
+body.accounting-dashboard-page {
+  background: #f5f7fb;
+}
+body.accounting-dashboard-page::before,
+body.accounting-dashboard-page::after,
+.accounting-dashboard-page .erp-topbar::before { display: none; }
+.accounting-dashboard-page .erp-main { background: #f5f7fb; padding: 24px; }
+.accounting-dashboard-page .erp-content { animation: none; background: transparent; }
+.accounting-dashboard-page .erp-topbar {
+  align-items: center;
+  backdrop-filter: none;
+  background: #fff;
+  border: 1px solid #e7edf3;
+  border-radius: 14px;
+  box-shadow: none;
+  gap: 14px;
+  margin-bottom: 21px;
+  padding: 15px 20px;
+}
+.accounting-dashboard-page .erp-topbar-kicker { color: #718299; font-size: 9px; letter-spacing: .12em; margin-bottom: 5px; }
+.accounting-dashboard-page .erp-topbar h2 { color: #22364e; font-size: 17px; letter-spacing: -.035em; }
+.accounting-dashboard-page .erp-topbar p { color: #718299; font-size: 11px; margin-top: 5px; }
+.accounting-dashboard-page .erp-topbar-actions { align-items: center; gap: 10px; }
+.accounting-dashboard-page .erp-user-chip {
+  background: #f7f9fc;
+  border: 1px solid #e6edf4;
+  border-radius: 8px;
+  box-shadow: none;
+  color: #60748b;
+  font-size: 11px;
+  padding: 10px 13px;
+}
+.accounting-dashboard-page .erp-company-switcher summary { border-color: #e7edf3; border-radius: 9px; box-shadow: none; min-width: 195px; padding: 6px 10px; }
+.accounting-dashboard-page .erp-company-switcher-icon { border-radius: 8px; height: 29px; width: 29px; }
+.accounting-dashboard-page .erp-company-switcher summary small { font-size: 8px; }
+.accounting-dashboard-page .erp-company-switcher summary strong { font-size: 11px; }
+.accounting-dashboard {
+  --ac-ink: #1c2d44;
+  --ac-muted: #64758b;
+  --ac-line: #e7edf3;
+  --ac-surface: #ffffff;
+  --ac-teal: #0b8b83;
+  --ac-radius: 18px;
+  color: var(--ac-ink);
+  font-family: inherit;
+  padding: 10px 2px 32px;
+  max-width: 1880px;
+  min-width: 0;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.accounting-dashboard *,
+.accounting-dashboard *::before,
+.accounting-dashboard *::after { box-sizing: border-box; }
+.accounting-dashboard [hidden] { display: none !important; }
+.accounting-dashboard h1,
+.accounting-dashboard h2,
+.accounting-dashboard h3,
+.accounting-dashboard p { margin: 0; }
+.accounting-dashboard a { text-decoration: none; }
+.accounting-dashboard button,
+.accounting-dashboard input { font: inherit; }
+.accounting-dashboard button { cursor: pointer; }
+.accounting-dashboard .ac-sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+.accounting-dashboard :is(a, button, input):focus-visible,
+.accounting-dashboard-page .erp-topbar .ac-btn:focus-visible {
+  outline: 3px solid #80cec9;
+  outline-offset: 4px;
+}
+.accounting-dashboard .ac-icon {
+  width: 21px;
+  height: 21px;
+  display: inline-block;
+  flex-shrink: 0;
+  stroke-width: 1.8;
+  vertical-align: middle;
+}
+.accounting-dashboard [data-tone="teal"] {
+  --ac-tone: #0b8b83;
+  --ac-tone-soft: #e7f6f3;
+  --ac-tone-border: #b5e4da;
+}
+.accounting-dashboard [data-tone="indigo"] {
+  --ac-tone: #6361ce;
+  --ac-tone-soft: #eeedfc;
+  --ac-tone-border: #d4d1f5;
+}
+.accounting-dashboard [data-tone="amber"] {
+  --ac-tone: #b78020;
+  --ac-tone-soft: #fff5df;
+  --ac-tone-border: #f3d89c;
+}
+.accounting-dashboard [data-tone="blue"] {
+  --ac-tone: #3976bd;
+  --ac-tone-soft: #eaf2fd;
+  --ac-tone-border: #c5daf3;
+}
+.accounting-dashboard [data-tone="cyan"] {
+  --ac-tone: #287f99;
+  --ac-tone-soft: #e6f4fa;
+  --ac-tone-border: #b8dfea;
+}
+.accounting-dashboard [data-tone="rose"] {
+  --ac-tone: #bd6280;
+  --ac-tone-soft: #fbedf3;
+  --ac-tone-border: #efcada;
+}
+.accounting-dashboard [data-tone="slate"] {
+  --ac-tone: #647991;
+  --ac-tone-soft: #edf2f7;
+  --ac-tone-border: #d4dfe9;
+}
+.accounting-dashboard [data-tone="violet"] {
+  --ac-tone: #8a60ba;
+  --ac-tone-soft: #f3edfb;
+  --ac-tone-border: #e1d2f0;
+}
+.accounting-dashboard .ac-eyebrow,
+.accounting-dashboard .ac-hero__kicker {
+  color: var(--ac-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .13em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+.accounting-dashboard .ac-hero {
+  align-items: center;
+  display: flex;
+  gap: 28px;
+  justify-content: space-between;
+  background: linear-gradient(110deg, #edf1fc 0%, #f1f5fb 52%, #eef7f6 100%);
+  border: 1px solid #e5eaf4;
+  border-radius: 18px;
+  margin-bottom: 23px;
+  min-height: 165px;
+  overflow: hidden;
+  padding: 26px 29px;
+  position: relative;
+}
+.accounting-dashboard .ac-hero__content { min-width: 0; position: relative; z-index: 1; }
+.accounting-dashboard .ac-hero__kicker {
+  align-items: center;
+  color: #7b8b9f;
+  display: flex;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+.accounting-dashboard .ac-hero__kicker .ac-icon { height: 13px; width: 13px; }
+.accounting-dashboard .ac-hero__title {
+  color: #192b42;
+  font-size: clamp(26px, 2.1vw, 35px);
+  font-weight: 750;
+  letter-spacing: -.045em;
+  line-height: 1.18;
+}
+.accounting-dashboard .ac-hero__text {
+  color: #687b92;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 8px;
+  max-width: 590px;
+}
+.accounting-dashboard .ac-hero__meta {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex-shrink: 0;
+  max-width: 350px;
+  position: relative;
+  z-index: 1;
+}
+.accounting-dashboard .ac-hero__visual { align-items: center; align-self: stretch; display: flex; flex-shrink: 0; justify-content: center; margin: -18px 6px -18px 10px; width: 190px; }
+.accounting-dashboard .ac-hero__visual > svg { height: 150px; max-width: 100%; width: 190px; }
+.accounting-dashboard .ac-hero__company {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--ac-line);
+  border-radius: 24px;
+  color: #4d6076;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 7px;
+  padding: 7px 12px;
+}
+.accounting-dashboard .ac-hero__company::before {
+  background: #0c9b7b;
+  border: 3px solid #e3f5ee;
+  border-radius: 50%;
+  box-sizing: content-box;
+  content: "";
+  height: 5px;
+  width: 5px;
+}
+.accounting-dashboard .ac-hero__date { align-items: center; color: #6d7f95; display: inline-flex; font-size: 11px; gap: 6px; }
+.accounting-dashboard .ac-hero__date .ac-icon { height: 14px; width: 14px; }
+.accounting-dashboard .ac-hero__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  justify-content: flex-end;
+}
+.accounting-dashboard .ac-btn,
+.accounting-dashboard-page .erp-topbar .ac-btn {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dfe7ef;
+  border-radius: 10px;
+  color: #52647a;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1.3;
+  min-height: 40px;
+  padding: 11px 15px;
+  transition: background .18s, border-color .18s, box-shadow .18s;
+  white-space: nowrap;
+}
+.accounting-dashboard .ac-btn .ac-icon,
+.accounting-dashboard-page .erp-topbar .ac-btn .ac-icon { height: 16px; width: 16px; }
+.accounting-dashboard .ac-btn:hover,
+.accounting-dashboard-page .erp-topbar .ac-btn:hover { background: #f5f8fb; border-color: #c9d6e3; }
+.accounting-dashboard .ac-btn--primary,
+.accounting-dashboard-page .erp-topbar .ac-btn--primary {
+  background: #6461ce;
+  border-color: #6461ce;
+  box-shadow: 0 4px 10px #6461ce17;
+  color: white;
+}
+.accounting-dashboard .ac-btn--primary:hover,
+.accounting-dashboard-page .erp-topbar .ac-btn--primary:hover { background: #5451b9; border-color: #5451b9; }
+.accounting-dashboard .ac-btn--small { font-size: 11px; min-height: 34px; padding: 8px 11px; }
+.accounting-dashboard .ac-btn--text { background: transparent; border-color: transparent; color: #0b8b83; padding: 4px 0; }
+.accounting-dashboard .ac-btn--text:hover { background: transparent; border-color: transparent; color: #05655e; }
+.accounting-dashboard .ac-kpis {
+  display: grid;
+  gap: 17px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 28px;
+}
+.accounting-dashboard .ac-kpi {
+  background: #fff;
+  border: 1px solid var(--ac-line);
+  border-radius: 15px;
+  box-shadow: 0 3px 14px #17314f03;
+  display: flex;
+  gap: 17px;
+  min-height: 119px;
+  padding: 22px;
+  position: relative;
+  transition: border-color .18s, box-shadow .18s;
+}
+.accounting-dashboard a.ac-kpi:hover { border-color: var(--ac-tone-border, #d6e2ec); box-shadow: 0 4px 15px #17314f08; }
+.accounting-dashboard .ac-kpi > div:not(.ac-icon-tile) { min-width: 0; }
+.accounting-dashboard .ac-icon-tile {
+  align-items: center;
+  background: var(--ac-tone-soft, #e7f6f3);
+  border-radius: 12px;
+  color: var(--ac-tone, #0b8b83);
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 45px;
+  justify-content: center;
+  width: 45px;
+}
+.accounting-dashboard .ac-kpi__label {
+  color: #66788e;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.45;
+}
+.accounting-dashboard .ac-kpi__value {
+  color: #20334b;
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  letter-spacing: -.04em;
+  line-height: 1.2;
+  margin: 4px 0 5px;
+}
+.accounting-dashboard .ac-kpi__detail { color: #758498; font-size: 11px; line-height: 1.4; }
+.accounting-dashboard .ac-workspace {
+  align-items: start;
+  display: grid;
+  gap: 23px;
+  grid-template-columns: minmax(0, 1fr) 292px;
+}
+.accounting-dashboard .ac-modules { min-width: 0; }
+.accounting-dashboard .ac-modules__head,
+.accounting-dashboard .ac-panel__head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+.accounting-dashboard .ac-modules__head { margin-bottom: 17px; }
+.accounting-dashboard .ac-section-title,
+.accounting-dashboard .ac-panel__title {
+  color: #26394f;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  line-height: 1.4;
+}
+.accounting-dashboard .ac-section-text,
+.accounting-dashboard .ac-panel__text {
+  color: #6b7c91;
+  font-size: 12px;
+  line-height: 1.65;
+  margin-top: 3px;
+}
+.accounting-dashboard .ac-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 17px;
+}
+.accounting-dashboard .ac-search {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--ac-line);
+  border-radius: 9px;
+  color: #98a4b3;
+  display: flex;
+  flex: 1 1 180px;
+  gap: 8px;
+  max-width: 330px;
+  min-height: 39px;
+  padding: 0 11px;
+  transition: border-color .18s, box-shadow .18s;
+}
+.accounting-dashboard .ac-search:focus-within { border-color: #7fc3ba; box-shadow: 0 0 0 3px #0b8b830b; }
+.accounting-dashboard .ac-search > .ac-icon { height: 16px; width: 16px; }
+.accounting-dashboard .ac-search input {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: #40546b;
+  font-size: 12px;
+  height: 37px;
+  min-width: 0;
+  outline: 0;
+  padding: 0;
+  width: 100%;
+}
+.accounting-dashboard .ac-search input::placeholder { color: #96a3b2; opacity: 1; }
+.accounting-dashboard .ac-search input:focus-visible { outline: none; }
+.accounting-dashboard .ac-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.accounting-dashboard .ac-search button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: #8291a2;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
+  width: 26px;
+}
+.accounting-dashboard .ac-search button:hover { background: #f0f4f8; color: #1c415b; }
+.accounting-dashboard .ac-search button .ac-icon { height: 13px; width: 13px; }
+.accounting-dashboard .ac-filter {
+  align-items: center;
+  background: #eaf0f5;
+  border: 1px solid #e4ebf2;
+  border-radius: 8px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 3px;
+}
+.accounting-dashboard .ac-filter button {
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: #64758b;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  min-height: 28px;
+  padding: 6px 10px;
+  transition: background .18s, color .18s, box-shadow .18s;
+}
+.accounting-dashboard .ac-filter button:hover { color: #344b66; }
+.accounting-dashboard .ac-filter button[aria-pressed="true"] {
+  background: #fff;
+  box-shadow: 0 1px 4px #29486812;
+  color: #198a81;
+}
+.accounting-dashboard .ac-modules-grid {
+  display: grid;
+  gap: 15px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.accounting-dashboard .ac-module {
+  background: #fff;
+  border: 1px solid var(--ac-line);
+  border-radius: 15px;
+  box-shadow: 0 3px 12px #17314f02;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  min-height: 231px;
+  min-width: 0;
+  padding: 20px;
+  position: relative;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+}
+.accounting-dashboard .ac-module:hover {
+  border-color: var(--ac-tone-border, #b5e4da);
+  box-shadow: 0 8px 24px #284b6c0b;
+  color: inherit;
+  transform: translateY(-3px);
+}
+.accounting-dashboard .ac-module__top {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 17px;
+}
+.accounting-dashboard .ac-module__icon {
+  align-items: center;
+  background: var(--ac-tone-soft, #e7f6f3);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--ac-tone, #0b8b83);
+  display: inline-flex;
+  height: 43px;
+  justify-content: center;
+  width: 43px;
+}
+.accounting-dashboard .ac-module__eyebrow {
+  color: #7a889b;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .095em;
+  line-height: 1.5;
+  text-align: right;
+  text-transform: uppercase;
+}
+.accounting-dashboard .ac-module__title {
+  color: #2b3d53;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.4;
+  margin-bottom: 7px;
+}
+.accounting-dashboard .ac-module__description {
+  color: #6b7d92;
+  font-size: 12px;
+  line-height: 1.75;
+  margin-bottom: 17px;
+}
+.accounting-dashboard .ac-module__footer {
+  align-items: center;
+  border-top: 1px solid #f0f3f7;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 13px;
+}
+.accounting-dashboard .ac-module__count,
+.accounting-dashboard .ac-module__action {
+  color: var(--ac-tone, #0b8b83);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.accounting-dashboard .ac-module__arrow {
+  align-items: center;
+  background: var(--ac-tone-soft, #e7f6f3);
+  border-radius: 50%;
+  color: var(--ac-tone, #0b8b83);
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 25px;
+  justify-content: center;
+  transition: background .18s, transform .18s;
+  width: 25px;
+}
+.accounting-dashboard .ac-module__arrow .ac-icon { height: 13px; width: 13px; }
+.accounting-dashboard .ac-module:hover .ac-module__arrow { transform: translateX(2px); }
+.accounting-dashboard .ac-module-results { color: #718196; font-size: 11px; line-height: 1.6; margin-top: 12px; }
+.accounting-dashboard .ac-no-results {
+  background: #fff;
+  border: 1px dashed #d7e2ec;
+  border-radius: 15px;
+  color: #8997a8;
+  font-size: 12px;
+  line-height: 1.8;
+  padding: 44px 24px;
+  text-align: center;
+}
+.accounting-dashboard .ac-no-results strong { color: #354b64; display: block; font-size: 14px; margin-bottom: 4px; }
+.accounting-dashboard .ac-sidebar { display: flex; flex-direction: column; gap: 17px; }
+.accounting-dashboard .ac-panel {
+  background: #fff;
+  border: 1px solid var(--ac-line);
+  border-radius: 16px;
+  box-shadow: 0 3px 12px #17314f02;
+  min-width: 0;
+  padding: 21px;
+}
+.accounting-dashboard .ac-panel__head .ac-icon { color: #a2aebc; height: 17px; width: 17px; }
+.accounting-dashboard .ac-month { text-align: center; }
+.accounting-dashboard .ac-month .ac-panel__head { text-align: left; }
+.accounting-dashboard .ac-month__label { color: #728197; font-size: 11px; font-weight: 500; }
+.accounting-dashboard .ac-ring {
+  align-items: center;
+  display: inline-flex;
+  height: 164px;
+  justify-content: center;
+  margin: 13px auto 12px;
+  position: relative;
+  width: 164px;
+}
+.accounting-dashboard .ac-ring > svg { height: 164px; width: 164px; }
+.accounting-dashboard .ac-ring__svg { transform: rotate(-90deg); }
+.accounting-dashboard .ac-ring__track { fill: none; stroke: #edf2f6; stroke-width: 10; }
+.accounting-dashboard .ac-ring__progress { fill: none; stroke: #20a296; stroke-linecap: round; stroke-width: 10; }
+.accounting-dashboard .ac-ring__center {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+}
+.accounting-dashboard .ac-month__total { color: #2b4057; font-size: 31px; font-weight: 700; letter-spacing: -.045em; line-height: 1.2; }
+.accounting-dashboard .ac-month__caption { color: #75869a; font-size: 11px; line-height: 1.6; margin-top: 2px; }
+.accounting-dashboard .ac-month-stats { display: flex; flex-direction: column; gap: 11px; text-align: left; }
+.accounting-dashboard .ac-month-stats > div { align-items: center; color: #6d7e94; display: flex; font-size: 12px; gap: 7px; justify-content: space-between; }
+.accounting-dashboard .ac-month-stats > div > span:first-child { align-items: center; display: inline-flex; gap: 7px; }
+.accounting-dashboard .ac-month-stats strong { color: #42576f; font-size: 11px; font-weight: 650; }
+.accounting-dashboard .ac-dot { background: #1aa493; border-radius: 50%; display: inline-block; flex-shrink: 0; height: 6px; width: 6px; }
+.accounting-dashboard .ac-dot--amber { background: #dfb351; }
+.accounting-dashboard .ac-dot--slate { background: #94a3b8; }
+.accounting-dashboard .ac-progress { background: #eef2f6; border-radius: 5px; height: 5px; margin: 17px 0 8px; overflow: hidden; }
+.accounting-dashboard .ac-progress > span { background: #20a296; border-radius: inherit; display: block; height: 100%; }
+.accounting-dashboard .ac-month__note { color: #75869a; font-size: 10px; line-height: 1.6; margin-top: 15px; text-align: left; }
+.accounting-dashboard .ac-progress + .ac-month__note { margin-top: 0; }
+.accounting-dashboard .ac-period-status {
+  align-items: center;
+  background: #f4f7fa;
+  border: 1px solid #e9eff4;
+  border-radius: 9px;
+  color: #64788d;
+  display: flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 7px;
+  line-height: 1.5;
+  margin: 17px 0 10px;
+  padding: 11px;
+}
+.accounting-dashboard .ac-period-status__dot { background: #99a8b7; border-radius: 50%; flex-shrink: 0; height: 6px; width: 6px; }
+.accounting-dashboard .ac-period-status[data-state="open"] { background: #fff8eb; border-color: #f2e7cc; color: #9c752d; }
+.accounting-dashboard .ac-period-status[data-state="open"] .ac-period-status__dot { background: #c99b3a; }
+.accounting-dashboard .ac-period-status[data-state="closed"] { background: #edf7f3; border-color: #dfeee6; color: #34806b; }
+.accounting-dashboard .ac-period-status[data-state="closed"] .ac-period-status__dot { background: #2e9d7b; }
+.accounting-dashboard .ac-sidebar .ac-btn--text { font-size: 11px; gap: 6px; margin-top: 13px; }
+.accounting-dashboard .ac-bank-pending {
+  align-items: center;
+  background: #eef4fb;
+  border: 1px solid #e1eaf5;
+  border-radius: 9px;
+  color: #587ca5;
+  display: flex;
+  font-size: 10px;
+  gap: 7px;
+  line-height: 1.7;
+  margin-top: 14px;
+  padding: 10px;
+}
+.accounting-dashboard .ac-bank-pending .ac-icon { height: 14px; width: 14px; }
+.accounting-dashboard .ac-bank-pending .ac-icon:last-child { margin-left: auto; }
+.accounting-dashboard .ac-bank-pending:hover { background: #e5eef9; color: #335e91; }
+.accounting-dashboard .ac-period-status__top { align-items: center; display: flex; gap: 10px; justify-content: space-between; margin-bottom: 10px; }
+.accounting-dashboard .ac-period-status__title { color: #40556c; font-size: 12px; font-weight: 650; }
+.accounting-dashboard .ac-period-status__text { color: #728298; font-size: 11px; line-height: 1.75; }
+.accounting-dashboard .ac-period-status .ac-btn { justify-content: space-between; margin-top: 15px; width: 100%; }
+.accounting-dashboard .ac-badge,
+.accounting-dashboard .ac-status {
+  align-items: center;
+  background: #eef7f5;
+  border: 1px solid #e0efe9;
+  border-radius: 6px;
+  color: #318f7a;
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 650;
+  gap: 5px;
+  line-height: 1.3;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+.accounting-dashboard .ac-badge--neutral,
+.accounting-dashboard .ac-period-status[data-state="none"] .ac-badge { background: #f2f5f8; border-color: #e8eef4; color: #8795a5; }
+.accounting-dashboard .ac-badge--amber,
+.accounting-dashboard .ac-status[data-state="draft"],
+.accounting-dashboard .ac-period-status[data-state="open"] .ac-badge { background: #fff7e8; border-color: #f4e8c9; color: #b18a39; }
+.accounting-dashboard .ac-status[data-state="cancelled"] { background: #f3f5f8; border-color: #e7edf3; color: #758498; }
+.accounting-dashboard .ac-activity { margin-top: 25px; padding: 22px 23px 0; }
+.accounting-dashboard .ac-activity .ac-panel__head { margin-bottom: 18px; }
+.accounting-dashboard .ac-table-wrap { margin: 0 -23px; overflow-x: auto; }
+.accounting-dashboard .ac-table { border-collapse: collapse; margin: 0; min-width: 720px; width: 100%; }
+.accounting-dashboard .ac-table thead { background: #f8fafc; }
+.accounting-dashboard .ac-table th {
+  border-bottom: 1px solid #edf1f6;
+  border-top: 1px solid #edf1f6;
+  color: #718197;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .045em;
+  padding: 12px 15px;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.accounting-dashboard .ac-table td {
+  border-bottom: 1px solid #edf1f6;
+  color: #6c7d90;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 15px;
+  vertical-align: middle;
+}
+.accounting-dashboard .ac-table th:first-child,
+.accounting-dashboard .ac-table td:first-child { padding-left: 24px; }
+.accounting-dashboard .ac-table th:last-child,
+.accounting-dashboard .ac-table td:last-child { padding-right: 24px; }
+.accounting-dashboard .ac-table tr:last-child td { border-bottom: 0; }
+.accounting-dashboard .ac-table tbody tr:hover { background: #fbfcfd; }
+.accounting-dashboard .ac-table a { color: #148d85; font-weight: 600; }
+.accounting-dashboard .ac-table .ac-table__number { color: #375369; font-variant-numeric: tabular-nums; font-weight: 650; }
+.accounting-dashboard .ac-table .ac-table__amount { color: #4e637b; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.accounting-dashboard .ac-table .ac-table__action { text-align: right; }
+.accounting-dashboard .ac-entry-title { display: block; font-size: 12px; }
+.accounting-dashboard .ac-entry-description { color: #78899e; display: block; font-size: 11px; margin-top: 3px; max-width: 480px; }
+.accounting-dashboard .ac-row-link { align-items: center; background: #f2f6fa; border: 1px solid #e7eef5; border-radius: 7px; color: #7190aa; display: inline-flex; height: 29px; justify-content: center; width: 29px; }
+.accounting-dashboard .ac-row-link .ac-icon { height: 14px; width: 14px; }
+.accounting-dashboard .ac-row-link:hover { background: #e8f2f1; border-color: #c8e3dc; color: #248b80; }
+.accounting-dashboard .ac-table td.ac-table__empty-cell { padding: 0; }
+.accounting-dashboard .ac-empty {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 215px;
+  padding: 25px;
+  text-align: center;
+}
+.accounting-dashboard .ac-empty__icon {
+  align-items: center;
+  background: #f0f6f8;
+  border: 1px solid #e6eff3;
+  border-radius: 15px;
+  color: #8ea9b4;
+  display: inline-flex;
+  height: 53px;
+  justify-content: center;
+  margin-bottom: 13px;
+  position: relative;
+  width: 53px;
+}
+.accounting-dashboard .ac-empty__icon .ac-icon { height: 25px; width: 25px; }
+.accounting-dashboard .ac-empty__title { color: #52677e; font-size: 12px; font-weight: 650; }
+.accounting-dashboard .ac-empty__text { color: #74869b; font-size: 11px; line-height: 1.8; margin-top: 5px; max-width: 400px; }
+.accounting-dashboard .ac-empty .ac-btn { margin-top: 14px; }
+.accounting-dashboard .ac-footer-note { align-items: center; color: #9aa7b6; display: flex; font-size: 9px; gap: 6px; justify-content: center; line-height: 1.6; margin-top: 20px; }
+.accounting-dashboard .ac-footer-note .ac-icon { height: 12px; width: 12px; }
+
+@media (max-width: 1400px) {
+  .accounting-dashboard .ac-hero__visual { margin-left: 0; width: 145px; }
+  .accounting-dashboard .ac-hero__meta { max-width: 290px; }
+  .accounting-dashboard .ac-modules-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .accounting-dashboard .ac-workspace { gap: 19px; grid-template-columns: minmax(0, 1fr) 270px; }
+  .accounting-dashboard .ac-kpi { gap: 13px; padding: 19px; }
+  .accounting-dashboard .ac-module { padding: 18px; }
+  .accounting-dashboard .ac-search { max-width: 280px; }
+}
+@media (max-width: 1100px) {
+  .accounting-dashboard .ac-workspace { grid-template-columns: minmax(0, 1fr); }
+  .accounting-dashboard .ac-sidebar { display: grid; grid-template-columns: 1fr 1fr; }
+  .accounting-dashboard .ac-modules-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .accounting-dashboard .ac-hero { flex-wrap: wrap; gap: 17px; }
+  .accounting-dashboard .ac-hero__content { flex: 1 1 55%; }
+  .accounting-dashboard .ac-hero__visual { margin-right: 10px; width: 135px; }
+  .accounting-dashboard .ac-hero__meta { align-items: center; border-top: 1px solid #dfe6f1; flex-direction: row; flex-wrap: wrap; justify-content: space-between; max-width: none; padding-top: 16px; width: 100%; }
+  .accounting-dashboard .ac-hero__title { font-size: 29px; }
+  .accounting-dashboard .ac-kpis { gap: 12px; }
+  .accounting-dashboard .ac-kpi { flex-direction: column; gap: 10px; min-height: 152px; padding: 18px; }
+  .accounting-dashboard .ac-kpi .ac-icon-tile { position: absolute; right: 16px; top: 17px; height: 34px; width: 34px; }
+  .accounting-dashboard .ac-kpi .ac-icon-tile .ac-icon { height: 17px; width: 17px; }
+  .accounting-dashboard .ac-kpi__label { padding-right: 37px; }
+  .accounting-dashboard .ac-kpi__value { margin-top: 17px; }
+}
+@media (max-width: 800px) {
+  .accounting-dashboard-page .erp-main { padding: 18px; }
+  .accounting-dashboard .ac-hero { align-items: flex-start; }
+  .accounting-dashboard .ac-hero__meta { align-items: center; }
+  .accounting-dashboard .ac-hero__actions { justify-content: flex-end; }
+  .accounting-dashboard .ac-hero__text { font-size: 12px; max-width: 360px; }
+  .accounting-dashboard .ac-hero__visual { opacity: .65; position: absolute; right: -6px; top: 20px; width: 140px; }
+  .accounting-dashboard .ac-hero__content { padding-right: 110px; }
+  .accounting-dashboard .ac-modules-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-dashboard .ac-module { min-height: 211px; }
+  .accounting-dashboard .ac-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-dashboard .ac-kpi { flex-direction: row; min-height: 114px; }
+  .accounting-dashboard .ac-kpi .ac-icon-tile { height: 41px; position: static; width: 41px; }
+  .accounting-dashboard .ac-kpi__label { padding-right: 0; }
+  .accounting-dashboard .ac-kpi__value { margin-top: 3px; }
+}
+@media (max-width: 600px) {
+  .accounting-dashboard-page .erp-main { padding: 16px; }
+  .accounting-dashboard-page .erp-topbar { align-items: flex-start; flex-direction: column; padding: 15px; }
+  .accounting-dashboard-page .erp-topbar-actions { gap: 8px; }
+  .accounting-dashboard-page .erp-company-switcher { width: auto; }
+  .accounting-dashboard-page .erp-company-switcher summary { min-width: 170px; }
+  .accounting-dashboard-page .erp-topbar .ac-btn { font-size: 10px; min-height: 36px; padding: 8px 10px; }
+  .accounting-dashboard { padding-top: 3px; }
+  .accounting-dashboard .ac-hero { flex-direction: column; gap: 16px; margin-bottom: 22px; padding: 22px; }
+  .accounting-dashboard .ac-hero__meta { align-items: flex-start; flex-wrap: wrap; flex-direction: row; gap: 10px; width: 100%; }
+  .accounting-dashboard .ac-hero__actions { align-items: stretch; flex-direction: column; width: 100%; }
+  .accounting-dashboard .ac-hero__company { font-size: 10px; }
+  .accounting-dashboard .ac-hero__date { align-self: center; font-size: 10px; }
+  .accounting-dashboard .ac-hero__title { font-size: 25px; }
+  .accounting-dashboard .ac-hero__visual { right: -18px; top: 28px; width: 110px; }
+  .accounting-dashboard .ac-hero__content { flex: none; padding-right: 48px; width: 100%; }
+  .accounting-dashboard .ac-kpi { gap: 10px; padding: 14px; }
+  .accounting-dashboard .ac-kpi .ac-icon-tile { height: 32px; width: 32px; }
+  .accounting-dashboard .ac-kpi__label { font-size: 11px; }
+  .accounting-dashboard .ac-kpi__value { font-size: 26px; }
+  .accounting-dashboard .ac-kpi__detail { font-size: 11px; }
+  .accounting-dashboard .ac-controls { align-items: stretch; flex-direction: column; gap: 10px; }
+  .accounting-dashboard .ac-search { flex: none; max-width: none; }
+  .accounting-dashboard .ac-filter { align-self: flex-start; }
+  .accounting-dashboard .ac-filter button { padding: 6px 11px; }
+  .accounting-dashboard .ac-sidebar { grid-template-columns: 1fr; }
+  .accounting-dashboard .ac-modules-grid { gap: 12px; grid-template-columns: 1fr; }
+  .accounting-dashboard .ac-module { min-height: 198px; padding: 19px; }
+  .accounting-dashboard .ac-module__top { margin-bottom: 14px; }
+  .accounting-dashboard .ac-module__title { font-size: 16px; }
+  .accounting-dashboard .ac-module__description { font-size: 13px; }
+  .accounting-dashboard .ac-module__count,
+  .accounting-dashboard .ac-module__action { font-size: 11px; }
+  .accounting-dashboard .ac-module__eyebrow { font-size: 9px; }
+  .accounting-dashboard .ac-panel { padding: 18px; }
+  .accounting-dashboard .ac-activity { padding: 18px 18px 0; }
+  .accounting-dashboard .ac-table-wrap { margin-left: -18px; margin-right: -18px; }
+  .accounting-dashboard .ac-activity .ac-panel__head { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .accounting-dashboard *,
+  .accounting-dashboard *::before,
+  .accounting-dashboard *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+  .accounting-dashboard .ac-module:hover,
+  .accounting-dashboard .ac-module:hover .ac-module__arrow { transform: none; }
+}

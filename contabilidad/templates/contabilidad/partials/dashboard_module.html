@@ -1,0 +1,13 @@
+<a class="ac-module" href="{{ destino }}" data-accounting-module data-category="{{ categoria }}" data-search="{{ titulo }} {{ descripcion }} {{ palabras }}" data-tone="{{ tono }}">
+  <div class="ac-module__top">
+    <span class="ac-module__icon">{% include "contabilidad/partials/dashboard_icon.html" with icon=icono only %}</span>
+    <span class="ac-module__eyebrow">{{ area }}</span>
+  </div>
+  <h3 class="ac-module__title">{{ titulo }}</h3>
+  <p class="ac-module__description">{{ descripcion }}</p>
+  <div class="ac-module__footer">
+    <span class="ac-module__count">{{ valor }} {{ detalle }}</span>
+    <span class="ac-module__arrow">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</span>
+  </div>
+  <span class="ac-sr-only">{{ accion }}</span>
+</a>
