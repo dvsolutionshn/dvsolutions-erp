@@ -142,6 +142,7 @@ class CuentaContable(models.Model):
         ("ingreso", "Ingreso"),
         ("costo", "Costo"),
         ("gasto", "Gasto"),
+        ("orden", "Control extracontable"),
     ]
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="cuentas_contables")
@@ -188,7 +189,11 @@ class CuentaContable(models.Model):
         return f"{'-- ' * self.nivel}{self.codigo} - {self.nombre}"
 
     def clean(self):
+        if self.tipo == "orden" and (self.acepta_movimientos or self.activa):
+            raise ValidationError("Las cuentas de control extracontable se conservan inactivas y no admiten asientos financieros.")
         if self.cuenta_padre_id:
+            if (self.tipo == "orden") != (self.cuenta_padre.tipo == "orden"):
+                raise ValidationError("Las cuentas financieras y los controles extracontables deben conservar jerarquías separadas.")
             if self.pk and self.cuenta_padre_id == self.pk:
                 raise ValidationError("Una cuenta no puede ser padre de si misma.")
             if self.cuenta_padre.empresa_id != self.empresa_id:
@@ -649,6 +654,8 @@ class LineaAsientoContable(models.Model):
         verbose_name_plural = "Lineas de asiento"
 
     def clean(self):
+        if self.cuenta_id and self.cuenta.tipo == "orden":
+            raise ValidationError("Las cuentas de control extracontable son de consulta y no admiten asientos financieros.")
         from .proteccion_conversion import validar_partida_revisada
         validar_partida_revisada(
             [self.asiento_id, self._asiento_anterior_id(self._state.db or "default")], self._state.db or "default",

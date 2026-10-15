@@ -1027,7 +1027,11 @@ class ContabilidadTests(TestCase):
             reverse("importar_catalogo_cuentas", args=[self.empresa.slug]),
             {"actualizar_existentes": "on", "archivo": archivo},
         )
-
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["revision_token"], response.context["form"].errors)
+        response = self.client.post(reverse("importar_catalogo_cuentas", args=[self.empresa.slug]), {
+            "accion": "importar", "confirmar": "on", "revision_token": response.context["revision_token"],
+        })
         self.assertRedirects(response, reverse("catalogo_cuentas", args=[self.empresa.slug]))
         cuenta_padre = CuentaContable.objects.get(empresa=self.empresa, codigo="1100")
         subcuenta = CuentaContable.objects.get(empresa=self.empresa, codigo="1101")
@@ -1063,7 +1067,11 @@ class ContabilidadTests(TestCase):
             reverse("importar_catalogo_cuentas", args=[self.empresa.slug]),
             {"actualizar_existentes": "on", "archivo": archivo},
         )
-
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["revision_token"], response.context["form"].errors)
+        response = self.client.post(reverse("importar_catalogo_cuentas", args=[self.empresa.slug]), {
+            "accion": "importar", "confirmar": "on", "revision_token": response.context["revision_token"],
+        })
         self.assertRedirects(response, reverse("catalogo_cuentas", args=[self.empresa.slug]))
         activos = CuentaContable.objects.get(empresa=self.empresa, codigo="1")
         caja = CuentaContable.objects.get(empresa=self.empresa, codigo="110101")

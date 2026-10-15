@@ -4,6 +4,7 @@ from functools import wraps
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from decimal import Decimal
@@ -15,7 +16,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
@@ -40,7 +41,7 @@ from .forms import (
     PeriodoContableForm,
     ReglaClasificacionBancoForm,
 )
-from .importadores import importar_catalogo_cuentas_desde_excel, importar_movimientos_bancarios_desde_excel
+from .importadores import analizar_catalogo_cuentas_desde_excel, aplicar_catalogo_cuentas, importar_movimientos_bancarios_desde_excel
 from .cierre import revisar_cierre_periodo
 from .moneda import convertir_a_lempiras, distribuir_conversion
 from .reportes import (
@@ -1106,30 +1107,123 @@ def _agregar_errores_validacion_form(form, error):
         form.add_error(None, mensaje)
 
 
+FIRMA_REVISION_CATALOGO = "contabilidad.importacion-catalogo.v1"
+
+
+def _vista_previa_catalogo(datos_firmados):
+    resultado = datos_firmados["resultado"]
+    tipos = dict(CuentaContable.TIPO_CHOICES)
+    prefijo = datos_firmados["opciones"].get("prefijo_codigos", "")
+    filas = []
+    for datos in resultado["datos"]:
+        fila = dict(datos)
+        fila["tipo_nombre"] = tipos.get(datos["tipo"], datos["tipo"])
+        if prefijo:
+            fila["codigo_original"] = datos["codigo"].removeprefix(prefijo)
+        for campo in ("activa", "acepta_movimientos"):
+            fila[f"{campo}_texto"] = (
+                "Sí" if datos[campo] else "No"
+            ) if campo in datos else "Sin modificar / predeterminado"
+        filas.append(fila)
+    return {
+        **{clave: valor for clave, valor in resultado.items() if clave not in {"datos", "firma_existentes"}},
+        "archivo_nombre": datos_firmados["archivo_nombre"],
+        "formato_nombre": {
+            "rumi": "Propuesta RUMI", "estandar": "Estándar", "jerarquico": "Jerárquico",
+        }.get(resultado["formato"], resultado["formato"]),
+        "opciones": datos_firmados["opciones"],
+        "filas": filas[:50],
+        "filas_adicionales": filas[50:],
+        "total": len(resultado["datos"]),
+        "no_mostradas": max(len(filas) - 50, 0),
+    }
+
+
 @login_required
+@require_http_methods(["GET", "POST"])
 def importar_catalogo_cuentas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_catalogo_cuentas")
+    accion = request.POST.get("accion", "revisar") if request.method == "POST" else "revisar"
     form = ImportarCatalogoCuentasForm(request.POST or None, request.FILES or None)
-    if request.method == "POST" and form.is_valid():
+    vista_previa, revision_token, error_importacion = None, "", ""
+
+    if request.method == "POST" and accion == "importar":
+        form = ImportarCatalogoCuentasForm()
         try:
-            resultado = importar_catalogo_cuentas_desde_excel(
-                empresa,
-                form.cleaned_data["archivo"],
-                actualizar_existentes=form.cleaned_data["actualizar_existentes"],
-            )
+            try:
+                datos_firmados = signing.loads(
+                    request.POST.get("revision_token", ""),
+                    salt=FIRMA_REVISION_CATALOGO,
+                    max_age=1800,
+                )
+            except signing.SignatureExpired:
+                raise ValidationError("La revisión venció. Vuelve a subir y revisar el archivo antes de importarlo.")
+            except signing.BadSignature:
+                raise ValidationError("La revisión falta o fue modificada. Vuelve a revisar el archivo antes de importarlo.")
+            if (
+                datos_firmados.get("empresa_id") != empresa.pk
+                or datos_firmados.get("usuario_id") != request.user.pk
+                or datos_firmados.get("version") != 1
+            ):
+                raise ValidationError("Esta revisión pertenece a otra empresa o usuario. Revisa el archivo desde esta empresa.")
+
+            form = ImportarCatalogoCuentasForm(initial=datos_firmados["opciones"])
+            vista_previa = _vista_previa_catalogo(datos_firmados)
+            revision_token = request.POST["revision_token"]
+            if not forms.BooleanField(required=False).clean(request.POST.get("confirmar")):
+                error_importacion = "Marca la confirmación después de revisar las cuentas y las opciones de importación."
+            else:
+                try:
+                    resultado = aplicar_catalogo_cuentas(
+                        empresa,
+                        datos_firmados["resultado"]["datos"],
+                        actualizar_existentes=datos_firmados["opciones"]["actualizar_existentes"],
+                        firma_existentes=datos_firmados["resultado"]["firma_existentes"],
+                    )
+                except ValidationError as error:
+                    vista_previa, revision_token = None, ""
+                    raise ValidationError(error.messages + ["Vuelve a subir y revisar el archivo para preparar una importación actualizada."])
+                messages.success(
+                    request,
+                    f"Catálogo importado en {empresa.nombre}: {resultado['creadas']} cuentas creadas, "
+                    f"{resultado['actualizadas']} actualizadas y {resultado['sin_cambios']} conservadas.",
+                )
+                return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
         except ValidationError as error:
-            mensajes = error.messages if hasattr(error, "messages") else [str(error)]
-            for mensaje in mensajes:
-                messages.error(request, mensaje)
-        else:
-            messages.success(
-                request,
-                f"Catalogo importado: {resultado['creadas']} creadas, {resultado['actualizadas']} actualizadas.",
-            )
-            return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
+            error_importacion = "; ".join(error.messages)
+
+    elif request.method == "POST" and accion == "revisar" and form.is_valid():
+        try:
+            opciones = {
+                "actualizar_existentes": form.cleaned_data["actualizar_existentes"],
+                "incluir_controles": form.cleaned_data["incluir_controles"],
+                "hoja": form.cleaned_data["hoja"],
+                "prefijo_codigos": form.cleaned_data["prefijo_codigos"],
+            }
+            archivo = form.cleaned_data["archivo"]
+            resultado = analizar_catalogo_cuentas_desde_excel(empresa, archivo, **opciones)
+            datos_firmados = {
+                "version": 1,
+                "empresa_id": empresa.pk,
+                "usuario_id": request.user.pk,
+                "archivo_nombre": archivo.name,
+                "opciones": opciones,
+                "resultado": resultado,
+            }
+            vista_previa = _vista_previa_catalogo(datos_firmados)
+            revision_token = signing.dumps(datos_firmados, salt=FIRMA_REVISION_CATALOGO, compress=True)
+        except ValidationError as error:
+            form.add_error(None, error)
+    elif request.method == "POST" and accion != "revisar":
+        error_importacion = "Elige revisar el archivo o confirmar una revisión válida."
+
     return render(request, "contabilidad/importar_catalogo_cuentas.html", {
         "empresa": empresa,
         "form": form,
+        "vista_previa": vista_previa,
+        "revision_token": revision_token,
+        "error_importacion": error_importacion,
     })
 
 

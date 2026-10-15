@@ -20,7 +20,10 @@ class CuentaContableForm(forms.ModelForm):
             self.instance.empresa = empresa
         cuentas_padre = CuentaContable.objects.none()
         if empresa:
-            cuentas_padre = CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre")
+            from django.db.models import Q
+            cuentas_padre = CuentaContable.objects.filter(empresa=empresa).filter(
+                Q(activa=True) | Q(tipo="orden") | Q(pk=self.instance.cuenta_padre_id),
+            ).order_by("codigo", "nombre")
             if self.instance and self.instance.pk:
                 cuentas_padre = cuentas_padre.exclude(pk=self.instance.pk)
         self.fields["cuenta_padre"].queryset = cuentas_padre
@@ -29,7 +32,7 @@ class CuentaContableForm(forms.ModelForm):
         textos = {
             "codigo": ("Codigo contable", "Ejemplo: 1.1.01 o 1101 segun tu estructura."),
             "nombre": ("Nombre de la cuenta", ""),
-            "tipo": ("Tipo de cuenta", ""),
+            "tipo": ("Tipo de cuenta", "Los controles extracontables se conservan inactivos para consulta y no admiten asientos financieros."),
             "cuenta_padre": ("Cuenta padre", "Usala para crear subcuentas y reportes agrupados."),
             "actividad_flujo": ("Actividad en el flujo de efectivo", "Puede indicar operación, inversión o financiamiento para cuentas propias. La opción automática usa la clasificación de la cuenta o de su cuenta padre."),
             "descripcion": ("Descripcion", ""),
@@ -54,20 +57,46 @@ class CuentaContableForm(forms.ModelForm):
 class ImportarCatalogoCuentasForm(forms.Form):
     archivo = forms.FileField(
         label="Archivo Excel",
-        help_text="Formato esperado: codigo, nombre, tipo, codigo_padre, acepta_movimientos, activa, descripcion.",
+        help_text="Acepta .xlsx o .xlsm: formato estándar, catálogos jerárquicos y propuestas como RUMI, incluso con títulos antes del encabezado.",
+        widget=forms.ClearableFileInput(attrs={"accept": ".xlsx,.xlsm"}),
     )
     actualizar_existentes = forms.BooleanField(
         required=False,
-        initial=True,
+        initial=False,
         label="Actualizar cuentas existentes",
-        help_text="Si el codigo ya existe para esta empresa, actualiza nombre, tipo, padre y estado.",
+        help_text="Déjalo desmarcado para conservar las cuentas actuales. Si lo activas, se revisarán los cambios de nombre, tipo, padre y estado antes de confirmar.",
+    )
+    incluir_controles = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Conservar controles extracontables para consulta",
+        help_text="Conserva las cuentas de orden como referencia; no admiten asientos ni afectan los estados financieros.",
+    )
+    hoja = forms.CharField(
+        required=False,
+        max_length=150,
+        label="Hoja del catálogo (opcional)",
+        help_text="Se detecta automáticamente. Si el archivo contiene varios catálogos, escribe el nombre exacto de la hoja que deseas importar.",
+    )
+    prefijo_codigos = forms.RegexField(
+        required=False,
+        max_length=20,
+        regex=r"^[A-Za-z0-9_.-]*$",
+        label="Prefijo para cuentas nuevas (opcional)",
+        help_text="Ejemplo: RUMI-. Permite agregar este catálogo sin ocupar los códigos del catálogo actual. También se aplica a sus cuentas padre.",
+        error_messages={"invalid": "Usa únicamente letras, números, punto, guion o guion bajo en el prefijo."},
     )
 
+    def __init__(self, *args, requiere_archivo=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["archivo"].required = requiere_archivo
+
     def clean_archivo(self):
-        archivo = self.cleaned_data["archivo"]
-        nombre = archivo.name.lower()
-        if not nombre.endswith((".xlsx", ".xlsm")):
-            raise forms.ValidationError("Sube un archivo Excel valido en formato .xlsx o .xlsm.")
+        archivo = self.cleaned_data.get("archivo")
+        if archivo is None:
+            return archivo
+        if not archivo.name.lower().endswith((".xlsx", ".xlsm")):
+            raise forms.ValidationError("Sube un archivo Excel válido en formato .xlsx o .xlsm.")
         return archivo
 
 
