@@ -47,6 +47,7 @@ from .alcance_catalogo import es_empresa_rumi
 from .catalogo_rumi_roles import usa_catalogo_rumi
 from .cierre import revisar_cierre_periodo
 from .dashboard import datos_dashboard_contable
+from .listado_asientos import contexto_listado_asientos
 from .moneda import convertir_a_lempiras, distribuir_conversion
 from .reportes import (
     saldo_natural, saldos_financieros, datos_mayor, datos_balance_comprobacion,
@@ -1291,36 +1292,8 @@ def editar_cuenta_contable(request, empresa_slug, cuenta_id):
 @login_required
 def asientos_contables(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    asientos = AsientoContable.objects.filter(empresa=empresa).prefetch_related("lineas").order_by("-fecha", "-id")
-    q = request.GET.get("q", "").strip()
-    estado = request.GET.get("estado", "").strip()
-    fecha_inicio = request.GET.get("fecha_inicio", "").strip()
-    fecha_fin = request.GET.get("fecha_fin", "").strip()
-    if q:
-        asientos = asientos.filter(
-            Q(numero__icontains=q)
-            | Q(descripcion__icontains=q)
-            | Q(referencia__icontains=q)
-            | Q(origen_modulo__icontains=q)
-        )
-    if estado:
-        asientos = asientos.filter(estado=estado)
-    if fecha_inicio:
-        asientos = asientos.filter(fecha__gte=fecha_inicio)
-    if fecha_fin:
-        asientos = asientos.filter(fecha__lte=fecha_fin)
-    context = {
-        "empresa": empresa,
-        "asientos": asientos,
-        "resumen": _resumen_contabilidad(empresa),
-        "filtros": {
-            "q": q,
-            "estado": estado,
-            "fecha_inicio": fecha_inicio,
-            "fecha_fin": fecha_fin,
-        },
-    }
-    return render(request, "contabilidad/asientos_contables.html", context)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    return render(request, "contabilidad/asientos_contables.html", contexto_listado_asientos(empresa, request.GET))
 
 
 
