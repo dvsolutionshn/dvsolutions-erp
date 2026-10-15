@@ -1,0 +1,17 @@
+{% load l10n %}
+{% if comision_sobre_total_factura %}
+<div class="erp-soft-panel" style="margin-top:16px;" aria-live="polite">
+    <strong>Cobro completo y comisión separada</strong>
+    <p>Registra todo el dinero recibido del cliente. La comisión se asigna al proveedor y se paga después desde cuentas por pagar.</p>
+    <div>Saldo de la factura después de guardar: <strong id="saldo-despues-pago"></strong></div>
+    <p id="aviso-saldo-comision" hidden>La factura quedará con pago parcial. Si recibiste el pago completo, usa «Pagar todo»: la comisión no se descuenta del cobro.</p>
+</div>
+<script>
+function actualizarSaldoComisionPago(totalAplicado){
+    const saldoDisponible = Number("{{ saldo_disponible_pago|unlocalize }}");
+    const saldo = Math.max(Math.round((saldoDisponible - totalAplicado) * 100) / 100, 0);
+    document.getElementById("saldo-despues-pago").textContent = moneyHN(saldo);
+    document.getElementById("aviso-saldo-comision").hidden = saldo <= 0;
+}
+</script>
+{% endif %}

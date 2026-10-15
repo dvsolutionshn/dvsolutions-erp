@@ -13,6 +13,7 @@
     <input id="porcentaje_comision" type="number" step="0.01" min="0" max="100" name="porcentaje_comision" value="{{ form_data.porcentaje_comision|default:'0.00' }}" placeholder="Ejemplo: 25.00">
     {% if comision_sobre_total_factura %}
     <div class="erp-field-help">Se calcula sobre el total completo de la factura, incluyendo ISV.</div>
+    <div class="erp-field-help">La comisión queda por pagar al proveedor. Registra el cobro completo del cliente sin descontarla.</div>
     {% else %}
     <div class="erp-field-help">Se calcula sobre el total aplicado y no reduce el saldo del cliente.</div>
     {% endif %}

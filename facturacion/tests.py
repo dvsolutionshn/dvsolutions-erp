@@ -2297,6 +2297,264 @@ class FacturacionTests(TestCase):
         self.assertContains(response, 'const comisionSobreTotalFactura = true;', html=False)
         self.assertContains(response, 'const baseComisionFactura = parseFloat("115.00");', html=False)
 
+    def _crear_factura_comision_digital_planning(self):
+        self.empresa.slug = "digital_planning"
+        self.empresa.save(update_fields=["slug"])
+        cuenta_banco = CuentaContable.objects.create(
+            empresa=self.empresa,
+            codigo="110296",
+            nombre="Banco cobro completo Digital Planning",
+            tipo="activo",
+        )
+        banco = CuentaFinanciera.objects.create(
+            empresa=self.empresa,
+            nombre="Banco cobro completo Digital Planning",
+            tipo="banco",
+            cuenta_contable=cuenta_banco,
+        )
+        proveedor = Proveedor.objects.create(
+            empresa=self.empresa,
+            nombre="Proveedor comisión cobro completo",
+            rtn="08011999444444",
+        )
+        factura = Factura.objects.create(
+            empresa=self.empresa,
+            cliente=self.cliente,
+            estado="emitida",
+            fecha_emision=date.today(),
+        )
+        LineaFactura.objects.create(
+            factura=factura,
+            producto=self.producto,
+            cantidad=Decimal("1.00"),
+            precio_unitario=Decimal("105000.00"),
+            impuesto=self.impuesto,
+        )
+        factura.calcular_totales()
+        factura.save(update_fields=["subtotal", "impuesto", "total", "total_lempiras"])
+        self.assertEqual(factura.subtotal, Decimal("105000.00"))
+        self.assertEqual(factura.impuesto, Decimal("15750.00"))
+        self.assertEqual(factura.total, Decimal("120750.00"))
+        return factura, banco, proveedor
+
+    def test_digital_planning_cobro_completo_y_pago_comision_conservan_factura_pagada(self):
+        factura, banco, proveedor = self._crear_factura_comision_digital_planning()
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "120750.00",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(banco.id),
+                "referencia": "DP-COBRO-COMPLETO",
+                "proveedor_comision": str(proveedor.id),
+                "porcentaje_comision": "25.00",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        pago = PagoFactura.objects.get(factura=factura)
+        self.assertEqual(pago.monto, Decimal("120750.00"))
+        self.assertEqual(pago.total_aplicado, Decimal("120750.00"))
+        self.assertEqual(pago.recibo.monto, Decimal("120750.00"))
+        self.assertEqual(pago.monto_comision, Decimal("30187.50"))
+        self.assertEqual(pago.saldo_comision_pendiente, Decimal("30187.50"))
+        self.assertFalse(PagoComisionProveedor.objects.filter(comision_origen=pago).exists())
+        factura.refresh_from_db()
+        self.assertEqual(factura.estado_pago, "pagado")
+        self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+        asiento_cobro = AsientoContable.objects.get(
+            documento_tipo="pago_factura", documento_id=pago.pk, evento="cobro",
+        )
+        factura.cliente.refresh_from_db()
+        proveedor.refresh_from_db()
+        self.assertTrue(asiento_cobro.lineas.filter(
+            cuenta=banco.cuenta_contable, debe=Decimal("120750.00"),
+        ).exists())
+        self.assertTrue(asiento_cobro.lineas.filter(
+            cuenta=factura.cliente.cuenta_contable, haber=Decimal("120750.00"),
+        ).exists())
+        self.assertTrue(asiento_cobro.lineas.filter(
+            cuenta=proveedor.cuenta_contable, haber=Decimal("30187.50"),
+        ).exists())
+        self.assertEqual(asiento_cobro.total_debe, asiento_cobro.total_haber)
+
+        response = self.client.post(
+            reverse("registrar_pago_comision_proveedor", args=[self.empresa.slug, pago.id]),
+            {
+                "fecha": str(date.today()),
+                "monto": "30187.50",
+                "metodo": "transferencia",
+                "cuenta_financiera": str(banco.id),
+                "referencia": "DP-PAGO-COMISION",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        pago_comision = PagoComisionProveedor.objects.get(comision_origen=pago)
+        asiento_comision = AsientoContable.objects.get(
+            documento_tipo="pago_comision_proveedor", documento_id=pago_comision.pk, evento="egreso",
+        )
+        self.assertTrue(asiento_comision.lineas.filter(
+            cuenta=proveedor.cuenta_contable, debe=Decimal("30187.50"),
+        ).exists())
+        self.assertTrue(asiento_comision.lineas.filter(
+            cuenta=banco.cuenta_contable, haber=Decimal("30187.50"),
+        ).exists())
+        self.assertEqual(asiento_comision.total_debe, asiento_comision.total_haber)
+        pago.refresh_from_db()
+        factura.refresh_from_db()
+        self.assertEqual(pago.saldo_comision_pendiente, Decimal("0.00"))
+        self.assertEqual(factura.pagos_facturacion.count(), 1)
+        self.assertEqual(factura.total_pagado, Decimal("120750.00"))
+        self.assertEqual(factura.estado_pago, "pagado")
+        self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+
+    def test_digital_planning_corregir_cobro_neto_actualiza_recibo_y_asiento_sin_duplicar_comision(self):
+        factura, banco, proveedor = self._crear_factura_comision_digital_planning()
+        datos_pago = {
+            "fecha": str(date.today()),
+            "monto": "90562.50",
+            "metodo": "transferencia",
+            "cuenta_financiera": str(banco.id),
+            "referencia": "DP-CORREGIR-COBRO",
+            "proveedor_comision": str(proveedor.id),
+            "porcentaje_comision": "25.00",
+        }
+        response = self.client.post(
+            reverse("registrar_pago", args=[self.empresa.slug, factura.id]), datos_pago,
+        )
+        self.assertEqual(response.status_code, 302)
+        pago = PagoFactura.objects.get(factura=factura)
+        recibo_id = pago.recibo.pk
+        factura.refresh_from_db()
+        self.assertEqual(factura.estado_pago, "parcial")
+        self.assertEqual(factura.saldo_pendiente, Decimal("30187.50"))
+        self.assertEqual(pago.monto_comision, Decimal("30187.50"))
+
+        datos_pago["monto"] = "120750.00"
+        response = self.client.post(
+            reverse("editar_pago_factura", args=[self.empresa.slug, factura.id, pago.id]), datos_pago,
+        )
+        self.assertEqual(response.status_code, 302)
+        pago.refresh_from_db()
+        factura.refresh_from_db()
+        self.assertEqual(factura.pagos_facturacion.count(), 1)
+        self.assertEqual(pago.monto, Decimal("120750.00"))
+        self.assertEqual(pago.total_aplicado, Decimal("120750.00"))
+        self.assertEqual(pago.recibo.pk, recibo_id)
+        self.assertEqual(pago.recibo.monto, Decimal("120750.00"))
+        self.assertEqual(ReciboPago.objects.filter(pago=pago).count(), 1)
+        self.assertEqual(pago.monto_comision, Decimal("30187.50"))
+        self.assertEqual(pago.saldo_comision_pendiente, Decimal("30187.50"))
+        self.assertEqual(factura.estado_pago, "pagado")
+        self.assertEqual(factura.saldo_pendiente, Decimal("0.00"))
+        asientos = AsientoContable.objects.filter(
+            documento_tipo="pago_factura", documento_id=pago.pk, evento="cobro",
+        )
+        self.assertEqual(asientos.count(), 1)
+        asiento = asientos.get()
+        factura.cliente.refresh_from_db()
+        proveedor.refresh_from_db()
+        self.assertTrue(asiento.lineas.filter(
+            cuenta=banco.cuenta_contable, debe=Decimal("120750.00"),
+        ).exists())
+        self.assertTrue(asiento.lineas.filter(
+            cuenta=factura.cliente.cuenta_contable, haber=Decimal("120750.00"),
+        ).exists())
+        comisiones = asiento.lineas.filter(detalle__startswith="Comision por pagar")
+        self.assertEqual(comisiones.count(), 1)
+        self.assertEqual(comisiones.get().cuenta, proveedor.cuenta_contable)
+        self.assertEqual(comisiones.get().haber, Decimal("30187.50"))
+        self.assertEqual(asiento.total_debe, asiento.total_haber)
+        self.assertFalse(PagoComisionProveedor.objects.filter(comision_origen=pago).exists())
+
+    def test_digital_planning_precarga_cobro_completo_y_respeta_abono_explicito(self):
+        factura, banco, proveedor = self._crear_factura_comision_digital_planning()
+        url = reverse("registrar_pago", args=[self.empresa.slug, factura.id])
+        for sufijo in ("", "?modal=1"):
+            with self.subTest(pantalla=sufijo or "normal"):
+                response = self.client.get(url + sufijo)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["form_data"]["monto"], "120750.00")
+
+        response = self.client.post(url, {
+            "fecha": str(date.today()),
+            "monto": "50000.00",
+            "metodo": "transferencia",
+            "cuenta_financiera": str(banco.id),
+            "referencia": "DP-ABONO-EXPLICITO",
+            "proveedor_comision": str(proveedor.id),
+            "porcentaje_comision": "25.00",
+        })
+        self.assertEqual(response.status_code, 302)
+        pago = PagoFactura.objects.get(factura=factura)
+        factura.refresh_from_db()
+        self.assertEqual(pago.monto, Decimal("50000.00"))
+        self.assertEqual(pago.total_aplicado, Decimal("50000.00"))
+        self.assertEqual(pago.monto_comision, Decimal("30187.50"))
+        self.assertEqual(factura.estado_pago, "parcial")
+        self.assertEqual(factura.saldo_pendiente, Decimal("70750.00"))
+
+    def test_digital_planning_edicion_conserva_saldo_disponible_original_tras_pago_invalido(self):
+        factura, banco, proveedor = self._crear_factura_comision_digital_planning()
+        pago = PagoFactura.objects.create(
+            factura=factura,
+            fecha=date.today(),
+            monto=Decimal("90562.50"),
+            metodo="transferencia",
+            cuenta_financiera=banco,
+            proveedor_comision=proveedor,
+            porcentaje_comision=Decimal("25.00"),
+            monto_comision=Decimal("30187.50"),
+            cajero=self.user,
+        )
+        registrar_asiento_pago_cliente(pago)
+        url = reverse("editar_pago_factura", args=[self.empresa.slug, factura.id, pago.id])
+        for sufijo in ("", "?modal=1"):
+            with self.subTest(pantalla=sufijo or "normal"):
+                response = self.client.get(url + sufijo)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["saldo_disponible_pago"], Decimal("120750.00"))
+                self.assertEqual(response.context["form_data"]["monto"], "90562.50")
+                self.assertContains(response, 'onclick="pagarTodo()"')
+
+        response = self.client.post(url + "?modal=1", {
+            "fecha": str(date.today()),
+            "monto": "120750.01",
+            "metodo": "transferencia",
+            "cuenta_financiera": str(banco.id),
+            "proveedor_comision": str(proveedor.id),
+            "porcentaje_comision": "25.00",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form_data"]["monto"], "120750.01")
+        self.assertEqual(response.context["saldo_disponible_pago"], Decimal("120750.00"))
+        self.assertContains(response, 'value="120750.01"')
+        pago.refresh_from_db()
+        factura.refresh_from_db()
+        self.assertEqual(pago.monto, Decimal("90562.50"))
+        self.assertEqual(pago.recibo.monto, Decimal("90562.50"))
+        self.assertEqual(factura.estado_pago, "parcial")
+        self.assertEqual(factura.saldo_pendiente, Decimal("30187.50"))
+
+    def test_digital_planning_registro_invalido_conserva_monto_ingresado_sin_precargarlo(self):
+        factura, banco, proveedor = self._crear_factura_comision_digital_planning()
+        url = reverse("registrar_pago", args=[self.empresa.slug, factura.id])
+        for sufijo in ("", "?modal=1"):
+            with self.subTest(pantalla=sufijo or "normal"):
+                response = self.client.post(url + sufijo, {
+                    "fecha": str(date.today()),
+                    "monto": "120750.01",
+                    "metodo": "transferencia",
+                    "cuenta_financiera": str(banco.id),
+                    "proveedor_comision": str(proveedor.id),
+                    "porcentaje_comision": "25.00",
+                })
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["form_data"]["monto"], "120750.01")
+                self.assertEqual(response.context["saldo_disponible_pago"], Decimal("120750.00"))
+                self.assertContains(response, 'value="120750.01"')
+                self.assertFalse(PagoFactura.objects.filter(factura=factura).exists())
+
     def test_comision_aparece_en_cxp_y_su_pago_cancela_proveedor_con_salida_bancaria(self):
         self.empresa.slug = "digital_planning"
         self.empresa.save(update_fields=["slug"])

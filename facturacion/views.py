@@ -8475,6 +8475,9 @@ def registrar_pago(request, empresa_slug, factura_id):
     simbolo_moneda = "$" if factura.moneda == "USD" else "L."
 
     def _contexto_pago(form_data=None):
+        datos_formulario = form_data or _form_data_pago_por_defecto(cuentas_financieras)
+        if request.method == "GET" and empresa.slug == "digital_planning":
+            datos_formulario = {**datos_formulario, "monto": f"{factura.saldo_pendiente:.2f}"}
         return {
             "factura": factura,
             "tipo_cambio_cobro": factura.tipo_cambio,
@@ -8493,7 +8496,8 @@ def registrar_pago(request, empresa_slug, factura_id):
             "subtotal_pendiente": factura.subtotal_pendiente_cobro,
             "impuesto_pendiente": factura.impuesto_pendiente_cobro,
             "today": timezone.now().date(),
-            "form_data": form_data or _form_data_pago_por_defecto(cuentas_financieras),
+            "form_data": datos_formulario,
+            "saldo_disponible_pago": factura.saldo_pendiente,
             "es_modal": es_modal,
             "comision_sobre_total_factura": empresa.slug == "digital_planning",
             "base_comision": _base_comision_pago(factura, factura.saldo_pendiente),
@@ -8910,6 +8914,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         id=pago_id,
         factura=factura,
     )
+    saldo_disponible_pago = factura.saldo_pendiente + pago.total_aplicado
     es_modal = not modo_app and request.GET.get("modal") == "1"
     template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
 
@@ -8984,6 +8989,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "es_modal": es_modal,
             "modo_edicion": True,
             "pago_edicion": pago,
+            "saldo_disponible_pago": saldo_disponible_pago,
             "modal_heading": "Editar pago",
             "modal_description": "Ajusta el monto, la cuenta o la referencia de este cobro. El sistema reconstruira recibo y contabilidad automaticamente.",
             "comision_sobre_total_factura": empresa.slug == "digital_planning",

@@ -1,4 +1,4 @@
-{% load static humanize %}
+{% load static humanize l10n %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -190,10 +190,10 @@
                     <input id="fecha" type="date" name="fecha" value="{{ form_data.fecha|default:today }}">
                 </div>
                 <div class="erp-field">
-                    <label for="monto">Monto</label>
+                    <label for="monto">{% if comision_sobre_total_factura %}Monto recibido del cliente (antes de comisión){% else %}Monto{% endif %}</label>
                     <div style="display:flex;gap:10px;align-items:center;">
                         <input id="monto" type="number" step="0.01" min="0" name="monto" value="{{ form_data.monto|default:'' }}" required>
-                    {% if not modo_edicion %}
+                    {% if not modo_edicion or comision_sobre_total_factura %}
                     <button type="button" class="erp-btn-secondary" style="white-space:nowrap;" onclick="pagarTodo()">Pagar todo</button>
                     {% endif %}
                 </div>
@@ -274,6 +274,7 @@
             </details>
             {% endif %}
 
+            {% include "facturacion/partials/resumen_saldo_comision_pago.html" %}
             <div class="erp-form-actions" style="margin-top:22px;">
                 <div class="erp-field-help">{% if modo_edicion %}Al actualizar, se sincronizan el recibo y el asiento contable del cobro.{% else %}Al guardar, se genera el recibo y se registra el asiento contable del cobro.{% endif %}</div>
                 <div class="erp-actions-right">
@@ -324,7 +325,7 @@ function pagarTodo(){
     const monto = document.getElementById("monto");
     const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
-    const saldo = parseFloat("{{ factura.saldo_pendiente }}");
+    const saldo = parseFloat("{{ saldo_disponible_pago|unlocalize }}");
     if(monto){
         const restante = saldo - (Number.isFinite(retIsr) ? retIsr : 0) - (Number.isFinite(retIsv) ? retIsv : 0);
         monto.value = Math.max(restante, 0).toFixed(2);
@@ -341,7 +342,10 @@ function actualizarTotalMixto(){
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
     const total = totalCobrado + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
     const target = document.getElementById("total-mixto");
-    if(target){ target.textContent = moneyHN(total); }
+    if(target){
+        target.textContent = moneyHN(total);
+        if(typeof actualizarSaldoComisionPago === "function"){ actualizarSaldoComisionPago(total); }
+    }
     const distribucion = calcularDistribucion(total);
     const baseTarget = document.getElementById("preview-base-mixto");
     const isvTarget = document.getElementById("preview-isv-mixto");
@@ -355,7 +359,10 @@ function actualizarTotalAplicadoSimple(){
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
     const total = (Number.isFinite(monto) ? monto : 0) + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
     const target = document.getElementById("total-aplicado-simple");
-    if(target){ target.textContent = moneyHN(total); }
+    if(target){
+        target.textContent = moneyHN(total);
+        if(typeof actualizarSaldoComisionPago === "function"){ actualizarSaldoComisionPago(total); }
+    }
     const distribucion = calcularDistribucion(total);
     const baseTarget = document.getElementById("preview-base-simple");
     const isvTarget = document.getElementById("preview-isv-simple");
