@@ -76,20 +76,24 @@
         <div class="ae-keyboard-guide" data-keyboard-guide hidden>
           <div class="ae-keyboard-guide__copy">
             <span class="ae-keyboard-guide__label">Captura rápida</span>
-            <p class="ae-keyboard-guide__flow"><strong>Cuenta</strong><span aria-hidden="true">→</span><strong>Importe</strong><span aria-hidden="true">→</span><kbd>Enter</kbd><span>Siguiente línea</span></p>
+            <p class="ae-keyboard-guide__flow"><strong>Cuenta</strong><span aria-hidden="true">→</span><strong>Importe</strong><span aria-hidden="true">→</span><kbd>Enter</kbd><span>Siguiente línea con el restante</span></p>
           </div>
           <details class="ae-keyboard-shortcuts">
             <summary>Ver atajos de teclado</summary>
             <ul>
-              <li><kbd>Enter</kbd><span>Elige la cuenta y pasa al importe. Desde un importe válido, avanza a la siguiente línea.</span></li>
+              <li><kbd>Enter</kbd><span>Elige la cuenta y pasa al importe. Desde un importe válido, avanza y propone el saldo pendiente.</span></li>
               <li><kbd>Tab</kbd><span>Pasa de Debe a Haber o recorre todos los campos, incluido el detalle opcional.</span></li>
               <li><kbd>Mayús</kbd> + <kbd>Tab</kbd><span>Vuelve al campo anterior.</span></li>
-              <li><kbd>Alt</kbd> + <kbd>N</kbd><span>Agrega una línea vacía.</span></li>
+              <li><kbd>Alt</kbd> + <kbd>N</kbd><span>Prepara otra línea con el restante, si está activado.</span></li>
               <li><kbd>Alt</kbd> + <kbd>C</kbd><span>Completa el importe de la contrapartida; tú eliges su cuenta.</span></li>
               <li class="ae-keyboard-note">Para guardar, utiliza los botones al final del formulario.</li>
             </ul>
           </details>
         </div>
+        <label class="ae-auto-remainder" data-auto-remainder-control for="ae-auto-remainder" hidden>
+          <input type="checkbox" id="ae-auto-remainder" data-auto-remainder checked aria-describedby="ae-auto-remainder-help">
+          <span><strong>Restante automático</strong><small id="ae-auto-remainder-help">Al terminar un importe, prepara el saldo pendiente en otra línea. Tú eliges la cuenta y puedes cambiar el monto.</small></span>
+        </label>
         <p class="ae-hint" id="ae-account-help">Busca por código o nombre. Solo se muestran las cuentas activas de {{ empresa.nombre }} que aceptan movimientos.</p>
         <div class="ae-lines" id="erpAsientoTable">
           <div class="ae-lines__head" aria-hidden="true"><span>N.º</span><span>Cuenta contable</span><span>Detalle</span><span>Debe · L</span><span>Haber · L</span><span></span></div>
@@ -103,7 +107,7 @@
         <div class="ae-lines__footer">
           <div>
             <button type="button" class="ae-btn ae-btn--secondary ae-btn--small" id="erpCompleteCounterpart" hidden>{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %} Completar contrapartida</button>
-            <p class="ae-hint">Completa el importe faltante en una línea vacía; tú seleccionas la cuenta.</p>
+            <p class="ae-hint">Puedes repartir el importe entre varias cuentas: al terminar cada línea se propone el nuevo restante.</p>
           </div>
           <button type="button" class="ae-btn ae-btn--text ae-btn--small" id="erpAddAsientoLineBottom" hidden>{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Otra línea</button>
         </div>

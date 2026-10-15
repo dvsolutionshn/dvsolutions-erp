@@ -252,6 +252,60 @@ body.accounting-entry-page::after,
 .accounting-entry .ae-keyboard-shortcuts li { align-items: center; display: flex; flex-wrap: wrap; font-size: 12px; gap: 5px 8px; line-height: 1.7; min-width: 0; }
 .accounting-entry .ae-keyboard-shortcuts li > :is(span, p) { flex: 1 1 160px; min-width: 0; }
 .accounting-entry .ae-keyboard-shortcuts:not([open]) ul { display: none; }
+.accounting-entry .ae-auto-remainder {
+  align-items: flex-start;
+  background: #f5f8fc;
+  border: 1px solid #e2eaf3;
+  border-radius: 10px;
+  color: #6f8196;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+}
+.accounting-entry .ae-auto-remainder > label { align-items: flex-start; cursor: pointer; display: flex; gap: 10px; min-width: 0; width: 100%; }
+.accounting-entry .ae-auto-remainder > :is(span, div),
+.accounting-entry .ae-auto-remainder > label > :is(span, div) { min-width: 0; }
+.accounting-entry .ae-auto-remainder input[type="checkbox"] {
+  accent-color: #6461ce;
+  appearance: auto;
+  cursor: pointer;
+  flex: 0 0 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  min-height: 18px;
+  padding: 0;
+  width: 18px;
+}
+.accounting-entry .ae-auto-remainder input[type="checkbox"]:focus-visible { outline: 3px solid #aaa7e8; outline-offset: 3px; }
+.accounting-entry .ae-auto-remainder strong { color: #53677e; display: block; font-size: 12px; font-weight: 650; line-height: 1.6; }
+.accounting-entry .ae-auto-remainder :is(small, p) { color: #718399; display: block; font-size: 11px; line-height: 1.7; margin-top: 3px; overflow-wrap: anywhere; }
+.accounting-entry .ae-auto-remainder:has(input:checked) { background: #f0f8f5; border-color: #dcece4; }
+.accounting-entry .ae-auto-remainder:has(input:checked) strong { color: #447f70; }
+.accounting-entry .ae-remainder-badge {
+  align-items: center;
+  background: #edf7f2;
+  border: 1px solid #d8eade;
+  border-radius: 5px;
+  color: #48806d;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 550;
+  gap: 5px;
+  line-height: 1.6;
+  margin-top: 7px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 3px 6px;
+  white-space: normal;
+}
+.accounting-entry .ae-remainder-badge::before { background: #73b69c; border-radius: 50%; content: ""; flex-shrink: 0; height: 5px; width: 5px; }
+.accounting-entry .ae-line[data-remainder-proposal="pending"] { background: #fbfefc; outline: 1px solid #cce5d9; outline-offset: 3px; }
+.accounting-entry .ae-line[data-remainder-proposal="stale"] { background: #fffdf9; outline: 1px solid #f0dfb9; outline-offset: 3px; }
+.accounting-entry .ae-line[data-remainder-proposal="stale"] .ae-remainder-badge { background: #fff8e9; border-color: #f1e3c2; color: #9b7838; }
+.accounting-entry .ae-line[data-remainder-proposal="stale"] .ae-remainder-badge::before { background: #c9a15d; }
 .accounting-entry .ae-lines { display: grid; gap: 10px; min-width: 0; overflow: visible; }
 .accounting-entry .ae-lines__head,
 .accounting-entry .ae-line { align-items: start; display: grid; gap: 11px; grid-template-columns: 22px minmax(0, 1.8fr) minmax(0, 1.1fr) 108px 108px 32px; min-width: 0; }

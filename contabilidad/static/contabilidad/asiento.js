@@ -68,8 +68,13 @@
     const announcement = form.querySelector("[data-asiento-announcement]");
     const undoPanel = form.querySelector("[data-asiento-undo]");
     const undoButton = form.querySelector("[data-undo-remove]");
+    const autoRemainder = form.querySelector("[data-auto-remainder]");
     const maxForms = Number.parseInt(maxFormsInput && maxFormsInput.value, 10) || 1000;
     const originalDisabled = new WeakMap();
+    const proposalOrigins = new WeakSet();
+    let changedAmounts = new WeakSet();
+    let pendingProposal = null;
+    let skipPointerCommit = false;
     let lastRemoved = null;
     let totals = { debe: 0n, haber: 0n, difference: 0n, invalid: false };
 
@@ -112,6 +117,124 @@
         && !row.querySelector(".errorlist");
     }
 
+    function automaticEnabled() {
+      return Boolean(autoRemainder && autoRemainder.checked);
+    }
+
+    function releaseProposal(row) {
+      if (!pendingProposal || (row && pendingProposal.row !== row)) return;
+      const previous = pendingProposal.row;
+      pendingProposal = null;
+      previous.removeAttribute("data-remainder-proposal");
+      const label = previous.querySelector("[data-remainder-proposal-label]");
+      if (label) { label.hidden = true; label.textContent = ""; }
+    }
+
+    function ownedProposal() {
+      if (!pendingProposal) return null;
+      const row = pendingProposal.row;
+      const savedId = field(row, "id");
+      const account = field(row, "cuenta");
+      const search = row.querySelector('[data-role="cuenta-search"]');
+      const detail = field(row, "detalle");
+      const intact = row.isConnected && !isDeleted(row) && !(savedId && savedId.value)
+        && !(account && account.value) && !(search && search.value.trim())
+        && !(detail && detail.value.trim()) && !row.querySelector(".errorlist")
+        && amount(field(row, "debe")) === pendingProposal.debe
+        && amount(field(row, "haber")) === pendingProposal.haber;
+      if (!intact) { releaseProposal(); return null; }
+      return row;
+    }
+
+    function manualBalance() {
+      const proposal = ownedProposal();
+      let debe = 0n;
+      let haber = 0n;
+      let invalid = false;
+      getRows().forEach(function (row) {
+        if (row === proposal || isDeleted(row)) return;
+        const rowDebe = amount(field(row, "debe"));
+        const rowHaber = amount(field(row, "haber"));
+        const account = field(row, "cuenta");
+        if (rowDebe === null || rowHaber === null || (rowDebe > 0n && rowHaber > 0n)
+          || (account && account.value && !accountsById.has(account.value))) {
+          invalid = true;
+          return;
+        }
+        debe += rowDebe;
+        haber += rowHaber;
+      });
+      return { difference: debe - haber, invalid: invalid };
+    }
+
+    function prepareRemainder(options) {
+      const settings = options || {};
+      if (!automaticEnabled() && !settings.force) return null;
+      const balance = manualBalance();
+      const absolute = balance.difference < 0n ? -balance.difference : balance.difference;
+      let row = ownedProposal();
+      if (balance.invalid || absolute > MAX_LINE_CENTS) { updateTotals(); return null; }
+      if (absolute === 0n) {
+        if (row) {
+          field(row, "debe").value = "0.00";
+          field(row, "haber").value = "0.00";
+          proposalOrigins.delete(row);
+          releaseProposal();
+          updateTotals();
+        }
+        return null;
+      }
+      if (!row && settings.create === false) return null;
+      if (!row) row = getRows().find(isEntirelyBlank) || addLine();
+      if (!row) return null;
+      const debe = balance.difference < 0n ? absolute : 0n;
+      const haber = balance.difference > 0n ? absolute : 0n;
+      field(row, "debe").value = inputAmount(debe);
+      field(row, "haber").value = inputAmount(haber);
+      if (automaticEnabled()) {
+        pendingProposal = { row: row, debe: debe, haber: haber };
+        proposalOrigins.add(row);
+        row.dataset.remainderProposal = "pending";
+      }
+      updateTotals();
+      return row;
+    }
+
+    function shouldSkipCommit(event) {
+      const target = event && event.relatedTarget;
+      return skipPointerCommit || Boolean(target && (!form.contains(target)
+        || target.closest('button[type="submit"], input[type="submit"], [data-role="remove-line"], [data-undo-remove], a, [data-auto-remainder]')));
+    }
+
+    function confirmAmount(row, input, event) {
+      if (!changedAmounts.has(input)) return;
+      if (!automaticEnabled()) { changedAmounts.delete(input); return; }
+      if (shouldSkipCommit(event) || isDeleted(row)) {
+        changedAmounts.delete(input);
+        return;
+      }
+      const account = field(row, "cuenta");
+      if (!account || !accountsById.has(account.value)) return;
+      const debe = amount(field(row, "debe"));
+      const haber = amount(field(row, "haber"));
+      if (debe === null || haber === null || (debe > 0n && haber > 0n)) {
+        updateTotals();
+        return;
+      }
+      changedAmounts.delete(input);
+      prepareRemainder();
+    }
+
+    function discardUntouchedProposal() {
+      const row = ownedProposal();
+      if (row && !isDeleted(row)) {
+        field(row, "debe").value = "0.00";
+        field(row, "haber").value = "0.00";
+      }
+      if (row) proposalOrigins.delete(row);
+      releaseProposal();
+    }
+
     function setCheck(name, state) {
       const check = form.querySelector('[data-asiento-check="' + name + '"]');
       if (check) check.dataset.state = state;
@@ -133,6 +256,13 @@
     }
 
     function updateTotals() {
+      const proposal = ownedProposal();
+      const sourceBalance = proposal ? manualBalance() : null;
+      const proposalAbsolute = sourceBalance && (sourceBalance.difference < 0n
+        ? -sourceBalance.difference : sourceBalance.difference);
+      const proposalStale = proposal && (sourceBalance.invalid || proposalAbsolute > MAX_LINE_CENTS
+        || sourceBalance.difference !== pendingProposal.haber - pendingProposal.debe);
+      if (proposal) proposal.dataset.remainderProposal = proposalStale ? "stale" : "pending";
       let debe = 0n;
       let haber = 0n;
       let invalid = false;
@@ -153,6 +283,18 @@
           closeResults(row);
           row.querySelectorAll("input").forEach(function (input) { input.setCustomValidity(""); });
           return;
+        }
+
+        const proposalLabel = row.querySelector("[data-remainder-proposal-label]");
+        if (proposalLabel) {
+          proposalLabel.hidden = row !== proposal;
+          if (row === proposal) {
+            const absolute = sourceBalance.difference < 0n ? -sourceBalance.difference : sourceBalance.difference;
+            proposalLabel.textContent = sourceBalance.invalid ? "Revisa los importes para actualizar el saldo"
+              : absolute > MAX_LINE_CENTS ? "El saldo supera el importe máximo por línea"
+                : proposalStale ? "Saldo por actualizar: termina de editar el importe"
+                : "Saldo sugerido: elige la cuenta";
+          }
         }
 
         visibleCount += 1;
@@ -265,7 +407,8 @@
       setCheck("balance", invalid ? "invalid" : balancedAmounts ? "complete" : "pending");
 
       if (counterpartButton) {
-        const absolute = difference < 0n ? -difference : difference;
+        const remaining = sourceBalance ? sourceBalance.difference : difference;
+        const absolute = remaining < 0n ? -remaining : remaining;
         counterpartButton.disabled = invalid || absolute === 0n || absolute > MAX_LINE_CENTS;
         counterpartButton.title = absolute > MAX_LINE_CENTS
           ? "Divide la diferencia en varias líneas: supera el importe máximo de una línea."
@@ -299,13 +442,17 @@
       const select = field(row, "cuenta");
       const search = row.querySelector('[data-role="cuenta-search"]');
       if (!select || !search || isDeleted(row)) return;
+      const selectSuggestedAmount = proposalOrigins.has(row);
+      releaseProposal(row);
       select.value = account.id;
       if (select.value !== account.id) return;
       search.value = account.label;
       search.setCustomValidity("");
       closeResults(row);
       updateTotals();
-      focusAmount(row);
+      const amountInput = focusAmount(row);
+      if (selectSuggestedAmount && amountInput && typeof amountInput.select === "function") amountInput.select();
+      proposalOrigins.delete(row);
     }
 
     function focusAmount(row, preferred) {
@@ -316,6 +463,7 @@
       if (!target || target.disabled) return;
       target.focus();
       if (amount(target) === 0n && typeof target.select === "function") target.select();
+      return target;
     }
 
     function skipNavigation(event) {
@@ -352,16 +500,19 @@
         return;
       }
       if (debe === 0n && haber === 0n) {
+        if (automaticEnabled()) prepareRemainder({ create: false });
         focusAmount(row, currentInput);
         announce("Ingresa un importe en el Debe o en el Haber antes de continuar.");
         return;
       }
+      changedAmounts.delete(currentInput);
+      const suggestion = automaticEnabled() ? prepareRemainder() : null;
       const activeRows = getRows().filter(function (item) {
         const search = item.querySelector('[data-role="cuenta-search"]');
         const selected = field(item, "cuenta");
         return !isDeleted(item) && search && !search.disabled && selected && !selected.disabled;
       });
-      const next = activeRows[activeRows.indexOf(row) + 1] || addLine();
+      const next = activeRows[activeRows.indexOf(row) + 1] || (suggestion !== row && suggestion) || addLine();
       if (next) focusAccount(next, "Continúa con la cuenta de la siguiente línea.");
     }
 
@@ -482,11 +633,12 @@
           } else search.value = "";
         }
         syncSelection();
-        account.addEventListener("change", function () { syncSelection(); updateTotals(); });
+        account.addEventListener("change", function () { releaseProposal(row); syncSelection(); updateTotals(); });
         search.addEventListener("focus", function () {
           renderResults(row, account.value ? "" : search.value);
         });
         search.addEventListener("input", function () {
+          releaseProposal(row);
           account.value = "";
           renderResults(row, search.value);
           updateTotals();
@@ -525,7 +677,21 @@
         input.setAttribute("step", "0.01");
         input.setAttribute("min", "0");
         input.setAttribute("inputmode", "decimal");
-        input.addEventListener("input", updateTotals);
+        input.addEventListener("input", function () {
+          releaseProposal(row);
+          proposalOrigins.delete(row);
+          changedAmounts.add(input);
+          updateTotals();
+        });
+        input.addEventListener("change", function () {
+          // Native change can precede blur. Wait until focus settles so saving never
+          // silently inserts a suggestion before the user has reviewed it.
+          setTimeout(function () {
+            if (!form.isConnected || !row.isConnected) return;
+            confirmAmount(row, input, { relatedTarget: document.activeElement });
+          }, 0);
+        });
+        input.addEventListener("blur", function (event) { confirmAmount(row, input, event); });
         input.addEventListener("keydown", function (event) {
           if (skipNavigation(event)) return;
           if (event.key !== "Enter") return;
@@ -535,7 +701,11 @@
       });
       const detail = field(row, "detalle");
       if (detail) {
-        detail.addEventListener("input", updateTotals);
+        detail.addEventListener("input", function () {
+          releaseProposal(row);
+          proposalOrigins.delete(row);
+          updateTotals();
+        });
         detail.addEventListener("keydown", function (event) {
           if (skipNavigation(event)) return;
           if (event.key !== "Enter" || detail.tagName === "TEXTAREA") return;
@@ -552,6 +722,9 @@
         deleteField.hidden = true;
         if (nativeDelete) nativeDelete.hidden = true;
         remove.addEventListener("click", function () {
+          if (ownedProposal() === row) releaseProposal(row);
+          else discardUntouchedProposal();
+          proposalOrigins.delete(row);
           deleteField.checked = true;
           lastRemoved = row;
           if (undoPanel && undoButton) undoPanel.hidden = false;
@@ -568,7 +741,7 @@
     addButtons.forEach(function (button) {
       button.hidden = false;
       button.addEventListener("click", function () {
-        const row = addLine();
+        const row = (automaticEnabled() && prepareRemainder()) || addLine();
         if (!row) return;
         announce("Nueva línea agregada. Selecciona su cuenta contable.");
         const search = row.querySelector('[data-role="cuenta-search"]');
@@ -580,6 +753,11 @@
       counterpartButton.hidden = false;
       counterpartButton.addEventListener("click", function () {
         updateTotals();
+        if (automaticEnabled()) {
+          const proposal = prepareRemainder({ force: true });
+          if (proposal) focusAccount(proposal, "Saldo sugerido. Selecciona la cuenta de la contrapartida.");
+          return;
+        }
         const difference = totals.difference;
         if (totals.invalid || difference === 0n) return;
         const absolute = difference < 0n ? -difference : difference;
@@ -603,6 +781,7 @@
     if (undoButton) undoButton.addEventListener("click", function () {
       if (!lastRemoved) return;
       const row = lastRemoved;
+      discardUntouchedProposal();
       const checkbox = field(row, "DELETE");
       if (checkbox) checkbox.checked = false;
       lastRemoved = null;
@@ -614,10 +793,21 @@
     });
 
     document.addEventListener("pointerdown", function (event) {
+      const target = event.target;
+      skipPointerCommit = !form.contains(target) || Boolean(target.closest(
+        'button[type="submit"], input[type="submit"], [data-role="remove-line"], [data-undo-remove], a, [data-auto-remainder]'));
       getRows().forEach(function (row) {
         const picker = row.querySelector("[data-account-picker], .erp-account-picker");
         if (!picker || !picker.contains(event.target)) closeResults(row);
       });
+    });
+    document.addEventListener("click", function () { skipPointerCommit = false; });
+    if (autoRemainder) autoRemainder.addEventListener("change", function () {
+      releaseProposal();
+      changedAmounts = new WeakSet();
+      updateTotals();
+      announce(autoRemainder.checked ? "Saldo automático activado para las próximas capturas."
+        : "Saldo automático pausado. Conservamos los importes que ya tienes.");
     });
     form.addEventListener("keydown", function (event) {
       if (event.defaultPrevented || event.isComposing) return;
@@ -647,6 +837,7 @@
     getRows().forEach(initializeRow);
     form.dataset.entryReady = "true";
     form.querySelectorAll("[data-keyboard-guide]").forEach(function (guide) { guide.hidden = false; });
+    form.querySelectorAll("[data-auto-remainder-control]").forEach(function (control) { control.hidden = false; });
     addButtons.forEach(function (button) { button.setAttribute("aria-keyshortcuts", "Alt+n"); });
     if (counterpartButton) counterpartButton.setAttribute("aria-keyshortcuts", "Alt+c");
     updateTotals();
