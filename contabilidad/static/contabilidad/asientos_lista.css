@@ -139,15 +139,17 @@ body.accounting-list-page::after,
 .accounting-list .al-error { background: #fff4f5; border: 1px solid #efd5dc; border-radius: 10px; color: #ac5264; font-size: 12px; line-height: 1.7; padding: 12px 15px; }
 .accounting-list .al-error ul { margin: 0; padding-left: 18px; }
 
-.accounting-list .al-results-head { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin: 2px 0 -6px; }
-.accounting-list .al-results-head h2 { color: #31465e; font-size: 15px; font-weight: 700; letter-spacing: -.02em; line-height: 1.6; }
+.accounting-list .al-results { display: grid; gap: 14px; min-width: 0; }
+.accounting-list .al-results-head { align-items: center; display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between; margin: 0; }
+.accounting-list .al-results-head > div { display: grid; gap: 4px; min-width: 0; }
+.accounting-list .al-results-head h2 { color: #31465e; font-size: 18px; font-weight: 700; letter-spacing: -.02em; line-height: 1.5; }
 .accounting-list .al-results-head :is(p, small) { color: #8190a4; font-size: 11px; line-height: 1.7; }
 .accounting-list .al-result-count { color: #7e8ca1; font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 500; line-height: 1.6; }
-.accounting-list .al-query-note { align-items: center; color: #8b98aa; display: flex; flex-wrap: wrap; font-size: 10px; gap: 6px; line-height: 1.7; margin-top: -7px; }
+.accounting-list .al-query-note { align-items: center; color: #8b98aa; display: flex; flex-wrap: wrap; font-size: 10px; gap: 6px; line-height: 1.7; margin: 0; }
 .accounting-list .al-query-note :is(.al-icon, .ac-icon) { height: 13px; width: 13px; }
 .accounting-list .al-list-head,
 .accounting-list .al-entry__summary { align-items: center; display: grid; gap: 15px; grid-template-columns: 90px 145px minmax(0, 1fr) 120px 115px 115px 80px; min-width: 0; padding: 0 21px; }
-.accounting-list .al-list-head { color: #8190a5; font-size: 9px; font-weight: 650; letter-spacing: .07em; line-height: 1.5; margin-bottom: -11px; min-height: 30px; text-transform: uppercase; }
+.accounting-list .al-list-head { color: #8190a5; font-size: 9px; font-weight: 650; letter-spacing: .07em; line-height: 1.5; margin: 0; min-height: 30px; text-transform: uppercase; }
 .accounting-list .al-list-head > :nth-child(5),
 .accounting-list .al-list-head > :nth-child(6) { text-align: right; }
 .accounting-list .al-list-head > :last-child { text-align: right; }
@@ -314,7 +316,7 @@ body.accounting-list-page::after,
   .accounting-list .al-filter-actions .al-btn { min-height: 44px; }
   .accounting-list .al-tabs { column-gap: 3px; row-gap: 5px; }
   .accounting-list .al-tab { font-size: 10px; min-height: 39px; padding: 8px; }
-  .accounting-list .al-results-head { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .accounting-list .al-results-head { align-items: flex-start; flex-direction: column; gap: 8px; }
   .accounting-list .al-entry__summary { column-gap: 12px; padding: 15px; }
   .accounting-list .al-entry__body { padding: 14px; }
   .accounting-list .al-entry__footer { align-items: stretch; flex-direction: column; gap: 7px; }

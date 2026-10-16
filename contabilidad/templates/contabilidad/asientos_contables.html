@@ -46,7 +46,7 @@
     {% if errores_filtros %}<div class="al-error" role="alert"><strong>Revisa los filtros</strong><ul>{% for error in errores_filtros %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
   </section>
 
-  <section aria-labelledby="al-results-title">
+  <section class="al-results" aria-labelledby="al-results-title">
     <div class="al-results-head"><div><h2 id="al-results-title">{% if hay_filtros %}Resultados de la búsqueda{% else %}Tu diario contable{% endif %}</h2><p class="al-query-note">{{ empresa.nombre }} · Importes contables en lempiras (HNL)</p></div><span class="al-result-count">{{ total_resultados }} asiento{{ total_resultados|pluralize }}{% if hay_filtros %} encontrado{{ total_resultados|pluralize }}{% endif %}</span></div>
     <nav class="al-tabs" aria-label="Filtrar asientos por estado">{% for enlace in enlaces_estado %}<a class="al-tab" href="{{ enlace.url }}" {% if enlace.activo %}aria-current="page"{% endif %}>{{ enlace.nombre }}</a>{% endfor %}</nav>
 
