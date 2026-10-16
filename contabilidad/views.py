@@ -45,6 +45,7 @@ from .forms import (
 from .importadores import analizar_catalogo_cuentas_desde_excel, aplicar_catalogo_cuentas, importar_catalogo_cuentas_desde_excel, importar_movimientos_bancarios_desde_excel
 from .alcance_catalogo import es_empresa_rumi
 from .catalogo_rumi_roles import usa_catalogo_rumi
+from .catalogo_consulta import ordenar_catalogo
 from .cierre import revisar_cierre_periodo
 from .dashboard import datos_dashboard_contable
 from .listado_asientos import contexto_listado_asientos
@@ -1044,17 +1045,18 @@ def desconciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
 @login_required
 def catalogo_cuentas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    cuentas = CuentaContable.objects.filter(empresa=empresa).select_related("cuenta_padre").order_by("codigo", "nombre")
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    cuentas = ordenar_catalogo(CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre", "id"))
     context = {
         "empresa": empresa,
         "es_rumi": es_empresa_rumi(empresa),
         "catalogo_rumi_instalado": usa_catalogo_rumi(empresa),
         "cuentas": cuentas,
         "resumen": {
-            "total": cuentas.count(),
-            "activas": cuentas.filter(activa=True).count(),
-            "movimiento": cuentas.filter(acepta_movimientos=True).count(),
-            "agrupadoras": cuentas.filter(acepta_movimientos=False).count(),
+            "total": len(cuentas),
+            "activas": sum(cuenta.activa for cuenta in cuentas),
+            "movimiento": sum(cuenta.acepta_movimientos for cuenta in cuentas),
+            "agrupadoras": sum(not cuenta.acepta_movimientos for cuenta in cuentas),
         },
     }
     return render(request, "contabilidad/catalogo_cuentas.html", context)
@@ -2408,13 +2410,22 @@ def exportar_balance_general_excel(request, empresa_slug):
     sheet.append(["Tipo", "Cuenta", "Debe", "Haber", "Saldo"])
     _aplicar_encabezado(sheet, 3)
     for grupo in ("activos", "pasivos", "patrimonio"):
-        for fila in data[grupo]:
+        for fila in data[f"{grupo}_jerarquia"]:
             sheet.append([fila["cuenta"].get_tipo_display(), f"{fila['cuenta'].codigo} - {fila['cuenta'].nombre}", fila["debe"], fila["haber"], fila["saldo"]])
+            sheet.cell(sheet.max_row, 2).alignment = Alignment(indent=min(fila["nivel"], 250))
+            if fila["es_agrupadora"]:
+                for celda in sheet[sheet.max_row]:
+                    celda.font = Font(bold=True)
     resumen = data["resumen"]
     sheet.append(["Patrimonio", "Resultado acumulado no traspasado a patrimonio", "", "", resumen["resultado_no_traspasado"]])
     sheet.append([])
     for etiqueta, clave in (("Total activos", "total_activos"), ("Total pasivos", "total_pasivos"), ("Patrimonio contabilizado", "patrimonio_contabilizado"), ("Resultado no traspasado", "resultado_no_traspasado"), ("Total patrimonio", "total_patrimonio"), ("Pasivo + patrimonio", "total_pasivo_patrimonio"), ("Diferencia", "diferencia")):
         sheet.append([etiqueta, "", "", "", resumen[clave]])
+    for fila in sheet.iter_rows(min_row=4, min_col=3, max_col=5):
+        for celda in fila:
+            if isinstance(celda.value, Decimal):
+                celda.number_format = '#,##0.00;[Red]-#,##0.00'
+    sheet.append(["Las cuentas principales acumulan sus subcuentas; los totales generales cuentan cada movimiento una sola vez."])
     _advertencias_excel_reporte(sheet, empresa, {"fecha_corte": request.GET.get("fecha_corte") or ""})
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Balance_General_{empresa.slug}.xlsx")

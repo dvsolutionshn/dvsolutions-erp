@@ -25,6 +25,19 @@
     return String(cents / 100n) + "." + String(cents % 100n).padStart(2, "0");
   }
 
+  function canonicalAmount(value) {
+    const raw = String(value == null ? "" : value).trim();
+    // A comma is only a grouping separator: never interpret 1,25 as 1.25.
+    if (raw.includes(",") && !/^\d{1,3}(?:,\d{3})+(?:\.\d{0,2})?$/.test(raw)) return null;
+    const canonical = raw.replace(/,/g, "");
+    return parseCentavos(canonical) === null ? null : canonical;
+  }
+
+  function formatAmount(cents) {
+    return integerFormatter.format(cents / 100n) + decimalSeparator
+      + String(cents % 100n).padStart(2, "0");
+  }
+
   function formatMoney(cents) {
     const absolute = cents < 0n ? -cents : cents;
     return (cents < 0n ? "−" : "") + "L " + integerFormatter.format(absolute / 100n)
@@ -71,6 +84,7 @@
     const autoRemainder = form.querySelector("[data-auto-remainder]");
     const maxForms = Number.parseInt(maxFormsInput && maxFormsInput.value, 10) || 1000;
     const originalDisabled = new WeakMap();
+    const amountDisplays = new WeakMap();
     const proposalOrigins = new WeakSet();
     let changedAmounts = new WeakSet();
     let pendingProposal = null;
@@ -99,6 +113,91 @@
       if (!input) return 0n;
       if (input.validity && input.validity.badInput) return null;
       return parseCentavos(input.value);
+    }
+
+    function amountControl(input) {
+      const enhanced = input && amountDisplays.get(input);
+      return enhanced ? enhanced.display : input;
+    }
+
+    function syncAmountDisplay(input) {
+      const enhanced = input && amountDisplays.get(input);
+      if (!enhanced || enhanced.canonical === input.value) return;
+      const cents = amount(input);
+      enhanced.display.value = cents === null || !input.value.trim() ? input.value
+        : document.activeElement === enhanced.display ? inputAmount(cents) : formatAmount(cents);
+      enhanced.canonical = input.value;
+    }
+
+    function enhanceAmount(input) {
+      const display = document.createElement("input");
+      display.type = "text";
+      display.id = input.id + "_display";
+      display.className = input.className + " ae-amount-display";
+      display.setAttribute("data-amount-display", "");
+      display.setAttribute("inputmode", "decimal");
+      display.setAttribute("autocomplete", "off");
+      display.setAttribute("spellcheck", "false");
+      ["placeholder", "aria-label", "aria-describedby", "aria-invalid", "title"].forEach(function (name) {
+        if (input.hasAttribute(name)) display.setAttribute(name, input.getAttribute(name));
+      });
+      display.disabled = input.disabled;
+      display.readOnly = input.readOnly;
+      display.required = input.required;
+      // The server value attribute retains invalid POST data that number inputs
+      // can sanitize to an empty DOM value before this enhancement runs.
+      const serverValue = input.getAttribute("value") || "";
+      const raw = input.value || (serverValue && parseCentavos(serverValue) === null ? serverValue : "");
+      input.type = "hidden";
+      input.required = false;
+      input.value = raw;
+      input.setAttribute("data-amount-canonical", "");
+      input.insertAdjacentElement("afterend", display);
+      const label = rowLabel(input);
+      if (label) label.htmlFor = display.id;
+      amountDisplays.set(input, { display: display, canonical: null });
+      syncAmountDisplay(input);
+      display.addEventListener("focus", function () {
+        const cents = amount(input);
+        if (cents === null || !input.value.trim()) return;
+        const editable = inputAmount(cents);
+        const previous = display.value;
+        if (previous === editable) return;
+        const start = display.selectionStart;
+        const end = display.selectionEnd;
+        const direction = display.selectionDirection;
+        display.value = editable;
+        // Changing the representation must preserve an existing selection/caret.
+        if (Number.isInteger(start) && Number.isInteger(end) && typeof display.setSelectionRange === "function") {
+          function position(offset) {
+            return Math.min(previous.slice(0, offset).replace(/,/g, "").length, editable.length);
+          }
+          display.setSelectionRange(position(start), position(end), direction || "none");
+        }
+      });
+      return display;
+    }
+
+    function rowLabel(input) {
+      return input.parentElement && Array.from(input.parentElement.querySelectorAll("label"))
+        .find(function (label) { return label.htmlFor === input.id; });
+    }
+
+    function captureAmount(input, display, formatted) {
+      if (formatted) {
+        const cents = amount(input);
+        if (cents !== null && input.value.trim()) {
+          input.value = inputAmount(cents);
+          display.value = formatAmount(cents);
+        }
+      } else {
+        const raw = display.value;
+        const canonical = canonicalAmount(raw);
+        // Only user input normalizes grouping. Focusing a rejected POST value
+        // must not silently repair it or discard its validation error.
+        input.value = canonical === null ? raw : canonical;
+      }
+      amountDisplays.get(input).canonical = input.value;
     }
 
     function rowHasData(row) {
@@ -274,7 +373,12 @@
       getRows().forEach(function (row) {
         const deleted = isDeleted(row);
         row.hidden = deleted;
-        [field(row, "cuenta"), field(row, "detalle"), field(row, "debe"), field(row, "haber"),
+        const debeField = field(row, "debe");
+        const haberField = field(row, "haber");
+        syncAmountDisplay(debeField);
+        syncAmountDisplay(haberField);
+        [field(row, "cuenta"), field(row, "detalle"), debeField, haberField,
+          amountControl(debeField), amountControl(haberField),
           row.querySelector('[data-role="cuenta-search"]')].filter(Boolean).forEach(function (control) {
           if (!originalDisabled.has(control)) originalDisabled.set(control, Boolean(control.disabled));
           control.disabled = deleted || originalDisabled.get(control);
@@ -308,7 +412,10 @@
         [["detalle", "Detalle"], ["debe", "Debe en lempiras"], ["haber", "Haber en lempiras"]]
           .forEach(function (item) {
             const input = field(row, item[0]);
-            if (input) input.setAttribute("aria-label", item[1] + ", línea " + visibleCount);
+            if (input) {
+              input.setAttribute("aria-label", item[1] + ", línea " + visibleCount);
+              amountControl(input).setAttribute("aria-label", item[1] + ", línea " + visibleCount);
+            }
           });
         const remove = row.querySelector('[data-role="remove-line"]');
         if (remove) remove.setAttribute("aria-label", "Eliminar línea " + visibleCount);
@@ -360,8 +467,11 @@
         }
         [debeInput, haberInput].filter(Boolean).forEach(function (input) {
           const inputInvalid = amount(input) === null;
-          input.setCustomValidity(bothSides ? "Usa una sola columna de importe por línea."
-            : inputInvalid ? "Ingresa un importe positivo con un máximo de dos decimales." : "");
+          const message = bothSides ? "Usa una sola columna de importe por línea."
+            : inputInvalid ? "Ingresa un importe positivo con un máximo de dos decimales." : "";
+          input.setCustomValidity(message);
+          amountControl(input).setCustomValidity(message);
+          amountControl(input).setAttribute("aria-invalid", String(Boolean(message)));
         });
 
         invalid = invalid || invalidAmount || bothSides || Boolean(account && account.value && !selected);
@@ -458,11 +568,12 @@
     function focusAmount(row, preferred) {
       const debe = field(row, "debe");
       const haber = field(row, "haber");
-      const target = preferred || (amount(debe) === null ? debe
+      const nativeTarget = preferred || (amount(debe) === null ? debe
         : amount(haber) === null || amount(haber) > 0n ? haber : debe);
+      const target = amountControl(nativeTarget);
       if (!target || target.disabled) return;
       target.focus();
-      if (amount(target) === 0n && typeof target.select === "function") target.select();
+      if (amount(nativeTarget) === 0n && typeof target.select === "function") target.select();
       return target;
     }
 
@@ -674,16 +785,15 @@
       }
 
       [field(row, "debe"), field(row, "haber")].filter(Boolean).forEach(function (input) {
-        input.setAttribute("step", "0.01");
-        input.setAttribute("min", "0");
-        input.setAttribute("inputmode", "decimal");
-        input.addEventListener("input", function () {
+        const display = enhanceAmount(input);
+        display.addEventListener("input", function () {
+          captureAmount(input, display, false);
           releaseProposal(row);
           proposalOrigins.delete(row);
           changedAmounts.add(input);
           updateTotals();
         });
-        input.addEventListener("change", function () {
+        display.addEventListener("change", function () {
           // Native change can precede blur. Wait until focus settles so saving never
           // silently inserts a suggestion before the user has reviewed it.
           setTimeout(function () {
@@ -691,8 +801,11 @@
             confirmAmount(row, input, { relatedTarget: document.activeElement });
           }, 0);
         });
-        input.addEventListener("blur", function (event) { confirmAmount(row, input, event); });
-        input.addEventListener("keydown", function (event) {
+        display.addEventListener("blur", function (event) {
+          captureAmount(input, display, true);
+          confirmAmount(row, input, event);
+        });
+        display.addEventListener("keydown", function (event) {
           if (skipNavigation(event)) return;
           if (event.key !== "Enter") return;
           event.preventDefault();
