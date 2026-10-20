@@ -6,18 +6,27 @@
         <option value="{{ proveedor.id }}" {% if form_data.proveedor_comision == proveedor.id|stringformat:"s" %}selected{% endif %}>{{ proveedor.nombre }}{% if proveedor.rtn %} - {{ proveedor.rtn }}{% endif %}</option>
         {% endfor %}
     </select>
-    <div class="erp-field-help">Selecciona quién recibirá la comisión generada por este cobro.</div>
+    <div class="erp-field-help">Selecciona el proveedor al que corresponde la comisión generada por este cobro.</div>
 </div>
 <div class="erp-field">
     <label for="porcentaje_comision">Comisión del proveedor (%)</label>
     <input id="porcentaje_comision" type="number" step="0.01" min="0" max="100" name="porcentaje_comision" value="{{ form_data.porcentaje_comision|default:'0.00' }}" placeholder="Ejemplo: 25.00">
     {% if comision_sobre_total_factura %}
     <div class="erp-field-help">Se calcula sobre el total completo de la factura, incluyendo ISV.</div>
-    <div class="erp-field-help">La comisión queda por pagar al proveedor. Registra el cobro completo del cliente sin descontarla.</div>
+    <div class="erp-field-help">Si el cliente se queda con la comisión, marca la compensación e ingresa únicamente el dinero que recibiste.</div>
     {% else %}
     <div class="erp-field-help">Se calcula sobre el total aplicado y no reduce el saldo del cliente.</div>
     {% endif %}
 </div>
+{% if comision_sobre_total_factura %}
+<div class="erp-field" style="grid-column:1 / -1;">
+    <label style="display:flex;gap:10px;align-items:center;" for="comision_retenida_cliente">
+        <input id="comision_retenida_cliente" type="checkbox" name="comision_retenida_cliente" {% if form_data.comision_retenida_cliente %}checked{% endif %}>
+        <span>Comisión retenida por el cliente</span>
+    </label>
+    <div class="erp-field-help">La comisión se aplica al saldo de la factura y se liquida automáticamente al proveedor seleccionado mediante compensación. Selecciona el proveedor que corresponde al cliente. El monto del cobro debe ser el dinero que realmente ingresó a caja o banco; «Pagar todo» calcula ese neto.</div>
+</div>
+{% endif %}
 <div class="erp-field">
     <label for="monto_comision">Comisión calculada</label>
     <input id="monto_comision" type="text" name="monto_comision" value="{{ form_data.monto_comision|default:'0.00' }}" readonly tabindex="-1">

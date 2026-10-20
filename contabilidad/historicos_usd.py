@@ -42,8 +42,9 @@ def _fuentes_empresa(empresa):
             moneda=F("factura_origen__moneda")))
     comisiones = PagoComisionProveedor.objects.filter(comision_origen__factura__empresa=empresa,
         comision_origen__factura__cliente__empresa=empresa, comision_origen__factura__moneda="USD",
-        comision_origen__proveedor_comision__empresa=empresa,
-        cuenta_financiera__empresa=empresa, cuenta_financiera__cuenta_contable__empresa=empresa)
+        comision_origen__proveedor_comision__empresa=empresa).filter(
+        Q(metodo="compensacion", cuenta_financiera__isnull=True)
+        | Q(cuenta_financiera__empresa=empresa, cuenta_financiera__cuenta_contable__empresa=empresa))
     return {"factura": facturas, "pago_factura": pagos,
             "nota_credito": notas, "pago_comision_proveedor": comisiones}
 
@@ -65,7 +66,9 @@ def consulta_asientos_historicos(empresa, filtros=None, aplicar_estado=True):
     partidas_ajenas = LineaAsientoContable.objects.filter(asiento_id=OuterRef("pk")).exclude(cuenta__empresa=empresa)
     asientos = asientos.annotate(_integral=Exists(integrales), _parcial=Exists(parciales), _partida_ajena=Exists(partidas_ajenas),
         _fuente_valida=Case(*[
-            When(documento_tipo=tipo, then=Exists(queryset.filter(pk=OuterRef("documento_id"))))
+            When(documento_tipo=tipo, then=Exists(
+                (queryset.exclude(metodo="compensacion") if tipo == "pago_comision_proveedor" else queryset)
+                .filter(pk=OuterRef("documento_id"))))
             for tipo, queryset in fuentes.items()
         ], default=Value(False), output_field=BooleanField()))
     asientos = asientos.annotate(estado_revision=Case(
@@ -82,7 +85,8 @@ def consulta_documentos_sin_asiento(empresa, filtros=None):
     fuentes = _fuentes_empresa(empresa)
     detalles = {
         "factura": ("fecha_emision", "numero_factura", "emision", Q(estado="emitida", total__gt=0)),
-        "pago_factura": ("fecha", "factura__numero_factura", "cobro", Q(monto__gt=0) | Q(retencion_isr__gt=0) | Q(retencion_isv__gt=0)),
+        "pago_factura": ("fecha", "factura__numero_factura", "cobro", Q(monto__gt=0) | Q(retencion_isr__gt=0) | Q(retencion_isv__gt=0)
+                         | Q(comision_retenida_cliente=True, monto_comision__gt=0)),
         "nota_credito": ("fecha_emision", "numero_nota", "emision", Q(estado="emitida", total__gt=0)),
         "pago_comision_proveedor": ("fecha", "comision_origen__factura__numero_factura", "egreso", Q(monto__gt=0)),
     }
@@ -93,8 +97,26 @@ def consulta_documentos_sin_asiento(empresa, filtros=None):
         campo_fecha, referencia, evento, condicion = detalles[tipo]
         publicados = AsientoContable.objects.filter(empresa=empresa, documento_tipo=tipo,
             documento_id=OuterRef("pk"), evento=evento, estado="contabilizado")
+        respaldo = Exists(publicados)
+        if tipo == "pago_comision_proveedor":
+            cobro = AsientoContable.objects.filter(
+                empresa=empresa, documento_tipo="pago_factura", documento_id=OuterRef("comision_origen_id"),
+                evento="cobro", estado="contabilizado", fecha=OuterRef("fecha"),
+            )
+            respaldo = Case(
+                When(
+                    Q(metodo="compensacion", cuenta_financiera__isnull=True,
+                      comision_origen__comision_retenida_cliente=True,
+                      comision_origen__factura__empresa__slug="digital_planning", monto__gt=0)
+                    & Q(monto=F("comision_origen__monto_comision"), fecha=F("comision_origen__fecha"),
+                        tipo_cambio=F("comision_origen__tipo_cambio")),
+                    then=Exists(cobro),
+                ),
+                When(metodo="compensacion", then=Value(False)),
+                default=respaldo, output_field=BooleanField(),
+            )
         consulta = _rango(consulta.filter(condicion), campo_fecha, filtros).annotate(
-            _registrado=Exists(publicados)).filter(_registrado=False).order_by()
+            _registrado=respaldo).filter(_registrado=False).order_by()
         consultas.append(consulta.annotate(_diag_fecha=F(campo_fecha), _diag_fuente=Value(tipo, output_field=CharField()),
             _diag_objeto=F("pk"), _diag_referencia=F(referencia)).values(
             "_diag_fecha", "_diag_fuente", "_diag_objeto", "_diag_referencia"))

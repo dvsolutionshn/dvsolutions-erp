@@ -177,7 +177,7 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
             <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
             <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
         </div>
-        <details class="erp-payment-advanced">
+        <details class="erp-payment-advanced" {% if form_data.comision_retenida_cliente %}open{% endif %}>
             <summary>Opciones avanzadas</summary>
             <div class="erp-payment-advanced-body">
                 <p class="erp-payment-advanced-copy">Abre esta seccion solo cuando haya retenciones o quieras resguardar el ISV en otra cuenta financiera.</p>
@@ -220,7 +220,7 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
                 <input id="fecha" type="date" name="fecha" value="{{ form_data.fecha|default:today }}">
             </div>
             <div class="erp-field">
-                <label for="monto">{% if comision_sobre_total_factura %}Monto recibido del cliente (antes de comisión){% else %}Monto{% endif %}</label>
+                <label for="monto">{% if comision_sobre_total_factura %}Dinero recibido en caja o banco{% else %}Monto{% endif %}</label>
                 <div style="display:flex;gap:10px;align-items:center;">
                     <input id="monto" type="number" step="0.01" min="0" name="monto" value="{{ form_data.monto|default:'' }}" required>
                     {% if not modo_edicion or comision_sobre_total_factura %}
@@ -264,7 +264,7 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
             <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
             <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
         </div>
-        <details class="erp-payment-advanced">
+        <details class="erp-payment-advanced" {% if form_data.comision_retenida_cliente %}open{% endif %}>
             <summary>Opciones avanzadas</summary>
             <div class="erp-payment-advanced-body">
                 <p class="erp-payment-advanced-copy">Usa esta seccion solo si hay retenciones o si deseas que el ISV cobrado quede resguardado en otra cuenta financiera.</p>
@@ -321,10 +321,10 @@ body.erp-modal-body .erp-shell-main{padding-top:18px;}
 </section>
 
 <script>
-const subtotalPendienteCobro = parseFloat("{{ subtotal_pendiente }}");
-const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente }}");
+const subtotalPendienteCobro = parseFloat("{{ subtotal_pendiente|unlocalize }}");
+const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente|unlocalize }}");
 const comisionSobreTotalFactura = {{ comision_sobre_total_factura|yesno:"true,false" }};
-const baseComisionFactura = parseFloat("{{ base_comision }}");
+const baseComisionFactura = parseFloat("{{ base_comision|unlocalize }}");
 function moneyHN(value){
     return "{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
 }
@@ -355,54 +355,64 @@ function calcularDistribucion(totalAplicado){
     }
     return {base, isv};
 }
+function comisionRetenidaClienteActiva(){
+    return comisionSobreTotalFactura && Boolean(document.getElementById("comision_retenida_cliente")?.checked);
+}
+function montoComisionRetenidaCliente(){
+    if(!comisionRetenidaClienteActiva()){ return 0; }
+    const porcentaje = parseFloat(document.getElementById("porcentaje_comision")?.value || "0");
+    if(!Number.isFinite(porcentaje) || !Number.isFinite(baseComisionFactura)){ return 0; }
+    return Math.round((baseComisionFactura * porcentaje + Number.EPSILON)) / 100;
+}
 function pagarTodo(){
     const monto = document.getElementById("monto");
     const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
     const saldo = parseFloat("{{ saldo_disponible_pago|unlocalize }}");
     if(monto){
-        const restante = saldo - (Number.isFinite(retIsr) ? retIsr : 0) - (Number.isFinite(retIsv) ? retIsv : 0);
+        const restante = saldo - (Number.isFinite(retIsr) ? retIsr : 0) - (Number.isFinite(retIsv) ? retIsv : 0) - montoComisionRetenidaCliente();
         monto.value = Math.max(restante, 0).toFixed(2);
         actualizarTotalAplicadoSimple();
     }
 }
-function actualizarTotalMixto(){
-    const totalCobrado = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
-        const input = document.getElementById(id);
-        const value = input ? parseFloat(input.value || "0") : 0;
-        return acc + (Number.isFinite(value) ? value : 0);
-    }, 0);
+function distribucionEfectivoComision(totalAplicado, retIsr, retIsv){
+    const distribucion = calcularDistribucion(totalAplicado);
+    if(!comisionRetenidaClienteActiva() || totalAplicado <= 0){ return distribucion; }
+    const comision = montoComisionRetenidaCliente();
+    const comisionIsv = Math.round((comision * distribucion.isv / totalAplicado + Number.EPSILON) * 100) / 100;
+    return {
+        base: Math.max(Math.round((distribucion.base - retIsr - comision + comisionIsv) * 100) / 100, 0),
+        isv: Math.max(Math.round((distribucion.isv - retIsv - comisionIsv) * 100) / 100, 0)
+    };
+}
+function actualizarResumenCobro(totalCobrado, targetId, prefijo){
+    const target = document.getElementById(targetId);
+    if(!target){ return; }
     const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
-    const total = totalCobrado + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
-    const target = document.getElementById("total-mixto");
-    if(target){
-        target.textContent = moneyHN(total);
-        if(typeof actualizarSaldoComisionPago === "function"){ actualizarSaldoComisionPago(total); }
-    }
-    const distribucion = calcularDistribucion(total);
-    const baseTarget = document.getElementById("preview-base-mixto");
-    const isvTarget = document.getElementById("preview-isv-mixto");
+    const isr = Number.isFinite(retIsr) ? retIsr : 0;
+    const isv = Number.isFinite(retIsv) ? retIsv : 0;
+    const cobroConRetenciones = totalCobrado + isr + isv;
+    actualizarComision(cobroConRetenciones);
+    const totalAplicado = Math.round((cobroConRetenciones + montoComisionRetenidaCliente()) * 100) / 100;
+    target.textContent = moneyHN(totalAplicado);
+    if(typeof actualizarSaldoComisionPago === "function"){ actualizarSaldoComisionPago(totalAplicado); }
+    const distribucion = distribucionEfectivoComision(totalAplicado, isr, isv);
+    const baseTarget = document.getElementById("preview-base-" + prefijo);
+    const isvTarget = document.getElementById("preview-isv-" + prefijo);
     if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
     if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
-    actualizarComision(total);
+}
+function actualizarTotalMixto(){
+    const totalCobrado = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
+        const value = parseFloat(document.getElementById(id)?.value || "0");
+        return acc + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    actualizarResumenCobro(totalCobrado, "total-mixto", "mixto");
 }
 function actualizarTotalAplicadoSimple(){
     const monto = parseFloat(document.getElementById("monto")?.value || "0");
-    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
-    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
-    const total = (Number.isFinite(monto) ? monto : 0) + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
-    const target = document.getElementById("total-aplicado-simple");
-    if(target){
-        target.textContent = moneyHN(total);
-        if(typeof actualizarSaldoComisionPago === "function"){ actualizarSaldoComisionPago(total); }
-    }
-    const distribucion = calcularDistribucion(total);
-    const baseTarget = document.getElementById("preview-base-simple");
-    const isvTarget = document.getElementById("preview-isv-simple");
-    if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
-    if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
-    actualizarComision(total);
+    actualizarResumenCobro(Number.isFinite(monto) ? monto : 0, "total-aplicado-simple", "simple");
 }
 function actualizarComision(totalAplicado){
     const porcentajeInput = document.getElementById("porcentaje_comision");
@@ -412,8 +422,17 @@ function actualizarComision(totalAplicado){
     const base = comisionSobreTotalFactura && Number.isFinite(baseComisionFactura)
         ? baseComisionFactura
         : totalAplicado;
-    const monto = Number.isFinite(porcentaje) ? base * porcentaje / 100 : 0;
+    const monto = Number.isFinite(porcentaje) ? Math.round((base * porcentaje + Number.EPSILON)) / 100 : 0;
     montoInput.value = monto.toFixed(2);
+}
+function actualizarCondicionesComision(){
+    const retenida = comisionRetenidaClienteActiva();
+    const proveedor = document.getElementById("proveedor_comision");
+    const porcentaje = document.getElementById("porcentaje_comision");
+    if(proveedor){ proveedor.required = retenida; }
+    if(porcentaje){ porcentaje.required = retenida; porcentaje.min = retenida ? "0.01" : "0"; }
+    actualizarTotalMixto();
+    actualizarTotalAplicadoSimple();
 }
 function seleccionarCuentaPagoPorMetodo(){
     const metodo = document.getElementById("metodo");
@@ -434,6 +453,9 @@ function seleccionarCuentaPagoPorMetodo(){
 });
 const porcentajeComision = document.getElementById("porcentaje_comision");
 if(porcentajeComision){ porcentajeComision.addEventListener("input", () => { actualizarTotalMixto(); actualizarTotalAplicadoSimple(); }); }
+const comisionRetenidaInput = document.getElementById("comision_retenida_cliente");
+if(comisionRetenidaInput){ comisionRetenidaInput.addEventListener("change", actualizarCondicionesComision); }
+actualizarCondicionesComision();
 const metodoPago = document.getElementById("metodo");
 if(metodoPago){ metodoPago.addEventListener("change", seleccionarCuentaPagoPorMetodo); }
 seleccionarCuentaPagoPorMetodo();

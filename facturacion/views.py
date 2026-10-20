@@ -246,6 +246,7 @@ def _form_data_pago_por_defecto(cuentas_financieras):
         "porcentaje_comision": "0.00",
         "monto_comision": "0.00",
         "proveedor_comision": "",
+        "comision_retenida_cliente": False,
     }
 
 
@@ -265,6 +266,11 @@ def _datos_comision_pago(payload, empresa, base_comision, factura=None):
         raise ValidationError("El porcentaje de comision no es valido.") from exc
     if porcentaje < 0 or porcentaje > 100:
         raise ValidationError("El porcentaje de comision debe estar entre 0 y 100.")
+    if payload.get('comision_retenida_cliente') in ('on', '1', 'true', True):
+        if empresa.slug != 'digital_planning':
+            raise ValidationError('La comisión retenida por el cliente está disponible solo para Digital Planning.')
+        if porcentaje <= 0:
+            raise ValidationError('Indica un porcentaje de comisión mayor que cero para compensarla.')
     if porcentaje == 0:
         return None, Decimal("0.00"), Decimal("0.00")
     proveedor = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True, id=proveedor_id).first()
@@ -5874,7 +5880,7 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
     if comision.factura.estado == 'anulada':
         messages.error(request, "No se puede pagar una comision originada en una factura anulada.")
         return redirect("reporte_cxp", empresa_slug=empresa.slug)
-    if comision.saldo_comision_pendiente <= 0:
+    if comision.saldo_comision_pendiente <= 0 and not (request.method == 'GET' and comision.comision_retenida_cliente):
         messages.info(request, "Esta comision ya fue pagada en su totalidad.")
         return redirect("reporte_cxp", empresa_slug=empresa.slug)
 
@@ -5939,6 +5945,9 @@ def revertir_pago_comision_proveedor(request, empresa_slug, pago_factura_id, pag
     comision = get_object_or_404(PagoFactura, id=pago_factura_id, factura__empresa=empresa)
     pago = get_object_or_404(PagoComisionProveedor, id=pago_id, comision_origen=comision)
     proveedor_id = comision.proveedor_comision_id
+    if pago.metodo == 'compensacion':
+        messages.error(request, 'La compensación se modifica desde el cobro de la factura; no se revierte como un egreso bancario.')
+        return redirect('editar_pago_factura', empresa_slug=empresa.slug, factura_id=comision.factura_id, pago_id=comision.pk)
     with transaction.atomic():
         registrar_reversion_documento(
             empresa=empresa,
@@ -8587,6 +8596,7 @@ def registrar_pago(request, empresa_slug, factura_id):
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
         separar_isv = request.POST.get("separar_isv") == "on"
+        comision_retenida_cliente = request.POST.get("comision_retenida_cliente") in ("on", "1", "true")
         cuenta_financiera_impuesto_id = request.POST.get("cuenta_financiera_impuesto")
         error = None
         usa_pago_mixto = any(
@@ -8672,6 +8682,9 @@ def registrar_pago(request, empresa_slug, factura_id):
                         proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
                             request.POST, empresa, total_pago + retencion_isr + retencion_isv, factura=factura
                         )
+                        total_aplicado = total_pago + retencion_isr + retencion_isv + (monto_comision if comision_retenida_cliente else Decimal('0.00'))
+                        if total_aplicado > factura.saldo_pendiente:
+                            raise ValidationError('El cobro y la comisión compensada no pueden superar el saldo pendiente.')
                         with transaction.atomic():
                             cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                             for indice, (metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta) in enumerate(pagos_validos, start=1):
@@ -8684,6 +8697,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                                     proveedor_comision=proveedor_comision if indice == 1 else None,
                                     porcentaje_comision=porcentaje_comision if indice == 1 else Decimal('0.00'),
                                     monto_comision=monto_comision if indice == 1 else Decimal('0.00'),
+                                    comision_retenida_cliente=comision_retenida_cliente if indice == 1 else False,
                                     separar_isv=separar_isv,
                                     cuenta_financiera_impuesto=cuenta_financiera_impuesto,
                                     metodo=metodo_mixto,
@@ -8697,10 +8711,10 @@ def registrar_pago(request, empresa_slug, factura_id):
                                     recibos.append(pago.recibo.numero_recibo)
                         messages.success(
                             request,
-                            presentar_mensaje_cobro_app(factura, f"Pago mixto registrado correctamente. Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}.", modo_app)
+                            presentar_mensaje_cobro_app(factura, f"Pago mixto registrado correctamente. Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {total_aplicado:.2f}. Recibos: {', '.join(recibos) or 'sin numero'}.", modo_app)
                         )
                         respuesta_modal = _respuesta_modal_exito(
-                            f"Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {(total_pago + retencion_isr + retencion_isv):.2f}."
+                            f"Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {total_aplicado:.2f}."
                         )
                         if respuesta_modal:
                             return respuesta_modal
@@ -8726,13 +8740,14 @@ def registrar_pago(request, empresa_slug, factura_id):
                 request.POST, empresa, monto_decimal + retencion_isr + retencion_isv, factura=factura
             )
 
+            total_aplicado = monto_decimal + retencion_isr + retencion_isv + (monto_comision if comision_retenida_cliente else Decimal('0.00'))
             if monto_decimal < 0:
                 error = "El monto recibido no puede ser negativo."
             elif retencion_isr < 0 or retencion_isv < 0:
                 error = "Las retenciones no pueden ser negativas."
-            elif monto_decimal + retencion_isr + retencion_isv <= 0:
+            elif total_aplicado <= 0:
                 error = "Debes registrar un monto o una retencion mayor que cero."
-            elif monto_decimal + retencion_isr + retencion_isv > factura.saldo_pendiente:
+            elif total_aplicado > factura.saldo_pendiente:
                 error = "El pago aplicado no puede ser mayor que el saldo pendiente."
             else:
                 cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
@@ -8746,6 +8761,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                     proveedor_comision=proveedor_comision,
                     porcentaje_comision=porcentaje_comision,
                     monto_comision=monto_comision,
+                    comision_retenida_cliente=comision_retenida_cliente,
                     separar_isv=separar_isv,
                     cuenta_financiera=cuenta_financiera,
                     cuenta_financiera_impuesto=cuenta_financiera_impuesto,
@@ -8776,6 +8792,7 @@ def registrar_pago(request, empresa_slug, factura_id):
                         proveedor_comision=proveedor_comision,
                         porcentaje_comision=porcentaje_comision,
                         monto_comision=monto_comision,
+                        comision_retenida_cliente=comision_retenida_cliente,
                         separar_isv=separar_isv,
                         cuenta_financiera_impuesto=cuenta_financiera_impuesto,
                         metodo=metodo,
@@ -8829,7 +8846,7 @@ def _recalcular_y_recontabilizar_pagos_factura(factura):
     subtotal_pendiente = Decimal(factura.subtotal_documento_ajustado or 0).quantize(Decimal("0.01"))
     impuesto_pendiente = Decimal(factura.impuesto_documento_ajustado or 0).quantize(Decimal("0.01"))
     ids_pagos = [p.id for p in pagos]
-    from contabilidad.models import RegularizacionMonedaFactura
+    from contabilidad.models import MovimientoBancario, RegularizacionMonedaFactura
     revision = RegularizacionMonedaFactura.objects.filter(factura=factura, empresa=factura.empresa).first()
     preservados = set()
     if revision:
@@ -8838,12 +8855,18 @@ def _recalcular_y_recontabilizar_pagos_factura(factura):
             evento='cobro', fecha_creacion__lte=revision.fecha_creacion, estado='contabilizado',
         ).values_list('documento_id', flat=True))
 
-    AsientoContable.objects.filter(
+    asientos_reconstruidos = AsientoContable.objects.filter(
         empresa=factura.empresa,
         documento_tipo="pago_factura",
         documento_id__in=ids_pagos,
         evento="cobro",
-    ).exclude(documento_id__in=preservados).delete()
+    ).exclude(documento_id__in=preservados)
+    if MovimientoBancario.objects.filter(empresa=factura.empresa).filter(
+        Q(asiento_id__in=asientos_reconstruidos.values('pk'))
+        | Q(pago_factura_id__in=[pk for pk in ids_pagos if pk not in preservados])
+    ).exists():
+        raise ValidationError('Hay cobros vinculados a movimientos bancarios. Desenlaza su conciliación bancaria antes de corregirlos para conservar el respaldo del banco.')
+    asientos_reconstruidos.delete()
 
     for pago in pagos:
         if pago.pk in preservados:
@@ -8915,6 +8938,8 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         factura=factura,
     )
     saldo_disponible_pago = factura.saldo_pendiente + pago.total_aplicado
+    subtotal_disponible_pago = factura.subtotal_pendiente_cobro + pago.subtotal_aplicado
+    impuesto_disponible_pago = factura.impuesto_pendiente_cobro + pago.impuesto_aplicado
     es_modal = not modo_app and request.GET.get("modal") == "1"
     template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
 
@@ -8951,6 +8976,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "proveedor_comision": str(pago.proveedor_comision_id or ""),
             "porcentaje_comision": f"{Decimal(pago.porcentaje_comision or 0):.2f}",
             "monto_comision": f"{Decimal(pago.monto_comision or 0):.2f}",
+            "comision_retenida_cliente": pago.comision_retenida_cliente,
             "separar_isv": pago.separar_isv,
             "cuenta_financiera_impuesto": str(pago.cuenta_financiera_impuesto_id or ""),
             "monto_efectivo": "",
@@ -8982,8 +9008,8 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "cuentas_tarjeta": cuentas_tarjeta,
             "proveedores_comision": proveedores_comision,
             "usa_pagos_mixtos": _empresa_usa_pago_mixto_predeterminado(empresa),
-            "subtotal_pendiente": factura.subtotal_pendiente_cobro,
-            "impuesto_pendiente": factura.impuesto_pendiente_cobro,
+            "subtotal_pendiente": subtotal_disponible_pago,
+            "impuesto_pendiente": impuesto_disponible_pago,
             "today": timezone.now().date(),
             "form_data": form_data or _form_data_base(),
             "es_modal": es_modal,
@@ -9069,6 +9095,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
         separar_isv = request.POST.get("separar_isv") == "on"
+        comision_retenida_cliente = request.POST.get("comision_retenida_cliente") in ("on", "1", "true")
         cuenta_financiera_impuesto_id = request.POST.get("cuenta_financiera_impuesto")
         error = None
 
@@ -9114,7 +9141,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 )
 
                 saldo_editable = (Decimal(factura.saldo_pendiente or 0) + Decimal(pago.total_aplicado or 0)).quantize(Decimal("0.01"))
-                if (total_pago + retencion_isr + retencion_isv).quantize(Decimal("0.01")) > saldo_editable:
+                if (total_pago + retencion_isr + retencion_isv + (monto_comision if comision_retenida_cliente else Decimal("0.00"))).quantize(Decimal("0.01")) > saldo_editable:
                     raise ValidationError("La suma aplicada no puede ser mayor que el saldo disponible de la factura.")
 
                 cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
@@ -9128,6 +9155,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     pago.proveedor_comision = proveedor_comision
                     pago.porcentaje_comision = porcentaje_comision
                     pago.monto_comision = monto_comision
+                    pago.comision_retenida_cliente = comision_retenida_cliente
                     pago.separar_isv = separar_isv
                     pago.cuenta_financiera = cuenta_principal
                     pago.cuenta_financiera_impuesto = cuenta_financiera_impuesto
@@ -9182,6 +9210,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 proveedor_comision=proveedor_comision,
                 porcentaje_comision=porcentaje_comision,
                 monto_comision=monto_comision,
+                comision_retenida_cliente=comision_retenida_cliente,
                 separar_isv=separar_isv,
                 cuenta_financiera=cuenta_financiera,
                 cuenta_financiera_impuesto=cuenta_financiera_impuesto,
@@ -9212,6 +9241,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 pago.proveedor_comision = proveedor_comision
                 pago.porcentaje_comision = porcentaje_comision
                 pago.monto_comision = monto_comision
+                pago.comision_retenida_cliente = comision_retenida_cliente
                 pago.separar_isv = separar_isv
                 pago.cuenta_financiera = cuenta_financiera
                 pago.cuenta_financiera_impuesto = cuenta_financiera_impuesto

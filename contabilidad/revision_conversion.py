@@ -56,6 +56,8 @@ def _documento_origen(asiento):
     ).first()
     if documento is None:
         raise ValidationError("No se encuentra el documento original dentro de esta empresa. Revise su vínculo contable.")
+    if asiento.documento_tipo == "pago_comision_proveedor" and documento.metodo == "compensacion":
+        raise ValidationError("La comisión retenida se compensa en el asiento del cobro. Revise ese cobro en lugar de crear un egreso separado.")
     factura = (
         documento if asiento.documento_tipo == "factura" else
         documento.factura if asiento.documento_tipo == "pago_factura" else
@@ -93,6 +95,10 @@ def _datos_documento(asiento, documento):
         datos["lineas"] = [_datos_objeto(linea) for linea in documento.lineas.order_by("pk")]
     if asiento.documento_tipo == "pago_factura":
         datos["factura"] = _datos_objeto(documento.factura)
+        if documento.comision_retenida_cliente:
+            datos["compensaciones"] = [
+                _datos_objeto(pago) for pago in documento.pagos_comision_proveedor.filter(metodo="compensacion").order_by("pk")
+            ]
     elif asiento.documento_tipo == "nota_credito" and documento.factura_origen_id:
         datos["factura"] = _datos_objeto(documento.factura_origen)
     elif asiento.documento_tipo == "pago_comision_proveedor":
@@ -200,6 +206,14 @@ def _validar_partidas_operativas(asiento, documento, lineas, partidas):
             if not candidatas and documento.proveedor_comision_id:
                 candidatas = [linea for linea in lineas if linea.haber > 0 and linea.cuenta_id == documento.proveedor_comision.cuenta_contable_id]
             validar_grupo(candidatas, documento.monto_comision, "pasivo", "comisiones por pagar")
+            if documento.comision_retenida_cliente:
+                cuentas_comision = {linea.cuenta_id for linea in candidatas}
+                compensadas = [linea for linea in lineas if linea.debe > 0 and linea.cuenta_id in cuentas_comision]
+                validar_grupo(compensadas, documento.monto_comision, "pasivo", "comisiones compensadas")
+                tasas_obligacion = {Decimal(str(snapshots[linea.pk]["tipo_cambio"])) for linea in candidatas}
+                tasas_compensacion = {Decimal(str(snapshots[linea.pk]["tipo_cambio"])) for linea in compensadas}
+                if tasas_compensacion != tasas_obligacion:
+                    raise ValidationError("La compensación de comisión debe conservar la tasa de su obligación para no reabrir el saldo del proveedor.")
     elif asiento.documento_tipo == "nota_credito" and asiento.evento == "emision":
         candidatas = [linea for linea in lineas if linea.haber > 0 and (linea.detalle or "").startswith("Disminucion de cuenta por cobrar")]
         if not candidatas:

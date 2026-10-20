@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+from django.db.models import F, Q
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
@@ -119,7 +120,15 @@ def validar_factura_cobro_app(empresa, factura):
     cuentas_historicas = CuentaFinanciera.objects.filter(
         empresa=empresa, cuenta_contable_id__in=CuentaContable.objects.filter(empresa=empresa).values("pk"),
     ).values("pk")
-    if (comisiones.exclude(cuenta_financiera_id__in=cuentas_historicas).exists()
+    compensacion_valida = (
+        Q(metodo="compensacion", cuenta_financiera__isnull=True,
+          comision_origen__comision_retenida_cliente=True,
+          comision_origen__factura__empresa__slug="digital_planning", monto__gt=0)
+        & Q(monto=F("comision_origen__monto_comision"), fecha=F("comision_origen__fecha"),
+            tipo_cambio=F("comision_origen__tipo_cambio"))
+    )
+    egreso_valido = ~Q(metodo="compensacion") & Q(cuenta_financiera_id__in=cuentas_historicas)
+    if (comisiones.exclude(compensacion_valida | egreso_valido).exists()
             or comisiones.filter(registrado_por_id__isnull=False).exclude(registrado_por_id__in=get_user_model().objects.values("pk")).exists()):
         raise PermissionDenied("Las relaciones de pagos de comisión no corresponden a esta empresa.")
     # El saver sincroniza el recibo encontrado por pago, incluso si una

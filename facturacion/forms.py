@@ -28,7 +28,7 @@ class PagoFacturaForm(forms.ModelForm):
         model = PagoFactura
         fields = [
             'monto', 'tipo_cambio', 'retencion_isr', 'retencion_isv', 'metodo', 'referencia',
-            'proveedor_comision', 'porcentaje_comision', 'monto_comision',
+            'proveedor_comision', 'porcentaje_comision', 'monto_comision', 'comision_retenida_cliente',
         ]
 
 
@@ -233,6 +233,7 @@ class PagoComisionProveedorForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['tipo_cambio'].label = 'Tipo de cambio del pago (HNL por USD)'
         self.fields['tipo_cambio'].help_text = 'Para una comisión en dólares, indique la tasa efectiva del pago. En lempiras se usa 1.'
+        self.fields['metodo'].choices = [opcion for opcion in PagoComisionProveedor.METODOS if opcion[0] != 'compensacion']
         self.fields['tipo_cambio'].widget = forms.NumberInput(attrs={'step': '0.000001', 'min': '0.000001'})
         self.fields['cuenta_financiera'].required = True
         self.fields['cuenta_financiera'].empty_label = 'Seleccione banco, caja o tarjeta'

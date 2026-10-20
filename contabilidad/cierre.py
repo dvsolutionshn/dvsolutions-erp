@@ -22,8 +22,8 @@ def _documentos_sin_asiento(empresa, periodo):
     )
     pendientes = []
 
-    def agregar(documento, tipo, evento, fecha, referencia, vista, objeto_id=None):
-        if (tipo, documento.pk, evento) in registrados:
+    def agregar(documento, tipo, evento, fecha, referencia, vista, objeto_id=None, respaldo=None, inconsistente=False):
+        if not inconsistente and (respaldo or (tipo, documento.pk, evento)) in registrados:
             return
         pendientes.append({
             "fecha": fecha,
@@ -31,7 +31,8 @@ def _documentos_sin_asiento(empresa, periodo):
                      "pago_compra": "Pago a proveedor", "nota_credito": "Nota de crédito",
                      "pago_comision_proveedor": "Pago de comisión", "planilla": "Planilla"}[tipo],
             "referencia": referencia or str(documento.pk),
-            "descripcion": "Devengo sin asiento" if evento == "cierre" else "Pago sin asiento" if evento == "pago" else "Documento sin asiento",
+            "descripcion": ("Compensación sin respaldo coherente" if inconsistente else
+                            "Devengo sin asiento" if evento == "cierre" else "Pago sin asiento" if evento == "pago" else "Documento sin asiento"),
             "url": reverse(vista, args=[empresa.slug, objeto_id or documento.pk]),
         })
 
@@ -41,8 +42,13 @@ def _documentos_sin_asiento(empresa, periodo):
         agregar(nota, "nota_credito", "emision", nota.fecha_emision, nota.numero_nota, "ver_nota_credito")
     for pago in PagoFactura.objects.filter(factura__empresa=empresa, fecha__range=rango).filter(
         Q(monto__gt=0) | Q(retencion_isr__gt=0) | Q(retencion_isv__gt=0)
+        | Q(comision_retenida_cliente=True, monto_comision__gt=0)
     ).select_related("factura"):
-        agregar(pago, "pago_factura", "cobro", pago.fecha, pago.factura.numero_factura, "ver_factura", pago.factura_id)
+        sin_compensacion = pago.comision_retenida_cliente and not pago.pagos_comision_proveedor.filter(metodo="compensacion").exists()
+        agregar(
+            pago, "pago_factura", "cobro", pago.fecha, pago.factura.numero_factura,
+            "ver_factura", pago.factura_id, inconsistente=sin_compensacion,
+        )
     for compra in CompraInventario.objects.filter(empresa=empresa, estado="aplicada", fecha_documento__range=rango).prefetch_related("lineas"):
         if compra.total_documento > 0:
             agregar(compra, "compra", "aplicacion", compra.fecha_documento, compra.numero_compra, "ver_compra")
@@ -64,9 +70,25 @@ def _documentos_sin_asiento(empresa, periodo):
         agregar(pago, "pago_compra", "egreso", pago.fecha, pago.compra.numero_compra, "ver_compra", pago.compra_id)
     for pago in PagoComisionProveedor.objects.filter(
         comision_origen__factura__empresa=empresa, monto__gt=0, fecha__range=rango,
-    ).select_related("comision_origen__factura"):
+    ).select_related("comision_origen__factura", "comision_origen__proveedor_comision"):
         factura = pago.comision_origen.factura
-        agregar(pago, "pago_comision_proveedor", "egreso", pago.fecha, factura.numero_factura, "ver_factura", factura.pk)
+        if pago.metodo == "compensacion":
+            origen = pago.comision_origen
+            coherente = (
+                empresa.slug == "digital_planning"
+                and origen.comision_retenida_cliente and pago.cuenta_financiera_id is None
+                and origen.monto_comision > 0 and pago.monto == origen.monto_comision
+                and pago.fecha == origen.fecha and pago.tipo_cambio == origen.tipo_cambio
+                and origen.proveedor_comision_id is not None
+                and origen.proveedor_comision.empresa_id == empresa.pk
+            )
+            agregar(
+                pago, "pago_comision_proveedor", "egreso", pago.fecha, factura.numero_factura,
+                "ver_factura", factura.pk, respaldo=("pago_factura", origen.pk, "cobro"),
+                inconsistente=not coherente,
+            )
+        else:
+            agregar(pago, "pago_comision_proveedor", "egreso", pago.fecha, factura.numero_factura, "ver_factura", factura.pk)
     for planilla in PeriodoPlanilla.objects.filter(empresa=empresa, estado__in=["cerrada", "pagada"]).filter(
         Q(fecha_fin__range=rango) | Q(estado="pagada", fecha_pago__range=rango)
     ).prefetch_related("detalles"):

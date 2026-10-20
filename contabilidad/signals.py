@@ -61,18 +61,34 @@ def _validar_documento_sin_asientos_cerrados(sender, instance, using):
     if empresa_id is None:
         return
     bloquear_empresas_contables([empresa_id], using=using)
+    fuentes = Q(documento_tipo=tipo, documento_id=instance.pk)
+    if sender.__name__ == "PagoComisionProveedor":
+        anterior = sender.objects.using(using).filter(pk=instance.pk).values("metodo", "comision_origen_id").first()
+        if anterior and anterior["metodo"] == "compensacion":
+            fuentes |= Q(documento_tipo="pago_factura", documento_id=anterior["comision_origen_id"])
+        if instance.metodo == "compensacion" and instance.comision_origen_id:
+            fuentes |= Q(documento_tipo="pago_factura", documento_id=instance.comision_origen_id)
+    asientos = AsientoContable.objects.using(using).filter(empresa_id=empresa_id).filter(fuentes)
     from .proteccion_conversion import asiento_tiene_revision
-    if any(asiento_tiene_revision(pk, using) for pk in AsientoContable.objects.using(using).filter(
-        empresa_id=empresa_id, documento_tipo=tipo, documento_id=instance.pk,
-    ).values_list("pk", flat=True)):
+    if any(asiento_tiene_revision(pk, using) for pk in asientos.values_list("pk", flat=True)):
         raise ValidationError("El documento respalda una revisión integral de moneda. Conserve el original y registre un nuevo ajuste.")
-    for asiento in AsientoContable.objects.using(using).filter(
-        empresa_id=empresa_id, documento_tipo=tipo, documento_id=instance.pk
-    ).values("empresa_id", "fecha"):
+    for asiento in asientos.values("empresa_id", "fecha"):
         validar_fecha_contable_abierta(asiento["empresa_id"], asiento["fecha"], using)
 
 
 def proteger_eliminacion_documento(sender, instance, using, **kwargs):
+    if sender.__name__ == "PagoComisionProveedor" and instance.metodo == "compensacion":
+        origen_eliminacion = kwargs.get("origin")
+        modelo_eliminacion = getattr(origen_eliminacion, "model", type(origen_eliminacion))
+        etiqueta = getattr(getattr(modelo_eliminacion, "_meta", None), "label_lower", "")
+        origen_pago = sender._meta.get_field("comision_origen").remote_field.model
+        retenida = origen_pago.objects.using(using).filter(
+            pk=instance.comision_origen_id, comision_retenida_cliente=True,
+        ).exists()
+        if retenida and etiqueta not in {"facturacion.pagofactura", "facturacion.factura"}:
+            raise ValidationError(
+                "La comisión fue compensada en el cobro del cliente. Corrija ese cobro para deshacer la compensación."
+            )
     _validar_documento_sin_asientos_cerrados(sender, instance, using)
 
 
@@ -125,7 +141,7 @@ CAMPOS_PAGO = {
     "fecha", "monto", "factura_id", "compra_id", "comision_origen_id", "metodo",
     "cuenta_financiera_id", "cuenta_financiera_impuesto_id", "retencion_isr", "retencion_isv",
     "porcentaje_comision", "monto_comision", "proveedor_comision_id", "separar_isv",
-    "subtotal_aplicado", "impuesto_aplicado", "tipo_cambio",
+    "subtotal_aplicado", "impuesto_aplicado", "tipo_cambio", "comision_retenida_cliente",
 }
 
 

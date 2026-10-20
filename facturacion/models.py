@@ -1,7 +1,7 @@
 from datetime import timedelta
 import re
 import uuid
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
@@ -2452,6 +2452,7 @@ class PagoFactura(models.Model):
     )
     porcentaje_comision = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     monto_comision = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    comision_retenida_cliente = models.BooleanField(default=False)
     subtotal_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     impuesto_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
@@ -2493,7 +2494,19 @@ class PagoFactura(models.Model):
 
     @property
     def total_aplicado(self):
-        return (Decimal(self.monto or 0) + self.total_retenciones).quantize(DOS_DECIMALES)
+        return (Decimal(self.monto or 0) + self.total_retenciones + self.comision_compensada).quantize(DOS_DECIMALES)
+
+    @property
+    def comision_compensada(self):
+        return Decimal(self.monto_comision or 0).quantize(DOS_DECIMALES) if self.comision_retenida_cliente else Decimal('0.00')
+
+    @property
+    def comision_impuesto_compensado(self):
+        if self.total_aplicado <= 0:
+            return Decimal('0.00')
+        return (self.comision_compensada * Decimal(self.impuesto_aplicado or 0) / self.total_aplicado).quantize(
+            DOS_DECIMALES, rounding=ROUND_HALF_UP,
+        )
 
     @property
     def total_comision_pagada(self):
@@ -2509,12 +2522,14 @@ class PagoFactura(models.Model):
 
     @property
     def subtotal_recibido(self):
-        subtotal = (Decimal(self.subtotal_aplicado or 0) - Decimal(self.retencion_isr or 0)).quantize(DOS_DECIMALES)
+        subtotal = (Decimal(self.subtotal_aplicado or 0) - Decimal(self.retencion_isr or 0)
+                    - self.comision_compensada + self.comision_impuesto_compensado).quantize(DOS_DECIMALES)
         return subtotal if subtotal > 0 else Decimal('0.00')
 
     @property
     def impuesto_recibido(self):
-        impuesto = (Decimal(self.impuesto_aplicado or 0) - Decimal(self.retencion_isv or 0)).quantize(DOS_DECIMALES)
+        impuesto = (Decimal(self.impuesto_aplicado or 0) - Decimal(self.retencion_isv or 0)
+                    - self.comision_impuesto_compensado).quantize(DOS_DECIMALES)
         return impuesto if impuesto > 0 else Decimal('0.00')
 
     def recalcular_componentes_pago(self):
@@ -2605,16 +2620,28 @@ class PagoFactura(models.Model):
             raise ValidationError({'proveedor_comision': 'Selecciona el proveedor al que corresponde la comision.'})
         if self.proveedor_comision_id and self.proveedor_comision.empresa_id != self.factura.empresa_id:
             raise ValidationError({'proveedor_comision': 'El proveedor de la comision debe pertenecer a la misma empresa de la factura.'})
-        if self.pk and self.monto_comision < self.total_comision_pagada:
+        pagos_externos = self.pagos_comision_proveedor.exclude(metodo='compensacion') if self.pk else None
+        if self.comision_retenida_cliente:
+            if self.factura.empresa.slug != 'digital_planning':
+                raise ValidationError({'comision_retenida_cliente': 'La compensación de comisión está disponible solo para Digital Planning.'})
+            if self.monto_comision <= 0 or self.porcentaje_comision <= 0 or not self.proveedor_comision_id:
+                raise ValidationError({'comision_retenida_cliente': 'Selecciona el proveedor y un porcentaje de comisión mayor que cero para compensarla.'})
+            esperado = (Decimal(self.factura.total or 0) * self.porcentaje_comision / Decimal('100')).quantize(DOS_DECIMALES, rounding=ROUND_HALF_UP)
+            if self.monto_comision != esperado:
+                raise ValidationError({'monto_comision': 'La comisión retenida debe coincidir con el porcentaje sobre el total de la factura.'})
+            if not self.proveedor_comision.activo or self.proveedor_comision.cliente_contable_id:
+                raise ValidationError({'proveedor_comision': 'Selecciona un proveedor activo disponible para la comisión.'})
+            if pagos_externos is not None and pagos_externos.exists():
+                raise ValidationError('Esta comisión ya tiene pagos registrados. Revierte esos pagos antes de compensarla con el cliente.')
+        pagado_externo = (pagos_externos.aggregate(total=models.Sum('monto'))['total'] or Decimal('0.00')) if pagos_externos is not None else Decimal('0.00')
+        if self.monto_comision < pagado_externo:
             raise ValidationError({
                 'monto_comision': 'La comision no puede ser menor que los pagos ya registrados al proveedor.'
             })
         if self.total_aplicado <= 0:
             raise ValidationError('Debes registrar un monto recibido o una retencion mayor que cero.')
 
-        total_pagado = self.factura.pagos_facturacion.exclude(pk=self.pk).aggregate(
-            total=models.Sum(models.F('monto') + models.F('retencion_isr') + models.F('retencion_isv'))
-        )['total'] or Decimal('0.00')
+        total_pagado = sum((p.total_aplicado for p in self.factura.pagos_facturacion.exclude(pk=self.pk)), Decimal('0.00'))
 
         saldo_disponible = self.factura.total_documento_ajustado - total_pagado
         if self.total_aplicado > saldo_disponible:
@@ -2628,11 +2655,28 @@ class PagoFactura(models.Model):
             raise ValidationError({'retencion_isr': 'La retencion ISR no puede exceder la base aplicada del pago.'})
         if self.retencion_isv > self.impuesto_aplicado:
             raise ValidationError({'retencion_isv': 'La retencion ISV no puede exceder el ISV aplicado del pago.'})
+        if self.comision_retenida_cliente and (
+            self.retencion_isr + self.comision_compensada - self.comision_impuesto_compensado > self.subtotal_aplicado
+            or self.retencion_isv + self.comision_impuesto_compensado > self.impuesto_aplicado
+        ):
+            raise ValidationError('La comisión compensada y las retenciones exceden los componentes disponibles del cobro.')
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        type(self.factura.empresa).objects.select_for_update().get(pk=self.factura.empresa_id)
+        self.factura = Factura.objects.select_related('empresa').get(pk=self.factura_id)
         self.full_clean()
         if kwargs.get('update_fields'):
             kwargs['update_fields'] = set(kwargs['update_fields']) | {'tipo_cambio', 'subtotal_aplicado', 'impuesto_aplicado'}
+            if self.pk:
+                anterior = type(self).objects.get(pk=self.pk)
+                campos = ('comision_retenida_cliente', 'monto_comision', 'porcentaje_comision', 'proveedor_comision',
+                          'monto', 'fecha', 'referencia', 'metodo', 'cajero')
+                for nombre in campos:
+                    campo = self._meta.get_field(nombre)
+                    if (nombre not in kwargs['update_fields'] and campo.attname not in kwargs['update_fields']
+                            and getattr(anterior, campo.attname) != getattr(self, campo.attname)):
+                        raise ValidationError('Guarda todos los campos modificados del cobro para sincronizar su recibo y compensación.')
         super().save(*args, **kwargs)
         recibo, _creado = ReciboPago.objects.get_or_create(
             pago=self,
@@ -2662,7 +2706,32 @@ class PagoFactura(models.Model):
                 cambios_recibo.append(campo)
         if cambios_recibo:
             recibo.save(update_fields=cambios_recibo)
+        self._sincronizar_compensacion_cliente()
         self.factura.actualizar_estado_pago()
+
+    def _sincronizar_compensacion_cliente(self):
+        compensaciones = self.pagos_comision_proveedor.filter(metodo='compensacion')
+        if not self.comision_retenida_cliente:
+            compensaciones.delete()
+            return
+        datos = {
+            'fecha': self.fecha, 'tipo_cambio': self.tipo_cambio,
+            'monto': self.monto_comision, 'cuenta_financiera': None,
+            'referencia': self.referencia, 'registrado_por': self.cajero,
+            'observacion': f'Comisión retenida por el cliente y liquidada por compensación en factura {self.factura.numero_factura or self.factura_id}.',
+        }
+        compensacion, creada = PagoComisionProveedor.objects.get_or_create(
+            comision_origen=self, metodo='compensacion', defaults=datos,
+        )
+        if not creada:
+            compensacion.comision_origen = self
+            cambios = []
+            for campo, valor in datos.items():
+                if getattr(compensacion, campo) != valor:
+                    setattr(compensacion, campo, valor)
+                    cambios.append(campo)
+            if cambios:
+                compensacion.save(update_fields=cambios)
 
     def __str__(self):
         return f"Pago {self.monto} - Factura {self.factura.numero_factura}"
@@ -2674,6 +2743,7 @@ class PagoComisionProveedor(models.Model):
         ('tarjeta', 'Tarjeta'),
         ('transferencia', 'Transferencia'),
         ('cheque', 'Cheque'),
+        ('compensacion', 'Compensación con cliente'),
     )
 
     comision_origen = models.ForeignKey(
@@ -2688,6 +2758,8 @@ class PagoComisionProveedor(models.Model):
     cuenta_financiera = models.ForeignKey(
         'contabilidad.CuentaFinanciera',
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name='pagos_comisiones_proveedores',
     )
     referencia = models.CharField(max_length=100, blank=True, null=True)
@@ -2703,6 +2775,12 @@ class PagoComisionProveedor(models.Model):
 
     class Meta:
         ordering = ['-fecha', '-id']
+        constraints = [
+            models.UniqueConstraint(fields=['comision_origen'], condition=models.Q(metodo='compensacion'), name='comision_compensacion_unica'),
+            models.CheckConstraint(condition=(models.Q(metodo='compensacion', cuenta_financiera__isnull=True)
+                                              | (~models.Q(metodo='compensacion') & models.Q(cuenta_financiera__isnull=False))),
+                                   name='comision_cuenta_segun_metodo'),
+        ]
 
     @property
     def proveedor(self):
@@ -2722,6 +2800,18 @@ class PagoComisionProveedor(models.Model):
         self.monto = Decimal(self.monto or 0).quantize(DOS_DECIMALES)
         if self.monto <= 0:
             raise ValidationError({'monto': 'El pago debe ser mayor que cero.'})
+        if self.pk and type(self).objects.filter(pk=self.pk, metodo='compensacion').exists() and self.metodo != 'compensacion':
+            raise ValidationError('La compensación automática se modifica desde el cobro de la factura.')
+        if self.metodo == 'compensacion':
+            origen = self.comision_origen
+            if (origen.factura.empresa.slug != 'digital_planning' or not origen.comision_retenida_cliente
+                    or self.cuenta_financiera_id or self.monto != origen.monto_comision
+                    or self.fecha != origen.fecha or self.tipo_cambio != origen.tipo_cambio):
+                raise ValidationError('La compensación debe coincidir con la comisión retenida, fecha y tipo de cambio del cobro de Digital Planning.')
+        elif not self.cuenta_financiera_id:
+            raise ValidationError({'cuenta_financiera': 'Selecciona una cuenta financiera para pagar la comisión.'})
+        elif self.comision_origen.comision_retenida_cliente:
+            raise ValidationError('Esta comisión ya se liquida automáticamente por compensación con el cliente.')
         if Decimal(self.comision_origen.monto_comision or 0) <= 0:
             raise ValidationError('La comision seleccionada no tiene un saldo valido por pagar.')
         total_pagado = self.comision_origen.pagos_comision_proveedor.exclude(pk=self.pk).aggregate(
@@ -2733,7 +2823,10 @@ class PagoComisionProveedor(models.Model):
         if self.cuenta_financiera_id and self.cuenta_financiera.empresa_id != self.empresa.id:
             raise ValidationError({'cuenta_financiera': 'La cuenta financiera debe pertenecer a la empresa de la comision.'})
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        type(self.empresa).objects.select_for_update().get(pk=self.empresa.pk)
+        self.comision_origen = PagoFactura.objects.select_related('factura__empresa', 'proveedor_comision').get(pk=self.comision_origen_id)
         self.full_clean()
         if kwargs.get('update_fields'):
             kwargs['update_fields'] = set(kwargs['update_fields']) | {'tipo_cambio'}

@@ -924,8 +924,7 @@ def _aplicaciones_historicas_factura(factura, cuenta, *, pago_actual=None, nota_
     }
     if incluir_pagos:
         importes_documentos.update({
-            ("pago_factura", pk): monto + isr + isv
-            for pk, monto, isr, isv in pagos.values_list("pk", "monto", "retencion_isr", "retencion_isv")
+            ("pago_factura", pago.pk): pago.total_aplicado for pago in pagos
         })
     fuente = _asiento_documento_existente(factura.empresa, "factura", factura.pk, "emision")
     exigir_revision = bool(fuente and _revision_conversion(fuente))
@@ -1105,6 +1104,16 @@ def registrar_asiento_pago_cliente(pago):
          "tipo_cambio": tasa_cobro, "debe_origen": redondear_importe(linea["debe"]), "haber_origen": Decimal("0.00")}
         for indice, linea in enumerate(lineas)
     ]
+    compensado_hnl = convertir_a_lempiras(pago.comision_compensada, moneda, tasa_cobro)
+    if pago.comision_compensada > 0:
+        cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.proveedor_comision)
+        lineas.append({
+            "cuenta": cuenta_proveedor,
+            "detalle": f"Compensación de comisión retenida por cliente a favor de {pago.proveedor_comision.nombre}",
+            "debe": compensado_hnl, "haber": Decimal("0.00"),
+            "moneda_origen": moneda, "tipo_cambio": tasa_cobro,
+            "debe_origen": pago.comision_compensada, "haber_origen": Decimal("0.00"),
+        })
     aplicado_original, aplicado_historico = _aplicaciones_historicas_factura(
         pago.factura, cuenta_cliente, pago_actual=pago.pk,
         fecha_aplicacion=pago.fecha,
@@ -1126,13 +1135,13 @@ def registrar_asiento_pago_cliente(pago):
             "haber_origen": pago.total_aplicado,
         }
     )
-    diferencia = _linea_diferencia_cambiaria(sum(convertidos_debe, Decimal("0")) - cancelacion_historica)
+    diferencia = _linea_diferencia_cambiaria(sum(convertidos_debe, Decimal("0")) + compensado_hnl - cancelacion_historica)
     if diferencia:
         lineas.append(diferencia)
 
     if pago.monto_comision > 0:
         cuenta_proveedor = asegurar_cuenta_contable_proveedor(pago.proveedor_comision)
-        lineas.extend(convertir_partidas_balanceadas(
+        partidas_comision = convertir_partidas_balanceadas(
             [
                 {
                     "cuenta": "gasto_comisiones_ventas",
@@ -1147,7 +1156,13 @@ def registrar_asiento_pago_cliente(pago):
                     "haber": pago.monto_comision,
                 },
             ], moneda, tasa_cobro,
-        ))
+        )
+        if pago.comision_compensada > 0:
+            # La compensación conserva la misma conversión que su obligación,
+            # sin asignar diferencias de redondeo al dinero recibido en banco.
+            partidas_comision[0]['debe'] = compensado_hnl
+            partidas_comision[1]['haber'] = compensado_hnl
+        lineas.extend(partidas_comision)
 
     return registrar_asiento_documento(
         empresa=pago.factura.empresa,
@@ -1300,6 +1315,9 @@ def registrar_asiento_pago_proveedor(pago):
 @transaction.atomic
 def registrar_asiento_pago_comision_proveedor(pago):
     type(pago.empresa).objects.select_for_update().get(pk=pago.empresa.pk)
+    if pago.metodo == 'compensacion':
+        pago.full_clean()
+        return registrar_asiento_pago_cliente(pago.comision_origen)
     existente = _asiento_documento_existente(pago.empresa, "pago_comision_proveedor", pago.pk, "egreso")
     if existente:
         return existente
