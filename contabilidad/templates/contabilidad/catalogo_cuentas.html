@@ -1,96 +1,78 @@
 {% extends "core/erp_base.html" %}
 {% load static %}
 
-{% block title %}Catálogo de Cuentas{% endblock %}
-{% block header_kicker %}Contabilidad{% endblock %}
-{% block header_title %}Catálogo de Cuentas{% endblock %}
-{% block header_description %}Estructura contable base por empresa para soportar asientos, integraciones y reportes financieros futuros.{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'contabilidad/catalogo_busqueda.css' %}">{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'importar_catalogo_cuentas' empresa.slug %}" class="erp-action-link">Importar Excel</a>
-<a href="{% url 'crear_cuenta_contable' empresa.slug %}" class="erp-action-link">Nueva Cuenta</a>
-{% endblock %}
+{% block title %}Catálogo de cuentas · {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} accounting-catalog-page{% endblock %}
+{% block header_kicker %}Centro financiero{% endblock %}
+{% block header_title %}Contabilidad{% endblock %}
+{% block header_description %}Organiza el catálogo y encuentra las cuentas de esta empresa.{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/catalogo_busqueda.css' %}">{% endblock %}
+{% block topbar_actions %}<a href="{% url 'contabilidad_dashboard' empresa.slug %}" class="cc-btn">Volver al resumen</a>{% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Total</div><p class="erp-stat-value">{{ resumen.total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Activas</div><p class="erp-stat-value">{{ resumen.activas }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Movimiento</div><p class="erp-stat-value">{{ resumen.movimiento }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Agrupadoras</div><p class="erp-stat-value">{{ resumen.agrupadoras }}</p></article>
-</section>
+<div class="cc-catalog">
+    {% include "contabilidad/partials/dashboard_icons.html" %}
+    <header class="cc-intro">
+        <div class="cc-intro-main"><span class="cc-hero-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><div><p class="cc-eyebrow">Plan de cuentas</p><h1>Catálogo de cuentas</h1><p class="cc-description">Cada cuenta en su lugar, lista para tus operaciones y reportes.</p></div></div>
+        <div class="cc-actions"><a href="{% url 'importar_catalogo_cuentas' empresa.slug %}" class="cc-btn cc-btn--secondary"><svg class="ac-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>Importar Excel</a><a href="{% url 'crear_cuenta_contable' empresa.slug %}" class="cc-btn cc-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %}Nueva cuenta</a></div>
+    </header>
+    <p class="cc-scope">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}<strong>{{ empresa.nombre }}</strong><span>· Catálogo independiente por empresa</span></p>
 
-{% if es_rumi %}
-<section class="erp-card">
-    <h3 class="erp-panel-title">Catálogo propio de RUMI</h3>
-    {% if catalogo_rumi_instalado %}
-    <p class="erp-card-muted">RUMI utiliza sus cuentas y enlaces operativos. Puede agregar cuentas y completar las operaciones pendientes.</p>
-    <a class="erp-btn" href="{% url 'configuracion_contable' empresa.slug %}">Revisar enlaces contables</a>
-    {% else %}
-    <p class="erp-card-muted">Sustituya la plantilla Honduras por el catálogo RUMI. Primero se revisan las cuentas sin uso y los enlaces que conservan historial.</p>
-    <a class="erp-btn" href="{% url 'sustituir_catalogo_rumi' empresa.slug %}">Reemplazar catálogo Honduras en RUMI</a>
+    <section class="cc-stats" aria-label="Resumen del catálogo de esta empresa">
+        <article class="cc-stat" data-tone="indigo"><span class="cc-stat-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><div><p class="cc-stat-label">Total de cuentas</p><p class="cc-stat-value">{{ resumen.total }}</p><p class="cc-stat-note">Registradas en este catálogo</p></div></article>
+        <article class="cc-stat" data-tone="teal"><span class="cc-stat-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}</span><div><p class="cc-stat-label">Cuentas activas</p><p class="cc-stat-value">{{ resumen.activas }}</p><p class="cc-stat-note">Con estado activo</p></div></article>
+        <article class="cc-stat" data-tone="slate"><span class="cc-stat-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><div><p class="cc-stat-label">Aceptan movimientos</p><p class="cc-stat-value">{{ resumen.movimiento }}</p><p class="cc-stat-note">Según su configuración</p></div></article>
+        <article class="cc-stat" data-tone="amber"><span class="cc-stat-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><div><p class="cc-stat-label">Agrupación y consulta</p><p class="cc-stat-value">{{ resumen.agrupadoras }}</p><p class="cc-stat-note">Sin movimiento directo</p></div></article>
+    </section>
+
+    {% if es_rumi %}
+    <section class="cc-rumi-note" aria-labelledby="cc-rumi-title">
+        <span class="cc-note-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}</span>
+        <div><h2 id="cc-rumi-title">Catálogo propio de RUMI</h2>{% if catalogo_rumi_instalado %}<p>Tus cuentas y enlaces operativos se administran dentro de esta empresa.</p>{% else %}<p>Revisa el reemplazo de la plantilla Honduras y los enlaces que conservan historial.</p>{% endif %}</div>
+        {% if catalogo_rumi_instalado %}<a class="cc-btn cc-btn--secondary" href="{% url 'configuracion_contable' empresa.slug %}">Revisar enlaces contables{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>{% else %}<a class="cc-btn cc-btn--secondary" href="{% url 'sustituir_catalogo_rumi' empresa.slug %}">Reemplazar catálogo Honduras en RUMI{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>{% endif %}
+    </section>
     {% endif %}
-</section>
-{% else %}
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <div class="erp-kpi-label">Plantilla Honduras</div>
-            <h3 class="erp-panel-title">Catalogo base para pruebas contables</h3>
-            <p class="erp-card-muted">Crea una estructura base con activos, pasivos, patrimonio, ingresos, costos, gastos, bancos, clientes, proveedores, ISV 15%/18%, retenciones y cuentas laborales. No sobrescribe cuentas existentes.</p>
-        </div>
-        <form method="post" action="{% url 'cargar_catalogo_base_honduras' empresa.slug %}">
-            {% csrf_token %}
-            <button class="erp-btn" type="submit">Cargar Catalogo Base Honduras</button>
-        </form>
-    </div>
-</section>
-{% endif %}
 
-<section class="erp-card" data-catalog-search-panel hidden aria-label="Buscar cuentas de esta empresa">
-    <div class="cc-search">
-        <div class="cc-search__field">
-            <label for="catalogo-busqueda">Buscar por código o nombre</label>
-            <input id="catalogo-busqueda" type="search" data-catalog-search aria-controls="catalogo-cuentas-filas" aria-describedby="catalogo-busqueda-ayuda" placeholder="Escribe el código o el nombre de la cuenta…" autocomplete="off">
+    <section class="cc-panel cc-search-panel" data-catalog-search-panel hidden aria-labelledby="cc-search-title">
+        <div class="cc-panel-heading"><div><h2 id="cc-search-title" class="cc-title">Encuentra tu cuenta</h2><p>Busca dentro del catálogo de {{ empresa.nombre }}.</p></div><span class="cc-search-status" data-catalog-status role="status" aria-live="polite"></span></div>
+        <div class="cc-search">
+            <div class="cc-search__field"><label for="catalogo-busqueda">Buscar por código o nombre</label><div class="cc-search__input">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}<input id="catalogo-busqueda" type="search" data-catalog-search aria-controls="catalogo-cuentas-filas" aria-describedby="catalogo-busqueda-ayuda" placeholder="Ej.: 10101001, bancos o caja…" autocomplete="off"></div></div>
+            <button type="button" class="cc-btn cc-btn--quiet" data-catalog-clear disabled>Limpiar búsqueda</button>
         </div>
-        <button type="button" class="erp-btn-secondary" data-catalog-clear disabled>Limpiar búsqueda</button>
-    </div>
-    <p class="cc-search-help" id="catalogo-busqueda-ayuda">Filtra al escribir. Conservamos las cuentas principales y las subcuentas relacionadas para mostrar su jerarquía.</p>
-    <p class="cc-search-status" data-catalog-status role="status" aria-live="polite"></p>
-</section>
+        <p class="cc-search-help" id="catalogo-busqueda-ayuda">Filtra al escribir. Las cuentas principales y subcuentas relacionadas permanecen visibles para conservar la jerarquía.</p>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Código</th>
-                    <th>Nombre</th>
-                    <th>Cuenta Padre</th>
-                    <th>Tipo</th>
-                    <th>Movimiento</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="catalogo-cuentas-filas">
-                {% for cuenta in cuentas %}
-                <tr data-catalog-row data-account-id="{{ cuenta.pk }}" data-account-parent="{{ cuenta.padre_catalogo.pk|default:'' }}" data-account-code="{{ cuenta.codigo }}" data-account-name="{{ cuenta.nombre }}">
-                    <td>{{ cuenta.codigo }}</td>
-                    <td><span class="cc-account-label{% if cuenta.tiene_subcuentas_catalogo %} cc-account-label--parent{% endif %}" style="--cc-indent:{{ cuenta.sangria_catalogo }}px;">{{ cuenta.nombre }}<span class="cc-context-label" data-catalog-context hidden>Jerarquía</span></span></td>
-                    <td>{% if cuenta.padre_catalogo %}{{ cuenta.padre_catalogo.codigo }} - {{ cuenta.padre_catalogo.nombre }}{% else %}<span class="erp-card-muted">Cuenta principal</span>{% endif %}</td>
-                    <td>{{ cuenta.get_tipo_display }}</td>
-                    <td><span class="erp-badge {% if cuenta.acepta_movimientos %}info{% else %}neutral{% endif %}">{% if cuenta.acepta_movimientos %}Si{% else %}No{% endif %}</span></td>
-                    <td><span class="erp-badge {% if cuenta.activa %}success{% else %}danger{% endif %}">{% if cuenta.activa %}Activa{% else %}Inactiva{% endif %}</span></td>
-                    <td class="actions"><a class="erp-link" href="{% url 'editar_cuenta_contable' empresa.slug cuenta.id %}">Editar</a></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="7" class="erp-empty">Todavía no hay cuentas contables creadas.</td></tr>
-                {% endfor %}
-                <tr data-catalog-no-results hidden><td colspan="7" class="erp-empty">No hay cuentas que coincidan con esta búsqueda. Prueba otro código o nombre.</td></tr>
-            </tbody>
-        </table>
-    </div>
-</section>
+    {% if not es_rumi %}
+    <details class="cc-setup">
+        <summary>{% include "contabilidad/partials/dashboard_icon.html" with icon="settings" only %}<div><strong>Opciones del catálogo</strong><small>Plantilla base de Honduras</small></div><svg class="cc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false"><path d="m7 10 5 5 5-5"/></svg></summary>
+        <div class="cc-setup-body"><div><h2 class="cc-title">Catálogo base para pruebas contables</h2><p>Crea una estructura base con activos, pasivos, patrimonio, ingresos, costos, gastos, bancos, clientes, proveedores, ISV 15%/18%, retenciones y cuentas laborales. No sobrescribe cuentas existentes.</p></div><form method="post" action="{% url 'cargar_catalogo_base_honduras' empresa.slug %}">{% csrf_token %}<button class="cc-btn cc-btn--secondary" type="submit">Cargar Catálogo Base Honduras</button></form></div>
+    </details>
+    {% endif %}
+
+    <section id="cc-list" class="cc-panel cc-list" aria-labelledby="cc-list-title">
+        <header class="cc-list-head"><div><h2 id="cc-list-title" class="cc-title">Tu estructura contable</h2><p class="cc-list-description">Cuentas principales y subcuentas, ordenadas por su jerarquía.</p></div><span class="cc-list-company">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}{{ empresa.nombre }}</span></header>
+        <div class="cc-table-wrap erp-table-wrap">
+            <table class="erp-table cc-table">
+                <thead><tr><th scope="col">Código</th><th scope="col">Cuenta</th><th scope="col">Tipo</th><th scope="col">Uso</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
+                <tbody id="catalogo-cuentas-filas">
+                    {% for cuenta in cuentas %}
+                    <tr{% if cuenta.tiene_subcuentas_catalogo %} class="cc-row-parent"{% endif %} id="cuenta-{{ cuenta.pk }}" data-catalog-row data-account-id="{{ cuenta.pk }}" data-account-parent="{{ cuenta.padre_catalogo.pk|default:'' }}" data-account-code="{{ cuenta.codigo }}" data-account-name="{{ cuenta.nombre }}">
+                        <td class="cc-code">{{ cuenta.codigo }}</td>
+                        <td class="cc-name"><span class="cc-account-label{% if cuenta.tiene_subcuentas_catalogo %} cc-account-label--parent{% endif %}" style="--cc-indent:{{ cuenta.sangria_catalogo }}px;">{% if cuenta.tiene_subcuentas_catalogo %}{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}{% else %}{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}{% endif %}<span class="cc-account-copy"><span class="cc-account-name">{{ cuenta.nombre }}</span><span class="cc-context-label" data-catalog-context hidden>Jerarquía</span><span class="cc-parentline">{% if cuenta.padre_catalogo %}<a class="cc-parent-link" href="#cuenta-{{ cuenta.padre_catalogo.pk }}">Cuenta padre: {{ cuenta.padre_catalogo.codigo }} · {{ cuenta.padre_catalogo.nombre }}</a>{% else %}Cuenta principal{% endif %}</span></span></span></td>
+                        <td><span class="cc-type" data-type="{{ cuenta.tipo }}">{{ cuenta.get_tipo_display }}</span></td>
+                        <td><span class="cc-usage" data-usage="{% if cuenta.acepta_movimientos %}movement{% elif cuenta.tipo == 'orden' %}control{% else %}group{% endif %}">{% if cuenta.acepta_movimientos %}Movimiento{% elif cuenta.tipo == 'orden' %}Consulta{% else %}Agrupación{% endif %}</span></td>
+                        <td><span class="cc-state" data-state="{% if cuenta.activa %}active{% else %}inactive{% endif %}">{% if cuenta.activa %}Activa{% else %}Inactiva{% endif %}</span></td>
+                        <td class="actions"><a class="cc-edit-link" href="{% url 'editar_cuenta_contable' empresa.slug cuenta.id %}" aria-label="Editar cuenta {{ cuenta.codigo }}">{% include "contabilidad/partials/dashboard_icon.html" with icon="settings" only %}Editar</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6"><div class="cc-empty">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}<h3>Tu catálogo está listo para empezar</h3><p>Agrega tu primera cuenta o importa tu estructura desde Excel.</p><div class="cc-actions"><a class="cc-btn cc-btn--primary" href="{% url 'crear_cuenta_contable' empresa.slug %}">Nueva cuenta</a><a class="cc-btn cc-btn--secondary" href="{% url 'importar_catalogo_cuentas' empresa.slug %}">Importar Excel</a></div></div></td></tr>
+                    {% endfor %}
+                    <tr data-catalog-no-results hidden><td colspan="6"><div class="cc-empty">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}<h3>No encontramos esa cuenta</h3><p>No hay cuentas que coincidan con esta búsqueda. Prueba otro código o nombre.</p></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <p class="cc-footer">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}Las cuentas de agrupación y consulta no reciben movimientos directos. Cada cuenta conserva su configuración y estado.</p>
+</div>
 {% endblock %}
-{% block extra_js %}<script src="{% static 'contabilidad/catalogo_busqueda.js' %}" defer></script>{% endblock %}
+{% block extra_js %}{{ block.super }}<script src="{% static 'contabilidad/catalogo_busqueda.js' %}" defer></script>{% endblock %}
