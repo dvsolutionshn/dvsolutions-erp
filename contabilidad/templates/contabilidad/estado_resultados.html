@@ -1,104 +1,69 @@
 {% extends "core/erp_base.html" %}
 {% load static %}
 
-{% block title %}Estado de Resultados - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Reportes Contables{% endblock %}
-{% block header_title %}Estado de Resultados{% endblock %}
-{% block header_description %}Consulta ingresos, costos, gastos y utilidad del periodo a partir de los asientos contabilizados del ERP.{% endblock %}
-
-{% block extra_head %}
-{{ block.super }}
-<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}">
-{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
-<a href="{% url 'balance_comprobacion' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Balance</a>
-<a href="{% url 'libro_diario' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Libro Diario</a>
-<a href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Flujo de Efectivo</a>
-<a href="{% url 'exportar_estado_resultados_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
-<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
-{% endblock %}
+{% block title %}Estado de Resultados · {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} accounting-reports-page{% endblock %}
+{% block header_kicker %}Centro financiero{% endblock %}
+{% block header_title %}Contabilidad{% endblock %}
+{% block header_description %}Consulta tus estados financieros y revisa cada saldo de esta empresa.{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}">{% endblock %}
+{% block topbar_actions %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ef-btn">Volver a reportes</a>{% endblock %}
 
 {% block content %}
-{% include "contabilidad/nota_moneda_reportes.html" %}
-<section class="erp-card erp-report-filter-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Filtros</h3>
-            <p class="erp-card-muted">Consulta el resultado del periodo usando las cuentas de ingresos, costos y gastos.</p>
-        </div>
-    </div>
-    <form method="get" class="erp-filters">
-        <div class="erp-filter-field">
-            <label for="fecha_inicio">Desde</label>
-            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
-        </div>
-        <div class="erp-filter-field">
-            <label for="fecha_fin">Hasta</label>
-            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
-        </div>
-        <div class="erp-filter-actions">
-            <button type="submit" class="erp-btn">Filtrar</button>
-            <a href="{% url 'estado_resultados' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
-        </div>
-    </form>
-</section>
+<div class="ef-report">
+    {% include "contabilidad/partials/dashboard_icons.html" %}
+    <header class="ef-hero">
+        <div class="ef-hero-main"><span class="ef-hero-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><div><p class="ef-eyebrow">Estados financieros</p><h1>Estado de resultados</h1><p class="ef-hero-description">Ingresos, costos y gastos para entender el resultado de tu período.</p></div></div>
+        {% url 'exportar_estado_resultados_excel' empresa.slug as descarga %}
+        {% include "contabilidad/partials/acciones_estado_financiero.html" with descarga=descarga consulta=request.GET.urlencode only %}
+        {% include "contabilidad/partials/metadatos_estado_financiero.html" with empresa=empresa filtros=filtros modo="resultados" only %}
+    </header>
 
-<section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Ingresos</div><p class="erp-stat-value">L. {{ resumen.total_ingresos|floatformat:"2g" }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Costos</div><p class="erp-stat-value">L. {{ resumen.total_costos|floatformat:"2g" }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Gastos</div><p class="erp-stat-value">L. {{ resumen.total_gastos|floatformat:"2g" }}</p></article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Resultado</div>
-        <p class="erp-stat-value">L. {{ resumen.utilidad|floatformat:"2g" }}</p>
-        <p class="erp-card-muted">{% if resumen.resultado_positivo %}Utilidad del periodo.{% else %}Pérdida del periodo.{% endif %}</p>
-    </article>
-    <article class="erp-card"><div class="erp-kpi-label">Cuentas usadas</div><p class="erp-stat-value">{{ resumen.cuentas_ingreso|add:resumen.cuentas_costo|add:resumen.cuentas_gasto }}</p></article>
-</section>
+    <section class="ef-filter-bar" aria-labelledby="ef-filter-title">
+        <div class="ef-filter-heading"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %}</span><div><h2 id="ef-filter-title">Período del reporte</h2><p>Consulta el rango de fechas que necesitas.</p></div></div>
+        <form method="get" class="ef-filters" aria-label="Filtrar estado de resultados por período">
+            <div class="ef-field"><label for="fecha_inicio">Desde</label><input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}"></div>
+            <div class="ef-field"><label for="fecha_fin">Hasta</label><input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}"></div>
+            <div class="ef-filter-actions"><button type="submit" class="ef-btn ef-btn--primary">Aplicar filtro</button><a href="{% url 'estado_resultados' empresa.slug %}" class="ef-btn ef-btn--quiet">Limpiar</a></div>
+        </form>
+    </section>
 
-<section class="erp-grid ef-secciones">
-    <article class="erp-card erp-table-card">
-        <div class="erp-toolbar">
-            <div>
-                <h3 class="erp-panel-title">Ingresos</h3>
-                <p class="erp-card-muted">Cuentas de ingreso con movimiento contabilizado.</p>
-            </div>
-        </div>
-        {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=ingresos_jerarquia total=resumen.total_ingresos etiqueta_total="Total ingresos" mensaje_vacio="No hay ingresos contabilizados en este periodo." only %}
-    </article>
+    <div class="ef-currency"><span class="ef-currency-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span>{% include "contabilidad/nota_moneda_reportes.html" %}</div>
 
-    <article class="erp-card erp-table-card">
-        <div class="erp-toolbar">
-            <div>
-                <h3 class="erp-panel-title">Costos</h3>
-                <p class="erp-card-muted">Cuentas de costo con movimiento contabilizado.</p>
-            </div>
-        </div>
-        {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=costos_jerarquia total=resumen.total_costos etiqueta_total="Total costos" mensaje_vacio="No hay costos contabilizados en este periodo." only %}
-    </article>
+    <section class="ef-kpis" aria-label="Resumen del resultado del período">
+        {% include "contabilidad/partials/kpi_estado_financiero.html" with icono="arrow-up" etiqueta="Ingresos" valor=resumen.total_ingresos tono="teal" destino="ef-ingresos" nota="Ingresos del período" only %}
+        {% include "contabilidad/partials/kpi_estado_financiero.html" with icono="receipt" etiqueta="Costos" valor=resumen.total_costos tono="amber" destino="ef-costos" nota="Costos del período" only %}
+        {% include "contabilidad/partials/kpi_estado_financiero.html" with icono="entry" etiqueta="Gastos" valor=resumen.total_gastos tono="slate" destino="ef-gastos" nota="Gastos del período" only %}
+        {% if resumen.resultado_positivo %}
+        {% include "contabilidad/partials/kpi_estado_financiero.html" with icono="chart" etiqueta="Resultado neto" valor=resumen.utilidad tono="indigo" destino="ef-resultado" nota="Utilidad del período" only %}
+        {% else %}
+        {% include "contabilidad/partials/kpi_estado_financiero.html" with icono="chart" etiqueta="Resultado neto" valor=resumen.utilidad tono="danger" destino="ef-resultado" nota="Pérdida del período" only %}
+        {% endif %}
+    </section>
 
-    <article class="erp-card erp-table-card">
-        <div class="erp-toolbar">
-            <div>
-                <h3 class="erp-panel-title">Gastos</h3>
-                <p class="erp-card-muted">Cuentas de gasto con movimiento contabilizado.</p>
-            </div>
-        </div>
-        {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=gastos_jerarquia total=resumen.total_gastos etiqueta_total="Total gastos" mensaje_vacio="No hay gastos contabilizados en este periodo." only %}
-    </article>
-</section>
+    <div class="ef-reading-bar"><p>{{ resumen.cuentas_ingreso|add:resumen.cuentas_costo|add:resumen.cuentas_gasto }} cuentas con movimiento · Principales en negrita</p><nav class="ef-jump-links" aria-label="Ir a una sección del estado de resultados"><a href="#ef-ingresos">Ingresos</a><a href="#ef-costos">Costos</a><a href="#ef-gastos">Gastos</a></nav></div>
 
-<section class="erp-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Resultado neto</h3>
-            <p class="erp-card-muted">Ingresos menos costos y gastos del periodo seleccionado. Utilidad bruta: L. {{ resumen.utilidad_bruta|floatformat:"2g" }}.</p>
-        </div>
-        <span class="erp-badge {% if resumen.resultado_positivo %}success{% else %}danger{% endif %}">
-            {% if resumen.resultado_positivo %}Utilidad{% else %}Perdida{% endif %}
-        </span>
-    </div>
-    <p class="erp-stat-value">L. {{ resumen.utilidad|floatformat:"2g" }}</p>
-</section>
+    <section class="erp-grid ef-secciones" aria-label="Detalle del resultado del período">
+        <article id="ef-ingresos" class="erp-card erp-table-card ef-section" data-tone="teal" aria-labelledby="ef-ingresos-title">
+            <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}</span><div><h2 id="ef-ingresos-title">Ingresos</h2><p>Ingresos contabilizados en el período.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=ingresos_jerarquia total=resumen.total_ingresos etiqueta_total="Total ingresos" mensaje_vacio="No hay ingresos contabilizados en este periodo." only %}
+        </article>
+        <article id="ef-costos" class="erp-card erp-table-card ef-section" data-tone="amber" aria-labelledby="ef-costos-title">
+            <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}</span><div><h2 id="ef-costos-title">Costos</h2><p>Costos contabilizados en el período.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=costos_jerarquia total=resumen.total_costos etiqueta_total="Total costos" mensaje_vacio="No hay costos contabilizados en este periodo." only %}
+        </article>
+        <article id="ef-gastos" class="erp-card erp-table-card ef-section" data-tone="slate" aria-labelledby="ef-gastos-title">
+            <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><div><h2 id="ef-gastos-title">Gastos</h2><p>Gastos contabilizados en el período.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=gastos_jerarquia total=resumen.total_gastos etiqueta_total="Total gastos" mensaje_vacio="No hay gastos contabilizados en este periodo." only %}
+        </article>
+    </section>
+
+    <section id="ef-resultado" class="ef-summary" aria-labelledby="ef-result-title">
+        <div class="ef-summary-head"><h2 id="ef-result-title">Resultado del período</h2><span class="ef-status" data-state="{% if resumen.resultado_positivo %}balanced{% else %}warning{% endif %}">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}{% if resumen.resultado_positivo %}Utilidad{% else %}Pérdida{% endif %}</span></div>
+        <p class="ef-result-value">L. {{ resumen.utilidad|floatformat:"2g" }}</p>
+        <div class="ef-result-breakdown"><span>Ingresos <strong>L. {{ resumen.total_ingresos|floatformat:"2g" }}</strong></span><span class="ef-equation-symbol">−</span><span>Costos <strong>L. {{ resumen.total_costos|floatformat:"2g" }}</strong></span><span class="ef-equation-symbol">−</span><span>Gastos <strong>L. {{ resumen.total_gastos|floatformat:"2g" }}</strong></span></div>
+        <p class="ef-summary-note">Utilidad bruta: <strong>L. {{ resumen.utilidad_bruta|floatformat:"2g" }}</strong>. Los totales cuentan cada movimiento una sola vez.</p>
+    </section>
+    <div class="ef-reading-bar"><p class="ef-footer-note">Solo asientos contabilizados de {{ empresa.nombre }}.</p><nav class="ef-jump-links" aria-label="Otros reportes contables"><a href="{% url 'balance_comprobacion' empresa.slug %}?{{ request.GET.urlencode }}">Balance de comprobación</a><a href="{% url 'libro_diario' empresa.slug %}?{{ request.GET.urlencode }}">Libro diario</a><a href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}">Flujo de efectivo</a></nav></div>
+</div>
 {% endblock %}

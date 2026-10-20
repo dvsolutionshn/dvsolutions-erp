@@ -1,0 +1,8 @@
+<a class="ef-kpi" data-tone="{{ tono }}" href="#{{ destino }}">
+    <div class="ef-kpi-top">
+        <span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon=icono only %}</span>
+        <span class="ef-kpi-label">{{ etiqueta }}</span>
+    </div>
+    <p class="ef-kpi-value">{% if es_texto %}{{ valor }}{% else %}L. {{ valor|floatformat:"2g" }}{% endif %}</p>
+    <span class="ef-kpi-foot">{{ nota }}{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</span>
+</a>
