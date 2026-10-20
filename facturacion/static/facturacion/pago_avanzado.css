@@ -1,0 +1,144 @@
+/* Only the advanced payment fields; retain the shared ERP form styles elsewhere. */
+.erp-payment-advanced.pay-options{
+    margin-top:18px;
+    border:1px solid #d6e1ed;
+    border-radius:14px;
+    overflow:hidden;
+    background:#f6f9fc;
+    color:#172b42;
+}
+.pay-options > summary{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:17px 20px;
+    cursor:pointer;
+    list-style:none;
+    background:#f6f9fc;
+}
+.pay-options > summary::-webkit-details-marker{display:none;}
+.pay-options > summary::after{
+    content:"+";
+    display:grid;
+    place-items:center;
+    flex:0 0 28px;
+    width:28px;
+    height:28px;
+    border:1px solid #d7e2ed;
+    border-radius:8px;
+    background:#fff;
+    color:#385674;
+    font-size:20px;
+    font-weight:500;
+    line-height:1;
+}
+.pay-options[open] > summary::after{content:"−";}
+.pay-options > summary:focus-visible{outline:3px solid #91b7df;outline-offset:-3px;}
+.pay-options .pay-options-summary-copy{display:grid;gap:4px;min-width:0;}
+.pay-options .pay-options-summary-title{font-size:14px;font-weight:750;color:#19324d;}
+.pay-options .pay-options-summary-help{font-size:12px;font-weight:400;color:#677b90;}
+.pay-options .pay-options-body{display:grid;gap:14px;padding:18px;border-top:1px solid #dce5ee;}
+.pay-options .pay-options-section{min-width:0;padding:18px;border:1px solid #e0e7ef;border-radius:11px;background:#fff;}
+.pay-options .pay-options-section-head{margin-bottom:17px;}
+.pay-options .pay-options-section-head h3{margin:0 0 4px;font-size:14px;line-height:1.4;font-weight:750;color:#1d354e;}
+.pay-options .pay-options-section-head p{margin:0;font-size:12px;line-height:1.5;color:#6b7d90;}
+.pay-options .pay-commission-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(145px,.72fr) minmax(180px,.85fr);gap:18px;align-items:start;}
+.pay-options .pay-options-secondary-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch;}
+.pay-options .pay-retentions-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.pay-options .erp-field{min-width:0;gap:7px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:visible;}
+.pay-options .erp-field > label{margin:0;font-size:12px;line-height:1.4;font-weight:650;letter-spacing:0;text-transform:none;color:#4e6176;}
+.pay-options .erp-field-help{font-size:11px;line-height:1.5;color:#738398;}
+.pay-options .erp-field > select{
+    box-sizing:border-box;
+    width:100%;
+    min-width:0;
+    height:44px;
+    min-height:44px;
+    padding:10px 12px;
+    border:1px solid #cedae7;
+    border-radius:8px;
+    background:#fff;
+    font-size:13px;
+    line-height:1.4;
+    color:#1c334d;
+    text-overflow:ellipsis;
+}
+.pay-options .pay-options-money,
+.pay-options .pay-options-input-affix{display:flex;align-items:center;box-sizing:border-box;height:44px;min-width:0;border:1px solid #cedae7;border-radius:8px;background:#fff;overflow:hidden;}
+.pay-options .pay-options-money > span{flex:0 0 auto;padding-left:12px;font-size:12px;font-weight:650;color:#74859a;}
+.pay-options .pay-options-input-affix > span{flex:0 0 auto;padding-right:13px;font-size:13px;font-weight:650;color:#74859a;}
+.pay-options .pay-options-money > input,
+.pay-options .pay-options-input-affix > input{
+    box-sizing:border-box;
+    width:100%;
+    min-width:0;
+    height:42px;
+    min-height:42px;
+    padding:10px 12px;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    color:#203a56;
+    font-size:14px;
+    font-variant-numeric:tabular-nums;
+    line-height:1.4;
+    text-align:right;
+    box-shadow:none;
+}
+.pay-options .pay-options-money:focus-within,
+.pay-options .pay-options-input-affix:focus-within{border-color:#7da7d1;box-shadow:0 0 0 3px rgba(43,100,156,.10);}
+.pay-options .pay-options-money > input:focus,
+.pay-options .pay-options-input-affix > input:focus{outline:0;background:transparent;box-shadow:none;}
+.pay-options .pay-options-money-readonly{background:#edf4fb;border-color:#d7e5f2;}
+.pay-options .pay-options-money-readonly > input{font-weight:750;color:#234f79;}
+.pay-options .pay-options-check{
+    display:grid;
+    grid-template-columns:20px minmax(0,1fr);
+    align-items:start;
+    gap:11px;
+    margin:0;
+    padding:14px;
+    border:1px solid #dae4ef;
+    border-radius:9px;
+    background:#f7fafd;
+    cursor:pointer;
+    text-transform:none;
+    letter-spacing:0;
+}
+.pay-options .pay-options-check-compensation{margin-top:17px;background:#f0f6fc;border-color:#d6e4f2;}
+.pay-options .pay-options-check input[type="checkbox"]{
+    box-sizing:border-box;
+    width:20px;
+    min-width:20px;
+    max-width:20px;
+    height:20px;
+    min-height:20px;
+    max-height:20px;
+    margin:1px 0 0;
+    padding:0;
+    border-radius:4px;
+    accent-color:#285f94;
+    cursor:pointer;
+}
+.pay-options .pay-options-check input[type="checkbox"]:focus-visible{outline:3px solid #a1c3e4;outline-offset:3px;}
+.pay-options .pay-options-check-copy{display:grid;gap:4px;min-width:0;}
+.pay-options .pay-options-check-title{font-size:13px;line-height:1.5;font-weight:650;color:#294662;}
+.pay-options .pay-options-check-help{font-size:11px;line-height:1.6;font-weight:400;color:#6a8096;}
+.pay-options .pay-options-isv-account{margin-top:15px;}
+.pay-options .pay-options-footnote{margin:13px 0 0;font-size:11px;line-height:1.6;color:#738398;}
+@media (max-width:900px){
+    .pay-options .pay-commission-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;}
+    .pay-options .pay-commission-grid > .erp-field:first-child{grid-column:1 / -1;}
+}
+@media (max-width:680px){
+    .pay-options .pay-options-secondary-grid{grid-template-columns:1fr;}
+    .pay-options .pay-options-body{padding:12px;gap:12px;}
+    .pay-options .pay-options-section{padding:15px;}
+    .pay-options > summary{padding:15px 16px;}
+}
+@media (max-width:420px){
+    .pay-options .pay-commission-grid,
+    .pay-options .pay-retentions-grid{grid-template-columns:minmax(0,1fr);gap:14px;}
+    .pay-options .pay-options-check{padding:12px;gap:10px;}
+}
