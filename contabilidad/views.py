@@ -2281,10 +2281,16 @@ def mayor_cuenta(request, empresa_slug):
     cuenta = get_object_or_404(CuentaContable, pk=filtros["cuenta"], empresa=empresa) if filtros["cuenta"] else None
     bloques = datos_mayor(empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta) if cuenta else []
     bloque = bloques[0] if bloques else {"movimientos": [], "debe": Decimal("0.00"), "haber": Decimal("0.00"), "saldo": Decimal("0.00"), "saldo_inicial": Decimal("0.00")}
+    # La selección sólo puede apuntar a una línea ya incluida en este mayor.
+    movimiento_solicitado = request.GET.get("movimiento") or ""
+    movimiento_seleccionado = next((
+        movimiento["linea"].pk for movimiento in bloque["movimientos"]
+        if str(movimiento["linea"].pk) == movimiento_solicitado
+    ), None)
     return _render_reporte(request, "contabilidad/mayor_cuenta.html", {
         "empresa": empresa, "cuenta": cuenta, "movimientos": bloque["movimientos"],
         "cuentas": CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre"),
-        "filtros": filtros,
+        "filtros": filtros, "movimiento_seleccionado": movimiento_seleccionado,
         "resumen": {"debe_total": bloque["debe"], "haber_total": bloque["haber"], "saldo": bloque["saldo"], "saldo_inicial": bloque["saldo_inicial"], "movimientos": len(bloque["movimientos"])},
     })
 

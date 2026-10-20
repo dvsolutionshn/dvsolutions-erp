@@ -4,6 +4,7 @@ from . import views
 from . import regularizacion_views
 from . import revision_conversion_views
 from . import catalogo_rumi_views
+from . import balance_movimientos_views
 
 urlpatterns = [
     path("", views.contabilidad_dashboard, name="contabilidad_dashboard"),
@@ -72,6 +73,7 @@ urlpatterns = [
     path("reportes/estado-resultados/", views.estado_resultados, name="estado_resultados"),
     path("reportes/estado-resultados/excel/", views.exportar_estado_resultados_excel, name="exportar_estado_resultados_excel"),
     path("reportes/balance-general/", views.balance_general, name="balance_general"),
+    path("reportes/balance-general/cuentas/<int:cuenta_id>/movimientos/", balance_movimientos_views.movimientos_balance_general, name="movimientos_balance_general"),
     path("reportes/balance-general/excel/", views.exportar_balance_general_excel, name="exportar_balance_general_excel"),
     path("reportes/flujo-efectivo/", views.estado_flujo_efectivo, name="estado_flujo_efectivo"),
     path("reportes/flujo-efectivo/excel/", views.exportar_estado_flujo_efectivo_excel, name="exportar_estado_flujo_efectivo_excel"),

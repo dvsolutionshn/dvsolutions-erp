@@ -1,0 +1,9 @@
+.mayor-movimiento { scroll-margin-top: 100px; }
+.erp-table .mayor-movimiento--seleccionado > td { background: #f0eefc; border-bottom-color: #d8d2f3; }
+.erp-table .mayor-movimiento--seleccionado > td:first-child { box-shadow: inset 3px 0 #6961ce; }
+.mayor-seleccion-etiqueta { background: #e3def8; border-radius: 5px; color: #5d4da4; display: block; font-size: 10px; font-weight: 600; line-height: 1.5; margin-top: 6px; padding: 3px 7px; width: fit-content; }
+@media print {
+    .erp-table .mayor-movimiento--seleccionado > td { background: #fff; }
+    .erp-table .mayor-movimiento--seleccionado > td:first-child { box-shadow: none; }
+    .mayor-seleccion-etiqueta { border: 1px solid #ddd; color: #444; }
+}

@@ -1,0 +1,62 @@
+/* Consulta progresiva del Balance. No interviene en sus saldos ni en otros reportes. */
+.ef-report[data-balance-interactivo] .bgm-toggle {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-weight: 400;
+    gap: 9px;
+    line-height: inherit;
+    margin: -5px -7px;
+    max-width: 100%;
+    min-height: 34px;
+    padding: 5px 7px;
+    text-align: start;
+}
+.ef-report[data-balance-interactivo] .bgm-toggle:hover,
+.ef-report[data-balance-interactivo] .bgm-toggle[aria-expanded="true"] { background: var(--ef-tint); color: var(--ef-tone); }
+.ef-report[data-balance-interactivo] .bgm-indicador { color: var(--ef-tone); flex: 0 0 10px; font-size: 9px; }
+.ef-report[data-balance-interactivo] .ef-tabla .bgm-panel > td { background: #f9fbfd; padding: 0; }
+.ef-report[data-balance-interactivo] .bgm-detalle { border-left: 2px solid #d4dfeb; margin: 12px 23px 16px calc(23px + min(var(--bgm-sangria, 0px), 72px)); padding: 4px 0 4px 16px; }
+.ef-report[data-balance-interactivo] [data-balance-contenido] { min-width: 0; }
+.ef-report[data-balance-interactivo] .bgm-header { align-items: flex-start; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; padding: 10px 2px 13px; }
+.ef-report[data-balance-interactivo] .bgm-title { color: #425b75; font-size: 12px; font-weight: 600; line-height: 1.6; }
+.ef-report[data-balance-interactivo] .bgm-subtitle,
+.ef-report[data-balance-interactivo] .bgm-estado { color: #74869b; font-size: 11px; line-height: 1.7; margin-top: 3px; }
+.ef-report[data-balance-interactivo] .bgm-mayor,
+.ef-report[data-balance-interactivo] [data-balance-pagina],
+.ef-report[data-balance-interactivo] [data-balance-reintentar] { background: #fff; border: 1px solid #dce5ee; border-radius: 7px; color: #5c579e; cursor: pointer; display: inline-flex; font: inherit; font-size: 11px; font-weight: 550; line-height: 1.5; padding: 8px 11px; white-space: nowrap; }
+.ef-report[data-balance-interactivo] :is(.bgm-mayor, [data-balance-pagina], [data-balance-reintentar]):hover { background: #f1eefb; border-color: #d4cfea; }
+.ef-report[data-balance-interactivo] .bgm-table-wrap { border: 1px solid #e1e8f0; border-radius: 9px; contain: inline-size; max-width: 100%; overflow-x: auto; }
+.ef-report[data-balance-interactivo] .ef-tabla .bgm-table { border-collapse: collapse; min-width: 800px; width: 100%; }
+.ef-report[data-balance-interactivo] .ef-tabla .bgm-table th { background: #eff4f8; color: #75859a; font-size: 9px; font-weight: 600; letter-spacing: .045em; padding: 9px 10px; text-transform: uppercase; white-space: nowrap; }
+.ef-report[data-balance-interactivo] .ef-tabla .bgm-table td { background: #fff; border-bottom: 1px solid #edf1f6; color: #4f647d; font-size: 11px; font-weight: 400; line-height: 1.6; padding: 0; vertical-align: top; }
+.ef-report[data-balance-interactivo] .ef-tabla .bgm-table .bgm-amount { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.ef-report[data-balance-interactivo] .bgm-table a { color: inherit; display: block; min-height: 42px; padding: 10px; }
+.ef-report[data-balance-interactivo] .bgm-table .bgm-concepto { min-width: 170px; overflow-wrap: anywhere; }
+.ef-report[data-balance-interactivo] .bgm-table .bgm-asiento { color: #625bab; white-space: nowrap; }
+.ef-report[data-balance-interactivo] .bgm-table .bgm-fecha { white-space: nowrap; }
+.ef-report[data-balance-interactivo] .bgm-table .bgm-reference { color: #8a98a9; display: block; font-size: 10px; }
+.ef-report[data-balance-interactivo] .ef-tabla .bgm-table tr:hover td,
+.ef-report[data-balance-interactivo] .ef-tabla .bgm-table tr:focus-within td { background: #f2f0fc; }
+.ef-report[data-balance-interactivo] .bgm-table .bgm-open-mayor { color: #625bab; display: block; font-size: 10px; white-space: nowrap; }
+.ef-report[data-balance-interactivo] .bgm-footer > p { color: #7c8ba0; font-size: 10px; line-height: 1.7; padding-top: 10px; }
+.ef-report[data-balance-interactivo] .bgm-pagination { align-items: center; display: flex; flex-wrap: wrap; gap: 9px; justify-content: flex-end; padding-top: 12px; }
+.ef-report[data-balance-interactivo] .bgm-pagination span { color: #7c8ba0; font-size: 11px; margin-right: auto; }
+.ef-report[data-balance-interactivo] .bgm-empty { color: #7c8da2; font-size: 12px; line-height: 1.7; padding: 17px 2px; }
+.ef-report[data-balance-interactivo] .bgm-cargando,
+.ef-report[data-balance-interactivo] .bgm-error { color: #6e8096; font-size: 12px; line-height: 1.7; padding: 12px 2px; }
+.ef-report[data-balance-interactivo] .bgm-error { color: #9a5362; }
+.ef-report[data-balance-interactivo] .bgm-error :is(button, a) { margin: 10px 8px 0 0; }
+@media (max-width: 720px) {
+    .ef-report[data-balance-interactivo] .bgm-detalle { margin: 10px 14px 14px 24px; padding-left: 11px; }
+}
+@media print {
+    .ef-report[data-balance-interactivo] .bgm-panel { display: none !important; }
+    .ef-report[data-balance-interactivo] .bgm-toggle { background: transparent; color: inherit; margin: 0; min-height: 0; padding: 0; }
+    .ef-report[data-balance-interactivo] .bgm-indicador { display: none; }
+}

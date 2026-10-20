@@ -6,11 +6,11 @@
 {% block header_kicker %}Centro financiero{% endblock %}
 {% block header_title %}Contabilidad{% endblock %}
 {% block header_description %}Consulta tus estados financieros y revisa cada saldo de esta empresa.{% endblock %}
-{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}">{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/balance_movimientos.css' %}">{% endblock %}
 {% block topbar_actions %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ef-btn">Volver a reportes</a>{% endblock %}
 
 {% block content %}
-<div class="ef-report">
+<div class="ef-report" data-balance-interactivo>
     {% include "contabilidad/partials/dashboard_icons.html" %}
     <header class="ef-hero">
         <div class="ef-hero-main">
@@ -43,20 +43,20 @@
         {% endif %}
     </section>
 
-    <div class="ef-reading-bar"><p>Principales en negrita · Subcuentas con sangría</p><nav class="ef-jump-links" aria-label="Ir a una sección del balance"><a href="#ef-activos">Activos</a><a href="#ef-pasivos">Pasivos</a><a href="#ef-patrimonio">Patrimonio</a></nav></div>
+    <div class="ef-reading-bar"><p>Principales en negrita · Despliega una cuenta para consultar sus movimientos.</p><nav class="ef-jump-links" aria-label="Ir a una sección del balance"><a href="#ef-activos">Activos</a><a href="#ef-pasivos">Pasivos</a><a href="#ef-patrimonio">Patrimonio</a></nav></div>
 
     <section class="erp-grid ef-secciones" aria-label="Detalle de la situación financiera">
         <article id="ef-activos" class="erp-card erp-table-card ef-section" data-tone="teal" aria-labelledby="ef-activos-title">
             <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="bank" only %}</span><div><h2 id="ef-activos-title">Activos</h2><p>Recursos controlados por la empresa.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
-            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=activos_jerarquia total=resumen.total_activos etiqueta_total="Total activos" mensaje_vacio="No hay activos contabilizados." only %}
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=activos_jerarquia total=resumen.total_activos etiqueta_total="Total activos" mensaje_vacio="No hay activos contabilizados." interactivo=True empresa=empresa filtros=filtros only %}
         </article>
         <article id="ef-pasivos" class="erp-card erp-table-card ef-section" data-tone="amber" aria-labelledby="ef-pasivos-title">
             <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}</span><div><h2 id="ef-pasivos-title">Pasivos</h2><p>Obligaciones pendientes de la empresa.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
-            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=pasivos_jerarquia total=resumen.total_pasivos etiqueta_total="Total pasivos" mensaje_vacio="No hay pasivos contabilizados." only %}
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=pasivos_jerarquia total=resumen.total_pasivos etiqueta_total="Total pasivos" mensaje_vacio="No hay pasivos contabilizados." interactivo=True empresa=empresa filtros=filtros only %}
         </article>
         <article id="ef-patrimonio" class="erp-card erp-table-card ef-section" data-tone="indigo" aria-labelledby="ef-patrimonio-title">
             <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><div><h2 id="ef-patrimonio-title">Patrimonio</h2><p>Capital y resultados de la empresa.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
-            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=patrimonio_jerarquia total=resumen.total_patrimonio etiqueta_total="Total patrimonio" mensaje_vacio="No hay cuentas de patrimonio con movimientos." incluir_resultado=True resultado=resumen.resultado_no_traspasado only %}
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=patrimonio_jerarquia total=resumen.total_patrimonio etiqueta_total="Total patrimonio" mensaje_vacio="No hay cuentas de patrimonio con movimientos." incluir_resultado=True resultado=resumen.resultado_no_traspasado interactivo=True empresa=empresa filtros=filtros only %}
         </article>
     </section>
 
@@ -68,3 +68,5 @@
     <div class="ef-reading-bar"><p class="ef-footer-note">Cada movimiento se cuenta una sola vez en los totales generales.</p><nav class="ef-jump-links" aria-label="Otros reportes contables"><a href="{% url 'balance_comprobacion' empresa.slug %}?fecha_fin={{ filtros.fecha_corte|urlencode }}">Balance de comprobación</a><a href="{% url 'estado_resultados' empresa.slug %}?fecha_fin={{ filtros.fecha_corte|urlencode }}">Estado de resultados</a><a href="{% url 'estado_flujo_efectivo' empresa.slug %}?fecha_fin={{ filtros.fecha_corte|urlencode }}">Flujo de efectivo</a></nav></div>
 </div>
 {% endblock %}
+
+{% block extra_js %}{{ block.super }}<script src="{% static 'contabilidad/balance_movimientos.js' %}" defer></script>{% endblock %}
