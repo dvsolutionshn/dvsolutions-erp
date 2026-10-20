@@ -1,0 +1,17 @@
+[data-catalog-search-panel][hidden],
+[data-catalog-row][hidden],
+[data-catalog-no-results][hidden],
+[data-catalog-context][hidden] { display: none !important; }
+.cc-search { align-items: end; display: flex; flex-wrap: wrap; gap: 12px; }
+.cc-search__field { flex: 1 1 320px; min-width: 0; }
+.cc-search label { color: #415b73; display: block; font-size: 13px; font-weight: 650; margin-bottom: 8px; }
+.cc-search input { background: #fff; border: 1px solid #dce5ef; border-radius: 9px; box-sizing: border-box; color: #29445a; font: inherit; min-height: 44px; padding: 11px 14px; width: 100%; }
+.cc-search input:focus-visible { border-color: #817acb; outline: 3px solid #e5e2fb; }
+.cc-search button { min-height: 44px; }
+.cc-search button:disabled { cursor: default; opacity: .5; }
+.cc-search-help { color: #71869a; font-size: 12px; line-height: 1.7; margin: 10px 0 0; }
+.cc-search-status { color: #5d589e; font-size: 12px; font-weight: 600; margin: 8px 0 0; }
+.cc-account-label { display: inline-block; padding-inline-start: var(--cc-indent, 0px); }
+.cc-account-label--parent { font-weight: 700; }
+.cc-context-row { background: #f8faff; }
+.cc-context-label { background: #eeedf8; border-radius: 4px; color: #716c9f; display: inline-block; font-size: 10px; font-weight: 500; margin-inline-start: 7px; padding: 2px 5px; }

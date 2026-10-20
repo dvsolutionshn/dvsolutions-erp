@@ -1,9 +1,21 @@
 {% extends "core/erp_base.html" %}
 
-{% block title %}Balance de Situacion Financiera - {{ empresa.nombre }}{% endblock %}
+{% block title %}Balance de Situación Financiera - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Reportes Contables{% endblock %}
-{% block header_title %}Balance de Situacion Financiera{% endblock %}
+{% block header_title %}Balance de Situación Financiera{% endblock %}
 {% block header_description %}Consulta activos, pasivos y patrimonio a una fecha de corte para validar la posicion financiera de la empresa.{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .balance-secciones { grid-template-columns: minmax(0, 1fr); }
+    .balance-secciones .erp-table { min-width: 650px; width: 100%; }
+    .balance-secciones .erp-table th:first-child { width: 46%; }
+    .balance-account { display: block; min-width: 12rem; }
+    .balance-account-total { font-weight: 700; }
+    .balance-account-note { display: block; margin-top: .2rem; color: var(--erp-muted, #64748b); font-size: .72rem; font-weight: 400; }
+</style>
+{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
@@ -20,7 +32,7 @@
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title">Fecha de corte</h3>
-            <p class="erp-card-muted">Si no seleccionas fecha, el reporte toma todos los asientos contabilizados.</p>
+            <p class="erp-card-muted">Si no seleccionas fecha, el reporte toma todos los asientos contabilizados. Cada cuenta principal acumula sus subcuentas; los totales generales cuentan cada movimiento una sola vez.</p>
         </div>
     </div>
     <form method="get" class="erp-filters">
@@ -36,17 +48,17 @@
 </section>
 
 <section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Activos</div><p class="erp-stat-value">L. {{ resumen.total_activos }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Pasivos</div><p class="erp-stat-value">L. {{ resumen.total_pasivos }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Patrimonio</div><p class="erp-stat-value">L. {{ resumen.total_patrimonio }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Activos</div><p class="erp-stat-value">L. {{ resumen.total_activos|floatformat:"2g" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Pasivos</div><p class="erp-stat-value">L. {{ resumen.total_pasivos|floatformat:"2g" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Patrimonio</div><p class="erp-stat-value">L. {{ resumen.total_patrimonio|floatformat:"2g" }}</p></article>
     <article class="erp-card">
         <div class="erp-kpi-label">Estado</div>
         <p class="erp-stat-value">{% if resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p>
-        <p class="erp-card-muted">Diferencia: L. {{ resumen.diferencia }}</p>
+        <p class="erp-card-muted">Diferencia: L. {{ resumen.diferencia|floatformat:"2g" }}</p>
     </article>
 </section>
 
-<section class="erp-grid">
+<section class="erp-grid balance-secciones">
     <article class="erp-card erp-table-card">
         <div class="erp-toolbar">
             <div>
@@ -60,18 +72,18 @@
                     <tr><th>Cuenta</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr>
                 </thead>
                 <tbody>
-                    {% for fila in activos %}
+                    {% for fila in activos_jerarquia %}
                     <tr>
-                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                        <td><span class="balance-account{% if fila.es_agrupadora %} balance-account-total{% endif %}" style="padding-inline-start: {{ fila.sangria_px }}px;">{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}{% if fila.es_agrupadora %}<small class="balance-account-note">Acumulado con subcuentas</small>{% endif %}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe|floatformat:"2g" }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber|floatformat:"2g" }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo|floatformat:"2g" }}</span></td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="erp-empty">No hay activos contabilizados.</td></tr>
                     {% endfor %}
                 </tbody>
-                <tfoot><tr><th colspan="3">Total activos</th><th class="amount"><span class="erp-money">L. {{ resumen.total_activos }}</span></th></tr></tfoot>
+                <tfoot><tr><th colspan="3">Total activos</th><th class="amount"><span class="erp-money">L. {{ resumen.total_activos|floatformat:"2g" }}</span></th></tr></tfoot>
             </table>
         </div>
     </article>
@@ -89,18 +101,18 @@
                     <tr><th>Cuenta</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr>
                 </thead>
                 <tbody>
-                    {% for fila in pasivos %}
+                    {% for fila in pasivos_jerarquia %}
                     <tr>
-                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                        <td><span class="balance-account{% if fila.es_agrupadora %} balance-account-total{% endif %}" style="padding-inline-start: {{ fila.sangria_px }}px;">{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}{% if fila.es_agrupadora %}<small class="balance-account-note">Acumulado con subcuentas</small>{% endif %}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe|floatformat:"2g" }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber|floatformat:"2g" }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo|floatformat:"2g" }}</span></td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="erp-empty">No hay pasivos contabilizados.</td></tr>
                     {% endfor %}
                 </tbody>
-                <tfoot><tr><th colspan="3">Total pasivos</th><th class="amount"><span class="erp-money">L. {{ resumen.total_pasivos }}</span></th></tr></tfoot>
+                <tfoot><tr><th colspan="3">Total pasivos</th><th class="amount"><span class="erp-money">L. {{ resumen.total_pasivos|floatformat:"2g" }}</span></th></tr></tfoot>
             </table>
         </div>
     </article>
@@ -118,22 +130,22 @@
                     <tr><th>Cuenta</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr>
                 </thead>
                 <tbody>
-                    {% for fila in patrimonio %}
+                    {% for fila in patrimonio_jerarquia %}
                     <tr>
-                        <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
-                        <td class="amount"><span class="erp-money">L. {{ fila.saldo }}</span></td>
+                        <td><span class="balance-account{% if fila.es_agrupadora %} balance-account-total{% endif %}" style="padding-inline-start: {{ fila.sangria_px }}px;">{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}{% if fila.es_agrupadora %}<small class="balance-account-note">Acumulado con subcuentas</small>{% endif %}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.debe|floatformat:"2g" }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.haber|floatformat:"2g" }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ fila.saldo|floatformat:"2g" }}</span></td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="erp-empty">No hay cuentas de patrimonio con movimientos.</td></tr>
                     {% endfor %}
                     <tr>
                         <td>Resultado acumulado no traspasado a patrimonio</td><td>—</td><td>—</td>
-                        <td class="amount"><span class="erp-money">L. {{ resumen.resultado_no_traspasado }}</span></td>
+                        <td class="amount"><span class="erp-money">L. {{ resumen.resultado_no_traspasado|floatformat:"2g" }}</span></td>
                     </tr>
                 </tbody>
-                <tfoot><tr><th colspan="3">Total patrimonio</th><th class="amount"><span class="erp-money">L. {{ resumen.total_patrimonio }}</span></th></tr></tfoot>
+                <tfoot><tr><th colspan="3">Total patrimonio</th><th class="amount"><span class="erp-money">L. {{ resumen.total_patrimonio|floatformat:"2g" }}</span></th></tr></tfoot>
             </table>
         </div>
     </article>
@@ -149,6 +161,6 @@
             {% if resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}
         </span>
     </div>
-    <p class="erp-stat-value">L. {{ resumen.total_activos }} = L. {{ resumen.total_pasivo_patrimonio }}</p>
+    <p class="erp-stat-value">L. {{ resumen.total_activos|floatformat:"2g" }} = L. {{ resumen.total_pasivo_patrimonio|floatformat:"2g" }}</p>
 </section>
 {% endblock %}

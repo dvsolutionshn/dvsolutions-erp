@@ -50,7 +50,7 @@ class CuentaContableForm(forms.ModelForm):
                 self.fields[field_name].help_text = help_text
         from .alcance_catalogo import es_empresa_rumi
         if es_empresa_rumi(empresa):
-            self.fields["tipo"].help_text = "Los controles extracontables se conservan inactivos para consulta y no admiten asientos financieros."
+            self.fields["tipo"].help_text = "Los controles extracontables se conservan para consulta y no admiten asientos financieros."
         else:
             self.fields["tipo"].choices = [(clave, etiqueta) for clave, etiqueta in self.fields["tipo"].choices if clave != "orden"]
             if self.instance.pk and self.instance.tipo == "orden":

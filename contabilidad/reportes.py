@@ -75,11 +75,77 @@ def datos_estado_resultados(empresa, fecha_inicio="", fecha_fin="", excluir_cier
     }
 
 
+def _jerarquia_balance(empresa, filas_directas):
+    """Acumula la jerarquía visible sin volver a sumar sus filas en los totales.
+
+    La relación padre es la fuente de la jerarquía, nunca el prefijo del código.
+    Las relaciones históricas incompatibles se separan sólo para presentar el
+    reporte: no cambian el catálogo ni trasladan saldos entre empresas o tipos.
+    """
+    cuentas = list(CuentaContable.objects.filter(
+        empresa=empresa, tipo__in=("activo", "pasivo", "patrimonio"),
+    ).order_by("codigo", "nombre", "pk"))
+    por_id = {cuenta.pk: cuenta for cuenta in cuentas}
+    directas = {fila["cuenta"].pk: fila for fila in filas_directas}
+    padres = {}
+    for cuenta in cuentas:
+        padre = por_id.get(cuenta.cuenta_padre_id)
+        padres[cuenta.pk] = padre.pk if padre and padre.tipo == cuenta.tipo else None
+
+    # Un catálogo antiguo puede contener ciclos creados fuera del formulario.
+    # Cortamos una sola arista por ciclo en memoria, con un orden estable.
+    revisadas = set()
+    for cuenta in cuentas:
+        camino, posiciones = [], {}
+        actual = cuenta.pk
+        while actual is not None and actual not in revisadas:
+            if actual in posiciones:
+                padres[camino[posiciones[actual]]] = None
+                break
+            posiciones[actual] = len(camino)
+            camino.append(actual)
+            actual = padres[actual]
+        revisadas.update(camino)
+
+    hijas = defaultdict(list)
+    for cuenta in cuentas:
+        hijas[padres[cuenta.pk]].append(cuenta.pk)
+    orden = []
+    pendientes = [(pk, 0) for pk in reversed(hijas[None])]
+    while pendientes:
+        pk, nivel = pendientes.pop()
+        orden.append((pk, nivel))
+        pendientes.extend((hija, nivel + 1) for hija in reversed(hijas[pk]))
+
+    acumuladas = {}
+    for pk, nivel in reversed(orden):
+        directa = directas.get(pk)
+        debe_directo, haber_directo = (
+            (directa["debe"], directa["haber"]) if directa else (CERO, CERO)
+        )
+        descendientes = [acumuladas[hija] for hija in hijas[pk] if hija in acumuladas]
+        if directa is None and not descendientes:
+            continue
+        debe = debe_directo + sum((fila["debe"] for fila in descendientes), CERO)
+        haber = haber_directo + sum((fila["haber"] for fila in descendientes), CERO)
+        cuenta = por_id[pk]
+        acumuladas[pk] = {
+            "cuenta": cuenta, "debe": debe, "haber": haber,
+            "saldo": saldo_natural(cuenta, debe, haber),
+            "debe_directo": debe_directo, "haber_directo": haber_directo,
+            "saldo_directo": saldo_natural(cuenta, debe_directo, haber_directo),
+            "nivel": nivel, "sangria_px": nivel * 18,
+            "es_agrupadora": bool(descendientes),
+        }
+    return [acumuladas[pk] for pk, _nivel in orden if pk in acumuladas]
+
+
 def datos_balance_general(empresa, fecha_corte=""):
     filas = saldos_financieros(empresa, ("activo", "pasivo", "patrimonio"), fecha_corte=fecha_corte)
     activos = [fila for fila in filas if fila["cuenta"].tipo == "activo"]
     pasivos = [fila for fila in filas if fila["cuenta"].tipo == "pasivo"]
     patrimonio = [fila for fila in filas if fila["cuenta"].tipo == "patrimonio"]
+    jerarquia = _jerarquia_balance(empresa, filas)
     # Incluye los cierres efectivos: después del traspaso, las cuentas de resultados
     # quedan sin saldo y el importe ya está registrado en patrimonio.
     resultado_pendiente = datos_estado_resultados(empresa, fecha_fin=fecha_corte, excluir_cierres=False)["resumen"]["utilidad"]
@@ -90,6 +156,9 @@ def datos_balance_general(empresa, fecha_corte=""):
     diferencia = total_activos - total_pasivos - total_patrimonio
     return {
         "activos": activos, "pasivos": pasivos, "patrimonio": patrimonio,
+        "activos_jerarquia": [fila for fila in jerarquia if fila["cuenta"].tipo == "activo"],
+        "pasivos_jerarquia": [fila for fila in jerarquia if fila["cuenta"].tipo == "pasivo"],
+        "patrimonio_jerarquia": [fila for fila in jerarquia if fila["cuenta"].tipo == "patrimonio"],
         "resumen": {
             "total_activos": total_activos, "total_pasivos": total_pasivos,
             "patrimonio_contabilizado": patrimonio_contabilizado,

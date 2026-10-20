@@ -20,9 +20,7 @@ class CuentasExtracontablesTests(TestCase):
 
     def test_cuenta_de_control_no_se_habilita_para_asientos(self):
         self.padre.activa = True
-        with self.assertRaisesMessage(ValidationError, "inactivas"):
-            self.padre.full_clean()
-        self.padre.activa = False
+        self.padre.full_clean()
         self.padre.acepta_movimientos = True
         with self.assertRaisesMessage(ValidationError, "no admiten"):
             self.padre.full_clean()
