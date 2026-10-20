@@ -1,0 +1,36 @@
+.ef-secciones {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ef-secciones .ef-tabla {
+    width: 100%;
+    min-width: 520px;
+}
+
+.ef-tabla .ef-codigo-columna {
+    width: 11rem;
+}
+
+.ef-tabla .ef-saldo-columna {
+    width: 12rem;
+}
+
+.ef-tabla .ef-codigo {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ef-tabla .ef-cuenta {
+    display: block;
+    min-width: 10rem;
+}
+
+.ef-tabla tbody .ef-fila > td,
+.ef-tabla tbody .ef-fila .erp-money {
+    font-weight: 400;
+}
+
+.ef-tabla tbody .ef-principal > td,
+.ef-tabla tbody .ef-principal .erp-money {
+    font-weight: 700;
+}

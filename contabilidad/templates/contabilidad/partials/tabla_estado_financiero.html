@@ -1,0 +1,35 @@
+<div class="erp-table-wrap">
+    <table class="erp-table ef-tabla">
+        <thead>
+            <tr>
+                <th class="ef-codigo-columna" scope="col">Código</th>
+                <th scope="col">Cuenta</th>
+                <th class="amount ef-saldo-columna" scope="col">Saldo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fila in filas %}
+            <tr class="ef-fila{% if fila.es_agrupadora %} ef-principal{% endif %}" data-cuenta-codigo="{{ fila.cuenta.codigo }}">
+                <td class="ef-codigo">{{ fila.cuenta.codigo }}</td>
+                <td><span class="ef-cuenta" style="padding-inline-start: {{ fila.sangria_px }}px;">{{ fila.cuenta.nombre }}</span></td>
+                <td class="amount"><span class="erp-money">L. {{ fila.saldo|floatformat:"2g" }}</span></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="erp-empty">{{ mensaje_vacio }}</td></tr>
+            {% endfor %}
+            {% if incluir_resultado %}
+            <tr class="ef-fila">
+                <td>—</td>
+                <td>Resultado acumulado no traspasado a patrimonio</td>
+                <td class="amount"><span class="erp-money">L. {{ resultado|floatformat:"2g" }}</span></td>
+            </tr>
+            {% endif %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <th colspan="2" scope="row">{{ etiqueta_total }}</th>
+                <th class="amount"><span class="erp-money">L. {{ total|floatformat:"2g" }}</span></th>
+            </tr>
+        </tfoot>
+    </table>
+</div>

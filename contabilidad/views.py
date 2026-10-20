@@ -2375,19 +2375,33 @@ def estado_resultados(request, empresa_slug):
     return _render_reporte(request, "contabilidad/estado_resultados.html", data)
 
 
+def _agregar_seccion_estado_financiero_excel(sheet, titulo, filas):
+    """Presenta la jerarquía ya calculada; no vuelve a sumar sus saldos."""
+    sheet.append([titulo])
+    sheet.cell(sheet.max_row, 1).font = Font(bold=True)
+    for fila in filas:
+        cuenta = fila["cuenta"]
+        sheet.append([cuenta.codigo, cuenta.nombre, fila["saldo"]])
+        sheet.cell(sheet.max_row, 2).alignment = Alignment(indent=min(fila["nivel"], 250))
+        for celda in sheet[sheet.max_row]:
+            celda.font = Font(bold=bool(fila["es_agrupadora"]))
+
+
 @login_required
 def exportar_estado_resultados_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     data = datos_estado_resultados(empresa, **_filtros_reportes(request))
     workbook, sheet = _preparar_excel("Estado de Resultados · HNL")
-    sheet.append(["Tipo", "Cuenta", "Debe", "Haber", "Saldo"])
+    sheet.append(["Código", "Cuenta", "Saldo"])
     _aplicar_encabezado(sheet, 3)
-    for grupo in ("ingresos", "costos", "gastos"):
-        for fila in data[grupo]:
-            sheet.append([fila["cuenta"].get_tipo_display(), f"{fila['cuenta'].codigo} - {fila['cuenta'].nombre}", fila["debe"], fila["haber"], fila["saldo"]])
+    for grupo, titulo in (("ingresos", "Ingresos"), ("costos", "Costos"), ("gastos", "Gastos")):
+        _agregar_seccion_estado_financiero_excel(sheet, titulo, data[f"{grupo}_jerarquia"])
     sheet.append([])
     for etiqueta, clave in (("Total ingresos", "total_ingresos"), ("Total costos", "total_costos"), ("Utilidad bruta", "utilidad_bruta"), ("Total gastos", "total_gastos"), ("Utilidad neta", "utilidad")):
-        sheet.append([etiqueta, "", "", "", data["resumen"][clave]])
+        sheet.append([etiqueta, "", data["resumen"][clave]])
+    for celda in sheet["C"]:
+        if isinstance(celda.value, Decimal):
+            celda.number_format = '#,##0.00;[Red]-#,##0.00'
     _advertencias_excel_reporte(sheet, empresa, _filtros_reportes(request))
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Estado_Resultados_{empresa.slug}.xlsx")
@@ -2407,24 +2421,18 @@ def exportar_balance_general_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     data = datos_balance_general(empresa, request.GET.get("fecha_corte") or "")
     workbook, sheet = _preparar_excel("Balance General · HNL")
-    sheet.append(["Tipo", "Cuenta", "Debe", "Haber", "Saldo"])
+    sheet.append(["Código", "Cuenta", "Saldo"])
     _aplicar_encabezado(sheet, 3)
-    for grupo in ("activos", "pasivos", "patrimonio"):
-        for fila in data[f"{grupo}_jerarquia"]:
-            sheet.append([fila["cuenta"].get_tipo_display(), f"{fila['cuenta'].codigo} - {fila['cuenta'].nombre}", fila["debe"], fila["haber"], fila["saldo"]])
-            sheet.cell(sheet.max_row, 2).alignment = Alignment(indent=min(fila["nivel"], 250))
-            if fila["es_agrupadora"]:
-                for celda in sheet[sheet.max_row]:
-                    celda.font = Font(bold=True)
+    for grupo, titulo in (("activos", "Activos"), ("pasivos", "Pasivos"), ("patrimonio", "Patrimonio")):
+        _agregar_seccion_estado_financiero_excel(sheet, titulo, data[f"{grupo}_jerarquia"])
     resumen = data["resumen"]
-    sheet.append(["Patrimonio", "Resultado acumulado no traspasado a patrimonio", "", "", resumen["resultado_no_traspasado"]])
+    sheet.append(["", "Resultado acumulado no traspasado a patrimonio", resumen["resultado_no_traspasado"]])
     sheet.append([])
     for etiqueta, clave in (("Total activos", "total_activos"), ("Total pasivos", "total_pasivos"), ("Patrimonio contabilizado", "patrimonio_contabilizado"), ("Resultado no traspasado", "resultado_no_traspasado"), ("Total patrimonio", "total_patrimonio"), ("Pasivo + patrimonio", "total_pasivo_patrimonio"), ("Diferencia", "diferencia")):
-        sheet.append([etiqueta, "", "", "", resumen[clave]])
-    for fila in sheet.iter_rows(min_row=4, min_col=3, max_col=5):
-        for celda in fila:
-            if isinstance(celda.value, Decimal):
-                celda.number_format = '#,##0.00;[Red]-#,##0.00'
+        sheet.append([etiqueta, "", resumen[clave]])
+    for celda in sheet["C"]:
+        if isinstance(celda.value, Decimal):
+            celda.number_format = '#,##0.00;[Red]-#,##0.00'
     sheet.append(["Las cuentas principales acumulan sus subcuentas; los totales generales cuentan cada movimiento una sola vez."])
     _advertencias_excel_reporte(sheet, empresa, {"fecha_corte": request.GET.get("fecha_corte") or ""})
     _autoajustar_columnas(sheet)

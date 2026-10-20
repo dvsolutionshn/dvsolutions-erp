@@ -64,8 +64,14 @@ def datos_estado_resultados(empresa, fecha_inicio="", fecha_fin="", excluir_cier
     total_costos = sum((fila["saldo"] for fila in costos), CERO)
     total_gastos = sum((fila["saldo"] for fila in gastos), CERO)
     utilidad = total_ingresos - total_costos - total_gastos
+    jerarquia = _jerarquia_balance(empresa, filas, tipos=("ingreso", "costo", "gasto"))
     return {
         "ingresos": ingresos, "costos": costos, "gastos": gastos,
+        # Las filas acumuladas son sólo para presentar el reporte. Los totales
+        # y los consumidores existentes conservan las partidas directas.
+        "ingresos_jerarquia": [fila for fila in jerarquia if fila["cuenta"].tipo == "ingreso"],
+        "costos_jerarquia": [fila for fila in jerarquia if fila["cuenta"].tipo == "costo"],
+        "gastos_jerarquia": [fila for fila in jerarquia if fila["cuenta"].tipo == "gasto"],
         "resumen": {
             "total_ingresos": total_ingresos, "total_costos": total_costos,
             "total_gastos": total_gastos, "utilidad_bruta": total_ingresos - total_costos,
@@ -75,7 +81,7 @@ def datos_estado_resultados(empresa, fecha_inicio="", fecha_fin="", excluir_cier
     }
 
 
-def _jerarquia_balance(empresa, filas_directas):
+def _jerarquia_balance(empresa, filas_directas, tipos=("activo", "pasivo", "patrimonio")):
     """Acumula la jerarquía visible sin volver a sumar sus filas en los totales.
 
     La relación padre es la fuente de la jerarquía, nunca el prefijo del código.
@@ -83,7 +89,7 @@ def _jerarquia_balance(empresa, filas_directas):
     reporte: no cambian el catálogo ni trasladan saldos entre empresas o tipos.
     """
     cuentas = list(CuentaContable.objects.filter(
-        empresa=empresa, tipo__in=("activo", "pasivo", "patrimonio"),
+        empresa=empresa, tipo__in=tipos,
     ).order_by("codigo", "nombre", "pk"))
     por_id = {cuenta.pk: cuenta for cuenta in cuentas}
     directas = {fila["cuenta"].pk: fila for fila in filas_directas}

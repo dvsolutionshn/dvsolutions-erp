@@ -92,10 +92,43 @@ class EstadosFinancierosTests(TestCase):
         self.assertEqual(response.context["resumen"]["total_patrimonio"], Decimal("100.00"))
         self.assertContains(response, "Resultado acumulado no traspasado")
         filas = self.excel("exportar_balance_general_excel", {"fecha_corte": "2026-01-31"})
-        self.assertEqual(next(fila[4] for fila in filas if fila[0] == "Total patrimonio"), 100)
+        self.assertEqual(next(fila[2] for fila in filas if fila[0] == "Total patrimonio"), 100)
         resumen = self.client.get(reverse("resumen_ejecutivo_contable", args=[self.empresa.slug]), {"fecha_inicio": "2026-01-01", "fecha_fin": "2026-01-31"})
         self.assertEqual(resumen.context["resumen"]["total_patrimonio"], Decimal("100.00"))
         self.assertEqual(resumen.context["resumen"]["diferencia_balance"], Decimal("0.00"))
+
+    def test_resultados_pantalla_excel_jerarquia_saldos_y_utilidad_sin_duplicar(self):
+        principal = self.cuenta("4100", "Ingresos por ventas", "ingreso", acepta_movimientos=False)
+        self.ventas.cuenta_padre = principal
+        self.ventas.save(update_fields=["cuenta_padre"])
+        otra_venta = self.cuenta("410102", "Ventas de servicios", "ingreso", cuenta_padre=principal)
+        self.asiento(date(2026, 1, 2), [(self.caja, 150000, 0), (self.ventas, 0, 100000), (otra_venta, 0, 50000)])
+        self.asiento(date(2026, 1, 3), [(self.costos, 20000, 0), (self.gastos, 10000, 0), (self.caja, 0, 30000)])
+        filtros = {"fecha_inicio": "2026-01-01", "fecha_fin": "2026-01-31"}
+        respuesta = self.client.get(reverse("estado_resultados", args=[self.empresa.slug]), filtros)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, '<th class="ef-codigo-columna" scope="col">Código</th>', count=3, html=True)
+        self.assertContains(respuesta, f'class="ef-fila ef-principal" data-cuenta-codigo="{principal.codigo}"')
+        self.assertContains(respuesta, f'class="ef-fila" data-cuenta-codigo="{self.ventas.codigo}"')
+        self.assertContains(respuesta, "padding-inline-start: 18px;")
+        self.assertNotContains(respuesta, "<th>Debe</th>", html=True)
+        self.assertNotContains(respuesta, "<th>Haber</th>", html=True)
+        self.assertEqual(respuesta.context["resumen"]["utilidad"], Decimal("120000.00"))
+        excel = self.client.get(reverse("exportar_estado_resultados_excel", args=[self.empresa.slug]), filtros)
+        self.assertEqual(excel.status_code, 200)
+        hoja = load_workbook(BytesIO(excel.content), data_only=True).active
+        self.assertEqual([celda.value for celda in hoja[3]], ["Código", "Cuenta", "Saldo"])
+        codigos = (principal.codigo, self.ventas.codigo, otra_venta.codigo)
+        filas = [fila for fila in hoja.iter_rows(min_row=4) if fila[0].value in codigos]
+        self.assertEqual([fila[0].value for fila in filas], list(codigos))
+        self.assertEqual([fila[2].value for fila in filas], [150000, 100000, 50000])
+        self.assertEqual([fila[1].alignment.indent for fila in filas], [0, 1, 1])
+        self.assertTrue(all(celda.font.bold for celda in filas[0]))
+        self.assertTrue(all(not celda.font.bold for fila in filas[1:] for celda in fila))
+        valores = list(hoja.values)
+        self.assertEqual(next(fila[2] for fila in valores if fila[0] == "Total ingresos"), 150000)
+        self.assertEqual(next(fila[2] for fila in valores if fila[0] == "Utilidad neta"), 120000)
+        self.assertEqual(datos_balance_general(self.empresa, "2026-01-31")["resumen"]["diferencia"], Decimal("0.00"))
 
     def test_mayor_pasivo_apertura_saldo_natural_y_excel(self):
         self.asiento(date(2026, 1, 5), [(self.inventario, 100, 0), (self.proveedores, 0, 100)])
