@@ -6,11 +6,11 @@
 {% block header_kicker %}Centro financiero{% endblock %}
 {% block header_title %}Contabilidad{% endblock %}
 {% block header_description %}Consulta tus estados financieros y revisa cada saldo de esta empresa.{% endblock %}
-{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}">{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/balance_movimientos.css' %}">{% endblock %}
 {% block topbar_actions %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ef-btn">Volver a reportes</a>{% endblock %}
 
 {% block content %}
-<div class="ef-report">
+<div class="ef-report" data-balance-interactivo>
     {% include "contabilidad/partials/dashboard_icons.html" %}
     <header class="ef-hero">
         <div class="ef-hero-main"><span class="ef-hero-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><div><p class="ef-eyebrow">Estados financieros</p><h1>Estado de resultados</h1><p class="ef-hero-description">Ingresos, costos y gastos para entender el resultado de tu período.</p></div></div>
@@ -41,20 +41,20 @@
         {% endif %}
     </section>
 
-    <div class="ef-reading-bar"><p>{{ resumen.cuentas_ingreso|add:resumen.cuentas_costo|add:resumen.cuentas_gasto }} cuentas con movimiento · Principales en negrita</p><nav class="ef-jump-links" aria-label="Ir a una sección del estado de resultados"><a href="#ef-ingresos">Ingresos</a><a href="#ef-costos">Costos</a><a href="#ef-gastos">Gastos</a></nav></div>
+    <div class="ef-reading-bar"><p>{{ resumen.cuentas_ingreso|add:resumen.cuentas_costo|add:resumen.cuentas_gasto }} cuentas con movimiento · Despliega una cuenta para consultar su detalle.</p><nav class="ef-jump-links" aria-label="Ir a una sección del estado de resultados"><a href="#ef-ingresos">Ingresos</a><a href="#ef-costos">Costos</a><a href="#ef-gastos">Gastos</a></nav></div>
 
     <section class="erp-grid ef-secciones" aria-label="Detalle del resultado del período">
         <article id="ef-ingresos" class="erp-card erp-table-card ef-section" data-tone="teal" aria-labelledby="ef-ingresos-title">
             <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}</span><div><h2 id="ef-ingresos-title">Ingresos</h2><p>Ingresos contabilizados en el período.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
-            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=ingresos_jerarquia total=resumen.total_ingresos etiqueta_total="Total ingresos" mensaje_vacio="No hay ingresos contabilizados en este periodo." only %}
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=ingresos_jerarquia total=resumen.total_ingresos etiqueta_total="Total ingresos" mensaje_vacio="No hay ingresos contabilizados en este periodo." interactivo=True modo_resultados=True empresa=empresa filtros=filtros only %}
         </article>
         <article id="ef-costos" class="erp-card erp-table-card ef-section" data-tone="amber" aria-labelledby="ef-costos-title">
             <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}</span><div><h2 id="ef-costos-title">Costos</h2><p>Costos contabilizados en el período.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
-            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=costos_jerarquia total=resumen.total_costos etiqueta_total="Total costos" mensaje_vacio="No hay costos contabilizados en este periodo." only %}
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=costos_jerarquia total=resumen.total_costos etiqueta_total="Total costos" mensaje_vacio="No hay costos contabilizados en este periodo." interactivo=True modo_resultados=True empresa=empresa filtros=filtros only %}
         </article>
         <article id="ef-gastos" class="erp-card erp-table-card ef-section" data-tone="slate" aria-labelledby="ef-gastos-title">
             <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><div><h2 id="ef-gastos-title">Gastos</h2><p>Gastos contabilizados en el período.</p></div></div><span class="ef-section-unit">Saldos en HNL</span></div>
-            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=gastos_jerarquia total=resumen.total_gastos etiqueta_total="Total gastos" mensaje_vacio="No hay gastos contabilizados en este periodo." only %}
+            {% include "contabilidad/partials/tabla_estado_financiero.html" with filas=gastos_jerarquia total=resumen.total_gastos etiqueta_total="Total gastos" mensaje_vacio="No hay gastos contabilizados en este periodo." interactivo=True modo_resultados=True empresa=empresa filtros=filtros only %}
         </article>
     </section>
 
@@ -67,3 +67,5 @@
     <div class="ef-reading-bar"><p class="ef-footer-note">Solo asientos contabilizados de {{ empresa.nombre }}.</p><nav class="ef-jump-links" aria-label="Otros reportes contables"><a href="{% url 'balance_comprobacion' empresa.slug %}?{{ request.GET.urlencode }}">Balance de comprobación</a><a href="{% url 'libro_diario' empresa.slug %}?{{ request.GET.urlencode }}">Libro diario</a><a href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}">Flujo de efectivo</a></nav></div>
 </div>
 {% endblock %}
+
+{% block extra_js %}{{ block.super }}<script src="{% static 'contabilidad/balance_movimientos.js' %}" defer></script>{% endblock %}

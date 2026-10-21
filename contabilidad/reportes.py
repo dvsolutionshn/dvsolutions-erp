@@ -175,10 +175,12 @@ def datos_balance_general(empresa, fecha_corte=""):
     }
 
 
-def datos_mayor(empresa, fecha_inicio="", fecha_fin="", tipo="", cuenta=None):
+def datos_mayor(empresa, fecha_inicio="", fecha_fin="", tipo="", cuenta=None, excluir_cierres=False):
     partidas = partidas_empresa(empresa)
     anteriores = _sumas_por_cuenta(partidas.filter(asiento__fecha__lt=fecha_inicio)) if fecha_inicio else {}
     periodo = partidas
+    if excluir_cierres:
+        periodo = periodo.exclude(asiento__evento__in=EVENTOS_CIERRE_RESULTADOS)
     if fecha_inicio:
         periodo = periodo.filter(asiento__fecha__gte=fecha_inicio)
     if fecha_fin:

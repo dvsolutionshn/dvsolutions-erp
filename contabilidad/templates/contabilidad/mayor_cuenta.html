@@ -8,7 +8,7 @@
 {% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/mayor_navegacion.css' %}">{% endblock %}
 
 {% block topbar_actions %}
-{% if movimiento_seleccionado %}<a href="{% url 'balance_general' empresa.slug %}?fecha_corte={{ filtros.fecha_fin|urlencode }}" class="erp-action-link">Volver al Balance</a>{% endif %}
+{% if desde_estado_resultados %}<a href="{% url 'estado_resultados' empresa.slug %}?fecha_inicio={{ filtros.fecha_inicio|urlencode }}&amp;fecha_fin={{ filtros.fecha_fin|urlencode }}" class="erp-action-link">Volver al Estado de Resultados</a>{% elif movimiento_seleccionado %}<a href="{% url 'balance_general' empresa.slug %}?fecha_corte={{ filtros.fecha_fin|urlencode }}" class="erp-action-link">Volver al Balance</a>{% endif %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
 <a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
 {% if cuenta %}<a href="{% url 'exportar_mayor_cuenta_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>{% endif %}
@@ -17,6 +17,7 @@
 
 {% block content %}
 {% include "contabilidad/nota_moneda_reportes.html" %}
+{% if desde_estado_resultados %}<section class="erp-card"><p class="erp-card-muted">Vista desde Estado de Resultados: se omiten los asientos de cierre del período; el saldo del Mayor incluye la apertura.</p><a class="erp-link" href="{% url 'mayor_cuenta' empresa.slug %}?cuenta={{ cuenta.pk }}&amp;fecha_inicio={{ filtros.fecha_inicio|urlencode }}&amp;fecha_fin={{ filtros.fecha_fin|urlencode }}{% if movimiento_seleccionado %}&amp;movimiento={{ movimiento_seleccionado }}#movimiento-{{ movimiento_seleccionado }}{% endif %}">Ver Mayor completo</a></section>{% endif %}
 <section class="erp-card erp-report-filter-card">
     <div class="erp-toolbar">
         <div>
@@ -25,6 +26,7 @@
         </div>
     </div>
     <form method="get" class="erp-filters">
+        {% if desde_estado_resultados %}<input type="hidden" name="origen" value="estado_resultados">{% endif %}
         <div class="erp-filter-field">
             <label for="cuenta">Cuenta</label>
             <select id="cuenta" name="cuenta" required>

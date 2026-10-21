@@ -2273,13 +2273,24 @@ def _filas_excel_mayor(sheet, bloques, fecha_inicio):
         sheet.append(["", "", etiqueta, "Totales del periodo / saldo final", "", bloque["debe"], bloque["haber"], bloque["saldo"]])
 
 
+def _mayor_desde_estado_resultados(request, cuenta):
+    return bool(
+        cuenta and cuenta.tipo in ("ingreso", "costo", "gasto")
+        and request.GET.get("origen") == "estado_resultados"
+    )
+
+
 @login_required
 def mayor_cuenta(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     filtros = _filtros_reportes(request)
     filtros["cuenta"] = request.GET.get("cuenta") or ""
     cuenta = get_object_or_404(CuentaContable, pk=filtros["cuenta"], empresa=empresa) if filtros["cuenta"] else None
-    bloques = datos_mayor(empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta) if cuenta else []
+    desde_estado_resultados = _mayor_desde_estado_resultados(request, cuenta)
+    bloques = datos_mayor(
+        empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta,
+        excluir_cierres=desde_estado_resultados,
+    ) if cuenta else []
     bloque = bloques[0] if bloques else {"movimientos": [], "debe": Decimal("0.00"), "haber": Decimal("0.00"), "saldo": Decimal("0.00"), "saldo_inicial": Decimal("0.00")}
     # La selección sólo puede apuntar a una línea ya incluida en este mayor.
     movimiento_solicitado = request.GET.get("movimiento") or ""
@@ -2291,6 +2302,7 @@ def mayor_cuenta(request, empresa_slug):
         "empresa": empresa, "cuenta": cuenta, "movimientos": bloque["movimientos"],
         "cuentas": CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre"),
         "filtros": filtros, "movimiento_seleccionado": movimiento_seleccionado,
+        "desde_estado_resultados": desde_estado_resultados,
         "resumen": {"debe_total": bloque["debe"], "haber_total": bloque["haber"], "saldo": bloque["saldo"], "saldo_inicial": bloque["saldo_inicial"], "movimientos": len(bloque["movimientos"])},
     })
 
@@ -2301,11 +2313,17 @@ def exportar_mayor_cuenta_excel(request, empresa_slug):
     filtros = _filtros_reportes(request)
     cuenta_id = request.GET.get("cuenta") or ""
     cuenta = get_object_or_404(CuentaContable, pk=cuenta_id, empresa=empresa) if cuenta_id else None
-    bloques = datos_mayor(empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta) if cuenta else []
+    desde_estado_resultados = _mayor_desde_estado_resultados(request, cuenta)
+    bloques = datos_mayor(
+        empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta,
+        excluir_cierres=desde_estado_resultados,
+    ) if cuenta else []
     workbook, sheet = _preparar_excel("Mayor por Cuenta · HNL")
     sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo natural"])
     _aplicar_encabezado(sheet, 3)
     _filas_excel_mayor(sheet, bloques, filtros["fecha_inicio"])
+    if desde_estado_resultados:
+        sheet.append(["Consulta desde Estado de Resultados", "Se omiten los asientos de cierre del período. El saldo final incluye la apertura anterior al período."])
     _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Mayor_Cuenta_{empresa.slug}.xlsx")

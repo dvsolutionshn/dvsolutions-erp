@@ -1,12 +1,12 @@
 <div class="bgm-detail" data-balance-fragmento>
     <div class="bgm-header">
-        <div><h3 class="bgm-title">Movimientos de {{ cuenta.codigo }} · {{ cuenta.nombre }}</h3><p class="bgm-subtitle">{% if fecha_corte %}Acumulados hasta el {{ fecha_corte_fecha|date:"d/m/Y" }}{% else %}Todo el historial contabilizado{% endif %} · {{ pagina.paginator.count }} movimiento{{ pagina.paginator.count|pluralize:"s" }} · HNL</p></div>
+        <div><h3 class="bgm-title">Movimientos de {{ cuenta.codigo }} · {{ cuenta.nombre }}</h3><p class="bgm-subtitle">{% if modo_resultados %}{% if fecha_inicio_fecha %}Desde el {{ fecha_inicio_fecha|date:"d/m/Y" }}{% else %}Desde el inicio del historial{% endif %}{% if fecha_fin_fecha %} hasta el {{ fecha_fin_fecha|date:"d/m/Y" }}{% else %} · Sin fecha final{% endif %}{% elif fecha_corte %}Acumulados hasta el {{ fecha_corte_fecha|date:"d/m/Y" }}{% else %}Todo el historial contabilizado{% endif %} · {{ pagina.paginator.count }} movimiento{{ pagina.paginator.count|pluralize:"s" }} · HNL</p></div>
         <a class="bgm-mayor" href="{{ mayor_url }}" data-balance-mayor>Ver Mayor de la cuenta <span aria-hidden="true">↗</span></a>
     </div>
     {% if pagina.paginator.count %}
     <div class="bgm-table-wrap">
         <table class="bgm-table" aria-label="Movimientos de {{ cuenta.codigo }} {{ cuenta.nombre }}">
-            <thead><tr><th scope="col">Fecha</th><th scope="col">Asiento / documento</th><th scope="col">Concepto</th><th scope="col" class="bgm-amount">Débito</th><th scope="col" class="bgm-amount">Crédito</th><th scope="col" class="bgm-amount">Saldo</th></tr></thead>
+            <thead><tr><th scope="col">Fecha</th><th scope="col">Asiento / documento</th><th scope="col">Concepto</th><th scope="col" class="bgm-amount">Débito</th><th scope="col" class="bgm-amount">Crédito</th><th scope="col" class="bgm-amount">{% if modo_resultados %}Importe{% else %}Saldo{% endif %}</th></tr></thead>
             <tbody>
                 {% for movimiento in pagina %}
                 <tr class="bgm-movement" data-movimiento="{{ movimiento.linea.pk }}">
@@ -15,14 +15,14 @@
                     <td class="bgm-concepto"><a href="{{ movimiento.url_mayor }}">{{ movimiento.linea.detalle|default:movimiento.linea.asiento.descripcion }}</a></td>
                     <td class="bgm-amount"><a href="{{ movimiento.url_mayor }}">L. {{ movimiento.linea.debe|floatformat:"2g" }}</a></td>
                     <td class="bgm-amount"><a href="{{ movimiento.url_mayor }}">L. {{ movimiento.linea.haber|floatformat:"2g" }}</a></td>
-                    <td class="bgm-amount"><a href="{{ movimiento.url_mayor }}">L. {{ movimiento.saldo|floatformat:"2g" }}<small class="bgm-open-mayor">Ver en Mayor <span aria-hidden="true">↗</span></small></a></td>
+                    <td class="bgm-amount"><a href="{{ movimiento.url_mayor }}">L. {% if modo_resultados %}{{ movimiento.importe|floatformat:"2g" }}{% else %}{{ movimiento.saldo|floatformat:"2g" }}{% endif %}<small class="bgm-open-mayor">Ver en Mayor <span aria-hidden="true">↗</span></small></a></td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <div class="bgm-footer"><p>Saldo acumulado según la naturaleza de la cuenta. Selecciona un movimiento para verlo en el Mayor.</p>{% if pagina.has_other_pages %}<nav class="bgm-pagination" aria-label="Páginas de movimientos de {{ cuenta.codigo }}">{% if pagina_anterior_url %}<a href="{{ pagina_anterior_url }}" data-balance-pagina>Anterior</a>{% endif %}<span>{{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>{% if pagina_siguiente_url %}<a href="{{ pagina_siguiente_url }}" data-balance-pagina>Siguiente</a>{% endif %}</nav>{% endif %}</div>
+    <div class="bgm-footer"><p>{% if modo_resultados %}Importe de cada movimiento según la naturaleza de la cuenta. Se omiten los asientos de cierre, igual que en el Estado de Resultados.{% else %}Saldo acumulado según la naturaleza de la cuenta.{% endif %} Selecciona un movimiento para verlo en el Mayor.</p>{% if pagina.has_other_pages %}<nav class="bgm-pagination" aria-label="Páginas de movimientos de {{ cuenta.codigo }}">{% if pagina_anterior_url %}<a href="{{ pagina_anterior_url }}" data-balance-pagina>Anterior</a>{% endif %}<span>{{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>{% if pagina_siguiente_url %}<a href="{{ pagina_siguiente_url }}" data-balance-pagina>Siguiente</a>{% endif %}</nav>{% endif %}</div>
     {% else %}
-    <p class="bgm-empty">No hay movimientos contabilizados en esta cuenta para la fecha de corte seleccionada.</p>
+    <p class="bgm-empty">No hay movimientos contabilizados en esta cuenta para {% if modo_resultados %}el período seleccionado{% else %}la fecha de corte seleccionada{% endif %}.</p>
     {% endif %}
 </div>

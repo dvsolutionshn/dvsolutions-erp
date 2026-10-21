@@ -71,6 +71,7 @@ urlpatterns = [
     path("reportes/balance-comprobacion/", views.balance_comprobacion, name="balance_comprobacion"),
     path("reportes/balance-comprobacion/excel/", views.exportar_balance_comprobacion_excel, name="exportar_balance_comprobacion_excel"),
     path("reportes/estado-resultados/", views.estado_resultados, name="estado_resultados"),
+    path("reportes/estado-resultados/cuentas/<int:cuenta_id>/movimientos/", balance_movimientos_views.movimientos_estado_resultados, name="movimientos_estado_resultados"),
     path("reportes/estado-resultados/excel/", views.exportar_estado_resultados_excel, name="exportar_estado_resultados_excel"),
     path("reportes/balance-general/", views.balance_general, name="balance_general"),
     path("reportes/balance-general/cuentas/<int:cuenta_id>/movimientos/", balance_movimientos_views.movimientos_balance_general, name="movimientos_balance_general"),
