@@ -123,6 +123,21 @@ El remitente activo en produccion es **`DV Solutions <oasis@dvsolutionshn.com>`*
 
 El **21 de octubre de 2026** se envio una prueba nueva desde el servidor, a traves de Brevo, exclusivamente a `daniel.varela@dvsolutionshn.com`. El registro de Brevo mostro **Entregado** con remitente Oasis y el usuario confirmo su recepcion desde Oasis. Esta comprobacion incluye entrega real, ademas de autenticacion y aceptacion SMTP. El servicio ya utiliza el remitente actualizado y la aplicacion respondio HTTP 200 despues del reinicio. El origen de los enlaces es `https://dvsolutionshn.com`.
 
-La autenticacion del dominio sigue pendiente en Brevo y no se encontro un registro DMARC publicado. Como mejora de entregabilidad, completar en Namecheap los registros SPF, DKIM y DMARC que indique el proveedor. Es una tarea DNS pendiente; no impidio la entrega real ya comprobada y no se da por configurado ninguno de esos registros.
+### Dominio autenticado en Brevo
+
+El **21 de octubre de 2026** se completo la autenticacion de `dvsolutionshn.com`. Con autorizacion explicita del usuario se publicaron estos cuatro registros en Namecheap, incluido el destino de los informes DMARC de Brevo:
+
+| Tipo | Host en Namecheap | Valor |
+| --- | --- | --- |
+| TXT | `@` | Codigo de verificacion generado por Brevo; su valor exacto se omite en esta guia. |
+| CNAME | `brevo1._domainkey` | `b1.dvsolutionshn-com.dkim.brevo.com` |
+| CNAME | `brevo2._domainkey` | `b2.dvsolutionshn-com.dkim.brevo.com` |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` |
+
+Ambos servidores DNS autoritativos de Namecheap respondieron con los registros publicados y la validacion final de Brevo mostro el dominio **Autentificado**, con confirmacion de autenticacion correcta. Se conservaron los registros A de la raiz, `www` y `pibe`, el MX de Google, su TXT de verificacion y los servidores de nombres existentes.
+
+DMARC queda en modo de observacion `p=none`, con informes a `rua@dmarc.brevo.com`; no se activo cuarentena ni rechazo. No se agrego un registro SPF: Brevo no lo requiere para esta autenticacion sin IP dedicada. [Autenticacion de dominio en Brevo](https://help.brevo.com/hc/en-us/articles/12163873383186-Authenticate-your-domain-with-Brevo-Brevo-code-DKIM-DMARC).
+
+La autenticacion del dominio reduce el riesgo de clasificacion como spam, sin garantizar la bandeja de entrada. La entrega real de la prueba a Daniel descrita arriba se habia confirmado antes de este ajuste DNS.
 
 Brevo admite STARTTLS por el puerto 2525 cuando el proveedor bloquea 587. El remitente debe estar verificado o pertenecer a un dominio autenticado en la cuenta de Brevo; que SMTP acepte un mensaje no demuestra que haya llegado a la bandeja. [Puertos de Brevo](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525), [validacion del remitente](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP).
