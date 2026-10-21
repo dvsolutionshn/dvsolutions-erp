@@ -439,18 +439,30 @@
                 {% if empresas_disponibles|length > 1 %}
                 <details class="erp-company-switcher">
                     <summary>
-                        <span class="erp-company-switcher-icon">{{ empresa.nombre|slice:":1" }}</span>
+                        <span class="erp-company-switcher-icon{% if empresa.logo %} has-logo{% endif %}" aria-hidden="true">
+                            {% if empresa.logo %}
+                            <img class="erp-company-logo" src="{{ empresa.logo.url }}" alt="" decoding="async">
+                            {% else %}
+                            {{ empresa.nombre|slice:":1" }}
+                            {% endif %}
+                        </span>
                         <span>
                             <small>Empresa activa</small>
                             <strong>{{ empresa.nombre }}</strong>
                         </span>
-                        <span class="erp-company-switcher-chevron">⌄</span>
+                        <span class="erp-company-switcher-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m7 10 5 5 5-5"/></svg></span>
                     </summary>
                     <div class="erp-company-switcher-menu">
                         <div class="erp-company-switcher-label">Cambiar de empresa</div>
                         {% for empresa_disponible in empresas_disponibles %}
                         <a href="{% url 'dashboard' empresa_disponible.slug %}" class="{% if empresa_disponible.id == empresa.id %}is-current{% endif %}">
-                            <span class="erp-company-option-icon">{{ empresa_disponible.nombre|slice:":1" }}</span>
+                            <span class="erp-company-option-icon{% if empresa_disponible.logo %} has-logo{% endif %}" aria-hidden="true">
+                                {% if empresa_disponible.logo %}
+                                <img class="erp-company-logo" src="{{ empresa_disponible.logo.url }}" alt="" decoding="async" loading="lazy">
+                                {% else %}
+                                {{ empresa_disponible.nombre|slice:":1" }}
+                                {% endif %}
+                            </span>
                             <span>
                                 <strong>{{ empresa_disponible.nombre }}</strong>
                                 <small>{% if empresa_disponible.id == empresa.id %}Empresa actual{% else %}Entrar sin iniciar sesión{% endif %}</small>
