@@ -20,5 +20,5 @@ Este enlace es personal, solo puede utilizarse una vez y está disponible hasta 
 No compartas este enlace con otras personas.
 
 Oasis
-Una solución de DV Solutions.
+Conecta tu equipo. Impulsa tu empresa.
 {% endautoescape %}
