@@ -42,6 +42,7 @@ En la instalacion actual, ejecutar el diagnostico con el usuario, directorio y a
 ```bash
 sudo systemd-run --quiet --wait --pipe --collect \
   --property=User=dvsolutions \
+  --property=Group=www-data \
   --property=WorkingDirectory=/var/www/dvsolutions-erp \
   --property=EnvironmentFile=/etc/dvsolutions-erp.env \
   /var/www/dvsolutions-erp/.venv/bin/python manage.py comprobar_smtp
@@ -56,6 +57,7 @@ La prueba autorizada para esta configuracion se dirige exclusivamente a Daniel:
 ```bash
 sudo systemd-run --quiet --wait --pipe --collect \
   --property=User=dvsolutions \
+  --property=Group=www-data \
   --property=WorkingDirectory=/var/www/dvsolutions-erp \
   --property=EnvironmentFile=/etc/dvsolutions-erp.env \
   /var/www/dvsolutions-erp/.venv/bin/python manage.py comprobar_smtp \
@@ -113,10 +115,14 @@ En servidores con acceso permitido a Google SMTP, `bash deploy/configurar_smtp_g
 
 ## Instalacion actual en DigitalOcean
 
-La aplicacion esta en `/var/www/dvsolutions-erp`, el servicio es `dvsolutions.service` y carga `/etc/dvsolutions-erp.env`. Su entorno virtual es `.venv`. Se verifico que Google SMTP no es accesible desde este servidor en los puertos 587 y 465; el firewall local permite salida y HTTPS funciona. DigitalOcean documenta el bloqueo predeterminado de los puertos SMTP 25, 465 y 587. [Politica de DigitalOcean](https://docs.digitalocean.com/support/why-is-smtp-blocked/).
+La aplicacion esta en `/var/www/dvsolutions-erp`, el servicio es `dvsolutions.service`, se ejecuta como usuario `dvsolutions` y grupo `www-data`, y carga `/etc/dvsolutions-erp.env`. Su entorno virtual es `.venv`. Se verifico que Google SMTP no es accesible desde este servidor en los puertos 587 y 465; el firewall local permite salida y HTTPS funciona. DigitalOcean documenta el bloqueo predeterminado de los puertos SMTP 25, 465 y 587. [Politica de DigitalOcean](https://docs.digitalocean.com/support/why-is-smtp-blocked/).
 
 Las correcciones de invitaciones y la migracion `0056` estan aplicadas. El ERP dispone de una cuenta SMTP de Brevo que autentica correctamente por `smtp-relay.brevo.com:2525`, con `EMAIL_USE_TLS=true` y `EMAIL_USE_SSL=false`. Se conservaron el usuario y la clave de Brevo en el archivo privado del servicio; la clave de aplicacion de Google se usa solo en la prueba local.
 
-El remitente vigente y conservado en produccion es **`dv.solutionshn@gmail.com`**. El cambio al remitente solicitado **`oasis@dvsolutionshn.com`** sigue pendiente de verificacion en Brevo y de confirmar la entrega a Daniel. La autenticacion SMTP correcta no verifica por si sola el permiso para enviar desde Oasis ni su entrega. No sustituir el remitente existente hasta completar esa comprobacion. El origen de los enlaces ya es `https://dvsolutionshn.com`.
+El remitente activo en produccion es **`DV Solutions <oasis@dvsolutionshn.com>`**, establecido en `DEFAULT_FROM_EMAIL`. Brevo rechazo el intento anterior porque Oasis no era un remitente valido en esa cuenta. Se agrego el remitente y el usuario completo su verificacion por codigo; el panel quedo en estado **Verificado**.
+
+El **21 de octubre de 2026** se envio una prueba nueva desde el servidor, a traves de Brevo, exclusivamente a `daniel.varela@dvsolutionshn.com`. El registro de Brevo mostro **Entregado** con remitente Oasis y el usuario confirmo su recepcion desde Oasis. Esta comprobacion incluye entrega real, ademas de autenticacion y aceptacion SMTP. El servicio ya utiliza el remitente actualizado y la aplicacion respondio HTTP 200 despues del reinicio. El origen de los enlaces es `https://dvsolutionshn.com`.
+
+La autenticacion del dominio sigue pendiente en Brevo y no se encontro un registro DMARC publicado. Como mejora de entregabilidad, completar en Namecheap los registros SPF, DKIM y DMARC que indique el proveedor. Es una tarea DNS pendiente; no impidio la entrega real ya comprobada y no se da por configurado ninguno de esos registros.
 
 Brevo admite STARTTLS por el puerto 2525 cuando el proveedor bloquea 587. El remitente debe estar verificado o pertenecer a un dominio autenticado en la cuenta de Brevo; que SMTP acepte un mensaje no demuestra que haya llegado a la bandeja. [Puertos de Brevo](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525), [validacion del remitente](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP).
