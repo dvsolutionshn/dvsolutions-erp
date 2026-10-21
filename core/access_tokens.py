@@ -1,5 +1,8 @@
 import hashlib
 import secrets
+from email.mime.image import MIMEImage
+from email.utils import make_msgid
+from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -8,6 +11,8 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.formats import date_format
+from django.utils.translation import override
 
 from .access_security import firma_estado_usuario, token_acceso_valido
 from .models import TokenAccesoUsuario, Usuario
@@ -82,18 +87,38 @@ def enviar_correo_acceso(request, usuario, token_raw, token, tipo):
 
 
 def _enviar_mensaje_acceso(usuario, token, tipo, url):
+    mensaje = _crear_mensaje_acceso(usuario, token, tipo, url)
+    if mensaje.send(fail_silently=False) != 1:
+        raise RuntimeError("El servidor de correo no acepto el mensaje.")
+
+
+def _crear_mensaje_acceso(usuario, token, tipo, url):
     es_invitacion = tipo == TokenAccesoUsuario.TIPO_INVITACION
+    nombre_empresa = usuario.empresa.nombre if usuario.empresa else "Oasis"
     asunto = (
-        f"Activa tu acceso a {usuario.empresa.nombre if usuario.empresa else 'DV Solutions ERP'}"
+        f"Activa tu acceso a {nombre_empresa} | Oasis"
         if es_invitacion
-        else "Restablece tu acceso a DV Solutions ERP"
+        else f"Restablece tu acceso a {nombre_empresa} | Oasis"
     )
+    expiracion_local = timezone.localtime(token.fecha_expiracion, timezone.get_default_timezone())
+    with override("es"):
+        fecha_expiracion_texto = date_format(expiracion_local, r"j \d\e F \d\e Y, H:i")
+    desplazamiento = expiracion_local.strftime("%z")
+    zona_horaria = f"UTC{desplazamiento[:3]}:{desplazamiento[3:]}"
+    if settings.TIME_ZONE == "America/Tegucigalpa":
+        zona_horaria = f"hora de Honduras · {zona_horaria}"
+    logo_cid = make_msgid(idstring="oasis-logo", domain="dvsolutionshn.com")
     contexto = {
         "usuario": usuario,
         "empresa": usuario.empresa,
+        "nombre_destinatario": usuario.get_full_name().strip() or usuario.email,
+        "nombre_empresa": nombre_empresa,
         "url_acceso": url,
         "fecha_expiracion": token.fecha_expiracion,
+        "fecha_expiracion_texto": fecha_expiracion_texto,
+        "zona_horaria": zona_horaria,
         "es_invitacion": es_invitacion,
+        "logo_cid": logo_cid[1:-1],
     }
     texto = render_to_string("core/emails/acceso_usuario.txt", contexto)
     html = render_to_string("core/emails/acceso_usuario.html", contexto)
@@ -104,8 +129,13 @@ def _enviar_mensaje_acceso(usuario, token, tipo, url):
         to=[usuario.email],
     )
     mensaje.attach_alternative(html, "text/html")
-    if mensaje.send(fail_silently=False) != 1:
-        raise RuntimeError("El servidor de correo no acepto el mensaje.")
+    mensaje.mixed_subtype = "related"
+    logo_path = Path(__file__).resolve().parent / "static" / "core" / "images" / "oasis-email-logo.png"
+    logo = MIMEImage(logo_path.read_bytes(), _subtype="png")
+    logo.add_header("Content-ID", logo_cid)
+    logo.add_header("Content-Disposition", "inline", filename="oasis-logo.png")
+    mensaje.attach(logo)
+    return mensaje
 
 
 def _client_ip(request):

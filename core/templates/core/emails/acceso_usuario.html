@@ -1,20 +1,111 @@
 <!DOCTYPE html>
-<html lang="es">
-<body style="margin:0;background:#edf3f7;font-family:Arial,sans-serif;color:#102338;padding:32px 16px;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+{% firstof nombre_destinatario usuario.get_full_name usuario.email as nombre_persona %}{% firstof nombre_empresa empresa.nombre "Oasis" as nombre_organizacion %}<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
+    <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+    <title>{% if es_invitacion %}Tu invitación a Oasis{% else %}Restablece tu acceso a Oasis{% endif %}</title>
+    <style>
+        body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+        table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
+        img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
+        @media only screen and (max-width:620px) {
+            .outer-padding { padding:20px 12px !important; }
+            .header-padding { padding:12px 24px !important; }
+            .hero-padding { padding:30px 24px 32px !important; }
+            .body-padding { padding:30px 24px !important; }
+            .footer-padding { padding:22px 24px !important; }
+            .hero-title { font-size:30px !important; line-height:37px !important; }
+            .header-caption { font-size:12px !important; line-height:19px !important; }
+            .logo { width:112px !important; height:112px !important; }
+            .logo-cell { width:124px !important; }
+        }
+    </style>
+</head>
+<body style="margin:0;padding:0;width:100%;background-color:#f1f3f7;font-family:Arial,Helvetica,sans-serif;color:#102344;">
+    <div aria-hidden="true" style="display:none;font-size:1px;line-height:1px;color:#f1f3f7;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">{% if es_invitacion %}Tu invitación a {{ nombre_organizacion }} está lista. Activa tu acceso a Oasis y crea tu contraseña personal.{% else %}Crea una nueva contraseña para acceder a {{ nombre_organizacion }} en Oasis.{% endif %}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f1f3f7" style="width:100%;background-color:#f1f3f7;">
         <tr>
-            <td align="center">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #dce7ef;border-radius:14px;overflow:hidden;">
-                    <tr><td style="height:6px;background:#16a9a4;"></td></tr>
+            <td class="outer-padding" align="center" style="padding:40px 20px;">
+                <!--[if mso]><table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;table-layout:fixed;background-color:#ffffff;border:1px solid #dde3ed;border-radius:16px;border-collapse:separate;overflow:hidden;">
                     <tr>
-                        <td style="padding:34px;">
-                            <div style="font-size:12px;font-weight:bold;letter-spacing:1.5px;color:#168b88;text-transform:uppercase;">DV Solutions ERP</div>
-                            <h1 style="font-size:28px;margin:14px 0 12px;">{% if es_invitacion %}Tu acceso esta listo{% else %}Recupera tu acceso{% endif %}</h1>
-                            <p style="line-height:1.7;color:#52687c;">Hola {{ usuario.get_full_name|default:usuario.email }}. {% if es_invitacion %}Has sido invitado a formar parte de {{ empresa.nombre|default:"DV Solutions ERP" }}.{% else %}Usa el siguiente enlace para crear una nueva contrasena.{% endif %}</p>
-                            <p style="margin:28px 0;">
-                                <a href="{{ url_acceso }}" style="display:inline-block;background:#1769e0;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 22px;border-radius:9px;">Crear mi contrasena</a>
+                        <td height="4" bgcolor="#d7b464" style="height:4px;font-size:0;line-height:4px;background-color:#d7b464;">&nbsp;</td>
+                    </tr>
+                    <tr>
+                        <td class="header-padding" bgcolor="#ffffff" style="padding:10px 40px;background-color:#ffffff;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;">
+                                <tr>
+                                    <td class="logo-cell" width="152" valign="middle" bgcolor="#ffffff" style="width:152px;background-color:#ffffff;">
+                                        <img class="logo" src="cid:{{ logo_cid }}" alt="Oasis" width="136" height="136" style="display:block;width:136px;height:136px;background-color:#ffffff;">
+                                    </td>
+                                    <td align="right" valign="middle" style="padding-left:12px;">
+                                        <p style="margin:0 0 6px;font-size:10px;line-height:16px;letter-spacing:1.4px;font-weight:bold;color:#8a6c2f;">TU ESPACIO DE TRABAJO</p>
+                                        <p class="header-caption" style="margin:0;font-size:13px;line-height:21px;color:#61718a;">{% if es_invitacion %}Invitación de acceso{% else %}Recuperación de acceso{% endif %}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="hero-padding" bgcolor="#061944" style="padding:34px 40px 38px;background-color:#061944;">
+                            <p style="margin:0 0 14px;font-size:10px;line-height:16px;letter-spacing:2px;font-weight:bold;color:#79dff2;">{% if es_invitacion %}UN NUEVO COMIENZO{% else %}VUELVE A TU ESPACIO{% endif %}</p>
+                            <h1 class="hero-title" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:34px;line-height:41px;letter-spacing:-0.8px;font-weight:bold;color:#ffffff;">{% if es_invitacion %}Tu acceso a Oasis<br>está listo.{% else %}Recupera tu acceso<br>a Oasis.{% endif %}</h1>
+                            <table role="presentation" width="42" cellspacing="0" cellpadding="0" border="0" style="width:42px;margin-top:22px;">
+                                <tr><td height="3" bgcolor="#d7b464" style="height:3px;font-size:0;line-height:3px;background-color:#d7b464;">&nbsp;</td></tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="body-padding" bgcolor="#ffffff" style="padding:36px 40px;background-color:#ffffff;">
+                            <p style="margin:0 0 14px;font-size:20px;line-height:28px;font-weight:bold;color:#102344;word-wrap:break-word;overflow-wrap:anywhere;">Hola, {{ nombre_persona }}.</p>
+                            <p style="margin:0 0 24px;font-size:15px;line-height:25px;color:#52637d;">{% if es_invitacion %}Has recibido una invitación para formar parte de tu espacio de trabajo en Oasis.{% else %}Recibimos una solicitud para restablecer la contraseña de tu cuenta en Oasis.{% endif %}</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f4f7fc" style="width:100%;background-color:#f4f7fc;border:1px solid #e2e8f2;border-left:3px solid #d7b464;border-radius:8px;">
+                                <tr>
+                                    <td style="padding:17px 20px;">
+                                        <p style="margin:0 0 5px;font-size:10px;line-height:16px;letter-spacing:1.3px;font-weight:bold;color:#61718a;">TU EMPRESA</p>
+                                        <p style="margin:0;font-size:18px;line-height:26px;font-weight:bold;color:#102344;word-wrap:break-word;overflow-wrap:anywhere;">{{ nombre_organizacion }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:24px 0 22px;font-size:15px;line-height:25px;color:#52637d;">{% if es_invitacion %}Para comenzar, activa tu acceso y crea tu contraseña personal.{% else %}Elige una nueva contraseña para volver a entrar a tu cuenta.{% endif %}</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:290px;">
+                                <tr>
+                                    <td align="center" bgcolor="#085de0" style="padding:17px 24px;background-color:#085de0;border:1px solid #085de0;border-radius:8px;">
+                                        <a href="{{ url_acceso }}" style="display:block;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:20px;font-weight:bold;color:#ffffff;text-decoration:none;">{% if es_invitacion %}Activar mi acceso{% else %}Restablecer mi contraseña{% endif %}</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:16px 0 28px;font-size:12px;line-height:19px;color:#6b7b92;">Este enlace es personal y solo puede utilizarse una vez.</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-top:1px solid #e6ebf2;">
+                                <tr>
+                                    <td style="padding:22px 0 0;">
+                                        <p style="margin:0 0 5px;font-size:10px;line-height:16px;letter-spacing:1.2px;font-weight:bold;color:#61718a;">ENLACE DISPONIBLE HASTA</p>
+                                        <p style="margin:0;font-size:13px;line-height:22px;color:#243c5f;">{% if fecha_expiracion_texto %}{{ fecha_expiracion_texto }}{% else %}{{ fecha_expiracion|date:"d/m/Y" }} a las {{ fecha_expiracion|date:"H:i" }}{% endif %}{% if zona_horaria %}<br><span style="font-size:12px;color:#6b7b92;">{{ zona_horaria }}</span>{% endif %}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:22px 0 6px;font-size:12px;line-height:20px;color:#6b7b92;">Si el botón no se abre, copia y pega este enlace en tu navegador:</p>
+                            <p style="margin:0;font-size:11px;line-height:18px;word-break:break-all;overflow-wrap:anywhere;">
+                                <a href="{{ url_acceso }}" style="font-size:11px;line-height:18px;color:#085de0;text-decoration:underline;word-break:break-all;overflow-wrap:anywhere;">{{ url_acceso }}</a>
                             </p>
-                            <p style="font-size:13px;line-height:1.6;color:#6e8192;">Este enlace vence el {{ fecha_expiracion|date:"d/m/Y" }} a las {{ fecha_expiracion|date:"H:i" }} y funciona una sola vez. Si no esperabas este correo, puedes ignorarlo.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="footer-padding" bgcolor="#f8f9fc" style="padding:24px 40px;background-color:#f8f9fc;border-top:1px solid #e6ebf2;">
+                            <p style="margin:0 0 7px;font-size:12px;line-height:20px;color:#61718a;">{% if es_invitacion %}Si no reconoces esta invitación, puedes ignorar el mensaje.{% else %}Si no solicitaste este cambio, ignora el mensaje. Tu contraseña seguirá igual.{% endif %}</p>
+                            <p style="margin:0;font-size:12px;line-height:20px;color:#61718a;">No compartas este enlace con otras personas.</p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]></td></tr></table><![endif]-->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;">
+                    <tr>
+                        <td align="center" style="padding:24px 16px 0;">
+                            <p style="margin:0 0 4px;font-size:12px;line-height:20px;font-weight:bold;letter-spacing:1.6px;color:#102344;">OASIS</p>
+                            <p style="margin:0;font-size:11px;line-height:18px;color:#7a879b;">Una solución de DV Solutions.</p>
                         </td>
                     </tr>
                 </table>

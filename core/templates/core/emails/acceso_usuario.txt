@@ -1,12 +1,24 @@
-Hola {{ usuario.get_full_name|default:usuario.email }},
+{% autoescape off %}{% firstof nombre_destinatario usuario.get_full_name usuario.email as nombre_persona %}{% firstof nombre_empresa empresa.nombre "Oasis" as nombre_organizacion %}OASIS
+{% if es_invitacion %}Tu acceso está listo.{% else %}Recupera tu acceso.{% endif %}
 
-{% if es_invitacion %}Has sido invitado a acceder a {{ empresa.nombre|default:"DV Solutions ERP" }}.{% else %}Recibimos una solicitud para restablecer tu acceso a {{ empresa.nombre|default:"DV Solutions ERP" }}.{% endif %}
+Hola, {{ nombre_persona }}.
 
-Abre este enlace seguro para crear tu contrasena:
+{% if es_invitacion %}Has recibido una invitación para formar parte de {{ nombre_organizacion }} en Oasis.
+
+Para comenzar, activa tu acceso y crea tu contraseña personal.
+
+ACTIVAR MI ACCESO{% else %}Recibimos una solicitud para restablecer la contraseña de tu cuenta en {{ nombre_organizacion }} a través de Oasis.
+
+Elige una nueva contraseña para volver a entrar a tu cuenta.
+
+RESTABLECER MI CONTRASEÑA{% endif %}
 {{ url_acceso }}
 
-El enlace vence el {{ fecha_expiracion|date:"d/m/Y" }} a las {{ fecha_expiracion|date:"H:i" }} y solo puede utilizarse una vez.
+Este enlace es personal, solo puede utilizarse una vez y está disponible hasta el {% if fecha_expiracion_texto %}{{ fecha_expiracion_texto }}{% else %}{{ fecha_expiracion|date:"d/m/Y" }} a las {{ fecha_expiracion|date:"H:i" }}{% endif %}{% if zona_horaria %} ({{ zona_horaria }}){% endif %}.
 
-Si no esperabas este mensaje, puedes ignorarlo.
+{% if es_invitacion %}Si no reconoces esta invitación, puedes ignorar el mensaje.{% else %}Si no solicitaste este cambio, ignora el mensaje. Tu contraseña seguirá igual.{% endif %}
+No compartas este enlace con otras personas.
 
-DV Solutions
+Oasis
+Una solución de DV Solutions.
+{% endautoescape %}

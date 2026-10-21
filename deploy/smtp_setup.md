@@ -141,3 +141,11 @@ DMARC queda en modo de observacion `p=none`, con informes a `rua@dmarc.brevo.com
 La autenticacion del dominio reduce el riesgo de clasificacion como spam, sin garantizar la bandeja de entrada. La entrega real de la prueba a Daniel descrita arriba se habia confirmado antes de este ajuste DNS.
 
 Brevo admite STARTTLS por el puerto 2525 cuando el proveedor bloquea 587. El remitente debe estar verificado o pertenecer a un dominio autenticado en la cuenta de Brevo; que SMTP acepte un mensaje no demuestra que haya llegado a la bandeja. [Puertos de Brevo](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525), [validacion del remitente](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP).
+
+## Presentacion de los correos de acceso
+
+Las invitaciones y la recuperacion de acceso usan la identidad de Oasis: logo oficial, azul marino y detalles dorados, nombre del destinatario y de la empresa, accion principal y enlace alternativo. La caducidad se presenta en espanol con la hora local del ERP y su desplazamiento UTC. Las dos operaciones conservan textos y botones propios.
+
+El logo se distribuye como PNG en `core/static/core/images/oasis-email-logo.png` y se incorpora al propio mensaje mediante un Content-ID unico. La estructura MIME contiene texto plano y HTML, mas la imagen inline; el destinatario no depende de un servidor de imagenes externo. Las plantillas estan en `core/templates/core/emails/acceso_usuario.html` y `.txt`. El archivo PNG se lee desde el codigo de la aplicacion; debe incluirse al desplegar los cambios.
+
+El HTML usa tablas, estilos inline y una adaptacion movil. El logo conserva la proporcion de la imagen proporcionada. El contenido sigue siendo legible si el cliente de correo oculta imagenes. Los enlaces, su firma, la vigencia de los tokens y el comportamiento de reenvio se mantienen en el flujo de acceso existente.
