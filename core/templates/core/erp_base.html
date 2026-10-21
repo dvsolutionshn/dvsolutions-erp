@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% if erp_access.interfaz_clinica %}Sistema Clinico{% else %}ERP{% endif %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    <link rel="stylesheet" href="{% static 'core/sidebar_visual.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% if erp_access.interfaz_clinica %}clinical-product-ui{% endif %}{% endblock %}">
@@ -114,6 +115,7 @@
     <div class="erp-mobile-backdrop" data-mobile-menu-close></div>
     <aside class="erp-sidebar">
         {% block sidebar_content %}
+        {% include "core/partials/sidebar_iconos.html" %}
         <div class="erp-mobile-drawer-head">
             <div>
                 <span>{% if erp_access.interfaz_clinica %}Menu Clinico{% else %}Menu ERP{% endif %}</span>
@@ -137,140 +139,140 @@
             <nav class="erp-nav">
                 {% if erp_access.interfaz_clinica %}
                 <a class="erp-nav-link {% if request.path == dashboard_url %}is-active{% endif %}" href="{{ dashboard_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="home" only %}</span>
                     <span>Panel Principal</span>
                 </a>
                 {% if erp_access.pacientes %}
                 <a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span>
                     <span>Pacientes</span>
                 </a>
                 {% endif %}
                 {% if erp_access.inventario %}
                 <a class="erp-nav-link {% if '/dashboard/facturacion/inventario/' in request.path %}is-active{% endif %}" href="{{ inventario_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="box" only %}</span>
                     <span>Inventario</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_facturacion %}
                 <a class="erp-nav-link {% if '/dashboard/facturacion/' in request.path and '/dashboard/facturacion/inventario/' not in request.path %}is-active{% endif %}" href="{{ facturacion_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="billing" only %}</span>
                     <span>Facturación</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_citas %}
                 <a class="erp-nav-link {% if '/dashboard/citas/' in request.path %}is-active{% endif %}" href="{{ agenda_citas_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="calendar" only %}</span>
                     <span>Agenda</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_rrhh %}
                 <a class="erp-nav-link {% if '/dashboard/rrhh/' in request.path %}is-active{% endif %}" href="{{ rrhh_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span>
                     <span>Recursos Humanos</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_crm %}
                 <a class="erp-nav-link {% if '/dashboard/crm/' in request.path %}is-active{% endif %}" href="{{ crm_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="crm" only %}</span>
                     <span>CRM y Marketing</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_contabilidad %}
                 <a class="erp-nav-link {% if '/dashboard/contabilidad/' in request.path %}is-active{% endif %}" href="{{ contabilidad_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="accounting" only %}</span>
                     <span>Contabilidad</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_tecnicentro %}
                 <a class="erp-nav-link {% if '/dashboard/tecnicentro/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="car" only %}</span>
                     <span>Tecnicentro</span>
                 </a>
                 {% endif %}
                 {% if erp_access.configuracion_producto_clinico %}
                 <a class="erp-nav-link {% if request.path == clinica_configuracion_url or '/dashboard/usuarios-clinicos/' in request.path %}is-active{% endif %}" href="{{ clinica_configuracion_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="settings" only %}</span>
                     <span>Configuración</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_gastos_adicionales %}
                 <a class="erp-nav-link {% if '/dashboard/clinica/gastos-adicionales/' in request.path %}is-active{% endif %}" href="{% if erp_access.ver_gastos_adicionales %}{{ clinica_gastos_adicionales_url }}{% else %}{{ clinica_gasto_adicional_nuevo_url }}{% endif %}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="expense" only %}</span>
                     <span>Gastos Adicionales</span>
                 </a>
                 {% endif %}
                 {% if erp_access.ver_manuales_pdf %}
                 <a class="erp-nav-link {% if '/dashboard/clinica/manuales-pdf/' in request.path %}is-active{% endif %}" href="{{ clinica_manuales_pdf_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="document" only %}</span>
                     <span>Manuales PDF</span>
                 </a>
                 {% endif %}
                 {% else %}
                 <a class="erp-nav-link {% if request.path == dashboard_url %}is-active{% endif %}" href="{{ dashboard_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="home" only %}</span>
                     <span>Panel Principal</span>
                 </a>
                 {% if erp_access.modulo_facturacion %}<a class="erp-nav-link {% if '/dashboard/facturacion/' in request.path %}is-active{% endif %}" href="{{ facturacion_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="billing" only %}</span>
                     <span>Facturacion</span>
                 </a>{% endif %}
                 {% if erp_access.modulo_contabilidad %}
                 <a class="erp-nav-link {% if '/dashboard/contabilidad/' in request.path %}is-active{% endif %}" href="{{ contabilidad_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="accounting" only %}</span>
                     <span>Contabilidad</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_rrhh %}
                 <a class="erp-nav-link {% if '/dashboard/rrhh/' in request.path %}is-active{% endif %}" href="{{ rrhh_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span>
                     <span>Recursos Humanos</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_crm %}
                 <a class="erp-nav-link {% if '/dashboard/crm/' in request.path %}is-active{% endif %}" href="{{ crm_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="crm" only %}</span>
                     <span>CRM y Marketing</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_citas %}
                 <a class="erp-nav-link {% if '/dashboard/citas/' in request.path %}is-active{% endif %}" href="{{ agenda_citas_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="calendar" only %}</span>
                     <span>Citas</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_clinica and not erp_access.interfaz_clinica %}
                 <a class="erp-nav-link {% if '/dashboard/clinica/' in request.path %}is-active{% endif %}" href="{{ clinica_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span>
                     <span>Clinica</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_gastos_adicionales %}
                 <a class="erp-nav-link {% if '/dashboard/clinica/gastos-adicionales/' in request.path %}is-active{% endif %}" href="{% if erp_access.ver_gastos_adicionales %}{{ clinica_gastos_adicionales_url }}{% else %}{{ clinica_gasto_adicional_nuevo_url }}{% endif %}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="expense" only %}</span>
                     <span>Gastos Adicionales</span>
                 </a>
                 {% endif %}
                 {% if erp_access.administrar_usuarios_clinicos %}
                 <a class="erp-nav-link {% if '/dashboard/usuarios-clinicos/' in request.path %}is-active{% endif %}" href="{{ usuarios_clinicos_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="shield" only %}</span>
                     <span>Usuarios y permisos</span>
                 </a>
                 {% endif %}
                 {% if erp_access.modulo_tecnicentro %}
                 <a class="erp-nav-link {% if '/dashboard/tecnicentro/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_url }}">
-                    <span class="erp-nav-bullet"></span>
+                    <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="car" only %}</span>
                     <span>Tecnicentro</span>
                 </a>
                 {% endif %}
                 {% if not erp_access.interfaz_clinica %}
                     {% if request.user.is_superuser or request.user.es_administrador_empresa %}
                     <a class="erp-nav-link {% if '/dashboard/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_empresa_url }}">
-                        <span class="erp-nav-bullet"></span>
+                        <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="shield" only %}</span>
                         <span>Bitacora ERP</span>
                     </a>
                     <a class="erp-nav-link {% if '/dashboard/respaldo/' in request.path %}is-active{% endif %}" href="{{ empresa_respaldo_url }}">
-                        <span class="erp-nav-bullet"></span>
+                        <span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="backup" only %}</span>
                         <span>Mi respaldo</span>
                     </a>
                     {% endif %}
@@ -283,37 +285,37 @@
         <div>
             <div class="erp-nav-group-title">Operacion</div>
             <nav class="erp-nav">
-                {% if erp_access.crear_facturas %}<a class="erp-nav-link {% if '/dashboard/facturacion/crear/' in request.path %}is-active{% endif %}" href="{{ crear_factura_url }}"><span class="erp-nav-bullet"></span><span>Crear Factura</span></a>{% endif %}
-                {% if erp_access.facturas %}<a class="erp-nav-link {% if '/dashboard/facturacion/facturas/' in request.path %}is-active{% endif %}" href="{{ facturas_url }}"><span class="erp-nav-bullet"></span><span>Facturas</span></a>{% endif %}
-                {% if erp_access.cotizaciones %}<a class="erp-nav-link {% if '/dashboard/facturacion/cotizaciones/' in request.path %}is-active{% endif %}" href="{{ cotizaciones_url }}"><span class="erp-nav-bullet"></span><span>Cotizaciones</span></a>{% endif %}
-                {% if erp_access.modulo_pos %}<a class="erp-nav-link {% if '/dashboard/facturacion/pos/' in request.path and '/dashboard/facturacion/pos/promociones/' not in request.path %}is-active{% endif %}" href="{{ punto_venta_url }}"><span class="erp-nav-bullet"></span><span>Punto de Venta</span></a>{% endif %}
-                {% if erp_access.modulo_pos %}<a class="erp-nav-link {% if '/dashboard/facturacion/pos/promociones/' in request.path %}is-active{% endif %}" href="{{ promociones_pos_url }}"><span class="erp-nav-bullet"></span><span>Promociones POS</span></a>{% endif %}
-                {% if erp_access.configuracion_facturacion %}<a class="erp-nav-link {% if '/dashboard/facturacion/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_facturacion_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
-                {% if erp_access.clientes %}<a class="erp-nav-link {% if '/dashboard/facturacion/clientes/' in request.path %}is-active{% endif %}" href="{{ clientes_url }}"><span class="erp-nav-bullet"></span><span>Clientes</span></a>{% endif %}
-                {% if erp_access.productos %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/' in request.path %}is-active{% endif %}" href="{{ productos_url }}"><span class="erp-nav-bullet"></span><span>Productos</span></a>{% endif %}
-                {% if erp_access.productos and erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/categorias-farmaceuticas/' in request.path %}is-active{% endif %}" href="{{ categorias_farmaceuticas_url }}"><span class="erp-nav-bullet"></span><span>Categorias Farmaceuticas</span></a>{% endif %}
-                {% if erp_access.proveedores %}<a class="erp-nav-link {% if '/dashboard/facturacion/proveedores/' in request.path %}is-active{% endif %}" href="{{ proveedores_url }}"><span class="erp-nav-bullet"></span><span>Proveedores</span></a>{% endif %}
-                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/' in request.path and '/dashboard/facturacion/inventario/bodegas/' not in request.path %}is-active{% endif %}" href="{{ inventario_url }}"><span class="erp-nav-bullet"></span><span>Inventario</span></a>{% endif %}
-                {% if erp_access.inventario and erp_access.usa_bodegas_internas %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/bodegas/' in request.path %}is-active{% endif %}" href="{{ bodegas_url }}"><span class="erp-nav-bullet"></span><span>Bodegas</span></a>{% endif %}
-                {% if erp_access.inventario and erp_access.usa_control_lotes_fefo %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/' in request.path %}is-active{% endif %}" href="{{ inventario_farmaceutico_url }}"><span class="erp-nav-bullet"></span><span>Lotes y Vencimientos</span></a>{% elif erp_access.inventario and erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/' in request.path %}is-active{% endif %}" href="{{ inventario_farmaceutico_url }}"><span class="erp-nav-bullet"></span><span>Inventario Farmaceutico</span></a>{% endif %}
-                {% if erp_access.transferir_inventario and erp_access.usa_bodegas_internas %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/traslado-rapido/' in request.path %}is-active{% endif %}" href="{{ traslado_rapido_farmaceutico_url }}"><span class="erp-nav-bullet"></span><span>Transferencia Rapida</span></a>{% endif %}
-                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/regalias/' in request.path %}is-active{% endif %}" href="{{ regalias_inventario_url }}"><span class="erp-nav-bullet"></span><span>Regalias</span></a>{% endif %}
-                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/entrada/' in request.path %}is-active{% endif %}" href="{{ entrada_inventario_url }}"><span class="erp-nav-bullet"></span><span>Entrada Inventario</span></a>{% endif %}
-                {% if erp_access.compras %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/compras/' in request.path %}is-active{% endif %}" href="{{ compras_url }}"><span class="erp-nav-bullet"></span><span>Compras</span></a>{% endif %}
-                {% if erp_access.compras %}<a class="erp-nav-link {% if '/dashboard/facturacion/libro-compras/' in request.path %}is-active{% endif %}" href="{{ libro_compras_fiscal_url }}"><span class="erp-nav-bullet"></span><span>Libro Compras</span></a>{% endif %}
-                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/entradas/' in request.path %}is-active{% endif %}" href="{{ entradas_inventario_url }}"><span class="erp-nav-bullet"></span><span>Entradas</span></a>{% endif %}
-                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/kardex/' in request.path %}is-active{% endif %}" href="{{ kardex_inventario_url }}"><span class="erp-nav-bullet"></span><span>Kardex</span></a>{% endif %}
-                {% if erp_access.cai %}<a class="erp-nav-link {% if '/dashboard/facturacion/cai/' in request.path %}is-active{% endif %}" href="{{ cai_url }}"><span class="erp-nav-bullet"></span><span>CAI</span></a>{% endif %}
-                {% if erp_access.impuestos %}<a class="erp-nav-link {% if '/dashboard/facturacion/impuestos/' in request.path %}is-active{% endif %}" href="{{ impuestos_url }}"><span class="erp-nav-bullet"></span><span>Impuestos</span></a>{% endif %}
-                {% if erp_access.notas_credito %}<a class="erp-nav-link {% if '/dashboard/facturacion/notas-credito/' in request.path %}is-active{% endif %}" href="{{ notas_url }}"><span class="erp-nav-bullet"></span><span>Notas de Credito</span></a>{% endif %}
-                {% if erp_access.recibos %}<a class="erp-nav-link {% if '/dashboard/facturacion/recibos/' in request.path %}is-active{% endif %}" href="{{ recibos_url }}"><span class="erp-nav-bullet"></span><span>Recibos</span></a>{% endif %}
-                {% if erp_access.cierres_caja and erp_access.usa_cierre_caja %}<a class="erp-nav-link {% if '/dashboard/facturacion/cierres-caja/' in request.path %}is-active{% endif %}" href="{{ cierres_caja_url }}"><span class="erp-nav-bullet"></span><span>Cierres de Caja</span></a>{% endif %}
-                {% if erp_access.cierres_caja and erp_access.usa_cierre_caja and erp_access.historial_cierres_caja %}<a class="erp-nav-link {% if '/dashboard/facturacion/cierres-caja/resumen-diario/' in request.path %}is-active{% endif %}" href="{{ resumen_diario_caja_url }}"><span class="erp-nav-bullet"></span><span>Resumen Diario</span></a>{% endif %}
-                {% if erp_access.egresos %}<a class="erp-nav-link {% if '/dashboard/facturacion/egresos/' in request.path %}is-active{% endif %}" href="{{ egresos_url }}"><span class="erp-nav-bullet"></span><span>Egresos</span></a>{% endif %}
-                {% if erp_access.reportes %}<a class="erp-nav-link {% if '/dashboard/facturacion/reportes/' in request.path %}is-active{% endif %}" href="{{ reportes_url }}"><span class="erp-nav-bullet"></span><span>Reportes</span></a>{% endif %}
-                {% if erp_access.reportes and erp_access.usa_reporte_bancos %}<a class="erp-nav-link {% if '/dashboard/facturacion/reportes/bancos/' in request.path %}is-active{% endif %}" href="{{ reporte_ingresos_bancos_url }}"><span class="erp-nav-bullet"></span><span>Ingresos por Banco</span></a>{% endif %}
-                {% if erp_access.cxc %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxc/' in request.path %}is-active{% endif %}" href="{{ cxc_url }}"><span class="erp-nav-bullet"></span><span>Cuentas por Cobrar</span></a>{% endif %}
-                {% if erp_access.cxp %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxp/' in request.path %}is-active{% endif %}" href="{{ cxp_url }}"><span class="erp-nav-bullet"></span><span>Cuentas por Pagar</span></a>{% endif %}
+                {% if erp_access.crear_facturas %}<a class="erp-nav-link {% if '/dashboard/facturacion/crear/' in request.path %}is-active{% endif %}" href="{{ crear_factura_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="invoice-plus" only %}</span><span>Crear Factura</span></a>{% endif %}
+                {% if erp_access.facturas %}<a class="erp-nav-link {% if '/dashboard/facturacion/facturas/' in request.path %}is-active{% endif %}" href="{{ facturas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="billing" only %}</span><span>Facturas</span></a>{% endif %}
+                {% if erp_access.cotizaciones %}<a class="erp-nav-link {% if '/dashboard/facturacion/cotizaciones/' in request.path %}is-active{% endif %}" href="{{ cotizaciones_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="document" only %}</span><span>Cotizaciones</span></a>{% endif %}
+                {% if erp_access.modulo_pos %}<a class="erp-nav-link {% if '/dashboard/facturacion/pos/' in request.path and '/dashboard/facturacion/pos/promociones/' not in request.path %}is-active{% endif %}" href="{{ punto_venta_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="pos" only %}</span><span>Punto de Venta</span></a>{% endif %}
+                {% if erp_access.modulo_pos %}<a class="erp-nav-link {% if '/dashboard/facturacion/pos/promociones/' in request.path %}is-active{% endif %}" href="{{ promociones_pos_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="products" only %}</span><span>Promociones POS</span></a>{% endif %}
+                {% if erp_access.configuracion_facturacion %}<a class="erp-nav-link {% if '/dashboard/facturacion/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_facturacion_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="settings" only %}</span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.clientes %}<a class="erp-nav-link {% if '/dashboard/facturacion/clientes/' in request.path %}is-active{% endif %}" href="{{ clientes_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span><span>Clientes</span></a>{% endif %}
+                {% if erp_access.productos %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/' in request.path %}is-active{% endif %}" href="{{ productos_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="products" only %}</span><span>Productos</span></a>{% endif %}
+                {% if erp_access.productos and erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/productos/categorias-farmaceuticas/' in request.path %}is-active{% endif %}" href="{{ categorias_farmaceuticas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="products" only %}</span><span>Categorias Farmaceuticas</span></a>{% endif %}
+                {% if erp_access.proveedores %}<a class="erp-nav-link {% if '/dashboard/facturacion/proveedores/' in request.path %}is-active{% endif %}" href="{{ proveedores_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="truck" only %}</span><span>Proveedores</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/' in request.path and '/dashboard/facturacion/inventario/bodegas/' not in request.path %}is-active{% endif %}" href="{{ inventario_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="box" only %}</span><span>Inventario</span></a>{% endif %}
+                {% if erp_access.inventario and erp_access.usa_bodegas_internas %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/bodegas/' in request.path %}is-active{% endif %}" href="{{ bodegas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="warehouse" only %}</span><span>Bodegas</span></a>{% endif %}
+                {% if erp_access.inventario and erp_access.usa_control_lotes_fefo %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/' in request.path %}is-active{% endif %}" href="{{ inventario_farmaceutico_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="medicine" only %}</span><span>Lotes y Vencimientos</span></a>{% elif erp_access.inventario and erp_access.usa_inventario_farmaceutico %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/' in request.path %}is-active{% endif %}" href="{{ inventario_farmaceutico_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="medicine" only %}</span><span>Inventario Farmaceutico</span></a>{% endif %}
+                {% if erp_access.transferir_inventario and erp_access.usa_bodegas_internas %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/farmaceutico/traslado-rapido/' in request.path %}is-active{% endif %}" href="{{ traslado_rapido_farmaceutico_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="transfer" only %}</span><span>Transferencia Rapida</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/regalias/' in request.path %}is-active{% endif %}" href="{{ regalias_inventario_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="gift" only %}</span><span>Regalias</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/entrada/' in request.path %}is-active{% endif %}" href="{{ entrada_inventario_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="receivable" only %}</span><span>Entrada Inventario</span></a>{% endif %}
+                {% if erp_access.compras %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/compras/' in request.path %}is-active{% endif %}" href="{{ compras_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="cart" only %}</span><span>Compras</span></a>{% endif %}
+                {% if erp_access.compras %}<a class="erp-nav-link {% if '/dashboard/facturacion/libro-compras/' in request.path %}is-active{% endif %}" href="{{ libro_compras_fiscal_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="accounting" only %}</span><span>Libro Compras</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/entradas/' in request.path %}is-active{% endif %}" href="{{ entradas_inventario_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="receivable" only %}</span><span>Entradas</span></a>{% endif %}
+                {% if erp_access.inventario %}<a class="erp-nav-link {% if '/dashboard/facturacion/inventario/kardex/' in request.path %}is-active{% endif %}" href="{{ kardex_inventario_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="list" only %}</span><span>Kardex</span></a>{% endif %}
+                {% if erp_access.cai %}<a class="erp-nav-link {% if '/dashboard/facturacion/cai/' in request.path %}is-active{% endif %}" href="{{ cai_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="tax" only %}</span><span>CAI</span></a>{% endif %}
+                {% if erp_access.impuestos %}<a class="erp-nav-link {% if '/dashboard/facturacion/impuestos/' in request.path %}is-active{% endif %}" href="{{ impuestos_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="percent" only %}</span><span>Impuestos</span></a>{% endif %}
+                {% if erp_access.notas_credito %}<a class="erp-nav-link {% if '/dashboard/facturacion/notas-credito/' in request.path %}is-active{% endif %}" href="{{ notas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="credit" only %}</span><span>Notas de Credito</span></a>{% endif %}
+                {% if erp_access.recibos %}<a class="erp-nav-link {% if '/dashboard/facturacion/recibos/' in request.path %}is-active{% endif %}" href="{{ recibos_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="receipt" only %}</span><span>Recibos</span></a>{% endif %}
+                {% if erp_access.cierres_caja and erp_access.usa_cierre_caja %}<a class="erp-nav-link {% if '/dashboard/facturacion/cierres-caja/' in request.path %}is-active{% endif %}" href="{{ cierres_caja_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="cash" only %}</span><span>Cierres de Caja</span></a>{% endif %}
+                {% if erp_access.cierres_caja and erp_access.usa_cierre_caja and erp_access.historial_cierres_caja %}<a class="erp-nav-link {% if '/dashboard/facturacion/cierres-caja/resumen-diario/' in request.path %}is-active{% endif %}" href="{{ resumen_diario_caja_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="chart" only %}</span><span>Resumen Diario</span></a>{% endif %}
+                {% if erp_access.egresos %}<a class="erp-nav-link {% if '/dashboard/facturacion/egresos/' in request.path %}is-active{% endif %}" href="{{ egresos_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="expense" only %}</span><span>Egresos</span></a>{% endif %}
+                {% if erp_access.reportes %}<a class="erp-nav-link {% if '/dashboard/facturacion/reportes/' in request.path %}is-active{% endif %}" href="{{ reportes_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="chart" only %}</span><span>Reportes</span></a>{% endif %}
+                {% if erp_access.reportes and erp_access.usa_reporte_bancos %}<a class="erp-nav-link {% if '/dashboard/facturacion/reportes/bancos/' in request.path %}is-active{% endif %}" href="{{ reporte_ingresos_bancos_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="bank" only %}</span><span>Ingresos por Banco</span></a>{% endif %}
+                {% if erp_access.cxc %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxc/' in request.path %}is-active{% endif %}" href="{{ cxc_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="receivable" only %}</span><span>Cuentas por Cobrar</span></a>{% endif %}
+                {% if erp_access.cxp %}<a class="erp-nav-link {% if '/dashboard/facturacion/cxp/' in request.path %}is-active{% endif %}" href="{{ cxp_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="payable" only %}</span><span>Cuentas por Pagar</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}
@@ -322,10 +324,10 @@
         <div>
             <div class="erp-nav-group-title">Garage OS</div>
             <nav class="erp-nav">
-                <a class="erp-nav-link {% if request.path == tecnicentro_url %}is-active{% endif %}" href="{{ tecnicentro_url }}"><span class="erp-nav-bullet"></span><span>Centro de Control</span></a>
-                {% if erp_access.recepcion_taller %}<a class="erp-nav-link {% if '/recepcion/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_recepcion_url }}"><span class="erp-nav-bullet"></span><span>Recepcion Digital</span></a>{% endif %}
-                <a class="erp-nav-link {% if '/ordenes/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_ordenes_url }}"><span class="erp-nav-bullet"></span><span>Ordenes de Trabajo</span></a>
-                {% if erp_access.configuracion_taller %}<a class="erp-nav-link {% if '/configuracion/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_configuracion_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
+                <a class="erp-nav-link {% if request.path == tecnicentro_url %}is-active{% endif %}" href="{{ tecnicentro_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="car" only %}</span><span>Centro de Control</span></a>
+                {% if erp_access.recepcion_taller %}<a class="erp-nav-link {% if '/recepcion/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_recepcion_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="car" only %}</span><span>Recepcion Digital</span></a>{% endif %}
+                <a class="erp-nav-link {% if '/ordenes/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_ordenes_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="document" only %}</span><span>Ordenes de Trabajo</span></a>
+                {% if erp_access.configuracion_taller %}<a class="erp-nav-link {% if '/configuracion/' in request.path %}is-active{% endif %}" href="{{ tecnicentro_configuracion_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="settings" only %}</span><span>Configuracion</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}
@@ -334,22 +336,22 @@
         <div>
             <div class="erp-nav-group-title">Contabilidad</div>
             <nav class="erp-nav">
-                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if request.path == contabilidad_url %}is-active{% endif %}" href="{{ contabilidad_url }}"><span class="erp-nav-bullet"></span><span>Resumen</span></a>{% endif %}
-                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_contable_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
-                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/periodos/' in request.path %}is-active{% endif %}" href="{{ periodos_contables_url }}"><span class="erp-nav-bullet"></span><span>Periodos Contables</span></a>{% endif %}
-                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/clasificaciones-compras/' in request.path %}is-active{% endif %}" href="{{ clasificaciones_compras_fiscales_url }}"><span class="erp-nav-bullet"></span><span>Clasif. Compras</span></a>{% endif %}
-                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/bancos/' in request.path and '/dashboard/contabilidad/bancos/conciliacion/' not in request.path %}is-active{% endif %}" href="{{ bancos_dashboard_url }}"><span class="erp-nav-bullet"></span><span>Bancos y Tarjetas</span></a>{% endif %}
-                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/bancos/conciliacion/' in request.path %}is-active{% endif %}" href="{{ conciliacion_bancaria_url }}"><span class="erp-nav-bullet"></span><span>Conciliacion</span></a>{% endif %}
-                {% if erp_access.catalogo_cuentas %}<a class="erp-nav-link {% if '/dashboard/contabilidad/cuentas/' in request.path %}is-active{% endif %}" href="{{ catalogo_cuentas_url }}"><span class="erp-nav-bullet"></span><span>Catalogo de Cuentas</span></a>{% endif %}
-                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/asientos/' in request.path %}is-active{% endif %}" href="{{ asientos_contables_url }}"><span class="erp-nav-bullet"></span><span>Asientos</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/' in request.path %}is-active{% endif %}" href="{{ reportes_contables_url }}"><span class="erp-nav-bullet"></span><span>Reportes Contables</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_contable_url }}"><span class="erp-nav-bullet"></span><span>Auditoria Contable</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/impuestos/' in request.path %}is-active{% endif %}" href="{{ reporte_impuestos_url }}"><span class="erp-nav-bullet"></span><span>Reporte Impuestos</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/libro-diario/' in request.path %}is-active{% endif %}" href="{{ libro_diario_url }}"><span class="erp-nav-bullet"></span><span>Libro Diario</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/mayor-cuenta/' in request.path %}is-active{% endif %}" href="{{ mayor_cuenta_url }}"><span class="erp-nav-bullet"></span><span>Mayor por Cuenta</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/balance-comprobacion/' in request.path %}is-active{% endif %}" href="{{ balance_comprobacion_url }}"><span class="erp-nav-bullet"></span><span>Balance de Comprobacion</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/estado-resultados/' in request.path %}is-active{% endif %}" href="{{ estado_resultados_url }}"><span class="erp-nav-bullet"></span><span>Estado de Resultados</span></a>{% endif %}
-                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/balance-general/' in request.path %}is-active{% endif %}" href="{{ balance_general_url }}"><span class="erp-nav-bullet"></span><span>Balance General</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if request.path == contabilidad_url %}is-active{% endif %}" href="{{ contabilidad_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="accounting" only %}</span><span>Resumen</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_contable_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="settings" only %}</span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/periodos/' in request.path %}is-active{% endif %}" href="{{ periodos_contables_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="calendar" only %}</span><span>Periodos Contables</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/clasificaciones-compras/' in request.path %}is-active{% endif %}" href="{{ clasificaciones_compras_fiscales_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="products" only %}</span><span>Clasif. Compras</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/bancos/' in request.path and '/dashboard/contabilidad/bancos/conciliacion/' not in request.path %}is-active{% endif %}" href="{{ bancos_dashboard_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="bank" only %}</span><span>Bancos y Tarjetas</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/bancos/conciliacion/' in request.path %}is-active{% endif %}" href="{{ conciliacion_bancaria_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="transfer" only %}</span><span>Conciliacion</span></a>{% endif %}
+                {% if erp_access.catalogo_cuentas %}<a class="erp-nav-link {% if '/dashboard/contabilidad/cuentas/' in request.path %}is-active{% endif %}" href="{{ catalogo_cuentas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="list" only %}</span><span>Catalogo de Cuentas</span></a>{% endif %}
+                {% if erp_access.contabilidad %}<a class="erp-nav-link {% if '/dashboard/contabilidad/asientos/' in request.path %}is-active{% endif %}" href="{{ asientos_contables_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="accounting" only %}</span><span>Asientos</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/' in request.path %}is-active{% endif %}" href="{{ reportes_contables_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="chart" only %}</span><span>Reportes Contables</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/auditoria/' in request.path %}is-active{% endif %}" href="{{ auditoria_contable_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="shield" only %}</span><span>Auditoria Contable</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/impuestos/' in request.path %}is-active{% endif %}" href="{{ reporte_impuestos_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="percent" only %}</span><span>Reporte Impuestos</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/libro-diario/' in request.path %}is-active{% endif %}" href="{{ libro_diario_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="accounting" only %}</span><span>Libro Diario</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/mayor-cuenta/' in request.path %}is-active{% endif %}" href="{{ mayor_cuenta_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="accounting" only %}</span><span>Mayor por Cuenta</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/balance-comprobacion/' in request.path %}is-active{% endif %}" href="{{ balance_comprobacion_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="list" only %}</span><span>Balance de Comprobacion</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/estado-resultados/' in request.path %}is-active{% endif %}" href="{{ estado_resultados_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="chart" only %}</span><span>Estado de Resultados</span></a>{% endif %}
+                {% if erp_access.reportes_contables %}<a class="erp-nav-link {% if '/dashboard/contabilidad/reportes/balance-general/' in request.path %}is-active{% endif %}" href="{{ balance_general_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="chart" only %}</span><span>Balance General</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}
@@ -358,12 +360,12 @@
         <div>
             <div class="erp-nav-group-title">Recursos Humanos</div>
             <nav class="erp-nav">
-                {% if erp_access.rrhh %}<a class="erp-nav-link {% if request.path == rrhh_url %}is-active{% endif %}" href="{{ rrhh_url }}"><span class="erp-nav-bullet"></span><span>Resumen</span></a>{% endif %}
-                {% if erp_access.configuracion_rrhh %}<a class="erp-nav-link {% if '/dashboard/rrhh/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
-                {% if erp_access.empleados %}<a class="erp-nav-link {% if '/dashboard/rrhh/empleados/' in request.path %}is-active{% endif %}" href="{{ empleados_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Empleados</span></a>{% endif %}
-                {% if erp_access.planillas %}<a class="erp-nav-link {% if '/dashboard/rrhh/planillas/' in request.path %}is-active{% endif %}" href="{{ planillas_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Planillas</span></a>{% endif %}
-                {% if erp_access.planillas %}<a class="erp-nav-link {% if '/dashboard/rrhh/movimientos/' in request.path %}is-active{% endif %}" href="{{ movimientos_planilla_url }}"><span class="erp-nav-bullet"></span><span>Bonos y Deducciones</span></a>{% endif %}
-                {% if erp_access.vacaciones %}<a class="erp-nav-link {% if '/dashboard/rrhh/vacaciones/' in request.path %}is-active{% endif %}" href="{{ vacaciones_rrhh_url }}"><span class="erp-nav-bullet"></span><span>Vacaciones</span></a>{% endif %}
+                {% if erp_access.rrhh %}<a class="erp-nav-link {% if request.path == rrhh_url %}is-active{% endif %}" href="{{ rrhh_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span><span>Resumen</span></a>{% endif %}
+                {% if erp_access.configuracion_rrhh %}<a class="erp-nav-link {% if '/dashboard/rrhh/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_rrhh_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="settings" only %}</span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.empleados %}<a class="erp-nav-link {% if '/dashboard/rrhh/empleados/' in request.path %}is-active{% endif %}" href="{{ empleados_rrhh_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span><span>Empleados</span></a>{% endif %}
+                {% if erp_access.planillas %}<a class="erp-nav-link {% if '/dashboard/rrhh/planillas/' in request.path %}is-active{% endif %}" href="{{ planillas_rrhh_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="payroll" only %}</span><span>Planillas</span></a>{% endif %}
+                {% if erp_access.planillas %}<a class="erp-nav-link {% if '/dashboard/rrhh/movimientos/' in request.path %}is-active{% endif %}" href="{{ movimientos_planilla_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="transfer" only %}</span><span>Bonos y Deducciones</span></a>{% endif %}
+                {% if erp_access.vacaciones %}<a class="erp-nav-link {% if '/dashboard/rrhh/vacaciones/' in request.path %}is-active{% endif %}" href="{{ vacaciones_rrhh_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="vacation" only %}</span><span>Vacaciones</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}
@@ -372,10 +374,10 @@
         <div>
             <div class="erp-nav-group-title">CRM y Agenda</div>
             <nav class="erp-nav">
-                {% if erp_access.crm %}<a class="erp-nav-link {% if request.path == crm_url %}is-active{% endif %}" href="{{ crm_url }}"><span class="erp-nav-bullet"></span><span>Resumen</span></a>{% endif %}
-                {% if erp_access.configuracion_crm %}<a class="erp-nav-link {% if '/dashboard/crm/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_crm_url }}"><span class="erp-nav-bullet"></span><span>Configuracion</span></a>{% endif %}
-                {% if erp_access.campanias %}<a class="erp-nav-link {% if '/dashboard/crm/plantillas/' in request.path %}is-active{% endif %}" href="{{ crm_plantillas_url }}"><span class="erp-nav-bullet"></span><span>Plantillas</span></a>{% endif %}
-                {% if erp_access.campanias %}<a class="erp-nav-link {% if '/dashboard/crm/campanias/' in request.path %}is-active{% endif %}" href="{{ crm_campanias_url }}"><span class="erp-nav-bullet"></span><span>Campanias</span></a>{% endif %}
+                {% if erp_access.crm %}<a class="erp-nav-link {% if request.path == crm_url %}is-active{% endif %}" href="{{ crm_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="crm" only %}</span><span>Resumen</span></a>{% endif %}
+                {% if erp_access.configuracion_crm %}<a class="erp-nav-link {% if '/dashboard/crm/configuracion/' in request.path %}is-active{% endif %}" href="{{ configuracion_crm_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="settings" only %}</span><span>Configuracion</span></a>{% endif %}
+                {% if erp_access.campanias %}<a class="erp-nav-link {% if '/dashboard/crm/plantillas/' in request.path %}is-active{% endif %}" href="{{ crm_plantillas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="mail" only %}</span><span>Plantillas</span></a>{% endif %}
+                {% if erp_access.campanias %}<a class="erp-nav-link {% if '/dashboard/crm/campanias/' in request.path %}is-active{% endif %}" href="{{ crm_campanias_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="campaign" only %}</span><span>Campanias</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}
@@ -384,9 +386,9 @@
         <div>
             <div class="erp-nav-group-title">Citas</div>
             <nav class="erp-nav">
-                {% if erp_access.citas %}<a class="erp-nav-link {% if request.path == agenda_citas_url %}is-active{% endif %}" href="{{ agenda_citas_url }}"><span class="erp-nav-bullet"></span><span>Calendario</span></a>{% endif %}
-                {% if empresa.slug == 'hospital_mia' and erp_access.ver_camara_hiperbarica %}<a class="erp-nav-link {% if request.path == agenda_camara_hiperbarica_url %}is-active{% endif %}" href="{{ agenda_camara_hiperbarica_url }}"><span class="erp-nav-bullet"></span><span>Cámara hiperbárica</span></a>{% endif %}
-                {% if empresa.slug == 'hospital_mia' and erp_access.ver_postquirurgicas %}<a class="erp-nav-link {% if request.path == agenda_terapias_postquirurgicas_url %}is-active{% endif %}" href="{{ agenda_terapias_postquirurgicas_url }}"><span class="erp-nav-bullet"></span><span>Terapias Post Quirúrgicas</span></a>{% endif %}
+                {% if erp_access.citas %}<a class="erp-nav-link {% if request.path == agenda_citas_url %}is-active{% endif %}" href="{{ agenda_citas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="calendar" only %}</span><span>Calendario</span></a>{% endif %}
+                {% if empresa.slug == 'hospital_mia' and erp_access.ver_camara_hiperbarica %}<a class="erp-nav-link {% if request.path == agenda_camara_hiperbarica_url %}is-active{% endif %}" href="{{ agenda_camara_hiperbarica_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Cámara hiperbárica</span></a>{% endif %}
+                {% if empresa.slug == 'hospital_mia' and erp_access.ver_postquirurgicas %}<a class="erp-nav-link {% if request.path == agenda_terapias_postquirurgicas_url %}is-active{% endif %}" href="{{ agenda_terapias_postquirurgicas_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Terapias Post Quirúrgicas</span></a>{% endif %}
             </nav>
         </div>
         {% endif %}
@@ -395,14 +397,14 @@
         <div>
             <div class="erp-nav-group-title">{% if paciente %}Expediente{% else %}Pacientes{% endif %}</div>
             <nav class="erp-nav">
-                {% if erp_access.pacientes %}<a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path and '/dashboard/clinica/pacientes/enlaces-registro/' not in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}"><span class="erp-nav-bullet"></span><span>Pacientes</span></a>{% endif %}
+                {% if erp_access.pacientes %}<a class="erp-nav-link {% if '/dashboard/clinica/pacientes/' in request.path and '/dashboard/clinica/pacientes/enlaces-registro/' not in request.path %}is-active{% endif %}" href="{{ clinica_pacientes_url }}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="people" only %}</span><span>Pacientes</span></a>{% endif %}
                 {% if paciente %}
-                {% if erp_access.ver_historia_clinica %}<a class="erp-nav-link {% if '/historias/' in request.path %}is-active{% endif %}" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><span class="erp-nav-bullet"></span><span>Historial Clinico</span></a>{% endif %}
-                {% if erp_access.ver_anexos_clinicos %}<a class="erp-nav-link {% if '/examenes/' in request.path or '/documentos/' in request.path or '/consentimientos/' in request.path %}is-active{% endif %}" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><span class="erp-nav-bullet"></span><span>Anexos</span></a>{% endif %}
-                {% if erp_access.ver_historia_clinica %}<a class="erp-nav-link {% if '/historias/' in request.path %}is-active{% endif %}" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><span class="erp-nav-bullet"></span><span>Especialidades</span></a>{% endif %}
-                {% if erp_access.escribir_enfermeria %}<a class="erp-nav-link" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'enfermeria' %}"><span class="erp-nav-bullet"></span><span>Registrar Enfermería</span></a>{% endif %}
-                {% if erp_access.escribir_terapias %}<a class="erp-nav-link" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias' %}"><span class="erp-nav-bullet"></span><span>Registrar Terapia</span></a>{% endif %}
-                {% if erp_access.crear_recordatorios_paciente %}<a class="erp-nav-link {% if '/seguimientos/' in request.path %}is-active{% endif %}" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}#recordatorios-tratamiento"><span class="erp-nav-bullet"></span><span>Citas / Recordatorios</span></a>{% endif %}
+                {% if erp_access.ver_historia_clinica %}<a class="erp-nav-link {% if '/historias/' in request.path %}is-active{% endif %}" href="{% url 'clinica_historial_clinico_consolidado' empresa.slug paciente.id %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="document" only %}</span><span>Historial Clinico</span></a>{% endif %}
+                {% if erp_access.ver_anexos_clinicos %}<a class="erp-nav-link {% if '/examenes/' in request.path or '/documentos/' in request.path or '/consentimientos/' in request.path %}is-active{% endif %}" href="{% url 'clinica_examenes_paciente' empresa.slug paciente.id %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="folder" only %}</span><span>Anexos</span></a>{% endif %}
+                {% if erp_access.ver_historia_clinica %}<a class="erp-nav-link {% if '/historias/' in request.path %}is-active{% endif %}" href="{% url 'clinica_historias_especialidad' empresa.slug paciente.id %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Especialidades</span></a>{% endif %}
+                {% if erp_access.escribir_enfermeria %}<a class="erp-nav-link" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'enfermeria' %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Registrar Enfermería</span></a>{% endif %}
+                {% if erp_access.escribir_terapias %}<a class="erp-nav-link" href="{% url 'clinica_crear_historia_especialidad' empresa.slug paciente.id 'terapias' %}"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="clinic" only %}</span><span>Registrar Terapia</span></a>{% endif %}
+                {% if erp_access.crear_recordatorios_paciente %}<a class="erp-nav-link {% if '/seguimientos/' in request.path %}is-active{% endif %}" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}#recordatorios-tratamiento"><span class="erp-nav-bullet">{% include "core/partials/sidebar_icono.html" with icono="calendar" only %}</span><span>Citas / Recordatorios</span></a>{% endif %}
                 {% endif %}
             </nav>
         </div>
