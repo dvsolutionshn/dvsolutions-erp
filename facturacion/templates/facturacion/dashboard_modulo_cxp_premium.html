@@ -2,66 +2,131 @@
 {% load static %}
 
 {% block title %}Facturación - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}{% if erp_access.interfaz_clinica %}Gestion de cobros y documentos{% else %}Modulo Financiero{% endif %}{% endblock %}
+{% block body_class %}{{ block.super }} billing-dashboard-page{% endblock %}
+{% block header_kicker %}{% if erp_access.interfaz_clinica %}Gestión de cobros y documentos{% else %}Gestión comercial{% endif %}{% endblock %}
 {% block header_title %}Facturación{% endblock %}
-{% block header_description %}Todos los accesos de facturacion, organizados en una vista compacta y facil de recorrer.{% endblock %}
-
+{% block header_description %}Documentos, inventario y pagos de {{ empresa.nombre }}.{% endblock %}
 {% block extra_head %}
-<style>
-.erp-billing-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;padding:16px 18px;border:1px solid #dce8ef;border-radius:18px;background:#fff;box-shadow:0 10px 28px rgba(16,35,56,.045)}
-.erp-billing-summary h3{margin:2px 0 4px;color:#102338;font-size:20px}.erp-billing-summary p{margin:0;color:var(--muted);font-size:13px}.erp-billing-summary-badges{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.erp-billing-summary-badges span{padding:7px 10px;border:1px solid #d9e7ee;border-radius:999px;background:#f8fbfd;color:#496276;font-size:11px;font-weight:850}
-.erp-facturacion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px;align-items:stretch;}
-.erp-facturacion-module{position:relative;overflow:hidden;display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto auto 1fr;column-gap:10px;min-height:108px;padding:12px;animation:erpFacturacionRise .38s ease both;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;}
-.erp-facturacion-module:nth-child(2){animation-delay:.04s}.erp-facturacion-module:nth-child(3){animation-delay:.08s}.erp-facturacion-module:nth-child(4){animation-delay:.12s}.erp-facturacion-module:nth-child(5){animation-delay:.16s}.erp-facturacion-module:nth-child(6){animation-delay:.2s}.erp-facturacion-module:nth-child(7){animation-delay:.24s}.erp-facturacion-module:nth-child(8){animation-delay:.28s}
-.erp-facturacion-module:hover{transform:translateY(-3px);border-color:#9bcbd1;box-shadow:0 15px 34px rgba(12,60,72,.09);}
-.erp-facturacion-visual{grid-row:1/3;position:relative;width:44px;height:44px;margin:0;border-radius:13px;overflow:hidden;border:1px solid #d5e6eb;background:linear-gradient(145deg,#f4fbfb,#edf5ff);}
-.erp-facturacion-visual::after{content:"";position:absolute;inset:auto -12px -18px auto;width:34px;height:34px;border-radius:50%;background:rgba(31,182,170,.13)}
-.erp-facturacion-visual img{position:absolute;inset:5px;width:34px;height:34px;object-fit:contain;transition:transform .28s ease;}
-.erp-facturacion-module:hover .erp-facturacion-visual img{transform:scale(1.08)}
-.erp-facturacion-module .erp-kpi-label{align-self:end;font-size:8px}.erp-facturacion-module h3{align-self:start;margin:2px 0 0;font-size:15px;line-height:1.12;color:#102338;}
-.erp-facturacion-module p{grid-column:1/-1;margin:7px 0 0;color:var(--muted);font-size:10.5px;line-height:1.32;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
-@keyframes erpFacturacionRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-@keyframes erpFacturacionSweep{0%,58%{transform:translateX(-120%) rotate(18deg)}100%{transform:translateX(260%) rotate(18deg)}}
-@media(max-width:680px){.erp-billing-summary{align-items:flex-start;flex-direction:column}.erp-billing-summary-badges{justify-content:flex-start}.erp-facturacion-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.erp-facturacion-module{min-height:126px}.erp-facturacion-module p{-webkit-line-clamp:2}}
-@media(max-width:430px){.erp-facturacion-grid{grid-template-columns:1fr}.erp-facturacion-module{min-height:112px}}
-</style>
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'facturacion/dashboard_modulo.css' %}">
 {% endblock %}
 
 {% block content %}
-<div style="display:none;">Facturacion</div>
-<div style="display:none;">Facturación</div>
-<div style="display:none;">Notas de Credito</div>
-<div style="display:none;">Notas de Crédito</div>
-<section class="erp-billing-summary">
-    <div><div class="erp-kpi-label">Centro de facturacion</div><h3>Seleccione una operacion</h3><p>Se muestran todas las funciones habilitadas por los permisos actuales.</p></div>
-    <div class="erp-billing-summary-badges" aria-label="Areas de facturacion"><span>Emision</span><span>Fiscal</span><span>Inventario</span><span>Tesoreria</span></div>
-</section>
+<div class="billing-dashboard" data-billing-dashboard>
+    {% include "facturacion/partials/dashboard_iconos.html" %}
+    <section class="billing-hero" aria-labelledby="billing-title">
+        <div class="billing-hero-copy">
+            <span class="billing-eyebrow">Tu centro de operaciones</span>
+            <h1 class="billing-hero-title" id="billing-title">Todo listo para tu próxima venta</h1>
+            <p class="billing-hero-description">Emite documentos, organiza tus productos y da seguimiento a los cobros desde un mismo lugar.</p>
+            <div class="billing-hero-actions">
+                {% if erp_access.crear_facturas %}
+                <a class="billing-button billing-button--primary" href="{% url 'crear_factura' empresa.slug %}">{% include "facturacion/partials/dashboard_icono.html" with icono="plus" only %} Crear factura</a>
+                {% endif %}
+                {% if erp_access.facturas %}
+                <a class="billing-button" href="{% url 'facturas_dashboard' empresa.slug %}">{% include "facturacion/partials/dashboard_icono.html" with icono="billing" only %} Ver facturas</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="billing-hero-icon" aria-hidden="true">{% include "facturacion/partials/dashboard_icono.html" with icono="billing" only %}</div>
+    </section>
 
-<section class="erp-facturacion-grid">
-    {% if erp_access.modulo_pos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'punto_venta' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/pos.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Venta Directa</div><h3>Punto de Venta</h3><p>Caja rapida para supermercados, tiendas y mostrador, conectada con factura, recibo, inventario y contabilidad.</p></a>{% endif %}
-    {% if erp_access.crear_facturas %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'crear_factura' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Emision</div><h3>Crear Factura</h3><p>Acceso directo para emitir una nueva factura sin navegar por el historial documental.</p></a>{% endif %}
-    {% if erp_access.facturas %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'facturas_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Operacion</div><h3>Facturacion</h3><p>Crear, emitir, revisar y administrar facturas con maxima claridad operativa.</p></a>{% endif %}
-    {% if erp_access.configuracion_facturacion %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'configuracion_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/settings.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Empresa</div><h3>Configuracion</h3><p>Personaliza plantilla PDF, colores, leyendas y datos visibles por empresa.</p></a>{% endif %}
-    {% if erp_access.clientes %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'clientes_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/customers.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Catalogo</div><h3>Clientes</h3><p>Gestion de clientes y datos fiscales bajo un estandar visual institucional.</p></a>{% endif %}
-    {% if erp_access.productos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'productos_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/products.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Catalogo</div><h3>Productos</h3><p>Base comercial lista para evolucionar hacia inventario y control de costos.</p></a>{% endif %}
-    {% if erp_access.productos and erp_access.usa_inventario_farmaceutico %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'categorias_farmaceuticas' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/products.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Farmacia</div><h3>Categorias Farmaceuticas</h3><p>Clasifica medicamentos, insumos, refrigerados y productos controlados por empresa.</p></a>{% endif %}
-    {% if erp_access.proveedores %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'proveedores_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/suppliers.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Catalogo</div><h3>Proveedores</h3><p>Base de abastecimiento para compras, contactos y crecimiento hacia cuentas por pagar.</p></a>{% endif %}
-    {% if erp_access.inventario %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'inventario_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/inventory.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Inventario</div><h3>Inventario</h3><p>Existencias, ajustes y movimientos iniciales conectados con facturacion.</p></a>{% endif %}
-    {% if erp_access.inventario and erp_access.usa_bodegas_internas %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'bodegas_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/inventory.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Ubicaciones</div><h3>Bodegas</h3><p>Consulta productos, lotes y cantidades separadas por cada bodega interna.</p></a>{% endif %}
-    {% if erp_access.inventario and erp_access.usa_inventario_farmaceutico %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'inventario_farmaceutico' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/inventory.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Farmacia</div><h3>Inventario Farmaceutico</h3><p>Lotes, vencimientos y bodegas internas para trazabilidad del inventario.</p></a>{% endif %}
-    {% if erp_access.transferir_inventario and erp_access.usa_bodegas_internas %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'traslado_rapido_farmaceutico' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/inventory.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Operacion Rapida</div><h3>Transferencia Rapida</h3><p>Mueve productos entre bodegas internas con el menor numero de pasos.</p></a>{% endif %}
-    {% if erp_access.inventario %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'regalias_inventario' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/gifts.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Salida sin factura</div><h3>Regalias</h3><p>Entrega productos y descuenta el inventario con trazabilidad de usuario, bodega y lote.</p></a>{% endif %}
-    {% if erp_access.compras %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'compras_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/purchases.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Abastecimiento</div><h3>Compras</h3><p>Documentos de compra conectados con el ingreso real de existencias al inventario.</p></a>{% endif %}
-    {% if erp_access.cai %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'cai_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/tax.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Fiscal</div><h3>CAI</h3><p>Administracion fina de rangos fiscales y correlativos con trazabilidad historica.</p></a>{% endif %}
-    {% if erp_access.impuestos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'impuestos_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/tax.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Fiscal</div><h3>Impuestos</h3><p>Configuracion tributaria lista para facturacion, ajustes y evolucion contable.</p></a>{% endif %}
-    {% if erp_access.notas_credito %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'notas_credito_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/credit-notes.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Ajustes</div><h3>Notas de Crédito</h3><p>Documentos de ajuste conectados con factura origen y saldo disponible real.</p></a>{% endif %}
-    {% if erp_access.recibos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'recibos_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/receipts.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Cobranza</div><h3>Recibos</h3><p>Comprobantes de pago formales vinculados con facturas y clientes.</p></a>{% endif %}
-    {% if erp_access.cierres_caja and erp_access.usa_cierre_caja %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'cierres_caja' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/cash.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Caja</div><h3>Cierres de Caja</h3><p>Cierres diarios por cajero para controlar efectivo, tarjetas y transferencias por turno.</p></a>{% endif %}
-    {% if erp_access.cierres_caja and erp_access.usa_cierre_caja and erp_access.historial_cierres_caja %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'resumen_diario_caja' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/reports.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Gerencia</div><h3>Resumen Diario</h3><p>Vista ejecutiva de cobros por cajero, metodo, banco y diferencia de cierres.</p></a>{% endif %}
-    {% if erp_access.egresos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'egresos_dashboard' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/expenses.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Pagos</div><h3>Egresos</h3><p>Comprobantes formales de pagos a proveedores enlazados con compras y cuentas por pagar.</p></a>{% endif %}
-    {% if erp_access.reportes %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'reportes_facturacion' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/reports.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Analitica</div><h3>Reportes</h3><p>Lectura ejecutiva de ventas, impuestos y desempeno financiero.</p></a>{% endif %}
-    {% if erp_access.reportes and erp_access.usa_reporte_bancos %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'reporte_ingresos_bancos' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/bank.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Tesoreria</div><h3>Ingresos por Banco</h3><p>Control de transferencias, POS y cajas por factura para cierres y conciliacion diaria.</p></a>{% endif %}
-    {% if erp_access.cxc %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'reporte_cxc' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/receivables.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Cobranza</div><h3>Cuentas por Cobrar</h3><p>Seguimiento a saldos pendientes y antiguedad de cartera por cliente.</p></a>{% endif %}
-    {% if erp_access.cxp %}<a class="erp-card erp-module-card erp-facturacion-module" href="{% url 'reporte_cxp' empresa.slug %}"><div class="erp-facturacion-visual"><img src="{% static 'core/img/modules/payables.svg' %}" alt="" aria-hidden="true"></div><div class="erp-kpi-label">Pagos</div><h3>Cuentas por Pagar</h3><p>Seguimiento ejecutivo de compras aplicadas, saldos pendientes y pagos a proveedores.</p></a>{% endif %}
-</section>
+    <div class="billing-toolbar" data-billing-controls hidden>
+        <form class="billing-search" role="search" data-billing-search-form>
+            {% include "facturacion/partials/dashboard_icono.html" with icono="search" only %}
+            <input type="search" aria-label="Buscar una operación de facturación" placeholder="Buscar una operación…" autocomplete="off" data-billing-search>
+            <button class="billing-search-clear" type="button" aria-label="Limpiar búsqueda" data-billing-clear hidden>{% include "facturacion/partials/dashboard_icono.html" with icono="close" only %}</button>
+        </form>
+        <div class="billing-filters" role="group" aria-label="Filtrar operaciones por área">
+            <button class="billing-filter" type="button" data-billing-filter="all" aria-pressed="true">Todos</button>
+            <button class="billing-filter" type="button" data-billing-filter="ventas" aria-pressed="false">Ventas</button>
+            <button class="billing-filter" type="button" data-billing-filter="inventario" aria-pressed="false">Inventario</button>
+            <button class="billing-filter" type="button" data-billing-filter="tesoreria" aria-pressed="false">Cobros y pagos</button>
+            <button class="billing-filter" type="button" data-billing-filter="control" aria-pressed="false">Control fiscal</button>
+        </div>
+        <span class="billing-count" data-billing-count hidden></span>
+    </div>
+    <p class="billing-sr-only" role="status" aria-live="polite" aria-atomic="true" data-billing-status></p>
+
+    {% if erp_access.modulo_pos or erp_access.crear_facturas or erp_access.facturas or erp_access.notas_credito or erp_access.clientes %}
+    <section class="billing-section" data-billing-section="ventas" aria-labelledby="billing-ventas-title">
+        <header class="billing-section-heading">
+            <span class="billing-section-mark" data-tone="indigo">{% include "facturacion/partials/dashboard_icono.html" with icono="billing" only %}</span>
+            <div><h2 id="billing-ventas-title">Ventas y documentos</h2><p>Desde la primera venta hasta sus ajustes.</p></div>
+        </header>
+        <div class="billing-grid">
+            {% if erp_access.crear_facturas %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="crear_factura" titulo="Crear factura" categoria="Emisión" descripcion="Emite una nueva factura con los datos de tu cliente y sus productos." icono="invoice-plus" tono="indigo" empresa=empresa only %}{% endif %}
+            {% if erp_access.facturas %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="facturas_dashboard" titulo="Facturación" categoria="Documentos" descripcion="Consulta, revisa y administra el historial de tus facturas." icono="billing" tono="indigo" empresa=empresa only %}{% endif %}
+            {% if erp_access.modulo_pos %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="punto_venta" titulo="Punto de venta" categoria="Venta directa" descripcion="Realiza ventas de mostrador desde la caja de tu negocio." icono="pos" tono="blue" empresa=empresa only %}{% endif %}
+            {% if erp_access.clientes %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="clientes_facturacion" titulo="Clientes" categoria="Directorio" descripcion="Mantén al día los contactos y datos fiscales de tus clientes." icono="people" tono="teal" empresa=empresa only %}{% endif %}
+            {% if erp_access.notas_credito %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="notas_credito_dashboard" titulo="Notas de Crédito" categoria="Ajustes" descripcion="Consulta y registra ajustes vinculados con la factura de origen." icono="credit" tono="rose" empresa=empresa only %}{% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if erp_access.productos or erp_access.proveedores or erp_access.inventario or erp_access.compras or erp_access.transferir_inventario and erp_access.usa_bodegas_internas %}
+    <section class="billing-section" data-billing-section="inventario" aria-labelledby="billing-inventario-title">
+        <header class="billing-section-heading">
+            <span class="billing-section-mark" data-tone="teal">{% include "facturacion/partials/dashboard_icono.html" with icono="box" only %}</span>
+            <div><h2 id="billing-inventario-title">Productos y abastecimiento</h2><p>Tu catálogo, existencias y compras, bien organizados.</p></div>
+        </header>
+        <div class="billing-grid">
+            {% if erp_access.productos %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="productos_facturacion" titulo="Productos" categoria="Catálogo" descripcion="Administra productos, servicios y precios para tus ventas." icono="products" tono="teal" empresa=empresa only %}{% endif %}
+            {% if erp_access.inventario %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="inventario_facturacion" titulo="Inventario" categoria="Existencias" descripcion="Consulta existencias, ajustes y movimientos de tus productos." icono="box" tono="teal" empresa=empresa only %}{% endif %}
+            {% if erp_access.compras %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="compras_dashboard" titulo="Compras" categoria="Abastecimiento" descripcion="Registra y revisa las compras realizadas a tus proveedores." icono="cart" tono="amber" empresa=empresa only %}{% endif %}
+            {% if erp_access.proveedores %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="proveedores_facturacion" titulo="Proveedores" categoria="Directorio" descripcion="Organiza los contactos y datos de quienes abastecen tu negocio." icono="truck" tono="blue" empresa=empresa only %}{% endif %}
+            {% if erp_access.inventario %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="regalias_inventario" titulo="Regalías" categoria="Salida sin factura" descripcion="Registra entregas de productos y su salida del inventario." icono="gift" tono="rose" empresa=empresa only %}{% endif %}
+            {% if erp_access.productos and erp_access.usa_inventario_farmaceutico %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="categorias_farmaceuticas" titulo="Categorías farmacéuticas" categoria="Farmacia" descripcion="Clasifica medicamentos, insumos y productos controlados." icono="products" tono="teal" empresa=empresa only %}{% endif %}
+            {% if erp_access.inventario and erp_access.usa_bodegas_internas %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="bodegas_dashboard" titulo="Bodegas" categoria="Ubicaciones" descripcion="Consulta productos y cantidades en cada bodega interna." icono="warehouse" tono="blue" empresa=empresa only %}{% endif %}
+            {% if erp_access.inventario and erp_access.usa_inventario_farmaceutico %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="inventario_farmaceutico" titulo="Inventario farmacéutico" categoria="Farmacia" descripcion="Revisa lotes, vencimientos y existencias por bodega." icono="medicine" tono="teal" empresa=empresa only %}{% endif %}
+            {% if erp_access.transferir_inventario and erp_access.usa_bodegas_internas %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="traslado_rapido_farmaceutico" titulo="Transferencia rápida" categoria="Entre bodegas" descripcion="Traslada productos entre las bodegas internas de tu empresa." icono="transfer" tono="blue" empresa=empresa only %}{% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if erp_access.recibos or erp_access.egresos or erp_access.cxc or erp_access.cxp or erp_access.cierres_caja and erp_access.usa_cierre_caja %}
+    <section class="billing-section" data-billing-section="tesoreria" aria-labelledby="billing-tesoreria-title">
+        <header class="billing-section-heading">
+            <span class="billing-section-mark" data-tone="blue">{% include "facturacion/partials/dashboard_icono.html" with icono="receipt" only %}</span>
+            <div><h2 id="billing-tesoreria-title">Cobros y pagos</h2><p>Da seguimiento al dinero que entra y sale de tu empresa.</p></div>
+        </header>
+        <div class="billing-grid">
+            {% if erp_access.recibos %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="recibos_dashboard" titulo="Recibos" categoria="Cobranza" descripcion="Consulta y emite comprobantes de pago de tus clientes." icono="receipt" tono="blue" empresa=empresa only %}{% endif %}
+            {% if erp_access.cxc %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="reporte_cxc" titulo="Cuentas por Cobrar" categoria="Cartera de clientes" descripcion="Revisa saldos pendientes y la antigüedad de tus cobros." icono="receivable" tono="teal" empresa=empresa only %}{% endif %}
+            {% if erp_access.egresos %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="egresos_dashboard" titulo="Egresos" categoria="Pagos" descripcion="Registra y consulta comprobantes de pago a proveedores." icono="expense" tono="rose" empresa=empresa only %}{% endif %}
+            {% if erp_access.cxp %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="reporte_cxp" titulo="Cuentas por Pagar" categoria="Proveedores" descripcion="Consulta compras pendientes de pago y sus saldos." icono="payable" tono="amber" empresa=empresa only %}{% endif %}
+            {% if erp_access.cierres_caja and erp_access.usa_cierre_caja %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="cierres_caja" titulo="Cierres de caja" categoria="Control de caja" descripcion="Revisa efectivo, tarjetas y transferencias al cerrar cada turno." icono="cash" tono="blue" empresa=empresa only %}{% endif %}
+            {% if erp_access.cierres_caja and erp_access.usa_cierre_caja and erp_access.historial_cierres_caja %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="resumen_diario_caja" titulo="Resumen diario" categoria="Gerencia" descripcion="Consulta cobros por cajero, método y diferencias de cierre." icono="chart" tono="indigo" empresa=empresa only %}{% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if erp_access.cai or erp_access.impuestos or erp_access.reportes or erp_access.configuracion_facturacion %}
+    <section class="billing-section" data-billing-section="control" aria-labelledby="billing-control-title">
+        <header class="billing-section-heading">
+            <span class="billing-section-mark" data-tone="amber">{% include "facturacion/partials/dashboard_icono.html" with icono="chart" only %}</span>
+            <div><h2 id="billing-control-title">Control fiscal y análisis</h2><p>Revisa tus reportes y configura los detalles de facturación.</p></div>
+        </header>
+        <div class="billing-grid">
+            {% if erp_access.reportes %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="reportes_facturacion" titulo="Reportes" categoria="Análisis" descripcion="Consulta reportes de ventas, impuestos y desempeño financiero." icono="chart" tono="indigo" empresa=empresa only %}{% endif %}
+            {% if erp_access.cai %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="cai_facturacion" titulo="CAI" categoria="Control fiscal" descripcion="Administra rangos autorizados y correlativos de facturación." icono="tax" tono="amber" empresa=empresa only %}{% endif %}
+            {% if erp_access.impuestos %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="impuestos_facturacion" titulo="Impuestos" categoria="Tributos" descripcion="Configura los impuestos que se aplican a tus documentos." icono="percent" tono="teal" empresa=empresa only %}{% endif %}
+            {% if erp_access.configuracion_facturacion %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="configuracion_facturacion" titulo="Configuración" categoria="Preferencias" descripcion="Personaliza el diseño, los datos y las leyendas de tus facturas." icono="settings" tono="blue" empresa=empresa only %}{% endif %}
+            {% if erp_access.reportes and erp_access.usa_reporte_bancos %}{% include "facturacion/partials/dashboard_tarjeta.html" with ruta="reporte_ingresos_bancos" titulo="Ingresos por banco" categoria="Tesorería" descripcion="Revisa los ingresos por banco y método para tus conciliaciones." icono="bank" tono="blue" empresa=empresa only %}{% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="billing-empty" data-billing-empty hidden>
+        {% include "facturacion/partials/dashboard_icono.html" with icono="search" only %}
+        <h2>No hay operaciones para mostrar</h2>
+        <p>Prueba con otra búsqueda o revisa los accesos habilitados para esta empresa.</p>
+        <button class="billing-button" type="button" data-billing-reset>Ver todos los accesos</button>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'facturacion/dashboard_modulo.js' %}" defer></script>
 {% endblock %}

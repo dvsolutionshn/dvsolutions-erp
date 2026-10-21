@@ -1,0 +1,9 @@
+<a class="billing-card" href="{% url ruta empresa.slug %}" data-billing-card data-billing-title="{{ titulo }}" data-billing-keywords="{{ categoria }} {{ descripcion }}" data-tone="{{ tono }}" aria-label="Abrir {{ titulo }}">
+    <div class="billing-card-top">
+        <span class="billing-card-icon">{% include "facturacion/partials/dashboard_icono.html" with icono=icono only %}</span>
+        <span class="billing-card-category">{{ categoria }}</span>
+    </div>
+    <h3>{{ titulo }}</h3>
+    <p>{{ descripcion }}</p>
+    <div class="billing-card-action"><span>Abrir</span>{% include "facturacion/partials/dashboard_icono.html" with icono="arrow" only %}</div>
+</a>

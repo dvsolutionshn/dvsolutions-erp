@@ -1831,7 +1831,7 @@ class FacturacionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Facturación")
-        self.assertContains(response, "Configuracion")
+        self.assertContains(response, "Configuración")
         self.assertContains(response, "Clientes")
         self.assertContains(response, "Productos")
         self.assertContains(response, "Inventario")
