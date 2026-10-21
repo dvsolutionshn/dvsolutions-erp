@@ -196,10 +196,13 @@ MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", not EMAIL_USE_SSL)
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured("Configura solo EMAIL_USE_TLS o EMAIL_USE_SSL, no ambas opciones.")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "465" if EMAIL_USE_SSL else "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
 EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "20"))
 # Email
 # In local development we keep console as fallback, but automatically switch to
@@ -213,6 +216,20 @@ EMAIL_BACKEND = os.environ.get(
     else "django.core.mail.backends.smtp.EmailBackend",
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@dvsolutions.local")
+ACCESS_PUBLIC_BASE_URL = os.environ.get("ACCESS_PUBLIC_BASE_URL", "").strip().rstrip("/")
+if ACCESS_PUBLIC_BASE_URL:
+    access_url = urlparse(ACCESS_PUBLIC_BASE_URL)
+    if (
+        access_url.scheme not in {"http", "https"}
+        or not access_url.hostname
+        or access_url.username is not None
+        or access_url.password is not None
+        or access_url.path
+        or access_url.query
+        or access_url.fragment
+        or (not DEBUG and access_url.scheme != "https")
+    ):
+        raise ImproperlyConfigured("ACCESS_PUBLIC_BASE_URL debe ser el origen publico del ERP, con HTTPS en produccion.")
 COMMERCIAL_REQUEST_RECIPIENTS = env_list("COMMERCIAL_REQUEST_RECIPIENTS", ["dv.solutionshn@gmail.com"])
 PUBLIC_WHATSAPP_NUMBER = os.environ.get("PUBLIC_WHATSAPP_NUMBER", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://dvsolutionshn.com").rstrip("/")

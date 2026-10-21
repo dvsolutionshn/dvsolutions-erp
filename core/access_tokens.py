@@ -2,12 +2,15 @@ import hashlib
 import secrets
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import TokenAccesoUsuario
+from .access_security import firma_estado_usuario, token_acceso_valido
+from .models import TokenAccesoUsuario, Usuario
 
 
 def hash_token_acceso(token):
@@ -16,30 +19,69 @@ def hash_token_acceso(token):
 
 def emitir_token_acceso(usuario, tipo, creado_por=None, request=None, horas=24):
     ahora = timezone.now()
-    TokenAccesoUsuario.objects.filter(
-        usuario=usuario,
-        tipo=tipo,
-        revocado=False,
-        fecha_uso__isnull=True,
-    ).update(revocado=True, fecha_revocacion=ahora)
-
     token_raw = secrets.token_urlsafe(32)
-    token = TokenAccesoUsuario.objects.create(
-        usuario=usuario,
-        tipo=tipo,
-        token_hash=hash_token_acceso(token_raw),
-        token_preview=f"{token_raw[:8]}...{token_raw[-4:]}",
-        creado_por=creado_por,
-        fecha_expiracion=ahora + timezone.timedelta(hours=horas),
-        ip_solicitud=_client_ip(request) if request else "",
-    )
+    with transaction.atomic():
+        usuario_actual = Usuario.objects.select_for_update().get(pk=usuario.pk)
+        token = TokenAccesoUsuario.objects.create(
+            usuario=usuario_actual,
+            tipo=tipo,
+            token_hash=hash_token_acceso(token_raw),
+            token_preview=f"{token_raw[:8]}...{token_raw[-4:]}",
+            estado_usuario_hash=firma_estado_usuario(usuario_actual),
+            estado_envio=TokenAccesoUsuario.ENVIO_PENDIENTE,
+            creado_por=creado_por,
+            fecha_expiracion=ahora + timezone.timedelta(hours=horas),
+            ip_solicitud=_client_ip(request) if request else "",
+        )
     return token_raw, token
 
 
 def enviar_correo_acceso(request, usuario, token_raw, token, tipo):
-    url = request.build_absolute_uri(
-        reverse("establecer_acceso", args=[token_raw])
-    )
+    ruta = reverse("establecer_acceso", args=[token_raw])
+    base_url = getattr(settings, "ACCESS_PUBLIC_BASE_URL", "").rstrip("/")
+    url = f"{base_url}{ruta}" if base_url else request.build_absolute_uri(ruta)
+    intento = timezone.now()
+    try:
+        # Mismo orden de bloqueos que al consumir el enlace o editar la cuenta.
+        # El enlace anterior se conserva hasta que SMTP acepte el nuevo mensaje.
+        with transaction.atomic():
+            usuario_actual = Usuario.objects.select_for_update().get(pk=usuario.pk)
+            token_actual = TokenAccesoUsuario.objects.select_for_update().get(pk=token.pk)
+            if (
+                token_actual.usuario_id != usuario_actual.pk
+                or token_actual.tipo != tipo
+                or token_actual.token_hash != hash_token_acceso(token_raw)
+                or not token_acceso_valido(token_actual, usuario_actual)
+                or token_actual.fecha_envio is not None
+            ):
+                raise ValueError("El enlace ya no es valido para esta cuenta.")
+            if settings.EMAIL_BACKEND in {
+                "django.core.mail.backends.console.EmailBackend",
+                "django.core.mail.backends.dummy.EmailBackend",
+                "django.core.mail.backends.filebased.EmailBackend",
+            }:
+                raise ImproperlyConfigured("Configura SMTP para enviar invitaciones por correo.")
+            _enviar_mensaje_acceso(usuario_actual, token_actual, tipo, url)
+            ahora = timezone.now()
+            token_actual.estado_envio = TokenAccesoUsuario.ENVIO_ENVIADO
+            token_actual.fecha_intento_envio = intento
+            token_actual.fecha_envio = ahora
+            token_actual.save(update_fields=["estado_envio", "fecha_intento_envio", "fecha_envio"])
+            TokenAccesoUsuario.objects.filter(
+                usuario=usuario_actual, tipo=tipo, revocado=False, fecha_uso__isnull=True,
+            ).exclude(pk=token_actual.pk).update(revocado=True, fecha_revocacion=ahora)
+    except Exception:
+        TokenAccesoUsuario.objects.filter(pk=token.pk, fecha_envio__isnull=True).update(
+            estado_envio=TokenAccesoUsuario.ENVIO_ERROR,
+            fecha_intento_envio=intento,
+            revocado=True,
+            fecha_revocacion=timezone.now(),
+        )
+        raise
+    return url
+
+
+def _enviar_mensaje_acceso(usuario, token, tipo, url):
     es_invitacion = tipo == TokenAccesoUsuario.TIPO_INVITACION
     asunto = (
         f"Activa tu acceso a {usuario.empresa.nombre if usuario.empresa else 'DV Solutions ERP'}"
@@ -62,8 +104,8 @@ def enviar_correo_acceso(request, usuario, token_raw, token, tipo):
         to=[usuario.email],
     )
     mensaje.attach_alternative(html, "text/html")
-    mensaje.send(fail_silently=False)
-    return url
+    if mensaje.send(fail_silently=False) != 1:
+        raise RuntimeError("El servidor de correo no acepto el mensaje.")
 
 
 def _client_ip(request):

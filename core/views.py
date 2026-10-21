@@ -28,6 +28,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .assistant import responder_consulta
 from .access import interfaz_clinica_activa
+from .access_security import token_acceso_valido
 from .access_tokens import emitir_token_acceso, enviar_correo_acceso, hash_token_acceso
 from .backup_service import generar_respaldo_empresa
 from .backup_tokens import generar_token_respaldo, hash_token_respaldo
@@ -796,6 +797,7 @@ def solicitar_recuperacion(request, slug=None):
     )
 
 
+@never_cache
 def establecer_acceso(request, token_raw):
     token = (
         TokenAccesoUsuario.objects.select_related("usuario", "usuario__empresa")
@@ -807,27 +809,41 @@ def establecer_acceso(request, token_raw):
         )
         .first()
     )
-    if not token:
+    if not token or not token_acceso_valido(token, token.usuario):
         return render(request, "core/establecer_acceso.html", {"token_invalido": True}, status=400)
 
     usuario = token.usuario
-    form = EstablecerAccesoForm(usuario, request.POST or None)
-    if request.method == "POST" and form.is_valid():
+    guardado = False
+    if request.method == "POST":
         with transaction.atomic():
-            form.save()
-            usuario.is_active = True
-            usuario.save(update_fields=["password", "is_active"])
-            token.fecha_uso = timezone.now()
-            token.save(update_fields=["fecha_uso"])
-            TokenAccesoUsuario.objects.filter(
-                usuario=usuario,
-                fecha_uso__isnull=True,
-                revocado=False,
-            ).exclude(pk=token.pk).update(
-                revocado=True,
-                fecha_revocacion=timezone.now(),
-            )
+            # All access mutations lock the owner before its tokens. Read again
+            # under that lock so an old form cannot undo an administrative block
+            # or consume a link that another request has just used.
+            usuario = Usuario.objects.select_for_update().filter(pk=token.usuario_id).first()
+            token = TokenAccesoUsuario.objects.select_for_update().filter(pk=token.pk).first()
+            if not usuario or not token_acceso_valido(token, usuario):
+                return render(request, "core/establecer_acceso.html", {"token_invalido": True}, status=400)
+            form = EstablecerAccesoForm(usuario, request.POST)
+            if form.is_valid():
+                form.save(commit=False)
+                if token.tipo == TokenAccesoUsuario.TIPO_INVITACION:
+                    usuario.is_active = True
+                usuario.save(update_fields=["password", "is_active"])
+                token.fecha_uso = timezone.now()
+                token.save(update_fields=["fecha_uso"])
+                TokenAccesoUsuario.objects.filter(
+                    usuario=usuario,
+                    fecha_uso__isnull=True,
+                    revocado=False,
+                ).exclude(pk=token.pk).update(
+                    revocado=True,
+                    fecha_revocacion=timezone.now(),
+                )
+                guardado = True
+    else:
+        form = EstablecerAccesoForm(usuario)
 
+    if guardado:
         messages.success(request, "Tu contrasena fue creada correctamente. Ya puedes iniciar sesion con tu correo.")
         if usuario.empresa_id:
             return redirect("empresa_login", slug=usuario.empresa.slug)
@@ -2239,24 +2255,35 @@ def superadmin_usuario_create(request):
 
 @superadmin_required
 def superadmin_usuario_edit(request, usuario_id):
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-    email_anterior = usuario.email
-    form = UsuarioControlUpdateForm(request.POST or None, instance=usuario)
-    if request.method == "POST" and form.is_valid():
-        usuario = form.save()
-        _guardar_roles_por_empresa(usuario, request.POST)
-        if not usuario.is_active and email_anterior.lower() != usuario.email.lower():
-            TokenAccesoUsuario.objects.filter(
-                usuario=usuario,
-                fecha_uso__isnull=True,
-                revocado=False,
-            ).update(revocado=True, fecha_revocacion=timezone.now())
-            messages.warning(
-                request,
-                "El correo fue actualizado. Reenvia la invitacion para entregar un enlace valido a la nueva direccion.",
-            )
-        messages.success(request, f"Usuario {usuario.username} actualizado correctamente.")
-        return redirect("superadmin_usuarios")
+    if request.method == "POST":
+        with transaction.atomic():
+            usuario = get_object_or_404(Usuario.objects.select_for_update(), id=usuario_id)
+            # ModelForm validation updates its instance; retain the persisted
+            # security state before validating and saving the submitted values.
+            email_anterior = (usuario.email or "").strip().lower()
+            activo_anterior = usuario.is_active
+            password_anterior = usuario.password
+            form = UsuarioControlUpdateForm(request.POST, instance=usuario)
+            if form.is_valid():
+                usuario = form.save()
+                _guardar_roles_por_empresa(usuario, request.POST)
+                cambio_email = email_anterior != usuario.email.strip().lower()
+                if cambio_email or (activo_anterior and not usuario.is_active) or password_anterior != usuario.password:
+                    TokenAccesoUsuario.objects.filter(
+                        usuario=usuario,
+                        fecha_uso__isnull=True,
+                        revocado=False,
+                    ).update(revocado=True, fecha_revocacion=timezone.now())
+                if cambio_email and not usuario.is_active and not usuario.has_usable_password():
+                    messages.warning(
+                        request,
+                        "El correo fue actualizado. Reenvia la invitacion para entregar un enlace valido a la nueva direccion.",
+                    )
+                messages.success(request, f"Usuario {usuario.username} actualizado correctamente.")
+                return redirect("superadmin_usuarios")
+    else:
+        usuario = get_object_or_404(Usuario, id=usuario_id)
+        form = UsuarioControlUpdateForm(instance=usuario)
 
     return render(request, "core/superadmin_usuario_form.html", {
         **_superadmin_base_context(),
@@ -2376,19 +2403,19 @@ def superadmin_usuario_restore(request, usuario_id):
 @require_POST
 def superadmin_usuario_reenviar_invitacion(request, usuario_id):
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    if usuario.retirado_control:
+        messages.error(request, "Restaura la cuenta antes de invitar de nuevo al usuario.")
+        return redirect("superadmin_usuarios")
     if not usuario.email:
         messages.error(request, "El usuario necesita un correo antes de poder recibir una invitacion.")
         return redirect("superadmin_usuario_edit", usuario_id=usuario.id)
-    if usuario.is_active and usuario.has_usable_password():
+    if usuario.is_active or usuario.has_usable_password():
         messages.error(
             request,
-            "Este usuario ya activo debe utilizar la opcion 'Olvide mi contrasena' desde el login de su empresa.",
+            "Esta cuenta ya tiene acceso configurado. Si esta bloqueada, habilitala desde Editar; para cambiar la contrasena utiliza la recuperacion de acceso.",
         )
         return redirect("superadmin_usuarios")
 
-    usuario.is_active = False
-    usuario.set_unusable_password()
-    usuario.save(update_fields=["is_active", "password"])
     token_raw, token = emitir_token_acceso(
         usuario,
         TokenAccesoUsuario.TIPO_INVITACION,
@@ -2406,7 +2433,10 @@ def superadmin_usuario_reenviar_invitacion(request, usuario_id):
         )
     except Exception:
         logger.exception("No se pudo reenviar la invitacion del usuario %s", usuario.pk)
-        messages.error(request, f"No se pudo enviar el correo a {usuario.email}. Revisa la configuracion SMTP.")
+        messages.error(
+            request,
+            f"No se pudo enviar el correo a {usuario.email}. Revisa la configuracion SMTP. Las invitaciones anteriores que sigan vigentes se conservan.",
+        )
     else:
         messages.success(request, f"Invitacion reenviada a {usuario.email}.")
     return redirect("superadmin_usuarios")

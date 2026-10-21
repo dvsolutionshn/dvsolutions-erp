@@ -1157,6 +1157,16 @@ class TokenAccesoUsuario(models.Model):
         (TIPO_INVITACION, "Invitacion"),
         (TIPO_RECUPERACION, "Recuperacion"),
     ]
+    ENVIO_DESCONOCIDO = "desconocido"
+    ENVIO_PENDIENTE = "pendiente"
+    ENVIO_ENVIADO = "enviado"
+    ENVIO_ERROR = "error"
+    ESTADO_ENVIO_CHOICES = [
+        (ENVIO_DESCONOCIDO, "Envio sin confirmar"),
+        (ENVIO_PENDIENTE, "Sin enviar"),
+        (ENVIO_ENVIADO, "Enviado al servidor de correo"),
+        (ENVIO_ERROR, "Error de envio"),
+    ]
 
     usuario = models.ForeignKey(
         "core.Usuario",
@@ -1166,6 +1176,12 @@ class TokenAccesoUsuario(models.Model):
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
     token_preview = models.CharField(max_length=20)
+    estado_usuario_hash = models.CharField(max_length=64, blank=True, default="")
+    estado_envio = models.CharField(
+        max_length=20, choices=ESTADO_ENVIO_CHOICES, default=ENVIO_DESCONOCIDO,
+    )
+    fecha_intento_envio = models.DateTimeField(blank=True, null=True)
+    fecha_envio = models.DateTimeField(blank=True, null=True)
     creado_por = models.ForeignKey(
         "core.Usuario",
         on_delete=models.SET_NULL,
@@ -1191,12 +1207,18 @@ class TokenAccesoUsuario(models.Model):
 
     @property
     def estado_display(self):
+        if self.estado_envio == self.ENVIO_ERROR:
+            return "Error de envio"
         if self.revocado:
             return "Revocado"
         if self.fecha_uso:
             return "Utilizado"
         if self.fecha_expiracion <= timezone.now():
             return "Vencido"
+        if self.estado_envio == self.ENVIO_PENDIENTE:
+            return "Sin enviar"
+        if self.estado_envio == self.ENVIO_DESCONOCIDO:
+            return "Envio sin confirmar"
         return "Pendiente"
 
     def __str__(self):
