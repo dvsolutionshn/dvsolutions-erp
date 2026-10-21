@@ -39,7 +39,7 @@ class AccessEmailDesignTests(SimpleTestCase):
         self.assertEqual(partes[1].get_content_type(), "image/png")
         self.assertEqual(partes[1].get_content_disposition(), "inline")
         self.assertTrue(partes[1].get_payload(decode=True).startswith(b"\x89PNG\r\n\x1a\n"))
-        cid = str(partes[1]["Content-ID"])
+        cid = str(partes[1]["Content-ID"]).strip()
         self.assertTrue(cid.startswith("<") and cid.endswith(">"))
         self.assertIn(f'cid:{cid[1:-1]}', alternativas[1].get_content())
         self.assertNotEqual(cid, self.correo().attachments[0]["Content-ID"])
