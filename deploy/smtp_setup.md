@@ -37,22 +37,29 @@ Antes de usar este cambio, aplicar la migracion `core.0056_seguridad_envio_invit
 
 Las invitaciones nuevas duran 48 horas y la recuperacion dura 2 horas. Cambiar el correo o la contrasena, desactivar o retirar una cuenta invalida sus enlaces. Un reenvio solo revoca el enlace anterior cuando SMTP acepta el nuevo correo. Si falla, el listado muestra `Error de envio` y conserva los enlaces anteriores que aun sean validos. El backend de consola no se presenta como envio real.
 
-En el servidor, cargar las mismas variables que usa el servicio y ejecutar con su entorno virtual:
+En la instalacion actual, ejecutar el diagnostico con el usuario, directorio y archivo de entorno del servicio real:
 
 ```bash
-cd /opt/dvsolutions/repo
-set -a
-source .env.production
-set +a
-venv/bin/python manage.py comprobar_smtp
+sudo systemd-run --quiet --wait --pipe --collect \
+  --property=User=dvsolutions \
+  --property=WorkingDirectory=/var/www/dvsolutions-erp \
+  --property=EnvironmentFile=/etc/dvsolutions-erp.env \
+  /var/www/dvsolutions-erp/.venv/bin/python manage.py comprobar_smtp
 ```
+
+systemd lee `EnvironmentFile` con la misma semantica que el servicio y entrega sus variables al proceso de diagnostico. No usar `source` ni un parser que divida valores por espacios: el formato de systemd no es un script de shell y los remitentes pueden incluir espacios. No imprimir el archivo ni el entorno del proceso. [systemd-run](https://www.freedesktop.org/software/systemd/man/255/systemd-run.html), [EnvironmentFile](https://www.freedesktop.org/software/systemd/man/255/systemd.exec.html#EnvironmentFile=).
 
 Este comando conecta y autentica cuando hay credenciales; no envia mensajes ni crea usuarios. Los errores se muestran sin revelar la credencial ni la respuesta completa del servidor SMTP. Una comprobacion de conexion no confirma que un destinatario vaya a recibir el correo.
 
-Con autorizacion para un destinatario de prueba concreto:
+La prueba autorizada para esta configuracion se dirige exclusivamente a Daniel:
 
 ```bash
-venv/bin/python manage.py comprobar_smtp --to CORREO_DE_PRUEBA_AUTORIZADO
+sudo systemd-run --quiet --wait --pipe --collect \
+  --property=User=dvsolutions \
+  --property=WorkingDirectory=/var/www/dvsolutions-erp \
+  --property=EnvironmentFile=/etc/dvsolutions-erp.env \
+  /var/www/dvsolutions-erp/.venv/bin/python manage.py comprobar_smtp \
+  --to daniel.varela@dvsolutionshn.com
 ```
 
 Este segundo comando si envia un mensaje sencillo. Que SMTP lo acepte no confirma entrega en la bandeja de entrada; comprobar tambien spam y, si corresponde, los registros de entrega del proveedor. [Backend SMTP de Django](https://docs.djangoproject.com/en/5.2/topics/email/#smtp-backend).
@@ -61,11 +68,11 @@ Despues de aplicar las variables al servicio, reiniciar la unidad real de Gunico
 
 En Windows local, cargar las variables en el proceso de PowerShell antes de iniciar `manage.py`; escribirlas en `.env` por si solo no las carga. Usar el backend de consola solo para desarrollo: imprime el correo y no lo entrega a personas.
 
-## Remitente elegido: oasis@dvsolutionshn.com
+## Prueba local con Google y remitente solicitado: oasis@dvsolutionshn.com
 
-El 21/10/2026 se verifico que el MX del dominio es `smtp.google.com`, correspondiente a Google Workspace. El usuario confirmo que `oasis@dvsolutionshn.com` es un alias de la cuenta principal `daniel.varela@dvsolutionshn.com`. La autenticacion SMTP usa a Daniel y el remitente visible se mantiene en `oasis@dvsolutionshn.com`, autorizado en Gmail como "Enviar como".
+El 21/10/2026 se verifico que el MX del dominio es `smtp.google.com`, correspondiente a Google Workspace. El usuario confirmo que `oasis@dvsolutionshn.com` es un alias de la cuenta principal `daniel.varela@dvsolutionshn.com`. La prueba local autentica con Daniel y solicita `oasis@dvsolutionshn.com` como remitente. La cuenta debe permitir ese alias como "Enviar como"; esta configuracion local no determina el remitente activo en produccion.
 
-Configuracion preparada para el backend SMTP de Google:
+Configuracion local para el backend SMTP de Google:
 
 ```dotenv
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
@@ -81,7 +88,7 @@ ACCESS_PUBLIC_BASE_URL=https://dvsolutionshn.com
 
 Agregar `EMAIL_HOST_PASSWORD` directamente en el entorno privado con una contrasena de aplicacion generada en `daniel.varela@dvsolutionshn.com`, sin ponerla en Git, comandos con historial o chat. Google requiere verificacion en dos pasos para crearla y las politicas de Workspace pueden limitar su disponibilidad. [Crear contrasena de aplicacion](https://myaccount.google.com/apppasswords), [instrucciones oficiales de Google](https://support.google.com/accounts/answer/185833?hl=es), [SMTP para aplicaciones](https://support.google.com/a/answer/176600?hl=en), [enviar desde un alias](https://support.google.com/mail/answer/22370?hl=es).
 
-Desde el entorno de la aplicacion, comprobar primero autenticacion con `python manage.py comprobar_smtp`. El destinatario autorizado por el usuario para la prueba es **daniel.varela@dvsolutionshn.com**:
+En un proceso local que haya cargado esas variables, comprobar primero autenticacion con `python manage.py comprobar_smtp`. El destinatario autorizado por el usuario para la prueba es **daniel.varela@dvsolutionshn.com**:
 
 ```bash
 python manage.py comprobar_smtp --to daniel.varela@dvsolutionshn.com
@@ -108,6 +115,8 @@ En servidores con acceso permitido a Google SMTP, `bash deploy/configurar_smtp_g
 
 La aplicacion esta en `/var/www/dvsolutions-erp`, el servicio es `dvsolutions.service` y carga `/etc/dvsolutions-erp.env`. Su entorno virtual es `.venv`. Se verifico que Google SMTP no es accesible desde este servidor en los puertos 587 y 465; el firewall local permite salida y HTTPS funciona. DigitalOcean documenta el bloqueo predeterminado de los puertos SMTP 25, 465 y 587. [Politica de DigitalOcean](https://docs.digitalocean.com/support/why-is-smtp-blocked/).
 
-El ERP ya dispone de una cuenta SMTP de Brevo que autentica correctamente por `smtp-relay.brevo.com:2525`. Conservar el usuario y la clave de Brevo existentes en el archivo privado del servicio; la clave de aplicacion de Google se usa solo en la prueba local. El remitente visible solicitado sigue siendo `DV Solutions <oasis@dvsolutionshn.com>` y el origen de los enlaces es `https://dvsolutionshn.com`.
+Las correcciones de invitaciones y la migracion `0056` estan aplicadas. El ERP dispone de una cuenta SMTP de Brevo que autentica correctamente por `smtp-relay.brevo.com:2525`, con `EMAIL_USE_TLS=true` y `EMAIL_USE_SSL=false`. Se conservaron el usuario y la clave de Brevo en el archivo privado del servicio; la clave de aplicacion de Google se usa solo en la prueba local.
+
+El remitente vigente y conservado en produccion es **`dv.solutionshn@gmail.com`**. El cambio al remitente solicitado **`oasis@dvsolutionshn.com`** sigue pendiente de verificacion en Brevo y de confirmar la entrega a Daniel. La autenticacion SMTP correcta no verifica por si sola el permiso para enviar desde Oasis ni su entrega. No sustituir el remitente existente hasta completar esa comprobacion. El origen de los enlaces ya es `https://dvsolutionshn.com`.
 
 Brevo admite STARTTLS por el puerto 2525 cuando el proveedor bloquea 587. El remitente debe estar verificado o pertenecer a un dominio autenticado en la cuenta de Brevo; que SMTP acepte un mensaje no demuestra que haya llegado a la bandeja. [Puertos de Brevo](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525), [validacion del remitente](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP).
