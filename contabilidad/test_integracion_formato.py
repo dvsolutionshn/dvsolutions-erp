@@ -2,7 +2,10 @@
 
 from decimal import Decimal
 
+from django.templatetags.static import static
 from django.test import TestCase
+
+from core.models import RolSistema, Usuario
 
 from . import test_asiento_interfaz as interfaz
 from .models import AsientoContable
@@ -16,6 +19,40 @@ class FormatoImportesAsientoTests(TestCase):
     setUp = interfaz.AsientoInterfazTests.setUp
     ruta = interfaz.AsientoInterfazTests.ruta
     datos = interfaz.AsientoInterfazTests.datos
+
+    def test_crear_y_editar_cargan_formato_actual_para_todos_los_perfiles(self):
+        respuesta = self.client.post(self.ruta(), self.datos())
+        self.assertEqual(respuesta.status_code, 302)
+        asiento = AsientoContable.objects.get(empresa=self.empresa)
+        rol_captura = RolSistema.objects.create(
+            nombre="Captura de importes", codigo="captura-importes",
+            puede_contabilidad=True, puede_crear_asientos=True,
+            puede_contabilizar_asientos=False,
+        )
+        captura = Usuario.objects.create_user(
+            username="captura-importes", empresa=self.empresa, rol_sistema=rol_captura,
+        )
+        administrador = Usuario.objects.create_user(
+            username="administrador-importes", empresa=self.empresa,
+            is_staff=True, is_superuser=True,
+        )
+        recurso = f"{static('contabilidad/asiento.js')}?v=20261021-formato-miles"
+        for usuario, puede_contabilizar in (
+            (administrador, True), (self.usuario, True), (captura, False),
+        ):
+            self.client.force_login(usuario)
+            for ruta in (self.ruta(), self.ruta("editar_asiento_contable", asiento)):
+                with self.subTest(usuario=usuario.username, ruta=ruta):
+                    respuesta = self.client.get(ruta)
+                    self.assertEqual(respuesta.status_code, 200)
+                    self.assertEqual(
+                        respuesta.content.decode().count(f'<script src="{recurso}" defer></script>'), 1,
+                    )
+                    self.assertEqual(respuesta.context["form"].puede_contabilizar, puede_contabilizar)
+                    self.assertEqual(
+                        {cuenta["id"] for cuenta in respuesta.context["cuentas_busqueda"]},
+                        {self.caja.pk, self.ingreso.pk},
+                    )
 
     def test_conserva_centavos_miles_millones_y_limite_del_importe(self):
         for importe in ("0.01", "1250.00", "1250000.50", "999999999999.99"):
