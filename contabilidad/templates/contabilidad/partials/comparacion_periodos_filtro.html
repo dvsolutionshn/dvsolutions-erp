@@ -1,0 +1,21 @@
+<details class="ef-comparison-control"{% if comparacion or comparacion_error %} open{% endif %}>
+    <summary class="ef-btn ef-comparison-button">
+        {% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %}
+        Comparar períodos
+        <svg class="ac-icon ef-comparison-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+    <div class="ef-comparison-settings">
+        <div class="ef-comparison-intro"><h2>Comparación mensual</h2><p>{% if modo == "balance" %}Consulta el saldo de cierre de cada mes. Los saldos mensuales se muestran por separado.{% else %}Consulta los ingresos, costos y gastos de cada mes, junto con su acumulado del rango.{% endif %}</p></div>
+        {% if comparacion_error %}<p class="ef-comparison-error" role="alert">{{ comparacion_error }}</p>{% endif %}
+        <form method="get" class="ef-filters" aria-label="Comparar períodos contables">
+            <input type="hidden" name="comparar" value="1">
+            <div class="ef-field"><label for="mes_inicio">Mes/año inicial</label><input type="month" id="mes_inicio" name="mes_inicio" value="{{ comparacion_form.mes_inicio }}" required></div>
+            <span class="ef-comparison-range-arrow" aria-hidden="true">→</span>
+            <div class="ef-field"><label for="mes_fin">Mes/año final</label><input type="month" id="mes_fin" name="mes_fin" value="{{ comparacion_form.mes_fin }}" required></div>
+            <div class="ef-filter-actions">
+                <button type="submit" class="ef-btn ef-btn--primary">Aplicar comparación</button>
+                {% if comparacion %}<a class="ef-btn ef-btn--quiet" href="{% if modo == 'balance' %}{% url 'balance_general' empresa.slug %}?fecha_corte={{ filtros.fecha_corte|urlencode }}{% else %}{% url 'estado_resultados' empresa.slug %}?fecha_inicio={{ filtros.fecha_inicio|urlencode }}&amp;fecha_fin={{ filtros.fecha_fin|urlencode }}{% endif %}">Volver al reporte individual</a>{% endif %}
+            </div>
+        </form>
+    </div>
+</details>

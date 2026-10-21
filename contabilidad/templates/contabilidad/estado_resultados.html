@@ -2,11 +2,11 @@
 {% load static %}
 
 {% block title %}Estado de Resultados · {{ empresa.nombre }}{% endblock %}
-{% block body_class %}{{ block.super }} accounting-reports-page{% endblock %}
+{% block body_class %}{{ block.super }} accounting-reports-page{% if comparacion %} accounting-comparison-page{% endif %}{% endblock %}
 {% block header_kicker %}Centro financiero{% endblock %}
 {% block header_title %}Contabilidad{% endblock %}
 {% block header_description %}Consulta tus estados financieros y revisa cada saldo de esta empresa.{% endblock %}
-{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/balance_movimientos.css' %}">{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/balance_movimientos.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/comparacion_periodos.css' %}?v=20261021-2">{% endblock %}
 {% block topbar_actions %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ef-btn">Volver a reportes</a>{% endblock %}
 
 {% block content %}
@@ -19,6 +19,7 @@
         {% include "contabilidad/partials/metadatos_estado_financiero.html" with empresa=empresa filtros=filtros modo="resultados" only %}
     </header>
 
+    {% if not comparacion %}
     <section class="ef-filter-bar" aria-labelledby="ef-filter-title">
         <div class="ef-filter-heading"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %}</span><div><h2 id="ef-filter-title">Período del reporte</h2><p>Consulta el rango de fechas que necesitas.</p></div></div>
         <form method="get" class="ef-filters" aria-label="Filtrar estado de resultados por período">
@@ -28,8 +29,14 @@
         </form>
     </section>
 
+    {% endif %}
+    {% include "contabilidad/partials/comparacion_periodos_filtro.html" with modo="resultados" %}
+
     <div class="ef-currency"><span class="ef-currency-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span>{% include "contabilidad/nota_moneda_reportes.html" %}</div>
 
+    {% if comparacion %}
+    {% include "contabilidad/partials/tabla_comparacion_periodos.html" with modo="resultados" %}
+    {% elif not comparacion_error %}
     <section class="ef-kpis" aria-label="Resumen del resultado del período">
         {% include "contabilidad/partials/kpi_estado_financiero.html" with icono="arrow-up" etiqueta="Ingresos" valor=resumen.total_ingresos tono="teal" destino="ef-ingresos" nota="Ingresos del período" only %}
         {% include "contabilidad/partials/kpi_estado_financiero.html" with icono="receipt" etiqueta="Costos" valor=resumen.total_costos tono="amber" destino="ef-costos" nota="Costos del período" only %}
@@ -65,6 +72,7 @@
         <p class="ef-summary-note">Utilidad bruta: <strong>L. {{ resumen.utilidad_bruta|floatformat:"2g" }}</strong>. Los totales cuentan cada movimiento una sola vez.</p>
     </section>
     <div class="ef-reading-bar"><p class="ef-footer-note">Solo asientos contabilizados de {{ empresa.nombre }}.</p><nav class="ef-jump-links" aria-label="Otros reportes contables"><a href="{% url 'balance_comprobacion' empresa.slug %}?{{ request.GET.urlencode }}">Balance de comprobación</a><a href="{% url 'libro_diario' empresa.slug %}?{{ request.GET.urlencode }}">Libro diario</a><a href="{% url 'estado_flujo_efectivo' empresa.slug %}?{{ request.GET.urlencode }}">Flujo de efectivo</a></nav></div>
+    {% endif %}
 </div>
 {% endblock %}
 

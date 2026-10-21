@@ -1,0 +1,106 @@
+/* La vista individual conserva sus estilos y su estructura. */
+.ef-report .ef-comparison-control { align-self: flex-start; min-width: 0; width: 100%; }
+.ef-report .ef-comparison-button { color: #5d58b7; border-color: #dcd8f4; background: #f5f3ff; list-style: none; width: max-content; max-width: 100%; }
+.ef-report .ef-comparison-button::-webkit-details-marker { display: none; }
+.ef-report .ef-comparison-button::marker { content: ""; }
+.ef-report .ef-comparison-button:focus-visible { outline: 3px solid #a6a3e6; outline-offset: 4px; }
+.ef-report .ef-comparison-chevron { margin-left: 8px; transition: transform .18s; }
+.ef-report .ef-comparison-control[open] .ef-comparison-chevron { transform: rotate(180deg); }
+.ef-report .ef-comparison-settings { background: #fff; border: 1px solid #e4e0f5; border-radius: 12px; margin-top: 12px; padding: 20px 22px; }
+.ef-report .ef-comparison-intro { margin-bottom: 17px; }
+.ef-report .ef-comparison-intro h2 { color: #394b65; font-size: 13px; font-weight: 650; }
+.ef-report .ef-comparison-intro p { color: #748399; font-size: 11px; line-height: 1.7; margin-top: 5px; }
+.ef-report .ef-comparison-settings .ef-field { min-width: 180px; }
+.ef-report .ef-comparison-range-arrow { color: #a09dc9; font-size: 20px; line-height: 42px; }
+.ef-report .ef-comparison-error { background: #fff3f2; border: 1px solid #f1d5d2; border-radius: 8px; color: #a14242; font-size: 12px; line-height: 1.7; margin: 0 0 16px; padding: 10px 13px; }
+.ef-report .ef-comparacion { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.ef-report .ef-comparison-overview { align-items: center; background: #f0effb; border: 1px solid #e0ddf5; border-radius: 14px; display: flex; flex-wrap: wrap; gap: 18px; justify-content: space-between; padding: 20px 23px; }
+.ef-report .ef-comparison-overview-main { align-items: center; display: flex; gap: 14px; min-width: 0; }
+.ef-report .ef-comparison-overview .ef-icon-tile { background: #e4e1f9; color: #655fb7; }
+.ef-report .ef-comparison-overview .ef-eyebrow { color: #817aaf; font-size: 9px; margin-bottom: 5px; }
+.ef-report .ef-comparison-overview h2 { color: #46466f; font-size: 19px; font-weight: 700; letter-spacing: -.025em; line-height: 1.4; }
+.ef-report .ef-comparison-overview h2 span { color: #a09ac6; font-weight: 400; padding: 0 7px; }
+.ef-report .ef-comparison-overview p:not(.ef-eyebrow) { color: #797b99; font-size: 11px; line-height: 1.7; margin-top: 6px; }
+.ef-report .ef-comparison-unit { background: #ffffffa8; border: 1px solid #e0ddf3; border-radius: 7px; color: #79769b; font-size: 10px; padding: 7px 10px; white-space: nowrap; }
+.ef-report .ef-comparison-scroll-hint { align-items: center; color: #8b90a6; display: inline-flex; font-size: 10px; gap: 6px; }
+.ef-report .ef-comparison-scroll-hint > span { color: #827abf; font-size: 17px; }
+.ef-report .ef-comparison-scroll { overscroll-behavior-inline: contain; scrollbar-color: #c5c5dc #f2f3f8; scrollbar-width: thin; }
+.ef-report .ef-comparison-scroll:focus-visible { outline: 3px solid #aaa3e4; outline-offset: -3px; }
+.ef-report .ef-comparison-section .ef-comparison-table { border-collapse: separate; border-spacing: 0; margin: 0; max-width: none; min-width: 100%; table-layout: auto; width: max-content; }
+.ef-report .ef-comparison-table .amount { min-width: 142px; text-align: right; }
+.ef-report .ef-comparison-table thead th { font-size: 11px; letter-spacing: .025em; padding: 13px 18px; text-transform: none; }
+.ef-report .ef-comparison-table thead th > span { color: #536b83; display: block; font-weight: 650; }
+.ef-report .ef-comparison-table thead th > small { color: #9aa6b6; display: block; font-size: 9px; font-weight: 400; margin-top: 4px; }
+.ef-report .ef-comparison-table tbody td { font-size: 11px; padding: 12px 18px; }
+.ef-report .ef-comparison-table .ef-comparison-account { background: #fff; border-bottom: 1px solid #edf1f6; border-right: 1px solid #e7ecf3; color: #435b73; font-size: 12px; font-weight: 400; left: 0; min-width: 290px; padding: 12px 20px; position: sticky; text-align: left; vertical-align: middle; width: 290px; z-index: 1; }
+.ef-report .ef-comparison-table thead .ef-comparison-account { background: #f8fafc; color: #7a8ba1; font-size: 10px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; z-index: 2; }
+.ef-report .ef-comparison-table .ef-comparison-account-inner { display: block; max-width: 330px; min-width: 0; }
+.ef-report .ef-comparison-table .ef-codigo { display: block; font-size: 9px; line-height: 1.6; margin-bottom: 2px; }
+.ef-report .ef-comparison-table .ef-cuenta { font-size: 11px; line-height: 1.6; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.ef-report .ef-comparison-table .ef-principal > .ef-comparison-account { background: #fbfcfe; color: #2b435b; font-weight: 700; }
+.ef-report .ef-comparison-table .ef-principal .ef-codigo { color: #64768e; font-weight: 700; }
+.ef-report .ef-comparison-table .ef-principal .ef-cuenta { font-weight: 700; }
+.ef-report .ef-comparison-table tbody tr:hover > .ef-comparison-account { background: #f7f9fd; }
+.ef-report .ef-comparison-table .ef-comparison-accumulated { background: #f5f3fc; border-left: 1px solid #e7e1f5; }
+.ef-report .ef-comparison-table tbody .ef-comparison-negative { color: #ad5264; }
+.ef-report .ef-comparison-table tfoot th { font-size: 11px; padding: 14px 18px; }
+.ef-report .ef-comparison-table tfoot .ef-comparison-account { background: #f5f7fc; color: #354d68; font-size: 11px; font-weight: 700; padding-left: 20px; }
+.ef-report .ef-comparison-summary { border-color: #dedbf2; }
+.ef-report .ef-comparison-summary .ef-section-head { background: #f6f5fc; }
+.ef-report .ef-comparison-summary-row .ef-comparison-account { font-size: 11px; }
+.ef-report .ef-comparison-summary-final > :is(th, td),
+.ef-report .ef-comparison-summary-final > .ef-comparison-account { background: #eff5f5; color: #326b64; font-weight: 700; }
+.ef-report .ef-comparison-summary-final .erp-money { font-weight: 700; }
+.ef-report .ef-comparison-sr-only { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+@media (max-width: 720px) {
+    .ef-report .ef-comparison-settings { padding: 17px; }
+    .ef-report .ef-comparison-settings .ef-filters { gap: 12px; }
+    .ef-report .ef-comparison-settings .ef-field { flex: 1 1 180px; }
+    .ef-report .ef-comparison-range-arrow { display: none; }
+    .ef-report .ef-comparison-overview { padding: 17px; }
+    .ef-report .ef-comparison-overview-main { align-items: flex-start; gap: 11px; }
+    .ef-report .ef-comparison-overview h2 { font-size: 17px; }
+    .ef-report .ef-comparison-overview h2 span { padding: 0 3px; }
+    .ef-report .ef-comparison-unit { display: none; }
+    .ef-report .ef-comparison-table .ef-comparison-account { min-width: 220px; padding-left: 16px; width: 220px; }
+    .ef-report .ef-comparison-table .amount { min-width: 128px; }
+}
+@media (max-width: 430px) {
+    .ef-report .ef-comparison-table .ef-comparison-account { min-width: 175px; width: 175px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ef-report .ef-comparison-chevron { transition: none; }
+}
+@page comparacion-contable { size: A4 landscape; margin: 10mm; }
+@media print {
+    body.accounting-comparison-page { page: comparacion-contable; }
+    .accounting-comparison-page :is(.erp-main, .erp-content, .ef-report, .ef-comparacion, .ef-secciones) { display: block; height: auto; min-height: 0; }
+    .accounting-comparison-page .erp-topbar { display: none !important; }
+    .accounting-comparison-page .ef-report > :not(:last-child),
+    .accounting-comparison-page .ef-comparacion > :not(:last-child),
+    .accounting-comparison-page .ef-secciones > :not(:last-child) { margin-bottom: 12px; }
+    .ef-report .ef-comparison-control,
+    .ef-report .ef-comparison-scroll-hint { display: none !important; }
+    .ef-report .ef-comparacion { gap: 12px; }
+    .ef-report .ef-comparison-overview { background: #fff; border-color: #d8dee8; break-inside: avoid; padding: 10px; }
+    .ef-report .ef-comparison-overview h2 { color: #222; font-size: 16px; }
+    .ef-report .ef-comparison-overview p:not(.ef-eyebrow) { color: #555; font-size: 9px; }
+    .accounting-comparison-page .ef-comparison-overview-main,
+    .accounting-comparison-page .ef-comparison-section .ef-section-head,
+    .accounting-comparison-page .ef-comparison-section .ef-section-title { display: block; }
+    .accounting-comparison-page .ef-comparison-overview .ef-icon-tile,
+    .accounting-comparison-page .ef-comparison-section .ef-section-title .ef-icon-tile { display: none; }
+    .accounting-comparison-page .ef-comparison-section .ef-section-unit { margin-top: 4px; }
+    .accounting-comparison-page .ef-comparison-section .ef-section-head { break-inside: avoid; break-after: avoid; }
+    .ef-report .ef-comparison-section .ef-comparison-table { font-size: 7px; table-layout: fixed; width: 100%; }
+    .ef-report .ef-comparison-table .ef-comparison-account { background: #fff; border-right-color: #d8dee8; left: auto; min-width: 0; padding: 5px 7px; position: static; width: 22%; }
+    .ef-report .ef-comparison-table .ef-comparison-account-inner { max-width: none; }
+    .ef-report .ef-comparison-table .ef-cuenta { font-size: 7px; line-height: 1.4; }
+    .ef-report .ef-comparison-table .ef-codigo { font-size: 6px; }
+    .ef-report .ef-comparison-table .amount { font-size: 7px; min-width: 0; overflow-wrap: anywhere; padding: 5px 4px; white-space: normal; }
+    .ef-report .ef-comparison-table .erp-money { white-space: normal; }
+    .ef-report .ef-comparison-table thead th { font-size: 7px; padding: 6px 4px; }
+    .ef-report .ef-comparison-table thead th > small { color: #555; font-size: 6px; }
+    .ef-report .ef-comparison-table tfoot .ef-comparison-account { font-size: 7px; padding-left: 7px; }
+    .ef-report .ef-comparison-table .ef-comparison-summary-row .ef-comparison-account { font-size: 7px; }
+}

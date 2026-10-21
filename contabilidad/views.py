@@ -11,7 +11,7 @@ from decimal import Decimal
 from django.utils import formats, timezone
 from django.utils.dateparse import parse_date
 
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -47,6 +47,7 @@ from .alcance_catalogo import es_empresa_rumi
 from .catalogo_rumi_roles import usa_catalogo_rumi
 from .catalogo_consulta import ordenar_catalogo
 from .cierre import revisar_cierre_periodo
+from .comparacion_reportes import ErrorComparacionPeriodos, datos_comparacion_balance, datos_comparacion_resultados, formulario_comparacion
 from .dashboard import datos_dashboard_contable
 from .listado_asientos import contexto_listado_asientos
 from .moneda import convertir_a_lempiras, distribuir_conversion
@@ -2393,10 +2394,90 @@ def exportar_balance_comprobacion_excel(request, empresa_slug):
 @login_required
 def estado_resultados(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    filtros = _filtros_reportes(request)
-    data = datos_estado_resultados(empresa, **filtros)
-    data.update(empresa=empresa, filtros=filtros)
+    data = _datos_estado_financiero(request, empresa, "resultados")
     return _render_reporte(request, "contabilidad/estado_resultados.html", data)
+
+
+def _datos_estado_financiero(request, empresa, modo, *, exportacion=False):
+    filtros = {"fecha_corte": request.GET.get("fecha_corte") or ""} if modo == "balance" else _filtros_reportes(request)
+    formulario = formulario_comparacion(request.GET, filtros)
+    comparacion, error = None, ""
+    if request.GET.get("comparar") == "1":
+        calcular = datos_comparacion_balance if modo == "balance" else datos_comparacion_resultados
+        try:
+            comparacion = calcular(empresa, **formulario)
+        except ErrorComparacionPeriodos as excepcion:
+            if exportacion:
+                raise
+            error = str(excepcion)
+            # Un rango mensual inválido nunca se convierte en filtros de fecha
+            # para los saldos ni provoca una consulta con valores incompletos.
+            filtros = {clave: "" for clave in filtros}
+    if comparacion:
+        data = comparacion["datos_actuales"].copy()
+        filtros = comparacion["filtros"]
+    elif modo == "balance":
+        data = datos_balance_general(empresa, **filtros)
+    else:
+        data = datos_estado_resultados(empresa, **filtros)
+    data.update(
+        empresa=empresa, filtros=filtros, comparacion=comparacion,
+        comparacion_form=formulario, comparacion_error=error,
+    )
+    return data
+
+
+def _exportar_comparacion_excel(empresa, comparacion, modo):
+    titulo = "Balance General" if modo == "balance" else "Estado de Resultados"
+    workbook, sheet = _preparar_excel(f"{titulo} · Comparativo HNL")
+    sheet["A2"] = f"{comparacion['etiqueta_inicio']} → {comparacion['etiqueta_fin']}"
+    sheet.append(["Código", "Cuenta", *[
+        columna["etiqueta"] if columna["es_acumulado"] else f"{columna['etiqueta']} {columna['anio']}"
+        for columna in comparacion["columnas"]
+    ]])
+    _aplicar_encabezado(sheet, 3)
+    sheet.freeze_panes = "C4"
+    for grupo in comparacion["grupos"]:
+        sheet.append([grupo["titulo"]])
+        sheet.cell(sheet.max_row, 1).font = Font(bold=True)
+        for fila in grupo["filas"]:
+            cuenta = fila["cuenta"]
+            sheet.append([cuenta.codigo if cuenta else "", cuenta.nombre if cuenta else fila["nombre"], *fila["saldos"]])
+            sheet.cell(sheet.max_row, 2).alignment = Alignment(indent=min(fila["nivel"], 250))
+            for celda in sheet[sheet.max_row]:
+                celda.font = Font(bold=bool(fila["es_agrupadora"]))
+        sheet.append(["", f"Total {grupo['titulo'].lower()}", *grupo["totales"]])
+        for celda in sheet[sheet.max_row]:
+            celda.font = Font(bold=True)
+        sheet.append([])
+    for fila in comparacion["resumen_filas"]:
+        sheet.append(["", fila["etiqueta"], *fila["saldos"]])
+        for celda in sheet[sheet.max_row]:
+            celda.font = Font(bold=True)
+    for fila in sheet.iter_rows(min_row=4, min_col=3):
+        for celda in fila:
+            if isinstance(celda.value, Decimal):
+                celda.number_format = '#,##0.00;[Red]-#,##0.00'
+    sheet.append([])
+    sheet.append([
+        "Cada mes muestra su saldo de cierre; los meses no se suman entre sí."
+        if modo == "balance" else "Cada mes muestra sus movimientos; Acumulado corresponde al rango completo."
+    ])
+    sheet.append(["Las cuentas principales acumulan sus subcuentas; los totales cuentan cada movimiento una sola vez."])
+    _advertencias_excel_reporte(sheet, empresa, comparacion["filtros"])
+    _autoajustar_columnas(sheet)
+    sheet.column_dimensions["A"].width = 18
+    sheet.column_dimensions["B"].width = 48
+    sheet.sheet_properties.pageSetUpPr.fitToPage = True
+    sheet.page_setup.orientation = "landscape"
+    sheet.page_setup.paperSize = sheet.PAPERSIZE_A3
+    sheet.page_setup.fitToWidth = 1
+    sheet.page_setup.fitToHeight = 0
+    sheet.print_title_rows = "1:3"
+    sheet.print_options.horizontalCentered = True
+    sheet.print_area = sheet.dimensions
+    nombre = "Balance_General" if modo == "balance" else "Estado_Resultados"
+    return _respuesta_excel(workbook, f"{nombre}_Comparativo_{empresa.slug}.xlsx")
 
 
 def _agregar_seccion_estado_financiero_excel(sheet, titulo, filas):
@@ -2414,7 +2495,12 @@ def _agregar_seccion_estado_financiero_excel(sheet, titulo, filas):
 @login_required
 def exportar_estado_resultados_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    data = datos_estado_resultados(empresa, **_filtros_reportes(request))
+    try:
+        data = _datos_estado_financiero(request, empresa, "resultados", exportacion=True)
+    except ErrorComparacionPeriodos as error:
+        return HttpResponseBadRequest(str(error))
+    if data["comparacion"]:
+        return _exportar_comparacion_excel(empresa, data["comparacion"], "resultados")
     workbook, sheet = _preparar_excel("Estado de Resultados · HNL")
     sheet.append(["Código", "Cuenta", "Saldo"])
     _aplicar_encabezado(sheet, 3)
@@ -2434,16 +2520,19 @@ def exportar_estado_resultados_excel(request, empresa_slug):
 @login_required
 def balance_general(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_corte = request.GET.get("fecha_corte") or ""
-    data = datos_balance_general(empresa, fecha_corte)
-    data.update(empresa=empresa, filtros={"fecha_corte": fecha_corte})
+    data = _datos_estado_financiero(request, empresa, "balance")
     return _render_reporte(request, "contabilidad/balance_general.html", data)
 
 
 @login_required
 def exportar_balance_general_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    data = datos_balance_general(empresa, request.GET.get("fecha_corte") or "")
+    try:
+        data = _datos_estado_financiero(request, empresa, "balance", exportacion=True)
+    except ErrorComparacionPeriodos as error:
+        return HttpResponseBadRequest(str(error))
+    if data["comparacion"]:
+        return _exportar_comparacion_excel(empresa, data["comparacion"], "balance")
     workbook, sheet = _preparar_excel("Balance General · HNL")
     sheet.append(["Código", "Cuenta", "Saldo"])
     _aplicar_encabezado(sheet, 3)

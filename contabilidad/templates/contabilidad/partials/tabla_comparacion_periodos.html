@@ -1,0 +1,40 @@
+<div class="ef-comparacion">
+    <section class="ef-comparison-overview" aria-labelledby="ef-comparison-title">
+        <div class="ef-comparison-overview-main"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><div><p class="ef-eyebrow">Vista comparativa</p><h2 id="ef-comparison-title">{{ comparacion.etiqueta_inicio }} <span aria-hidden="true">→</span> {{ comparacion.etiqueta_fin }}</h2><p>{% if modo == "balance" %}Cada columna muestra el saldo al último día de ese mes.{% else %}Cada columna muestra el movimiento de ese mes. Acumulado reúne todo el rango.{% endif %}</p></div></div>
+        <span class="ef-comparison-unit">HNL · Lempiras</span>
+    </section>
+    <div class="ef-reading-bar"><p>Principales en negrita · Subcuentas indentadas · Cuenta siempre visible al desplazarte.</p><span class="ef-comparison-scroll-hint"><span aria-hidden="true">↔</span> Desliza para ver todos los meses</span></div>
+    <section class="ef-secciones" aria-label="Comparación mensual de cuentas">
+        {% for grupo in comparacion.grupos %}
+        <article class="ef-section ef-comparison-section" data-tone="{{ grupo.tono }}" aria-labelledby="ef-comparison-{{ grupo.clave }}-title">
+            <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><div><h2 id="ef-comparison-{{ grupo.clave }}-title">{{ grupo.titulo }}</h2><p>{% if modo == "balance" %}Saldos de cierre por mes{% else %}Movimientos mensuales y acumulado{% endif %}</p></div></div><span class="ef-section-unit">{{ empresa.nombre }}</span></div>
+            <div class="erp-table-wrap ef-comparison-scroll" role="region" aria-label="{{ grupo.titulo }}: tabla comparativa con desplazamiento horizontal" tabindex="0">
+                <table class="erp-table ef-tabla ef-comparison-table">
+                    <caption class="ef-comparison-sr-only">{{ grupo.titulo }} · {{ comparacion.etiqueta_inicio }} a {{ comparacion.etiqueta_fin }} · Lempiras</caption>
+                    <thead><tr><th class="ef-comparison-account" scope="col">Cuenta</th>{% for columna in comparacion.columnas %}<th class="amount{% if columna.es_acumulado %} ef-comparison-accumulated{% endif %}" scope="col"><span>{{ columna.etiqueta }}</span><small>{% if columna.es_acumulado %}Todo el rango{% else %}{{ columna.anio }}{% endif %}</small></th>{% endfor %}</tr></thead>
+                    <tbody>
+                        {% for fila in grupo.filas %}
+                        <tr class="ef-fila{% if fila.es_agrupadora %} ef-principal{% endif %}"{% if fila.cuenta %} data-cuenta-codigo="{{ fila.cuenta.codigo }}"{% endif %}>
+                            <th class="ef-comparison-account" scope="row"><span class="ef-comparison-account-inner" style="padding-inline-start: {{ fila.sangria_px|default:0 }}px;"><span class="ef-codigo">{% if fila.cuenta %}{{ fila.cuenta.codigo }}{% else %}—{% endif %}</span><span class="ef-cuenta">{% if fila.cuenta %}{{ fila.cuenta.nombre }}{% else %}{{ fila.nombre }}{% endif %}</span></span></th>
+                            {% for saldo in fila.saldos %}<td class="amount{% if modo == 'resultados' and forloop.last %} ef-comparison-accumulated{% endif %}{% if saldo < 0 %} ef-comparison-negative{% endif %}"><span class="erp-money">L. {{ saldo|floatformat:"2g" }}</span></td>{% endfor %}
+                        </tr>
+                        {% empty %}<tr><td class="erp-empty" colspan="{{ comparacion.columnas|length|add:'1' }}">No hay movimientos contabilizados en este grupo para el rango seleccionado.</td></tr>{% endfor %}
+                    </tbody>
+                    <tfoot><tr><th class="ef-comparison-account" scope="row">Total {{ grupo.titulo|lower }}</th>{% for saldo in grupo.totales %}<th class="amount{% if modo == 'resultados' and forloop.last %} ef-comparison-accumulated{% endif %}"><span class="erp-money">L. {{ saldo|floatformat:"2g" }}</span></th>{% endfor %}</tr></tfoot>
+                </table>
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+    <section class="ef-section ef-comparison-section ef-comparison-summary" aria-labelledby="ef-comparison-summary-title">
+        <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}</span><div><h2 id="ef-comparison-summary-title">{% if modo == "balance" %}Ecuación contable por mes{% else %}Resultado por mes{% endif %}</h2><p>{% if modo == "balance" %}Activo = Pasivo + Patrimonio. La diferencia debe ser cero en cada columna.{% else %}Ingresos − Costos − Gastos = Resultado neto.{% endif %}</p></div></div></div>
+        <div class="erp-table-wrap ef-comparison-scroll" role="region" aria-label="Resumen comparativo con desplazamiento horizontal" tabindex="0">
+            <table class="erp-table ef-tabla ef-comparison-table">
+                <caption class="ef-comparison-sr-only">{% if modo == "balance" %}Ecuación contable{% else %}Resultado{% endif %} · {{ comparacion.etiqueta_inicio }} a {{ comparacion.etiqueta_fin }}</caption>
+                <thead><tr><th class="ef-comparison-account" scope="col">Concepto</th>{% for columna in comparacion.columnas %}<th class="amount{% if columna.es_acumulado %} ef-comparison-accumulated{% endif %}" scope="col"><span>{{ columna.etiqueta }}</span><small>{% if columna.es_acumulado %}Todo el rango{% else %}{{ columna.anio }}{% endif %}</small></th>{% endfor %}</tr></thead>
+                <tbody>{% for fila in comparacion.resumen_filas %}<tr class="ef-comparison-summary-row{% if forloop.last %} ef-comparison-summary-final{% endif %}"><th class="ef-comparison-account" scope="row">{{ fila.etiqueta }}</th>{% for saldo in fila.saldos %}<td class="amount{% if modo == 'resultados' and forloop.last %} ef-comparison-accumulated{% endif %}{% if saldo < 0 %} ef-comparison-negative{% endif %}"><span class="erp-money">L. {{ saldo|floatformat:"2g" }}</span></td>{% endfor %}</tr>{% endfor %}</tbody>
+            </table>
+        </div>
+    </section>
+    <p class="ef-footer-note">Solo asientos contabilizados de {{ empresa.nombre }}. Los totales cuentan cada movimiento una sola vez.{% if modo == "balance" %} Los saldos de distintos meses no se suman entre sí.{% endif %}</p>
+</div>
