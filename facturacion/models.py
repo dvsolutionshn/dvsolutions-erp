@@ -1,7 +1,7 @@
 from datetime import timedelta
 import re
 import uuid
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
@@ -614,6 +614,7 @@ class InventarioProducto(models.Model):
         related_name='inventario'
     )
     existencias = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    valor_contable = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True, editable=False)
     stock_minimo = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -780,6 +781,7 @@ class MovimientoInventario(models.Model):
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
     existencia_anterior = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     existencia_resultante = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    valor_contable = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, editable=False)
     referencia = models.CharField(max_length=120, blank=True, null=True)
     observacion = models.TextField(blank=True, null=True)
     factura = models.ForeignKey('Factura', on_delete=models.SET_NULL, null=True, blank=True)
@@ -1150,7 +1152,27 @@ class LineaCompraInventario(models.Model):
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     impuesto = models.ForeignKey(TipoImpuesto, on_delete=models.PROTECT, null=True, blank=True)
     impuesto_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    costo_contable_total = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, editable=False)
+    isv_recuperable_capturado = models.BooleanField(null=True, blank=True, editable=False)
     comentario = models.CharField(max_length=150, blank=True, null=True)
+
+    def clean(self):
+        super().clean()
+        if self.compra_id and self.producto_id and self.producto.empresa_id != self.compra.empresa_id:
+            raise ValidationError({'producto': 'El producto debe pertenecer a la misma empresa de la compra.'})
+        if self.cantidad is not None and self.cantidad <= 0:
+            raise ValidationError({'cantidad': 'La cantidad comprada debe ser mayor que cero.'})
+        if self.costo_unitario is not None and self.costo_unitario < 0:
+            raise ValidationError({'costo_unitario': 'El costo de compra no puede ser negativo.'})
+        if self.descuento_porcentaje is not None and not 0 <= self.descuento_porcentaje <= 100:
+            raise ValidationError({'descuento_porcentaje': 'El descuento debe estar entre 0 y 100.'})
+        if self.pk:
+            anterior = type(self).objects.filter(pk=self.pk).first()
+            if anterior and anterior.costo_contable_total is not None and any(
+                getattr(self, campo) != getattr(anterior, campo)
+                for campo in ('compra_id', 'producto_id', 'cantidad', 'costo_unitario', 'descuento_porcentaje', 'impuesto_id')
+            ):
+                raise ValidationError('No se puede cambiar una línea de compra ya valorada; registre una devolución o un ajuste.')
 
     def calcular_totales(self):
         cantidad = Decimal(self.cantidad or 0)
@@ -1163,15 +1185,20 @@ class LineaCompraInventario(models.Model):
         self.impuesto_monto = (self.subtotal * (porcentaje / Decimal("100"))).quantize(DOS_DECIMALES)
 
     def save(self, *args, **kwargs):
-        self.calcular_totales()
+        self.full_clean()
+        campos = set(kwargs.get('update_fields') or [])
+        economicos = {'cantidad', 'costo_unitario', 'descuento_porcentaje', 'impuesto', 'impuesto_id'}
+        valorada = bool(self.pk and type(self).objects.filter(pk=self.pk, costo_contable_total__isnull=False).exists())
+        if not valorada and (not kwargs.get('update_fields') or campos & economicos):
+            self.calcular_totales()
+            if kwargs.get('update_fields'):
+                kwargs['update_fields'] = campos | {'descuento_monto', 'subtotal', 'impuesto_monto'}
         super().save(*args, **kwargs)
 
     @property
     def total_linea(self):
         subtotal = Decimal(self.subtotal or 0)
         impuesto = Decimal(self.impuesto_monto or 0)
-        if subtotal == 0 and impuesto == 0 and self.cantidad and self.costo_unitario:
-            return (Decimal(self.cantidad) * Decimal(self.costo_unitario)).quantize(DOS_DECIMALES)
         return (subtotal + impuesto).quantize(DOS_DECIMALES)
 
     def __str__(self):
@@ -1362,9 +1389,22 @@ class Factura(models.Model):
     def clean(self):
         super().clean()
         self._validar_numero_factura_manual()
+        if self.cliente_id and self.empresa_id and self.cliente.empresa_id != self.empresa_id:
+            raise ValidationError({'cliente': 'El cliente debe pertenecer a la misma empresa de la factura.'})
+        from contabilidad.moneda import validar_moneda_tipo_cambio
+        self.moneda, self.tipo_cambio = validar_moneda_tipo_cambio(self.moneda, self.tipo_cambio)
+        self.tipo_cambio = self.tipo_cambio.quantize(Decimal('0.0001'))
+        if self.pk:
+            from contabilidad.models import RegularizacionMonedaFactura
+            if RegularizacionMonedaFactura.objects.filter(factura_id=self.pk).exists():
+                campos = ['empresa_id', 'cliente_id', 'moneda', 'tipo_cambio', 'subtotal', 'impuesto', 'total', 'fecha_emision', 'estado']
+                anterior = type(self).objects.filter(pk=self.pk).values(*campos).first()
+                if anterior and any(anterior[campo] != getattr(self, campo) for campo in campos):
+                    raise ValidationError('La factura tiene una regularización monetaria documentada. Conserve el documento original y registre un ajuste nuevo.')
 
     def save(self, *args, **kwargs):
-
+        if self.pk and set(kwargs.get('update_fields') or ()) == {'estado_pago'}:
+            return super().save(*args, **kwargs)
         self.full_clean()
 
         is_new = self.pk is None
@@ -1589,10 +1629,8 @@ class Factura(models.Model):
         self.impuesto = impuesto_general
         self.total = subtotal_general + impuesto_general
 
-        if self.moneda == 'USD':
-            self.total_lempiras = (self.total * self.tipo_cambio).quantize(DOS_DECIMALES)
-        else:
-            self.total_lempiras = Decimal(self.total).quantize(DOS_DECIMALES)
+        from contabilidad.moneda import convertir_a_lempiras
+        self.total_lempiras = convertir_a_lempiras(self.total, self.moneda, self.tipo_cambio)
 
     def actualizar_estado_pago(self):
 
@@ -1608,7 +1646,7 @@ class Factura(models.Model):
         else:
             self.estado_pago = 'pagado'
 
-        self.save()
+        self.save(update_fields=['estado_pago'])
 
     @property
     def total_pagado(self):
@@ -1826,6 +1864,27 @@ class NotaCredito(models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk:
+            from contabilidad.models import AsientoContable, RegularizacionMonedaFactura
+            revision = RegularizacionMonedaFactura.objects.filter(factura_id=self.factura_origen_id).first()
+            if revision and AsientoContable.objects.filter(
+                empresa_id=revision.empresa_id, documento_tipo='nota_credito', documento_id=self.pk,
+                fecha_creacion__lte=revision.fecha_creacion, estado='contabilizado',
+            ).exists():
+                raise ValidationError('Esta nota de crédito pertenece a una regularización monetaria documentada. Conserve el original y registre un ajuste nuevo.')
+        if self.cliente_id and self.empresa_id and self.cliente.empresa_id != self.empresa_id:
+            raise ValidationError({'cliente': 'El cliente debe pertenecer a la misma empresa de la nota de crédito.'})
+        if self.cliente_id and self.factura_origen_id and self.cliente_id != self.factura_origen.cliente_id:
+            raise ValidationError({'cliente': 'El cliente debe ser el mismo de la factura original.'})
+        from contabilidad.moneda import validar_moneda_tipo_cambio
+        if self.factura_origen_id:
+            self.moneda = self.factura_origen.moneda
+            self.tipo_cambio = self.factura_origen.tipo_cambio
+        self.moneda, self.tipo_cambio = validar_moneda_tipo_cambio(self.moneda, self.tipo_cambio)
+        self.tipo_cambio = self.tipo_cambio.quantize(Decimal('0.0001'))
+        if self.estado == 'emitida' and self.pk:
+            from .costos_inventario import validar_devoluciones_nota
+            validar_devoluciones_nota(self)
 
         if self.factura_origen_id and self.empresa_id and self.factura_origen.empresa_id != self.empresa_id:
             raise ValidationError("La factura origen no pertenece a la empresa seleccionada.")
@@ -1937,10 +1996,8 @@ class NotaCredito(models.Model):
         self.impuesto = impuesto_general
         self.total = subtotal_general + impuesto_general
 
-        if self.moneda == 'USD':
-            self.total_lempiras = (self.total * self.tipo_cambio).quantize(DOS_DECIMALES)
-        else:
-            self.total_lempiras = Decimal(self.total).quantize(DOS_DECIMALES)
+        from contabilidad.moneda import convertir_a_lempiras
+        self.total_lempiras = convertir_a_lempiras(self.total, self.moneda, self.tipo_cambio)
 
     def resumen_fiscal(self):
         resumen = {
@@ -2060,6 +2117,7 @@ class LineaFactura(models.Model):
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
     precio_incluye_impuesto = models.BooleanField(default=False)
     costo_unitario = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    costo_contable_total = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, editable=False)
 
     comentario = models.TextField(blank=True, null=True)
 
@@ -2073,6 +2131,8 @@ class LineaFactura(models.Model):
 
     def clean(self):
         super().clean()
+        if self.producto_id and self.factura_id and self.producto.empresa_id != self.factura.empresa_id:
+            raise ValidationError({'producto': 'El producto debe pertenecer a la misma empresa de la factura.'})
         if self.descripcion_manual:
             self.descripcion_manual = self.descripcion_manual.strip()
         if not self.producto and not self.descripcion_manual:
@@ -2190,10 +2250,8 @@ class Cotizacion(models.Model):
         self.subtotal = subtotal_general.quantize(DOS_DECIMALES)
         self.impuesto = impuesto_general.quantize(DOS_DECIMALES)
         self.total = (self.subtotal + self.impuesto).quantize(DOS_DECIMALES)
-        if self.moneda == 'USD':
-            self.total_lempiras = (self.total * self.tipo_cambio).quantize(DOS_DECIMALES)
-        else:
-            self.total_lempiras = Decimal(self.total).quantize(DOS_DECIMALES)
+        from contabilidad.moneda import convertir_a_lempiras
+        self.total_lempiras = convertir_a_lempiras(self.total, self.moneda, self.tipo_cambio)
 
     @property
     def factura_generada(self):
@@ -2280,11 +2338,20 @@ class LineaNotaCredito(models.Model):
     )
 
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT, null=True, blank=True)
+    linea_factura_origen = models.ForeignKey(
+        LineaFactura,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='devoluciones_nota_credito',
+        verbose_name='Línea original de la factura',
+    )
     descripcion_manual = models.CharField(max_length=255, blank=True, null=True)
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
     precio_incluye_impuesto = models.BooleanField(default=False)
     costo_unitario = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    costo_contable_total = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, editable=False)
     comentario = models.TextField(blank=True, null=True)
     descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0, blank=True, null=True)
     descuento_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -2300,12 +2367,26 @@ class LineaNotaCredito(models.Model):
             raise ValidationError({
                 "producto": "Selecciona un producto o escribe una descripcion manual para la linea."
             })
+        if self.nota_credito_id and self.producto_id and self.producto.empresa_id != self.nota_credito.empresa_id:
+            raise ValidationError({'producto': 'El producto devuelto debe pertenecer a la misma empresa de la nota de crédito.'})
+        if self.nota_credito_id:
+            from .costos_inventario import validar_cantidad_devolucion
+            validar_cantidad_devolucion(self)
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        from contabilidad.models import bloquear_empresas_contables
 
-        if self._state.adding and self.producto_id and not self.costo_unitario:
-            self.costo_unitario = self.producto.costo_promedio or Decimal('0')
+        with transaction.atomic():
+            if self.nota_credito_id:
+                bloquear_empresas_contables([self.nota_credito.empresa_id])
+            self.full_clean()
+            if self.linea_factura_origen_id:
+                self.costo_unitario = self.linea_factura_origen.costo_unitario
+                if kwargs.get('update_fields'):
+                    kwargs['update_fields'] = set(kwargs['update_fields']) | {'linea_factura_origen', 'costo_unitario'}
+            self._guardar_importes(*args, **kwargs)
+
+    def _guardar_importes(self, *args, **kwargs):
 
         subtotal_base = (self.cantidad * self.precio_unitario).quantize(DOS_DECIMALES)
         descuento = self.descuento_porcentaje or Decimal('0')
@@ -2358,6 +2439,7 @@ class PagoFactura(models.Model):
     )
 
     fecha = models.DateField(default=timezone.now)
+    tipo_cambio = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True, default=None)
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     retencion_isr = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     retencion_isv = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -2370,6 +2452,7 @@ class PagoFactura(models.Model):
     )
     porcentaje_comision = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     monto_comision = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    comision_retenida_cliente = models.BooleanField(default=False)
     subtotal_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     impuesto_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
@@ -2411,7 +2494,19 @@ class PagoFactura(models.Model):
 
     @property
     def total_aplicado(self):
-        return (Decimal(self.monto or 0) + self.total_retenciones).quantize(DOS_DECIMALES)
+        return (Decimal(self.monto or 0) + self.total_retenciones + self.comision_compensada).quantize(DOS_DECIMALES)
+
+    @property
+    def comision_compensada(self):
+        return Decimal(self.monto_comision or 0).quantize(DOS_DECIMALES) if self.comision_retenida_cliente else Decimal('0.00')
+
+    @property
+    def comision_impuesto_compensado(self):
+        if self.total_aplicado <= 0:
+            return Decimal('0.00')
+        return (self.comision_compensada * Decimal(self.impuesto_aplicado or 0) / self.total_aplicado).quantize(
+            DOS_DECIMALES, rounding=ROUND_HALF_UP,
+        )
 
     @property
     def total_comision_pagada(self):
@@ -2427,12 +2522,14 @@ class PagoFactura(models.Model):
 
     @property
     def subtotal_recibido(self):
-        subtotal = (Decimal(self.subtotal_aplicado or 0) - Decimal(self.retencion_isr or 0)).quantize(DOS_DECIMALES)
+        subtotal = (Decimal(self.subtotal_aplicado or 0) - Decimal(self.retencion_isr or 0)
+                    - self.comision_compensada + self.comision_impuesto_compensado).quantize(DOS_DECIMALES)
         return subtotal if subtotal > 0 else Decimal('0.00')
 
     @property
     def impuesto_recibido(self):
-        impuesto = (Decimal(self.impuesto_aplicado or 0) - Decimal(self.retencion_isv or 0)).quantize(DOS_DECIMALES)
+        impuesto = (Decimal(self.impuesto_aplicado or 0) - Decimal(self.retencion_isv or 0)
+                    - self.comision_impuesto_compensado).quantize(DOS_DECIMALES)
         return impuesto if impuesto > 0 else Decimal('0.00')
 
     def recalcular_componentes_pago(self):
@@ -2478,6 +2575,29 @@ class PagoFactura(models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk:
+            from contabilidad.models import AsientoContable, RegularizacionMonedaFactura
+            revision = RegularizacionMonedaFactura.objects.filter(factura_id=self.factura_id).first()
+            if revision and AsientoContable.objects.filter(
+                empresa_id=revision.empresa_id, documento_tipo='pago_factura', documento_id=self.pk,
+                fecha_creacion__lte=revision.fecha_creacion, estado='contabilizado',
+            ).exists():
+                raise ValidationError('Este cobro pertenece a una regularización monetaria documentada. Conserve el original y registre un ajuste nuevo.')
+        from contabilidad.moneda import validar_moneda_tipo_cambio
+        if self.factura_id:
+            tasa = self.tipo_cambio if self.tipo_cambio is not None else self.factura.tipo_cambio
+            _moneda, self.tipo_cambio = validar_moneda_tipo_cambio(self.factura.moneda, tasa)
+        if self.pk and self.pagos_comision_proveedor.exists():
+            anterior = type(self).objects.select_related('factura').get(pk=self.pk)
+            _moneda, tasa_anterior = validar_moneda_tipo_cambio(
+                anterior.factura.moneda, anterior.tipo_cambio or anterior.factura.tipo_cambio,
+            )
+            if (self.factura_id != anterior.factura_id
+                    or self.proveedor_comision_id != anterior.proveedor_comision_id
+                    or self.tipo_cambio != tasa_anterior):
+                raise ValidationError(
+                    'Este cobro tiene pagos de comisión registrados. Conserve la factura, el proveedor y el tipo de cambio para no alterar la obligación ya pagada.'
+                )
         if self.monto is None:
             return
 
@@ -2500,16 +2620,28 @@ class PagoFactura(models.Model):
             raise ValidationError({'proveedor_comision': 'Selecciona el proveedor al que corresponde la comision.'})
         if self.proveedor_comision_id and self.proveedor_comision.empresa_id != self.factura.empresa_id:
             raise ValidationError({'proveedor_comision': 'El proveedor de la comision debe pertenecer a la misma empresa de la factura.'})
-        if self.pk and self.monto_comision < self.total_comision_pagada:
+        pagos_externos = self.pagos_comision_proveedor.exclude(metodo='compensacion') if self.pk else None
+        if self.comision_retenida_cliente:
+            if self.factura.empresa.slug != 'digital_planning':
+                raise ValidationError({'comision_retenida_cliente': 'La compensación de comisión está disponible solo para Digital Planning.'})
+            if self.monto_comision <= 0 or self.porcentaje_comision <= 0 or not self.proveedor_comision_id:
+                raise ValidationError({'comision_retenida_cliente': 'Selecciona el proveedor y un porcentaje de comisión mayor que cero para compensarla.'})
+            esperado = (Decimal(self.factura.total or 0) * self.porcentaje_comision / Decimal('100')).quantize(DOS_DECIMALES, rounding=ROUND_HALF_UP)
+            if self.monto_comision != esperado:
+                raise ValidationError({'monto_comision': 'La comisión retenida debe coincidir con el porcentaje sobre el total de la factura.'})
+            if not self.proveedor_comision.activo or self.proveedor_comision.cliente_contable_id:
+                raise ValidationError({'proveedor_comision': 'Selecciona un proveedor activo disponible para la comisión.'})
+            if pagos_externos is not None and pagos_externos.exists():
+                raise ValidationError('Esta comisión ya tiene pagos registrados. Revierte esos pagos antes de compensarla con el cliente.')
+        pagado_externo = (pagos_externos.aggregate(total=models.Sum('monto'))['total'] or Decimal('0.00')) if pagos_externos is not None else Decimal('0.00')
+        if self.monto_comision < pagado_externo:
             raise ValidationError({
                 'monto_comision': 'La comision no puede ser menor que los pagos ya registrados al proveedor.'
             })
         if self.total_aplicado <= 0:
             raise ValidationError('Debes registrar un monto recibido o una retencion mayor que cero.')
 
-        total_pagado = self.factura.pagos_facturacion.exclude(pk=self.pk).aggregate(
-            total=models.Sum(models.F('monto') + models.F('retencion_isr') + models.F('retencion_isv'))
-        )['total'] or Decimal('0.00')
+        total_pagado = sum((p.total_aplicado for p in self.factura.pagos_facturacion.exclude(pk=self.pk)), Decimal('0.00'))
 
         saldo_disponible = self.factura.total_documento_ajustado - total_pagado
         if self.total_aplicado > saldo_disponible:
@@ -2523,9 +2655,28 @@ class PagoFactura(models.Model):
             raise ValidationError({'retencion_isr': 'La retencion ISR no puede exceder la base aplicada del pago.'})
         if self.retencion_isv > self.impuesto_aplicado:
             raise ValidationError({'retencion_isv': 'La retencion ISV no puede exceder el ISV aplicado del pago.'})
+        if self.comision_retenida_cliente and (
+            self.retencion_isr + self.comision_compensada - self.comision_impuesto_compensado > self.subtotal_aplicado
+            or self.retencion_isv + self.comision_impuesto_compensado > self.impuesto_aplicado
+        ):
+            raise ValidationError('La comisión compensada y las retenciones exceden los componentes disponibles del cobro.')
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        type(self.factura.empresa).objects.select_for_update().get(pk=self.factura.empresa_id)
+        self.factura = Factura.objects.select_related('empresa').get(pk=self.factura_id)
         self.full_clean()
+        if kwargs.get('update_fields'):
+            kwargs['update_fields'] = set(kwargs['update_fields']) | {'tipo_cambio', 'subtotal_aplicado', 'impuesto_aplicado'}
+            if self.pk:
+                anterior = type(self).objects.get(pk=self.pk)
+                campos = ('comision_retenida_cliente', 'monto_comision', 'porcentaje_comision', 'proveedor_comision',
+                          'monto', 'fecha', 'referencia', 'metodo', 'cajero')
+                for nombre in campos:
+                    campo = self._meta.get_field(nombre)
+                    if (nombre not in kwargs['update_fields'] and campo.attname not in kwargs['update_fields']
+                            and getattr(anterior, campo.attname) != getattr(self, campo.attname)):
+                        raise ValidationError('Guarda todos los campos modificados del cobro para sincronizar su recibo y compensación.')
         super().save(*args, **kwargs)
         recibo, _creado = ReciboPago.objects.get_or_create(
             pago=self,
@@ -2555,7 +2706,32 @@ class PagoFactura(models.Model):
                 cambios_recibo.append(campo)
         if cambios_recibo:
             recibo.save(update_fields=cambios_recibo)
+        self._sincronizar_compensacion_cliente()
         self.factura.actualizar_estado_pago()
+
+    def _sincronizar_compensacion_cliente(self):
+        compensaciones = self.pagos_comision_proveedor.filter(metodo='compensacion')
+        if not self.comision_retenida_cliente:
+            compensaciones.delete()
+            return
+        datos = {
+            'fecha': self.fecha, 'tipo_cambio': self.tipo_cambio,
+            'monto': self.monto_comision, 'cuenta_financiera': None,
+            'referencia': self.referencia, 'registrado_por': self.cajero,
+            'observacion': f'Comisión retenida por el cliente y liquidada por compensación en factura {self.factura.numero_factura or self.factura_id}.',
+        }
+        compensacion, creada = PagoComisionProveedor.objects.get_or_create(
+            comision_origen=self, metodo='compensacion', defaults=datos,
+        )
+        if not creada:
+            compensacion.comision_origen = self
+            cambios = []
+            for campo, valor in datos.items():
+                if getattr(compensacion, campo) != valor:
+                    setattr(compensacion, campo, valor)
+                    cambios.append(campo)
+            if cambios:
+                compensacion.save(update_fields=cambios)
 
     def __str__(self):
         return f"Pago {self.monto} - Factura {self.factura.numero_factura}"
@@ -2567,6 +2743,7 @@ class PagoComisionProveedor(models.Model):
         ('tarjeta', 'Tarjeta'),
         ('transferencia', 'Transferencia'),
         ('cheque', 'Cheque'),
+        ('compensacion', 'Compensación con cliente'),
     )
 
     comision_origen = models.ForeignKey(
@@ -2575,11 +2752,14 @@ class PagoComisionProveedor(models.Model):
         related_name='pagos_comision_proveedor',
     )
     fecha = models.DateField(default=timezone.now)
+    tipo_cambio = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True, default=None)
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     metodo = models.CharField(max_length=20, choices=METODOS, default='transferencia')
     cuenta_financiera = models.ForeignKey(
         'contabilidad.CuentaFinanciera',
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name='pagos_comisiones_proveedores',
     )
     referencia = models.CharField(max_length=100, blank=True, null=True)
@@ -2595,6 +2775,12 @@ class PagoComisionProveedor(models.Model):
 
     class Meta:
         ordering = ['-fecha', '-id']
+        constraints = [
+            models.UniqueConstraint(fields=['comision_origen'], condition=models.Q(metodo='compensacion'), name='comision_compensacion_unica'),
+            models.CheckConstraint(condition=(models.Q(metodo='compensacion', cuenta_financiera__isnull=True)
+                                              | (~models.Q(metodo='compensacion') & models.Q(cuenta_financiera__isnull=False))),
+                                   name='comision_cuenta_segun_metodo'),
+        ]
 
     @property
     def proveedor(self):
@@ -2606,9 +2792,26 @@ class PagoComisionProveedor(models.Model):
 
     def clean(self):
         super().clean()
+        from contabilidad.moneda import validar_moneda_tipo_cambio
+        if self.comision_origen_id:
+            origen = self.comision_origen
+            tasa = self.tipo_cambio if self.tipo_cambio is not None else (origen.tipo_cambio or origen.factura.tipo_cambio)
+            _moneda, self.tipo_cambio = validar_moneda_tipo_cambio(origen.factura.moneda, tasa)
         self.monto = Decimal(self.monto or 0).quantize(DOS_DECIMALES)
         if self.monto <= 0:
             raise ValidationError({'monto': 'El pago debe ser mayor que cero.'})
+        if self.pk and type(self).objects.filter(pk=self.pk, metodo='compensacion').exists() and self.metodo != 'compensacion':
+            raise ValidationError('La compensación automática se modifica desde el cobro de la factura.')
+        if self.metodo == 'compensacion':
+            origen = self.comision_origen
+            if (origen.factura.empresa.slug != 'digital_planning' or not origen.comision_retenida_cliente
+                    or self.cuenta_financiera_id or self.monto != origen.monto_comision
+                    or self.fecha != origen.fecha or self.tipo_cambio != origen.tipo_cambio):
+                raise ValidationError('La compensación debe coincidir con la comisión retenida, fecha y tipo de cambio del cobro de Digital Planning.')
+        elif not self.cuenta_financiera_id:
+            raise ValidationError({'cuenta_financiera': 'Selecciona una cuenta financiera para pagar la comisión.'})
+        elif self.comision_origen.comision_retenida_cliente:
+            raise ValidationError('Esta comisión ya se liquida automáticamente por compensación con el cliente.')
         if Decimal(self.comision_origen.monto_comision or 0) <= 0:
             raise ValidationError('La comision seleccionada no tiene un saldo valido por pagar.')
         total_pagado = self.comision_origen.pagos_comision_proveedor.exclude(pk=self.pk).aggregate(
@@ -2620,8 +2823,13 @@ class PagoComisionProveedor(models.Model):
         if self.cuenta_financiera_id and self.cuenta_financiera.empresa_id != self.empresa.id:
             raise ValidationError({'cuenta_financiera': 'La cuenta financiera debe pertenecer a la empresa de la comision.'})
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        type(self.empresa).objects.select_for_update().get(pk=self.empresa.pk)
+        self.comision_origen = PagoFactura.objects.select_related('factura__empresa', 'proveedor_comision').get(pk=self.comision_origen_id)
         self.full_clean()
+        if kwargs.get('update_fields'):
+            kwargs['update_fields'] = set(kwargs['update_fields']) | {'tipo_cambio'}
         super().save(*args, **kwargs)
 
     def __str__(self):

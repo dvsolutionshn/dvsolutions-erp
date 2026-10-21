@@ -1,6 +1,10 @@
 from django.urls import path
 
 from . import views
+from . import regularizacion_views
+from . import revision_conversion_views
+from . import catalogo_rumi_views
+from . import balance_movimientos_views
 
 urlpatterns = [
     path("", views.contabilidad_dashboard, name="contabilidad_dashboard"),
@@ -37,6 +41,8 @@ urlpatterns = [
     path("cuentas/catalogo-base-honduras/", views.cargar_catalogo_base_honduras_view, name="cargar_catalogo_base_honduras"),
     path("cuentas/crear/", views.crear_cuenta_contable, name="crear_cuenta_contable"),
     path("cuentas/importar/", views.importar_catalogo_cuentas, name="importar_catalogo_cuentas"),
+    path("cuentas/sustituir-rumi/", catalogo_rumi_views.sustituir_catalogo_rumi, name="sustituir_catalogo_rumi"),
+    path("cuentas/respaldo-rumi/<int:registro_id>/", catalogo_rumi_views.respaldo_catalogo_rumi, name="respaldo_catalogo_rumi"),
     path("cuentas/<int:cuenta_id>/editar/", views.editar_cuenta_contable, name="editar_cuenta_contable"),
     path("asientos/", views.asientos_contables, name="asientos_contables"),
     path("asientos/crear/", views.crear_asiento_contable, name="crear_asiento_contable"),
@@ -46,10 +52,14 @@ urlpatterns = [
     path("asientos/<int:asiento_id>/reversar/", views.reversar_asiento_contable, name="reversar_asiento_contable"),
     path("asientos/<int:asiento_id>/regresar-borrador/", views.regresar_asiento_borrador, name="regresar_asiento_borrador"),
     path("asientos/<int:asiento_id>/contabilizar/", views.contabilizar_asiento_contable, name="contabilizar_asiento_contable"),
+    path("asientos/<int:asiento_id>/regularizar-moneda/", regularizacion_views.regularizar_moneda_factura, name="regularizar_moneda_factura"),
+    path("asientos/<int:asiento_id>/revisar-conversion/", revision_conversion_views.revisar_conversion_asiento, name="revisar_conversion_asiento"),
     path("reportes/", views.reportes_contables, name="reportes_contables"),
     path("reportes/dashboard-bi/", views.dashboard_bi_financiero, name="dashboard_bi_financiero"),
     path("reportes/auditoria/", views.auditoria_contable, name="auditoria_contable"),
     path("reportes/auditoria/excel/", views.exportar_auditoria_contable_excel, name="exportar_auditoria_contable_excel"),
+    path("reportes/historicos-usd/", revision_conversion_views.historicos_usd, name="historicos_usd"),
+    path("reportes/historicos-usd/csv/", revision_conversion_views.exportar_historicos_usd_csv, name="exportar_historicos_usd_csv"),
     path("reportes/impuestos/", views.reporte_impuestos, name="reporte_impuestos"),
     path("reportes/impuestos/excel/", views.exportar_reporte_impuestos_excel, name="exportar_reporte_impuestos_excel"),
     path("reportes/libro-diario/", views.libro_diario, name="libro_diario"),
@@ -61,8 +71,10 @@ urlpatterns = [
     path("reportes/balance-comprobacion/", views.balance_comprobacion, name="balance_comprobacion"),
     path("reportes/balance-comprobacion/excel/", views.exportar_balance_comprobacion_excel, name="exportar_balance_comprobacion_excel"),
     path("reportes/estado-resultados/", views.estado_resultados, name="estado_resultados"),
+    path("reportes/estado-resultados/cuentas/<int:cuenta_id>/movimientos/", balance_movimientos_views.movimientos_estado_resultados, name="movimientos_estado_resultados"),
     path("reportes/estado-resultados/excel/", views.exportar_estado_resultados_excel, name="exportar_estado_resultados_excel"),
     path("reportes/balance-general/", views.balance_general, name="balance_general"),
+    path("reportes/balance-general/cuentas/<int:cuenta_id>/movimientos/", balance_movimientos_views.movimientos_balance_general, name="movimientos_balance_general"),
     path("reportes/balance-general/excel/", views.exportar_balance_general_excel, name="exportar_balance_general_excel"),
     path("reportes/flujo-efectivo/", views.estado_flujo_efectivo, name="estado_flujo_efectivo"),
     path("reportes/flujo-efectivo/excel/", views.exportar_estado_flujo_efectivo_excel, name="exportar_estado_flujo_efectivo_excel"),

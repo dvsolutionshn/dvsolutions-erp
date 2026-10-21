@@ -1,89 +1,91 @@
 {% extends "core/erp_base.html" %}
+{% load static %}
 
-{% block title %}Asientos Contables{% endblock %}
-{% block header_kicker %}Contabilidad{% endblock %}
-{% block header_title %}Asientos Contables{% endblock %}
-{% block header_description %}Gestiona borradores, contabilizacion y detalle de partidas con una lectura clara y profesional.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="erp-action-link">Nuevo Asiento</a>
-{% endblock %}
+{% block title %}Asientos contables · {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} accounting-list-page{% endblock %}
+{% block header_kicker %}Centro financiero{% endblock %}
+{% block header_title %}Contabilidad{% endblock %}
+{% block header_description %}Consulta tu diario y revisa las partidas de esta empresa.{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'contabilidad/asientos_lista.css' %}">{% endblock %}
+{% block topbar_actions %}<a href="{% url 'contabilidad_dashboard' empresa.slug %}" class="al-btn al-btn--secondary">Volver al resumen</a>{% endblock %}
 
 {% block content %}
-<section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Asientos</div><p class="erp-stat-value">{{ resumen.asientos }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Contabilizados</div><p class="erp-stat-value">{{ resumen.contabilizados }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Borradores</div><p class="erp-stat-value">{{ resumen.borradores }}</p></article>
-</section>
-
-<section class="erp-card erp-report-filter-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Filtros de asientos</h3>
-            <p class="erp-card-muted">Busca por numero, descripcion, referencia u origen para auditoria rapida.</p>
-        </div>
+<div class="accounting-list">
+  {% include "contabilidad/partials/dashboard_icons.html" %}
+  <header class="al-intro">
+    <div>
+      <p class="al-eyebrow">Diario contable</p>
+      <h1>Asientos contables</h1>
+      <p>Encuentra una partida y despliega sus líneas para revisarla aquí mismo.</p>
     </div>
-    <form method="get" class="erp-filters">
-        <div class="erp-filter-field">
-            <label for="q">Buscar</label>
-            <input id="q" name="q" value="{{ filtros.q }}" placeholder="ASI, factura, pago, referencia" autocomplete="off">
-        </div>
-        <div class="erp-filter-field">
-            <label for="estado">Estado</label>
-            <select id="estado" name="estado">
-                <option value="">Todos</option>
-                <option value="borrador" {% if filtros.estado == "borrador" %}selected{% endif %}>Borrador</option>
-                <option value="contabilizado" {% if filtros.estado == "contabilizado" %}selected{% endif %}>Contabilizado</option>
-                <option value="anulado" {% if filtros.estado == "anulado" %}selected{% endif %}>Anulado</option>
-            </select>
-        </div>
-        <div class="erp-filter-field">
-            <label for="fecha_inicio">Desde</label>
-            <input id="fecha_inicio" type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
-        </div>
-        <div class="erp-filter-field">
-            <label for="fecha_fin">Hasta</label>
-            <input id="fecha_fin" type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}">
-        </div>
-        <div class="erp-filter-actions">
-            <button type="submit" class="erp-btn-secondary">Filtrar</button>
-            <a class="erp-btn-secondary" href="{% url 'asientos_contables' empresa.slug %}">Limpiar</a>
-        </div>
+    {% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="al-btn al-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Nuevo asiento</a>{% endif %}
+  </header>
+
+  <section aria-label="Resumen de asientos de la empresa">
+    <p class="al-scope">Resumen de {{ empresa.nombre }} · Todos los registros de esta empresa</p>
+    <div class="al-stats">
+      <article class="al-stat"><span class="al-stat__icon" data-tone="indigo">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><div><p class="al-stat__label">Asientos registrados</p><p class="al-stat__value">{{ resumen_lista.total }}</p></div></article>
+      <article class="al-stat"><span class="al-stat__icon" data-tone="green">{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}</span><div><p class="al-stat__label">Contabilizados</p><p class="al-stat__value">{{ resumen_lista.contabilizados }}</p></div></article>
+      <article class="al-stat"><span class="al-stat__icon" data-tone="amber">{% include "contabilidad/partials/dashboard_icon.html" with icon="clock" only %}</span><div><p class="al-stat__label">Borradores</p><p class="al-stat__value">{{ resumen_lista.borradores }}</p></div></article>
+      <article class="al-stat"><span class="al-stat__icon" data-tone="slate">{% include "contabilidad/partials/dashboard_icon.html" with icon="close" only %}</span><div><p class="al-stat__label">Anulados</p><p class="al-stat__value">{{ resumen_lista.anulados }}</p></div></article>
+    </div>
+  </section>
+
+  <section class="al-panel" aria-labelledby="al-search-title">
+    <div class="al-panel__heading"><div><h2 class="al-panel__title" id="al-search-title">Encuentra tu partida</h2><p class="al-panel__hint">Busca por número, referencia, descripción, cuenta o detalle de una línea.</p></div>{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}</div>
+    <form method="get" class="al-filters" role="search" aria-label="Buscar asientos de esta empresa">
+      {% if filtros.estado %}<input type="hidden" name="estado" value="{{ filtros.estado }}">{% endif %}
+      <div class="al-field al-field--search"><label for="al-q">Buscar en el diario</label><div class="al-search">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}<input type="search" id="al-q" name="q" value="{{ filtros.q }}" placeholder="Número, referencia, cuenta o descripción…" maxlength="200" autocomplete="off"></div></div>
+      <div class="al-field al-field--account"><label for="al-cuenta">Cuenta contable</label><select id="al-cuenta" name="cuenta"><option value="">Todas las cuentas</option>{% for cuenta in cuentas_filtro %}<option value="{{ cuenta.pk }}" {% if filtros.cuenta == cuenta.pk|stringformat:"s" %}selected{% endif %}>{{ cuenta.codigo }} — {{ cuenta.nombre }}{% if not cuenta.activa %} (inactiva){% endif %}</option>{% endfor %}</select></div>
+      <div class="al-field al-field--date"><label for="al-fecha-inicio">Desde</label><input id="al-fecha-inicio" type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}"></div>
+      <div class="al-field al-field--date"><label for="al-fecha-fin">Hasta</label><input id="al-fecha-fin" type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}"></div>
+      <div class="al-field al-field--order"><label for="al-orden">Ordenar por</label><select id="al-orden" name="orden"><option value="recientes" {% if filtros.orden == "recientes" %}selected{% endif %}>Más recientes</option><option value="antiguos" {% if filtros.orden == "antiguos" %}selected{% endif %}>Más antiguos</option><option value="importe_desc" {% if filtros.orden == "importe_desc" %}selected{% endif %}>Mayor importe</option><option value="importe_asc" {% if filtros.orden == "importe_asc" %}selected{% endif %}>Menor importe</option></select></div>
+      <div class="al-field al-field--size"><label for="al-por-pagina">Por página</label><select id="al-por-pagina" name="por_pagina"><option value="25" {% if filtros.por_pagina == "25" %}selected{% endif %}>25 asientos</option><option value="50" {% if filtros.por_pagina == "50" %}selected{% endif %}>50 asientos</option><option value="100" {% if filtros.por_pagina == "100" %}selected{% endif %}>100 asientos</option></select></div>
+      <div class="al-filter-actions"><button type="submit" class="al-btn al-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %} Buscar</button><a class="al-btn al-btn--quiet" href="{% url 'asientos_contables' empresa.slug %}">Limpiar filtros</a></div>
     </form>
-</section>                                                                                                                                                   
+    {% if errores_filtros %}<div class="al-error" role="alert"><strong>Revisa los filtros</strong><ul>{% for error in errores_filtros %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+  </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Numero</th>
-                    <th>Fecha</th>
-                    <th>Descripcion</th>
-                    <th>Referencia</th>
-                    <th>Estado</th>
-                    <th>Debe</th>
-                    <th>Haber</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for asiento in asientos %}
-                <tr>
-                    <td>{{ asiento.numero|default:"Sin numero" }}</td>
-                    <td>{{ asiento.fecha|date:"F j, Y" }}</td>
-                    <td>{{ asiento.descripcion }}</td>
-                    <td>{{ asiento.referencia|default:"-" }}</td>
-                    <td><span class="erp-badge {% if asiento.estado == 'contabilizado' %}success{% elif asiento.estado == 'borrador' %}warning{% else %}danger{% endif %}">{{ asiento.get_estado_display }}</span></td>
-                    <td>L. {{ asiento.total_debe }}</td>
-                    <td>L. {{ asiento.total_haber }}</td>
-                    <td class="actions"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}">Ver</a>{% if asiento.estado == "borrador" %}<a class="erp-link" href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}">Editar</a>{% elif asiento.estado == "contabilizado" and erp_access.contabilizar_asientos %}<form method="post" action="{% url 'regresar_asiento_borrador' empresa.slug asiento.id %}" style="display:inline;">{% csrf_token %}<button class="erp-link" type="submit">A borrador</button></form>{% endif %}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="8" class="erp-empty">Todavia no hay asientos creados.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+  <section class="al-results" aria-labelledby="al-results-title">
+    <div class="al-results-head"><div><h2 id="al-results-title">{% if hay_filtros %}Resultados de la búsqueda{% else %}Tu diario contable{% endif %}</h2><p class="al-query-note">{{ empresa.nombre }} · Importes contables en lempiras (HNL)</p></div><span class="al-result-count">{{ total_resultados }} asiento{{ total_resultados|pluralize }}{% if hay_filtros %} encontrado{{ total_resultados|pluralize }}{% endif %}</span></div>
+    <nav class="al-tabs" aria-label="Filtrar asientos por estado">{% for enlace in enlaces_estado %}<a class="al-tab" href="{{ enlace.url }}" {% if enlace.activo %}aria-current="page"{% endif %}>{{ enlace.nombre }}</a>{% endfor %}</nav>
+
+    {% if asientos %}
+    <div class="al-list-head" aria-hidden="true"><span>Fecha</span><span>Asiento / referencia</span><span>Descripción</span><span>Estado</span><span>Debe · L</span><span>Haber · L</span><span>Líneas</span></div>
+    <ol class="al-entries" aria-label="Partidas contables">
+      {% for asiento in asientos %}
+      <li>
+        <details class="al-entry" id="asiento-{{ asiento.pk }}">
+          <summary class="al-entry__summary">
+            <span class="al-date"><span class="al-cell-label">Fecha</span><time datetime="{{ asiento.fecha|date:'Y-m-d' }}">{{ asiento.fecha|date:"d/m/Y" }}</time></span>
+            <span class="al-number"><strong>{% if asiento.numero %}{{ asiento.numero }}{% else %}Asiento #{{ asiento.pk }}{% endif %}</strong><small class="al-reference">{% if asiento.referencia %}{{ asiento.referencia }}{% else %}Sin referencia{% endif %}</small></span>
+            <span class="al-description"><strong>{{ asiento.descripcion }}</strong><small class="al-source">{{ asiento.origen_modulo|default:"Manual"|capfirst }} · {{ asiento.numero_lineas }} línea{{ asiento.numero_lineas|pluralize }}{% if not asiento.conversion_verificada %} · Conversión histórica{% endif %}</small></span>
+            <span class="al-status" data-state="{{ asiento.estado }}">{{ asiento.get_estado_display }}</span>
+            <span class="al-amount al-amount--debe"><span class="al-cell-label">Debe · L</span>{{ asiento.importe_debe|floatformat:"2g" }}</span>
+            <span class="al-amount al-amount--haber"><span class="al-cell-label">Haber · L</span>{{ asiento.importe_haber|floatformat:"2g" }}</span>
+            <span class="al-review-label"><span class="al-review-open">Revisar</span><span class="al-review-close">Cerrar</span><svg class="al-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></span>
+          </summary>
+          <div class="al-entry__body">
+            <div class="al-review-heading"><h3>Líneas de {% if asiento.numero %}{{ asiento.numero }}{% else %}asiento #{{ asiento.pk }}{% endif %}</h3>{% if asiento.importe_debe == asiento.importe_haber and asiento.importe_debe > 0 %}<span class="al-balance" data-state="balanced">{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %} Debe y Haber iguales</span>{% else %}<span class="al-balance" data-state="pending">{% include "contabilidad/partials/dashboard_icon.html" with icon="clock" only %} Revisa los importes</span>{% endif %}</div>
+            {% if not asiento.conversion_verificada %}<p class="al-review-note">Este asiento conserva sus importes históricos. Consulta el asiento completo para ver su revisión y los ajustes registrados.</p>{% endif %}
+            <div class="al-lines-wrap" role="region" aria-label="Líneas de {% if asiento.numero %}{{ asiento.numero }}{% else %}asiento {{ asiento.pk }}{% endif %}" tabindex="0">
+              <table class="al-lines-table">
+                <caption class="al-sr-only">Cuentas e importes de {% if asiento.numero %}{{ asiento.numero }}{% else %}asiento {{ asiento.pk }}{% endif %}. Moneda contable: lempiras.</caption>
+                <thead><tr><th scope="col">Cuenta contable</th><th scope="col">Detalle</th><th scope="col">Debe · L</th><th scope="col">Haber · L</th></tr></thead>
+                <tbody>{% for linea in asiento.lineas_revision %}<tr><td>{% if linea.cuenta.empresa_id == empresa.id %}<span class="al-account-code">{{ linea.cuenta.codigo }}</span><strong class="al-account-name">{{ linea.cuenta.nombre }}</strong>{% else %}<span class="al-review-note">Cuenta pendiente de revisión</span>{% endif %}</td><td>{{ linea.detalle|default:"Sin detalle" }}</td><td>{{ linea.debe|floatformat:"2g" }}</td><td>{{ linea.haber|floatformat:"2g" }}</td></tr>{% empty %}<tr><td colspan="4">Este asiento no tiene líneas registradas.</td></tr>{% endfor %}</tbody>
+                <tfoot><tr><th scope="row" colspan="2">Totales de la partida</th><td>{{ asiento.importe_debe|floatformat:"2g" }}</td><td>{{ asiento.importe_haber|floatformat:"2g" }}</td></tr></tfoot>
+              </table>
+            </div>
+            <div class="al-entry__footer"><a href="{% url 'ver_asiento_contable' empresa.slug asiento.pk %}" class="al-btn al-btn--secondary al-btn--small">Ver asiento completo {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a>{% if asiento.estado == "borrador" and erp_access.asientos_contables %}<a href="{% url 'editar_asiento_contable' empresa.slug asiento.pk %}" class="al-btn al-btn--quiet al-btn--small">Editar borrador</a>{% endif %}</div>
+          </div>
+        </details>
+      </li>
+      {% endfor %}
+    </ol>
+    <nav class="al-pagination" aria-label="Páginas de asientos"><p>Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ total_resultados }} asiento{{ total_resultados|pluralize }}</p><div class="al-pagination__pages">{% if paginacion.anterior_url %}<a class="al-page" href="{{ paginacion.anterior_url }}" aria-label="Página anterior">Anterior</a>{% endif %}{% for pagina in paginacion.paginas %}{% if pagina.url %}<a class="al-page" href="{{ pagina.url }}" {% if pagina.actual %}aria-current="page"{% endif %} aria-label="Página {{ pagina.numero }}">{{ pagina.numero }}</a>{% else %}<span class="al-page-gap">{{ pagina.numero }}</span>{% endif %}{% endfor %}{% if paginacion.siguiente_url %}<a class="al-page" href="{{ paginacion.siguiente_url }}" aria-label="Página siguiente">Siguiente</a>{% endif %}</div></nav>
+    {% else %}
+    <div class="al-empty">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}{% if hay_filtros or errores_filtros %}<h3>No encontramos partidas con estos filtros</h3><p>Prueba otra palabra, cuenta o rango de fechas dentro de {{ empresa.nombre }}.</p><a href="{% url 'asientos_contables' empresa.slug %}" class="al-btn al-btn--secondary">Ver todos los asientos</a>{% else %}<h3>Tu diario está listo para empezar</h3><p>Aquí aparecerán los asientos de {{ empresa.nombre }}, con sus cuentas e importes para revisión.</p>{% if erp_access.asientos_contables %}<a href="{% url 'crear_asiento_contable' empresa.slug %}" class="al-btn al-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %} Crear primer asiento</a>{% endif %}{% endif %}</div>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

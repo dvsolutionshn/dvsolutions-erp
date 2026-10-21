@@ -35,7 +35,7 @@ class LoginCorporativoTests(SimpleTestCase):
 
     def test_tecnicentro_conserva_acceso_especializado(self):
         empresa = SimpleNamespace(slug="garage-demo", tipo_solucion="tecnicentro")
-        with patch("core.views._resolver_empresa_request", return_value=empresa), patch("core.views.redirect") as redirect:
+        with patch("core.views._resolver_empresa_request", return_value=empresa), patch("core.views.redirect", return_value=HttpResponse(status=302)) as redirect:
             empresa_login(RequestFactory().get("/garage-demo/"), empresa.slug)
         redirect.assert_called_once_with("tecnicentro_login", empresa_slug="garage-demo")
 

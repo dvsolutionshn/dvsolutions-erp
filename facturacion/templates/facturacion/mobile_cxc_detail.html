@@ -1,0 +1,73 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Cartera del cliente{% endblock %}
+{% block mobile_page_title %}Cartera del cliente{% endblock %}
+{% block mobile_kicker %}Cuentas por cobrar{% endblock %}
+{% block mobile_back_url %}{{ app_cxc_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>{{ cliente_seleccionado.nombre }}</p>{% endblock %}
+{% block mobile_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'facturacion/mobile_egresos.css' %}">
+<link rel="stylesheet" href="{% static 'facturacion/mobile_cxc.css' %}">
+{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'facturacion/mobile_egresos.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mcxc-summary" aria-labelledby="cxcClientTitle">
+  <span class="mi-kicker">Cliente seleccionado</span>
+  <h2 id="cxcClientTitle" class="mcxc-client-name">{{ cliente_seleccionado.nombre }}</h2>
+  <dl class="mcxc-summary-grid">
+    <div><dt>Facturas pendientes</dt><dd>{{ cliente_resumen.facturas|default:0 }}</dd></div>
+    <div><dt>Facturas vencidas</dt><dd>{{ cliente_resumen.vencidas|default:0 }}</dd></div>
+    <div class="mcxc-summary-total"><dt>Saldo del cliente · HNL</dt><dd>L. {{ cliente_resumen.saldo_total|default:0|floatformat:2|intcomma }}</dd></div>
+  </dl>
+  <div class="mi-row mcxc-next-date"><span>Próxima fecha del reporte</span><strong>{% if cliente_resumen.proxima_fecha %}{{ cliente_resumen.proxima_fecha|date:'d/m/Y' }}{% else %}Sin fecha pendiente{% endif %}</strong></div>
+  <p class="mcxc-caption">El resumen incluye todas las facturas pendientes de este cliente que coinciden con los filtros del reporte.</p>
+</section>
+{% for item in data %}
+<section class="mi-card mcxc-age-card" aria-labelledby="cxcAgeTitle">
+  <h2 id="cxcAgeTitle">Antigüedad del saldo · HNL</h2>
+  <dl class="mcxc-age-grid">
+    <div><dt>0–30 días</dt><dd>L. {{ item.0_30|floatformat:2|intcomma }}</dd></div>
+    <div><dt>31–60 días</dt><dd>L. {{ item.31_60|floatformat:2|intcomma }}</dd></div>
+    <div><dt>61–90 días</dt><dd>L. {{ item.61_90|floatformat:2|intcomma }}</dd></div>
+    <div class="mcxc-age-oldest"><dt>Más de 90 días</dt><dd>L. {{ item.90_mas|floatformat:2|intcomma }}</dd></div>
+  </dl>
+</section>
+{% endfor %}
+<div class="meg-list-meta"><strong>{{ mobile_cxc_total }} factura{% if mobile_cxc_total != 1 %}s{% endif %} pendiente{% if mobile_cxc_total != 1 %}s{% endif %}</strong><span>Moneda de cada documento</span></div>
+<div class="meg-list">
+  {% for entry in mobile_cxc_documents %}
+  {% with factura=entry.factura %}
+  <article class="mi-card meg-card mcxc-document-card">
+    <div class="meg-card-head"><div><small>Número de factura</small><h2>{{ factura.numero_factura|default:'Sin número asignado' }}</h2></div><span class="meg-method">{{ factura.moneda }}</span></div>
+    <div class="mi-badges"><span class="mi-badge">{{ factura.get_estado_display }}</span><span class="mi-badge {% if factura.estado_pago == 'parcial' %}parcial{% elif factura.estado_pago == 'pagado' %}pagado{% else %}pendiente{% endif %}">{{ factura.get_estado_pago_display }}</span></div>
+    <dl class="meg-card-meta">
+      <div><dt>Fecha de factura</dt><dd>{{ factura.fecha_emision|date:'d/m/Y' }}</dd></div>
+      <div><dt>Vencimiento</dt><dd>{% if factura.fecha_vencimiento %}{{ factura.fecha_vencimiento|date:'d/m/Y' }}{% else %}Sin vencimiento registrado{% endif %}</dd></div>
+    </dl>
+    <dl class="mcxc-document-money">
+      <div><dt>Total de factura · {{ factura.moneda }}</dt><dd>{{ factura.reporte_simbolo }} {{ factura.total|floatformat:2|intcomma }}</dd></div>
+      <div class="mcxc-document-balance"><dt>Saldo pendiente · {{ factura.moneda }}</dt><dd>{{ factura.reporte_simbolo }} {{ factura.saldo_pendiente|floatformat:2|intcomma }}</dd></div>
+    </dl>
+    <details class="mcxc-conversion">
+      <summary>Valores del reporte en lempiras <span aria-hidden="true">⌄</span></summary>
+      <dl class="meg-data">
+        <div><dt>Total para reporte · HNL</dt><dd>L. {{ factura.reporte_total_hnl|floatformat:2|intcomma }}</dd></div>
+        <div><dt>Saldo para reporte · HNL</dt><dd>L. {{ factura.reporte_saldo_hnl|floatformat:2|intcomma }}</dd></div>
+        {% if factura.moneda == 'USD' %}<div><dt>Tipo de cambio usado por el reporte</dt><dd>{{ factura.reporte_tasa_cambio|floatformat:4 }}</dd></div>{% endif %}
+      </dl>
+      <p class="mcxc-caption">Se muestran los valores preparados por el reporte actual, incluidos sus ajustes documentales y conversión. No se calcula ni se cambia el saldo desde la app.</p>
+    </details>
+  </article>
+  {% endwith %}
+  {% empty %}
+  <section class="mi-card meg-empty"><h2>Sin facturas pendientes</h2><p>Este cliente no tiene facturas emitidas con saldo pendiente{% if mobile_cxc_query %} que coincidan con la búsqueda{% endif %}.</p></section>
+  {% endfor %}
+</div>
+{% if mobile_cxc_num_pages > 1 %}
+<nav class="meg-pagination" aria-label="Páginas de facturas pendientes"><div>{% if mobile_cxc_previous_url %}<a href="{{ mobile_cxc_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_cxc_page }} / {{ mobile_cxc_num_pages }}</span>{% if mobile_cxc_next_url %}<a href="{{ mobile_cxc_next_url }}">Siguiente ›</a>{% endif %}</div></nav>
+{% endif %}
+<div class="meg-info-note"><strong>Consulta de cuentas por cobrar</strong><p>La cartera está expresada en HNL; cada factura conserva su moneda original. Esta pantalla no registra pagos, no modifica documentos y no abre otros módulos.</p></div>
+<a class="mi-button secondary" href="{{ app_cxc_back_url }}">Volver a cartera</a>
+{% endblock %}

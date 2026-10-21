@@ -1,0 +1,17 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Configuración avanzada{% endblock %}
+{% block mobile_page_title %}Configuración avanzada{% endblock %}
+{% block mobile_kicker %}Opciones por empresa{% endblock %}
+{% block mobile_back_url %}{% if can_view_app_modules and app_modules_url %}{{ app_modules_url }}{% else %}{{ app_advanced_back_url }}{% endif %}{% endblock %}
+{% block mobile_header_description %}<p>Inventario, bodegas y opciones existentes de las cuatro clínicas.</p>{% endblock %}
+{% block mobile_navigation %}{% include "core/mobile_advanced_navigation.html" %}{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_advanced_configuration.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'core/mobile_advanced_configuration.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mac-intro"><h2>Configuración existente</h2><p>La consulta, edición y creación dependen de los permisos originales del Admin. Abrir esta pantalla no crea registros ni cambia opciones.</p><div class="mac-count"><strong>{{ total_empresas }}</strong><span>{% if total_empresas == 1 %}empresa clínica{% else %}empresas clínicas{% endif %}</span></div><p class="mac-caption">Los valores se aplican con las reglas actuales del sistema. La configuración no sustituye los permisos de los usuarios.</p></section>
+<div class="mac-list" id="mobileAdvancedList">
+  {% for item in mobile_advanced_items %}<article class="mi-card mac-card" data-advanced-company-id="{{ item.empresa.pk }}"><div class="mac-heading"><div class="mac-avatar" aria-hidden="true">{{ item.empresa.nombre|slice:':1'|upper }}</div><div><h2>{{ item.empresa.nombre }}</h2><p>{{ item.empresa.slug }}</p></div></div><div class="mac-badges"><span class="mac-badge{% if not item.empresa.activa %} warning{% endif %}">{% if item.empresa.activa %}Empresa activa{% else %}Empresa inactiva{% endif %}</span><span class="mac-badge{% if not item.configuracion_existe %} warning{% endif %}">{% if item.configuracion_existe %}Configuración registrada{% else %}Sin configuración registrada{% endif %}</span></div>
+  {% if item.entry_url %}<a class="mi-button secondary" href="{{ item.entry_url }}">{% if item.configuracion_existe %}{% if item.can_change_advanced %}Editar configuración{% else %}Consultar configuración{% endif %}{% elif item.can_add_advanced %}Crear configuración{% else %}Ver disponibilidad{% endif %}</a>{% else %}<p class="mac-caption">No tiene autorización para abrir esta configuración.</p>{% endif %}</article>{% empty %}<section class="mi-card mac-empty"><h2>No hay empresas disponibles</h2><p>No se crearon registros. Sólo aparecen las empresas clínicas autorizadas en esta pantalla.</p></section>{% endfor %}
+</div>
+{% endblock %}

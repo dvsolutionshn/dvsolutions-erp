@@ -1,0 +1,1 @@
+{% if mobile_special_history_forms %}<section class="mi-card"><h2>Registros clínicos complementarios</h2><div class="mp-shortcuts">{% for registro in mobile_special_history_forms %}<a href="{{ registro.url }}"><strong>{{ registro.nombre }}</strong><span>Registrar datos en el mismo expediente</span><i aria-hidden="true">›</i></a>{% endfor %}</div></section>{% endif %}

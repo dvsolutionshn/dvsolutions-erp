@@ -1,0 +1,16 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Detalle de egreso{% endblock %}
+{% block mobile_page_title %}Comprobante de egreso{% endblock %}
+{% block mobile_kicker %}Documento de pago a proveedor{% endblock %}
+{% block mobile_back_url %}{{ app_egreso_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>Datos documentales del egreso registrado.</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'facturacion/mobile_egresos.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'facturacion/mobile_egresos.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card"><span class="mi-kicker">Número de comprobante</span><div class="mi-number">{{ comprobante.numero_comprobante|default:'Sin número asignado' }}</div><div class="mi-badges"><span class="mi-badge">{{ comprobante.get_metodo_display }}</span><span class="mi-badge">HNL</span></div><div class="mi-row"><span>Fecha del comprobante</span><strong>{{ comprobante.fecha|date:'d/m/Y' }}</strong></div><div class="mi-row total"><span>Monto documentado</span><strong>L. {{ comprobante.monto|floatformat:2|intcomma }}</strong></div>{% if can_download_egreso and app_egreso_pdf_url %}<a class="mi-button mi-status-space" href="{{ app_egreso_pdf_url }}" target="_blank" rel="noopener">Abrir PDF original</a>{% endif %}</section>
+<section class="mi-card"><h2>Datos del comprobante</h2><dl class="meg-data"><div><dt>Proveedor documentado</dt><dd>{{ comprobante.proveedor_nombre|default:'Sin nombre documental' }}</dd></div><div><dt>Compra asociada</dt><dd>{{ comprobante.compra.numero_compra|default:'Sin número de compra' }}</dd></div><div><dt>Referencia documental</dt><dd class="meg-text">{{ comprobante.referencia|default:'Sin referencia' }}</dd></div></dl></section>
+<section class="mi-card"><h2>Observación del comprobante</h2><p class="meg-text">{{ comprobante.observacion|default:'Sin observación registrada' }}</p></section>
+<div class="meg-info-note"><strong>Consulta del documento original</strong><p>Se muestran el nombre del proveedor, fecha, monto, método y textos guardados en el comprobante. No se sustituyen por datos actuales del proveedor o del pago y esta pantalla no modifica compras ni contabilidad.</p></div>
+{% endblock %}

@@ -1,0 +1,19 @@
+<tbody>
+{% for cuenta in filas_catalogo %}
+    <tr>
+        <td>{{ cuenta.codigo }}{% if cuenta.codigo_original %}<div class="erp-card-muted">Original: {{ cuenta.codigo_original }}</div>{% endif %}</td>
+        <td>
+            {{ cuenta.nombre }}
+            {% if cuenta.descripcion %}
+            <details><summary>Referencia del archivo</summary><p style="white-space:pre-wrap">{{ cuenta.descripcion }}</p></details>
+            {% endif %}
+        </td>
+        <td>{{ cuenta.tipo_nombre }}</td>
+        <td>{{ cuenta.codigo_padre|default:"Principal" }}</td>
+        <td>{{ cuenta.activa_texto }}</td>
+        <td>{{ cuenta.acepta_movimientos_texto }}</td>
+    </tr>
+{% empty %}
+    <tr><td colspan="6" class="erp-empty">El archivo no contiene cuentas importables.</td></tr>
+{% endfor %}
+</tbody>

@@ -29,7 +29,6 @@ from contabilidad.services import asegurar_cuentas_financieras_base_honduras
 from facturacion.models import (
     BodegaInventario,
     Cliente,
-    ExistenciaLoteBodega,
     Factura,
     PagoFactura,
     Producto,
@@ -76,6 +75,12 @@ from .services import (
     subir_media_whatsapp,
 )
 from .tokens import leer_token_respuesta_cita
+from .mobile_modules import construir_contexto_modulos_app, inicio_app_disponible, url_modulos_app
+from .mobile_inventory import productos_inventario_app
+from .mobile_appointment_controls import (
+    autorizar_control_cita_app, es_control_cita_app, render_control_cita_app,
+    validar_contexto_control_cita_app, validar_control_cita_app, volver_control_cita_app,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -1089,13 +1094,33 @@ def crm_dashboard(request, empresa_slug):
 
 @login_required
 def configuracion_crm(request, empresa_slug):
+    from .mobile_crm_configuration import (
+        adaptar_formulario_crm_app, autorizar_configuracion_crm_app,
+        contexto_configuracion_crm_app, es_configuracion_crm_app,
+        render_configuracion_crm_app, volver_configuracion_crm_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
-    config = _configuracion_crm(empresa)
+    modo_app = es_configuracion_crm_app(request)
+    if modo_app:
+        autorizar_configuracion_crm_app(request, empresa)
+    if modo_app and request.method in {"GET", "HEAD"}:
+        config = ConfiguracionCRM.objects.filter(empresa=empresa).first() or ConfiguracionCRM(empresa=empresa)
+    else:
+        # POST conserva el inicializador original, incluso antes de validar.
+        config = _configuracion_crm(empresa)
+    contexto_app = contexto_configuracion_crm_app(request, empresa, config) if modo_app else None
     form = ConfiguracionCRMForm(request.POST or None, instance=config)
+    if modo_app:
+        adaptar_formulario_crm_app(form)
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Configuracion CRM actualizada correctamente.")
+        if modo_app:
+            return volver_configuracion_crm_app(empresa)
         return redirect("crm_dashboard", empresa_slug=empresa.slug)
+    if modo_app:
+        return render_configuracion_crm_app(request, form, contexto_app)
     response = render(
         request,
         "crm/form.html",
@@ -1120,6 +1145,9 @@ def configuracion_crm(request, empresa_slug):
 @login_required
 @require_POST
 def conectar_whatsapp_meta(request, empresa_slug):
+    from .mobile_crm_configuration import denegar_accion_crm_no_adaptada_app
+
+    denegar_accion_crm_no_adaptada_app(request)
     empresa = _empresa_desde_slug(empresa_slug)
     if not settings.META_WHATSAPP_APP_SECRET:
         return JsonResponse(
@@ -1132,6 +1160,7 @@ def conectar_whatsapp_meta(request, empresa_slug):
     except (UnicodeDecodeError, json.JSONDecodeError):
         return JsonResponse({"ok": False, "error": "Respuesta de Meta no valida."}, status=400)
 
+    denegar_accion_crm_no_adaptada_app(request, payload)
     code = str(payload.get("code") or "").strip()
     waba_id = str(payload.get("waba_id") or "").strip()
     phone_number_id = str(payload.get("phone_number_id") or "").strip()
@@ -1209,6 +1238,9 @@ def conectar_whatsapp_meta(request, empresa_slug):
 @login_required
 @require_POST
 def enviar_prueba_whatsapp(request, empresa_slug):
+    from .mobile_crm_configuration import denegar_accion_crm_no_adaptada_app
+
+    denegar_accion_crm_no_adaptada_app(request)
     empresa = _empresa_desde_slug(empresa_slug)
     config = _configuracion_crm(empresa)
     if not config.whatsapp_activo:
@@ -1466,8 +1498,15 @@ def agenda_citas(request, empresa_slug):
 @login_required
 @require_POST
 def guardar_bloqueo_disponibilidad(request, empresa_slug):
+    from .mobile_availability import (
+        es_disponibilidad_app, preparar_disponibilidad_app,
+        render_disponibilidad_app, validar_citas_disponibilidad_app,
+        volver_disponibilidad_app,
+    )
+
     empresa = _empresa_desde_slug(empresa_slug)
-    empresa_agenda = _empresa_origen_agenda(empresa)
+    modo_app = es_disponibilidad_app(request, empresa)
+    empresa_agenda = preparar_disponibilidad_app(request, empresa) if modo_app else _empresa_origen_agenda(empresa)
     bloqueo_id = (request.POST.get("bloqueo_id") or "").strip()
     bloqueo = None
     if bloqueo_id:
@@ -1490,6 +1529,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
         profesional = form.cleaned_data["profesional"]
         if not _puede_gestionar_bloqueo(request.user, empresa_agenda, profesional):
             return HttpResponse("No tiene permiso para gestionar bloqueos de este profesional.", status=403)
+        if modo_app:
+            validar_citas_disponibilidad_app(empresa_agenda, profesional)
         afectadas = citas_afectadas_por_bloqueo(
             empresa=empresa_agenda,
             profesional=profesional,
@@ -1500,6 +1541,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
             hora_fin=form.cleaned_data.get("hora_fin"),
         )
         if afectadas and request.POST.get("confirmar_conflictos") != "1":
+            if modo_app:
+                return render_disponibilidad_app(request, empresa, empresa_agenda, form, bloqueo, afectadas)
             return render(
                 request,
                 "crm/bloqueo_disponibilidad_form.html",
@@ -1520,6 +1563,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
             request,
             "Bloqueo de disponibilidad actualizado." if bloqueo else "Horario marcado como No disponible.",
         )
+        if modo_app:
+            return volver_disponibilidad_app(request, empresa, registro.fecha)
         if request.POST.get("regresar_a") == "app":
             return redirect(
                 f"{reverse('agenda_mobile', args=[empresa.slug])}?vista=dia&fecha={registro.fecha.isoformat()}#disponibilidad-medica"
@@ -1527,6 +1572,8 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
         return redirect(
             f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={registro.fecha.isoformat()}#disponibilidad-medica"
         )
+    if modo_app:
+        return render_disponibilidad_app(request, empresa, empresa_agenda, form, bloqueo, status=400)
     return render(
         request,
         "crm/bloqueo_disponibilidad_form.html",
@@ -1544,8 +1591,13 @@ def guardar_bloqueo_disponibilidad(request, empresa_slug):
 @login_required
 @require_POST
 def eliminar_bloqueo_disponibilidad(request, empresa_slug, bloqueo_id):
+    from .mobile_availability import es_disponibilidad_app, preparar_disponibilidad_app, volver_disponibilidad_app
+
     empresa = _empresa_desde_slug(empresa_slug)
-    empresa_agenda = _empresa_origen_agenda(empresa)
+    modo_app = es_disponibilidad_app(request, empresa)
+    empresa_agenda = preparar_disponibilidad_app(
+        request, empresa, eliminar=True, bloqueo_id=bloqueo_id,
+    ) if modo_app else _empresa_origen_agenda(empresa)
     bloqueo = get_object_or_404(
         BloqueoDisponibilidadMedica.objects.select_related("profesional"),
         empresa=empresa_agenda,
@@ -1556,6 +1608,8 @@ def eliminar_bloqueo_disponibilidad(request, empresa_slug, bloqueo_id):
     fecha = bloqueo.fecha.isoformat()
     bloqueo.delete()
     messages.success(request, "Bloqueo de disponibilidad eliminado.")
+    if modo_app:
+        return volver_disponibilidad_app(request, empresa, fecha)
     if request.POST.get("regresar_a") == "app":
         return redirect(f"{reverse('agenda_mobile', args=[empresa.slug])}?vista=dia&fecha={fecha}#disponibilidad-medica")
     return redirect(f"{reverse('agenda_citas', args=[empresa.slug])}?vista=dia&fecha={fecha}#disponibilidad-medica")
@@ -1564,6 +1618,7 @@ def eliminar_bloqueo_disponibilidad(request, empresa_slug, bloqueo_id):
 @login_required
 def camara_hiperbarica(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "camara_hiperbarica")
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este módulo clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1579,6 +1634,7 @@ def camara_hiperbarica(request, empresa_slug):
         return HttpResponse("Tu usuario no tiene permiso para consultar controles clínicos.", status=403)
 
     fecha_seleccionada = _fecha_agenda(request.GET.get("fecha"))
+    validar_contexto_control_cita_app(request, empresa, "camara_hiperbarica", fecha_seleccionada, _es_cita_camara_hiperbarica)
     contexto = {
         "empresa": empresa,
         "fecha_seleccionada": fecha_seleccionada,
@@ -1586,13 +1642,14 @@ def camara_hiperbarica(request, empresa_slug):
         "fecha_siguiente": fecha_seleccionada + timedelta(days=1),
     }
     contexto.update(_contexto_control_camara_hyperbarica(empresa, request, fecha_seleccionada))
-    return render(request, "crm/camara_hiperbarica.html", contexto)
+    return render_control_cita_app(request, empresa, "camara_hiperbarica", "crm/camara_hiperbarica.html", contexto)
 
 
 @login_required
 @require_POST
 def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "camara_hiperbarica", cita_id)
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este control clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1612,12 +1669,15 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
         id=cita_id,
         paciente__isnull=False,
     )
+    validar_control_cita_app(request, empresa, "camara_hiperbarica", cita, _es_cita_camara_hiperbarica)
     if not _es_cita_camara_hiperbarica(cita):
         return HttpResponse("La cita seleccionada no corresponde a cámara hiperbárica.", status=400)
 
     sesion = SesionCamaraHiperbarica.objects.filter(cita=cita).select_related("programa").first()
     if sesion and sesion.bloqueada:
         messages.warning(request, "La sesión ya fue finalizada y permanece bloqueada para proteger el historial clínico.")
+        if es_control_cita_app(request, empresa):
+            return volver_control_cita_app(request, empresa, "camara_hiperbarica", cita)
         return redirect(
             f"{reverse('agenda_camara_hiperbarica', args=[empresa.slug])}?fecha={cita.fecha_hora:%Y-%m-%d}"
             f"&control_camara={cita.id}#documento-camara"
@@ -1793,9 +1853,11 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
             "sesion_camara_form": sesion_form,
             "numero_sesion_desde_cita": numero_sesion_desde_cita,
         })
-        return render(request, "crm/camara_hiperbarica.html", contexto)
+        return render_control_cita_app(request, empresa, "camara_hiperbarica", "crm/camara_hiperbarica.html", contexto, borrador_guardado_automaticamente)
 
     fecha = timezone.localtime(cita.fecha_hora).date().isoformat()
+    if es_control_cita_app(request, empresa):
+        return volver_control_cita_app(request, empresa, "camara_hiperbarica", cita)
     return redirect(
         f"{reverse('agenda_camara_hiperbarica', args=[empresa.slug])}?fecha={fecha}"
         f"&control_camara={cita.id}#documento-camara"
@@ -1805,6 +1867,7 @@ def guardar_control_camara_hiperbarica(request, empresa_slug, cita_id):
 @login_required
 def terapias_postquirurgicas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "terapias_postquirurgicas")
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este módulo clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1816,18 +1879,20 @@ def terapias_postquirurgicas(request, empresa_slug):
     ):
         return HttpResponse("Tu usuario no tiene permiso para consultar controles clínicos.", status=403)
     fecha = _fecha_agenda(request.GET.get("fecha"))
+    validar_contexto_control_cita_app(request, empresa, "terapias_postquirurgicas", fecha, _es_cita_terapia_postquirurgica)
     contexto = {
         "empresa": empresa, "fecha_seleccionada": fecha,
         "fecha_anterior": fecha - timedelta(days=1), "fecha_siguiente": fecha + timedelta(days=1),
     }
     contexto.update(_contexto_terapias_postquirurgicas(empresa, request, fecha))
-    return render(request, "crm/terapias_postquirurgicas.html", contexto)
+    return render_control_cita_app(request, empresa, "terapias_postquirurgicas", "crm/terapias_postquirurgicas.html", contexto)
 
 
 @login_required
 @require_POST
 def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    autorizar_control_cita_app(request, empresa, "terapias_postquirurgicas", cita_id)
     if empresa.slug != "hospital_mia":
         return HttpResponse("Este control clínico solo está habilitado para Hospital Mia.", status=404)
     if not request.user.puede_acceder_empresa(empresa):
@@ -1842,6 +1907,7 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
         CitaCliente.objects.select_related("paciente", "servicio_clinico"),
         empresa=empresa, id=cita_id, paciente__isnull=False,
     )
+    validar_control_cita_app(request, empresa, "terapias_postquirurgicas", cita, _es_cita_terapia_postquirurgica)
     if not _es_cita_terapia_postquirurgica(cita):
         return HttpResponse("La cita seleccionada no corresponde a terapias post quirúrgicas.", status=400)
     sesion = SesionTerapiaPostQuirurgica.objects.filter(cita=cita).select_related("programa").first()
@@ -1852,6 +1918,8 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
     )
     if sesion and sesion.bloqueada:
         messages.warning(request, "La sesión ya fue finalizada y permanece bloqueada.")
+        if es_control_cita_app(request, empresa):
+            return volver_control_cita_app(request, empresa, "terapias_postquirurgicas", cita)
         return redirect(regreso)
     programa = sesion.programa if sesion else None
     programa_id = (request.POST.get("programa_id") or "").strip()
@@ -1929,6 +1997,8 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
             f"Sesión {guardada.numero_sesion} finalizada y vinculada al expediente."
             if finalizar else f"Borrador de la sesión {guardada.numero_sesion} guardado.",
         )
+        if es_control_cita_app(request, empresa):
+            return volver_control_cita_app(request, empresa, "terapias_postquirurgicas", cita)
         return redirect(regreso)
 
     borrador_guardado = False
@@ -1973,7 +2043,7 @@ def guardar_terapia_postquirurgica(request, empresa_slug, cita_id):
         "sesion_terapia": sesion, "sesion_terapia_form": sesion_form,
         "numero_sesion_desde_cita": numero_cita,
     })
-    return render(request, "crm/terapias_postquirurgicas.html", contexto)
+    return render_control_cita_app(request, empresa, "terapias_postquirurgicas", "crm/terapias_postquirurgicas.html", contexto, borrador_guardado)
 
 
 def agenda_mobile(request, empresa_slug):
@@ -2005,6 +2075,14 @@ def agenda_mobile(request, empresa_slug):
         vista_predeterminada="dia",
         empresa_agenda=empresa_agenda,
     )
+    from .mobile_availability import disponibilidad_disponible_app
+    from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES
+
+    if empresa.slug in EMPRESAS_CLINICAS_CON_ROLES and interfaz_clinica_activa(empresa):
+        contexto["puede_gestionar_bloqueos"] = bool(
+            contexto.get("puede_gestionar_bloqueos")
+            and disponibilidad_disponible_app(request, empresa, empresa_agenda)
+        )
     contexto["empresas_app_switch"] = [
         {
             "id": empresa_disponible.id,
@@ -2318,121 +2396,7 @@ def agenda_mobile(request, empresa_slug):
     )
     contexto["inventario_productos_app_payload"] = []
     if puede_ver_productos_app:
-        productos_inventario = list(
-            Producto.objects.filter(
-                empresa=empresa,
-                activo=True,
-                eliminado=False,
-                controla_inventario=True,
-                tipo_item="producto",
-            )
-            .select_related("inventario")
-            .order_by("nombre")
-        )
-        producto_ids = [producto.id for producto in productos_inventario]
-        existencias_lotes = list(
-            ExistenciaLoteBodega.objects.filter(
-                empresa=empresa,
-                lote__empresa=empresa,
-                lote__producto_id__in=producto_ids,
-                lote__activo=True,
-                bodega__empresa=empresa,
-                bodega__activa=True,
-            ).select_related("bodega", "lote")
-        )
-        bodegas_por_producto = {producto_id: {} for producto_id in producto_ids}
-        lotes_por_producto = {producto_id: {} for producto_id in producto_ids}
-        for existencia in existencias_lotes:
-            producto_id = existencia.lote.producto_id
-            bodegas_producto = bodegas_por_producto.setdefault(producto_id, {})
-            bodegas_producto[existencia.bodega.nombre] = (
-                bodegas_producto.get(existencia.bodega.nombre, 0) + existencia.cantidad
-            )
-            lotes_producto = lotes_por_producto.setdefault(producto_id, {})
-            lote_payload = lotes_producto.setdefault(
-                existencia.lote_id,
-                {
-                    "numero": existencia.lote.numero_lote,
-                    "fecha_vencimiento": (
-                        existencia.lote.fecha_vencimiento.isoformat()
-                        if existencia.lote.fecha_vencimiento
-                        else ""
-                    ),
-                    "fecha_vencimiento_label": (
-                        existencia.lote.fecha_vencimiento.strftime("%d/%m/%Y")
-                        if existencia.lote.fecha_vencimiento
-                        else "Sin vencimiento"
-                    ),
-                    "cantidad": 0,
-                    "bodegas": [],
-                    "dias_para_vencer": existencia.lote.dias_para_vencer,
-                    "vencido": existencia.lote.vencido,
-                    "proximo_vencer": existencia.lote.por_vencer,
-                },
-            )
-            lote_payload["cantidad"] += existencia.cantidad
-            lote_payload["bodegas"].append(
-                {"nombre": existencia.bodega.nombre, "cantidad": float(existencia.cantidad)}
-            )
-
-        hoy = timezone.localdate()
-        inventario_payload = []
-        for producto in productos_inventario:
-            inventario = getattr(producto, "inventario", None)
-            total = inventario.existencias if inventario else 0
-            stock_minimo = inventario.stock_minimo if inventario else 0
-            lotes = list(lotes_por_producto.get(producto.id, {}).values())
-            lotes.sort(
-                key=lambda lote: (
-                    date.fromisoformat(lote["fecha_vencimiento"])
-                    if lote["fecha_vencimiento"]
-                    else date.max,
-                    lote["numero"].casefold(),
-                )
-            )
-            bodegas = [
-                {"nombre": nombre, "cantidad": float(cantidad)}
-                for nombre, cantidad in sorted(
-                    bodegas_por_producto.get(producto.id, {}).items(),
-                    key=lambda item: item[0].casefold(),
-                )
-                if cantidad != 0
-            ]
-            lotes_disponibles = [lote for lote in lotes if lote["cantidad"] > 0]
-            lote_proximo = next(
-                (lote for lote in lotes_disponibles if lote["fecha_vencimiento"]),
-                None,
-            )
-            sin_stock = total <= 0
-            stock_bajo = bool(not sin_stock and stock_minimo > 0 and total <= stock_minimo)
-            vencido = any(lote["vencido"] for lote in lotes_disponibles)
-            proximo_vencer = any(lote["proximo_vencer"] for lote in lotes_disponibles)
-            inventario_payload.append(
-                {
-                    "id": producto.id,
-                    "nombre": producto.nombre,
-                    "codigo": producto.codigo or "",
-                    "unidad": producto.get_unidad_medida_display(),
-                    "existencia": float(total),
-                    "stock_minimo": float(stock_minimo),
-                    "estado_stock": "sin_stock" if sin_stock else "stock_bajo" if stock_bajo else "normal",
-                    "stock_bajo": stock_bajo,
-                    "sin_stock": sin_stock,
-                    "proximo_vencer": proximo_vencer,
-                    "vencido": vencido,
-                    "bodegas": bodegas,
-                    "lotes": lotes,
-                    "maneja_lotes": bool(lotes),
-                    "proximo_vencimiento": lote_proximo["fecha_vencimiento"] if lote_proximo else "",
-                    "proximo_vencimiento_label": lote_proximo["fecha_vencimiento_label"] if lote_proximo else "",
-                    "dias_proximo_vencimiento": (
-                        (date.fromisoformat(lote_proximo["fecha_vencimiento"]) - hoy).days
-                        if lote_proximo
-                        else None
-                    ),
-                }
-            )
-        contexto["inventario_productos_app_payload"] = inventario_payload
+        contexto["inventario_productos_app_payload"] = productos_inventario_app(empresa)
     contexto["impuestos_app_payload"] = [
         {
             "id": impuesto.id,
@@ -2487,7 +2451,122 @@ def agenda_mobile(request, empresa_slug):
     ]
     contexto["precios_incluyen_impuesto_app"] = bool(empresa.slug in {"hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos"})
     contexto["app_scope_url"] = reverse("dashboard", args=[empresa.slug])
+    contexto.update(construir_contexto_modulos_app(request, empresa))
     response = render(request, "crm/agenda_mobile.html", contexto)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
+@require_http_methods(["GET"])
+def agenda_mobile_inventory(request, empresa_slug):
+    from facturacion.mobile_product_management import gestion_productos_disponible_app, url_gestion_producto_app
+    from facturacion.mobile_stock_operations import acciones_stock_app, url_stock_app
+
+    empresa = _empresa_desde_slug(empresa_slug)
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado is not None:
+        return acceso_denegado
+    contexto = construir_contexto_modulos_app(request, empresa)
+    if not contexto["puede_ver_modulos_app"]:
+        return HttpResponse("Inventario móvil no disponible para esta empresa.", status=404)
+    if not empresa.tiene_modulo_activo("facturacion") or not request.user.tiene_permiso_erp("puede_inventario", empresa):
+        return HttpResponse("No tienes permiso para consultar inventario.", status=403)
+    inicio = reverse("agenda_mobile", args=[empresa.slug])
+    gestion = gestion_productos_disponible_app(request, empresa)
+    acciones = acciones_stock_app(request, empresa)
+    productos_app = productos_inventario_app(empresa)
+    filas_productos_app = []
+    for producto in productos_app:
+        fila = {"producto": producto}
+        if acciones:
+            fila["app_stock_entry_url"] = url_stock_app(empresa, producto=producto["id"])
+        if gestion["editar"]:
+            fila["app_product_edit_url"] = url_gestion_producto_app("editar_producto_facturacion", empresa, {"id": producto["id"]})
+        filas_productos_app.append(fila)
+    response = render(request, "crm/mobile_inventory.html", {
+        "empresa": empresa,
+        "app_base_url": inicio,
+        "app_invoices_url": f"{inicio}#facturas-app",
+        "app_modules_url": url_modulos_app(request, empresa),
+        "app_home_disponible": inicio_app_disponible(request, empresa),
+        "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
+        "productos": productos_app,
+        "mobile_inventory_rows": filas_productos_app,
+        **acciones,
+        "app_product_create_url": url_gestion_producto_app("crear_producto_facturacion", empresa) if gestion["crear"] else "",
+        "app_existing_stock_entry_url": f"{inicio}#productos-app" if empresa.slug == "hospital_mia" and inicio_app_disponible(request, empresa) and request.user.tiene_permiso_erp("puede_ajustar_inventario", empresa) else "",
+    })
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
+@require_http_methods(["GET"])
+def agenda_mobile_modules_screen(request, empresa_slug):
+    """Acceso adicional sin calendario ni datos de pacientes en el catálogo."""
+    from core.mobile_users import usuarios_disponibles_app
+    from facturacion.mobile_transfers import transferencia_disponible_app
+    from facturacion.mobile_suppliers import proveedores_disponibles_app
+
+    empresa = _empresa_desde_slug(empresa_slug)
+    acceso_denegado = _proteger_agenda_mobile(request, empresa)
+    if acceso_denegado is not None and not (
+        transferencia_disponible_app(request, empresa)
+        or any(proveedores_disponibles_app(request, empresa).values())
+        or usuarios_disponibles_app(request, empresa)
+    ):
+        return acceso_denegado
+    contexto = construir_contexto_modulos_app(request, empresa)
+    if not contexto["puede_ver_modulos_app"]:
+        return HttpResponse("Módulos móviles no disponibles para esta empresa.", status=404)
+    inicio = reverse("agenda_mobile", args=[empresa.slug])
+    contexto.update({
+        "empresa": empresa, "app_base_url": inicio,
+        "app_invoices_url": f"{inicio}#facturas-app",
+        "app_patients_url": f"{reverse('clinica_pacientes', args=[empresa.slug])}?app=1",
+        "app_modules_url": reverse("agenda_mobile_modules_screen", args=[empresa.slug]),
+        "app_home_disponible": acceso_denegado is None and inicio_app_disponible(request, empresa) and (request.user.is_superuser or empresa.licencia_operativa),
+        "app_hide_agenda_navigation": usuarios_disponibles_app(request, empresa) and not (request.user.is_superuser or empresa.licencia_operativa),
+        "app_hide_patient_navigation": usuarios_disponibles_app(request, empresa) and not (request.user.is_superuser or empresa.licencia_operativa),
+        "modulos_standalone": True,
+    })
+    response = render(request, "crm/mobile_modules.html", contexto)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
+@require_http_methods(["GET"])
+def agenda_mobile_modules(request, empresa_slug):
+    """Capacidades de presentación, sin datos clínicos ni permisos nuevos."""
+    from core.mobile_users import usuarios_disponibles_app
+    from facturacion.mobile_transfers import transferencia_disponible_app
+    from facturacion.mobile_suppliers import proveedores_disponibles_app
+
+    empresa = _empresa_desde_slug(empresa_slug)
+    response = _proteger_agenda_mobile(request, empresa)
+    acceso_modulos_adicional = response is not None and (
+        transferencia_disponible_app(request, empresa)
+        or any(proveedores_disponibles_app(request, empresa).values())
+        or usuarios_disponibles_app(request, empresa)
+    )
+    if usuarios_disponibles_app(request, empresa) and not (request.user.is_superuser or empresa.licencia_operativa):
+        acceso_modulos_adicional = True
+    if response is None or acceso_modulos_adicional:
+        contexto = construir_contexto_modulos_app(request, empresa)
+        if not contexto["puede_ver_modulos_app"]:
+            response = JsonResponse({"error": "Módulos móviles no disponibles para esta empresa."}, status=404)
+        else:
+            response = JsonResponse({
+                "version": 1,
+                "empresa": {"slug": empresa.slug, "nombre": empresa.nombre},
+                "modulos": contexto["modulos_app"],
+                "inicio_url": reverse("agenda_mobile_modules_screen" if acceso_modulos_adicional else "agenda_mobile", args=[empresa.slug]),
+            })
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response["Pragma"] = "no-cache"
     response["Expires"] = "0"

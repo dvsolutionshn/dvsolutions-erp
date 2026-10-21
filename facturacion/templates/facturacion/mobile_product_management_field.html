@@ -1,0 +1,9 @@
+<div class="mi-field msop-field{% if field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %} msop-choice-field{% endif %}" data-operation-field="{{ field.name }}">
+  {% if field.widget_type == 'checkbox' %}<label class="msop-check msop-label">{{ field }}<span>{{ field.label }}</span></label>
+  {% elif field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %}<span class="msop-label" id="msop-label-{{ field.html_name }}">{{ field.label }}{% if field.field.required %}<span class="msop-required" aria-hidden="true"> *</span>{% endif %}</span><div role="group" aria-labelledby="msop-label-{{ field.html_name }}">{{ field }}</div>
+  {% else %}<label class="msop-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="msop-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+  {% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}
+  {% if field.widget_type == 'clearablefile' and form.is_bound %}<small class="msop-received">Si adjuntó una imagen nueva, vuelva a seleccionarla antes de reenviar. El navegador no conserva el archivo tras un error.</small>{% endif %}
+  {% if form.is_bound and field.field.widget.input_type == 'date' and field.value %}<small class="msop-received">Valor recibido: {{ field.value }}</small>{% elif field.errors and field.value and field.widget_type != 'clearablefile' %}<small class="msop-received">Valor recibido: {{ field.value }}</small>{% endif %}
+  {% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+</div>

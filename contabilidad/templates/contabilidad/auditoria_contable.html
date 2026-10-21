@@ -7,6 +7,7 @@
 
 {% block topbar_actions %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
+<a href="{% url 'historicos_usd' empresa.slug %}" class="erp-action-link">Revisar históricos USD</a>
 <a href="{% url 'exportar_auditoria_contable_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
 <button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
 {% endblock %}
@@ -111,7 +112,10 @@
                     </td>
                     <td><span class="erp-badge {% if asiento.estado == 'contabilizado' %}success{% elif asiento.estado == 'borrador' %}warning{% else %}danger{% endif %}">{{ asiento.get_estado_display }}</span></td>
                     <td>{{ asiento.origen_modulo|default:"Manual" }}</td>
-                    <td>{% if asiento.documento_tipo %}{{ asiento.documento_tipo }} #{{ asiento.documento_id|default:"" }}{% else %}-{% endif %}</td>
+                    <td>{% if asiento.documento_tipo %}{{ asiento.documento_tipo }} #{{ asiento.documento_id|default:"" }}{% else %}-{% endif %}
+                        <div class="erp-card-muted">Origen {{ asiento.moneda_origen }} · tipo de cambio {{ asiento.tipo_cambio|floatformat:6 }} HNL</div>
+                        {% if not asiento.conversion_verificada %}<span class="erp-badge danger">Conversión pendiente de revisión</span>{% endif %}
+                    </td>
                     <td>{{ asiento.evento|default:"-" }}</td>
                     <td>{{ asiento.creado_por.username|default:"Sistema" }}</td>
                     <td class="amount"><span class="erp-money">L. {{ asiento.total_debe }}</span></td>

@@ -33,6 +33,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from .captura_rapida import calcular_importes, captura_rapida
+from .costos_inventario import actualizar_valor_inventario, cantidad_disponible_para_linea, capturar_costos_devolucion, costo_reversion_compra, validar_devoluciones_nota, valor_actual_inventario, valor_contable_linea_inventario, valorar_linea_compra
 
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa, Empresa, RegistroAuditoria, Usuario
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
@@ -52,7 +53,7 @@ from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaP
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoComisionProveedorForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
 from .mobile_presentation import preparar_historial_factura_mobile
-from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera
+from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera, bloquear_empresas_contables, validar_fecha_contable_abierta
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_documento_whatsapp
 
@@ -65,10 +66,20 @@ EMPRESAS_CONTROL_LOTES_FEFO = {
     "luque_aestetic",
     "serviciosmedicos",
 }
+EMPRESAS_PAGO_MIXTO_PREDETERMINADO = {
+    "hospital_mia",
+    "medical_spa",
+    "luque_aestetic",
+    "serviciosmedicos",
+}
 
 
 def _empresa_muestra_costo_real_inventario(empresa):
     return bool(empresa and empresa.slug in EMPRESAS_COSTO_REAL_INVENTARIO)
+
+
+def _empresa_usa_pago_mixto_predeterminado(empresa):
+    return bool(empresa and empresa.slug in EMPRESAS_PAGO_MIXTO_PREDETERMINADO)
 
 
 def _registrar_cambio_costo_real(producto, costo_anterior, usuario):
@@ -191,11 +202,21 @@ def _desglose_metodo_caja(pagos, metodo_pago):
 
 
 def _cuentas_financieras_activas_para_pago(empresa):
-    asegurar_cuentas_financieras_base_honduras(empresa)
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
+    modo_catalogo_rumi = usa_catalogo_rumi(empresa)
+    if not modo_catalogo_rumi:
+        asegurar_cuentas_financieras_base_honduras(empresa)
     cuentas = CuentaFinanciera.objects.filter(
         empresa=empresa,
         activa=True,
     ).select_related("cuenta_contable").order_by("nombre")
+    if modo_catalogo_rumi:
+        return cuentas.filter(
+            cuenta_contable__empresa=empresa,
+            cuenta_contable__activa=True,
+            cuenta_contable__acepta_movimientos=True,
+        )
     if not cuentas.exists():
         cargar_catalogo_base_honduras(empresa)
         cuentas = CuentaFinanciera.objects.filter(
@@ -205,6 +226,19 @@ def _cuentas_financieras_activas_para_pago(empresa):
     return cuentas
 
 
+def _avisar_configuracion_cuentas_financieras_rumi(request, empresa, cuentas):
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
+    modo_catalogo_rumi = usa_catalogo_rumi(empresa)
+    if modo_catalogo_rumi and not cuentas.exists():
+        messages.warning(
+            request,
+            "RUMI no tiene una caja o cuenta financiera activa enlazada a su catálogo. "
+            "Configure las cuentas financieras en Contabilidad antes de registrar cobros o pagos.",
+        )
+    return modo_catalogo_rumi
+
+
 def _form_data_pago_por_defecto(cuentas_financieras):
     cuenta = cuentas_financieras.first()
     return {
@@ -212,6 +246,7 @@ def _form_data_pago_por_defecto(cuentas_financieras):
         "porcentaje_comision": "0.00",
         "monto_comision": "0.00",
         "proveedor_comision": "",
+        "comision_retenida_cliente": False,
     }
 
 
@@ -231,6 +266,11 @@ def _datos_comision_pago(payload, empresa, base_comision, factura=None):
         raise ValidationError("El porcentaje de comision no es valido.") from exc
     if porcentaje < 0 or porcentaje > 100:
         raise ValidationError("El porcentaje de comision debe estar entre 0 y 100.")
+    if payload.get('comision_retenida_cliente') in ('on', '1', 'true', True):
+        if empresa.slug != 'digital_planning':
+            raise ValidationError('La comisión retenida por el cliente está disponible solo para Digital Planning.')
+        if porcentaje <= 0:
+            raise ValidationError('Indica un porcentaje de comisión mayor que cero para compensarla.')
     if porcentaje == 0:
         return None, Decimal("0.00"), Decimal("0.00")
     proveedor = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True, id=proveedor_id).first()
@@ -490,6 +530,9 @@ def punto_venta(request, empresa_slug):
     impuestos_qs = TipoImpuesto.objects.filter(activo=True).order_by("nombre")
     impuesto_default = impuestos_qs.first()
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
     cliente_obligatorio = _pos_cliente_obligatorio(empresa)
     bodegas_pos = []
     if empresa.slug in POS_CLIENTE_OBLIGATORIO_SLUGS:
@@ -520,6 +563,10 @@ def punto_venta(request, empresa_slug):
         fecha_venta = _parsear_fecha_latam(fecha_venta_raw) if fecha_venta_raw else timezone.localdate()
 
         try:
+            if modo_catalogo_rumi and not cuentas_financieras.exists():
+                raise ValidationError(
+                    "Configure una caja o cuenta financiera de RUMI enlazada a su catálogo antes de cobrar esta venta."
+                )
             if fecha_venta_raw and not fecha_venta:
                 raise ValidationError("Selecciona una fecha de factura valida.")
             if not usa_pago_mixto_pos and metodo not in dict(PagoFactura.METODOS):
@@ -1185,16 +1232,13 @@ def _decimal_reporte(valor):
 
 
 def _tasa_factura_reporte(factura):
-    if factura.moneda != "USD":
-        return Decimal("1.0000")
-    tasa = _decimal_reporte(factura.tipo_cambio)
-    return tasa if tasa > 0 else Decimal("1.0000")
+    from contabilidad.moneda import validar_moneda_tipo_cambio
+    return validar_moneda_tipo_cambio(factura.moneda, factura.tipo_cambio)[1]
 
 
 def _convertir_factura_a_lempiras(factura, valor):
-    return (_decimal_reporte(valor) * _tasa_factura_reporte(factura)).quantize(
-        Decimal("0.01")
-    )
+    from contabilidad.moneda import convertir_a_lempiras
+    return convertir_a_lempiras(valor, factura.moneda, factura.tipo_cambio)
 
 
 def _preparar_factura_para_reporte(factura):
@@ -2486,6 +2530,7 @@ def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None
             raise ValidationError(f"No hay suficiente inventario en Vitrina para {linea.producto.nombre}.")
 
 
+@transaction.atomic
 def _registrar_movimiento_inventario(
     *,
     empresa,
@@ -2500,22 +2545,57 @@ def _registrar_movimiento_inventario(
     compra_documento=None,
     bodega=None,
     usuario=None,
+    valor_contable=None,
 ):
+    from contabilidad.services import contabilidad_activa_para_empresa, registrar_asiento_movimiento_inventario_manual
+
+    bloquear_empresas_contables([empresa.pk])
+    if producto.empresa_id != empresa.pk:
+        raise ValidationError('El producto del movimiento debe pertenecer a la misma empresa.')
     if not producto.controla_inventario:
         return None
+    manual = tipo in ['entrada', 'ajuste_entrada', 'ajuste_salida', 'regalia']
+    fecha_efectiva = entrada_documento.fecha_documento if entrada_documento else timezone.localdate()
+    if manual and contabilidad_activa_para_empresa(empresa):
+        validar_fecha_contable_abierta(empresa.pk, fecha_efectiva)
+
+    producto_guardado = Producto.objects.select_for_update().get(pk=producto.pk, empresa=empresa)
+    producto.costo_promedio = producto_guardado.costo_promedio
 
     inventario = _obtener_inventario_producto(producto)
     existencia_anterior = inventario.existencias
+    es_entrada = tipo in ['entrada', 'entrada_compra', 'ajuste_entrada', 'devolucion_nota_credito', 'reversion_factura']
+    valor_anterior = valor_actual_inventario(inventario, producto)
+    if valor_contable is not None:
+        inventario.valor_contable = actualizar_valor_inventario(
+            producto, existencia_anterior, cantidad, valor_contable,
+            entrada=es_entrada, permitir_saldo_negativo=tipo == 'salida_factura',
+            valor_anterior=valor_anterior,
+        )
+    else:
+        # Los ajustes y entradas sin factura conservan el promedio vigente y
+        # actualizan el saldo monetario; nunca dejan una captura obsoleta.
+        importe = (
+            valor_anterior * Decimal(cantidad) / Decimal(existencia_anterior)
+            if existencia_anterior > 0 else Decimal(cantidad) * Decimal(producto.costo_promedio or 0)
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        inventario.valor_contable = valor_anterior + importe if es_entrada else valor_anterior - importe
+        if manual:
+            valor_contable = importe
+            inventario.valor_contable = actualizar_valor_inventario(
+                producto, existencia_anterior, cantidad, importe,
+                entrada=es_entrada, valor_anterior=valor_anterior,
+            )
 
-    if tipo in ['entrada', 'entrada_compra', 'ajuste_entrada', 'devolucion_nota_credito', 'reversion_factura']:
+    if es_entrada:
         existencia_resultante = existencia_anterior + cantidad
     else:
         existencia_resultante = existencia_anterior - cantidad
 
     inventario.existencias = existencia_resultante
-    inventario.save(update_fields=['existencias', 'fecha_actualizacion'])
+    inventario.save(update_fields=['existencias', 'valor_contable', 'fecha_actualizacion'])
 
-    return MovimientoInventario.objects.create(
+    movimiento = MovimientoInventario.objects.create(
         empresa=empresa,
         producto=producto,
         bodega=bodega,
@@ -2530,19 +2610,58 @@ def _registrar_movimiento_inventario(
         entrada_documento=entrada_documento,
         compra_documento=compra_documento,
         usuario=usuario if getattr(usuario, "is_authenticated", False) else None,
+        valor_contable=valor_contable,
+        fecha=timezone.make_aware(datetime.combine(fecha_efectiva, datetime.min.time())) if entrada_documento else timezone.now(),
     )
+    if manual:
+        registrar_asiento_movimiento_inventario_manual(movimiento)
+    return movimiento
 
 
 @transaction.atomic
 def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
+    bloquear_empresas_contables([factura.empresa_id])
     if not forzar and MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
+    validar_fecha_contable_abierta(factura.empresa_id, factura.fecha_emision)
+
+    asiento_publicado = AsientoContable.objects.filter(
+        empresa=factura.empresa, documento_tipo='factura', documento_id=factura.pk,
+        evento='emision', estado='contabilizado',
+    ).exists()
+    lineas = list(factura.lineas.select_related('producto'))
+    if not asiento_publicado:
+        costos = dict(Producto.objects.select_for_update().filter(
+            empresa=factura.empresa, pk__in=[linea.producto_id for linea in lineas if linea.producto_id],
+        ).values_list('pk', 'costo_promedio'))
+        grupos = {}
+        for linea in lineas:
+            if linea.producto_id and linea.producto.controla_inventario:
+                grupos.setdefault(linea.producto_id, []).append(linea)
+        for producto_id, lineas_producto in grupos.items():
+            costo = costos.get(producto_id, Decimal('0.00')) or Decimal('0.00')
+            producto = lineas_producto[0].producto
+            producto.costo_promedio = costo
+            inventario = _obtener_inventario_producto(producto)
+            cantidad_stock = Decimal(inventario.existencias or 0)
+            costo_exacto = valor_actual_inventario(inventario, producto) / cantidad_stock if cantidad_stock > 0 else Decimal(costo)
+            total_cantidad = sum((Decimal(linea.cantidad) for linea in lineas_producto), Decimal('0.00'))
+            costo_total = (total_cantidad * costo_exacto).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            acumulado = Decimal('0.00')
+            cantidad_acumulada = Decimal('0.00')
+            for linea in lineas_producto:
+                linea.costo_unitario = costo
+                cantidad_acumulada += Decimal(linea.cantidad)
+                objetivo_acumulado = (costo_total * cantidad_acumulada / total_cantidad).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                linea.costo_contable_total = objetivo_acumulado - acumulado
+                acumulado += linea.costo_contable_total
+                linea.save(update_fields=['costo_unitario', 'costo_contable_total'])
 
     observacion = observacion or 'Salida generada automaticamente por emision de factura.'
     if not _registrar_salida_fefo_factura(factura, forzar=forzar, observacion=observacion):
         _registrar_salida_vitrina_factura(factura, forzar=forzar, observacion=observacion)
 
-    for linea in factura.lineas.select_related('producto').all():
+    for linea in lineas:
         if not linea.producto_id or not linea.producto:
             continue
         if not linea.producto.controla_inventario:
@@ -2555,12 +2674,16 @@ def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
             referencia=factura.numero_factura or f"Factura {factura.id}",
             observacion=observacion,
             factura=factura,
+            valor_contable=valor_contable_linea_inventario(linea),
         )
 
 
+@transaction.atomic
 def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
+    bloquear_empresas_contables([factura.empresa_id])
     if not MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
+    validar_fecha_contable_abierta(factura.empresa_id, factura.fecha_emision)
 
     observacion = observacion or 'Reversion automatica por anulacion de factura.'
 
@@ -2597,6 +2720,8 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
         .annotate(
             salida=Sum("cantidad", filter=Q(tipo="salida_factura")),
             reversion=Sum("cantidad", filter=Q(tipo="reversion_factura")),
+            valor_salida=Sum("valor_contable", filter=Q(tipo="salida_factura")),
+            valor_reversion=Sum("valor_contable", filter=Q(tipo="reversion_factura")),
         )
     )
     for resumen in movimientos_producto:
@@ -2614,15 +2739,25 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
             referencia=factura.numero_factura or f"Factura {factura.id}",
             observacion=observacion,
             factura=factura,
+            valor_contable=(
+                Decimal(resumen['valor_salida']) - Decimal(resumen.get('valor_reversion') or 0)
+                if resumen.get('valor_salida') is not None else None
+            ),
         )
 
 
+@transaction.atomic
 def _registrar_entrada_nota_credito(nota):
+    bloquear_empresas_contables([nota.empresa_id])
     if MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').exists():
         return
+    validar_fecha_contable_abierta(nota.empresa_id, nota.fecha_emision)
 
+    validar_devoluciones_nota(nota)
+    if not AsientoContable.objects.filter(empresa=nota.empresa, documento_tipo='nota_credito', documento_id=nota.pk, evento='emision', estado='contabilizado').exists():
+        capturar_costos_devolucion(nota)
     for linea in nota.lineas.select_related('producto').all():
-        if not linea.producto.controla_inventario:
+        if not linea.producto_id or not linea.producto.controla_inventario:
             continue
         _registrar_movimiento_inventario(
             empresa=nota.empresa,
@@ -2632,30 +2767,37 @@ def _registrar_entrada_nota_credito(nota):
             referencia=nota.numero_nota or f"NC {nota.id}",
             observacion='Entrada generada automaticamente por nota de credito emitida.',
             nota_credito=nota,
+            valor_contable=valor_contable_linea_inventario(linea),
         )
 
 
+@transaction.atomic
 def _revertir_entrada_nota_credito(nota):
+    bloquear_empresas_contables([nota.empresa_id])
     if not MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').exists():
         return
     if MovimientoInventario.objects.filter(nota_credito=nota, tipo='reversion_nota_credito').exists():
         return
+    validar_fecha_contable_abierta(nota.empresa_id, nota.fecha_emision)
 
-    for linea in nota.lineas.select_related('producto').all():
-        if not linea.producto.controla_inventario:
+    for movimiento in MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').select_related('producto'):
+        if not movimiento.producto.controla_inventario:
             continue
         _registrar_movimiento_inventario(
             empresa=nota.empresa,
-            producto=linea.producto,
+            producto=movimiento.producto,
             tipo='reversion_nota_credito',
-            cantidad=linea.cantidad,
+            cantidad=movimiento.cantidad,
             referencia=nota.numero_nota or f"NC {nota.id}",
             observacion='Reversion automatica por anulacion de nota de credito.',
             nota_credito=nota,
+            valor_contable=movimiento.valor_contable,
         )
 
 
+@transaction.atomic
 def _reconstruir_nota_credito_emitida(nota):
+    _revertir_entrada_nota_credito(nota)
     MovimientoInventario.objects.filter(
         nota_credito=nota,
         tipo__in=["devolucion_nota_credito", "reversion_nota_credito"],
@@ -2670,7 +2812,9 @@ def _reconstruir_nota_credito_emitida(nota):
     registrar_asiento_nota_credito(nota)
 
 
+@transaction.atomic
 def _aplicar_entrada_documento(entrada):
+    bloquear_empresas_contables([entrada.empresa_id])
     if MovimientoInventario.objects.filter(entrada_documento=entrada).exists():
         return
 
@@ -2695,25 +2839,18 @@ def _aplicar_entrada_documento(entrada):
         )
 
 
+@transaction.atomic
 def _aplicar_compra_documento(compra):
+    bloquear_empresas_contables([compra.empresa_id])
     if MovimientoInventario.objects.filter(compra_documento=compra).exists():
         return
+    validar_fecha_contable_abierta(compra.empresa_id, compra.fecha_documento)
 
     bodega_destino = _obtener_bodega_destino_compra(compra.empresa)
-    for linea in compra.lineas.select_related('producto').all():
+    for linea in compra.lineas.select_related('producto', 'compra', 'impuesto').all():
+        valor = valorar_linea_compra(linea, capturar=True)
         if not linea.producto.controla_inventario:
             continue
-        inventario = _obtener_inventario_producto(linea.producto)
-        cantidad_anterior = Decimal(inventario.existencias or 0)
-        valor_anterior = cantidad_anterior * Decimal(linea.producto.costo_promedio or 0)
-        cantidad_nueva = cantidad_anterior + Decimal(linea.cantidad or 0)
-        if cantidad_nueva > 0:
-            costo_nuevo = (
-                (valor_anterior + (Decimal(linea.cantidad) * Decimal(linea.costo_unitario)))
-                / cantidad_nueva
-            ).quantize(Decimal("0.0001"))
-            Producto.objects.filter(pk=linea.producto_id).update(costo_promedio=costo_nuevo)
-            linea.producto.costo_promedio = costo_nuevo
         _registrar_movimiento_inventario(
             empresa=compra.empresa,
             producto=linea.producto,
@@ -2723,6 +2860,7 @@ def _aplicar_compra_documento(compra):
             observacion=linea.comentario or compra.observacion or f'Ingreso por compra a {compra.proveedor_nombre}.',
             compra_documento=compra,
             bodega=bodega_destino,
+            valor_contable=valor['costo_total'],
         )
         _entrada_farmaceutica_generica(
             empresa=compra.empresa,
@@ -2734,28 +2872,18 @@ def _aplicar_compra_documento(compra):
         )
 
 
+@transaction.atomic
 def _revertir_compra_documento(compra):
+    bloquear_empresas_contables([compra.empresa_id])
     if not MovimientoInventario.objects.filter(compra_documento=compra, tipo='entrada_compra').exists():
         return
     if MovimientoInventario.objects.filter(compra_documento=compra, tipo='reversion_compra').exists():
         return
+    validar_fecha_contable_abierta(compra.empresa_id, compra.fecha_documento)
 
     for linea in compra.lineas.select_related('producto').all():
         if not linea.producto.controla_inventario:
             continue
-        inventario = _obtener_inventario_producto(linea.producto)
-        cantidad_anterior = Decimal(inventario.existencias or 0)
-        cantidad_nueva = cantidad_anterior - Decimal(linea.cantidad or 0)
-        valor_nuevo = (
-            (cantidad_anterior * Decimal(linea.producto.costo_promedio or 0))
-            - (Decimal(linea.cantidad or 0) * Decimal(linea.costo_unitario or 0))
-        )
-        costo_nuevo = (
-            max(valor_nuevo, Decimal("0.00")) / cantidad_nueva
-            if cantidad_nueva > 0 else Decimal("0.00")
-        ).quantize(Decimal("0.0001"))
-        Producto.objects.filter(pk=linea.producto_id).update(costo_promedio=costo_nuevo)
-        linea.producto.costo_promedio = costo_nuevo
         _registrar_movimiento_inventario(
             empresa=compra.empresa,
             producto=linea.producto,
@@ -2764,6 +2892,7 @@ def _revertir_compra_documento(compra):
             referencia=compra.numero_compra or compra.referencia_documento or f"Compra {compra.id}",
             observacion=f'Reversion automatica por anulacion de compra a {compra.proveedor_nombre}.',
             compra_documento=compra,
+            valor_contable=costo_reversion_compra(linea),
         )
 
 
@@ -2956,6 +3085,8 @@ def _redirect_factura(request, empresa, factura_id=None, *, destino="ver_factura
 
 
 def _contexto_factura_app(request, empresa, factura, config_avanzada=None):
+    from .mobile_payments import contexto_pagos_factura_app
+
     config_avanzada = config_avanzada or ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     permiso = lambda nombre: request.user.tiene_permiso_erp(nombre, empresa)
     borrador_eliminable = factura.estado == "borrador" and not factura.numero_factura
@@ -2993,6 +3124,7 @@ def _contexto_factura_app(request, empresa, factura, config_avanzada=None):
         "app_void_url": "anular_factura",
     }.items():
         contexto[clave] = reverse(vista, args=[empresa.slug, factura.pk]) + "?app=1"
+    contexto.update(contexto_pagos_factura_app(request, empresa, factura))
     return contexto
 
 
@@ -3138,6 +3270,8 @@ def clientes_facturacion(request, empresa_slug):
 @login_required
 @xframe_options_sameorigin
 def crear_cliente(request, empresa_slug):
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
 
@@ -3148,7 +3282,8 @@ def crear_cliente(request, empresa_slug):
                 cliente = form.save(commit=False)
                 cliente.empresa = empresa
                 cliente.save()
-                asegurar_cuenta_contable_cliente(cliente)
+                if not usa_catalogo_rumi(empresa):
+                    asegurar_cuenta_contable_cliente(cliente)
                 if quick_mode:
                     return render(request, "facturacion/crear_cliente_rapido_modal.html", {
                         "empresa": empresa,
@@ -3191,6 +3326,8 @@ def crear_cliente(request, empresa_slug):
 
 @login_required
 def editar_cliente(request, empresa_slug, cliente_id):
+    from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     cliente = get_object_or_404(Cliente, id=cliente_id, empresa=empresa)
 
@@ -3199,7 +3336,8 @@ def editar_cliente(request, empresa_slug, cliente_id):
         if form.is_valid():
             try:
                 cliente = form.save()
-                asegurar_cuenta_contable_cliente(cliente)
+                if not usa_catalogo_rumi(empresa):
+                    asegurar_cuenta_contable_cliente(cliente)
                 messages.success(request, "Cliente actualizado correctamente.")
                 return redirect("clientes_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
@@ -3238,7 +3376,15 @@ def eliminar_cliente(request, empresa_slug, cliente_id):
 
 @login_required
 def productos_facturacion(request, empresa_slug):
+    from .mobile_products import (
+        autorizar_productos_app, es_productos_app, render_productos_app,
+        validar_relaciones_productos_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_productos_app(request, empresa)
+    if modo_app:
+        autorizar_productos_app(request, empresa)
     q = request.GET.get("q", "").strip()
     categoria_id = request.GET.get("categoria", "").strip()
     tipo_item = request.GET.get("tipo", "todos").strip().lower()
@@ -3248,6 +3394,8 @@ def productos_facturacion(request, empresa_slug):
         'impuesto_predeterminado',
         'perfil_farmaceutico__categoria',
     ).order_by('nombre')
+    if modo_app:
+        categoria_seleccionada = validar_relaciones_productos_app(empresa, productos, categoria_id)
     if q:
         productos = productos.filter(
             Q(nombre__icontains=q) |
@@ -3275,6 +3423,12 @@ def productos_facturacion(request, empresa_slug):
         "controlados": productos_filtrados.filter(perfil_farmaceutico__producto_controlado=True).count(),
         "refrigerados": productos_filtrados.filter(perfil_farmaceutico__requiere_refrigeracion=True).count(),
     }
+
+    if modo_app:
+        return render_productos_app(
+            request, empresa, productos_filtrados, resumen, q, categoria_id,
+            tipo_item, categoria_seleccionada,
+        )
 
     productos_filtrados = _anotar_existencias_por_bodega(productos_filtrados, empresa)
 
@@ -3356,7 +3510,12 @@ def codigos_barras_productos(request, empresa_slug):
 
 @login_required
 def proveedores_facturacion(request, empresa_slug):
+    from .mobile_suppliers import autorizar_proveedores_app, es_proveedores_app, listar_proveedores_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if es_proveedores_app(request, empresa):
+        autorizar_proveedores_app(request, empresa)
+        return listar_proveedores_app(request, empresa)
     q = request.GET.get("q", "").strip()
     estado = request.GET.get("estado", "").strip()
     proveedores = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa).order_by('nombre')
@@ -3391,8 +3550,19 @@ def proveedores_facturacion(request, empresa_slug):
 
 @login_required
 def ver_proveedor(request, empresa_slug, proveedor_id):
+    from .mobile_suppliers import (
+        autorizar_proveedores_app, es_proveedores_app, render_proveedor_app,
+        validar_compras_proveedor_app, validar_proveedor_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_proveedores_app(request, empresa)
+    if modo_app:
+        autorizar_proveedores_app(request, empresa, proveedor_id=proveedor_id)
     proveedor = get_object_or_404(Proveedor, cliente_contable__isnull=True, id=proveedor_id, empresa=empresa)
+    if modo_app:
+        validar_proveedor_app(empresa, proveedor)
+        validar_compras_proveedor_app(empresa, proveedor)
     compras = (
         CompraInventario.objects.filter(empresa=empresa, proveedor=proveedor)
         .prefetch_related('lineas', 'pagos_compra')
@@ -3408,6 +3578,10 @@ def ver_proveedor(request, empresa_slug, proveedor_id):
         "vencidas": sum(1 for compra in compras if compra.esta_vencida),
     }
 
+    if modo_app:
+        return render_proveedor_app(request, empresa, {
+            "empresa": empresa, "proveedor": proveedor, "compras": compras[:20], "resumen": resumen,
+        })
     return render(request, "facturacion/ver_proveedor_cxp_premium.html", {
         "empresa": empresa,
         "proveedor": proveedor,
@@ -3418,7 +3592,12 @@ def ver_proveedor(request, empresa_slug, proveedor_id):
 
 @login_required
 def crear_proveedor(request, empresa_slug):
+    from .mobile_suppliers import autorizar_proveedores_app, es_proveedores_app, render_proveedor_app, volver_proveedor_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_proveedores_app(request, empresa)
+    if modo_app:
+        autorizar_proveedores_app(request, empresa, "crear", campos=ProveedorForm.base_fields)
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -3432,6 +3611,8 @@ def crear_proveedor(request, empresa_slug):
                 proveedor.empresa = empresa
                 proveedor.save()
                 messages.success(request, "Proveedor creado correctamente.")
+                if modo_app:
+                    return volver_proveedor_app(request, empresa, proveedor)
                 return _redirect_seguro(request, "proveedores_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
@@ -3444,6 +3625,10 @@ def crear_proveedor(request, empresa_slug):
     else:
         form = ProveedorForm()
 
+    if modo_app:
+        return render_proveedor_app(request, empresa, {
+            "empresa": empresa, "form": form, "titulo": "Nuevo Proveedor", "texto_boton": "Guardar Proveedor",
+        }, formulario=True)
     return render(request, "facturacion/crear_proveedor.html", {
         "empresa": empresa,
         "form": form,
@@ -3455,8 +3640,18 @@ def crear_proveedor(request, empresa_slug):
 
 @login_required
 def editar_proveedor(request, empresa_slug, proveedor_id):
+    from .mobile_suppliers import (
+        autorizar_proveedores_app, errores_guardado_proveedor_app, es_proveedores_app,
+        render_proveedor_app, validar_proveedor_app, volver_proveedor_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_proveedores_app(request, empresa)
+    if modo_app:
+        autorizar_proveedores_app(request, empresa, "editar", proveedor_id, ProveedorForm.base_fields)
     proveedor = get_object_or_404(Proveedor, cliente_contable__isnull=True, id=proveedor_id, empresa=empresa)
+    if modo_app:
+        validar_proveedor_app(empresa, proveedor)
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -3464,12 +3659,25 @@ def editar_proveedor(request, empresa_slug, proveedor_id):
         post_data.setdefault('dias_credito', str(proveedor.dias_credito or 0))
         form = ProveedorForm(post_data, instance=proveedor)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Proveedor actualizado correctamente.")
-            return redirect("proveedores_facturacion", empresa_slug=empresa.slug)
+            try:
+                form.save()
+            except ValidationError as exc:
+                if not modo_app:
+                    raise
+                errores_guardado_proveedor_app(form, exc)
+            else:
+                messages.success(request, "Proveedor actualizado correctamente.")
+                if modo_app:
+                    return volver_proveedor_app(request, empresa, proveedor, editar=True)
+                return redirect("proveedores_facturacion", empresa_slug=empresa.slug)
     else:
         form = ProveedorForm(instance=proveedor)
 
+    if modo_app:
+        return render_proveedor_app(request, empresa, {
+            "empresa": empresa, "proveedor": proveedor, "form": form,
+            "titulo": "Editar Proveedor", "texto_boton": "Guardar Cambios",
+        }, formulario=True)
     return render(request, "facturacion/crear_proveedor.html", {
         "empresa": empresa,
         "form": form,
@@ -3785,7 +3993,16 @@ def ver_bodega_inventario(request, empresa_slug, bodega_id):
 
 @login_required
 def crear_lote_inventario(request, empresa_slug):
+    from .mobile_stock_operations import (
+        autorizar_stock_app, errores_estructura_stock_app, es_stock_app,
+        render_stock_app, validar_relaciones_stock_app, volver_stock_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_stock_app(request, empresa)
+    if modo_app:
+        autorizar_stock_app(request, empresa, "entrada_lote")
+        validar_relaciones_stock_app(empresa)
     if not _empresa_usa_inventario_por_lotes(empresa):
         messages.error(request, "El control de inventario por lotes no esta activo para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
@@ -3795,6 +4012,12 @@ def crear_lote_inventario(request, empresa_slug):
     proveedores = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
     producto_preseleccionado = productos.filter(id=request.GET.get("producto")).first()
     next_url = request.POST.get("next") or request.GET.get("next") or ""
+    if modo_app:
+        errores_app = errores_estructura_stock_app(request, empresa, "entrada_lote")
+        if errores_app:
+            return render_stock_app(request, empresa, "entrada_lote", productos=productos,
+                proveedores=proveedores, bodegas=BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
+                bodega_principal=bodegas["principal"], errores=errores_app)
     if request.method == "POST":
         producto = productos.filter(id=request.POST.get("producto")).first()
         bodega = BodegaInventario.objects.filter(empresa=empresa, id=request.POST.get("bodega")).first()
@@ -3802,7 +4025,8 @@ def crear_lote_inventario(request, empresa_slug):
         cantidad_raw = request.POST.get("cantidad", "").strip()
         fecha_vencimiento = request.POST.get("fecha_vencimiento") or None
         vencimiento_rapido = request.POST.get("fecha_vencimiento_rapida", "").strip()
-        proveedor = proveedores.filter(id=request.POST.get("proveedor")).first()
+        proveedor_id = request.POST.get("proveedor") or None
+        proveedor = proveedores.filter(id=proveedor_id).first()
         try:
             cantidad = Decimal(cantidad_raw)
         except InvalidOperation:
@@ -3820,42 +4044,54 @@ def crear_lote_inventario(request, empresa_slug):
         elif not producto or not bodega or not numero_lote or cantidad <= 0:
             messages.error(request, "Completa producto, bodega, lote y cantidad mayor que cero.")
         else:
-            lote, _ = LoteInventario.objects.get_or_create(
-                empresa=empresa,
-                producto=producto,
-                numero_lote=numero_lote,
-                defaults={
-                    "fecha_vencimiento": fecha_vencimiento,
-                    "proveedor": proveedor,
-                    "activo": True,
-                },
-            )
-            lote.fecha_vencimiento = fecha_vencimiento
-            lote.proveedor = proveedor
-            lote.activo = True
-            lote.save(update_fields=["fecha_vencimiento", "proveedor", "activo"])
-            _registrar_movimiento_lote_bodega(
-                empresa=empresa,
-                bodega=bodega,
-                lote=lote,
-                tipo="entrada",
-                cantidad=cantidad,
-                referencia=f"Lote {numero_lote}",
-                observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
-            )
-            _registrar_movimiento_inventario(
-                empresa=empresa,
-                producto=producto,
-                tipo="entrada",
-                cantidad=cantidad,
-                referencia=f"Lote {numero_lote}",
-                observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
-            )
-            messages.success(request, "Lote registrado correctamente.")
-            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-                return redirect(next_url)
-            return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
+            try:
+                with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
+                    lote, _ = LoteInventario.objects.get_or_create(
+                        empresa=empresa,
+                        producto=producto,
+                        numero_lote=numero_lote,
+                        defaults={
+                            "fecha_vencimiento": fecha_vencimiento,
+                            "proveedor": proveedor,
+                            "activo": True,
+                        },
+                    )
+                    lote.fecha_vencimiento = fecha_vencimiento
+                    lote.proveedor = proveedor
+                    lote.activo = True
+                    lote.save(update_fields=["fecha_vencimiento", "proveedor", "activo"])
+                    _registrar_movimiento_lote_bodega(
+                        empresa=empresa,
+                        bodega=bodega,
+                        lote=lote,
+                        tipo="entrada",
+                        cantidad=cantidad,
+                        referencia=f"Lote {numero_lote}",
+                        observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
+                    )
+                    _registrar_movimiento_inventario(
+                        empresa=empresa,
+                        producto=producto,
+                        tipo="entrada",
+                        cantidad=cantidad,
+                        referencia=f"Lote {numero_lote}",
+                        observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
+                    )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                messages.success(request, "Lote registrado correctamente.")
+                if modo_app:
+                    return volver_stock_app(empresa)
+                if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                    return redirect(next_url)
+                return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
 
+    if modo_app:
+        return render_stock_app(request, empresa, "entrada_lote", productos=productos,
+            proveedores=proveedores, bodegas=BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
+            bodega_principal=bodegas["principal"])
     return render(request, "facturacion/crear_lote_inventario.html", {
         "empresa": empresa,
         "productos": productos,
@@ -3871,9 +4107,20 @@ def crear_lote_inventario(request, empresa_slug):
 
 @login_required
 def traslado_inventario_farmaceutico(request, empresa_slug):
+    from .mobile_stock_operations import (
+        autorizar_stock_app, errores_estructura_stock_app, es_stock_app,
+        render_stock_app, validar_relaciones_stock_app, volver_stock_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_stock_app(request, empresa)
+    if modo_app:
+        autorizar_stock_app(request, empresa, "transferencia")
+        validar_relaciones_stock_app(empresa)
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     if not config_avanzada.usa_bodegas_internas:
+        if modo_app:
+            return render_stock_app(request, empresa, "transferencia", readiness_reason="Los traslados internos no están habilitados. Revise la configuración existente con un administrador autorizado.")
         messages.error(request, "Los traslados internos no estan activos para esta empresa.")
         return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
@@ -3885,6 +4132,10 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
         .order_by("lote__producto__nombre", "lote__fecha_vencimiento")
     )
 
+    if modo_app:
+        errores_app = errores_estructura_stock_app(request, empresa, "transferencia")
+        if errores_app:
+            return render_stock_app(request, empresa, "transferencia", bodegas=bodegas, existencias=existencias, errores=errores_app)
     if request.method == "POST":
         existencia = existencias.filter(id=request.POST.get("existencia")).first()
         bodega_destino = bodegas.filter(id=request.POST.get("bodega_destino")).first()
@@ -3923,8 +4174,12 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
                     observacion=observacion,
                 )
             messages.success(request, "Traslado registrado correctamente.")
+            if modo_app:
+                return volver_stock_app(empresa)
             return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
 
+    if modo_app:
+        return render_stock_app(request, empresa, "transferencia", bodegas=bodegas, existencias=existencias)
     return render(request, "facturacion/traslado_inventario_farmaceutico.html", {
         "empresa": empresa,
         "existencias": existencias,
@@ -3934,13 +4189,32 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
 
 @login_required
 def traslado_rapido_farmaceutico(request, empresa_slug):
-    empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    if not config_avanzada.usa_bodegas_internas:
-        messages.error(request, "Los traslados internos no estan activos para esta empresa.")
-        return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+    from .mobile_transfers import (
+        es_transferencia_app, preparar_transferencia_app, render_transferencia_app,
+        validar_cantidad_transferencia_app, volver_transferencia_app,
+    )
 
-    bodegas_base = _asegurar_bodegas_farmaceuticas(empresa)
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_transferencia_app(request, empresa)
+    if modo_app:
+        preparacion = preparar_transferencia_app(request, empresa)
+        if not preparacion["ready"]:
+            return render_transferencia_app(request, {
+                "empresa": empresa, "rutas": {}, "ruta_key": "", "ruta": {},
+                "existencias": (), "bodegas": (),
+                "usar_selectores_bodega": empresa.slug == "medical_spa",
+                "mobile_transfer_ready": False,
+                "mobile_transfer_unavailable_reason": preparacion["reason"],
+            })
+        config_avanzada = preparacion["config_avanzada"]
+        bodegas_base = preparacion["bodegas_base"]
+    else:
+        config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+        if not config_avanzada.usa_bodegas_internas:
+            messages.error(request, "Los traslados internos no estan activos para esta empresa.")
+            return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+
+        bodegas_base = _asegurar_bodegas_farmaceuticas(empresa)
     usar_selectores_bodega = empresa.slug == "medical_spa"
     if usar_selectores_bodega:
         bodegas_activas = BodegaInventario.objects.filter(
@@ -3949,6 +4223,9 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         ).order_by("tipo", "nombre")
         origen_id = request.POST.get("bodega_origen") or request.GET.get("bodega_origen")
         destino_id = request.POST.get("bodega_destino") or request.GET.get("bodega_destino")
+        if modo_app and request.method == "POST":
+            origen_id = request.POST.get("bodega_origen") or None
+            destino_id = request.POST.get("bodega_destino") or None
         bodega_origen = bodegas_activas.filter(
             id=origen_id
         ).first()
@@ -4020,9 +4297,26 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         .select_related("lote", "lote__producto", "bodega")
         .order_by("lote__fecha_vencimiento", "lote__producto__nombre")
     )
+    contexto = {
+        "empresa": empresa,
+        "rutas": rutas,
+        "ruta_key": ruta_key,
+        "ruta": ruta,
+        "existencias": existencias,
+        "bodegas": bodegas_activas if usar_selectores_bodega else (),
+        "usar_selectores_bodega": usar_selectores_bodega,
+    }
 
     if request.method == "POST":
-        existencia = existencias.filter(id=request.POST.get("existencia")).first()
+        if modo_app and ruta["origen"] and ruta["destino"] and ruta["origen"].id != ruta["destino"].id:
+            error_cantidad = validar_cantidad_transferencia_app(request, contexto)
+            if error_cantidad:
+                messages.error(request, error_cantidad)
+                return render_transferencia_app(request, contexto)
+        existencia_id = request.POST.get("existencia")
+        if modo_app and not existencia_id:
+            existencia_id = None
+        existencia = existencias.filter(id=existencia_id).first()
         cantidad_raw = request.POST.get("cantidad", "").strip()
         try:
             cantidad = Decimal(cantidad_raw)
@@ -4065,21 +4359,17 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
                 request,
                 f"Traslado rapido realizado: {cantidad:.2f} unidad(es) de {existencia.lote.producto.nombre} hacia {ruta['destino'].nombre}."
             )
+            if modo_app:
+                return volver_transferencia_app(empresa, ruta, ruta_key, usar_selectores_bodega)
             if usar_selectores_bodega:
                 return redirect(
                     f"{request.path}?bodega_origen={ruta['origen'].id}&bodega_destino={ruta['destino'].id}"
                 )
             return redirect(f"{request.path}?ruta={ruta_key}")
 
-    return render(request, "facturacion/traslado_rapido_farmaceutico.html", {
-        "empresa": empresa,
-        "rutas": rutas,
-        "ruta_key": ruta_key,
-        "ruta": ruta,
-        "existencias": existencias,
-        "bodegas": bodegas_activas if usar_selectores_bodega else (),
-        "usar_selectores_bodega": usar_selectores_bodega,
-    })
+    if modo_app:
+        return render_transferencia_app(request, contexto)
+    return render(request, "facturacion/traslado_rapido_farmaceutico.html", contexto)
 
 
 def _existencias_regalia_producto(empresa, producto, bodega):
@@ -4245,6 +4535,7 @@ def regalias_inventario(request, empresa_slug):
             referencia = f"Regalia {timezone.localtime():%Y%m%d-%H%M%S-%f}"
             try:
                 with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
                     inventarios = {
                         inventario.producto_id: inventario
                         for inventario in InventarioProducto.objects.select_for_update().filter(
@@ -4352,6 +4643,7 @@ def ajustar_inventario(request, empresa_slug):
             observacion_final = observacion or 'Ajuste manual de inventario.'
             try:
                 with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
                     inventario = _obtener_inventario_producto(producto)
                     if stock_minimo is not None:
                         inventario.stock_minimo = stock_minimo
@@ -4391,9 +4683,17 @@ def ajustar_inventario(request, empresa_slug):
 
 @login_required
 def entrada_inventario(request, empresa_slug):
+    from .mobile_stock_operations import autorizar_stock_app, es_stock_app, url_stock_app, validar_relaciones_stock_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_stock_app(request, empresa)
+    if modo_app:
+        autorizar_stock_app(request, empresa, "entrada")
+        validar_relaciones_stock_app(empresa)
     if _empresa_usa_control_lotes_fefo(empresa):
         messages.info(request, "Registra la entrada con su lote y vencimiento para mantener el control FEFO.")
+        if modo_app:
+            return redirect(url_stock_app(empresa, **({"producto": request.GET["producto"]} if "producto" in request.GET else {})))
         return redirect("crear_lote_inventario", empresa_slug=empresa.slug)
     if empresa.slug in {"hospital_mia", "medical_spa"}:
         _asegurar_bodegas_farmaceuticas(empresa)
@@ -4408,31 +4708,36 @@ def entrada_inventario(request, empresa_slug):
             observacion = form.cleaned_data['observacion']
             stock_minimo = form.cleaned_data['stock_minimo']
 
-            with transaction.atomic():
-                inventario = _obtener_inventario_producto(producto)
-                if stock_minimo is not None:
-                    inventario.stock_minimo = stock_minimo
-                    inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
+            try:
+                with transaction.atomic():
+                    bloquear_empresas_contables([empresa.pk])
+                    inventario = _obtener_inventario_producto(producto)
+                    if stock_minimo is not None:
+                        inventario.stock_minimo = stock_minimo
+                        inventario.save(update_fields=['stock_minimo', 'fecha_actualizacion'])
 
-                _registrar_movimiento_inventario(
-                    empresa=empresa,
-                    producto=producto,
-                    bodega=bodega,
-                    tipo='entrada',
-                    cantidad=cantidad,
-                    referencia=referencia,
-                    observacion=observacion or 'Entrada formal de inventario.',
-                )
-                if bodega:
-                    _registrar_movimiento_lote_bodega(
+                    _registrar_movimiento_inventario(
                         empresa=empresa,
+                        producto=producto,
                         bodega=bodega,
-                        lote=_obtener_lote_generico(producto),
                         tipo='entrada',
                         cantidad=cantidad,
                         referencia=referencia,
                         observacion=observacion or 'Entrada formal de inventario.',
                     )
+                    if bodega:
+                        _registrar_movimiento_lote_bodega(
+                            empresa=empresa,
+                            bodega=bodega,
+                            lote=_obtener_lote_generico(producto),
+                            tipo='entrada',
+                            cantidad=cantidad,
+                            referencia=referencia,
+                            observacion=observacion or 'Entrada formal de inventario.',
+                        )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return render(request, "facturacion/entrada_inventario.html", {"empresa": empresa, "form": form})
             destino = f" en {bodega.nombre}" if bodega else ""
             messages.success(request, f"Entrada de inventario registrada correctamente{destino}.")
             return redirect("inventario_facturacion", empresa_slug=empresa.slug)
@@ -4502,6 +4807,7 @@ def entrada_inventario_rapida_app(request, empresa_slug):
     observacion_final = observacion or "Entrada rápida registrada desde la app móvil."
     try:
         with transaction.atomic():
+            bloquear_empresas_contables([empresa.pk])
             lote, creado = LoteInventario.objects.get_or_create(
                 empresa=empresa,
                 producto=producto,
@@ -4618,23 +4924,29 @@ def crear_entrada_inventario_documento(request, empresa_slug):
                 lineas_validas.append(f)
 
         if form.is_valid() and lineas_validas:
-            with transaction.atomic():
-                estado_destino = form.cleaned_data['estado']
-                entrada = form.save(commit=False)
-                entrada.empresa = empresa
-                entrada.estado = 'borrador'
-                entrada.save()
+            try:
+                with transaction.atomic():
+                    estado_destino = form.cleaned_data['estado']
+                    entrada = form.save(commit=False)
+                    entrada.empresa = empresa
+                    entrada.estado = 'borrador'
+                    entrada.save()
 
-                for f in lineas_validas:
-                    linea = f.save(commit=False)
-                    linea.entrada = entrada
-                    linea.save()
+                    for f in lineas_validas:
+                        linea = f.save(commit=False)
+                        linea.entrada = entrada
+                        linea.save()
 
-                if estado_destino == 'aplicada':
-                    _aplicar_entrada_documento(entrada)
-                    entrada.estado = 'aplicada'
-                    entrada.save(update_fields=['estado'])
+                    if estado_destino == 'aplicada':
+                        _aplicar_entrada_documento(entrada)
+                        entrada.estado = 'aplicada'
+                        entrada.save(update_fields=['estado'])
 
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return render(request, "facturacion/crear_entrada_inventario_premium.html", {
+                    "empresa": empresa, "form": form, "formset": formset, "productos": productos_qs,
+                })
             messages.success(request, "Entrada de inventario guardada correctamente.")
             return redirect("ver_entrada_inventario", empresa_slug=empresa.slug, entrada_id=entrada.id)
         elif form.is_valid():
@@ -4675,6 +4987,14 @@ def ver_entrada_inventario(request, empresa_slug, entrada_id):
 @login_required
 def compras_dashboard(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_purchases import (
+        autorizar_compras_app, es_compras_app, render_compras_app, validar_relaciones_compras_app,
+    )
+
+    modo_app = es_compras_app(request, empresa)
+    if modo_app:
+        autorizar_compras_app(request, empresa)
+        validar_relaciones_compras_app(empresa, CompraInventario.objects.filter(empresa=empresa))
     q = request.GET.get("q", "").strip()
     estado_filtro = request.GET.get("estado", "").strip()
     pago_filtro = request.GET.get("pago", "").strip()
@@ -4708,6 +5028,11 @@ def compras_dashboard(request, empresa_slug):
         "por_pagar": sum(1 for compra in compras_lista if compra.saldo_pendiente > 0),
     }
 
+    if modo_app:
+        return render_compras_app(request, empresa, {
+            "empresa": empresa, "compras": compras_lista, "resumen": resumen,
+            "q": q, "estado_filtro": estado_filtro, "pago_filtro": pago_filtro,
+        })
     return render(request, "facturacion/compras_cxp_premium.html", {
         "empresa": empresa,
         "compras": compras_lista,
@@ -5444,6 +5769,9 @@ def eliminar_compra_anulada(request, empresa_slug, compra_id):
 def registrar_pago_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related('pagos_compra'),
         id=compra_id,
@@ -5465,6 +5793,8 @@ def registrar_pago_compra(request, empresa_slug, compra_id):
                 post_data["cuenta_financiera"] = str(cuenta_defecto.id)
 
         form = PagoCompraForm(post_data, empresa=empresa)
+        if modo_catalogo_rumi:
+            form.fields["cuenta_financiera"].queryset = cuentas_financieras
         form.instance.compra = compra
         if form.is_valid():
             try:
@@ -5497,6 +5827,8 @@ def registrar_pago_compra(request, empresa_slug, compra_id):
             },
             empresa=empresa,
         )
+        if modo_catalogo_rumi:
+            form.fields["cuenta_financiera"].queryset = cuentas_financieras
 
     historial = compra.pagos_compra.all()
     return render(request, "facturacion/registrar_pago_compra.html", {
@@ -5548,11 +5880,12 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
     if comision.factura.estado == 'anulada':
         messages.error(request, "No se puede pagar una comision originada en una factura anulada.")
         return redirect("reporte_cxp", empresa_slug=empresa.slug)
-    if comision.saldo_comision_pendiente <= 0:
+    if comision.saldo_comision_pendiente <= 0 and not (request.method == 'GET' and comision.comision_retenida_cliente):
         messages.info(request, "Esta comision ya fue pagada en su totalidad.")
         return redirect("reporte_cxp", empresa_slug=empresa.slug)
 
     cuentas = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(request, empresa, cuentas)
     if request.method == 'POST':
         post_data = request.POST.copy()
         if not post_data.get('cuenta_financiera'):
@@ -5560,6 +5893,8 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
             if cuenta_defecto:
                 post_data['cuenta_financiera'] = str(cuenta_defecto.id)
         form = PagoComisionProveedorForm(post_data, empresa=empresa)
+        if modo_catalogo_rumi:
+            form.fields["cuenta_financiera"].queryset = cuentas
         form.instance.comision_origen = comision
         form.instance.registrado_por = request.user
         if form.is_valid():
@@ -5585,11 +5920,15 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
             initial={
                 'fecha': timezone.localdate(),
                 'monto': comision.saldo_comision_pendiente,
+                'tipo_cambio': comision.tipo_cambio or comision.factura.tipo_cambio,
                 'metodo': 'transferencia',
                 'cuenta_financiera': cuenta_defecto.id if cuenta_defecto else None,
             },
             empresa=empresa,
         )
+
+    if modo_catalogo_rumi:
+        form.fields["cuenta_financiera"].queryset = cuentas
 
     return render(request, 'facturacion/registrar_pago_comision_proveedor.html', {
         'empresa': empresa,
@@ -5606,6 +5945,9 @@ def revertir_pago_comision_proveedor(request, empresa_slug, pago_factura_id, pag
     comision = get_object_or_404(PagoFactura, id=pago_factura_id, factura__empresa=empresa)
     pago = get_object_or_404(PagoComisionProveedor, id=pago_id, comision_origen=comision)
     proveedor_id = comision.proveedor_comision_id
+    if pago.metodo == 'compensacion':
+        messages.error(request, 'La compensación se modifica desde el cobro de la factura; no se revierte como un egreso bancario.')
+        return redirect('editar_pago_factura', empresa_slug=empresa.slug, factura_id=comision.factura_id, pago_id=comision.pk)
     with transaction.atomic():
         registrar_reversion_documento(
             empresa=empresa,
@@ -5626,6 +5968,12 @@ def revertir_pago_comision_proveedor(request, empresa_slug, pago_factura_id, pag
 @login_required
 def ver_compra(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_purchases import autorizar_compras_app, es_compras_app, render_compra_app, validar_compra_app
+
+    modo_app = es_compras_app(request, empresa)
+    if modo_app:
+        autorizar_compras_app(request, empresa, compra_id)
+        validar_compra_app(empresa, compra_id)
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related('lineas__producto', 'pagos_compra'),
         id=compra_id,
@@ -5634,6 +5982,8 @@ def ver_compra(request, empresa_slug, compra_id):
     movimientos = MovimientoInventario.objects.filter(compra_documento=compra).select_related('producto')
     pagos = compra.pagos_compra.select_related('comprobante').all()
 
+    if modo_app:
+        return render_compra_app(request, empresa, {"empresa": empresa, "compra": compra, "movimientos": movimientos, "pagos": pagos})
     return render(request, "facturacion/ver_compra_cxp_premium.html", {
         "empresa": empresa,
         "compra": compra,
@@ -5646,6 +5996,12 @@ def ver_compra(request, empresa_slug, compra_id):
 @login_required
 def descargar_compra_pdf(request, empresa_slug, compra_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_purchases import autorizar_compras_app, es_compras_app, respuesta_compras_app, validar_compra_app
+
+    modo_app = es_compras_app(request, empresa)
+    if modo_app:
+        autorizar_compras_app(request, empresa, compra_id)
+        validar_compra_app(empresa, compra_id)
     compra = get_object_or_404(
         CompraInventario.objects.select_related('proveedor').prefetch_related(
             'lineas__producto',
@@ -5689,12 +6045,21 @@ def descargar_compra_pdf(request, empresa_slug, compra_id):
 
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{nombre_archivo}"'
+    if modo_app:
+        return respuesta_compras_app(response)
     return response
 
 
 @login_required
 def kardex_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_kardex import autorizar_kardex_app, es_kardex_app, render_kardex_app, validar_relaciones_kardex_app
+
+    modo_app = es_kardex_app(request, empresa)
+    producto_seleccionado_app = None
+    if modo_app:
+        autorizar_kardex_app(request, empresa)
+        producto_seleccionado_app = validar_relaciones_kardex_app(empresa, request.GET.get("producto"))
     producto_id = request.GET.get("producto")
     tipo = request.GET.get("tipo", "").strip()
     fecha_desde = request.GET.get("fecha_desde", "").strip()
@@ -5790,6 +6155,13 @@ def kardex_inventario(request, empresa_slug):
         if valor in {'traslado_salida', 'traslado_entrada'} and valor not in tipos_existentes
     )
 
+    if modo_app:
+        return render_kardex_app(request, empresa, {
+            "empresa": empresa, "productos": productos, "movimientos": movimientos,
+            "resumen": resumen, "producto_id": str(producto_id or ""), "tipo": tipo,
+            "fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta,
+            "tipos_movimiento": tipos_movimiento,
+        }, producto_seleccionado_app)
     return render(request, "facturacion/kardex_premium.html", {
         "empresa": empresa,
         "productos": productos,
@@ -5972,7 +6344,17 @@ def editar_impuesto(request, empresa_slug, impuesto_id):
 @login_required
 @xframe_options_sameorigin
 def crear_producto(request, empresa_slug):
+    from .mobile_product_management import (
+        autorizar_gestion_producto_app, es_gestion_producto_app,
+        render_gestion_producto_app, validar_formulario_producto_app,
+        validar_preparacion_bodegas_producto_app, volver_gestion_producto_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_gestion_producto_app(request, empresa)
+    if modo_app:
+        autorizar_gestion_producto_app(request, empresa, "crear")
+        validar_preparacion_bodegas_producto_app(empresa)
     quick_mode = request.GET.get("modal") == "1" or request.POST.get("quick_mode") == "1"
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
     if config_avanzada.usa_bodegas_internas:
@@ -5980,6 +6362,8 @@ def crear_producto(request, empresa_slug):
 
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, empresa=empresa)
+        if modo_app:
+            validar_formulario_producto_app(request, form)
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -6008,6 +6392,8 @@ def crear_producto(request, empresa_slug):
                         },
                     })
                 messages.success(request, "Producto creado correctamente.")
+                if modo_app:
+                    return volver_gestion_producto_app(request, empresa, producto)
                 return _redirect_seguro(request, "productos_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
@@ -6023,6 +6409,8 @@ def crear_producto(request, empresa_slug):
         if nombre_prefill:
             form.fields["nombre"].initial = nombre_prefill
 
+    if modo_app:
+        return render_gestion_producto_app(request, empresa, form)
     template_name = "facturacion/crear_producto_rapido_modal.html" if quick_mode else "facturacion/crear_producto.html"
     return render(request, template_name, {
         "empresa": empresa,
@@ -6040,12 +6428,26 @@ def crear_producto(request, empresa_slug):
 
 @login_required
 def editar_producto(request, empresa_slug, producto_id):
+    from .mobile_product_management import (
+        autorizar_gestion_producto_app, es_gestion_producto_app, identidad_producto_app,
+        render_gestion_producto_app, validar_formulario_producto_app,
+        validar_relaciones_gestion_producto_app, volver_gestion_producto_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_gestion_producto_app(request, empresa)
+    if modo_app:
+        autorizar_gestion_producto_app(request, empresa, "editar", producto_id)
     producto = get_object_or_404(Producto, id=producto_id, empresa=empresa, eliminado=False)
+    if modo_app:
+        validar_relaciones_gestion_producto_app(empresa, producto)
+        producto_original = identidad_producto_app(producto)
     costo_real_anterior = producto.costo_real_inventario
 
     if request.method == "POST":
         form = ProductoForm(request.POST, request.FILES, instance=producto, empresa=empresa)
+        if modo_app:
+            validar_formulario_producto_app(request, form)
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -6056,6 +6458,8 @@ def editar_producto(request, empresa_slug, producto_id):
                         form.guardar_perfil_farmaceutico(producto)
                     _aplicar_distribucion_bodegas_producto(producto, form)
                 messages.success(request, "Producto actualizado correctamente.")
+                if modo_app:
+                    return volver_gestion_producto_app(request, empresa, producto)
                 return redirect("productos_facturacion", empresa_slug=empresa.slug)
             except ValidationError as exc:
                 if hasattr(exc, "message_dict"):
@@ -6068,6 +6472,8 @@ def editar_producto(request, empresa_slug, producto_id):
     else:
         form = ProductoForm(instance=producto, empresa=empresa)
 
+    if modo_app:
+        return render_gestion_producto_app(request, empresa, form, producto_original)
     lotes_producto = (
         ExistenciaLoteBodega.objects.filter(
             empresa=empresa,
@@ -6094,11 +6500,30 @@ def editar_producto(request, empresa_slug, producto_id):
 @login_required
 @require_POST
 def eliminar_producto(request, empresa_slug, producto_id):
+    from .mobile_product_management import (
+        autorizar_gestion_producto_app, es_gestion_producto_app,
+        gestion_productos_disponible_app, identidad_producto_app,
+        render_gestion_producto_app, validar_relaciones_gestion_producto_app,
+        volver_gestion_producto_app,
+    )
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_gestion_producto_app(request, empresa)
+    if modo_app:
+        autorizar_gestion_producto_app(request, empresa, "eliminar", producto_id)
     producto = get_object_or_404(Producto, id=producto_id, empresa=empresa, eliminado=False)
+    if modo_app:
+        validar_relaciones_gestion_producto_app(empresa, producto)
     form = EliminarProductoForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Indica un motivo claro para dejar registrada la baja del producto.")
+        if modo_app:
+            if gestion_productos_disponible_app(request, empresa)["editar"]:
+                return render_gestion_producto_app(
+                    request, empresa, ProductoForm(instance=producto, empresa=empresa),
+                    identidad_producto_app(producto), delete_form=form,
+                )
+            return volver_gestion_producto_app(request, empresa)
         return redirect("productos_facturacion", empresa_slug=empresa.slug)
 
     motivo = form.cleaned_data["motivo"].strip()
@@ -6129,6 +6554,8 @@ def eliminar_producto(request, empresa_slug, producto_id):
         ])
 
     messages.success(request, f"Producto {producto.nombre} eliminado del catalogo operativo y registrado en bitacora.")
+    if modo_app:
+        return volver_gestion_producto_app(request, empresa)
     return redirect("productos_facturacion", empresa_slug=empresa.slug)
 
 
@@ -6197,7 +6624,12 @@ def notas_credito_dashboard(request, empresa_slug):
 
 @login_required
 def recibos_dashboard(request, empresa_slug):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, listar_recibos_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if es_recibos_app(request, empresa):
+        autorizar_recibos_app(request, empresa)
+        return listar_recibos_app(request, empresa)
     q = request.GET.get("q", "").strip()
     recibos = ReciboPago.objects.filter(empresa=empresa).select_related('cliente', 'factura').order_by('-fecha_creacion')
     if q:
@@ -6227,7 +6659,13 @@ def recibos_dashboard(request, empresa_slug):
 
 @login_required
 def ver_recibo(request, empresa_slug, recibo_id):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, render_recibo_app, validar_recibo_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_recibos_app(request, empresa)
+    if modo_app:
+        autorizar_recibos_app(request, empresa, recibo_id)
+        validar_recibo_app(empresa, recibo_id, detalle=True)
     recibo = get_object_or_404(
         ReciboPago.objects.select_related('cliente', 'factura', 'pago'),
         id=recibo_id,
@@ -6240,6 +6678,11 @@ def ver_recibo(request, empresa_slug, recibo_id):
         (pago.total_aplicado for pago in pagos_factura if recibo.pago_id and pago.id != recibo.pago_id),
         Decimal("0.00"),
     )
+    if modo_app:
+        return render_recibo_app(request, empresa, {
+            "recibo": recibo, "pagos_factura": pagos_factura,
+            "total_pagos_previos": total_pagos_previos,
+        })
 
     return render(request, "facturacion/ver_recibo_premium.html", {
         "empresa": empresa,
@@ -6251,7 +6694,13 @@ def ver_recibo(request, empresa_slug, recibo_id):
 
 @login_required
 def editar_recibo(request, empresa_slug, recibo_id):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, render_recibo_app, validar_recibo_app, volver_recibo_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_recibos_app(request, empresa)
+    if modo_app:
+        autorizar_recibos_app(request, empresa, recibo_id, editar=True, campos=ReciboPagoForm.base_fields)
+        validar_recibo_app(empresa, recibo_id)
     recibo = get_object_or_404(
         ReciboPago.objects.select_related('cliente', 'factura', 'pago'),
         id=recibo_id,
@@ -6261,8 +6710,12 @@ def editar_recibo(request, empresa_slug, recibo_id):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, f"Recibo {recibo.numero_recibo} actualizado correctamente.")
+        if modo_app:
+            return volver_recibo_app(empresa, recibo)
         return redirect("ver_recibo", empresa_slug=empresa.slug, recibo_id=recibo.id)
 
+    if modo_app:
+        return render_recibo_app(request, empresa, {"recibo": recibo, "form": form}, editar=True)
     return render(request, "facturacion/editar_recibo_premium.html", {
         "empresa": empresa,
         "recibo": recibo,
@@ -6272,7 +6725,13 @@ def editar_recibo(request, empresa_slug, recibo_id):
 
 @login_required
 def descargar_recibo_pdf(request, empresa_slug, recibo_id):
+    from .mobile_receipts import autorizar_recibos_app, es_recibos_app, respuesta_recibos_app, validar_recibo_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_recibos_app(request, empresa)
+    if modo_app:
+        autorizar_recibos_app(request, empresa, recibo_id)
+        validar_recibo_app(empresa, recibo_id)
     recibo = get_object_or_404(
         ReciboPago.objects.select_related('cliente', 'factura', 'pago'),
         id=recibo_id,
@@ -6301,12 +6760,19 @@ def descargar_recibo_pdf(request, empresa_slug, recibo_id):
 
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    if modo_app:
+        return respuesta_recibos_app(response)
     return response
 
 
 @login_required
 def egresos_dashboard(request, empresa_slug):
+    from .mobile_egresos import autorizar_egresos_app, es_egresos_app, listar_egresos_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if es_egresos_app(request, empresa):
+        autorizar_egresos_app(request, empresa)
+        return listar_egresos_app(request, empresa)
     q = request.GET.get("q", "").strip()
     metodo = request.GET.get("metodo", "").strip()
     egresos = (
@@ -6342,13 +6808,21 @@ def egresos_dashboard(request, empresa_slug):
 
 @login_required
 def ver_comprobante_egreso(request, empresa_slug, comprobante_id):
+    from .mobile_egresos import autorizar_egresos_app, es_egresos_app, render_egreso_app, validar_egreso_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_egresos_app(request, empresa)
+    if modo_app:
+        autorizar_egresos_app(request, empresa, comprobante_id)
+        validar_egreso_app(empresa, comprobante_id)
     comprobante = get_object_or_404(
         ComprobanteEgresoCompra.objects.select_related('compra', 'proveedor', 'pago'),
         id=comprobante_id,
         empresa=empresa,
     )
 
+    if modo_app:
+        return render_egreso_app(request, empresa, {"empresa": empresa, "comprobante": comprobante})
     return render(request, "facturacion/ver_comprobante_egreso_premium.html", {
         "empresa": empresa,
         "comprobante": comprobante,
@@ -6357,7 +6831,13 @@ def ver_comprobante_egreso(request, empresa_slug, comprobante_id):
 
 @login_required
 def descargar_comprobante_egreso_pdf(request, empresa_slug, comprobante_id):
+    from .mobile_egresos import autorizar_egresos_app, es_egresos_app, respuesta_egresos_app, validar_egreso_app
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_egresos_app(request, empresa)
+    if modo_app:
+        autorizar_egresos_app(request, empresa, comprobante_id)
+        validar_egreso_app(empresa, comprobante_id)
     comprobante = get_object_or_404(
         ComprobanteEgresoCompra.objects.select_related('compra', 'proveedor', 'pago'),
         id=comprobante_id,
@@ -6385,6 +6865,8 @@ def descargar_comprobante_egreso_pdf(request, empresa_slug, comprobante_id):
 
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    if modo_app:
+        return respuesta_egresos_app(response)
     return response
 
 
@@ -6400,10 +6882,15 @@ def detalle_factura_para_nota_credito(request, empresa_slug, factura_id):
 
     lineas = []
     for linea in factura.lineas.all():
+        disponible = cantidad_disponible_para_linea(linea)
+        if disponible <= 0:
+            continue
         lineas.append({
+            "linea_factura_origen_id": linea.pk,
             "producto_id": linea.producto_id,
             "producto_nombre": linea.descripcion_visual,
-            "cantidad": str(linea.cantidad),
+            "cantidad": str(disponible),
+            "cantidad_original": str(linea.cantidad),
             "precio_unitario": str(linea.precio_unitario),
             "descuento_porcentaje": str(linea.descuento_porcentaje or 0),
             "comentario": linea.comentario or "",
@@ -6442,6 +6929,7 @@ def crear_nota_credito(request, empresa_slug):
         NotaCredito,
         LineaNotaCredito,
         fields=[
+            'linea_factura_origen',
             'producto',
             'cantidad',
             'precio_unitario',
@@ -6450,7 +6938,8 @@ def crear_nota_credito(request, empresa_slug):
             'impuesto'
         ],
         extra=1,
-        can_delete=True
+        can_delete=True,
+        widgets={'linea_factura_origen': forms.HiddenInput()},
     )
 
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
@@ -6465,6 +6954,7 @@ def crear_nota_credito(request, empresa_slug):
         formset = LineaFormSet(request.POST, instance=nota_temp)
 
         for f in formset.forms:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -6537,6 +7027,7 @@ def crear_nota_credito(request, empresa_slug):
         formset = LineaFormSet()
 
         for f in formset:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -6577,6 +7068,7 @@ def editar_nota_credito(request, empresa_slug, nota_id):
         NotaCredito,
         LineaNotaCredito,
         fields=[
+            'linea_factura_origen',
             'producto',
             'cantidad',
             'precio_unitario',
@@ -6585,7 +7077,8 @@ def editar_nota_credito(request, empresa_slug, nota_id):
             'impuesto'
         ],
         extra=0,
-        can_delete=True
+        can_delete=True,
+        widgets={'linea_factura_origen': forms.HiddenInput()},
     )
 
     productos_qs = Producto.objects.filter(empresa=empresa, activo=True).select_related('impuesto_predeterminado')
@@ -6599,6 +7092,7 @@ def editar_nota_credito(request, empresa_slug, nota_id):
         formset = LineaFormSet(request.POST, instance=nota)
 
         for f in formset.forms:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -6657,6 +7151,7 @@ def editar_nota_credito(request, empresa_slug, nota_id):
         formset = LineaFormSet(instance=nota)
 
         for f in formset:
+            f.fields['linea_factura_origen'].queryset = LineaFactura.objects.filter(factura__empresa=empresa)
             f.fields['producto'].queryset = productos_qs
             f.fields['impuesto'].queryset = impuestos_qs
 
@@ -6748,10 +7243,14 @@ def generar_nota_credito_desde_factura(request, empresa_slug, factura_id):
     )
 
     for linea in factura.lineas.all():
+        cantidad_disponible = cantidad_disponible_para_linea(linea)
+        if cantidad_disponible <= 0:
+            continue
         LineaNotaCredito.objects.create(
             nota_credito=nota,
+            linea_factura_origen=linea,
             producto=linea.producto,
-            cantidad=linea.cantidad,
+            cantidad=cantidad_disponible,
             precio_unitario=linea.precio_unitario,
             precio_incluye_impuesto=linea.precio_incluye_impuesto,
             costo_unitario=linea.costo_unitario,
@@ -6771,31 +7270,28 @@ def generar_nota_credito_desde_factura(request, empresa_slug, factura_id):
 @require_POST
 def anular_nota_credito(request, empresa_slug, nota_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    nota = get_object_or_404(NotaCredito, id=nota_id, empresa=empresa)
-
-    if nota.estado == 'anulada':
-        messages.info(request, "La nota de crédito ya estaba anulada.")
-    else:
-        if nota.estado == 'emitida':
-            _revertir_entrada_nota_credito(nota)
-            registrar_reversion_documento(
-                empresa=nota.empresa,
-                documento_tipo='nota_credito',
-                documento_id=nota.id,
-                evento_origen='emision',
-                evento_reversion='anulacion',
-                fecha=timezone.now().date(),
-                descripcion=f"Reversion nota de credito {nota.numero_nota or nota.id}",
-                referencia=nota.numero_nota or str(nota.id),
-                origen_modulo='facturacion',
-                creado_por=nota.vendedor,
-            )
-        nota.estado = 'anulada'
-        nota.save(update_fields=['estado'])
-        nota.factura_origen.actualizar_estado_pago()
-        messages.success(request, "Nota de crédito anulada correctamente.")
-
-    return redirect("ver_nota_credito", empresa_slug=empresa.slug, nota_id=nota.id)
+    try:
+        with transaction.atomic():
+            bloquear_empresas_contables([empresa.pk])
+            nota = get_object_or_404(NotaCredito.objects.select_for_update(), id=nota_id, empresa=empresa)
+            if nota.estado == 'anulada':
+                messages.info(request, "La nota de crédito ya estaba anulada.")
+            else:
+                if nota.estado == 'emitida':
+                    _revertir_entrada_nota_credito(nota)
+                    registrar_reversion_documento(
+                        empresa=nota.empresa, documento_tipo='nota_credito', documento_id=nota.id,
+                        evento_origen='emision', evento_reversion='anulacion', fecha=timezone.localdate(),
+                        descripcion=f"Reversión de nota de crédito {nota.numero_nota or nota.id}",
+                        referencia=nota.numero_nota or str(nota.id), origen_modulo='facturacion', creado_por=request.user,
+                    )
+                nota.estado = 'anulada'
+                nota.save(update_fields=['estado'])
+                nota.factura_origen.actualizar_estado_pago()
+                messages.success(request, "Nota de crédito anulada correctamente.")
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+    return redirect("ver_nota_credito", empresa_slug=empresa.slug, nota_id=nota_id)
 
 
 # =====================================================
@@ -7951,33 +8447,66 @@ def editar_factura(request, empresa_slug, factura_id):
 @login_required
 @xframe_options_sameorigin
 def registrar_pago(request, empresa_slug, factura_id):
+    from .mobile_payments import (
+        autorizar_cobros_app, cuentas_cobro_app, errores_numericos_cobro_app,
+        es_cobros_app, presentar_mensaje_cobro_app, render_cobro_app, validar_factura_cobro_app,
+        validar_selecciones_cobro_app, volver_cobro_app,
+    )
+
+    from contabilidad.moneda import validar_moneda_tipo_cambio
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_cobros_app(request, empresa)
+    if modo_app:
+        autorizar_cobros_app(request, empresa, factura_id)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
-    es_modal = request.GET.get("modal") == "1"
+    if modo_app:
+        validar_factura_cobro_app(empresa, factura)
+    es_modal = not modo_app and request.GET.get("modal") == "1"
     template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
-    config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
-    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    config_avanzada = None if modo_app else ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
+    cuentas_financieras = cuentas_cobro_app(empresa) if modo_app else _cuentas_financieras_activas_para_pago(empresa)
+    if modo_app:
+        from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+        if usa_catalogo_rumi(empresa):
+            cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
+    if modo_app:
+        validar_selecciones_cobro_app(request, empresa, cuentas_financieras)
     cajas = cuentas_financieras.filter(tipo='caja')
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
     cuentas_tarjeta = tarjetas if tarjetas.exists() else cuentas_financieras
     proveedores_comision = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
 
+    simbolo_moneda = "$" if factura.moneda == "USD" else "L."
+
     def _contexto_pago(form_data=None):
+        datos_formulario = form_data or _form_data_pago_por_defecto(cuentas_financieras)
+        if request.method == "GET" and empresa.slug == "digital_planning":
+            datos_formulario = {**datos_formulario, "monto": f"{factura.saldo_pendiente:.2f}"}
         return {
             "factura": factura,
+            "tipo_cambio_cobro": factura.tipo_cambio,
             "empresa": empresa,
             "cuentas_financieras": cuentas_financieras,
             "cajas": cajas,
             "bancos": bancos,
             "cuentas_tarjeta": cuentas_tarjeta,
             "proveedores_comision": proveedores_comision,
-            "usa_pagos_mixtos": True,
+            "usa_pagos_mixtos": _empresa_usa_pago_mixto_predeterminado(empresa),
+            "modal_heading": (
+                "Pago rapido"
+                if _empresa_usa_pago_mixto_predeterminado(empresa)
+                else "Registrar pago"
+            ),
             "subtotal_pendiente": factura.subtotal_pendiente_cobro,
             "impuesto_pendiente": factura.impuesto_pendiente_cobro,
             "today": timezone.now().date(),
-            "form_data": form_data or _form_data_pago_por_defecto(cuentas_financieras),
+            "form_data": datos_formulario,
+            "saldo_disponible_pago": factura.saldo_pendiente,
             "es_modal": es_modal,
             "comision_sobre_total_factura": empresa.slug == "digital_planning",
             "base_comision": _base_comision_pago(factura, factura.saldo_pendiente),
@@ -8039,11 +8568,21 @@ def registrar_pago(request, empresa_slug, factura_id):
 
     if factura.estado == 'anulada':
         messages.error(request, "No se pueden registrar pagos en una factura anulada.")
+        if modo_app:
+            return render_cobro_app(request, empresa, _contexto_pago(), readonly_reason="La factura está anulada. No permite registrar cobros.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
     if factura.saldo_pendiente <= 0:
         messages.info(request, "Esta factura no tiene saldo pendiente.")
+        if modo_app:
+            return render_cobro_app(request, empresa, _contexto_pago(), readonly_reason="Esta factura no tiene saldo pendiente. No hay un nuevo cobro que registrar.")
         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+
+    if modo_app:
+        errores_app = errores_numericos_cobro_app(request)
+        if errores_app:
+            messages.error(request, "Revise los valores numéricos del cobro. Los datos ingresados se conservan.")
+            return render_cobro_app(request, empresa, _contexto_pago(request.POST), errores=errores_app)
 
     if request.method == "POST":
 
@@ -8052,9 +8591,12 @@ def registrar_pago(request, empresa_slug, factura_id):
         referencia = request.POST.get("referencia", "").strip()
         fecha_pago = request.POST.get("fecha")
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
+        if (modo_app or modo_catalogo_rumi) and cuenta_financiera_id == "":
+            cuenta_financiera_id = None
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
         separar_isv = request.POST.get("separar_isv") == "on"
+        comision_retenida_cliente = request.POST.get("comision_retenida_cliente") in ("on", "1", "true")
         cuenta_financiera_impuesto_id = request.POST.get("cuenta_financiera_impuesto")
         error = None
         usa_pago_mixto = any(
@@ -8069,6 +8611,16 @@ def registrar_pago(request, empresa_slug, factura_id):
                 return Decimal(valor)
             except InvalidOperation as exc:
                 raise ValidationError(f"El valor de {etiqueta} no es valido.") from exc
+
+        try:
+            _moneda, tasa_cobro = validar_moneda_tipo_cambio(
+                factura.moneda, request.POST.get("tipo_cambio") or factura.tipo_cambio
+            )
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            if modo_app:
+                return render_cobro_app(request, empresa, _contexto_pago(request.POST))
+            return render(request, template_name, _contexto_pago(request.POST))
 
         if usa_pago_mixto:
             try:
@@ -8106,6 +8658,8 @@ def registrar_pago(request, empresa_slug, factura_id):
                     if monto_decimal <= 0:
                         error = f"El monto de {etiqueta} debe ser mayor que cero."
                         break
+                    if (modo_app or modo_catalogo_rumi) and cuenta_id == "":
+                        cuenta_id = None
                     cuenta_mixta = cuentas_financieras.filter(id=cuenta_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo_mixto)
                     if not cuenta_mixta:
                         error = f"Selecciona la cuenta financiera para {etiqueta}."
@@ -8128,17 +8682,22 @@ def registrar_pago(request, empresa_slug, factura_id):
                         proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
                             request.POST, empresa, total_pago + retencion_isr + retencion_isv, factura=factura
                         )
+                        total_aplicado = total_pago + retencion_isr + retencion_isv + (monto_comision if comision_retenida_cliente else Decimal('0.00'))
+                        if total_aplicado > factura.saldo_pendiente:
+                            raise ValidationError('El cobro y la comisión compensada no pueden superar el saldo pendiente.')
                         with transaction.atomic():
                             cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                             for indice, (metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta) in enumerate(pagos_validos, start=1):
                                 pago = PagoFactura.objects.create(
                                     factura=factura,
+                                    tipo_cambio=tasa_cobro,
                                     monto=monto_decimal,
                                     retencion_isr=retencion_isr if indice == 1 else Decimal('0.00'),
                                     retencion_isv=retencion_isv if indice == 1 else Decimal('0.00'),
                                     proveedor_comision=proveedor_comision if indice == 1 else None,
                                     porcentaje_comision=porcentaje_comision if indice == 1 else Decimal('0.00'),
                                     monto_comision=monto_comision if indice == 1 else Decimal('0.00'),
+                                    comision_retenida_cliente=comision_retenida_cliente if indice == 1 else False,
                                     separar_isv=separar_isv,
                                     cuenta_financiera_impuesto=cuenta_financiera_impuesto,
                                     metodo=metodo_mixto,
@@ -8152,13 +8711,15 @@ def registrar_pago(request, empresa_slug, factura_id):
                                     recibos.append(pago.recibo.numero_recibo)
                         messages.success(
                             request,
-                            f"Pago mixto registrado correctamente. Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}. Recibos: {', '.join(recibos) or 'sin numero'}."
+                            presentar_mensaje_cobro_app(factura, f"Pago mixto registrado correctamente. Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {total_aplicado:.2f}. Recibos: {', '.join(recibos) or 'sin numero'}.", modo_app)
                         )
                         respuesta_modal = _respuesta_modal_exito(
-                            f"Cobro recibido: L. {total_pago:.2f}. Aplicado total: L. {(total_pago + retencion_isr + retencion_isv):.2f}."
+                            f"Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Aplicado total: {simbolo_moneda} {total_aplicado:.2f}."
                         )
                         if respuesta_modal:
                             return respuesta_modal
+                        if modo_app:
+                            return volver_cobro_app(request, empresa, factura)
                         return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
                     except ValidationError as exc:
                         error = "; ".join(exc.messages)
@@ -8167,6 +8728,8 @@ def registrar_pago(request, empresa_slug, factura_id):
                         error = f"No se pudo completar el cobro: {exc}"
 
             messages.error(request, error)
+            if modo_app:
+                return render_cobro_app(request, empresa, _contexto_pago(request.POST))
             return render(request, template_name, _contexto_pago(request.POST))
 
         try:
@@ -8177,25 +8740,28 @@ def registrar_pago(request, empresa_slug, factura_id):
                 request.POST, empresa, monto_decimal + retencion_isr + retencion_isv, factura=factura
             )
 
+            total_aplicado = monto_decimal + retencion_isr + retencion_isv + (monto_comision if comision_retenida_cliente else Decimal('0.00'))
             if monto_decimal < 0:
                 error = "El monto recibido no puede ser negativo."
             elif retencion_isr < 0 or retencion_isv < 0:
                 error = "Las retenciones no pueden ser negativas."
-            elif monto_decimal + retencion_isr + retencion_isv <= 0:
+            elif total_aplicado <= 0:
                 error = "Debes registrar un monto o una retencion mayor que cero."
-            elif monto_decimal + retencion_isr + retencion_isv > factura.saldo_pendiente:
+            elif total_aplicado > factura.saldo_pendiente:
                 error = "El pago aplicado no puede ser mayor que el saldo pendiente."
             else:
                 cuenta_financiera = cuentas_financieras.filter(id=cuenta_financiera_id).first() or _cuenta_financiera_por_defecto(cuentas_financieras, metodo)
                 cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                 pago_borrador = PagoFactura(
                     factura=factura,
+                    tipo_cambio=tasa_cobro,
                     monto=monto_decimal,
                     retencion_isr=retencion_isr,
                     retencion_isv=retencion_isv,
                     proveedor_comision=proveedor_comision,
                     porcentaje_comision=porcentaje_comision,
                     monto_comision=monto_comision,
+                    comision_retenida_cliente=comision_retenida_cliente,
                     separar_isv=separar_isv,
                     cuenta_financiera=cuenta_financiera,
                     cuenta_financiera_impuesto=cuenta_financiera_impuesto,
@@ -8207,6 +8773,10 @@ def registrar_pago(request, empresa_slug, factura_id):
                 requiere_cuenta_principal = pago_borrador.subtotal_recibido > 0 or (
                     pago_borrador.impuesto_recibido > 0 and not cuenta_financiera_impuesto
                 )
+                if requiere_cuenta_principal and not cuenta_financiera and modo_catalogo_rumi:
+                    raise ValidationError(
+                        "Configure una caja o cuenta financiera de RUMI enlazada a su catálogo antes de registrar este cobro."
+                    )
                 if requiere_cuenta_principal and not cuenta_financiera:
                     raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el dinero recibido.")
 
@@ -8215,12 +8785,14 @@ def registrar_pago(request, empresa_slug, factura_id):
                 with transaction.atomic():
                     pago = PagoFactura.objects.create(
                         factura=factura,
+                        tipo_cambio=tasa_cobro,
                         monto=monto_decimal,
                         retencion_isr=retencion_isr,
                         retencion_isv=retencion_isv,
                         proveedor_comision=proveedor_comision,
                         porcentaje_comision=porcentaje_comision,
                         monto_comision=monto_comision,
+                        comision_retenida_cliente=comision_retenida_cliente,
                         separar_isv=separar_isv,
                         cuenta_financiera_impuesto=cuenta_financiera_impuesto,
                         metodo=metodo,
@@ -8232,14 +8804,16 @@ def registrar_pago(request, empresa_slug, factura_id):
                     registrar_asiento_pago_cliente(pago)
                 recibo_numero = pago.recibo.numero_recibo if hasattr(pago, 'recibo') else None
                 if recibo_numero:
-                    messages.success(request, f"Pago registrado correctamente. Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.")
+                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Cobro recibido: {simbolo_moneda} {monto_decimal:.2f}. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}. Recibo generado: {recibo_numero}.", modo_app))
                 else:
-                    messages.success(request, f"Pago registrado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
+                    messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago registrado correctamente. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}.", modo_app))
                 respuesta_modal = _respuesta_modal_exito(
-                    f"Cobro recibido: L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
+                    f"Cobro recibido: {simbolo_moneda} {monto_decimal:.2f}. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}."
                 )
                 if respuesta_modal:
                     return respuesta_modal
+                if modo_app:
+                    return volver_cobro_app(request, empresa, factura)
                 return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
         except (InvalidOperation, ValueError):
             error = "Ingrese un monto y una fecha validos."
@@ -8251,6 +8825,8 @@ def registrar_pago(request, empresa_slug, factura_id):
 
         messages.error(request, error)
 
+    if modo_app:
+        return render_cobro_app(request, empresa, _contexto_pago(request.POST if request.method == "POST" else {}))
     return render(request, template_name, _contexto_pago(request.POST if request.method == "POST" else {}))
 
 
@@ -8270,15 +8846,33 @@ def _recalcular_y_recontabilizar_pagos_factura(factura):
     subtotal_pendiente = Decimal(factura.subtotal_documento_ajustado or 0).quantize(Decimal("0.01"))
     impuesto_pendiente = Decimal(factura.impuesto_documento_ajustado or 0).quantize(Decimal("0.01"))
     ids_pagos = [p.id for p in pagos]
+    from contabilidad.models import MovimientoBancario, RegularizacionMonedaFactura
+    revision = RegularizacionMonedaFactura.objects.filter(factura=factura, empresa=factura.empresa).first()
+    preservados = set()
+    if revision:
+        preservados = set(AsientoContable.objects.filter(
+            empresa=factura.empresa, documento_tipo='pago_factura', documento_id__in=ids_pagos,
+            evento='cobro', fecha_creacion__lte=revision.fecha_creacion, estado='contabilizado',
+        ).values_list('documento_id', flat=True))
 
-    AsientoContable.objects.filter(
+    asientos_reconstruidos = AsientoContable.objects.filter(
         empresa=factura.empresa,
         documento_tipo="pago_factura",
         documento_id__in=ids_pagos,
         evento="cobro",
-    ).delete()
+    ).exclude(documento_id__in=preservados)
+    if MovimientoBancario.objects.filter(empresa=factura.empresa).filter(
+        Q(asiento_id__in=asientos_reconstruidos.values('pk'))
+        | Q(pago_factura_id__in=[pk for pk in ids_pagos if pk not in preservados])
+    ).exists():
+        raise ValidationError('Hay cobros vinculados a movimientos bancarios. Desenlaza su conciliación bancaria antes de corregirlos para conservar el respaldo del banco.')
+    asientos_reconstruidos.delete()
 
     for pago in pagos:
+        if pago.pk in preservados:
+            subtotal_pendiente = max(subtotal_pendiente - pago.subtotal_aplicado, Decimal('0.00'))
+            impuesto_pendiente = max(impuesto_pendiente - pago.impuesto_aplicado, Decimal('0.00'))
+            continue
         total_aplicado = Decimal(pago.total_aplicado or 0).quantize(Decimal("0.01"))
         total_pendiente = (subtotal_pendiente + impuesto_pendiente).quantize(Decimal("0.01"))
 
@@ -8323,21 +8917,46 @@ def _recalcular_y_recontabilizar_pagos_factura(factura):
 @login_required
 @xframe_options_sameorigin
 def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
+    from .mobile_payments import (
+        autorizar_cobros_app, cuentas_cobro_app, errores_numericos_cobro_app,
+        es_cobros_app, presentar_mensaje_cobro_app, render_cobro_app, validar_factura_cobro_app,
+        validar_selecciones_cobro_app, volver_cobro_app,
+    )
+
+    from contabilidad.moneda import validar_moneda_tipo_cambio
+
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    modo_app = es_cobros_app(request, empresa)
+    if modo_app:
+        autorizar_cobros_app(request, empresa, factura_id, pago_id)
     factura = get_object_or_404(Factura, id=factura_id, empresa=empresa)
+    if modo_app:
+        validar_factura_cobro_app(empresa, factura)
     pago = get_object_or_404(
         PagoFactura.objects.select_related("cuenta_financiera", "cuenta_financiera_impuesto", "proveedor_comision"),
         id=pago_id,
         factura=factura,
     )
-    es_modal = request.GET.get("modal") == "1"
+    saldo_disponible_pago = factura.saldo_pendiente + pago.total_aplicado
+    subtotal_disponible_pago = factura.subtotal_pendiente_cobro + pago.subtotal_aplicado
+    impuesto_disponible_pago = factura.impuesto_pendiente_cobro + pago.impuesto_aplicado
+    es_modal = not modo_app and request.GET.get("modal") == "1"
     template_name = "facturacion/registrar_pago_modal.html" if es_modal else "facturacion/registrar_pago.html"
 
     if factura.estado == "anulada":
         messages.error(request, "No se pueden editar pagos de una factura anulada.")
-        return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
+        if not modo_app:
+            return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
-    cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+    cuentas_financieras = cuentas_cobro_app(empresa) if modo_app else _cuentas_financieras_activas_para_pago(empresa)
+    if modo_app:
+        from contabilidad.catalogo_rumi_roles import usa_catalogo_rumi
+        if usa_catalogo_rumi(empresa):
+            cuentas_financieras = _cuentas_financieras_activas_para_pago(empresa)
+        validar_selecciones_cobro_app(request, empresa, cuentas_financieras)
+    modo_catalogo_rumi = _avisar_configuracion_cuentas_financieras_rumi(
+        request, empresa, cuentas_financieras,
+    )
     cajas = cuentas_financieras.filter(tipo='caja')
     bancos = cuentas_financieras.filter(tipo='banco')
     tarjetas = cuentas_financieras.filter(tipo='tarjeta_credito')
@@ -8348,6 +8967,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         data = {
             "fecha": pago.fecha.isoformat() if pago.fecha else timezone.now().date().isoformat(),
             "monto": f"{Decimal(pago.monto or 0):.2f}",
+            "tipo_cambio": str(pago.tipo_cambio or factura.tipo_cambio),
             "metodo": pago.metodo,
             "cuenta_financiera": str(pago.cuenta_financiera_id or ""),
             "referencia": pago.referencia or "",
@@ -8356,6 +8976,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             "proveedor_comision": str(pago.proveedor_comision_id or ""),
             "porcentaje_comision": f"{Decimal(pago.porcentaje_comision or 0):.2f}",
             "monto_comision": f"{Decimal(pago.monto_comision or 0):.2f}",
+            "comision_retenida_cliente": pago.comision_retenida_cliente,
             "separar_isv": pago.separar_isv,
             "cuenta_financiera_impuesto": str(pago.cuenta_financiera_impuesto_id or ""),
             "monto_efectivo": "",
@@ -8374,23 +8995,27 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         data[f"referencia_{metodo}"] = pago.referencia or ""
         return data
 
+    simbolo_moneda = "$" if factura.moneda == "USD" else "L."
+
     def _contexto_pago(form_data=None):
         return {
             "factura": factura,
+            "tipo_cambio_cobro": (pago.tipo_cambio or factura.tipo_cambio),
             "empresa": empresa,
             "cuentas_financieras": cuentas_financieras,
             "cajas": cajas,
             "bancos": bancos,
             "cuentas_tarjeta": cuentas_tarjeta,
             "proveedores_comision": proveedores_comision,
-            "usa_pagos_mixtos": True,
-            "subtotal_pendiente": factura.subtotal_pendiente_cobro,
-            "impuesto_pendiente": factura.impuesto_pendiente_cobro,
+            "usa_pagos_mixtos": _empresa_usa_pago_mixto_predeterminado(empresa),
+            "subtotal_pendiente": subtotal_disponible_pago,
+            "impuesto_pendiente": impuesto_disponible_pago,
             "today": timezone.now().date(),
             "form_data": form_data or _form_data_base(),
             "es_modal": es_modal,
             "modo_edicion": True,
             "pago_edicion": pago,
+            "saldo_disponible_pago": saldo_disponible_pago,
             "modal_heading": "Editar pago",
             "modal_description": "Ajusta el monto, la cuenta o la referencia de este cobro. El sistema reconstruira recibo y contabilidad automaticamente.",
             "comision_sobre_total_factura": empresa.slug == "digital_planning",
@@ -8451,15 +9076,26 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         """.strip()
         return HttpResponse(html)
 
+    if modo_app:
+        if factura.estado == "anulada":
+            return render_cobro_app(request, empresa, _contexto_pago(), readonly_reason="La factura está anulada. No permite corregir sus cobros.")
+        errores_app = errores_numericos_cobro_app(request)
+        if errores_app:
+            messages.error(request, "Revise los valores numéricos del cobro. Los datos ingresados se conservan.")
+            return render_cobro_app(request, empresa, _contexto_pago(request.POST), errores=errores_app)
+
     if request.method == "POST":
         monto = request.POST.get("monto", "").strip()
         metodo = request.POST.get("metodo")
         referencia = request.POST.get("referencia", "").strip()
         fecha_pago = request.POST.get("fecha")
         cuenta_financiera_id = request.POST.get("cuenta_financiera")
+        if (modo_app or modo_catalogo_rumi) and cuenta_financiera_id == "":
+            cuenta_financiera_id = None
         retencion_isr_raw = request.POST.get("retencion_isr", "").strip()
         retencion_isv_raw = request.POST.get("retencion_isv", "").strip()
         separar_isv = request.POST.get("separar_isv") == "on"
+        comision_retenida_cliente = request.POST.get("comision_retenida_cliente") in ("on", "1", "true")
         cuenta_financiera_impuesto_id = request.POST.get("cuenta_financiera_impuesto")
         error = None
 
@@ -8477,6 +9113,9 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         )
 
         try:
+            _moneda, tasa_cobro = validar_moneda_tipo_cambio(
+                factura.moneda, request.POST.get("tipo_cambio") or (pago.tipo_cambio or factura.tipo_cambio)
+            )
             if usa_pago_mixto:
                 try:
                     fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
@@ -8488,7 +9127,13 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 if retencion_isr < 0 or retencion_isv < 0:
                     raise ValidationError("Las retenciones no pueden ser negativas.")
 
-                pagos_validos, total_pago = _pagos_mixtos_desde_post(request.POST, cuentas_financieras)
+                datos_pagos_mixtos = request.POST
+                if modo_app or modo_catalogo_rumi:
+                    datos_pagos_mixtos = request.POST.copy()
+                    for campo_cuenta in ("cuenta_efectivo", "cuenta_tarjeta", "cuenta_transferencia"):
+                        if datos_pagos_mixtos.get(campo_cuenta) == "":
+                            datos_pagos_mixtos.pop(campo_cuenta)
+                pagos_validos, total_pago = _pagos_mixtos_desde_post(datos_pagos_mixtos, cuentas_financieras)
                 if not pagos_validos:
                     raise ValidationError("Ingresa al menos un monto valido para dividir el cobro.")
                 proveedor_comision, porcentaje_comision, monto_comision = _datos_comision_pago(
@@ -8496,12 +9141,13 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 )
 
                 saldo_editable = (Decimal(factura.saldo_pendiente or 0) + Decimal(pago.total_aplicado or 0)).quantize(Decimal("0.01"))
-                if (total_pago + retencion_isr + retencion_isv).quantize(Decimal("0.01")) > saldo_editable:
+                if (total_pago + retencion_isr + retencion_isv + (monto_comision if comision_retenida_cliente else Decimal("0.00"))).quantize(Decimal("0.01")) > saldo_editable:
                     raise ValidationError("La suma aplicada no puede ser mayor que el saldo disponible de la factura.")
 
                 cuenta_financiera_impuesto = cuentas_financieras.filter(id=cuenta_financiera_impuesto_id).first() if cuenta_financiera_impuesto_id else None
                 with transaction.atomic():
                     metodo_principal, monto_principal, referencia_principal, cuenta_principal = pagos_validos[0]
+                    pago.tipo_cambio = tasa_cobro
                     pago.fecha = fecha_convertida
                     pago.monto = monto_principal
                     pago.retencion_isr = retencion_isr
@@ -8509,6 +9155,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     pago.proveedor_comision = proveedor_comision
                     pago.porcentaje_comision = porcentaje_comision
                     pago.monto_comision = monto_comision
+                    pago.comision_retenida_cliente = comision_retenida_cliente
                     pago.separar_isv = separar_isv
                     pago.cuenta_financiera = cuenta_principal
                     pago.cuenta_financiera_impuesto = cuenta_financiera_impuesto
@@ -8519,6 +9166,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     for metodo_mixto, monto_decimal, referencia_mixta, cuenta_mixta in pagos_validos[1:]:
                         PagoFactura.objects.create(
                             factura=factura,
+                            tipo_cambio=tasa_cobro,
                             monto=monto_decimal,
                             retencion_isr=Decimal("0.00"),
                             retencion_isv=Decimal("0.00"),
@@ -8533,12 +9181,14 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                     _recalcular_y_recontabilizar_pagos_factura(factura)
 
                 pago.refresh_from_db()
-                messages.success(request, f"Pago mixto actualizado correctamente. Cobro recibido: L. {total_pago:.2f}.")
+                messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago mixto actualizado correctamente. Cobro recibido: {simbolo_moneda} {total_pago:.2f}.", modo_app))
                 respuesta_modal = _respuesta_modal_exito(
-                    f"Pago mixto actualizado. Cobro recibido: L. {total_pago:.2f}. Movimientos: {len(pagos_validos)}."
+                    f"Pago mixto actualizado. Cobro recibido: {simbolo_moneda} {total_pago:.2f}. Movimientos: {len(pagos_validos)}."
                 )
                 if respuesta_modal:
                     return respuesta_modal
+                if modo_app:
+                    return volver_cobro_app(request, empresa, factura)
                 return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
 
             monto_decimal = _parsear_decimal(monto, "monto recibido")
@@ -8553,12 +9203,14 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             pago_borrador = PagoFactura(
                 pk=pago.pk,
                 factura=factura,
+                tipo_cambio=tasa_cobro,
                 monto=monto_decimal,
                 retencion_isr=retencion_isr,
                 retencion_isv=retencion_isv,
                 proveedor_comision=proveedor_comision,
                 porcentaje_comision=porcentaje_comision,
                 monto_comision=monto_comision,
+                comision_retenida_cliente=comision_retenida_cliente,
                 separar_isv=separar_isv,
                 cuenta_financiera=cuenta_financiera,
                 cuenta_financiera_impuesto=cuenta_financiera_impuesto,
@@ -8571,12 +9223,17 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             requiere_cuenta_principal = pago_borrador.subtotal_recibido > 0 or (
                 pago_borrador.impuesto_recibido > 0 and not cuenta_financiera_impuesto
             )
+            if requiere_cuenta_principal and not cuenta_financiera and modo_catalogo_rumi:
+                raise ValidationError(
+                    "Configure una caja o cuenta financiera de RUMI enlazada a su catálogo antes de actualizar este cobro."
+                )
             if requiere_cuenta_principal and not cuenta_financiera:
                 raise ValidationError("Selecciona la cuenta bancaria o caja donde entro el dinero recibido.")
 
             fecha_convertida = datetime.strptime(fecha_pago, "%Y-%m-%d").date() if fecha_pago else timezone.now().date()
 
             with transaction.atomic():
+                pago.tipo_cambio = tasa_cobro
                 pago.fecha = fecha_convertida
                 pago.monto = monto_decimal
                 pago.retencion_isr = retencion_isr
@@ -8584,6 +9241,7 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 pago.proveedor_comision = proveedor_comision
                 pago.porcentaje_comision = porcentaje_comision
                 pago.monto_comision = monto_comision
+                pago.comision_retenida_cliente = comision_retenida_cliente
                 pago.separar_isv = separar_isv
                 pago.cuenta_financiera = cuenta_financiera
                 pago.cuenta_financiera_impuesto = cuenta_financiera_impuesto
@@ -8592,12 +9250,14 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
                 pago.save()
                 _recalcular_y_recontabilizar_pagos_factura(factura)
 
-            messages.success(request, f"Pago actualizado correctamente. Aplicado total: L. {pago.total_aplicado:.2f}.")
+            messages.success(request, presentar_mensaje_cobro_app(factura, f"Pago actualizado correctamente. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}.", modo_app))
             respuesta_modal = _respuesta_modal_exito(
-                f"Cobro actualizado por L. {monto_decimal:.2f}. Aplicado total: L. {pago.total_aplicado:.2f}."
+                f"Cobro actualizado por {simbolo_moneda} {monto_decimal:.2f}. Aplicado total: {simbolo_moneda} {pago.total_aplicado:.2f}."
             )
             if respuesta_modal:
                 return respuesta_modal
+            if modo_app:
+                return volver_cobro_app(request, empresa, factura)
             return redirect("ver_factura", empresa_slug=empresa.slug, factura_id=factura.id)
         except (InvalidOperation, ValueError):
             error = "Ingrese un monto y una fecha validos."
@@ -8608,8 +9268,12 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
             error = f"No se pudo actualizar el cobro: {exc}"
 
         messages.error(request, error)
+        if modo_app:
+            return render_cobro_app(request, empresa, _contexto_pago(request.POST))
         return render(request, template_name, _contexto_pago(request.POST))
 
+    if modo_app:
+        return render_cobro_app(request, empresa, _contexto_pago())
     return render(request, template_name, _contexto_pago())
 
 
@@ -9959,8 +10623,15 @@ def resumen_diario_caja(request, empresa_slug):
 @login_required
 def reporte_cxc(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .mobile_cxc import autorizar_cxc_app, es_cxc_app, render_cxc_app, validar_relaciones_cxc_app
+    modo_app = es_cxc_app(request, empresa)
+    if modo_app:
+        autorizar_cxc_app(request, empresa)
+        validar_relaciones_cxc_app(empresa)
     contexto = _construir_reporte_cxc(empresa, request.GET)
     contexto["empresa"] = empresa
+    if modo_app:
+        return render_cxc_app(request, empresa, contexto)
     return render(request, "facturacion/reporte_cxc_premium.html", contexto)
 
 

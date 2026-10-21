@@ -1,0 +1,15 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}{{ form_titulo }}{% endblock %}
+{% block mobile_page_title %}{{ form_titulo }}{% endblock %}
+{% block mobile_kicker %}Configuración clínica{% endblock %}
+{% block mobile_back_url %}{{ app_catalog_back_url }}{% endblock %}
+{% block mobile_header_description %}<p>{{ form_descripcion }}</p>{% endblock %}
+{% block mobile_navigation %}{% include "clinica/mobile_configuration_navigation.html" %}{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'clinica/mobile_configuration.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'clinica/mobile_configuration.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+{% include "clinica/mobile_configuration_editor.html" with in_sheet=False %}
+{% if objeto_editando and not form.is_bound and can_delete_catalog and app_catalog_delete_url %}<section class="mi-card mcfg-delete-section"><h2>Eliminar del catálogo</h2><p class="mcfg-help">Esta acción está disponible únicamente con la autorización actual para administrar servicios.</p><button class="mcfg-delete-link" type="button" data-configuration-delete="{{ app_catalog_delete_url }}" data-configuration-delete-name="{{ objeto_editando.nombre }}">Eliminar servicio</button></section>{% endif %}
+{% include "clinica/mobile_configuration_dialogs.html" %}
+{% endblock %}

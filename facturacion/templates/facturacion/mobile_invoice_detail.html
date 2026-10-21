@@ -48,6 +48,7 @@
   {% if factura.estado != "anulada" %}<div class="mi-row"><span>Pagado</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.total_pagado|floatformat:2|intcomma }}</strong></div><div class="mi-row"><span>Pendiente</span><strong>{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ factura.saldo_pendiente|floatformat:2|intcomma }}</strong></div>{% endif %}
 </section>
 {% if factura.orden_compra_exenta or factura.registro_exonerado or factura.registro_sag %}<details class="mi-card mi-fold"><summary>Datos fiscales adicionales</summary><div>{% if factura.orden_compra_exenta %}<div class="mi-row"><span>Orden de compra exenta</span><strong>{{ factura.orden_compra_exenta }}</strong></div>{% endif %}{% if factura.registro_exonerado %}<div class="mi-row"><span>Registro exonerado</span><strong>{{ factura.registro_exonerado }}</strong></div>{% endif %}{% if factura.registro_sag %}<div class="mi-row"><span>Registro SAG</span><strong>{{ factura.registro_sag }}</strong></div>{% endif %}</div></details>{% endif %}
+{% include "facturacion/mobile_invoice_payment_actions.html" %}
 {% if mobile_invoice_audit %}
 <details class="mi-card mi-fold"><summary>Historial de cambios · {{ mobile_invoice_audit|length }}</summary>
   <div class="mi-audit-list">

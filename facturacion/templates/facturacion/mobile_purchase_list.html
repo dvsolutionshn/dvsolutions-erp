@@ -1,0 +1,42 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Compras{% endblock %}
+{% block mobile_page_title %}Compras{% endblock %}
+{% block mobile_kicker %}Abastecimiento{% endblock %}
+{% block mobile_back_url %}{{ app_purchase_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>Consulta los documentos de la empresa activa.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_egresos.css' %}"><link rel="stylesheet" href="{% static 'facturacion/mobile_purchases.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'facturacion/mobile_egresos.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card meg-search-card"><h2>Buscar compras</h2>
+  <form id="mobilePurchaseSearchForm" method="get" action="{{ app_purchases_search_url }}">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field"><label for="purchaseSearch">Número, proveedor o referencia</label><input id="purchaseSearch" type="search" name="q" value="{{ mobile_purchase_query }}" placeholder="Buscar compra..." autocomplete="off"></div>
+    <div class="mi-field"><label for="purchaseState">Estado del documento</label><select id="purchaseState" name="estado"><option value="">Todos</option>{% for state in mobile_purchase_states %}<option value="{{ state.codigo }}"{% if mobile_purchase_state == state.codigo %} selected{% endif %}>{{ state.nombre }}</option>{% endfor %}</select></div>
+    <div class="mi-field"><label for="purchasePaymentState">Estado de pago</label><select id="purchasePaymentState" name="pago"><option value="">Todos</option>{% for state in mobile_purchase_payment_states %}<option value="{{ state.codigo }}"{% if mobile_purchase_payment_state == state.codigo %} selected{% endif %}>{{ state.nombre }}</option>{% endfor %}</select></div>
+    <button class="mi-button secondary" type="submit">Filtrar</button>
+    {% if mobile_purchase_query or mobile_purchase_state or mobile_purchase_payment_state %}<a class="meg-clear-search" href="{{ app_purchases_url }}">Limpiar filtros</a>{% endif %}
+  </form><p class="meg-search-note">Los filtros y el resumen incluyen todos los resultados, no solo esta página.</p>
+</section>
+<section class="mi-card"><h2>Resumen según filtros</h2>
+  <dl class="mpu-stats"><div><dt>Compras</dt><dd>{{ resumen.total }}</dd></div><div><dt>Aplicadas</dt><dd>{{ resumen.aplicadas }}</dd></div><div><dt>Borradores</dt><dd>{{ resumen.borradores }}</dd></div><div><dt>Por pagar</dt><dd>{{ resumen.por_pagar }}</dd></div><div><dt>Unidades</dt><dd>{{ resumen.unidades|floatformat:2|intcomma }}</dd></div></dl>
+  <div class="mi-row"><span>Monto documental</span><strong>L. {{ resumen.monto|floatformat:2|intcomma }}</strong></div>
+  <div class="mi-row total"><span>Saldo pendiente</span><strong>L. {{ resumen.saldo_total|floatformat:2|intcomma }}</strong></div>
+</section>
+<div class="meg-list-meta"><strong>{{ mobile_purchase_total }} compra{% if mobile_purchase_total != 1 %}s{% endif %}</strong>{% if mobile_purchase_total %}<span>{{ compras.start_index }}–{{ compras.end_index }}</span>{% endif %}</div>
+<div class="meg-list">
+{% for item in mobile_purchase_items %}
+  <article class="mi-card meg-card mpu-card">
+    <div class="meg-card-head"><div><small>Número de compra</small><strong>{{ item.compra.numero_compra|default:'Sin número asignado' }}</strong></div><span class="mpu-badge {{ item.compra.estado }}">{{ item.compra.get_estado_display }}</span></div>
+    <div class="meg-provider"><small>Proveedor documentado</small><strong>{{ item.compra.proveedor_nombre|default:'Sin nombre documental' }}</strong></div>
+    <dl class="meg-card-meta"><div><dt>Fecha del documento</dt><dd>{{ item.compra.fecha_documento|date:'d/m/Y' }}</dd></div><div><dt>Vencimiento</dt><dd>{% if item.compra.fecha_vencimiento %}{{ item.compra.fecha_vencimiento|date:'d/m/Y' }}{% else %}Sin fecha{% endif %}</dd></div><div><dt>Condición</dt><dd>{{ item.compra.get_condicion_pago_display }}</dd></div><div><dt>Saldo pendiente</dt><dd>L. {{ item.compra.saldo_pendiente|floatformat:2|intcomma }}</dd></div></dl>
+    <span class="mpu-badge {{ item.compra.estado_pago }}">{% if item.compra.estado_pago == 'pagado' %}Pagada{% elif item.compra.estado_pago == 'parcial' %}Pago parcial{% else %}Pago pendiente{% endif %}</span>
+    {% if item.compra.referencia_documento %}<p class="meg-reference">Referencia: {{ item.compra.referencia_documento }}</p>{% endif %}
+    <div class="meg-card-bottom"><strong class="meg-amount">L. {{ item.compra.total_documento|floatformat:2|intcomma }}</strong><a class="meg-view-link" href="{{ item.detalle_url }}" aria-label="Ver compra {{ item.compra.numero_compra }}">Ver ›</a></div>
+  </article>
+{% empty %}<section class="mi-card meg-empty"><h2>Sin compras que coincidan</h2><p>No hay documentos con estos filtros para la empresa activa.</p></section>{% endfor %}
+</div>
+{% if mobile_purchase_num_pages > 1 %}<nav class="meg-pagination" aria-label="Páginas de compras"><div>{% if mobile_purchase_previous_url %}<a href="{{ mobile_purchase_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_purchase_page }} / {{ mobile_purchase_num_pages }}</span>{% if mobile_purchase_next_url %}<a href="{{ mobile_purchase_next_url }}">Siguiente ›</a>{% endif %}</div></nav>{% endif %}
+<div class="meg-info-note"><strong>Solo consulta</strong><p>Esta pantalla muestra compras, pagos registrados y movimientos. No modifica documentos, pagos, inventario ni contabilidad. Los importes y estados conservan las reglas del sistema actual.</p></div>
+{% endblock %}

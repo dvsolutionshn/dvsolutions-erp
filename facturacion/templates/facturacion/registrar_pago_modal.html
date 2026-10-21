@@ -1,4 +1,4 @@
-{% load static humanize %}
+{% load static humanize l10n %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if modo_edicion %}Editar Pago{% else %}Registrar Pago{% endif %} - {{ empresa.nombre }}</title>
     <link rel="stylesheet" href="{% static 'core/erp.css' %}">
+    <link rel="stylesheet" href="{% static 'facturacion/pago_avanzado.css' %}">
     <style>
     body{margin:0;background:#f5f8fc;font-family:"Segoe UI",Roboto,Arial,sans-serif;}
     .erp-payment-compact{display:flex;flex-direction:column;gap:18px;}
@@ -14,13 +15,6 @@
     .erp-payment-hero-copy h3{margin:0 0 8px;font-size:24px;color:#102338;}
     .erp-payment-hero-copy p{margin:0;color:#5a6b80;line-height:1.6;max-width:760px;}
     .erp-payment-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
-    .erp-payment-advanced{margin-top:18px;border:1px solid var(--line);border-radius:16px;background:#fbfcfe;overflow:hidden;}
-    .erp-payment-advanced summary{cursor:pointer;list-style:none;padding:16px 18px;font-weight:700;color:#102338;display:flex;align-items:center;justify-content:space-between;}
-    .erp-payment-advanced summary::-webkit-details-marker{display:none;}
-    .erp-payment-advanced summary::after{content:"+";font-size:22px;line-height:1;color:#46627d;}
-    .erp-payment-advanced[open] summary::after{content:"−";}
-    .erp-payment-advanced-body{padding:0 18px 18px;border-top:1px solid var(--line);}
-    .erp-payment-advanced-copy{margin:0 0 14px;color:#5a6b80;line-height:1.55;}
     .erp-payment-modal-note{padding:14px 16px;border-radius:14px;background:#f7faff;border:1px solid #d8e4f2;color:#334a63;}
     @media (max-width: 760px){
         .erp-payment-shell{padding:14px;}
@@ -54,6 +48,7 @@
 
         <form method="post" class="erp-form-shell" style="margin-top:0;">
             {% csrf_token %}
+        {% include "facturacion/_tipo_cambio_cobro.html" %}
 
             {% if usa_pagos_mixtos %}
             <div class="erp-form-grid two">
@@ -138,50 +133,15 @@
                 </article>
             </div>
             <div class="erp-soft-panel">
-                <strong>Total capturado:</strong> <span id="total-mixto">L. 0.00</span>
-                <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+                <strong>Total capturado:</strong> <span id="total-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</span>
+                <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: {% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
             </div>
             <div class="erp-soft-panel" style="margin-top:12px;">
                 <strong>Proyeccion del cobro:</strong>
-                <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">L. 0.00</strong></span>
-                <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-mixto">L. 0.00</strong></span>
+                <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
+                <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-mixto">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
             </div>
-            <details class="erp-payment-advanced">
-                <summary>Opciones avanzadas</summary>
-                <div class="erp-payment-advanced-body">
-                    <p class="erp-payment-advanced-copy">Abre esta seccion solo cuando haya retenciones o quieras resguardar el ISV en otra cuenta financiera.</p>
-                    <div class="erp-form-grid two">
-                        <div class="erp-field">
-                            <label for="retencion_isr">Retencion ISR</label>
-                            <input id="retencion_isr" type="number" step="0.01" min="0" name="retencion_isr" value="{{ form_data.retencion_isr|default:'0.00' }}" placeholder="0.00">
-                            <div class="erp-field-help">Monto retenido por el cliente y aplicado al saldo de la factura.</div>
-                        </div>
-                        <div class="erp-field">
-                            <label for="retencion_isv">Retencion ISV</label>
-                            <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
-                            <div class="erp-field-help">Usalo cuando el cliente retiene el impuesto y no entrega ese efectivo.</div>
-                        </div>
-                        {% include "facturacion/partials/campos_comision_pago.html" %}
-                        <div class="erp-field">
-                            <label style="display:flex;gap:10px;align-items:center;">
-                                <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
-                                <span>Separar ISV automaticamente</span>
-                            </label>
-                            <div class="erp-field-help">Divide el cobro entre base e impuesto, incluso si solo queda pendiente el ISV.</div>
-                        </div>
-                        <div class="erp-field">
-                            <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
-                            <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
-                                <option value="">Misma cuenta del cobro</option>
-                                {% for cuenta in cuentas_financieras %}
-                                <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>{{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}</option>
-                                {% endfor %}
-                            </select>
-                            <div class="erp-field-help">Si eliges una cuenta aparte, el ISV cobrado quedara resguardado ahi.</div>
-                        </div>
-                    </div>
-                </div>
-            </details>
+            {% include "facturacion/partials/opciones_avanzadas_pago.html" %}
             {% else %}
             <div class="erp-payment-quick-grid">
                 <div class="erp-field">
@@ -189,10 +149,10 @@
                     <input id="fecha" type="date" name="fecha" value="{{ form_data.fecha|default:today }}">
                 </div>
                 <div class="erp-field">
-                    <label for="monto">Monto</label>
+                    <label for="monto">{% if comision_sobre_total_factura %}Dinero recibido en caja o banco{% else %}Monto{% endif %}</label>
                     <div style="display:flex;gap:10px;align-items:center;">
                         <input id="monto" type="number" step="0.01" min="0" name="monto" value="{{ form_data.monto|default:'' }}" required>
-                    {% if not modo_edicion %}
+                    {% if not modo_edicion or comision_sobre_total_factura %}
                     <button type="button" class="erp-btn-secondary" style="white-space:nowrap;" onclick="pagarTodo()">Pagar todo</button>
                     {% endif %}
                 </div>
@@ -225,54 +185,18 @@
                 </div>
             </div>
             <div class="erp-soft-panel">
-                <strong>Total aplicado:</strong> <span id="total-aplicado-simple">L. 0.00</span>
-                <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: L. {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
+                <strong>Total aplicado:</strong> <span id="total-aplicado-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</span>
+                <span class="erp-card-muted" style="margin-left:12px;">Saldo pendiente: {% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} {{ factura.saldo_pendiente|floatformat:2|intcomma }}</span>
             </div>
             <div class="erp-soft-panel" style="margin-top:12px;">
                 <strong>Proyeccion del cobro:</strong>
-                <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">L. 0.00</strong></span>
-                <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-simple">L. 0.00</strong></span>
+                <span class="erp-card-muted" style="margin-left:10px;">Base a cuenta principal: <strong id="preview-base-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
+                <span class="erp-card-muted" style="margin-left:12px;">ISV a cuenta separada: <strong id="preview-isv-simple">{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} 0.00</strong></span>
             </div>
-            <details class="erp-payment-advanced">
-                <summary>Opciones avanzadas</summary>
-                <div class="erp-payment-advanced-body">
-                    <p class="erp-payment-advanced-copy">Usa esta seccion solo si hay retenciones o si deseas que el ISV cobrado quede resguardado en otra cuenta financiera.</p>
-                    <div class="erp-form-grid two">
-                        <div class="erp-field">
-                            <label for="retencion_isr">Retencion ISR</label>
-                            <input id="retencion_isr" type="number" step="0.01" min="0" name="retencion_isr" value="{{ form_data.retencion_isr|default:'0.00' }}" placeholder="0.00">
-                            <div class="erp-field-help">Si el cliente retuvo ISR, registralo aqui para aplicarlo al saldo.</div>
-                        </div>
-                        <div class="erp-field">
-                            <label for="retencion_isv">Retencion ISV</label>
-                            <input id="retencion_isv" type="number" step="0.01" min="0" name="retencion_isv" value="{{ form_data.retencion_isv|default:'0.00' }}" placeholder="0.00">
-                            <div class="erp-field-help">Permite reflejar el ISV retenido sin inflar el efectivo recibido.</div>
-                        </div>
-                        {% include "facturacion/partials/campos_comision_pago.html" %}
-                        <div class="erp-field">
-                            <label style="display:flex;gap:10px;align-items:center;">
-                                <input id="separar_isv" type="checkbox" name="separar_isv" {% if form_data.separar_isv %}checked{% endif %}>
-                                <span>Separar ISV automaticamente</span>
-                            </label>
-                            <div class="erp-field-help">Cuando quieras ver base e impuesto por separado en el mismo cobro, activalo aqui.</div>
-                        </div>
-                        <div class="erp-field">
-                            <label for="cuenta_financiera_impuesto">Cuenta destino del ISV</label>
-                            <select id="cuenta_financiera_impuesto" name="cuenta_financiera_impuesto">
-                                <option value="">Misma cuenta del cobro</option>
-                                {% for cuenta in cuentas_financieras %}
-                                <option value="{{ cuenta.id }}" {% if form_data.cuenta_financiera_impuesto == cuenta.id|stringformat:"s" %}selected{% endif %}>
-                                    {{ cuenta.nombre }} - {{ cuenta.cuenta_contable.codigo }} {{ cuenta.cuenta_contable.nombre }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <div class="erp-field-help">Si la dejas vacia, el ISV se registra en la misma cuenta financiera donde entro el cobro.</div>
-                        </div>
-                    </div>
-                </div>
-            </details>
+            {% include "facturacion/partials/opciones_avanzadas_pago.html" %}
             {% endif %}
 
+            {% include "facturacion/partials/resumen_saldo_comision_pago.html" %}
             <div class="erp-form-actions" style="margin-top:22px;">
                 <div class="erp-field-help">{% if modo_edicion %}Al actualizar, se sincronizan el recibo y el asiento contable del cobro.{% else %}Al guardar, se genera el recibo y se registra el asiento contable del cobro.{% endif %}</div>
                 <div class="erp-actions-right">
@@ -285,12 +209,12 @@
 </section>
 
 <script>
-const subtotalPendienteCobro = parseFloat("{{ subtotal_pendiente }}");
-const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente }}");
+const subtotalPendienteCobro = parseFloat("{{ subtotal_pendiente|unlocalize }}");
+const impuestoPendienteCobro = parseFloat("{{ impuesto_pendiente|unlocalize }}");
 const comisionSobreTotalFactura = {{ comision_sobre_total_factura|yesno:"true,false" }};
-const baseComisionFactura = parseFloat("{{ base_comision }}");
+const baseComisionFactura = parseFloat("{{ base_comision|unlocalize }}");
 function moneyHN(value){
-    return "L. " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
+    return "{% if factura.moneda == "USD" %}USD{% else %}L.{% endif %} " + value.toLocaleString("es-HN", {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function calcularDistribucion(totalAplicado){
     const subtotalPendiente = Number.isFinite(subtotalPendienteCobro) ? subtotalPendienteCobro : 0;
@@ -319,48 +243,64 @@ function calcularDistribucion(totalAplicado){
     }
     return {base, isv};
 }
+function comisionRetenidaClienteActiva(){
+    return comisionSobreTotalFactura && Boolean(document.getElementById("comision_retenida_cliente")?.checked);
+}
+function montoComisionRetenidaCliente(){
+    if(!comisionRetenidaClienteActiva()){ return 0; }
+    const porcentaje = parseFloat(document.getElementById("porcentaje_comision")?.value || "0");
+    if(!Number.isFinite(porcentaje) || !Number.isFinite(baseComisionFactura)){ return 0; }
+    return Math.round((baseComisionFactura * porcentaje + Number.EPSILON)) / 100;
+}
 function pagarTodo(){
     const monto = document.getElementById("monto");
     const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
-    const saldo = parseFloat("{{ factura.saldo_pendiente }}");
+    const saldo = parseFloat("{{ saldo_disponible_pago|unlocalize }}");
     if(monto){
-        const restante = saldo - (Number.isFinite(retIsr) ? retIsr : 0) - (Number.isFinite(retIsv) ? retIsv : 0);
+        const restante = saldo - (Number.isFinite(retIsr) ? retIsr : 0) - (Number.isFinite(retIsv) ? retIsv : 0) - montoComisionRetenidaCliente();
         monto.value = Math.max(restante, 0).toFixed(2);
         actualizarTotalAplicadoSimple();
     }
 }
-function actualizarTotalMixto(){
-    const totalCobrado = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
-        const input = document.getElementById(id);
-        const value = input ? parseFloat(input.value || "0") : 0;
-        return acc + (Number.isFinite(value) ? value : 0);
-    }, 0);
+function distribucionEfectivoComision(totalAplicado, retIsr, retIsv){
+    const distribucion = calcularDistribucion(totalAplicado);
+    if(!comisionRetenidaClienteActiva() || totalAplicado <= 0){ return distribucion; }
+    const comision = montoComisionRetenidaCliente();
+    const comisionIsv = Math.round((comision * distribucion.isv / totalAplicado + Number.EPSILON) * 100) / 100;
+    return {
+        base: Math.max(Math.round((distribucion.base - retIsr - comision + comisionIsv) * 100) / 100, 0),
+        isv: Math.max(Math.round((distribucion.isv - retIsv - comisionIsv) * 100) / 100, 0)
+    };
+}
+function actualizarResumenCobro(totalCobrado, targetId, prefijo){
+    const target = document.getElementById(targetId);
+    if(!target){ return; }
     const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
     const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
-    const total = totalCobrado + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
-    const target = document.getElementById("total-mixto");
-    if(target){ target.textContent = moneyHN(total); }
-    const distribucion = calcularDistribucion(total);
-    const baseTarget = document.getElementById("preview-base-mixto");
-    const isvTarget = document.getElementById("preview-isv-mixto");
+    const isr = Number.isFinite(retIsr) ? retIsr : 0;
+    const isv = Number.isFinite(retIsv) ? retIsv : 0;
+    const cobroConRetenciones = totalCobrado + isr + isv;
+    actualizarComision(cobroConRetenciones);
+    const totalAplicado = Math.round((cobroConRetenciones + montoComisionRetenidaCliente()) * 100) / 100;
+    target.textContent = moneyHN(totalAplicado);
+    if(typeof actualizarSaldoComisionPago === "function"){ actualizarSaldoComisionPago(totalAplicado); }
+    const distribucion = distribucionEfectivoComision(totalAplicado, isr, isv);
+    const baseTarget = document.getElementById("preview-base-" + prefijo);
+    const isvTarget = document.getElementById("preview-isv-" + prefijo);
     if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
     if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
-    actualizarComision(total);
+}
+function actualizarTotalMixto(){
+    const totalCobrado = ["monto_efectivo", "monto_tarjeta", "monto_transferencia"].reduce((acc, id) => {
+        const value = parseFloat(document.getElementById(id)?.value || "0");
+        return acc + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    actualizarResumenCobro(totalCobrado, "total-mixto", "mixto");
 }
 function actualizarTotalAplicadoSimple(){
     const monto = parseFloat(document.getElementById("monto")?.value || "0");
-    const retIsr = parseFloat(document.getElementById("retencion_isr")?.value || "0");
-    const retIsv = parseFloat(document.getElementById("retencion_isv")?.value || "0");
-    const total = (Number.isFinite(monto) ? monto : 0) + (Number.isFinite(retIsr) ? retIsr : 0) + (Number.isFinite(retIsv) ? retIsv : 0);
-    const target = document.getElementById("total-aplicado-simple");
-    if(target){ target.textContent = moneyHN(total); }
-    const distribucion = calcularDistribucion(total);
-    const baseTarget = document.getElementById("preview-base-simple");
-    const isvTarget = document.getElementById("preview-isv-simple");
-    if(baseTarget){ baseTarget.textContent = moneyHN(distribucion.base); }
-    if(isvTarget){ isvTarget.textContent = moneyHN(distribucion.isv); }
-    actualizarComision(total);
+    actualizarResumenCobro(Number.isFinite(monto) ? monto : 0, "total-aplicado-simple", "simple");
 }
 function actualizarComision(totalAplicado){
     const porcentajeInput = document.getElementById("porcentaje_comision");
@@ -370,8 +310,17 @@ function actualizarComision(totalAplicado){
     const base = comisionSobreTotalFactura && Number.isFinite(baseComisionFactura)
         ? baseComisionFactura
         : totalAplicado;
-    const monto = Number.isFinite(porcentaje) ? base * porcentaje / 100 : 0;
+    const monto = Number.isFinite(porcentaje) ? Math.round((base * porcentaje + Number.EPSILON)) / 100 : 0;
     montoInput.value = monto.toFixed(2);
+}
+function actualizarCondicionesComision(){
+    const retenida = comisionRetenidaClienteActiva();
+    const proveedor = document.getElementById("proveedor_comision");
+    const porcentaje = document.getElementById("porcentaje_comision");
+    if(proveedor){ proveedor.required = retenida; }
+    if(porcentaje){ porcentaje.required = retenida; porcentaje.min = retenida ? "0.01" : "0"; }
+    actualizarTotalMixto();
+    actualizarTotalAplicadoSimple();
 }
 function seleccionarCuentaPagoPorMetodo(){
     const metodo = document.getElementById("metodo");
@@ -392,6 +341,9 @@ function seleccionarCuentaPagoPorMetodo(){
 });
 const porcentajeComision = document.getElementById("porcentaje_comision");
 if(porcentajeComision){ porcentajeComision.addEventListener("input", () => { actualizarTotalMixto(); actualizarTotalAplicadoSimple(); }); }
+const comisionRetenidaInput = document.getElementById("comision_retenida_cliente");
+if(comisionRetenidaInput){ comisionRetenidaInput.addEventListener("change", actualizarCondicionesComision); }
+actualizarCondicionesComision();
 const metodoPago = document.getElementById("metodo");
 if(metodoPago){ metodoPago.addEventListener("change", seleccionarCuentaPagoPorMetodo); }
 seleccionarCuentaPagoPorMetodo();

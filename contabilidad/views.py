@@ -1,22 +1,27 @@
 from collections import defaultdict
+from functools import wraps
 
+from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core import signing
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from decimal import Decimal
-from django.utils import timezone
+from django.utils import formats, timezone
 from django.utils.dateparse import parse_date
 
 from django.http import HttpResponse
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 from core.models import Empresa, Usuario
+from core.audit_context import audit_scope
 from facturacion.models import CompraInventario, Factura, NotaCredito, PagoCompra, PagoFactura, RegistroCompraFiscal
 
 from .forms import (
@@ -29,6 +34,7 @@ from .forms import (
     EnlazarMovimientoFacturaForm,
     EnlazarMovimientoCompraForm,
     ImportarCatalogoCuentasForm,
+    ImportarCatalogoCuentasRumiForm,
     ImportarMovimientosBancoForm,
     LineaAsientoFormSet,
     MovimientoBancarioClasificacionForm,
@@ -36,13 +42,66 @@ from .forms import (
     PeriodoContableForm,
     ReglaClasificacionBancoForm,
 )
-from .importadores import importar_catalogo_cuentas_desde_excel, importar_movimientos_bancarios_desde_excel
+from .importadores import analizar_catalogo_cuentas_desde_excel, aplicar_catalogo_cuentas, importar_catalogo_cuentas_desde_excel, importar_movimientos_bancarios_desde_excel
+from .alcance_catalogo import es_empresa_rumi
+from .catalogo_rumi_roles import usa_catalogo_rumi
+from .catalogo_consulta import ordenar_catalogo
+from .cierre import revisar_cierre_periodo
+from .dashboard import datos_dashboard_contable
+from .listado_asientos import contexto_listado_asientos
+from .moneda import convertir_a_lempiras, distribuir_conversion
+from .reportes import (
+    saldo_natural, saldos_financieros, datos_mayor, datos_balance_comprobacion,
+    datos_estado_resultados, datos_balance_general, datos_flujo_efectivo,
+    cuentas_efectivo_ids, clasificar_contrapartida,
+)
 from .models import AsientoContable, ClasificacionCompraFiscal, ClasificacionMovimientoBanco, ConfiguracionContableEmpresa, CuentaContable, CuentaFinanciera, LineaAsientoContable, MovimientoBancario, PeriodoContable, ReglaClasificacionBanco
 from .services import aplicar_reglas_clasificacion_bancaria, asegurar_clasificaciones_bancarias_base_honduras, cargar_catalogo_base_honduras, registrar_asiento_pago_cliente, registrar_asiento_pago_proveedor
 
 
 def _empresa_desde_slug(empresa_slug):
     return get_object_or_404(Empresa, slug=empresa_slug, activa=True)
+
+
+def _verificar_permiso_contable(request, empresa, permiso):
+    usuario = request.user
+    if not (
+        usuario.is_authenticated and usuario.is_active
+        and usuario.puede_acceder_empresa(empresa)
+        and usuario.tiene_permiso_erp("puede_contabilidad", empresa)
+        and usuario.tiene_permiso_erp(permiso, empresa)
+    ):
+        raise PermissionDenied("Tu usuario no tiene permiso para realizar esta operación contable en esta empresa.")
+
+
+def _verificar_contabilizacion_solicitada(request, empresa):
+    if request.method == "POST" and (
+        request.POST.get("estado") == "contabilizado"
+        or request.POST.get("contabilizar_ahora", "").lower() not in {"", "false", "0"}
+    ):
+        _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+
+
+def _manejar_validacion_contable(vista):
+    @wraps(vista)
+    def protegida(request, empresa_slug, *args, **kwargs):
+        try:
+            return vista(request, empresa_slug, *args, **kwargs)
+        except ValidationError as error:
+            messages.error(request, "No se pudo completar la operación: " + "; ".join(error.messages))
+            destino = "asientos_contables" if "asiento" in vista.__name__ else "periodos_contables" if "periodo" in vista.__name__ else "movimientos_bancarios"
+            return redirect(destino, empresa_slug=empresa_slug)
+    return protegida
+
+
+def _retorno_bancario(request, empresa, vista="movimientos_bancarios"):
+    destino = request.POST.get("next", "")
+    prefijo = f"/{empresa.slug}/dashboard/contabilidad/"
+    if destino.startswith(prefijo) and url_has_allowed_host_and_scheme(
+        destino, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+    ):
+        return destino
+    return redirect(vista, empresa_slug=empresa.slug).url
 
 
 def _resumen_contabilidad(empresa):
@@ -58,65 +117,11 @@ def _resumen_contabilidad(empresa):
 
 
 def _pendientes_cierre_periodo(empresa, periodo):
-    rango = {"fecha__gte": periodo.fecha_inicio, "fecha__lte": periodo.fecha_fin}
-    asientos_borrador = AsientoContable.objects.filter(
-        empresa=empresa,
-        estado="borrador",
-        **rango,
-    ).count()
-    movimientos_bancarios = MovimientoBancario.objects.filter(
-        empresa=empresa,
-        fecha__gte=periodo.fecha_inicio,
-        fecha__lte=periodo.fecha_fin,
-    ).exclude(estado="contabilizado").count()
-    movimientos_sin_conciliar = MovimientoBancario.objects.filter(
-        empresa=empresa,
-        estado="contabilizado",
-        conciliado=False,
-        fecha__gte=periodo.fecha_inicio,
-        fecha__lte=periodo.fecha_fin,
-    ).count()
-    lineas = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-        asiento__fecha__gte=periodo.fecha_inicio,
-        asiento__fecha__lte=periodo.fecha_fin,
-    ).aggregate(debe=Sum("debe"), haber=Sum("haber"))
-    total_debe = lineas["debe"] or Decimal("0.00")
-    total_haber = lineas["haber"] or Decimal("0.00")
-    return {
-        "asientos_borrador": asientos_borrador,
-        "movimientos_bancarios": movimientos_bancarios,
-        "movimientos_sin_conciliar": movimientos_sin_conciliar,
-        "debe": total_debe,
-        "haber": total_haber,
-        "balance_cuadrado": total_debe == total_haber,
-        "total": asientos_borrador + movimientos_bancarios + movimientos_sin_conciliar + (0 if total_debe == total_haber else 1),
-    }
+    return revisar_cierre_periodo(empresa, periodo)["control"]
 
 
 def _detalle_cierre_periodo(empresa, periodo):
-    return {
-        "control": _pendientes_cierre_periodo(empresa, periodo),
-        "asientos_borrador": AsientoContable.objects.filter(
-            empresa=empresa,
-            estado="borrador",
-            fecha__gte=periodo.fecha_inicio,
-            fecha__lte=periodo.fecha_fin,
-        ).order_by("fecha", "id"),
-        "movimientos_no_contabilizados": MovimientoBancario.objects.filter(
-            empresa=empresa,
-            fecha__gte=periodo.fecha_inicio,
-            fecha__lte=periodo.fecha_fin,
-        ).exclude(estado="contabilizado").select_related("cuenta_financiera", "clasificacion").order_by("fecha", "id"),
-        "movimientos_sin_conciliar": MovimientoBancario.objects.filter(
-            empresa=empresa,
-            estado="contabilizado",
-            conciliado=False,
-            fecha__gte=periodo.fecha_inicio,
-            fecha__lte=periodo.fecha_fin,
-        ).select_related("cuenta_financiera", "asiento").order_by("fecha", "id"),
-    }
+    return revisar_cierre_periodo(empresa, periodo)
 
 
 def _preparar_excel(titulo):
@@ -158,147 +163,33 @@ def _autoajustar_columnas(sheet):
 
 
 def _saldo_natural(cuenta, debe, haber):
-    if cuenta.tipo in ["activo", "costo", "gasto"]:
-        return (debe or Decimal("0.00")) - (haber or Decimal("0.00"))
-    return (haber or Decimal("0.00")) - (debe or Decimal("0.00"))
+    return saldo_natural(cuenta, debe, haber)
 
 
 def _saldo_financiero_por_cuenta(empresa, tipos, fecha_inicio="", fecha_fin="", fecha_corte=""):
-    cuentas = CuentaContable.objects.filter(empresa=empresa, tipo__in=tipos).order_by("tipo", "codigo", "nombre")
-    movimientos_base = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-        cuenta__tipo__in=tipos,
-    )
-    if fecha_inicio:
-        movimientos_base = movimientos_base.filter(asiento__fecha__gte=fecha_inicio)
-    if fecha_fin:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_fin)
-    if fecha_corte:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_corte)
-
-    movimientos_por_cuenta = {
-        item["cuenta_id"]: item
-        for item in movimientos_base.values("cuenta_id").annotate(debe=Sum("debe"), haber=Sum("haber"))
-    }
-    filas = []
-    for cuenta in cuentas:
-        movimiento = movimientos_por_cuenta.get(cuenta.id, {})
-        debe = movimiento.get("debe") or Decimal("0.00")
-        haber = movimiento.get("haber") or Decimal("0.00")
-        if debe == 0 and haber == 0:
-            continue
-        filas.append({
-            "cuenta": cuenta,
-            "debe": debe,
-            "haber": haber,
-            "saldo": _saldo_natural(cuenta, debe, haber),
-        })
-    return filas
+    return saldos_financieros(empresa, tipos, fecha_inicio, fecha_fin, fecha_corte)
 
 
 def _cuentas_efectivo_ids(empresa):
-    ids = set()
-    try:
-        configuracion = empresa.configuracion_contable
-    except ConfiguracionContableEmpresa.DoesNotExist:
-        configuracion = None
-    if configuracion:
-        if configuracion.cuenta_caja_id:
-            ids.add(configuracion.cuenta_caja_id)
-        if configuracion.cuenta_bancos_id:
-            ids.add(configuracion.cuenta_bancos_id)
-
-    ids.update(
-        CuentaFinanciera.objects.filter(empresa=empresa, cuenta_contable__isnull=False)
-        .values_list("cuenta_contable_id", flat=True)
-    )
-    heuristicas = CuentaContable.objects.filter(
-        empresa=empresa,
-        tipo="activo",
-        activa=True,
-    ).filter(
-        Q(nombre__icontains="caja")
-        | Q(nombre__icontains="banco")
-        | Q(nombre__icontains="efectivo")
-        | Q(codigo__startswith="1101")
-        | Q(codigo__startswith="1102")
-    )
-    ids.update(heuristicas.values_list("id", flat=True))
-    return ids
+    return cuentas_efectivo_ids(empresa)
 
 
 def _clasificar_flujo_efectivo(linea_efectivo, lineas_asiento):
-    contrapartidas = [linea for linea in lineas_asiento if linea.cuenta_id != linea_efectivo.cuenta_id]
-    if any(linea.cuenta.tipo == "patrimonio" for linea in contrapartidas):
-        return "financiamiento"
-    if any(linea.cuenta.tipo == "pasivo" for linea in contrapartidas):
-        return "financiamiento"
-    palabras_inversion = ["equipo", "mobiliario", "vehiculo", "vehículo", "propiedad", "planta", "maquinaria", "activo fijo"]
-    if any(linea.cuenta.tipo == "activo" and any(palabra in linea.cuenta.nombre.lower() for palabra in palabras_inversion) for linea in contrapartidas):
-        return "inversion"
-    return "operacion"
+    categorias = {clasificar_contrapartida(linea.cuenta) for linea in lineas_asiento if linea.cuenta_id != linea_efectivo.cuenta_id}
+    return next(iter(categorias)) if len(categorias) == 1 else "operacion"
 
 
 def _calcular_flujo_efectivo(empresa, fecha_inicio="", fecha_fin=""):
-    cuentas_efectivo = _cuentas_efectivo_ids(empresa)
-    resumen = {
-        "operacion": {"entradas": Decimal("0.00"), "salidas": Decimal("0.00"), "neto": Decimal("0.00"), "movimientos": []},
-        "inversion": {"entradas": Decimal("0.00"), "salidas": Decimal("0.00"), "neto": Decimal("0.00"), "movimientos": []},
-        "financiamiento": {"entradas": Decimal("0.00"), "salidas": Decimal("0.00"), "neto": Decimal("0.00"), "movimientos": []},
-    }
-    if not cuentas_efectivo:
-        return resumen, Decimal("0.00"), CuentaContable.objects.none()
-
-    asientos = AsientoContable.objects.filter(empresa=empresa, estado="contabilizado").prefetch_related("lineas__cuenta").order_by("fecha", "numero", "id")
-    if fecha_inicio:
-        asientos = asientos.filter(fecha__gte=fecha_inicio)
-    if fecha_fin:
-        asientos = asientos.filter(fecha__lte=fecha_fin)
-
-    for asiento in asientos:
-        lineas_asiento = list(asiento.lineas.all())
-        for linea in lineas_asiento:
-            if linea.cuenta_id not in cuentas_efectivo:
-                continue
-            neto = (linea.debe or Decimal("0.00")) - (linea.haber or Decimal("0.00"))
-            if neto == 0:
-                continue
-            categoria = _clasificar_flujo_efectivo(linea, lineas_asiento)
-            movimiento = {
-                "asiento": asiento,
-                "cuenta": linea.cuenta,
-                "detalle": linea.detalle or asiento.descripcion,
-                "entrada": neto if neto > 0 else Decimal("0.00"),
-                "salida": abs(neto) if neto < 0 else Decimal("0.00"),
-                "neto": neto,
-            }
-            resumen[categoria]["movimientos"].append(movimiento)
-            if neto > 0:
-                resumen[categoria]["entradas"] += neto
-            else:
-                resumen[categoria]["salidas"] += abs(neto)
-            resumen[categoria]["neto"] += neto
-
-    total_neto = sum((grupo["neto"] for grupo in resumen.values()), Decimal("0.00"))
-    cuentas = CuentaContable.objects.filter(id__in=cuentas_efectivo).order_by("codigo", "nombre")
-    return resumen, total_neto, cuentas
+    datos = datos_flujo_efectivo(empresa, fecha_inicio, fecha_fin)
+    return datos["flujo"], datos["resumen"]["total_neto"], datos["cuentas_efectivo"]
 
 
 @login_required
 def contabilidad_dashboard(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    ultimos_asientos = AsientoContable.objects.filter(empresa=empresa).order_by("-fecha", "-id")[:8]
     context = {
         "empresa": empresa,
-        "resumen": _resumen_contabilidad(empresa),
-        "ultimos_asientos": ultimos_asientos,
-        "cuentas_por_tipo": (
-            CuentaContable.objects.filter(empresa=empresa)
-            .values("tipo")
-            .annotate(total=Count("id"))
-            .order_by("tipo")
-        ),
+        **datos_dashboard_contable(empresa),
     }
     return render(request, "contabilidad/dashboard_contabilidad.html", context)
 
@@ -306,6 +197,9 @@ def contabilidad_dashboard(request, empresa_slug):
 @login_required
 def configuracion_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    if usa_catalogo_rumi(empresa):
+        from .catalogo_rumi_views import configuracion_rumi
+        return configuracion_rumi(request, empresa)
     configuracion, _ = ConfiguracionContableEmpresa.objects.get_or_create(empresa=empresa)
     form = ConfiguracionContableEmpresaForm(
         request.POST or None,
@@ -313,9 +207,13 @@ def configuracion_contable(request, empresa_slug):
         empresa=empresa,
     )
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Configuracion contable actualizada correctamente.")
-        return redirect("contabilidad_dashboard", empresa_slug=empresa.slug)
+        try:
+            form.save()
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(request, "Configuracion contable actualizada correctamente.")
+            return redirect("contabilidad_dashboard", empresa_slug=empresa.slug)
     return render(request, "contabilidad/configuracion_contable.html", {
         "empresa": empresa,
         "form": form,
@@ -349,15 +247,15 @@ def periodos_contables(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def crear_periodo_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
     form = PeriodoContableForm(request.POST or None, empresa=empresa)
     if request.method == "POST" and form.is_valid():
         periodo = form.save(commit=False)
         periodo.empresa = empresa
-        if periodo.estado == "cerrado":
-            periodo.cerrado_por = request.user
-            periodo.fecha_cierre = timezone.now()
+        periodo.estado = "abierto"
         periodo.save()
         messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} guardado correctamente.")
         return redirect("periodos_contables", empresa_slug=empresa.slug)
@@ -369,20 +267,15 @@ def crear_periodo_contable(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def editar_periodo_contable(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
     periodo = get_object_or_404(PeriodoContable, id=periodo_id, empresa=empresa)
-    estado_original = periodo.estado
     form = PeriodoContableForm(request.POST or None, instance=periodo, empresa=empresa)
     if request.method == "POST" and form.is_valid():
         periodo = form.save(commit=False)
         periodo.empresa = empresa
-        if periodo.estado == "cerrado" and estado_original != "cerrado":
-            periodo.cerrado_por = request.user
-            periodo.fecha_cierre = timezone.now()
-        if periodo.estado == "abierto":
-            periodo.cerrado_por = None
-            periodo.fecha_cierre = None
         periodo.save()
         messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} actualizado correctamente.")
         return redirect("periodos_contables", empresa_slug=empresa.slug)
@@ -396,27 +289,33 @@ def editar_periodo_contable(request, empresa_slug, periodo_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def cerrar_periodo_contable(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    periodo = get_object_or_404(PeriodoContable, id=periodo_id, empresa=empresa)
-    pendientes = _pendientes_cierre_periodo(empresa, periodo)
-    if pendientes["total"]:
-        messages.error(
-            request,
-            (
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        periodo = get_object_or_404(PeriodoContable.objects.select_for_update(), id=periodo_id, empresa=empresa)
+        if periodo.esta_cerrado:
+            messages.info(request, "Este período ya está cerrado; se conserva su cierre original.")
+            return redirect("periodos_contables", empresa_slug=empresa.slug)
+        pendientes = _pendientes_cierre_periodo(empresa, periodo)
+        if pendientes["total"]:
+            messages.error(request, (
                 f"No se puede cerrar {periodo.mes}/{periodo.anio}: "
-                f"hay {pendientes['asientos_borrador']} asientos borrador y "
+                f"hay {pendientes['asientos_borrador']} asientos borrador, "
                 f"{pendientes['movimientos_bancarios']} movimientos bancarios sin contabilizar, "
-                f"{pendientes['movimientos_sin_conciliar']} movimientos sin conciliar"
-                f"{' y el balance del periodo no cuadra.' if not pendientes['balance_cuadrado'] else '.'}"
-            ),
-        )
-        return redirect("periodos_contables", empresa_slug=empresa.slug)
-    periodo.estado = "cerrado"
-    periodo.cerrado_por = request.user
-    periodo.fecha_cierre = timezone.now()
-    periodo.save(update_fields=["estado", "cerrado_por", "fecha_cierre"])
-    messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} cerrado correctamente.")
+                f"{pendientes['movimientos_sin_conciliar']} movimientos sin conciliar, "
+                f"{pendientes['asientos_invalidos']} asientos inválidos, "
+                f"{pendientes['movimientos_sin_asiento']} movimientos sin asiento válido y "
+                f"{pendientes['documentos_sin_asiento']} documentos sin asiento y "
+                f"{pendientes['conversiones_pendientes']} conversiones históricas pendientes de revisar"
+                f"{' y el balance del período no cuadra.' if not pendientes['balance_cuadrado'] else '.'}"
+            ))
+            return redirect("checklist_cierre_periodo", empresa_slug=empresa.slug, periodo_id=periodo.pk)
+        with audit_scope(user=request.user, reason=f"Cierre del período {periodo.mes:02d}/{periodo.anio}"):
+            periodo.cambiar_estado("cerrado", cerrado_por=request.user, fecha_cierre=timezone.now())
+    messages.success(request, f"Período {periodo.mes}/{periodo.anio} cerrado correctamente.")
     return redirect("periodos_contables", empresa_slug=empresa.slug)
 
 
@@ -434,14 +333,23 @@ def checklist_cierre_periodo(request, empresa_slug, periodo_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def abrir_periodo_contable(request, empresa_slug, periodo_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    periodo = get_object_or_404(PeriodoContable, id=periodo_id, empresa=empresa)
-    periodo.estado = "abierto"
-    periodo.cerrado_por = None
-    periodo.fecha_cierre = None
-    periodo.save(update_fields=["estado", "cerrado_por", "fecha_cierre"])
-    messages.success(request, f"Periodo {periodo.mes}/{periodo.anio} abierto nuevamente.")
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        periodo = get_object_or_404(PeriodoContable.objects.select_for_update(), id=periodo_id, empresa=empresa)
+        if not periodo.esta_cerrado:
+            messages.info(request, "Este período ya está abierto.")
+            return redirect("periodos_contables", empresa_slug=empresa.slug)
+        motivo = request.POST.get("motivo_reapertura", "").strip()
+        if not motivo or len(motivo) > 400:
+            messages.error(request, "Indica el motivo de la reapertura, con un máximo de 400 caracteres.")
+            return redirect("periodos_contables", empresa_slug=empresa.slug)
+        with audit_scope(user=request.user, reason=f"Reapertura del período {periodo.mes:02d}/{periodo.anio}: {motivo}"):
+            periodo.cambiar_estado("abierto")
+    messages.success(request, f"Período {periodo.mes}/{periodo.anio} reabierto. El motivo quedó registrado en el historial.")
     return redirect("periodos_contables", empresa_slug=empresa.slug)
 
 
@@ -659,14 +567,19 @@ def editar_regla_bancaria(request, empresa_slug, regla_id):
 
 
 @login_required
+@require_POST
+@_manejar_validacion_contable
 def aplicar_reglas_bancarias_view(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    resultado = aplicar_reglas_clasificacion_bancaria(empresa)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        resultado = aplicar_reglas_clasificacion_bancaria(empresa)
     if resultado["actualizados"]:
         messages.success(request, f"{resultado['actualizados']} movimientos clasificados automaticamente.")
     else:
         messages.info(request, "No se encontraron movimientos pendientes que coincidan con las reglas activas.")
-    return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
+    return redirect(_retorno_bancario(request, empresa))
 
 
 @login_required
@@ -677,7 +590,18 @@ def movimientos_bancarios(request, empresa_slug):
     estado = request.GET.get("estado") or ""
     tipo = request.GET.get("tipo") or ""
     q = request.GET.get("q") or ""
+    desde = request.GET.get("desde", "").strip()
+    hasta = request.GET.get("hasta", "").strip()
     movimientos = MovimientoBancario.objects.filter(empresa=empresa).select_related("cuenta_financiera", "clasificacion", "asiento").order_by("-fecha", "-id")
+    for valor, comparador in ((desde, "fecha__gte"), (hasta, "fecha__lte")):
+        if valor:
+            try:
+                fecha = forms.DateField().clean(valor)
+            except ValidationError:
+                messages.error(request, "Indica fechas válidas para filtrar los movimientos bancarios.")
+                movimientos = movimientos.none()
+            else:
+                movimientos = movimientos.filter(**{comparador: fecha})
     if cuenta_id:
         movimientos = movimientos.filter(cuenta_financiera_id=cuenta_id)
     if estado:
@@ -707,14 +631,16 @@ def movimientos_bancarios(request, empresa_slug):
         "cuentas": CuentaFinanciera.objects.filter(empresa=empresa).order_by("nombre"),
         "clasificaciones": clasificaciones,
         "resumen": resumen,
-        "filtros": {"cuenta": cuenta_id, "estado": estado, "tipo": tipo, "q": q},
+        "filtros": {"cuenta": cuenta_id, "estado": estado, "tipo": tipo, "q": q, "desde": desde, "hasta": hasta},
     })
 
 
 @login_required
+@_manejar_validacion_contable
 def clasificar_movimientos_bancarios_lote(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    redirect_url = request.POST.get("next") or redirect("movimientos_bancarios", empresa_slug=empresa.slug).url
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    redirect_url = _retorno_bancario(request, empresa)
     if request.method != "POST":
         return redirect(redirect_url)
 
@@ -726,6 +652,7 @@ def clasificar_movimientos_bancarios_lote(request, empresa_slug):
     actualizados = 0
 
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
         for movimiento in movimientos:
             valor = request.POST.get(f"clasificacion_{movimiento.id}") or ""
             if valor:
@@ -754,11 +681,13 @@ def clasificar_movimientos_bancarios_lote(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def clasificar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
     movimiento = get_object_or_404(MovimientoBancario, id=movimiento_id, empresa=empresa)
     form = MovimientoBancarioClasificacionForm(request.POST or None, instance=movimiento, empresa=empresa)
-    redirect_url = request.POST.get("next") or redirect("movimientos_bancarios", empresa_slug=empresa.slug).url
+    redirect_url = _retorno_bancario(request, empresa)
     if request.method == "POST" and form.is_valid():
         movimiento = form.save(commit=False)
         movimiento.estado = "clasificado" if movimiento.clasificacion_id else "pendiente"
@@ -807,8 +736,10 @@ def editar_movimiento_bancario(request, empresa_slug, movimiento_id):
 
 
 @login_required
+@_manejar_validacion_contable
 def enlazar_movimiento_factura(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(
         MovimientoBancario.objects.select_related("cuenta_financiera", "pago_factura", "asiento"),
         id=movimiento_id,
@@ -825,10 +756,18 @@ def enlazar_movimiento_factura(request, empresa_slug, movimiento_id):
     if request.method == "POST" and form.is_valid():
         factura = form.cleaned_data["factura"]
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+            factura = Factura.objects.select_for_update().get(pk=factura.pk, empresa=empresa)
+            if movimiento.estado == "contabilizado" or movimiento.asiento_id or movimiento.pago_factura_id:
+                messages.error(request, "El movimiento ya fue enlazado. Vuelve a revisarlo.")
+                return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
+            importe_original, tasa_cobro = form.datos_aplicacion(factura, movimiento)
             pago = PagoFactura.objects.create(
                 factura=factura,
                 fecha=movimiento.fecha,
-                monto=movimiento.credito,
+                monto=importe_original,
+                tipo_cambio=tasa_cobro,
                 metodo="transferencia",
                 referencia=movimiento.referencia or movimiento.descripcion[:100],
                 cuenta_financiera=movimiento.cuenta_financiera,
@@ -849,8 +788,10 @@ def enlazar_movimiento_factura(request, empresa_slug, movimiento_id):
 
 
 @login_required
+@_manejar_validacion_contable
 def enlazar_movimiento_compra(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(
         MovimientoBancario.objects.select_related("cuenta_financiera", "pago_compra", "asiento"),
         id=movimiento_id,
@@ -867,6 +808,15 @@ def enlazar_movimiento_compra(request, empresa_slug, movimiento_id):
     if request.method == "POST" and form.is_valid():
         compra = form.cleaned_data["compra"]
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+            compra = CompraInventario.objects.select_for_update().get(pk=compra.pk, empresa=empresa)
+            if movimiento.estado == "contabilizado" or movimiento.asiento_id or movimiento.pago_compra_id:
+                messages.error(request, "El movimiento ya fue enlazado. Vuelve a revisarlo.")
+                return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
+            if compra.saldo_pendiente < movimiento.debito:
+                messages.error(request, "El saldo de la compra cambió. Revisa el importe antes de enlazar el débito.")
+                return redirect("movimientos_bancarios", empresa_slug=empresa.slug)
             pago = PagoCompra.objects.create(
                 compra=compra,
                 fecha=movimiento.fecha,
@@ -893,9 +843,11 @@ def enlazar_movimiento_compra(request, empresa_slug, movimiento_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def contabilizar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
-    redirect_url = request.POST.get("next") or redirect("movimientos_bancarios", empresa_slug=empresa.slug).url
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
+    redirect_url = _retorno_bancario(request, empresa)
     movimiento = get_object_or_404(
         MovimientoBancario.objects.select_related("cuenta_financiera", "clasificacion__cuenta_contable"),
         id=movimiento_id,
@@ -912,6 +864,11 @@ def contabilizar_movimiento_bancario(request, empresa_slug, movimiento_id):
         return redirect(redirect_url)
 
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+        if movimiento.estado == "contabilizado" or movimiento.asiento_id:
+            messages.warning(request, "El movimiento ya tiene un asiento; vuelve a revisarlo.")
+            return redirect(redirect_url)
         asiento = AsientoContable.objects.create(
             empresa=empresa,
             fecha=movimiento.fecha,
@@ -1030,10 +987,12 @@ def conciliacion_bancaria(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def conciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(MovimientoBancario, id=movimiento_id, empresa=empresa)
-    redirect_url = request.POST.get("next") or redirect("conciliacion_bancaria", empresa_slug=empresa.slug).url
+    redirect_url = _retorno_bancario(request, empresa, "conciliacion_bancaria")
 
     if request.method != "POST":
         return redirect(redirect_url)
@@ -1041,27 +1000,44 @@ def conciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
         messages.error(request, "Solo se pueden conciliar movimientos ya contabilizados.")
         return redirect(redirect_url)
 
-    movimiento.conciliado = True
-    movimiento.fecha_conciliacion = timezone.now()
-    movimiento.conciliado_por = request.user
-    movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+        if PeriodoContable.fecha_bloqueada(empresa, movimiento.fecha):
+            messages.error(request, "No se puede conciliar un movimiento de un período cerrado. Primero solicita su reapertura.")
+            return redirect(redirect_url)
+        if movimiento.estado != "contabilizado" or not movimiento.asiento_id or movimiento.asiento.empresa_id != empresa.pk or movimiento.asiento.estado != "contabilizado":
+            messages.error(request, "El movimiento debe tener un asiento contabilizado de esta empresa antes de conciliarse.")
+            return redirect(redirect_url)
+        movimiento.conciliado = True
+        movimiento.fecha_conciliacion = timezone.now()
+        movimiento.conciliado_por = request.user
+        movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
     messages.success(request, "Movimiento conciliado correctamente.")
     return redirect(redirect_url)
 
 
 @login_required
+@_manejar_validacion_contable
 def desconciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     movimiento = get_object_or_404(MovimientoBancario, id=movimiento_id, empresa=empresa)
-    redirect_url = request.POST.get("next") or redirect("conciliacion_bancaria", empresa_slug=empresa.slug).url
+    redirect_url = _retorno_bancario(request, empresa, "conciliacion_bancaria")
 
     if request.method != "POST":
         return redirect(redirect_url)
 
-    movimiento.conciliado = False
-    movimiento.fecha_conciliacion = None
-    movimiento.conciliado_por = None
-    movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        movimiento = MovimientoBancario.objects.select_for_update().get(pk=movimiento.pk, empresa=empresa)
+        if PeriodoContable.fecha_bloqueada(empresa, movimiento.fecha):
+            messages.error(request, "No se puede desconciliar un movimiento de un período cerrado. Primero solicita su reapertura.")
+            return redirect(redirect_url)
+        movimiento.conciliado = False
+        movimiento.fecha_conciliacion = None
+        movimiento.conciliado_por = None
+        movimiento.save(update_fields=["conciliado", "fecha_conciliacion", "conciliado_por"])
     messages.success(request, "Movimiento marcado como no conciliado.")
     return redirect(redirect_url)
 
@@ -1069,15 +1045,18 @@ def desconciliar_movimiento_bancario(request, empresa_slug, movimiento_id):
 @login_required
 def catalogo_cuentas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    cuentas = CuentaContable.objects.filter(empresa=empresa).select_related("cuenta_padre").order_by("codigo", "nombre")
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    cuentas = ordenar_catalogo(CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre", "id"))
     context = {
         "empresa": empresa,
+        "es_rumi": es_empresa_rumi(empresa),
+        "catalogo_rumi_instalado": usa_catalogo_rumi(empresa),
         "cuentas": cuentas,
         "resumen": {
-            "total": cuentas.count(),
-            "activas": cuentas.filter(activa=True).count(),
-            "movimiento": cuentas.filter(acepta_movimientos=True).count(),
-            "agrupadoras": cuentas.filter(acepta_movimientos=False).count(),
+            "total": len(cuentas),
+            "activas": sum(cuenta.activa for cuenta in cuentas),
+            "movimiento": sum(cuenta.acepta_movimientos for cuenta in cuentas),
+            "agrupadoras": sum(not cuenta.acepta_movimientos for cuenta in cuentas),
         },
     }
     return render(request, "contabilidad/catalogo_cuentas.html", context)
@@ -1089,7 +1068,11 @@ def cargar_catalogo_base_honduras_view(request, empresa_slug):
     if request.method != "POST":
         return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
 
-    resultado = cargar_catalogo_base_honduras(empresa)
+    try:
+        resultado = cargar_catalogo_base_honduras(empresa)
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+        return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
     if resultado["creadas"] or resultado["cuentas_financieras_creadas"]:
         messages.success(
             request,
@@ -1136,9 +1119,46 @@ def _agregar_errores_validacion_form(form, error):
         form.add_error(None, mensaje)
 
 
+FIRMA_REVISION_CATALOGO = "contabilidad.importacion-catalogo.v1"
+
+
+def _vista_previa_catalogo(datos_firmados):
+    resultado = datos_firmados["resultado"]
+    tipos = dict(CuentaContable.TIPO_CHOICES)
+    prefijo = datos_firmados["opciones"].get("prefijo_codigos", "")
+    filas = []
+    for datos in resultado["datos"]:
+        fila = dict(datos)
+        fila["tipo_nombre"] = tipos.get(datos["tipo"], datos["tipo"])
+        if prefijo:
+            fila["codigo_original"] = datos["codigo"].removeprefix(prefijo)
+        for campo in ("activa", "acepta_movimientos"):
+            fila[f"{campo}_texto"] = (
+                "Sí" if datos[campo] else "No"
+            ) if campo in datos else "Sin modificar / predeterminado"
+        filas.append(fila)
+    return {
+        **{clave: valor for clave, valor in resultado.items() if clave not in {"datos", "firma_existentes"}},
+        "archivo_nombre": datos_firmados["archivo_nombre"],
+        "formato_nombre": {
+            "rumi": "Propuesta RUMI", "estandar": "Estándar", "jerarquico": "Jerárquico",
+        }.get(resultado["formato"], resultado["formato"]),
+        "opciones": datos_firmados["opciones"],
+        "filas": filas[:50],
+        "filas_adicionales": filas[50:],
+        "total": len(resultado["datos"]),
+        "no_mostradas": max(len(filas) - 50, 0),
+    }
+
+
 @login_required
+@require_http_methods(["GET", "POST"])
 def importar_catalogo_cuentas(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_catalogo_cuentas")
+    if es_empresa_rumi(empresa):
+        return _importar_catalogo_rumi(request, empresa)
+
     form = ImportarCatalogoCuentasForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -1160,6 +1180,90 @@ def importar_catalogo_cuentas(request, empresa_slug):
     return render(request, "contabilidad/importar_catalogo_cuentas.html", {
         "empresa": empresa,
         "form": form,
+    })
+
+
+def _importar_catalogo_rumi(request, empresa):
+    accion = request.POST.get("accion", "revisar") if request.method == "POST" else "revisar"
+    form = ImportarCatalogoCuentasRumiForm(request.POST or None, request.FILES or None)
+    vista_previa, revision_token, error_importacion = None, "", ""
+
+    if request.method == "POST" and accion == "importar":
+        form = ImportarCatalogoCuentasRumiForm()
+        try:
+            try:
+                datos_firmados = signing.loads(
+                    request.POST.get("revision_token", ""),
+                    salt=FIRMA_REVISION_CATALOGO,
+                    max_age=1800,
+                )
+            except signing.SignatureExpired:
+                raise ValidationError("La revisión venció. Vuelve a subir y revisar el archivo antes de importarlo.")
+            except signing.BadSignature:
+                raise ValidationError("La revisión falta o fue modificada. Vuelve a revisar el archivo antes de importarlo.")
+            if (
+                datos_firmados.get("empresa_id") != empresa.pk
+                or datos_firmados.get("usuario_id") != request.user.pk
+                or datos_firmados.get("version") != 1
+            ):
+                raise ValidationError("Esta revisión pertenece a otra empresa o usuario. Revisa el archivo desde esta empresa.")
+
+            form = ImportarCatalogoCuentasRumiForm(initial=datos_firmados["opciones"])
+            vista_previa = _vista_previa_catalogo(datos_firmados)
+            revision_token = request.POST["revision_token"]
+            if not forms.BooleanField(required=False).clean(request.POST.get("confirmar")):
+                error_importacion = "Marca la confirmación después de revisar las cuentas y las opciones de importación."
+            else:
+                try:
+                    resultado = aplicar_catalogo_cuentas(
+                        empresa,
+                        datos_firmados["resultado"]["datos"],
+                        actualizar_existentes=datos_firmados["opciones"]["actualizar_existentes"],
+                        firma_existentes=datos_firmados["resultado"]["firma_existentes"],
+                    )
+                except ValidationError as error:
+                    vista_previa, revision_token = None, ""
+                    raise ValidationError(error.messages + ["Vuelve a subir y revisar el archivo para preparar una importación actualizada."])
+                messages.success(
+                    request,
+                    f"Catálogo importado en {empresa.nombre}: {resultado['creadas']} cuentas creadas, "
+                    f"{resultado['actualizadas']} actualizadas y {resultado['sin_cambios']} conservadas.",
+                )
+                return redirect("catalogo_cuentas", empresa_slug=empresa.slug)
+        except ValidationError as error:
+            error_importacion = "; ".join(error.messages)
+
+    elif request.method == "POST" and accion == "revisar" and form.is_valid():
+        try:
+            opciones = {
+                "actualizar_existentes": form.cleaned_data["actualizar_existentes"],
+                "incluir_controles": form.cleaned_data["incluir_controles"],
+                "hoja": form.cleaned_data["hoja"],
+                "prefijo_codigos": form.cleaned_data["prefijo_codigos"],
+            }
+            archivo = form.cleaned_data["archivo"]
+            resultado = analizar_catalogo_cuentas_desde_excel(empresa, archivo, **opciones)
+            datos_firmados = {
+                "version": 1,
+                "empresa_id": empresa.pk,
+                "usuario_id": request.user.pk,
+                "archivo_nombre": archivo.name,
+                "opciones": opciones,
+                "resultado": resultado,
+            }
+            vista_previa = _vista_previa_catalogo(datos_firmados)
+            revision_token = signing.dumps(datos_firmados, salt=FIRMA_REVISION_CATALOGO, compress=True)
+        except ValidationError as error:
+            form.add_error(None, error)
+    elif request.method == "POST" and accion != "revisar":
+        error_importacion = "Elige revisar el archivo o confirmar una revisión válida."
+
+    return render(request, "contabilidad/importar_catalogo_cuentas_rumi.html", {
+        "empresa": empresa,
+        "form": form,
+        "vista_previa": vista_previa,
+        "revision_token": revision_token,
+        "error_importacion": error_importacion,
     })
 
 
@@ -1190,36 +1294,8 @@ def editar_cuenta_contable(request, empresa_slug, cuenta_id):
 @login_required
 def asientos_contables(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    asientos = AsientoContable.objects.filter(empresa=empresa).prefetch_related("lineas").order_by("-fecha", "-id")
-    q = request.GET.get("q", "").strip()
-    estado = request.GET.get("estado", "").strip()
-    fecha_inicio = request.GET.get("fecha_inicio", "").strip()
-    fecha_fin = request.GET.get("fecha_fin", "").strip()
-    if q:
-        asientos = asientos.filter(
-            Q(numero__icontains=q)
-            | Q(descripcion__icontains=q)
-            | Q(referencia__icontains=q)
-            | Q(origen_modulo__icontains=q)
-        )
-    if estado:
-        asientos = asientos.filter(estado=estado)
-    if fecha_inicio:
-        asientos = asientos.filter(fecha__gte=fecha_inicio)
-    if fecha_fin:
-        asientos = asientos.filter(fecha__lte=fecha_fin)
-    context = {
-        "empresa": empresa,
-        "asientos": asientos,
-        "resumen": _resumen_contabilidad(empresa),
-        "filtros": {
-            "q": q,
-            "estado": estado,
-            "fecha_inicio": fecha_inicio,
-            "fecha_fin": fecha_fin,
-        },
-    }
-    return render(request, "contabilidad/asientos_contables.html", context)
+    _verificar_permiso_contable(request, empresa, "puede_contabilidad")
+    return render(request, "contabilidad/asientos_contables.html", contexto_listado_asientos(empresa, request.GET))
 
 
 
@@ -1263,10 +1339,13 @@ def _contexto_form_asiento(empresa, form, formset, titulo, cuentas_disponibles):
 
 
 @login_required
+@_manejar_validacion_contable
 def crear_asiento_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_crear_asientos")
+    _verificar_contabilizacion_solicitada(request, empresa)
     asiento = AsientoContable(empresa=empresa, creado_por=request.user)
-    form = AsientoContableForm(request.POST or None, instance=asiento)
+    form = AsientoContableForm(request.POST or None, instance=asiento, usuario=request.user, empresa=empresa)
     cuentas_disponibles = CuentaContable.objects.filter(
         empresa=empresa,
         activa=True,
@@ -1288,6 +1367,7 @@ def crear_asiento_contable(request, empresa_slug):
             return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Nuevo Asiento Contable", cuentas_disponibles))
 
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
             asiento = form.save(commit=False)
             asiento.empresa = empresa
             asiento.creado_por = request.user
@@ -1314,14 +1394,17 @@ def crear_asiento_contable(request, empresa_slug):
 
 
 @login_required
+@_manejar_validacion_contable
 def editar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_crear_asientos")
+    _verificar_contabilizacion_solicitada(request, empresa)
     asiento = get_object_or_404(AsientoContable.objects.prefetch_related("lineas"), id=asiento_id, empresa=empresa)
     if asiento.estado != "borrador":
         messages.error(request, "Solo se pueden editar asientos en borrador. Para corregir un asiento contabilizado, reversalo o duplicalo.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
-    form = AsientoContableForm(request.POST or None, instance=asiento)
+    form = AsientoContableForm(request.POST or None, instance=asiento, usuario=request.user, empresa=empresa)
     cuentas_disponibles = CuentaContable.objects.filter(
         empresa=empresa,
         activa=True,
@@ -1343,6 +1426,11 @@ def editar_asiento_contable(request, empresa_slug, asiento_id):
             return render(request, "contabilidad/asiento_form.html", _contexto_form_asiento(empresa, form, formset, "Editar Asiento Contable", cuentas_disponibles))
 
         with transaction.atomic():
+            Empresa.objects.select_for_update().get(pk=empresa.pk)
+            actual = AsientoContable.objects.select_for_update().get(pk=asiento.pk, empresa=empresa)
+            if actual.estado != "borrador":
+                messages.error(request, "El asiento cambió mientras lo editabas. Vuelve a revisarlo.")
+                return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.pk)
             asiento = form.save(commit=False)
             asiento.empresa = empresa
             asiento.estado = "borrador"
@@ -1371,26 +1459,42 @@ def editar_asiento_contable(request, empresa_slug, asiento_id):
 def ver_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
     asiento = get_object_or_404(AsientoContable.objects.prefetch_related("lineas__cuenta"), id=asiento_id, empresa=empresa)
+    from .models import RegularizacionMonedaFactura, RevisionConversionAsiento
+    revision_moneda = RegularizacionMonedaFactura.objects.filter(empresa=empresa, asiento_origen=asiento).select_related("asiento_ajuste").first()
+    revision_integral = RevisionConversionAsiento.objects.filter(empresa=empresa).filter(
+        Q(origen=asiento) | Q(ajuste=asiento)
+    ).select_related("origen", "ajuste", "creado_por").first()
+    puede_regularizar_moneda = (
+        not revision_moneda and not revision_integral and asiento.estado == "contabilizado" and not asiento.conversion_verificada
+        and asiento.documento_tipo == "factura" and asiento.evento == "emision"
+        and Factura.objects.filter(pk=asiento.documento_id, empresa=empresa, cliente__empresa=empresa, moneda="USD", estado="emitida").exists()
+    )
     return render(request, "contabilidad/ver_asiento.html", {
         "empresa": empresa,
         "asiento": asiento,
+        "revision_moneda": revision_moneda,
+        "revision_integral": revision_integral,
+        "puede_regularizar_moneda": puede_regularizar_moneda,
     })
 
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def duplicar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_crear_asientos")
     asiento_origen = get_object_or_404(
         AsientoContable.objects.prefetch_related("lineas"),
         id=asiento_id,
         empresa=empresa,
     )
-    fecha = timezone.now().date()
+    fecha = timezone.localdate()
     if PeriodoContable.fecha_bloqueada(empresa, fecha):
         messages.error(request, "No se puede duplicar el asiento porque el periodo actual esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.id)
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
         nuevo = AsientoContable.objects.create(
             empresa=empresa,
             fecha=fecha,
@@ -1399,7 +1503,7 @@ def duplicar_asiento_contable(request, empresa_slug, asiento_id):
             origen_modulo=asiento_origen.origen_modulo or "manual",
             documento_tipo="asiento_duplicado",
             documento_id=asiento_origen.id,
-            evento="duplicado",
+            evento=None,
             creado_por=request.user,
             estado="borrador",
         )
@@ -1417,8 +1521,10 @@ def duplicar_asiento_contable(request, empresa_slug, asiento_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def reversar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     asiento_origen = get_object_or_404(
         AsientoContable.objects.prefetch_related("lineas"),
         id=asiento_id,
@@ -1436,11 +1542,23 @@ def reversar_asiento_contable(request, empresa_slug, asiento_id):
     ).exists():
         messages.warning(request, "Este asiento ya tiene una reversion contabilizada.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.id)
-    fecha = timezone.now().date()
+    fecha = timezone.localdate()
     if PeriodoContable.fecha_bloqueada(empresa, fecha):
         messages.error(request, "No se puede reversar el asiento porque el periodo actual esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.id)
     with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        asiento_origen = AsientoContable.objects.select_for_update().get(pk=asiento_origen.pk, empresa=empresa)
+        from .proteccion_conversion import asiento_tiene_revision
+        if asiento_tiene_revision(asiento_origen.pk):
+            messages.error(request, "El asiento respalda una revisión integral documentada. Registre un nuevo ajuste para conservar su respaldo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.pk)
+        if asiento_origen.estado != "contabilizado" or AsientoContable.objects.filter(
+            empresa=empresa, documento_tipo="asiento_contable", documento_id=asiento_origen.pk,
+            evento="reversion", estado="contabilizado",
+        ).exists():
+            messages.warning(request, "El asiento cambió o ya fue reversado. Vuelve a revisarlo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento_origen.pk)
         reversion = AsientoContable.objects.create(
             empresa=empresa,
             fecha=fecha,
@@ -1470,8 +1588,10 @@ def reversar_asiento_contable(request, empresa_slug, asiento_id):
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def regresar_asiento_borrador(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     asiento = get_object_or_404(AsientoContable, id=asiento_id, empresa=empresa)
     if asiento.estado != "contabilizado":
         messages.warning(request, "Solo los asientos contabilizados pueden regresar a borrador.")
@@ -1480,16 +1600,24 @@ def regresar_asiento_borrador(request, empresa_slug, asiento_id):
         messages.error(request, "No se puede regresar a borrador porque el periodo contable esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
-    asiento.estado = "borrador"
-    asiento.save(update_fields=["estado"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        asiento = AsientoContable.objects.select_for_update().get(pk=asiento.pk, empresa=empresa)
+        if asiento.estado != "contabilizado" or PeriodoContable.fecha_bloqueada(empresa, asiento.fecha):
+            messages.error(request, "El asiento cambió o su período está cerrado. Vuelve a revisarlo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.pk)
+        asiento.estado = "borrador"
+        asiento.save(update_fields=["estado"])
     messages.success(request, f"Asiento {asiento.numero or asiento.id} regresado a borrador. Ya puedes editarlo y volver a contabilizarlo.")
     return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
 
 @login_required
 @require_POST
+@_manejar_validacion_contable
 def contabilizar_asiento_contable(request, empresa_slug, asiento_id):
     empresa = _empresa_desde_slug(empresa_slug)
+    _verificar_permiso_contable(request, empresa, "puede_contabilizar_asientos")
     asiento = get_object_or_404(AsientoContable, id=asiento_id, empresa=empresa)
     if asiento.estado != "borrador":
         messages.warning(request, "Solo los asientos en borrador pueden contabilizarse.")
@@ -1500,9 +1628,15 @@ def contabilizar_asiento_contable(request, empresa_slug, asiento_id):
     if PeriodoContable.fecha_bloqueada(empresa, asiento.fecha):
         messages.error(request, "No se puede contabilizar porque el periodo contable esta cerrado.")
         return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
-    asiento.generar_numero()
-    asiento.estado = "contabilizado"
-    asiento.save(update_fields=["numero", "estado"])
+    with transaction.atomic():
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
+        asiento = AsientoContable.objects.select_for_update().get(pk=asiento.pk, empresa=empresa)
+        if asiento.estado != "borrador" or not asiento.esta_balanceado or PeriodoContable.fecha_bloqueada(empresa, asiento.fecha):
+            messages.error(request, "El asiento cambió o su período está cerrado. Vuelve a revisarlo.")
+            return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.pk)
+        asiento.generar_numero()
+        asiento.estado = "contabilizado"
+        asiento.save(update_fields=["numero", "estado"])
     messages.success(request, f"Asiento {asiento.numero} contabilizado correctamente.")
     return redirect("ver_asiento_contable", empresa_slug=empresa.slug, asiento_id=asiento.id)
 
@@ -1546,7 +1680,7 @@ def _variacion_porcentual(actual, anterior):
 @login_required
 def dashboard_bi_financiero(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    hoy = timezone.now().date()
+    hoy = timezone.localdate()
     inicio_mes_actual = hoy.replace(day=1)
     if inicio_mes_actual.month == 1:
         inicio_mes_anterior = inicio_mes_actual.replace(year=inicio_mes_actual.year - 1, month=12)
@@ -1554,21 +1688,20 @@ def dashboard_bi_financiero(request, empresa_slug):
         inicio_mes_anterior = inicio_mes_actual.replace(month=inicio_mes_actual.month - 1)
 
     compras_qs = (
-        CompraInventario.objects.filter(empresa=empresa)
-        .exclude(estado="anulada")
+        CompraInventario.objects.filter(empresa=empresa, estado="aplicada", fecha_documento__lte=hoy)
         .select_related("proveedor")
         .prefetch_related("lineas")
         .order_by("fecha_documento", "id")
     )
     compras = list(compras_qs)
     pagos_qs = (
-        PagoCompra.objects.filter(compra__empresa=empresa)
+        PagoCompra.objects.filter(compra__empresa=empresa, compra__estado="aplicada", fecha__lte=hoy)
         .select_related("compra__proveedor", "cuenta_financiera")
         .order_by("fecha", "id")
     )
     pagos = list(pagos_qs)
     movimientos_qs = (
-        MovimientoBancario.objects.filter(empresa=empresa)
+        MovimientoBancario.objects.filter(empresa=empresa, fecha__lte=hoy)
         .select_related("cuenta_financiera")
         .order_by("fecha", "id")
     )
@@ -1619,7 +1752,7 @@ def dashboard_bi_financiero(request, empresa_slug):
             item = compras_por_mes_map[mes]
             compras_por_mes.append({
                 "mes": mes,
-                "etiqueta": mes.strftime("%b %Y"),
+                "etiqueta": formats.date_format(mes, "M Y"),
                 "comprado": item["comprado"],
                 "pagado": item["pagado"],
                 "documentos": item["documentos"],
@@ -1705,6 +1838,7 @@ def dashboard_bi_financiero(request, empresa_slug):
     context = {
         "empresa": empresa,
         "compras": compras,
+        "compras_borrador": CompraInventario.objects.filter(empresa=empresa, estado="borrador").count(),
         "inicio_mes_actual": inicio_mes_actual,
         "kpis_bi": {
             "total_compras_actual": total_compras_actual,
@@ -1729,6 +1863,24 @@ def dashboard_bi_financiero(request, empresa_slug):
     return render(request, "contabilidad/dashboard_bi_financiero.html", context)
 
 
+def _fiscal_documento_lempiras(documento):
+    fiscal = documento.resumen_fiscal()
+    claves = ("base_15", "base_18", "base_exento", "base_exonerado", "isv_15", "isv_18")
+    convertidos = distribuir_conversion(
+        [fiscal.get(clave) or Decimal("0.00") for clave in claves],
+        documento.moneda, documento.tipo_cambio,
+        total_lempiras=convertir_a_lempiras(documento.total, documento.moneda, documento.tipo_cambio),
+    )
+    resultado = dict(zip(claves, convertidos))
+    resultado.update(
+        subtotal=sum((resultado[clave] for clave in claves[:4]), Decimal("0.00")),
+        descuento_total=convertir_a_lempiras(fiscal.get("descuento_total"), documento.moneda, documento.tipo_cambio),
+        impuesto=resultado["isv_15"] + resultado["isv_18"],
+        total=sum(convertidos, Decimal("0.00")),
+    )
+    return resultado
+
+
 def _resumen_fiscal_documentos(documentos):
     resumen = {
         "subtotal": Decimal("0.00"),
@@ -1744,17 +1896,10 @@ def _resumen_fiscal_documentos(documentos):
         "documentos": documentos.count(),
     }
     for documento in documentos:
-        fiscal = documento.resumen_fiscal()
-        resumen["subtotal"] += documento.subtotal or Decimal("0.00")
-        resumen["descuento_total"] += fiscal.get("descuento_total") or Decimal("0.00")
-        resumen["base_15"] += fiscal.get("base_15") or Decimal("0.00")
-        resumen["base_18"] += fiscal.get("base_18") or Decimal("0.00")
-        resumen["base_exento"] += fiscal.get("base_exento") or Decimal("0.00")
-        resumen["base_exonerado"] += fiscal.get("base_exonerado") or Decimal("0.00")
-        resumen["isv_15"] += fiscal.get("isv_15") or Decimal("0.00")
-        resumen["isv_18"] += fiscal.get("isv_18") or Decimal("0.00")
-        resumen["impuesto"] += documento.impuesto or Decimal("0.00")
-        resumen["total"] += documento.total or Decimal("0.00")
+        fiscal = _fiscal_documento_lempiras(documento)
+        documento.fiscal_lempiras = fiscal
+        for clave in fiscal:
+            resumen[clave] += fiscal[clave]
     return resumen
 
 
@@ -1838,7 +1983,7 @@ def reporte_impuestos(request, empresa_slug):
         request.GET.get("fecha_fin") or "",
     )
     data["empresa"] = empresa
-    return render(request, "contabilidad/reporte_impuestos.html", data)
+    return _render_reporte(request, "contabilidad/reporte_impuestos.html", data)
 
 
 @login_required
@@ -1863,7 +2008,7 @@ def exportar_reporte_impuestos_excel(request, empresa_slug):
     sheet.append(["Fecha", "Numero", "Cliente", "Base 15%", "ISV 15%", "Base 18%", "ISV 18%", "Exento", "Exonerado", "ISV", "Total"])
     _aplicar_encabezado(sheet, sheet.max_row)
     for factura in data["facturas"]:
-        fiscal = factura.resumen_fiscal()
+        fiscal = _fiscal_documento_lempiras(factura)
         sheet.append([
             factura.fecha_emision,
             factura.numero_factura or "Sin numero",
@@ -1874,15 +2019,15 @@ def exportar_reporte_impuestos_excel(request, empresa_slug):
             fiscal["isv_18"],
             fiscal["base_exento"],
             fiscal["base_exonerado"],
-            factura.impuesto,
-            factura.total,
+            fiscal["impuesto"],
+            fiscal["total"],
         ])
     sheet.append([])
     sheet.append(["Notas de credito"])
     sheet.append(["Fecha", "Numero", "Factura origen", "Cliente", "Base 15%", "ISV 15%", "Base 18%", "ISV 18%", "Exento", "Exonerado", "ISV", "Total"])
     _aplicar_encabezado(sheet, sheet.max_row)
     for nota in data["notas_credito"]:
-        fiscal = nota.resumen_fiscal()
+        fiscal = _fiscal_documento_lempiras(nota)
         sheet.append([
             nota.fecha_emision,
             nota.numero_nota or "Sin numero",
@@ -1894,8 +2039,8 @@ def exportar_reporte_impuestos_excel(request, empresa_slug):
             fiscal["isv_18"],
             fiscal["base_exento"],
             fiscal["base_exonerado"],
-            nota.impuesto,
-            nota.total,
+            fiscal["impuesto"],
+            fiscal["total"],
         ])
     sheet.append([])
     sheet.append(["Compras fiscales"])
@@ -1915,6 +2060,7 @@ def exportar_reporte_impuestos_excel(request, empresa_slug):
             compra.impuesto_total,
             compra.total,
         ])
+    _advertencias_excel_reporte(sheet, empresa, data["filtros"])
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Reporte_Impuestos_{empresa.slug}.xlsx")
 
@@ -1980,8 +2126,8 @@ def exportar_auditoria_contable_excel(request, empresa_slug):
         "usuario": request.GET.get("usuario") or "",
     }
     asientos = _auditoria_asientos_queryset(empresa, filtros)
-    workbook, sheet = _preparar_excel("Auditoria Contable")
-    sheet.append(["Fecha", "Numero", "Estado", "Origen", "Documento", "Evento", "Referencia", "Usuario", "Debe", "Haber", "Creado"])
+    workbook, sheet = _preparar_excel("Auditoría Contable · HNL")
+    sheet.append(["Fecha", "Número", "Estado", "Origen", "Documento", "Evento", "Referencia", "Usuario", "Debe HNL", "Haber HNL", "Creado", "Moneda origen", "Tipo de cambio a HNL", "Conversión verificada"])
     _aplicar_encabezado(sheet, 3)
     for asiento in asientos:
         sheet.append([
@@ -1996,6 +2142,9 @@ def exportar_auditoria_contable_excel(request, empresa_slug):
             asiento.total_debe,
             asiento.total_haber,
             asiento.fecha_creacion.replace(tzinfo=None) if asiento.fecha_creacion else "",
+            asiento.moneda_origen,
+            asiento.tipo_cambio,
+            "Sí" if asiento.conversion_verificada else "Pendiente de revisión",
         ])
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Auditoria_Contable_{empresa.slug}.xlsx")
@@ -2024,7 +2173,7 @@ def libro_diario(request, empresa_slug):
     context = {
         "empresa": empresa,
         "lineas": lineas,
-        "cuentas": CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre"),
+        "cuentas": CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre"),
         "filtros": {
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin,
@@ -2036,7 +2185,7 @@ def libro_diario(request, empresa_slug):
             "lineas": lineas.count(),
         },
     }
-    return render(request, "contabilidad/libro_diario.html", context)
+    return _render_reporte(request, "contabilidad/libro_diario.html", context)
 
 
 @login_required
@@ -2057,7 +2206,7 @@ def exportar_libro_diario_excel(request, empresa_slug):
     if cuenta_id:
         lineas = lineas.filter(cuenta_id=cuenta_id)
 
-    workbook, sheet = _preparar_excel("Libro Diario")
+    workbook, sheet = _preparar_excel("Libro Diario · HNL")
     sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber"])
     _aplicar_encabezado(sheet, 3)
     for linea in lineas:
@@ -2070,97 +2219,112 @@ def exportar_libro_diario_excel(request, empresa_slug):
             linea.debe,
             linea.haber,
         ])
+    _advertencias_excel_reporte(sheet, empresa, {"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin})
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Libro_Diario_{empresa.slug}.xlsx")
+
+
+def _filtros_reportes(request):
+    return {"fecha_inicio": request.GET.get("fecha_inicio") or "", "fecha_fin": request.GET.get("fecha_fin") or ""}
+
+
+def _conversiones_pendientes_reporte(empresa, filtros):
+    from datetime import date
+    from .estado_conversion import asientos_conversion_pendiente
+    corte = filtros.get("fecha_fin") or filtros.get("fecha_corte") or None
+    if isinstance(corte, str):
+        corte = date.fromisoformat(corte)
+    asientos = asientos_conversion_pendiente(empresa, fecha_corte=corte)
+    # La apertura también forma parte del mayor y del balance; no se oculta por «Desde».
+    return asientos.count()
+
+
+def _render_reporte(request, plantilla, datos):
+    datos["conversiones_pendientes"] = _conversiones_pendientes_reporte(datos["empresa"], datos.get("filtros", {}))
+    return render(request, plantilla, datos)
+
+
+def _advertencias_excel_reporte(sheet, empresa, filtros):
+    sheet.append([])
+    sheet.append(["Empresa", empresa.nombre])
+    sheet.append(["Moneda funcional", "Lempiras (HNL)"])
+    if filtros.get("fecha_inicio"):
+        sheet.append(["Desde", filtros["fecha_inicio"]])
+    if filtros.get("fecha_fin") or filtros.get("fecha_corte"):
+        sheet.append(["Hasta", filtros.get("fecha_fin") or filtros["fecha_corte"]])
+    pendientes = _conversiones_pendientes_reporte(empresa, filtros)
+    if pendientes:
+        sheet.append(["Conversión histórica pendiente", f"{pendientes} asientos en dólares requieren revisión en un período abierto; se conservan los importes registrados."])
+
+
+def _filas_excel_mayor(sheet, bloques, fecha_inicio):
+    for bloque in bloques:
+        cuenta = bloque["cuenta"]
+        etiqueta = f"{cuenta.codigo} - {cuenta.nombre}"
+        if fecha_inicio:
+            sheet.append(["", "", etiqueta, "Saldo inicial anterior al periodo", "", "", "", bloque["saldo_inicial"]])
+        for movimiento in bloque["movimientos"]:
+            linea = movimiento["linea"]
+            sheet.append([
+                linea.asiento.fecha, linea.asiento.numero or "Sin número", etiqueta,
+                linea.detalle or linea.asiento.descripcion, linea.asiento.referencia or "",
+                linea.debe, linea.haber, movimiento["saldo"],
+            ])
+        sheet.append(["", "", etiqueta, "Totales del periodo / saldo final", "", bloque["debe"], bloque["haber"], bloque["saldo"]])
+
+
+def _mayor_desde_estado_resultados(request, cuenta):
+    return bool(
+        cuenta and cuenta.tipo in ("ingreso", "costo", "gasto")
+        and request.GET.get("origen") == "estado_resultados"
+    )
 
 
 @login_required
 def mayor_cuenta(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    cuenta_id = request.GET.get("cuenta") or ""
-    cuenta = None
-    lineas = LineaAsientoContable.objects.none()
-    movimientos = []
-    saldo = Decimal("0.00")
-
-    if cuenta_id:
-        cuenta = get_object_or_404(CuentaContable, id=cuenta_id, empresa=empresa)
-        lineas = LineaAsientoContable.objects.filter(
-            asiento__empresa=empresa,
-            asiento__estado="contabilizado",
-            cuenta=cuenta,
-        ).select_related("asiento", "cuenta").order_by("asiento__fecha", "asiento__numero", "id")
-
-        if fecha_inicio:
-            lineas = lineas.filter(asiento__fecha__gte=fecha_inicio)
-        if fecha_fin:
-            lineas = lineas.filter(asiento__fecha__lte=fecha_fin)
-
-        for linea in lineas:
-            saldo += linea.debe - linea.haber
-            movimientos.append({
-                "linea": linea,
-                "saldo": saldo,
-            })
-
-    totales = lineas.aggregate(debe=Sum("debe"), haber=Sum("haber"))
-    context = {
-        "empresa": empresa,
-        "cuenta": cuenta,
-        "movimientos": movimientos,
-        "cuentas": CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre"),
-        "filtros": {
-            "fecha_inicio": fecha_inicio,
-            "fecha_fin": fecha_fin,
-            "cuenta": cuenta_id,
-        },
-        "resumen": {
-            "debe_total": totales["debe"] or Decimal("0.00"),
-            "haber_total": totales["haber"] or Decimal("0.00"),
-            "saldo": saldo,
-            "movimientos": len(movimientos),
-        },
-    }
-    return render(request, "contabilidad/mayor_cuenta.html", context)
+    filtros = _filtros_reportes(request)
+    filtros["cuenta"] = request.GET.get("cuenta") or ""
+    cuenta = get_object_or_404(CuentaContable, pk=filtros["cuenta"], empresa=empresa) if filtros["cuenta"] else None
+    desde_estado_resultados = _mayor_desde_estado_resultados(request, cuenta)
+    bloques = datos_mayor(
+        empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta,
+        excluir_cierres=desde_estado_resultados,
+    ) if cuenta else []
+    bloque = bloques[0] if bloques else {"movimientos": [], "debe": Decimal("0.00"), "haber": Decimal("0.00"), "saldo": Decimal("0.00"), "saldo_inicial": Decimal("0.00")}
+    # La selección sólo puede apuntar a una línea ya incluida en este mayor.
+    movimiento_solicitado = request.GET.get("movimiento") or ""
+    movimiento_seleccionado = next((
+        movimiento["linea"].pk for movimiento in bloque["movimientos"]
+        if str(movimiento["linea"].pk) == movimiento_solicitado
+    ), None)
+    return _render_reporte(request, "contabilidad/mayor_cuenta.html", {
+        "empresa": empresa, "cuenta": cuenta, "movimientos": bloque["movimientos"],
+        "cuentas": CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre"),
+        "filtros": filtros, "movimiento_seleccionado": movimiento_seleccionado,
+        "desde_estado_resultados": desde_estado_resultados,
+        "resumen": {"debe_total": bloque["debe"], "haber_total": bloque["haber"], "saldo": bloque["saldo"], "saldo_inicial": bloque["saldo_inicial"], "movimientos": len(bloque["movimientos"])},
+    })
 
 
 @login_required
 def exportar_mayor_cuenta_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
+    filtros = _filtros_reportes(request)
     cuenta_id = request.GET.get("cuenta") or ""
-    cuenta = get_object_or_404(CuentaContable, id=cuenta_id, empresa=empresa) if cuenta_id else None
-
-    workbook, sheet = _preparar_excel("Mayor por Cuenta")
-    sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo"])
+    cuenta = get_object_or_404(CuentaContable, pk=cuenta_id, empresa=empresa) if cuenta_id else None
+    desde_estado_resultados = _mayor_desde_estado_resultados(request, cuenta)
+    bloques = datos_mayor(
+        empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta,
+        excluir_cierres=desde_estado_resultados,
+    ) if cuenta else []
+    workbook, sheet = _preparar_excel("Mayor por Cuenta · HNL")
+    sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo natural"])
     _aplicar_encabezado(sheet, 3)
-
-    if cuenta:
-        saldo = Decimal("0.00")
-        lineas = LineaAsientoContable.objects.filter(
-            asiento__empresa=empresa,
-            asiento__estado="contabilizado",
-            cuenta=cuenta,
-        ).select_related("asiento", "cuenta").order_by("asiento__fecha", "asiento__numero", "id")
-        if fecha_inicio:
-            lineas = lineas.filter(asiento__fecha__gte=fecha_inicio)
-        if fecha_fin:
-            lineas = lineas.filter(asiento__fecha__lte=fecha_fin)
-        for linea in lineas:
-            saldo += _saldo_natural(cuenta, linea.debe, linea.haber)
-            sheet.append([
-                linea.asiento.fecha,
-                linea.asiento.numero or "Sin numero",
-                f"{linea.cuenta.codigo} - {linea.cuenta.nombre}",
-                linea.detalle or linea.asiento.descripcion,
-                linea.asiento.referencia or "",
-                linea.debe,
-                linea.haber,
-                saldo,
-            ])
+    _filas_excel_mayor(sheet, bloques, filtros["fecha_inicio"])
+    if desde_estado_resultados:
+        sheet.append(["Consulta desde Estado de Resultados", "Se omiten los asientos de cierre del período. El saldo final incluye la apertura anterior al período."])
+    _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Mayor_Cuenta_{empresa.slug}.xlsx")
 
@@ -2168,95 +2332,32 @@ def exportar_mayor_cuenta_excel(request, empresa_slug):
 @login_required
 def libro_mayor_general(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    tipo = request.GET.get("tipo") or ""
-
-    cuentas = CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre")
-    if tipo:
-        cuentas = cuentas.filter(tipo=tipo)
-
-    cuentas_mayor = []
-    total_debe = Decimal("0.00")
-    total_haber = Decimal("0.00")
-    for cuenta in cuentas:
-        lineas = LineaAsientoContable.objects.filter(
-            asiento__empresa=empresa,
-            asiento__estado="contabilizado",
-            cuenta=cuenta,
-        ).select_related("asiento", "cuenta").order_by("asiento__fecha", "asiento__numero", "id")
-        if fecha_inicio:
-            lineas = lineas.filter(asiento__fecha__gte=fecha_inicio)
-        if fecha_fin:
-            lineas = lineas.filter(asiento__fecha__lte=fecha_fin)
-        if not lineas.exists():
-            continue
-        saldo = Decimal("0.00")
-        movimientos = []
-        for linea in lineas:
-            saldo += _saldo_natural(cuenta, linea.debe, linea.haber)
-            movimientos.append({"linea": linea, "saldo": saldo})
-            total_debe += linea.debe
-            total_haber += linea.haber
-        cuentas_mayor.append({
-            "cuenta": cuenta,
-            "movimientos": movimientos,
-            "debe": sum((mov["linea"].debe for mov in movimientos), Decimal("0.00")),
-            "haber": sum((mov["linea"].haber for mov in movimientos), Decimal("0.00")),
-            "saldo": saldo,
-        })
-
-    context = {
-        "empresa": empresa,
-        "cuentas_mayor": cuentas_mayor,
-        "tipos_cuenta": CuentaContable.TIPO_CHOICES,
-        "filtros": {"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin, "tipo": tipo},
+    filtros = _filtros_reportes(request)
+    filtros["tipo"] = request.GET.get("tipo") or ""
+    bloques = datos_mayor(empresa, **filtros)
+    saldos_contables = [b["saldo"] if b["cuenta"].tipo in ("activo", "costo", "gasto") else -b["saldo"] for b in bloques]
+    return _render_reporte(request, "contabilidad/libro_mayor_general.html", {
+        "empresa": empresa, "cuentas_mayor": bloques, "tipos_cuenta": CuentaContable.TIPO_CHOICES, "filtros": filtros,
         "resumen": {
-            "cuentas": len(cuentas_mayor),
-            "debe_total": total_debe,
-            "haber_total": total_haber,
-            "saldo_neto": sum((cuenta["saldo"] for cuenta in cuentas_mayor), Decimal("0.00")),
+            "cuentas": len(bloques), "debe_total": sum((b["debe"] for b in bloques), Decimal("0.00")),
+            "haber_total": sum((b["haber"] for b in bloques), Decimal("0.00")),
+            "saldo_deudor_total": sum((max(saldo, Decimal("0.00")) for saldo in saldos_contables), Decimal("0.00")),
+            "saldo_acreedor_total": sum((max(-saldo, Decimal("0.00")) for saldo in saldos_contables), Decimal("0.00")),
         },
-    }
-    return render(request, "contabilidad/libro_mayor_general.html", context)
+    })
 
 
 @login_required
 def exportar_libro_mayor_general_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    tipo = request.GET.get("tipo") or ""
-    cuentas = CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre")
-    if tipo:
-        cuentas = cuentas.filter(tipo=tipo)
-
-    workbook, sheet = _preparar_excel("Libro Mayor General")
-    sheet.append(["Cuenta", "Fecha", "Asiento", "Detalle", "Referencia", "Debe", "Haber", "Saldo"])
+    filtros = _filtros_reportes(request)
+    filtros["tipo"] = request.GET.get("tipo") or ""
+    bloques = datos_mayor(empresa, **filtros)
+    workbook, sheet = _preparar_excel("Libro Mayor General · HNL")
+    sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo natural"])
     _aplicar_encabezado(sheet, 3)
-    for cuenta in cuentas:
-        lineas = LineaAsientoContable.objects.filter(
-            asiento__empresa=empresa,
-            asiento__estado="contabilizado",
-            cuenta=cuenta,
-        ).select_related("asiento", "cuenta").order_by("asiento__fecha", "asiento__numero", "id")
-        if fecha_inicio:
-            lineas = lineas.filter(asiento__fecha__gte=fecha_inicio)
-        if fecha_fin:
-            lineas = lineas.filter(asiento__fecha__lte=fecha_fin)
-        saldo = Decimal("0.00")
-        for linea in lineas:
-            saldo += _saldo_natural(cuenta, linea.debe, linea.haber)
-            sheet.append([
-                f"{cuenta.codigo} - {cuenta.nombre}",
-                linea.asiento.fecha,
-                linea.asiento.numero or "Sin numero",
-                linea.detalle or linea.asiento.descripcion,
-                linea.asiento.referencia or "",
-                linea.debe,
-                linea.haber,
-                saldo,
-            ])
+    _filas_excel_mayor(sheet, bloques, filtros["fecha_inicio"])
+    _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Libro_Mayor_General_{empresa.slug}.xlsx")
 
@@ -2264,125 +2365,27 @@ def exportar_libro_mayor_general_excel(request, empresa_slug):
 @login_required
 def balance_comprobacion(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    tipo = request.GET.get("tipo") or ""
-    incluir_ceros = request.GET.get("incluir_ceros") == "1"
-
-    cuentas = CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre")
-    if tipo:
-        cuentas = cuentas.filter(tipo=tipo)
-
-    movimientos_base = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-    )
-    if fecha_inicio:
-        movimientos_base = movimientos_base.filter(asiento__fecha__gte=fecha_inicio)
-    if fecha_fin:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_fin)
-
-    movimientos_por_cuenta = {
-        item["cuenta_id"]: item
-        for item in movimientos_base.values("cuenta_id").annotate(debe=Sum("debe"), haber=Sum("haber"))
-    }
-
-    filas = []
-    total_debe = Decimal("0.00")
-    total_haber = Decimal("0.00")
-    saldo_deudor_total = Decimal("0.00")
-    saldo_acreedor_total = Decimal("0.00")
-
-    for cuenta in cuentas:
-        movimiento = movimientos_por_cuenta.get(cuenta.id, {})
-        debe = movimiento.get("debe") or Decimal("0.00")
-        haber = movimiento.get("haber") or Decimal("0.00")
-        saldo = debe - haber
-        saldo_deudor = saldo if saldo > 0 else Decimal("0.00")
-        saldo_acreedor = abs(saldo) if saldo < 0 else Decimal("0.00")
-
-        if not incluir_ceros and debe == 0 and haber == 0 and saldo == 0:
-            continue
-
-        total_debe += debe
-        total_haber += haber
-        saldo_deudor_total += saldo_deudor
-        saldo_acreedor_total += saldo_acreedor
-        filas.append({
-            "cuenta": cuenta,
-            "debe": debe,
-            "haber": haber,
-            "saldo_deudor": saldo_deudor,
-            "saldo_acreedor": saldo_acreedor,
-        })
-
-    context = {
-        "empresa": empresa,
-        "filas": filas,
-        "tipos_cuenta": CuentaContable.TIPO_CHOICES,
-        "filtros": {
-            "fecha_inicio": fecha_inicio,
-            "fecha_fin": fecha_fin,
-            "tipo": tipo,
-            "incluir_ceros": incluir_ceros,
-        },
-        "resumen": {
-            "cuentas": len(filas),
-            "debe_total": total_debe,
-            "haber_total": total_haber,
-            "saldo_deudor_total": saldo_deudor_total,
-            "saldo_acreedor_total": saldo_acreedor_total,
-            "cuadrado": total_debe == total_haber,
-        },
-    }
-    return render(request, "contabilidad/balance_comprobacion.html", context)
+    filtros = _filtros_reportes(request)
+    filtros.update(tipo=request.GET.get("tipo") or "", incluir_ceros=request.GET.get("incluir_ceros") == "1")
+    data = datos_balance_comprobacion(empresa, **filtros)
+    data.update(empresa=empresa, filtros=filtros, tipos_cuenta=CuentaContable.TIPO_CHOICES)
+    return _render_reporte(request, "contabilidad/balance_comprobacion.html", data)
 
 
 @login_required
 def exportar_balance_comprobacion_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    tipo = request.GET.get("tipo") or ""
-    incluir_ceros = request.GET.get("incluir_ceros") == "1"
-
-    cuentas = CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre")
-    if tipo:
-        cuentas = cuentas.filter(tipo=tipo)
-
-    movimientos_base = LineaAsientoContable.objects.filter(asiento__empresa=empresa, asiento__estado="contabilizado")
-    if fecha_inicio:
-        movimientos_base = movimientos_base.filter(asiento__fecha__gte=fecha_inicio)
-    if fecha_fin:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_fin)
-
-    movimientos_por_cuenta = {
-        item["cuenta_id"]: item
-        for item in movimientos_base.values("cuenta_id").annotate(debe=Sum("debe"), haber=Sum("haber"))
-    }
-
-    workbook, sheet = _preparar_excel("Balance de Comprobacion")
-    sheet.append(["Cuenta", "Tipo", "Debe", "Haber", "Saldo deudor", "Saldo acreedor"])
+    filtros = _filtros_reportes(request)
+    filtros.update(tipo=request.GET.get("tipo") or "", incluir_ceros=request.GET.get("incluir_ceros") == "1")
+    data = datos_balance_comprobacion(empresa, **filtros)
+    workbook, sheet = _preparar_excel("Balance de Comprobación · HNL")
+    sheet.append(["Cuenta", "Tipo", "Apertura deudora", "Apertura acreedora", "Debe del periodo", "Haber del periodo", "Saldo final deudor", "Saldo final acreedor"])
     _aplicar_encabezado(sheet, 3)
-    total_debe = Decimal("0.00")
-    total_haber = Decimal("0.00")
-    total_deudor = Decimal("0.00")
-    total_acreedor = Decimal("0.00")
-    for cuenta in cuentas:
-        movimiento = movimientos_por_cuenta.get(cuenta.id, {})
-        debe = movimiento.get("debe") or Decimal("0.00")
-        haber = movimiento.get("haber") or Decimal("0.00")
-        saldo = debe - haber
-        saldo_deudor = saldo if saldo > 0 else Decimal("0.00")
-        saldo_acreedor = abs(saldo) if saldo < 0 else Decimal("0.00")
-        if not incluir_ceros and debe == 0 and haber == 0 and saldo == 0:
-            continue
-        total_debe += debe
-        total_haber += haber
-        total_deudor += saldo_deudor
-        total_acreedor += saldo_acreedor
-        sheet.append([f"{cuenta.codigo} - {cuenta.nombre}", cuenta.get_tipo_display(), debe, haber, saldo_deudor, saldo_acreedor])
-    sheet.append(["Totales", "", total_debe, total_haber, total_deudor, total_acreedor])
+    for fila in data["filas"]:
+        sheet.append([f"{fila['cuenta'].codigo} - {fila['cuenta'].nombre}", fila["cuenta"].get_tipo_display(), fila["apertura_deudora"], fila["apertura_acreedora"], fila["debe"], fila["haber"], fila["saldo_deudor"], fila["saldo_acreedor"]])
+    resumen = data["resumen"]
+    sheet.append(["Totales", "", resumen["apertura_deudora_total"], resumen["apertura_acreedora_total"], resumen["debe_total"], resumen["haber_total"], resumen["saldo_deudor_total"], resumen["saldo_acreedor_total"]])
+    _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Balance_Comprobacion_{empresa.slug}.xlsx")
 
@@ -2390,146 +2393,40 @@ def exportar_balance_comprobacion_excel(request, empresa_slug):
 @login_required
 def estado_resultados(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
+    filtros = _filtros_reportes(request)
+    data = datos_estado_resultados(empresa, **filtros)
+    data.update(empresa=empresa, filtros=filtros)
+    return _render_reporte(request, "contabilidad/estado_resultados.html", data)
 
-    cuentas = CuentaContable.objects.filter(
-        empresa=empresa,
-        tipo__in=["ingreso", "costo", "gasto"],
-    ).order_by("tipo", "codigo", "nombre")
 
-    movimientos_base = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-        cuenta__tipo__in=["ingreso", "costo", "gasto"],
-    )
-    if fecha_inicio:
-        movimientos_base = movimientos_base.filter(asiento__fecha__gte=fecha_inicio)
-    if fecha_fin:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_fin)
-
-    movimientos_por_cuenta = {
-        item["cuenta_id"]: item
-        for item in movimientos_base.values("cuenta_id").annotate(debe=Sum("debe"), haber=Sum("haber"))
-    }
-
-    ingresos = []
-    costos = []
-    gastos = []
-    total_ingresos = Decimal("0.00")
-    total_costos = Decimal("0.00")
-    total_gastos = Decimal("0.00")
-
-    for cuenta in cuentas:
-        movimiento = movimientos_por_cuenta.get(cuenta.id, {})
-        debe = movimiento.get("debe") or Decimal("0.00")
-        haber = movimiento.get("haber") or Decimal("0.00")
-        if debe == 0 and haber == 0:
-            continue
-
-        if cuenta.tipo == "ingreso":
-            saldo = haber - debe
-            total_ingresos += saldo
-            ingresos.append({
-                "cuenta": cuenta,
-                "debe": debe,
-                "haber": haber,
-                "saldo": saldo,
-            })
-        elif cuenta.tipo == "costo":
-            saldo = debe - haber
-            total_costos += saldo
-            costos.append({
-                "cuenta": cuenta,
-                "debe": debe,
-                "haber": haber,
-                "saldo": saldo,
-            })
-        elif cuenta.tipo == "gasto":
-            saldo = debe - haber
-            total_gastos += saldo
-            gastos.append({
-                "cuenta": cuenta,
-                "debe": debe,
-                "haber": haber,
-                "saldo": saldo,
-            })
-
-    utilidad_bruta = total_ingresos - total_costos
-    utilidad = utilidad_bruta - total_gastos
-    context = {
-        "empresa": empresa,
-        "ingresos": ingresos,
-        "costos": costos,
-        "gastos": gastos,
-        "filtros": {
-            "fecha_inicio": fecha_inicio,
-            "fecha_fin": fecha_fin,
-        },
-        "resumen": {
-            "total_ingresos": total_ingresos,
-            "total_costos": total_costos,
-            "utilidad_bruta": utilidad_bruta,
-            "total_gastos": total_gastos,
-            "utilidad": utilidad,
-            "resultado_positivo": utilidad >= 0,
-            "cuentas_ingreso": len(ingresos),
-            "cuentas_costo": len(costos),
-            "cuentas_gasto": len(gastos),
-        },
-    }
-    return render(request, "contabilidad/estado_resultados.html", context)
+def _agregar_seccion_estado_financiero_excel(sheet, titulo, filas):
+    """Presenta la jerarquía ya calculada; no vuelve a sumar sus saldos."""
+    sheet.append([titulo])
+    sheet.cell(sheet.max_row, 1).font = Font(bold=True)
+    for fila in filas:
+        cuenta = fila["cuenta"]
+        sheet.append([cuenta.codigo, cuenta.nombre, fila["saldo"]])
+        sheet.cell(sheet.max_row, 2).alignment = Alignment(indent=min(fila["nivel"], 250))
+        for celda in sheet[sheet.max_row]:
+            celda.font = Font(bold=bool(fila["es_agrupadora"]))
 
 
 @login_required
 def exportar_estado_resultados_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-
-    cuentas = CuentaContable.objects.filter(empresa=empresa, tipo__in=["ingreso", "costo", "gasto"]).order_by("tipo", "codigo", "nombre")
-    movimientos_base = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-        cuenta__tipo__in=["ingreso", "costo", "gasto"],
-    )
-    if fecha_inicio:
-        movimientos_base = movimientos_base.filter(asiento__fecha__gte=fecha_inicio)
-    if fecha_fin:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_fin)
-    movimientos_por_cuenta = {
-        item["cuenta_id"]: item
-        for item in movimientos_base.values("cuenta_id").annotate(debe=Sum("debe"), haber=Sum("haber"))
-    }
-
-    workbook, sheet = _preparar_excel("Estado de Resultados")
-    sheet.append(["Tipo", "Cuenta", "Debe", "Haber", "Saldo"])
+    data = datos_estado_resultados(empresa, **_filtros_reportes(request))
+    workbook, sheet = _preparar_excel("Estado de Resultados · HNL")
+    sheet.append(["Código", "Cuenta", "Saldo"])
     _aplicar_encabezado(sheet, 3)
-    total_ingresos = Decimal("0.00")
-    total_costos = Decimal("0.00")
-    total_gastos = Decimal("0.00")
-    for cuenta in cuentas:
-        movimiento = movimientos_por_cuenta.get(cuenta.id, {})
-        debe = movimiento.get("debe") or Decimal("0.00")
-        haber = movimiento.get("haber") or Decimal("0.00")
-        if debe == 0 and haber == 0:
-            continue
-        if cuenta.tipo == "ingreso":
-            saldo = haber - debe
-            total_ingresos += saldo
-        else:
-            saldo = debe - haber
-            if cuenta.tipo == "costo":
-                total_costos += saldo
-            else:
-                total_gastos += saldo
-        sheet.append([cuenta.get_tipo_display(), f"{cuenta.codigo} - {cuenta.nombre}", debe, haber, saldo])
+    for grupo, titulo in (("ingresos", "Ingresos"), ("costos", "Costos"), ("gastos", "Gastos")):
+        _agregar_seccion_estado_financiero_excel(sheet, titulo, data[f"{grupo}_jerarquia"])
     sheet.append([])
-    sheet.append(["Total ingresos", "", "", "", total_ingresos])
-    sheet.append(["Total costos", "", "", "", total_costos])
-    sheet.append(["Utilidad bruta", "", "", "", total_ingresos - total_costos])
-    sheet.append(["Total gastos", "", "", "", total_gastos])
-    sheet.append(["Utilidad neta", "", "", "", total_ingresos - total_costos - total_gastos])
+    for etiqueta, clave in (("Total ingresos", "total_ingresos"), ("Total costos", "total_costos"), ("Utilidad bruta", "utilidad_bruta"), ("Total gastos", "total_gastos"), ("Utilidad neta", "utilidad")):
+        sheet.append([etiqueta, "", data["resumen"][clave]])
+    for celda in sheet["C"]:
+        if isinstance(celda.value, Decimal):
+            celda.number_format = '#,##0.00;[Red]-#,##0.00'
+    _advertencias_excel_reporte(sheet, empresa, _filtros_reportes(request))
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Estado_Resultados_{empresa.slug}.xlsx")
 
@@ -2538,120 +2435,30 @@ def exportar_estado_resultados_excel(request, empresa_slug):
 def balance_general(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     fecha_corte = request.GET.get("fecha_corte") or ""
-
-    cuentas = CuentaContable.objects.filter(
-        empresa=empresa,
-        tipo__in=["activo", "pasivo", "patrimonio"],
-    ).order_by("tipo", "codigo", "nombre")
-
-    movimientos_base = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-        cuenta__tipo__in=["activo", "pasivo", "patrimonio"],
-    )
-    if fecha_corte:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_corte)
-
-    movimientos_por_cuenta = {
-        item["cuenta_id"]: item
-        for item in movimientos_base.values("cuenta_id").annotate(debe=Sum("debe"), haber=Sum("haber"))
-    }
-
-    activos = []
-    pasivos = []
-    patrimonio = []
-    total_activos = Decimal("0.00")
-    total_pasivos = Decimal("0.00")
-    total_patrimonio = Decimal("0.00")
-
-    for cuenta in cuentas:
-        movimiento = movimientos_por_cuenta.get(cuenta.id, {})
-        debe = movimiento.get("debe") or Decimal("0.00")
-        haber = movimiento.get("haber") or Decimal("0.00")
-        if debe == 0 and haber == 0:
-            continue
-
-        if cuenta.tipo == "activo":
-            saldo = debe - haber
-            total_activos += saldo
-            activos.append({"cuenta": cuenta, "debe": debe, "haber": haber, "saldo": saldo})
-        elif cuenta.tipo == "pasivo":
-            saldo = haber - debe
-            total_pasivos += saldo
-            pasivos.append({"cuenta": cuenta, "debe": debe, "haber": haber, "saldo": saldo})
-        elif cuenta.tipo == "patrimonio":
-            saldo = haber - debe
-            total_patrimonio += saldo
-            patrimonio.append({"cuenta": cuenta, "debe": debe, "haber": haber, "saldo": saldo})
-
-    total_pasivo_patrimonio = total_pasivos + total_patrimonio
-    diferencia = total_activos - total_pasivo_patrimonio
-    context = {
-        "empresa": empresa,
-        "activos": activos,
-        "pasivos": pasivos,
-        "patrimonio": patrimonio,
-        "filtros": {
-            "fecha_corte": fecha_corte,
-        },
-        "resumen": {
-            "total_activos": total_activos,
-            "total_pasivos": total_pasivos,
-            "total_patrimonio": total_patrimonio,
-            "total_pasivo_patrimonio": total_pasivo_patrimonio,
-            "diferencia": diferencia,
-            "cuadrado": diferencia == 0,
-        },
-    }
-    return render(request, "contabilidad/balance_general.html", context)
+    data = datos_balance_general(empresa, fecha_corte)
+    data.update(empresa=empresa, filtros={"fecha_corte": fecha_corte})
+    return _render_reporte(request, "contabilidad/balance_general.html", data)
 
 
 @login_required
 def exportar_balance_general_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_corte = request.GET.get("fecha_corte") or ""
-    cuentas = CuentaContable.objects.filter(empresa=empresa, tipo__in=["activo", "pasivo", "patrimonio"]).order_by("tipo", "codigo", "nombre")
-    movimientos_base = LineaAsientoContable.objects.filter(
-        asiento__empresa=empresa,
-        asiento__estado="contabilizado",
-        cuenta__tipo__in=["activo", "pasivo", "patrimonio"],
-    )
-    if fecha_corte:
-        movimientos_base = movimientos_base.filter(asiento__fecha__lte=fecha_corte)
-    movimientos_por_cuenta = {
-        item["cuenta_id"]: item
-        for item in movimientos_base.values("cuenta_id").annotate(debe=Sum("debe"), haber=Sum("haber"))
-    }
-
-    workbook, sheet = _preparar_excel("Balance General")
-    sheet.append(["Tipo", "Cuenta", "Debe", "Haber", "Saldo"])
+    data = datos_balance_general(empresa, request.GET.get("fecha_corte") or "")
+    workbook, sheet = _preparar_excel("Balance General · HNL")
+    sheet.append(["Código", "Cuenta", "Saldo"])
     _aplicar_encabezado(sheet, 3)
-    total_activos = Decimal("0.00")
-    total_pasivos = Decimal("0.00")
-    total_patrimonio = Decimal("0.00")
-    for cuenta in cuentas:
-        movimiento = movimientos_por_cuenta.get(cuenta.id, {})
-        debe = movimiento.get("debe") or Decimal("0.00")
-        haber = movimiento.get("haber") or Decimal("0.00")
-        if debe == 0 and haber == 0:
-            continue
-        if cuenta.tipo == "activo":
-            saldo = debe - haber
-            total_activos += saldo
-        else:
-            saldo = haber - debe
-            if cuenta.tipo == "pasivo":
-                total_pasivos += saldo
-            else:
-                total_patrimonio += saldo
-        sheet.append([cuenta.get_tipo_display(), f"{cuenta.codigo} - {cuenta.nombre}", debe, haber, saldo])
-    total_pasivo_patrimonio = total_pasivos + total_patrimonio
+    for grupo, titulo in (("activos", "Activos"), ("pasivos", "Pasivos"), ("patrimonio", "Patrimonio")):
+        _agregar_seccion_estado_financiero_excel(sheet, titulo, data[f"{grupo}_jerarquia"])
+    resumen = data["resumen"]
+    sheet.append(["", "Resultado acumulado no traspasado a patrimonio", resumen["resultado_no_traspasado"]])
     sheet.append([])
-    sheet.append(["Total activos", "", "", "", total_activos])
-    sheet.append(["Total pasivos", "", "", "", total_pasivos])
-    sheet.append(["Total patrimonio", "", "", "", total_patrimonio])
-    sheet.append(["Pasivo + patrimonio", "", "", "", total_pasivo_patrimonio])
-    sheet.append(["Diferencia", "", "", "", total_activos - total_pasivo_patrimonio])
+    for etiqueta, clave in (("Total activos", "total_activos"), ("Total pasivos", "total_pasivos"), ("Patrimonio contabilizado", "patrimonio_contabilizado"), ("Resultado no traspasado", "resultado_no_traspasado"), ("Total patrimonio", "total_patrimonio"), ("Pasivo + patrimonio", "total_pasivo_patrimonio"), ("Diferencia", "diferencia")):
+        sheet.append([etiqueta, "", resumen[clave]])
+    for celda in sheet["C"]:
+        if isinstance(celda.value, Decimal):
+            celda.number_format = '#,##0.00;[Red]-#,##0.00'
+    sheet.append(["Las cuentas principales acumulan sus subcuentas; los totales generales cuentan cada movimiento una sola vez."])
+    _advertencias_excel_reporte(sheet, empresa, {"fecha_corte": request.GET.get("fecha_corte") or ""})
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Balance_General_{empresa.slug}.xlsx")
 
@@ -2659,55 +2466,32 @@ def exportar_balance_general_excel(request, empresa_slug):
 @login_required
 def estado_flujo_efectivo(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    flujo, total_neto, cuentas_efectivo = _calcular_flujo_efectivo(empresa, fecha_inicio, fecha_fin)
-    context = {
-        "empresa": empresa,
-        "flujo": flujo,
-        "cuentas_efectivo": cuentas_efectivo,
-        "filtros": {"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin},
-        "resumen": {
-            "total_neto": total_neto,
-            "operacion": flujo["operacion"]["neto"],
-            "inversion": flujo["inversion"]["neto"],
-            "financiamiento": flujo["financiamiento"]["neto"],
-            "movimientos": sum((len(grupo["movimientos"]) for grupo in flujo.values()), 0),
-        },
-    }
-    return render(request, "contabilidad/estado_flujo_efectivo.html", context)
+    filtros = _filtros_reportes(request)
+    data = datos_flujo_efectivo(empresa, **filtros)
+    data.update(empresa=empresa, filtros=filtros)
+    return _render_reporte(request, "contabilidad/estado_flujo_efectivo.html", data)
 
 
 @login_required
 def exportar_estado_flujo_efectivo_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    flujo, total_neto, cuentas_efectivo = _calcular_flujo_efectivo(empresa, fecha_inicio, fecha_fin)
-
-    workbook, sheet = _preparar_excel("Flujo de Efectivo")
+    data = datos_flujo_efectivo(empresa, **_filtros_reportes(request))
+    workbook, sheet = _preparar_excel("Flujo de Efectivo · HNL")
     sheet.append(["Actividad", "Fecha", "Asiento", "Cuenta de efectivo", "Detalle", "Entrada", "Salida", "Neto"])
     _aplicar_encabezado(sheet, 3)
-    etiquetas = {
-        "operacion": "Actividades de operacion",
-        "inversion": "Actividades de inversion",
-        "financiamiento": "Actividades de financiamiento",
-    }
-    for clave, grupo in flujo.items():
+    etiquetas = {"operacion": "Actividades de operación", "inversion": "Actividades de inversión", "financiamiento": "Actividades de financiamiento"}
+    for clave, grupo in data["flujo"].items():
         for movimiento in grupo["movimientos"]:
-            sheet.append([
-                etiquetas[clave],
-                movimiento["asiento"].fecha,
-                movimiento["asiento"].numero or "Sin numero",
-                f"{movimiento['cuenta'].codigo} - {movimiento['cuenta'].nombre}",
-                movimiento["detalle"],
-                movimiento["entrada"],
-                movimiento["salida"],
-                movimiento["neto"],
-            ])
+            sheet.append([etiquetas[clave], movimiento["asiento"].fecha, movimiento["asiento"].numero or "Sin número", f"{movimiento['cuenta'].codigo} - {movimiento['cuenta'].nombre}", movimiento["detalle"], movimiento["entrada"], movimiento["salida"], movimiento["neto"]])
         sheet.append([f"Neto {etiquetas[clave].lower()}", "", "", "", "", grupo["entradas"], grupo["salidas"], grupo["neto"]])
     sheet.append([])
-    sheet.append(["Variacion neta de efectivo", "", "", "", "", "", "", total_neto])
+    for ajuste in data["ajustes_historicos"]:
+        sheet.append(["Ajuste histórico de saldo", ajuste["asiento"].fecha, ajuste["asiento"].numero, "", "Corrección documentada; no es un cobro ni un pago nuevo", "", "", ajuste["neto"]])
+    for etiqueta, clave in (("Efectivo al inicio", "saldo_inicial"), ("Variación neta de efectivo", "total_neto"), ("Ajustes históricos del saldo", "ajustes_historicos"), ("Efectivo al cierre", "saldo_final"), ("Diferencia por revisar", "diferencia")):
+        sheet.append([etiqueta, "", "", "", "", "", "", data["resumen"][clave]])
+    if data["resumen"]["cuentas_financieras_incompatibles"]:
+        sheet.append(["Cuentas financieras por revisar", data["resumen"]["cuentas_financieras_incompatibles"], "Su tipo financiero y cuenta contable no coinciden; se conservan los saldos de bancos configurados."])
+    _advertencias_excel_reporte(sheet, empresa, _filtros_reportes(request))
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Flujo_Efectivo_{empresa.slug}.xlsx")
 
@@ -2715,48 +2499,33 @@ def exportar_estado_flujo_efectivo_excel(request, empresa_slug):
 @login_required
 def resumen_ejecutivo_contable(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
-    fecha_inicio = request.GET.get("fecha_inicio") or ""
-    fecha_fin = request.GET.get("fecha_fin") or ""
-    fecha_corte = fecha_fin or ""
-
-    resultados = _saldo_financiero_por_cuenta(empresa, ["ingreso", "costo", "gasto"], fecha_inicio, fecha_fin)
-    balance = _saldo_financiero_por_cuenta(empresa, ["activo", "pasivo", "patrimonio"], fecha_corte=fecha_corte)
-    total_ingresos = sum((fila["saldo"] for fila in resultados if fila["cuenta"].tipo == "ingreso"), Decimal("0.00"))
-    total_costos = sum((fila["saldo"] for fila in resultados if fila["cuenta"].tipo == "costo"), Decimal("0.00"))
-    total_gastos = sum((fila["saldo"] for fila in resultados if fila["cuenta"].tipo == "gasto"), Decimal("0.00"))
-    utilidad = total_ingresos - total_costos - total_gastos
-    total_activos = sum((fila["saldo"] for fila in balance if fila["cuenta"].tipo == "activo"), Decimal("0.00"))
-    total_pasivos = sum((fila["saldo"] for fila in balance if fila["cuenta"].tipo == "pasivo"), Decimal("0.00"))
-    total_patrimonio = sum((fila["saldo"] for fila in balance if fila["cuenta"].tipo == "patrimonio"), Decimal("0.00"))
-    flujo, total_flujo, cuentas_efectivo = _calcular_flujo_efectivo(empresa, fecha_inicio, fecha_fin)
-    asientos_pendientes = AsientoContable.objects.filter(empresa=empresa, estado="borrador").count()
-    asientos_contabilizados = AsientoContable.objects.filter(empresa=empresa, estado="contabilizado")
-    if fecha_inicio:
-        asientos_contabilizados = asientos_contabilizados.filter(fecha__gte=fecha_inicio)
-    if fecha_fin:
-        asientos_contabilizados = asientos_contabilizados.filter(fecha__lte=fecha_fin)
-
-    context = {
-        "empresa": empresa,
-        "filtros": {"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin},
-        "resumen": {
-            "total_ingresos": total_ingresos,
-            "total_costos": total_costos,
-            "total_gastos": total_gastos,
-            "total_egresos_resultado": total_costos + total_gastos,
-            "utilidad": utilidad,
-            "margen_neto": (utilidad / total_ingresos * Decimal("100.00")) if total_ingresos else Decimal("0.00"),
-            "total_activos": total_activos,
-            "total_pasivos": total_pasivos,
-            "total_patrimonio": total_patrimonio,
-            "diferencia_balance": total_activos - (total_pasivos + total_patrimonio),
-            "flujo_neto": total_flujo,
-            "flujo_operacion": flujo["operacion"]["neto"],
-            "asientos_contabilizados": asientos_contabilizados.count(),
-            "asientos_pendientes": asientos_pendientes,
-            "cuentas_efectivo": cuentas_efectivo.count(),
-        },
-        "top_resultados": sorted(resultados, key=lambda fila: abs(fila["saldo"]), reverse=True)[:8],
-        "top_balance": sorted(balance, key=lambda fila: abs(fila["saldo"]), reverse=True)[:8],
-    }
-    return render(request, "contabilidad/resumen_ejecutivo_contable.html", context)
+    filtros = _filtros_reportes(request)
+    resultados = datos_estado_resultados(empresa, **filtros)
+    balance = datos_balance_general(empresa, filtros["fecha_fin"])
+    flujo = datos_flujo_efectivo(empresa, **filtros)
+    resumen = resultados["resumen"].copy()
+    resumen.update(balance["resumen"])
+    total_ingresos, utilidad = resumen["total_ingresos"], resumen["utilidad"]
+    asientos = AsientoContable.objects.filter(empresa=empresa, estado="contabilizado")
+    if filtros["fecha_inicio"]:
+        asientos = asientos.filter(fecha__gte=filtros["fecha_inicio"])
+    if filtros["fecha_fin"]:
+        asientos = asientos.filter(fecha__lte=filtros["fecha_fin"])
+    resumen.update(
+        total_egresos_resultado=resumen["total_costos"] + resumen["total_gastos"],
+        margen_neto=(utilidad / total_ingresos * Decimal("100.00")) if total_ingresos else Decimal("0.00"),
+        diferencia_balance=resumen["diferencia"], flujo_neto=flujo["resumen"]["total_neto"],
+        flujo_operacion=flujo["resumen"]["operacion"], efectivo_inicial=flujo["resumen"]["saldo_inicial"],
+        efectivo_final=flujo["resumen"]["saldo_final"], diferencia_flujo=flujo["resumen"]["diferencia"],
+        ajustes_historicos_efectivo=flujo["resumen"]["ajustes_historicos"],
+        asientos_contabilizados=asientos.count(),
+        asientos_pendientes=AsientoContable.objects.filter(empresa=empresa, estado="borrador").count(),
+        cuentas_efectivo=flujo["cuentas_efectivo"].count(),
+    )
+    filas_resultados = resultados["ingresos"] + resultados["costos"] + resultados["gastos"]
+    filas_balance = balance["activos"] + balance["pasivos"] + balance["patrimonio"]
+    return _render_reporte(request, "contabilidad/resumen_ejecutivo_contable.html", {
+        "empresa": empresa, "filtros": filtros, "resumen": resumen,
+        "top_resultados": sorted(filas_resultados, key=lambda fila: abs(fila["saldo"]), reverse=True)[:8],
+        "top_balance": sorted(filas_balance, key=lambda fila: abs(fila["saldo"]), reverse=True)[:8],
+    })

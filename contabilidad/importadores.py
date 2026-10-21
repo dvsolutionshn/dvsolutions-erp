@@ -220,7 +220,7 @@ def _extraer_catalogo_con_encabezados(filas):
     return datos, errores
 
 
-def importar_catalogo_cuentas_desde_excel(empresa, archivo, *, actualizar_existentes=True):
+def _importar_catalogo_original(empresa, archivo, *, actualizar_existentes=True):
     workbook = load_workbook(archivo, data_only=True)
     sheet = workbook.active
     filas = list(sheet.iter_rows(values_only=True))
@@ -289,6 +289,50 @@ def importar_catalogo_cuentas_desde_excel(empresa, archivo, *, actualizar_existe
         "actualizadas": actualizadas,
         "total": creadas + actualizadas,
     }
+
+
+def importar_catalogo_cuentas_desde_excel(
+    empresa, archivo, *, actualizar_existentes=True, incluir_controles=True, hoja=None, prefijo_codigos="",
+):
+    from .alcance_catalogo import es_empresa_rumi
+
+    if es_empresa_rumi(empresa):
+        from .importadores_rumi import importar_catalogo_cuentas_desde_excel as importar_rumi
+
+        return importar_rumi(
+            empresa, archivo, actualizar_existentes=actualizar_existentes,
+            incluir_controles=incluir_controles, hoja=hoja, prefijo_codigos=prefijo_codigos,
+        )
+    if not incluir_controles or hoja is not None or prefijo_codigos:
+        raise ValidationError("Las opciones adicionales de importación están disponibles únicamente para la empresa RUMI.")
+    return _importar_catalogo_original(empresa, archivo, actualizar_existentes=actualizar_existentes)
+
+
+def analizar_catalogo_cuentas_desde_excel(
+    empresa, archivo, *, actualizar_existentes=True, incluir_controles=True, hoja=None, prefijo_codigos="",
+):
+    from .alcance_catalogo import es_empresa_rumi
+
+    if not es_empresa_rumi(empresa):
+        raise ValidationError("La revisión avanzada de catálogos está disponible únicamente para la empresa RUMI.")
+    from .importadores_rumi import analizar_catalogo_cuentas_desde_excel as analizar_rumi
+
+    return analizar_rumi(
+        empresa, archivo, actualizar_existentes=actualizar_existentes,
+        incluir_controles=incluir_controles, hoja=hoja, prefijo_codigos=prefijo_codigos,
+    )
+
+
+def aplicar_catalogo_cuentas(empresa, datos, *, actualizar_existentes=True, firma_existentes=None):
+    from .alcance_catalogo import es_empresa_rumi
+
+    if not es_empresa_rumi(empresa):
+        raise ValidationError("La importación avanzada de catálogos está disponible únicamente para la empresa RUMI.")
+    from .importadores_rumi import aplicar_catalogo_cuentas as aplicar_rumi
+
+    return aplicar_rumi(
+        empresa, datos, actualizar_existentes=actualizar_existentes, firma_existentes=firma_existentes,
+    )
 
 
 MOVIMIENTO_COLUMNAS = {

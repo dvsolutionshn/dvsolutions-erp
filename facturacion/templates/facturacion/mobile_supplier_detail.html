@@ -1,0 +1,40 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Proveedor{% endblock %}
+{% block mobile_page_title %}Proveedor{% endblock %}
+{% block mobile_kicker %}Ficha comercial{% endblock %}
+{% block mobile_back_url %}{{ app_supplier_back_url }}{% endblock %}
+{% block mobile_header_description %}<p>Datos comerciales y compras asociadas.</p>{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_suppliers.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'facturacion/mobile_suppliers.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card msu-profile-card">
+  <small class="mi-kicker">Proveedor</small><h2 class="msu-name">{{ proveedor.nombre }}</h2>
+  <div class="msu-badges"><span class="msu-badge {% if proveedor.activo %}active{% else %}inactive{% endif %}">{% if proveedor.activo %}Activo{% else %}Inactivo{% endif %}</span><span class="msu-badge">{{ proveedor.get_condicion_pago_display }}</span></div>
+  <dl class="msu-data msu-data-grid"><div><dt>RTN</dt><dd>{{ proveedor.rtn|default:'Sin RTN' }}</dd></div><div><dt>Días de crédito</dt><dd>{{ proveedor.dias_credito }}</dd></div></dl>
+  {% if can_edit_supplier and app_supplier_edit_url %}<a class="mi-button secondary msu-profile-edit" href="{{ app_supplier_edit_url }}">Editar proveedor</a>{% endif %}
+</section>
+<section class="mi-card"><h2>Datos de contacto</h2><dl class="msu-data"><div><dt>Contacto</dt><dd>{{ proveedor.contacto|default:'Sin contacto' }}</dd></div><div><dt>Teléfono</dt><dd>{{ proveedor.telefono|default:'Sin teléfono' }}</dd></div><div><dt>Correo</dt><dd>{{ proveedor.correo|default:'Sin correo' }}</dd></div><div><dt>Ciudad</dt><dd>{{ proveedor.ciudad|default:'Sin ciudad' }}</dd></div><div><dt>Dirección</dt><dd class="msu-text">{{ proveedor.direccion|default:'Sin dirección' }}</dd></div></dl></section>
+<section class="mi-card msu-summary-card">
+  <h2>Resumen de compras</h2>
+  <dl class="msu-amounts"><div><dt>Monto histórico</dt><dd>L. {{ resumen.monto|floatformat:2|intcomma }}</dd></div><div><dt>Saldo pendiente</dt><dd>L. {{ resumen.saldo_pendiente|floatformat:2|intcomma }}</dd></div></dl>
+  <dl class="msu-stats msu-purchase-stats"><div><dt>Compras</dt><dd>{{ resumen.compras }}</dd></div><div><dt>Aplicadas</dt><dd>{{ resumen.aplicadas }}</dd></div><div><dt>Borradores</dt><dd>{{ resumen.borradores }}</dd></div><div><dt>Por pagar</dt><dd>{{ resumen.por_pagar }}</dd></div><div><dt>Vencidas</dt><dd>{{ resumen.vencidas }}</dd></div></dl>
+  <p class="msu-help">Resumen de todas las compras asociadas, con los importes y estados del sistema.</p>
+</section>
+<section class="msu-purchase-section" aria-labelledby="supplierPurchasesTitle">
+  <div class="msu-section-heading"><h2 id="supplierPurchasesTitle">Compras asociadas</h2><p>Se muestran hasta las 20 compras más recientes. Solo consulta.</p></div>
+  <div class="msu-list">
+  {% for item in mobile_supplier_purchase_items %}{% with compra=item.compra %}
+    <article class="mi-card msu-purchase-card">
+      <div class="msu-card-head"><h3>{{ compra.numero_compra|default:'Compra sin número' }}</h3><span class="msu-badge {{ compra.estado }}">{{ compra.get_estado_display }}</span></div>
+      <dl class="msu-data msu-data-grid"><div><dt>Fecha del documento</dt><dd>{{ compra.fecha_documento|date:'d/m/Y' }}</dd></div><div><dt>Vencimiento</dt><dd>{% if compra.fecha_vencimiento %}{{ compra.fecha_vencimiento|date:'d/m/Y' }}{% else %}Sin fecha{% endif %}</dd></div><div><dt>Total</dt><dd class="msu-money">L. {{ compra.total_documento|floatformat:2|intcomma }}</dd></div><div><dt>Saldo pendiente</dt><dd class="msu-money">L. {{ compra.saldo_pendiente|floatformat:2|intcomma }}</dd></div></dl>
+      <div class="msu-badges"><span class="msu-badge {{ compra.estado_pago }}">{% if compra.estado_pago == 'pagado' %}Pagada{% elif compra.estado_pago == 'parcial' %}Pago parcial{% else %}Pago pendiente{% endif %}</span>{% if compra.esta_vencida %}<span class="msu-badge vencida">Vencida</span>{% endif %}</div>
+      <details class="msu-purchase-fold"><summary>Datos de la compra</summary><dl class="msu-data"><div><dt>Referencia</dt><dd class="msu-text">{{ compra.referencia_documento|default:'Sin referencia' }}</dd></div><div><dt>Condición de pago</dt><dd>{{ compra.get_condicion_pago_display }}</dd></div><div><dt>Unidades</dt><dd>{{ compra.total_unidades|floatformat:2|intcomma }}</dd></div></dl></details>
+      {% if item.detalle_url %}<a class="mi-button secondary mi-status-space" href="{{ item.detalle_url }}">Ver compra</a>{% endif %}
+      {% if item.pdf_url %}<a class="mi-button secondary mi-status-space" href="{{ item.pdf_url }}" target="_blank" rel="noopener">Abrir PDF original de la compra</a>{% endif %}
+    </article>
+  {% endwith %}{% empty %}<section class="mi-card msu-empty"><h2>Sin compras registradas</h2><p>Este proveedor todavía no tiene compras asociadas.</p></section>{% endfor %}
+  </div>
+</section>
+{% endblock %}

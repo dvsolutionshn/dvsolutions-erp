@@ -1,0 +1,13 @@
+{% extends "clinica/mobile_manual_base.html" %}
+{% block mobile_title %}{% if manual %}Editar manual{% else %}Subir manual PDF{% endif %}{% endblock %}
+{% block mobile_back_url %}{% if can_admin_manuals %}{{ app_manual_admin_url }}{% elif can_view_manuals %}{{ app_manuals_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}{% if manual %}Editar manual{% else %}Subir manual PDF{% endif %}{% endblock %}
+{% block mobile_header_description %}<p>{% if manual %}{{ manual.titulo }}{% else %}Deja un documento disponible para el módulo clínico.{% endif %}</p>{% endblock %}
+{% block mobile_content %}
+<form method="post" action="{{ app_manual_form_url }}" enctype="multipart/form-data" id="mobileManualForm" class="mm-compose" data-submit-once>{% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}{% endfor %}
+  {% if form.non_field_errors %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}{% if form.errors %}<div class="mi-error-box" role="alert"><strong>Revisa los datos marcados</strong><p>El título y la descripción se conservan. Revisa el archivo antes de guardar.</p></div>{% endif %}
+  <section class="mi-card"><h2>Datos del documento</h2><div class="mm-fields">{% for field in form.visible_fields %}{% include "clinica/mobile_manual_field.html" with field=field %}{% endfor %}</div><p class="mi-summary-note" data-manual-file-state hidden></p></section>
+  {% if manual and manual.archivo %}<section class="mi-card"><h2>PDF actual</h2><p class="mi-muted">Si no seleccionas otro archivo se conservará el documento actual y sus asociaciones históricas.</p>{% if can_view_manuals and app_manual_pdf_url %}<a class="mi-button secondary mi-status-space" href="{{ app_manual_pdf_url }}" target="_blank" rel="noopener">Abrir PDF actual</a>{% endif %}</section>{% endif %}
+  <a class="mm-cancel" href="{% if can_admin_manuals %}{{ app_manual_admin_url }}{% elif can_view_manuals %}{{ app_manuals_url }}{% else %}{{ app_modules_url }}{% endif %}">Cancelar</a><div class="mi-save-bar"><button class="mi-button" type="submit">Guardar manual</button></div>
+</form>
+{% endblock %}

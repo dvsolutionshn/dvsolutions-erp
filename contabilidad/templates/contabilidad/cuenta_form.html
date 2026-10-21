@@ -1,32 +1,75 @@
 {% extends "core/erp_base.html" %}
+{% load static %}
 
-{% block title %}{{ titulo }}{% endblock %}
-{% block header_kicker %}Contabilidad{% endblock %}
-{% block header_title %}{{ titulo }}{% endblock %}
-{% block header_description %}Configura la base del catalogo contable con una estructura clara y preparada para crecer por empresa.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-action-link">Volver al Catalogo</a>
-{% endblock %}
+{% block title %}{% if form.instance.pk %}Editar cuenta{% else %}Nueva cuenta{% endif %} · {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} accounting-account-page{% endblock %}
+{% block header_kicker %}Centro financiero{% endblock %}
+{% block header_title %}Contabilidad{% endblock %}
+{% block header_description %}Organiza las cuentas y su lugar en el catálogo de esta empresa.{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/cuenta_form.css' %}">{% endblock %}
+{% block topbar_actions %}<a href="{% url 'catalogo_cuentas' empresa.slug %}" class="cf-btn">Volver al catálogo</a>{% endblock %}
 
 {% block content %}
-<form method="post" class="erp-form-shell">
+<form method="post" class="accounting-account" id="erpCuentaForm">
     {% csrf_token %}
-    <section class="erp-form-card">
-        <div class="erp-form-grid">
-            {% for field in form %}
-            <div class="erp-field {% if field.name == 'descripcion' %}erp-field-span-full{% endif %}">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="erp-field-help">{{ field.help_text }}</div>{% endif %}
-                {{ field.errors }}
-            </div>
-            {% endfor %}
-        </div>
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% include "contabilidad/partials/dashboard_icons.html" %}
+    <header class="cf-intro">
+        <div class="cf-intro-main"><span class="cf-hero-icon">{% if form.instance.pk %}{% include "contabilidad/partials/dashboard_icon.html" with icon="settings" only %}{% else %}{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}{% endif %}</span><div><p class="cf-eyebrow">Catálogo de cuentas</p><h1>{% if form.instance.pk %}Editar cuenta contable{% else %}Nueva cuenta contable{% endif %}</h1><p class="cf-description">{% if form.instance.pk %}Actualiza sus datos, clasificación y opciones de uso.{% else %}Define su código, clasificación y lugar en tu estructura contable.{% endif %}</p></div></div>
+        <span class="cf-mode" data-mode="{% if form.instance.pk %}edit{% else %}new{% endif %}">{% if form.instance.pk %}{% include "contabilidad/partials/dashboard_icon.html" with icon="settings" only %}Editando · {{ form.instance.codigo }}{% else %}{% include "contabilidad/partials/dashboard_icon.html" with icon="plus" only %}Nueva cuenta{% endif %}</span>
+    </header>
+    <p class="cf-scope">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}<strong>{{ empresa.nombre }}</strong><span>· Los campos con * son obligatorios.</span></p>
+
+    {% if form.errors %}
+    <section class="cf-error-summary" role="alert" aria-labelledby="cf-errors-title" tabindex="-1">
+        <h2 id="cf-errors-title">Revisa los campos señalados</h2><p>Conservamos los datos que ingresaste para que puedas corregirlos.</p>
+        {{ form.non_field_errors }}
+        <div class="cf-error-links">{% for field in form.visible_fields %}{% if field.errors %}<a href="#{{ field.id_for_label }}">Revisar {{ field.label|lower }}</a>{% endif %}{% endfor %}</div>
+        {% for hidden in form.hidden_fields %}{{ hidden.errors }}{% endfor %}
     </section>
-    <div class="erp-form-actions">
-        <a href="{% url 'catalogo_cuentas' empresa.slug %}" class="erp-btn-secondary">Cancelar</a>
-        <button type="submit" class="erp-btn">Guardar Cuenta</button>
+    {% endif %}
+
+    <div class="cf-layout">
+        <div class="cf-main">
+            <section class="cf-panel" aria-labelledby="cf-data-title">
+                <div class="cf-panel-head"><span class="cf-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><div><h2 id="cf-data-title" class="cf-title">Datos de la cuenta</h2><p class="cf-panel-hint">Identifica la cuenta dentro de tu catálogo.</p></div></div>
+                <div class="cf-fields">
+                    {% include "contabilidad/partials/cuenta_campo.html" with field=form.codigo etiqueta="Código contable" ayuda="Ejemplo: 1.1.01 o 1101, según tu estructura." only %}
+                    {% include "contabilidad/partials/cuenta_campo.html" with field=form.nombre etiqueta="Nombre de la cuenta" only %}
+                    {% include "contabilidad/partials/cuenta_campo.html" with field=form.descripcion etiqueta="Descripción" clase="cf-field--full" only %}
+                </div>
+            </section>
+
+            <section class="cf-panel" aria-labelledby="cf-structure-title">
+                <div class="cf-panel-head"><span class="cf-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><div><h2 id="cf-structure-title" class="cf-title">Clasificación y jerarquía</h2><p class="cf-panel-hint">Indica qué representa y dónde se organiza.</p></div></div>
+                <div class="cf-fields">
+                    {% include "contabilidad/partials/cuenta_campo.html" with field=form.tipo etiqueta="Tipo de cuenta" only %}
+                    {% include "contabilidad/partials/cuenta_campo.html" with field=form.cuenta_padre etiqueta="Cuenta padre" ayuda="Selecciona una cuenta de esta empresa para crear una subcuenta. Déjala sin padre si será principal." only %}
+                </div>
+                <details class="cf-advanced"{% if form.actividad_flujo.errors or form.actividad_flujo.value and form.actividad_flujo.value != "auto" %} open{% endif %}>
+                    <summary>{% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %}<span>Clasificación del flujo de efectivo</span><svg class="cf-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false"><path d="m7 10 5 5 5-5"/></svg></summary>
+                    <div class="cf-advanced-body">{% include "contabilidad/partials/cuenta_campo.html" with field=form.actividad_flujo etiqueta="Actividad en el flujo de efectivo" only %}</div>
+                </details>
+            </section>
+        </div>
+
+        <aside class="cf-sidebar" aria-label="Uso, estado y empresa de la cuenta">
+            <section class="cf-panel" aria-labelledby="cf-options-title">
+                <div class="cf-panel-head"><span class="cf-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="settings" only %}</span><div><h2 id="cf-options-title" class="cf-title">Uso y estado</h2><p class="cf-panel-hint">Define cómo se utiliza esta cuenta.</p></div></div>
+                <div class="cf-toggle-list">
+                    <div class="cf-toggle-item"><label class="cf-toggle" for="{{ form.acepta_movimientos.id_for_label }}">{{ form.acepta_movimientos }}<span class="cf-toggle-copy"><strong>Acepta movimientos</strong><span class="cf-toggle-help" id="{{ form.acepta_movimientos.auto_id }}_helptext">Desmárcala si la cuenta solo agrupa o se conserva para consulta.</span></span></label>{{ form.acepta_movimientos.errors }}</div>
+                    <div class="cf-toggle-item"><label class="cf-toggle" for="{{ form.activa.id_for_label }}">{{ form.activa }}<span class="cf-toggle-copy"><strong>Cuenta activa</strong><span class="cf-toggle-help">Mantén la cuenta habilitada para su uso en el catálogo.</span></span></label>{{ form.activa.errors }}</div>
+                </div>
+            </section>
+            <section class="cf-panel cf-company-card" aria-labelledby="cf-company-title">
+                <div class="cf-panel-head"><span class="cf-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}</span><div><h2 id="cf-company-title" class="cf-title">Empresa de la cuenta</h2></div></div>
+                <strong class="cf-company-name">{{ empresa.nombre }}</strong><p class="cf-company-note">Las cuentas padre disponibles corresponden a esta misma empresa.</p>
+                <div class="cf-guide">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}<div><strong>Cuenta principal</strong><p>Organiza el catálogo cuando no seleccionas una cuenta padre.</p></div></div>
+                <div class="cf-guide">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}<div><strong>Subcuenta</strong><p>Se presenta debajo de su cuenta padre en la jerarquía.</p></div></div>
+            </section>
+        </aside>
     </div>
+
+    <footer class="cf-actions-bar"><p class="cf-save-note">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}<span>Los cambios se guardan en <strong>{{ empresa.nombre }}</strong>.</span></p><div class="cf-actions"><a href="{% url 'catalogo_cuentas' empresa.slug %}" class="cf-btn cf-btn--quiet">Cancelar</a><button type="submit" class="cf-btn cf-btn--primary">{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}{% if form.instance.pk %}Guardar cambios{% else %}Crear cuenta{% endif %}</button></div></footer>
 </form>
 {% endblock %}

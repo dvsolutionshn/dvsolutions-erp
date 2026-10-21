@@ -1,0 +1,9 @@
+<div class="cf-field{% if clase %} {{ clase }}{% endif %}{% if field.errors %} cf-field--invalid{% endif %}">
+    <label for="{{ field.id_for_label }}">
+        {{ etiqueta|default:field.label }}
+        {% if field.field.disabled %}<span class="cf-optional">Solo lectura</span>{% elif field.field.required %}<span class="cf-required" aria-hidden="true">*</span>{% else %}<span class="cf-optional">Opcional</span>{% endif %}
+    </label>
+    {{ field }}
+    {% if ayuda or field.help_text %}<p class="cf-field-help" id="{{ field.auto_id }}_helptext">{% firstof ayuda field.help_text %}</p>{% endif %}
+    {{ field.errors }}
+</div>

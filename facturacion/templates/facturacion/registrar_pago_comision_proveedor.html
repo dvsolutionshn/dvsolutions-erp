@@ -1,10 +1,10 @@
 {% extends "core/erp_base.html" %}
 {% load humanize %}
 
-{% block title %}Pagar comisión - {{ empresa.nombre }}{% endblock %}
+{% block title %}{% if comision.comision_retenida_cliente %}Compensación de comisión{% else %}Pagar comisión{% endif %} - {{ empresa.nombre }}{% endblock %}
 {% block header_kicker %}Cuentas por pagar{% endblock %}
-{% block header_title %}Pagar comisión a proveedor{% endblock %}
-{% block header_description %}Registra la salida de caja o banco y cancela la obligación contable con el proveedor.{% endblock %}
+{% block header_title %}{% if comision.comision_retenida_cliente %}Comisión liquidada por compensación{% else %}Pagar comisión a proveedor{% endif %}{% endblock %}
+{% block header_description %}{% if comision.comision_retenida_cliente %}Liquidación vinculada al cobro de la factura y al proveedor beneficiario.{% else %}Registra la salida de caja o banco y cancela la obligación contable con el proveedor.{% endif %}{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'reporte_cxp' empresa.slug %}?proveedor={{ comision.proveedor_comision_id }}">Volver a cuentas por pagar</a>
 {% endblock %}
@@ -25,16 +25,17 @@
         </article>
         <article class="erp-card">
             <div class="erp-kpi-label">Comisión reconocida</div>
-            <div class="erp-stat-value">L. {{ comision.monto_comision|floatformat:2|intcomma }}</div>
+            <div class="erp-stat-value">{{ comision.factura.moneda }} {{ comision.monto_comision|floatformat:2|intcomma }}</div>
             <p class="erp-card-muted">{{ comision.porcentaje_comision|floatformat:2 }}% sobre la base configurada.</p>
         </article>
         <article class="erp-card">
             <div class="erp-kpi-label">Saldo pendiente</div>
-            <div class="erp-stat-value">L. {{ comision.saldo_comision_pendiente|floatformat:2|intcomma }}</div>
-            <p class="erp-card-muted">Monto aún pendiente con el proveedor.</p>
+            <div class="erp-stat-value">{{ comision.factura.moneda }} {{ comision.saldo_comision_pendiente|floatformat:2|intcomma }}</div>
+            <p class="erp-card-muted">{% if comision.comision_retenida_cliente %}Liquidada por compensación con el cliente.{% else %}Monto aún pendiente con el proveedor.{% endif %}</p>
         </article>
     </section>
 
+    {% if comision.saldo_comision_pendiente > 0 and not comision.comision_retenida_cliente %}
     {% if form.errors %}
     <section class="erp-card" style="border-color:#ef9a9a;color:#8c2d2d;">
         <strong>Revisa los datos del pago.</strong>
@@ -53,6 +54,7 @@
             <button class="erp-btn-secondary" type="button" onclick="document.getElementById('{{ form.monto.id_for_label }}').value='{{ comision.saldo_comision_pendiente|floatformat:2 }}';">Usar saldo pendiente</button>
         </div>
         <div class="erp-field"><label for="{{ form.metodo.id_for_label }}">Método</label>{{ form.metodo }}</div>
+        {% if comision.factura.moneda == "USD" %}<div class="erp-field"><label for="{{ form.tipo_cambio.id_for_label }}">{{ form.tipo_cambio.label }}</label>{{ form.tipo_cambio }}<p>{{ form.tipo_cambio.help_text }}</p>{{ form.tipo_cambio.errors }}</div>{% endif %}
         <div class="erp-field"><label for="{{ form.cuenta_financiera.id_for_label }}">Cuenta financiera</label>{{ form.cuenta_financiera }}</div>
         <div class="erp-field"><label for="{{ form.referencia.id_for_label }}">Referencia</label>{{ form.referencia }}</div>
         <div class="erp-field" style="grid-column:1/-1;"><label for="{{ form.observacion.id_for_label }}">Observación</label>{{ form.observacion }}</div>
@@ -61,6 +63,7 @@
         <a class="erp-btn-secondary" href="{% url 'reporte_cxp' empresa.slug %}?proveedor={{ comision.proveedor_comision_id }}">Cancelar</a>
         <button class="erp-btn" type="submit">Registrar pago</button>
     </section>
+    {% endif %}
 </form>
 
 <section class="erp-card erp-table-card">
@@ -72,14 +75,18 @@
             {% for pago in historial %}
                 <tr>
                     <td>{{ pago.fecha }}</td>
-                    <td class="amount">L. {{ pago.monto|floatformat:2|intcomma }}</td>
+                    <td class="amount">{{ comision.factura.moneda }} {{ pago.monto|floatformat:2|intcomma }}</td>
                     <td>{{ pago.get_metodo_display }}</td>
-                    <td>{{ pago.cuenta_financiera.nombre }}</td>
+                    <td>{% if pago.metodo == "compensacion" %}Compensación con cliente{% elif pago.cuenta_financiera %}{{ pago.cuenta_financiera.nombre }}{% else %}-{% endif %}</td>
                     <td>{{ pago.referencia|default:"-" }}</td>
                     <td>
+                        {% if pago.metodo == "compensacion" %}
+                        <a class="erp-action-link" href="{% url 'editar_pago_factura' empresa.slug comision.factura_id comision.id %}">Editar cobro origen</a>
+                        {% else %}
                         <form method="post" action="{% url 'revertir_pago_comision_proveedor' empresa.slug comision.id pago.id %}" onsubmit="return confirm('¿Revertir este pago de comisión?');">
                             {% csrf_token %}<button class="erp-btn-secondary" type="submit">Revertir</button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
             {% empty %}

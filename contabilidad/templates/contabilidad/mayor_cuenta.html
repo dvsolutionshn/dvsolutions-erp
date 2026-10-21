@@ -1,94 +1,87 @@
 {% extends "core/erp_base.html" %}
+{% load static %}
 
-{% block title %}Mayor por Cuenta - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Reportes Contables{% endblock %}
-{% block header_title %}Mayor por Cuenta{% endblock %}
-{% block header_description %}Analiza el movimiento de una cuenta contable con debe, haber y saldo acumulado por cada partida.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
-<a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
-{% if cuenta %}<a href="{% url 'exportar_mayor_cuenta_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>{% endif %}
-<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
-{% endblock %}
+{% block title %}Mayor por Cuenta · {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} accounting-reports-page accounting-mayor-page{% endblock %}
+{% block header_kicker %}Centro financiero{% endblock %}
+{% block header_title %}Contabilidad{% endblock %}
+{% block header_description %}Consulta tus cuentas y sigue cada movimiento de esta empresa.{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/mayor_navegacion.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/mayor_cuenta.css' %}">{% endblock %}
+{% block topbar_actions %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ef-btn">Volver a reportes</a><a href="{% url 'libro_diario' empresa.slug %}" class="ef-btn">Libro diario</a>{% endblock %}
 
 {% block content %}
-<section class="erp-card erp-report-filter-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Seleccionar cuenta</h3>
-            <p class="erp-card-muted">Consulta el mayor auxiliar por cuenta y periodo.</p>
+<div class="ef-report mc-report">
+    {% include "contabilidad/partials/dashboard_icons.html" %}
+    <header class="ef-hero">
+        <div class="ef-hero-main"><span class="ef-hero-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><div><p class="ef-eyebrow">Reportes contables</p><h1>Mayor por cuenta</h1><p class="ef-hero-description">De la apertura al saldo final, cada movimiento en su lugar.</p></div></div>
+        <div class="ef-hero-actions" aria-label="Acciones del Mayor">
+            {% if cuenta %}<a href="{% url 'exportar_mayor_cuenta_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="ef-btn">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}Descargar Excel</a>{% endif %}
+            <button type="button" onclick="window.print()" class="ef-btn erp-print-button">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}Imprimir</button>
         </div>
-    </div>
-    <form method="get" class="erp-filters">
-        <div class="erp-filter-field">
-            <label for="cuenta">Cuenta</label>
-            <select id="cuenta" name="cuenta" required>
-                <option value="">Selecciona una cuenta</option>
-                {% for cuenta_item in cuentas %}
-                <option value="{{ cuenta_item.id }}" {% if filtros.cuenta == cuenta_item.id|stringformat:"s" %}selected{% endif %}>{{ cuenta_item.codigo }} - {{ cuenta_item.nombre }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="erp-filter-field">
-            <label for="fecha_inicio">Desde</label>
-            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
-        </div>
-        <div class="erp-filter-field">
-            <label for="fecha_fin">Hasta</label>
-            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
-        </div>
-        <div class="erp-filter-actions">
-            <button type="submit" class="erp-btn">Consultar</button>
-            <a href="{% url 'mayor_cuenta' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
-        </div>
-    </form>
-</section>
+        {% include "contabilidad/partials/metadatos_estado_financiero.html" with empresa=empresa filtros=filtros modo="mayor" only %}
+    </header>
 
-<section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Cuenta</div><p class="erp-stat-value">{% if cuenta %}{{ cuenta.codigo }}{% else %}-{% endif %}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Movimientos</div><p class="erp-stat-value">{{ resumen.movimientos }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Saldo</div><p class="erp-stat-value">L. {{ resumen.saldo }}</p></article>
-</section>
+    <section id="mc-filtros" class="ef-filter-bar mc-filter-card" aria-labelledby="mc-filter-title">
+        <div class="ef-filter-heading mc-filter-heading"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}</span><div><h2 id="mc-filter-title">Cuenta y período</h2><p>Elige la cuenta y las fechas que quieres revisar.</p></div></div>
+        <form method="get" class="ef-filters mc-filters" aria-label="Consultar Mayor por cuenta y período">
+            {% if desde_estado_resultados %}<input type="hidden" name="origen" value="estado_resultados">{% endif %}
+            <div class="ef-field mc-account-field"><label for="cuenta">Cuenta</label><select id="cuenta" name="cuenta" required><option value="">Selecciona una cuenta</option>{% for cuenta_item in cuentas %}<option value="{{ cuenta_item.id }}" {% if filtros.cuenta == cuenta_item.id|stringformat:"s" %}selected{% endif %}>{{ cuenta_item.codigo }} - {{ cuenta_item.nombre }}{% if not cuenta_item.activa %} (inactiva){% endif %}</option>{% endfor %}</select></div>
+            <div class="ef-field"><label for="fecha_inicio">Desde</label><input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}"></div>
+            <div class="ef-field"><label for="fecha_fin">Hasta</label><input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}"></div>
+            <div class="ef-filter-actions"><button type="submit" class="ef-btn ef-btn--primary">Consultar</button><a href="{% url 'mayor_cuenta' empresa.slug %}" class="ef-btn ef-btn--quiet">Limpiar</a></div>
+        </form>
+    </section>
 
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">{% if cuenta %}{{ cuenta.codigo }} - {{ cuenta.nombre }}{% else %}Mayor auxiliar{% endif %}</h3>
-            <p class="erp-card-muted">Selecciona una cuenta para consultar su movimiento contable.</p>
+    <div class="ef-currency"><span class="ef-currency-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}</span>{% include "contabilidad/nota_moneda_reportes.html" %}</div>
+
+    {% if desde_estado_resultados %}
+    <section class="mc-context-notice" aria-label="Vista desde Estado de Resultados"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><div><p>Vista desde Estado de Resultados: se omiten los asientos de cierre del período; el saldo del Mayor incluye la apertura.</p><a class="ef-btn" href="{% url 'mayor_cuenta' empresa.slug %}?cuenta={{ cuenta.pk }}&amp;fecha_inicio={{ filtros.fecha_inicio|urlencode }}&amp;fecha_fin={{ filtros.fecha_fin|urlencode }}{% if movimiento_seleccionado %}&amp;movimiento={{ movimiento_seleccionado }}#movimiento-{{ movimiento_seleccionado }}{% endif %}">Ver Mayor completo {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a></div></section>
+    {% endif %}
+
+    <section class="mc-account-card" aria-label="Cuenta consultada">
+        <div class="mc-account-main"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><div><p class="mc-account-eyebrow">{% if cuenta %}{{ cuenta.codigo }}{% else %}Mayor auxiliar{% endif %}</p><h2 class="mc-account-name">{% if cuenta %}{{ cuenta.nombre }}{% else %}Selecciona una cuenta para comenzar{% endif %}</h2></div></div>
+        {% if cuenta %}<div class="mc-account-meta"><span class="mc-badge">{{ cuenta.get_tipo_display }}</span>{% if not cuenta.activa %}<span class="mc-badge mc-badge--muted">Cuenta inactiva</span>{% endif %}<span class="mc-nature">{% if cuenta.tipo == "activo" or cuenta.tipo == "costo" or cuenta.tipo == "gasto" %}Naturaleza deudora{% else %}Naturaleza acreedora{% endif %}</span></div>{% else %}<p class="mc-nature">Las cuentas disponibles pertenecen a {{ empresa.nombre }}.</p>{% endif %}
+    </section>
+
+    <section class="ef-kpis mc-kpis" aria-label="Resumen de saldos de la cuenta">
+        <article class="ef-kpi" data-tone="slate"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="clock" only %}</span><span class="ef-kpi-label">Saldo inicial</span></div><p class="ef-kpi-value">{% if cuenta %}L. {{ resumen.saldo_inicial|floatformat:"2g" }}{% else %}—{% endif %}</p><div class="ef-kpi-foot"><span>Anterior al período</span></div></article>
+        <article class="ef-kpi" data-tone="teal"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}</span><span class="ef-kpi-label">Débitos del período</span></div><p class="ef-kpi-value">{% if cuenta %}L. {{ resumen.debe_total|floatformat:"2g" }}{% else %}—{% endif %}</p><div class="ef-kpi-foot"><span>Total del Debe</span></div></article>
+        <article class="ef-kpi" data-tone="amber"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}</span><span class="ef-kpi-label">Créditos del período</span></div><p class="ef-kpi-value">{% if cuenta %}L. {{ resumen.haber_total|floatformat:"2g" }}{% else %}—{% endif %}</p><div class="ef-kpi-foot"><span>Total del Haber</span></div></article>
+        <article class="ef-kpi mc-kpi-final" data-tone="indigo"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}</span><span class="ef-kpi-label">Saldo final</span></div><p class="ef-kpi-value">{% if cuenta %}L. {{ resumen.saldo|floatformat:"2g" }}{% else %}—{% endif %}</p><div class="ef-kpi-foot"><span>Apertura y movimientos del período</span></div></article>
+    </section>
+
+    <article id="mc-movimientos" class="ef-section mc-movements" aria-labelledby="mc-movements-title">
+        <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><div><h2 id="mc-movements-title">Movimientos de la cuenta</h2><p>{% if cuenta %}Abre un número de asiento para consultar la partida completa.{% else %}Aquí aparecerá el detalle de la cuenta que selecciones.{% endif %}</p></div></div>{% if cuenta %}<span class="mc-movement-count">{{ resumen.movimientos }} movimiento{{ resumen.movimientos|pluralize:"s" }}</span>{% endif %}</div>
+        <nav class="mc-table-actions" aria-label="Navegación de la consulta">
+            {% if desde_estado_resultados %}<a href="{% url 'estado_resultados' empresa.slug %}?fecha_inicio={{ filtros.fecha_inicio|urlencode }}&amp;fecha_fin={{ filtros.fecha_fin|urlencode }}" class="ef-btn">{% include "contabilidad/partials/dashboard_icon.html" with icon="chart" only %}Volver al Estado de Resultados</a>{% elif movimiento_seleccionado %}<a href="{% url 'balance_general' empresa.slug %}?fecha_corte={{ filtros.fecha_fin|urlencode }}" class="ef-btn">{% include "contabilidad/partials/dashboard_icon.html" with icon="bank" only %}Volver al Balance</a>{% endif %}
+            <a href="#mc-filtros" class="ef-btn ef-btn--quiet">Cambiar cuenta o período</a>
+        </nav>
+        {% if cuenta %}
+        <div class="erp-table-wrap">
+            <table class="erp-table mc-table">
+                <caption class="mc-table-caption">{{ cuenta.codigo }} — {{ cuenta.nombre }} · Importes en HNL</caption>
+                <thead><tr><th scope="col">Fecha</th><th scope="col">Asiento</th><th scope="col">Concepto</th><th scope="col">Referencia</th><th scope="col" class="mc-amount">Débito</th><th scope="col" class="mc-amount">Crédito</th><th scope="col" class="mc-amount">Saldo</th></tr></thead>
+                <tbody>
+                    {% if filtros.fecha_inicio %}<tr class="mc-opening-row"><td colspan="6">Saldo inicial anterior al período</td><td class="mc-amount"><span class="erp-money">L. {{ resumen.saldo_inicial|floatformat:"2g" }}</span></td></tr>{% endif %}
+                    {% for movimiento in movimientos %}
+                    <tr id="movimiento-{{ movimiento.linea.pk }}" class="mayor-movimiento{% if movimiento.linea.pk == movimiento_seleccionado %} mayor-movimiento--seleccionado{% endif %}"{% if movimiento.linea.pk == movimiento_seleccionado %} aria-current="true"{% endif %}>
+                        <td class="mc-date">{{ movimiento.linea.asiento.fecha|date:"d/m/Y" }}</td>
+                        <td class="mc-entry"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.linea.asiento.id %}">{{ movimiento.linea.asiento.numero|default:"Sin número" }}</a></td>
+                        <td class="mc-detail">{{ movimiento.linea.detalle|default:movimiento.linea.asiento.descripcion }}{% if movimiento.linea.pk == movimiento_seleccionado %}<span class="mayor-seleccion-etiqueta">Movimiento seleccionado</span>{% endif %}</td>
+                        <td class="mc-reference">{{ movimiento.linea.asiento.referencia|default:"—" }}</td>
+                        <td class="mc-amount"><span class="erp-money">L. {{ movimiento.linea.debe|floatformat:"2g" }}</span></td>
+                        <td class="mc-amount"><span class="erp-money">L. {{ movimiento.linea.haber|floatformat:"2g" }}</span></td>
+                        <td class="mc-amount mc-running-balance"><span class="erp-money">L. {{ movimiento.saldo|floatformat:"2g" }}</span></td>
+                    </tr>
+                    {% empty %}<tr><td colspan="7" class="erp-empty">No hay movimientos contabilizados para esta cuenta en el período seleccionado.</td></tr>{% endfor %}
+                </tbody>
+                <tfoot><tr class="mc-closing-row"><th colspan="4" scope="row">Totales del período / saldo final</th><td class="mc-amount"><span class="erp-money">L. {{ resumen.debe_total|floatformat:"2g" }}</span></td><td class="mc-amount"><span class="erp-money">L. {{ resumen.haber_total|floatformat:"2g" }}</span></td><td class="mc-amount"><span class="erp-money">L. {{ resumen.saldo|floatformat:"2g" }}</span></td></tr></tfoot>
+            </table>
         </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Asiento</th>
-                    <th>Detalle</th>
-                    <th>Referencia</th>
-                    <th>Debe</th>
-                    <th>Haber</th>
-                    <th>Saldo</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for movimiento in movimientos %}
-                <tr>
-                    <td>{{ movimiento.linea.asiento.fecha|date:"F j, Y" }}</td>
-                    <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.linea.asiento.id %}">{{ movimiento.linea.asiento.numero|default:"Sin numero" }}</a></td>
-                    <td>{{ movimiento.linea.detalle|default:movimiento.linea.asiento.descripcion }}</td>
-                    <td>{{ movimiento.linea.asiento.referencia|default:"-" }}</td>
-                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.debe }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.haber }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ movimiento.saldo }}</span></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="7" class="erp-empty">Selecciona una cuenta o ajusta los filtros para ver movimientos.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+        {% else %}
+        <div class="mc-empty"><span class="mc-empty-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}</span><h3 class="mc-empty-title">Elige qué cuenta quieres revisar</h3><p class="mc-empty-note">Selecciona una cuenta de {{ empresa.nombre }} y consulta su apertura, movimientos y saldo final.</p><a class="ef-btn" href="#mc-filtros">Seleccionar cuenta {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a></div>
+        {% endif %}
+    </article>
+    <p class="mc-footer-note">Los saldos siguen la naturaleza de la cuenta: deudora en activos, costos y gastos; acreedora en pasivos, patrimonio e ingresos. Solo se incluyen asientos contabilizados de {{ empresa.nombre }}.</p>
+</div>
 {% endblock %}

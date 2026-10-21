@@ -1,0 +1,20 @@
+/* Summary-only audit screen; no shared calendar, billing or desktop changes. */
+.maud-control{display:grid;gap:14px;min-width:0}.maud-header-description{overflow-wrap:anywhere}
+.maud-control h2,.maud-control p,.maud-control strong,.maud-control dd,.maud-control dt{overflow-wrap:anywhere}
+.maud-intro h2{margin-bottom:8px}.maud-intro p{font-size:12px;line-height:1.6}
+.maud-count{display:flex;align-items:center;justify-content:space-between;gap:15px;border-left:4px solid #23a99b}
+.maud-count h2{margin:0;font-size:14px}.maud-count small{display:block;color:#6b8192;margin-top:5px;font-size:11px;line-height:1.5}.maud-count strong{font-size:29px;color:#12324a;font-variant-numeric:tabular-nums;line-height:1.2}
+.maud-filters form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.maud-wide{grid-column:1/-1}.maud-filters .mi-field input[type=date]{padding-inline:8px;max-width:100%}
+.maud-clear{display:grid;place-items:center;min-height:44px;text-decoration:none;color:#197f76;font-weight:800;font-size:12px}
+.maud-page-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;color:#678092;padding:0 3px}.maud-page-meta p{margin:0}.maud-page-meta>span{white-space:nowrap;font-size:11px}
+.maud-list{display:grid;gap:11px;min-width:0}.maud-record{padding:17px;border-radius:21px}
+.maud-record-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}.maud-record time{display:grid;gap:4px;min-width:0;font-size:12px;color:#274b61;font-weight:800;line-height:1.4}.maud-record time span{color:#738899;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.maud-action{display:inline-flex;align-items:center;gap:6px;max-width:100%;font-size:10px;font-weight:800;border-radius:999px;padding:7px 10px;line-height:1.45;background:#edf3f7;color:#586f83;overflow-wrap:anywhere}
+.maud-action:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}.maud-action.action-crear{background:#e5f6ee;color:#167d5d}.maud-action.action-modificar{background:#e8f1fc;color:#2b679d}.maud-action.action-eliminar{background:#fbedef;color:#a14a59}.maud-action.action-relacion{background:#efecf9;color:#6a55a2}
+.maud-record .maud-model{font-size:15px;line-height:1.5;margin:14px 0 4px}.maud-record .maud-id{font-size:11px;color:#728899;margin:0 0 13px;font-variant-numeric:tabular-nums}
+.maud-record dl{display:grid;gap:9px;margin:0;padding-top:12px;border-top:1px solid #e3edf3}.maud-record dl>div{display:grid;grid-template-columns:minmax(0,80px) minmax(0,1fr);gap:12px;align-items:start}.maud-record dt{font-size:11px;color:#728898;line-height:1.5}.maud-record dd{margin:0;font-size:12px;color:#2b5067;font-weight:700;line-height:1.5}
+.maud-source{font-size:10px;color:#7a8d9b;margin-top:12px;overflow-wrap:anywhere;line-height:1.5}
+.maud-empty{text-align:center;padding:27px 18px}.maud-empty h2{margin:0 0 8px}.maud-empty p{font-size:12px;color:#6c8293}
+.maud-pagination p{font-size:12px;text-align:center;color:#6e8495;margin:5px 0 12px}.maud-pagination>div{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}.maud-pagination a{display:grid;place-items:center;min-height:45px;padding:10px 17px;border:1px solid #cbdfe9;border-radius:13px;background:#fff;color:#286c7b;text-decoration:none;font-weight:800;font-size:12px}
+.maud-navigation{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}.maud-navigation a{padding-inline:6px}.maud-navigation span{text-align:center;overflow-wrap:anywhere;line-height:1.35}
+@media(max-width:370px){.maud-filters form{gap:10px}.maud-filters .mi-field input[type=date]{padding-inline:5px}.maud-record{padding:14px}.maud-record dl>div{grid-template-columns:minmax(0,70px) minmax(0,1fr);gap:8px}}

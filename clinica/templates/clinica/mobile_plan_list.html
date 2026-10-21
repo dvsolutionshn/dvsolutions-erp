@@ -1,0 +1,16 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% load static %}
+{% block mobile_title %}Historial de planes{% endblock %}
+{% block mobile_page_title %}Historial de planes{% endblock %}
+{% block mobile_kicker %}Planes e indicaciones{% endblock %}
+{% block mobile_back_url %}{% if can_view_patient and app_patient_detail_url %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'clinica/mobile_plans.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'clinica/mobile_plans.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+{% if can_create_plan %}<a class="mi-button" href="{{ app_plan_create_url }}">Registrar nuevo plan</a>{% endif %}
+<section class="mi-card mpl-search-card" aria-labelledby="planSearchTitle"><h2 id="planSearchTitle">Buscar en el historial</h2><form method="get" action="{{ app_plan_search_url }}" id="mobilePlanSearchForm"><input type="hidden" name="app" value="1"><div class="mi-field"><label for="planSearch">Texto del plan</label><input id="planSearch" type="search" name="q" value="{{ mobile_plan_query }}" placeholder="Buscar indicaciones..." autocomplete="off"></div><button class="mi-button secondary" type="submit">Buscar</button>{% if mobile_plan_query %}<a class="mpl-clear-search" href="{{ app_plans_url }}">Limpiar búsqueda</a>{% endif %}</form><p class="mpl-search-note">La búsqueda consulta todo el historial de este paciente, no solo la página actual. Del más reciente al más antiguo.</p></section>
+<div class="mpl-list-meta"><strong>{{ mobile_plan_total }} plan{% if mobile_plan_total != 1 %}es{% endif %}</strong>{% if mobile_plan_total %}<span>{{ planes.start_index }}–{{ planes.end_index }}</span>{% endif %}</div>
+<div class="mpl-plan-list">{% for item in mobile_plan_items %}<details class="mi-card mpl-plan-card"><summary><span><strong>{{ item.responsable }}</strong><small><time datetime="{{ item.fecha|date:'c' }}">{{ item.fecha|date:'d/m/Y H:i' }}</time> · Ver indicaciones completas</small></span><b aria-hidden="true">⌄</b></summary><div class="mpl-plan-content">{% if item.autor %}<p class="mpl-registered-by">Registrado por {{ item.autor }}</p>{% endif %}<p>{{ item.texto }}</p></div></details>{% empty %}<section class="mi-card mpl-empty"><h2>Sin planes{% if mobile_plan_query %} que coincidan{% endif %}</h2><p>{% if mobile_plan_query %}No se encontraron indicaciones con este texto en el historial del paciente.{% else %}Todavía no hay planes registrados para este paciente.{% endif %}</p>{% if can_create_plan %}<a class="mi-link" href="{{ app_plan_create_url }}">Registrar nuevo plan</a>{% endif %}</section>{% endfor %}</div>
+{% if mobile_plan_num_pages > 1 %}<nav class="mpl-pagination" aria-label="Páginas del historial de planes"><div>{% if mobile_plan_previous_url %}<a href="{{ mobile_plan_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_plan_page }} / {{ mobile_plan_num_pages }}</span>{% if mobile_plan_next_url %}<a href="{{ mobile_plan_next_url }}">Siguiente ›</a>{% endif %}</div></nav>{% endif %}
+{% endblock %}

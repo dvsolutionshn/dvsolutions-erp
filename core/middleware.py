@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.utils import translation
 
 from core.access import (
     gastos_adicionales_habilitados,
@@ -79,6 +80,10 @@ class EmpresaAccessMiddleware:
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de facturacion.")
                         return redirect("dashboard", slug=empresa.slug)
 
+                with translation.override("es-ni"):
+                    request.LANGUAGE_CODE = "es-ni"
+                    return self.get_response(request)
+
         if len(parts) >= 3 and parts[1] == "dashboard" and parts[2] == "contabilidad":
             empresa_slug = parts[0]
             empresa = Empresa.objects.filter(slug=empresa_slug, activa=True).first()
@@ -108,6 +113,11 @@ class EmpresaAccessMiddleware:
                     if not suffix and not request.user.tiene_alguna_permision_contabilidad_empresa(empresa):
                         messages.error(request, "Tu rol no tiene acceso operativo al modulo de contabilidad.")
                         return redirect("dashboard", slug=empresa.slug)
+
+                # Español y formato numérico centroamericano: 1,234.56.
+                with translation.override("es-ni"):
+                    request.LANGUAGE_CODE = "es-ni"
+                    return self.get_response(request)
 
         if len(parts) >= 3 and parts[1] == "dashboard" and parts[2] == "rrhh":
             empresa_slug = parts[0]
@@ -169,6 +179,15 @@ class EmpresaAccessMiddleware:
                     messages.error(request, "Tu usuario no pertenece a esta empresa.")
                     return redirect("empresa_login", slug=empresa.slug)
 
+                # Sólo el catálogo móvil para regresar a Usuarios. Las rutas
+                # administrativas originales no exigen agenda ni licencia;
+                # esta excepción no autoriza el inicio ni sus operaciones.
+                if request.method == "GET" and "/".join(parts[3:]) in {"app/modules.json", "app/modulos"}:
+                    from core.mobile_users import usuarios_disponibles_app
+
+                    if usuarios_disponibles_app(request, empresa):
+                        return self.get_response(request)
+
                 if not request.user.is_superuser and not empresa.licencia_operativa:
                     messages.error(request, "La licencia comercial de esta empresa esta suspendida o vencida. Contactate con el administrador de DV Solutions para revisar la activacion del servicio.")
                     return redirect("empresa_login", slug=empresa.slug)
@@ -206,6 +225,14 @@ class EmpresaAccessMiddleware:
                             messages.error(request, "Tu rol no tiene permiso para ejecutar esta acción de agenda.")
                             return redirect("dashboard", slug=empresa.slug)
                         return self.get_response(request)
+                    # Sólo metadatos del catálogo móvil. Crear/editar proveedores
+                    # ya tienen permisos de acción independientes; no conceden
+                    # calendario, inicio clínico ni consultas financieras.
+                    if request.method == "GET" and suffix in {"app/modules.json", "app/modulos"}:
+                        from facturacion.mobile_suppliers import proveedores_disponibles_app
+
+                        if any(proveedores_disponibles_app(request, empresa).values()):
+                            return self.get_response(request)
                     tiene_permiso_app = bool(
                         (es_app_clinica_global or es_gestion_disponibilidad_medica)
                         and (

@@ -1,0 +1,4 @@
+<div class="mi-field ms-field{% if field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %} ms-choice-field{% endif %}" data-special-history-field="{{ field.name }}">
+  {% if field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %}<span class="ms-field-label" id="ms-label-{{ field.html_name }}">{{ field.label }}{% if field.field.required %}<span class="ms-required"> *</span>{% endif %}</span><div role="group" aria-labelledby="ms-label-{{ field.html_name }}">{{ field }}</div>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="ms-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+  {% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+</div>

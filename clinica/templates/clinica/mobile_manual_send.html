@@ -1,0 +1,8 @@
+{% extends "clinica/mobile_manual_list.html" %}
+{% block mobile_title %}Enviar manuales{% endblock %}
+{% block mobile_back_url %}{% if can_view_manuals %}{{ app_manuals_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}Enviar manuales{% endblock %}
+{% block mobile_header_description %}<p>Selecciona los documentos y confirma el paciente y el método de envío.</p>{% endblock %}
+{% block mobile_header_actions %}{% endblock %}
+{% block mobile_content %}<span data-manual-autostart hidden></span>{{ block.super }}{% endblock %}
+{% block mobile_manual_history %}{% endblock %}

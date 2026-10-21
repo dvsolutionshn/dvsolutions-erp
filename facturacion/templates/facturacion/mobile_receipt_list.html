@@ -1,0 +1,16 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Recibos{% endblock %}
+{% block mobile_page_title %}Recibos{% endblock %}
+{% block mobile_kicker %}Comprobantes de pago{% endblock %}
+{% block mobile_back_url %}{{ app_modules_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>Consulta los documentos de pago de la empresa activa.</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'facturacion/mobile_receipts.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'facturacion/mobile_receipts.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mrc-search-card" aria-labelledby="receiptSearchTitle"><h2 id="receiptSearchTitle">Buscar recibos</h2><form id="mobileReceiptSearchForm" action="{{ app_receipts_search_url }}" method="get"><input type="hidden" name="app" value="1"><div class="mi-field"><label for="receiptSearch">Número, cliente, factura o referencia</label><input id="receiptSearch" type="search" name="q" value="{{ mobile_receipt_query }}" placeholder="Buscar recibo..." autocomplete="off"></div><button class="mi-button secondary" type="submit">Buscar</button>{% if mobile_receipt_query %}<a class="mrc-clear-search" href="{{ app_receipts_url }}">Limpiar búsqueda</a>{% endif %}</form><p class="mrc-search-note">La búsqueda consulta todos los recibos de esta empresa, no solo la página actual.</p></section>
+<div class="mrc-list-meta"><strong>{{ mobile_receipt_total }} recibo{% if mobile_receipt_total != 1 %}s{% endif %}</strong>{% if mobile_receipt_total %}<span>{{ recibos.start_index }}–{{ recibos.end_index }}</span>{% endif %}</div>
+<div class="mrc-list">{% for item in mobile_receipt_items %}<article class="mi-card mrc-receipt-card"><div class="mrc-receipt-head"><div><small>Número de recibo</small><strong>{{ item.numero }}</strong></div><span class="mrc-method">{{ item.metodo_label }}</span></div><div class="mrc-client">{{ item.cliente }}</div><div class="mrc-card-bottom"><div><small>{{ item.fecha|date:'d/m/Y' }} · {{ item.moneda }}</small><strong class="mrc-card-amount">{% if item.moneda == 'USD' %}$ {% else %}L. {% endif %}{{ item.monto|floatformat:2|intcomma }}</strong></div><a class="mrc-view-link" href="{{ item.detalle_url }}" aria-label="Ver recibo {{ item.numero }}">Ver ›</a></div></article>{% empty %}<section class="mi-card mrc-empty"><h2>Sin recibos{% if mobile_receipt_query %} que coincidan{% endif %}</h2><p>{% if mobile_receipt_query %}No se encontraron recibos con esta búsqueda.{% else %}Todavía no hay recibos registrados para esta empresa.{% endif %}</p></section>{% endfor %}</div>
+{% if mobile_receipt_num_pages > 1 %}<nav class="mrc-pagination" aria-label="Páginas de recibos"><div>{% if mobile_receipt_previous_url %}<a href="{{ mobile_receipt_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_receipt_page }} / {{ mobile_receipt_num_pages }}</span>{% if mobile_receipt_next_url %}<a href="{{ mobile_receipt_next_url }}">Siguiente ›</a>{% endif %}</div></nav>{% endif %}
+{% endblock %}

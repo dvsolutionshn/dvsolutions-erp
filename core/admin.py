@@ -47,6 +47,75 @@ class ConfiguracionAvanzadaEmpresaAdmin(admin.ModelAdmin):
         'usa_bodegas_internas',
     )
 
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app, preparar_cambio_avanzado_app
+
+        if es_configuracion_avanzada_app(request):
+            preparar_cambio_avanzado_app(self, request, object_id)
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        formulario = super().get_form(request, obj, change, **kwargs)
+        from .mobile_advanced_configuration import adaptar_formulario_avanzado_app, es_configuracion_avanzada_app
+
+        if es_configuracion_avanzada_app(request):
+            return adaptar_formulario_avanzado_app(formulario)
+        return formulario
+
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app, render_cambio_avanzado_app
+
+        if es_configuracion_avanzada_app(request):
+            return render_cambio_avanzado_app(self, request, context, add, obj)
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def response_add(self, request, obj, post_url_continue=None):
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app, respuesta_guardado_avanzado_app
+
+        if es_configuracion_avanzada_app(request):
+            return respuesta_guardado_avanzado_app(self, request, obj, add=True)
+        return super().response_add(request, obj, post_url_continue)
+
+    def response_change(self, request, obj):
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app, respuesta_guardado_avanzado_app
+
+        if es_configuracion_avanzada_app(request):
+            return respuesta_guardado_avanzado_app(self, request, obj)
+        return super().response_change(request, obj)
+
+    def _get_obj_does_not_exist_redirect(self, request, opts, object_id):
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app
+
+        if es_configuracion_avanzada_app(request):
+            from django.http import Http404
+
+            raise Http404("La configuración seleccionada ya no existe.")
+        return super()._get_obj_does_not_exist_redirect(request, opts, object_id)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        from django.core.exceptions import PermissionDenied
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app
+
+        if es_configuracion_avanzada_app(request):
+            raise PermissionDenied("La app no incluye eliminación global de configuración avanzada.")
+        return super().delete_view(request, object_id, extra_context)
+
+    def changelist_view(self, request, extra_context=None):
+        from django.core.exceptions import PermissionDenied
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app
+
+        if es_configuracion_avanzada_app(request):
+            raise PermissionDenied("Use el selector móvil de las cuatro empresas clínicas.")
+        return super().changelist_view(request, extra_context)
+
+    def history_view(self, request, object_id, extra_context=None):
+        from django.core.exceptions import PermissionDenied
+        from .mobile_advanced_configuration import es_configuracion_avanzada_app
+
+        if es_configuracion_avanzada_app(request):
+            raise PermissionDenied("La app no incluye el historial global del administrador.")
+        return super().history_view(request, object_id, extra_context)
+
 
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):

@@ -1,0 +1,61 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Bitácora clínica{% endblock %}
+{% block mobile_page_title %}Bitácora clínica{% endblock %}
+{% block mobile_kicker %}Resumen de actividad{% endblock %}
+{% block mobile_back_url %}{{ app_audit_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="maud-header-description">Eventos autorizados de {{ empresa.nombre }}, en una vista de consulta.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_audit.css' %}">{% endblock %}
+{% block mobile_navigation %}
+{% if can_view_app_modules or can_view_clinical_configuration %}
+<nav class="mi-bottom maud-navigation" aria-label="Navegación de la bitácora">
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>{% endif %}
+  {% if can_view_clinical_configuration and app_configuration_url %}<a href="{{ app_configuration_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg><span>Configuración clínica</span></a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}
+{% block mobile_content %}
+<div class="maud-control" id="mobileAuditSummary">
+  <section class="mi-card maud-intro">
+    <span class="mi-kicker">Solo consulta</span>
+    <h2>Resumen clínico y administrativo</h2>
+    <p>Esta pantalla incluye eventos de clínica, configuración local e inventario. No es el expediente clínico ni la bitácora completa del ERP; los documentos contables y financieros no están incluidos aquí.</p>
+    <p class="mi-muted">Se muestran la acción, el registro identificado, la fecha y el autor. No se muestran valores anteriores o nuevos, motivos, datos privados ni detalles de la solicitud.</p>
+  </section>
+  <section class="mi-card maud-count" aria-label="Eventos encontrados">
+    <div><h2>Eventos encontrados</h2><small>Según los filtros, antes de paginar</small></div><strong>{{ total_registros }}</strong>
+  </section>
+  <section class="mi-card maud-filters">
+    <h2>Filtrar actividad</h2>
+    <form id="mobileAuditFilters" method="get" action="{{ app_audit_search_url }}">
+      <input type="hidden" name="app" value="1">
+      <div class="mi-field maud-wide"><label for="auditSummarySearch">Buscar</label><input id="auditSummarySearch" type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar en los registros..." autocomplete="off"></div>
+      <div class="mi-field"><label for="auditSummaryAction">Acción</label><select id="auditSummaryAction" name="accion"><option value=""{% if not filtros.accion %} selected{% endif %}>Todas</option>{% for value,label in acciones %}<option value="{{ value }}"{% if filtros.accion == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="mi-field"><label for="auditSummaryModule">Módulo</label><select id="auditSummaryModule" name="modulo"><option value=""{% if not filtros.modulo %} selected{% endif %}>Todos</option>{% for value in modulos %}<option value="{{ value }}"{% if filtros.modulo == value %} selected{% endif %}>{{ value }}</option>{% endfor %}</select></div>
+      <div class="mi-field maud-wide"><label for="auditSummaryUser">Usuario</label><select id="auditSummaryUser" name="usuario"><option value=""{% if not filtros.usuario %} selected{% endif %}>Todos</option>{% for value in usuarios_auditoria %}<option value="{{ value.id }}"{% if filtros.usuario == value.id|stringformat:'s' %} selected{% endif %}>{{ value.username }}</option>{% endfor %}</select></div>
+      <div class="mi-field"><label for="auditSummaryFrom">Desde</label><input id="auditSummaryFrom" type="date" name="desde" value="{{ filtros.desde }}"></div>
+      <div class="mi-field"><label for="auditSummaryUntil">Hasta</label><input id="auditSummaryUntil" type="date" name="hasta" value="{{ filtros.hasta }}"></div>
+      <button class="mi-button maud-wide" type="submit">Aplicar filtros</button>
+      {% if filtros.q or filtros.accion or filtros.modulo or filtros.usuario or filtros.desde or filtros.hasta %}<a class="maud-clear maud-wide" href="{{ app_audit_url }}">Limpiar filtros</a>{% endif %}
+    </form>
+    <p class="mi-muted">La búsqueda conserva los filtros del registro original y puede coincidir con información que no se muestra en este resumen.</p>
+  </section>
+  <div class="maud-page-meta"><p>Página {{ registros.number }} de {{ registros.paginator.num_pages }}</p>{% if total_registros %}<span>{{ registros.start_index }}–{{ registros.end_index }}</span>{% endif %}</div>
+  <section class="maud-list" aria-label="Eventos de la bitácora">
+    {% for item in mobile_audit_items %}
+    <article class="mi-card maud-record" data-audit-action="{{ item.accion }}">
+      <div class="maud-record-head"><time datetime="{{ item.fecha|date:'c' }}">{{ item.fecha|date:'d/m/Y' }}<span>{{ item.fecha|date:'H:i:s' }}</span></time><span class="maud-action action-{{ item.accion }}">{{ item.accion_label }}</span></div>
+      <h2 class="maud-model">{{ item.modelo_label }}</h2>
+      <p class="maud-id">ID {{ item.objeto_id }}</p>
+      <dl><div><dt>Autor</dt><dd>{{ item.usuario_nombre }}</dd></div><div><dt>Módulo</dt><dd>{{ item.modulo }}</dd></div></dl>
+      <div class="maud-source">{{ item.app_label }} · {{ item.modelo }}</div>
+    </article>
+    {% empty %}
+    <article class="mi-card maud-empty"><h2>Sin eventos con estos filtros</h2><p>Pruebe otra búsqueda, acción, módulo, usuario o período.</p></article>
+    {% endfor %}
+  </section>
+  {% if registros.paginator.num_pages > 1 %}
+  <nav class="maud-pagination" aria-label="Páginas de la bitácora"><p>Página {{ registros.number }} de {{ registros.paginator.num_pages }}</p><div>{% if mobile_audit_previous_url %}<a href="{{ mobile_audit_previous_url }}">‹ Anterior</a>{% endif %}{% if mobile_audit_next_url %}<a href="{{ mobile_audit_next_url }}">Siguiente ›</a>{% endif %}</div></nav>
+  {% endif %}
+</div>
+{% endblock %}

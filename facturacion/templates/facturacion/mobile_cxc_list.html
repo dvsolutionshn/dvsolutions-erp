@@ -1,0 +1,57 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static humanize %}
+{% block mobile_title %}Cuentas por cobrar{% endblock %}
+{% block mobile_page_title %}Cuentas por cobrar{% endblock %}
+{% block mobile_kicker %}Consulta de cartera{% endblock %}
+{% block mobile_back_url %}{{ app_cxc_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>Saldos pendientes de la empresa activa, sin modificar pagos.</p>{% endblock %}
+{% block mobile_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'facturacion/mobile_egresos.css' %}">
+<link rel="stylesheet" href="{% static 'facturacion/mobile_cxc.css' %}">
+{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'facturacion/mobile_egresos.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mcxc-summary" aria-labelledby="cxcSummaryTitle">
+  <h2 id="cxcSummaryTitle">Cartera{% if mobile_cxc_query %} filtrada{% endif %}</h2>
+  <dl class="mcxc-summary-grid">
+    <div><dt>Clientes con saldo</dt><dd>{{ resumen.clientes_con_saldo }}</dd></div>
+    <div><dt>Facturas pendientes</dt><dd>{{ resumen.facturas_pendientes }}</dd></div>
+    <div class="mcxc-summary-total"><dt>Saldo total de cartera · HNL</dt><dd>L. {{ resumen.total_cartera|floatformat:2|intcomma }}</dd></div>
+  </dl>
+  <p class="mcxc-caption">Resumen completo de los resultados, no solo de esta página. Los importes de cartera se presentan en lempiras con la conversión del reporte actual.</p>
+</section>
+<section class="mi-card meg-search-card" aria-labelledby="cxcSearchTitle">
+  <h2 id="cxcSearchTitle">Buscar cliente</h2>
+  <form id="mobileCxcSearchForm" action="{{ app_cxc_search_url }}" method="get">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field"><label for="cxcSearch">Nombre del cliente</label><input id="cxcSearch" type="search" name="q" value="{{ mobile_cxc_query }}" placeholder="Buscar cliente..." autocomplete="off"></div>
+    <button class="mi-button secondary" type="submit">Buscar</button>
+    {% if mobile_cxc_query %}<a class="meg-clear-search" href="{{ app_cxc_url }}">Limpiar búsqueda</a>{% endif %}
+  </form>
+  <p class="meg-search-note">La búsqueda consulta toda la cartera de esta empresa, no solo los clientes de la página actual.</p>
+</section>
+<div class="meg-list-meta"><strong>{{ mobile_cxc_total }} cliente{% if mobile_cxc_total != 1 %}s{% endif %} con saldo</strong><span>HNL</span></div>
+<div class="meg-list">
+  {% for entry in mobile_cxc_items %}
+  <article class="mi-card meg-card mcxc-client-card">
+    <div class="meg-provider"><small>Cliente</small><h2>{{ entry.item.cliente.nombre }}</h2></div>
+    <div class="mcxc-client-total"><span>Saldo pendiente · HNL</span><strong>L. {{ entry.item.total|floatformat:2|intcomma }}</strong></div>
+    <dl class="mcxc-age-grid" aria-label="Antigüedad del saldo en lempiras">
+      <div><dt>0–30 días</dt><dd>L. {{ entry.item.0_30|floatformat:2|intcomma }}</dd></div>
+      <div><dt>31–60 días</dt><dd>L. {{ entry.item.31_60|floatformat:2|intcomma }}</dd></div>
+      <div><dt>61–90 días</dt><dd>L. {{ entry.item.61_90|floatformat:2|intcomma }}</dd></div>
+      <div class="mcxc-age-oldest"><dt>Más de 90 días</dt><dd>L. {{ entry.item.90_mas|floatformat:2|intcomma }}</dd></div>
+    </dl>
+    <a class="mi-button secondary mcxc-detail-link" href="{{ entry.detail_url }}" aria-label="Ver cartera de {{ entry.item.cliente.nombre }}">Ver cartera del cliente ›</a>
+  </article>
+  {% empty %}
+  <section class="mi-card meg-empty"><h2>Sin saldos pendientes{% if mobile_cxc_query %} que coincidan{% endif %}</h2><p>{% if mobile_cxc_query %}No hay clientes con saldo pendiente para esta búsqueda.{% else %}No hay facturas emitidas con saldo pendiente en esta empresa.{% endif %}</p></section>
+  {% endfor %}
+</div>
+{% if mobile_cxc_num_pages > 1 %}
+<nav class="meg-pagination" aria-label="Páginas de clientes con saldo"><div>{% if mobile_cxc_previous_url %}<a href="{{ mobile_cxc_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_cxc_page }} / {{ mobile_cxc_num_pages }}</span>{% if mobile_cxc_next_url %}<a href="{{ mobile_cxc_next_url }}">Siguiente ›</a>{% endif %}</div></nav>
+{% endif %}
+<div class="meg-info-note"><strong>Solo consulta</strong><p>Esta pantalla muestra la cartera y su antigüedad. No registra cobros ni cambia facturas o contabilidad.</p></div>
+{% endblock %}

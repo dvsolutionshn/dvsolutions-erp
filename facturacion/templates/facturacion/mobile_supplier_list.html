@@ -1,0 +1,41 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Proveedores{% endblock %}
+{% block mobile_page_title %}Proveedores{% endblock %}
+{% block mobile_kicker %}Abastecimiento{% endblock %}
+{% block mobile_back_url %}{{ app_supplier_back_url }}{% endblock %}
+{% block mobile_header_description %}<p>Consulta los proveedores de la empresa activa.</p>{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'facturacion/mobile_suppliers.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'facturacion/mobile_suppliers.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+{% if can_create_supplier and app_supplier_create_url %}<a class="mi-button msu-create-link" href="{{ app_supplier_create_url }}"><span aria-hidden="true">＋</span> Nuevo proveedor</a>{% endif %}
+<section class="mi-card msu-search-card">
+  <h2>Buscar proveedores</h2>
+  <form id="mobileSupplierSearchForm" method="get" action="{{ app_suppliers_search_url }}">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field"><label for="supplierSearch">Nombre, RTN, contacto o ciudad</label><input id="supplierSearch" type="search" name="q" value="{{ mobile_supplier_query }}" placeholder="Buscar proveedor..." autocomplete="off"></div>
+    <div class="mi-field"><label for="supplierState">Estado</label><select id="supplierState" name="estado"><option value=""{% if not mobile_supplier_state %} selected{% endif %}>Todos</option><option value="activos"{% if mobile_supplier_state == 'activos' %} selected{% endif %}>Activos</option><option value="inactivos"{% if mobile_supplier_state == 'inactivos' %} selected{% endif %}>Inactivos</option></select></div>
+    <button class="mi-button secondary" type="submit">Filtrar</button>
+    {% if mobile_supplier_query or mobile_supplier_state %}<a class="msu-clear-search" href="{{ app_suppliers_url }}">Limpiar filtros</a>{% endif %}
+  </form>
+  <p class="msu-help">Los filtros buscan en todos los proveedores de esta empresa, no solo en la página actual.</p>
+</section>
+<section class="mi-card msu-summary-card" aria-label="Resumen de proveedores según los filtros">
+  <h2>Resumen según filtros</h2>
+  <dl class="msu-stats"><div><dt>Total</dt><dd>{{ resumen.total }}</dd></div><div><dt>Activos</dt><dd>{{ resumen.activos }}</dd></div><div><dt>Inactivos</dt><dd>{{ resumen.inactivos }}</dd></div><div><dt>Con RTN</dt><dd>{{ resumen.con_rtn }}</dd></div></dl>
+</section>
+<div class="msu-list-meta"><strong>{{ mobile_supplier_total }} proveedor{% if mobile_supplier_total != 1 %}es{% endif %}</strong>{% if mobile_supplier_total %}<span>{{ proveedores.start_index }}–{{ proveedores.end_index }}</span>{% endif %}</div>
+<div class="msu-list">
+{% for item in mobile_supplier_items %}
+  <article class="mi-card msu-supplier-card">
+    <div class="msu-card-head"><h2>{{ item.proveedor.nombre }}</h2><span class="msu-badge {% if item.proveedor.activo %}active{% else %}inactive{% endif %}">{% if item.proveedor.activo %}Activo{% else %}Inactivo{% endif %}</span></div>
+    <dl class="msu-data msu-data-grid"><div><dt>RTN</dt><dd>{{ item.proveedor.rtn|default:'Sin RTN' }}</dd></div><div><dt>Condición de pago</dt><dd>{{ item.proveedor.get_condicion_pago_display }}{% if item.proveedor.condicion_pago == 'credito' %} · {{ item.proveedor.dias_credito }} días{% endif %}</dd></div>{% if item.proveedor.contacto %}<div><dt>Contacto</dt><dd>{{ item.proveedor.contacto }}</dd></div>{% endif %}{% if item.proveedor.ciudad %}<div><dt>Ciudad</dt><dd>{{ item.proveedor.ciudad }}</dd></div>{% endif %}</dl>
+    <div class="msu-card-actions">{% if item.detalle_url %}<a class="msu-view-link" href="{{ item.detalle_url }}">Ver proveedor <span aria-hidden="true">›</span></a>{% endif %}{% if can_edit_supplier and item.editar_url %}<a class="msu-edit-link" href="{{ item.editar_url }}">Editar datos</a>{% endif %}</div>
+  </article>
+{% empty %}
+  <section class="mi-card msu-empty"><h2>Sin proveedores que coincidan</h2><p>No se encontraron proveedores con estos filtros.</p>{% if can_create_supplier and app_supplier_create_url %}<a class="mi-link" href="{{ app_supplier_create_url }}">Crear un proveedor</a>{% endif %}</section>
+{% endfor %}
+</div>
+{% if mobile_supplier_num_pages > 1 %}<nav class="msu-pagination" aria-label="Páginas de proveedores"><p>Página {{ mobile_supplier_page }} de {{ mobile_supplier_num_pages }}</p><div>{% if mobile_supplier_previous_url %}<a href="{{ mobile_supplier_previous_url }}">‹ Anterior</a>{% endif %}{% if mobile_supplier_next_url %}<a href="{{ mobile_supplier_next_url }}">Siguiente ›</a>{% endif %}</div></nav>{% endif %}
+{% endblock %}

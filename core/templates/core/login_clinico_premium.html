@@ -24,7 +24,7 @@
         <div class="login-card">
             <header><span class="eyebrow">BIENVENIDO</span><h2 id="login-title">Inicia sesión</h2><p>Accede al Sistema Clínico</p><span class="current-company">{{ empresa.nombre }}</span></header>
             {% if messages %}<div class="messages" role="alert">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>{% endif %}
-            <form method="post">
+            <form method="post" data-login-form data-csrf-refresh-url="{% url 'login_csrf_token' %}">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{% firstof request.POST.next request.GET.next '' %}">
                 <label for="id_username">Correo electrónico</label>
@@ -39,5 +39,6 @@
     </section>
 </main>
 <script src="{% static 'core/password-toggle.js' %}"></script>
+<script src="{% static 'core/login.js' %}?v=20261013"></script>
 </body>
 </html>

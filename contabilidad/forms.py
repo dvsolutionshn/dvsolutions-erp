@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms import BaseInlineFormSet, inlineformset_factory
+from django.utils import timezone
 
 from facturacion.models import CompraInventario, Factura
 
@@ -9,7 +12,7 @@ from .models import AsientoContable, ClasificacionCompraFiscal, ClasificacionMov
 class CuentaContableForm(forms.ModelForm):
     class Meta:
         model = CuentaContable
-        fields = ["codigo", "nombre", "tipo", "cuenta_padre", "descripcion", "acepta_movimientos", "activa"]
+        fields = ["codigo", "nombre", "tipo", "cuenta_padre", "actividad_flujo", "descripcion", "acepta_movimientos", "activa"]
 
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop("empresa", None)
@@ -18,7 +21,14 @@ class CuentaContableForm(forms.ModelForm):
             self.instance.empresa = empresa
         cuentas_padre = CuentaContable.objects.none()
         if empresa:
-            cuentas_padre = CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre")
+            from .alcance_catalogo import es_empresa_rumi
+            if es_empresa_rumi(empresa):
+                from django.db.models import Q
+                cuentas_padre = CuentaContable.objects.filter(empresa=empresa).filter(
+                    Q(activa=True) | Q(tipo="orden") | Q(pk=self.instance.cuenta_padre_id),
+                ).order_by("codigo", "nombre")
+            else:
+                cuentas_padre = CuentaContable.objects.filter(empresa=empresa, activa=True).order_by("codigo", "nombre")
             if self.instance and self.instance.pk:
                 cuentas_padre = cuentas_padre.exclude(pk=self.instance.pk)
         self.fields["cuenta_padre"].queryset = cuentas_padre
@@ -29,6 +39,7 @@ class CuentaContableForm(forms.ModelForm):
             "nombre": ("Nombre de la cuenta", ""),
             "tipo": ("Tipo de cuenta", ""),
             "cuenta_padre": ("Cuenta padre", "Usala para crear subcuentas y reportes agrupados."),
+            "actividad_flujo": ("Actividad en el flujo de efectivo", "Puede indicar operación, inversión o financiamiento para cuentas propias. La opción automática usa la clasificación de la cuenta o de su cuenta padre."),
             "descripcion": ("Descripcion", ""),
             "acepta_movimientos": ("Acepta movimientos", "Desmarca si quieres dejarla solo como cuenta agrupadora."),
             "activa": ("Cuenta activa", ""),
@@ -37,6 +48,19 @@ class CuentaContableForm(forms.ModelForm):
             self.fields[field_name].label = label
             if help_text:
                 self.fields[field_name].help_text = help_text
+        from .alcance_catalogo import es_empresa_rumi
+        if es_empresa_rumi(empresa):
+            self.fields["tipo"].help_text = "Los controles extracontables se conservan para consulta y no admiten asientos financieros."
+        else:
+            self.fields["tipo"].choices = [(clave, etiqueta) for clave, etiqueta in self.fields["tipo"].choices if clave != "orden"]
+            if self.instance.pk and self.instance.tipo == "orden":
+                # Conserva una eventual cuenta importada antes de restringir el alcance.
+                self.fields["tipo"].choices += [("orden", "Control extracontable existente")]
+                self.fields["tipo"].disabled = True
+                self.fields["cuenta_padre"].disabled = True
+                self.fields["cuenta_padre"].queryset = CuentaContable.objects.filter(
+                    empresa=empresa, pk=self.instance.cuenta_padre_id,
+                )
 
     def clean_codigo(self):
         codigo = (self.cleaned_data.get("codigo") or "").strip()
@@ -68,10 +92,56 @@ class ImportarCatalogoCuentasForm(forms.Form):
         return archivo
 
 
+class ImportarCatalogoCuentasRumiForm(forms.Form):
+    archivo = forms.FileField(
+        label="Archivo Excel",
+        help_text="Acepta .xlsx o .xlsm: formato estándar, catálogos jerárquicos y propuestas como RUMI, incluso con títulos antes del encabezado.",
+        widget=forms.ClearableFileInput(attrs={"accept": ".xlsx,.xlsm"}),
+    )
+    actualizar_existentes = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Actualizar cuentas existentes",
+        help_text="Déjalo desmarcado para conservar las cuentas actuales. Si lo activas, se revisarán los cambios de nombre, tipo, padre y estado antes de confirmar.",
+    )
+    incluir_controles = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Conservar controles extracontables para consulta",
+        help_text="Conserva las cuentas de orden como referencia; no admiten asientos ni afectan los estados financieros.",
+    )
+    hoja = forms.CharField(
+        required=False,
+        max_length=150,
+        label="Hoja del catálogo (opcional)",
+        help_text="Se detecta automáticamente. Si el archivo contiene varios catálogos, escribe el nombre exacto de la hoja que deseas importar.",
+    )
+    prefijo_codigos = forms.RegexField(
+        required=False,
+        max_length=20,
+        regex=r"^[A-Za-z0-9_.-]*$",
+        label="Prefijo para cuentas nuevas (opcional)",
+        help_text="Ejemplo: RUMI-. Permite agregar este catálogo sin ocupar los códigos del catálogo actual. También se aplica a sus cuentas padre.",
+        error_messages={"invalid": "Usa únicamente letras, números, punto, guion o guion bajo en el prefijo."},
+    )
+
+    def __init__(self, *args, requiere_archivo=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["archivo"].required = requiere_archivo
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if archivo is None:
+            return archivo
+        if not archivo.name.lower().endswith((".xlsx", ".xlsm")):
+            raise forms.ValidationError("Sube un archivo Excel válido en formato .xlsx o .xlsm.")
+        return archivo
+
+
 class PeriodoContableForm(forms.ModelForm):
     class Meta:
         model = PeriodoContable
-        fields = ["anio", "mes", "estado", "observacion"]
+        fields = ["anio", "mes", "observacion"]
         widgets = {
             "observacion": forms.Textarea(attrs={"rows": 3}),
         }
@@ -81,10 +151,34 @@ class PeriodoContableForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if empresa:
             self.instance.empresa = empresa
-        self.fields["anio"].label = "Anio"
+        self._estado_original = self.instance.estado
+        self._periodo_original = (self.instance.anio, self.instance.mes)
+        self.fields["anio"].label = "Año"
         self.fields["mes"].label = "Mes"
-        self.fields["estado"].label = "Estado"
-        self.fields["observacion"].label = "Observacion"
+        self.fields["observacion"].label = "Observación"
+        if self.instance.pk:
+            for nombre in ("anio", "mes"):
+                self.fields[nombre].disabled = True
+                self.fields[nombre].help_text = "El año y el mes de un período existente no se pueden cambiar."
+
+    def clean(self):
+        cleaned_data = super().clean()
+        estado_enviado = self.data.get(self.add_prefix("estado"))
+        if estado_enviado is not None and estado_enviado != self._estado_original:
+            raise forms.ValidationError(
+                "El estado no se modifica desde este formulario. Usa la revisión del cierre o la reapertura con motivo."
+            )
+        if self.instance.pk:
+            for nombre, original in zip(("anio", "mes"), self._periodo_original):
+                enviado = self.data.get(self.add_prefix(nombre))
+                if enviado is not None:
+                    try:
+                        coincide = int(enviado) == original
+                    except (TypeError, ValueError):
+                        coincide = False
+                    if not coincide:
+                        self.add_error(nombre, "El año y el mes de un período existente no se pueden cambiar.")
+        return cleaned_data
 
 
 class ClasificacionCompraFiscalForm(forms.ModelForm):
@@ -189,7 +283,7 @@ class MovimientoBancarioEdicionForm(forms.ModelForm):
         model = MovimientoBancario
         fields = ["fecha", "descripcion", "referencia", "debito", "credito", "saldo", "clasificacion"]
         widgets = {
-            "fecha": forms.DateInput(attrs={"type": "date"}),
+            "fecha": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "descripcion": forms.TextInput(),
             "referencia": forms.TextInput(),
             "debito": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
@@ -232,6 +326,16 @@ class ReglaClasificacionBancoForm(forms.ModelForm):
 
 class EnlazarMovimientoFacturaForm(forms.Form):
     factura = forms.ModelChoiceField(queryset=Factura.objects.none(), label="Factura pendiente")
+    tipo_cambio_cobro = forms.DecimalField(
+        max_digits=14, decimal_places=6, required=False, min_value=Decimal('0.000001'),
+        label="Tipo de cambio del depósito (HNL por USD)",
+        help_text="Para facturas en dólares indique la tasa efectiva. Si lo deja vacío se usa la tasa de la factura.",
+    )
+    importe_moneda_factura = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False, min_value=Decimal('0.01'),
+        label="Importe en la moneda de la factura",
+        help_text="Opcional. La conversión debe coincidir exactamente con el depósito en lempiras.",
+    )
 
     def __init__(self, *args, **kwargs):
         empresa = kwargs.pop("empresa", None)
@@ -247,11 +351,30 @@ class EnlazarMovimientoFacturaForm(forms.Form):
             self.fields["factura"].queryset = facturas
         self.fields["factura"].help_text = "El deposito se aplicara como pago de esta factura."
 
-    def clean_factura(self):
-        factura = self.cleaned_data["factura"]
-        if self.movimiento and factura.saldo_pendiente < self.movimiento.credito:
-            raise forms.ValidationError("La factura seleccionada tiene un saldo menor que el deposito. Usa una factura con saldo suficiente.")
-        return factura
+    def datos_aplicacion(self, factura, movimiento=None):
+        from .moneda import convertir_a_lempiras, redondear_importe, validar_moneda_tipo_cambio
+        movimiento = movimiento or self.movimiento
+        if movimiento.empresa_id != factura.empresa_id:
+            raise forms.ValidationError("El depósito y la factura deben pertenecer a la misma empresa.")
+        _moneda, tasa = validar_moneda_tipo_cambio(
+            factura.moneda, self.cleaned_data.get("tipo_cambio_cobro") or factura.tipo_cambio,
+        )
+        importe = self.cleaned_data.get("importe_moneda_factura")
+        if importe is None:
+            importe = redondear_importe(movimiento.credito / tasa)
+        if convertir_a_lempiras(importe, factura.moneda, tasa) != movimiento.credito:
+            raise forms.ValidationError(
+                "La conversión no coincide con el depósito en lempiras. Indique el importe original y la tasa efectiva del cobro."
+            )
+        if importe <= 0 or importe > factura.saldo_pendiente:
+            raise forms.ValidationError("La factura seleccionada tiene un saldo menor que el depósito. Use una factura con saldo suficiente.")
+        return importe, tasa
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get("factura") and self.movimiento and not self.errors:
+            self.datos_aplicacion(datos["factura"])
+        return datos
 
 
 class EnlazarMovimientoCompraForm(forms.Form):
@@ -284,10 +407,62 @@ class AsientoContableForm(forms.ModelForm):
         fields = ["fecha", "descripcion", "referencia", "origen_modulo", "estado"]
 
     def __init__(self, *args, **kwargs):
+        usuario = kwargs.pop("usuario", None)
+        empresa = kwargs.pop("empresa", None)
+        puede_contabilizar = kwargs.pop("puede_contabilizar", None)
         super().__init__(*args, **kwargs)
-        self.fields["fecha"].widget = forms.DateInput(attrs={"type": "date"})
-        self.fields["estado"].help_text = "Puedes guardarlo en borrador o dejarlo listo para contabilizar."
+        if empresa:
+            self.instance.empresa = empresa
+        if puede_contabilizar is None:
+            empresa = empresa or getattr(self.instance, "empresa", None)
+            puede_contabilizar = bool(
+                usuario
+                and usuario.tiene_permiso_erp("puede_contabilizar_asientos", empresa)
+            )
+        self.puede_contabilizar = bool(puede_contabilizar)
+        self.fields["fecha"].widget = forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+        if (
+            not self.is_bound and not self.instance.pk
+            and not self.instance.fecha and not self.initial.get("fecha")
+        ):
+            self.initial["fecha"] = timezone.localdate()
+        self.fields["fecha"].label = "Fecha"
+        self.fields["descripcion"].label = "Descripción"
+        self.fields["descripcion"].widget = forms.Textarea(attrs={
+            "rows": 2,
+            "maxlength": 255,
+            "placeholder": "Describe la operación que estás registrando",
+        })
+        self.fields["referencia"].label = "Referencia"
+        self.fields["referencia"].widget.attrs.update({
+            "placeholder": "Ej.: recibo, transferencia o documento",
+            "autocomplete": "off",
+        })
+        self.fields["estado"].choices = [
+            opcion for opcion in AsientoContable.ESTADO_CHOICES
+            if opcion[0] == "borrador" or (self.puede_contabilizar and opcion[0] == "contabilizado")
+        ]
+        self.fields["estado"].required = False
+        self.fields["estado"].widget = forms.HiddenInput()
+        self.fields["estado"].initial = "borrador"
+        self.fields["contabilizar_ahora"].disabled = not self.puede_contabilizar
+        self.fields["contabilizar_ahora"].widget = forms.HiddenInput()
         self.fields["origen_modulo"].label = "Origen"
+        self.fields["origen_modulo"].widget.attrs.update({
+            "placeholder": "Ej.: manual",
+            "autocomplete": "off",
+        })
+
+    def clean(self):
+        cleaned_data = super().clean()
+        estado_enviado = self.data.get(self.add_prefix("estado"))
+        contabilizar_enviado = forms.BooleanField(required=False).to_python(
+            self.data.get(self.add_prefix("contabilizar_ahora"))
+        )
+        if not self.puede_contabilizar and (estado_enviado == "contabilizado" or contabilizar_enviado):
+            raise forms.ValidationError("Tu rol no tiene permiso para contabilizar asientos.")
+        cleaned_data["estado"] = cleaned_data.get("estado") or "borrador"
+        return cleaned_data
 
 
 class ConfiguracionContableEmpresaForm(forms.ModelForm):
@@ -302,6 +477,9 @@ class ConfiguracionContableEmpresaForm(forms.ModelForm):
             "cuenta_proveedores",
             "cuenta_ventas",
             "cuenta_devoluciones_ventas",
+            "isv_compras_recuperable",
+            "cuenta_isv_acreditable",
+            "cuenta_entradas_inventario",
         ]
 
     def __init__(self, *args, empresa=None, **kwargs):
@@ -323,13 +501,29 @@ class ConfiguracionContableEmpresaForm(forms.ModelForm):
             "cuenta_proveedores": ("Cuentas por pagar proveedores", "Cuenta que recibe compras aplicadas y se reduce con pagos a proveedores."),
             "cuenta_ventas": ("Ventas", "Cuenta de ingresos para las facturas emitidas."),
             "cuenta_devoluciones_ventas": ("Devoluciones sobre ventas", "Cuenta usada para notas de credito emitidas."),
+            "cuenta_isv_acreditable": ("ISV acreditable de compras", "Crédito fiscal utilizado únicamente si el ISV de compras es recuperable para esta empresa."),
+            "cuenta_entradas_inventario": ("Contrapartida de entradas manuales de inventario", "Seleccione la cuenta según el origen: saldo inicial, aporte o deuda documentada. Para compras reales utilice el módulo de Compras. Es obligatoria al aplicar entradas manuales con costo."),
         }
         for field_name, (label, help_text) in textos.items():
             self.fields[field_name].queryset = cuentas
+            tipo = {
+                'cuenta_caja': 'activo', 'cuenta_bancos': 'activo', 'cuenta_clientes': 'activo',
+                'cuenta_inventario': 'activo', 'cuenta_isv_acreditable': 'activo',
+                'cuenta_proveedores': 'pasivo', 'cuenta_isv_por_pagar': 'pasivo',
+                'cuenta_ventas': 'ingreso', 'cuenta_devoluciones_ventas': 'ingreso',
+            }.get(field_name)
+            if tipo:
+                self.fields[field_name].queryset = cuentas.filter(tipo=tipo)
             self.fields[field_name].required = False
             self.fields[field_name].label = label
             self.fields[field_name].help_text = help_text
             self.fields[field_name].empty_label = "Usar cuenta automatica por defecto"
+        self.fields['cuenta_entradas_inventario'].empty_label = 'Sin configurar; sólo entradas sin costo'
+        self.fields["isv_compras_recuperable"].label = "Esta empresa recupera el ISV de compras"
+        self.fields["isv_compras_recuperable"].help_text = (
+            "Al activarlo, el ISV se separa como crédito fiscal. Si se deja desactivado, "
+            "forma parte del costo. Se aplica a nuevas compras; conserva la valoración de compras ya aplicadas."
+        )
 
 
 class LineaAsientoContableForm(forms.ModelForm):
@@ -337,11 +531,45 @@ class LineaAsientoContableForm(forms.ModelForm):
         model = LineaAsientoContable
         fields = ["cuenta", "detalle", "debe", "haber"]
 
+    def __init__(self, *args, empresa=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if empresa is None and self.instance.asiento_id:
+            empresa = self.instance.asiento.empresa
+        self.fields["cuenta"].queryset = (
+            CuentaContable.objects.filter(empresa=empresa, activa=True, acepta_movimientos=True)
+            .order_by("codigo", "nombre")
+            if empresa else CuentaContable.objects.none()
+        )
+        self.fields["cuenta"].label = "Cuenta contable"
+        self.fields["cuenta"].empty_label = "Selecciona una cuenta"
+        self.fields["detalle"].label = "Detalle"
+        self.fields["detalle"].widget.attrs.update({
+            "placeholder": "Detalle de esta partida (opcional)",
+            "autocomplete": "off",
+        })
+        for nombre in ("debe", "haber"):
+            self.fields[nombre].label = nombre.capitalize()
+            self.fields[nombre].widget.attrs.update({
+                "inputmode": "decimal",
+                "placeholder": "0.00",
+                "autocomplete": "off",
+            })
+
+
+class LineasAsientoEmpresaFormSet(BaseInlineFormSet):
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        # También se ejecuta al construir empty_form; la plantilla y las
+        # partidas agregadas conservan el mismo catálogo de la empresa.
+        kwargs["empresa"] = self.instance.empresa if self.instance.empresa_id else None
+        return kwargs
+
 
 LineaAsientoFormSet = inlineformset_factory(
     AsientoContable,
     LineaAsientoContable,
     form=LineaAsientoContableForm,
+    formset=LineasAsientoEmpresaFormSet,
     extra=2,
     can_delete=True,
 )

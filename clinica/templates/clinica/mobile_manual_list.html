@@ -1,0 +1,12 @@
+{% extends "clinica/mobile_manual_base.html" %}
+{% block mobile_title %}Manuales PDF{% endblock %}
+{% block mobile_page_title %}Manuales PDF{% endblock %}
+{% block mobile_header_description %}<p>Documentos disponibles para consultar y compartir según tus permisos.</p>{% endblock %}
+{% block mobile_header_actions %}{% if can_admin_manuals %}<a class="mi-more mm-header-link" href="{{ app_manual_admin_url }}">Gestionar</a>{% endif %}{% endblock %}
+{% block mobile_content %}
+{% block mobile_manual_filters %}<section class="mi-card"><div class="mi-field"><label for="mobileManualSearch">Buscar manual</label><input type="search" id="mobileManualSearch" placeholder="Buscar manual…" autocomplete="off" data-manual-search-input></div></section>{% endblock %}
+<div class="mm-list-head"><strong>{{ manuales|length }} manual{{ manuales|length|pluralize }}</strong>{% if can_send_manuals and manuales %}<label><input type="checkbox" data-manual-select-all> Seleccionar visibles</label>{% endif %}</div>
+{% include "clinica/mobile_manual_cards.html" %}
+{% if can_send_manuals and manuales %}<div class="mi-save-bar mm-selection-bar"><span><strong data-manual-selected-count>0</strong> <span data-manual-selected-label>seleccionados</span></span><button class="mi-button" type="button" data-manual-open-composer disabled>Compartir seleccionados</button></div>{% include "clinica/mobile_manual_composer.html" %}{% elif can_view_manuals and manuales %}<p class="mi-summary-note">Este perfil puede consultar los documentos. El envío requiere su permiso correspondiente.</p>{% endif %}
+{% block mobile_manual_history %}{% if can_view_manuals %}{% include "clinica/mobile_manual_history.html" %}{% endif %}{% endblock %}
+{% endblock %}

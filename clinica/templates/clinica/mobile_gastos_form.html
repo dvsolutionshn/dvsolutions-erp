@@ -1,0 +1,40 @@
+{% extends "clinica/mobile_clinical_base.html" %}
+{% load static %}
+{% block mobile_title %}{% if gasto %}Editar {{ gasto.numero }}{% else %}Nuevo gasto adicional{% endif %}{% endblock %}
+{% block mobile_back_url %}{% if gasto and can_view_gastos %}{{ app_gasto_detail_url }}{% elif can_view_gastos %}{{ app_gastos_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}{% if gasto %}Editar gasto{% else %}Nuevo gasto{% endif %}{% endblock %}
+{% block mobile_header_description %}<p>{% if gasto %}{{ gasto.numero }} · {% endif %}Registra los productos y servicios de la atención.</p>{% endblock %}
+{% block mobile_content %}
+<form method="post" action="{{ app_gasto_form_url }}" class="mg-compose" id="ga-form" data-patient-url="{% url 'clinica_gastos_adicionales_pacientes_buscar' empresa.slug %}?app=1" data-product-url="{% url 'clinica_gastos_adicionales_productos_buscar' empresa.slug %}?app=1" data-price-includes-tax="{{ precios_incluyen_impuesto|yesno:'true,false' }}" data-can-edit-price="{{ puede_editar_precio|yesno:'true,false' }}">
+  {% csrf_token %}<input type="hidden" name="app" value="1"><input type="hidden" id="ga-lines-data" name="lineas" value="{{ lineas_json|default:'[]' }}">
+  {{ paciente_inicial|json_script:"ga-initial-patient" }}{{ lineas_iniciales|json_script:"ga-initial-lines" }}
+  {% if form.non_field_errors or errores_lineas %}<div class="mi-error-box" role="alert">{{ form.non_field_errors }}{% for error in errores_lineas %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+  <div class="mi-error-box" id="ga-client-errors" role="alert" hidden></div><noscript><div class="mi-warning">Activa JavaScript para buscar pacientes y productos y registrar este documento.</div></noscript>
+  <section class="mi-card">
+    <h2 class="mi-step-label"><span>1</span>Paciente y cirugía</h2>
+    <div class="mi-field mg-patient-field"><label for="ga-patient-search">Seleccionar paciente</label>{{ form.paciente }}<div class="ga-search-control"><input type="search" id="ga-patient-search" placeholder="Nombre, identidad o teléfono…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ga-patient-results" aria-describedby="ga-patient-help"><div class="ga-search-results" id="ga-patient-results" role="listbox" hidden></div></div><small id="ga-patient-help">Toca un resultado para vincular el gasto a su expediente.</small>{% for error in form.paciente.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}<div class="ga-selected-patient" id="ga-selected-patient" hidden></div></div>
+    <div class="mi-field-grid mg-attention-grid">
+      {% include "facturacion/mobile_invoice_field.html" with field=form.fecha %}
+      <div class="mi-field"><label for="ga-professional-name">Profesional</label>{{ form.profesional }}<input type="text" id="ga-professional-name" value="Dr. Luis González" readonly aria-readonly="true">{% for error in form.profesional.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}</div>
+      {% include "facturacion/mobile_invoice_field.html" with field=form.tipo_cirugia wide=True %}
+    </div>
+  </section>
+  <section class="mi-card">
+    <div class="mi-card-head"><h2 class="mi-step-label"><span>2</span>Productos y servicios</h2><span class="mi-muted" id="ga-line-count">0 líneas</span></div>
+    <div class="mi-field"><label for="ga-product-search">Agregar producto o servicio</label><div class="ga-search-control"><input type="search" id="ga-product-search" placeholder="Ver catálogo o buscar producto…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ga-product-results" aria-describedby="ga-product-feedback"><div class="ga-search-results" id="ga-product-results" role="listbox" hidden></div></div><small id="ga-product-feedback" aria-live="polite">Selecciona primero el tipo de cirugía.</small></div>
+    <div class="mg-lines" id="ga-lines" aria-label="Productos seleccionados"></div>
+    <div class="mg-empty-line" id="ga-lines-empty"><strong>Agrega el primer producto</strong><p>Busca en el catálogo y ajusta la cantidad.</p></div>
+    <button type="button" class="mg-add-product" data-ga-add-more>+ Agregar otro producto</button>
+    <details class="mg-observation" {% if form.observacion.value or form.observacion.errors %}open{% endif %}><summary>Añadir una observación <span>Opcional</span></summary><div>{% include "facturacion/mobile_invoice_field.html" with field=form.observacion %}</div></details>
+  </section>
+  <section class="mi-card ga-compose-summary">
+    <h2 class="mi-step-label"><span>3</span>Revisar y guardar</h2><p class="mi-muted" id="ga-summary-count">0 productos seleccionados</p>
+    <div class="mi-row"><span>Subtotal sin ISV</span><strong id="ga-subtotal">L 0.00</strong></div><div class="mi-row"><span id="ga-tax-label">Impuestos</span><strong id="ga-taxes">L 0.00</strong></div><div class="mi-row total"><span>Total del gasto</span><strong id="ga-total" aria-live="polite">L 0.00</strong></div>
+    <p class="mi-summary-note" id="ga-tax-note" aria-live="polite">Los impuestos se confirman al facturar.</p>
+    {% if can_view_gastos %}<button class="mi-button secondary mi-status-space" name="accion" value="pdf" type="submit">Guardar y generar PDF</button>{% endif %}
+  </section>
+  <a class="mg-cancel" href="{% if gasto and can_view_gastos %}{{ app_gasto_detail_url }}{% elif can_view_gastos %}{{ app_gastos_url }}{% else %}{{ app_modules_url }}{% endif %}">Cancelar</a>
+  <div class="mi-save-bar mg-save-actions"><button class="mi-button" name="accion" value="guardar" type="submit">Guardar gasto</button></div>
+</form>
+{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'clinica/gastos_adicionales.js' %}" defer></script>{{ block.super }}{% endblock %}

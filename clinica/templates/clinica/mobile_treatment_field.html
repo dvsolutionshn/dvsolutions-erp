@@ -1,0 +1,6 @@
+<div class="mi-field mtr-field" data-treatment-field="{{ field.name }}">
+<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mtr-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}
+{% if field.name == 'paciente' or field.name == 'servicio' or field.name == 'profesional' %}<button class="mtr-search-options" type="button" data-treatment-choose="{{ field.auto_id }}" hidden>Buscar opciones</button>{% endif %}
+{% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+{% if field.errors %}{% if field.name == 'fecha_inicio' or field.name == 'fecha_fin_estimada' or field.name == 'monto_estimado' %}<small class="mtr-received-value">Valor recibido: {{ field.value|default_if_none:'Sin valor' }}</small>{% endif %}{% endif %}
+</div>

@@ -1,4 +1,5 @@
 from django.urls import path
+from .mobile_advanced_configuration import configuracion_avanzada_empresa_app, configuracion_avanzada_empresas_app
 from .views import (
     public_access,
     public_demo_detail,
@@ -10,11 +11,13 @@ from .views import (
     cerrar_sesion,
     dashboard,
     empresa_login,
+    login_csrf_token,
     establecer_acceso,
     solicitar_recuperacion,
     superadmin_solicitudes,
     superadmin_dashboard,
     superadmin_empresas,
+    superadmin_empresas_app,
     superadmin_empresa_create,
     superadmin_empresa_detail,
     superadmin_empresa_edit,
@@ -60,6 +63,9 @@ urlpatterns = [
     path('control/', superadmin_dashboard, name='superadmin_dashboard'),
     path('control/solicitudes/', superadmin_solicitudes, name='superadmin_solicitudes'),
     path('control/empresas/', superadmin_empresas, name='superadmin_empresas'),
+    path('control/empresas/app/', superadmin_empresas_app, name='superadmin_empresas_app'),
+    path('control/empresas/configuracion-avanzada/app/', configuracion_avanzada_empresas_app, name='configuracion_avanzada_empresas_app'),
+    path('control/empresas/<int:empresa_id>/configuracion-avanzada/app/', configuracion_avanzada_empresa_app, name='configuracion_avanzada_empresa_app'),
     path('control/empresas/nueva/', superadmin_empresa_create, name='superadmin_empresa_create'),
     path('control/empresas/<int:empresa_id>/', superadmin_empresa_detail, name='superadmin_empresa_detail'),
     path('control/empresas/<int:empresa_id>/editar/', superadmin_empresa_edit, name='superadmin_empresa_edit'),
@@ -91,6 +97,7 @@ urlpatterns = [
     path('favicon.ico', public_favicon, name='public_favicon'),
     path('politica-de-privacidad/', politica_privacidad, name='politica_privacidad'),
     path('acceso/', public_access, name='public_access'),
+    path('acceso/csrf/', login_csrf_token, name='login_csrf_token'),
     path('demo/<slug:demo_slug>/', public_demo_detail, name='public_demo_detail'),
     path('acceso/establecer/<str:token_raw>/', establecer_acceso, name='establecer_acceso'),
     path('dashboard/asistente/consulta/', asistente_consulta, name='asistente_consulta_host'),

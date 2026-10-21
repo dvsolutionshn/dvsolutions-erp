@@ -1,0 +1,259 @@
+"""Conserva el historial cerrado también al operar desde facturación y nómina."""
+
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models.signals import pre_delete, pre_save
+from django.db.models import Q
+from django.dispatch import receiver
+from django.utils import timezone
+
+from .models import (
+    AsientoContable, CuentaContable, LineaAsientoContable, MovimientoBancario, PeriodoContable, RegularizacionMonedaFactura, RevisionConversionAsiento,
+    bloquear_empresas_contables, validar_fecha_contable_abierta,
+)
+
+
+@receiver(pre_delete, sender=AsientoContable)
+@receiver(pre_delete, sender=LineaAsientoContable)
+@receiver(pre_delete, sender=MovimientoBancario)
+@receiver(pre_delete, sender=PeriodoContable)
+def proteger_eliminacion_contable(sender, instance, using, **kwargs):
+    if sender is AsientoContable:
+        from .proteccion_conversion import validar_asiento_revisado
+        validar_asiento_revisado(instance, using, eliminar=True)
+    # El recolector de Django no llama al método delete() durante las cascadas.
+    instance.validar_eliminacion(using=using)
+
+
+@receiver(pre_delete, sender=RegularizacionMonedaFactura)
+def proteger_regularizacion_monetaria(sender, instance, using, **kwargs):
+    raise ValidationError('La regularización monetaria conserva el respaldo de los saldos. Registre un nuevo ajuste para corregirla.')
+
+
+@receiver(pre_save, sender=CuentaContable)
+def proteger_cuenta_conversion(sender, instance, using, raw=False, **kwargs):
+    if raw or not instance.pk:
+        return
+    anterior = sender.objects.using(using).filter(pk=instance.pk).values("empresa_id", "tipo").first()
+    if not anterior or (anterior["empresa_id"] == instance.empresa_id and anterior["tipo"] == instance.tipo):
+        return
+    if RevisionConversionAsiento.objects.using(using).filter(
+        Q(origen__lineas__cuenta_id=instance.pk) | Q(ajuste__lineas__cuenta_id=instance.pk)
+    ).exists():
+        raise ValidationError("La cuenta respalda una revisión integral. Conserve su empresa y su tipo para mantener los saldos documentados.")
+
+
+DOCUMENTOS_CONTABLES = {
+    "Factura": ("factura", "empresa_id"),
+    "NotaCredito": ("nota_credito", "empresa_id"),
+    "CompraInventario": ("compra", "empresa_id"),
+    "PagoFactura": ("pago_factura", "factura__empresa_id"),
+    "PagoCompra": ("pago_compra", "compra__empresa_id"),
+    "PagoComisionProveedor": ("pago_comision_proveedor", "comision_origen__factura__empresa_id"),
+    "PeriodoPlanilla": ("planilla", "empresa_id"),
+    "MovimientoInventario": ("movimiento_inventario", "empresa_id"),
+}
+
+
+def _validar_documento_sin_asientos_cerrados(sender, instance, using):
+    tipo, campo_empresa = DOCUMENTOS_CONTABLES[sender.__name__]
+    empresa_id = sender.objects.using(using).filter(pk=instance.pk).values_list(campo_empresa, flat=True).first()
+    if empresa_id is None:
+        return
+    bloquear_empresas_contables([empresa_id], using=using)
+    fuentes = Q(documento_tipo=tipo, documento_id=instance.pk)
+    if sender.__name__ == "PagoComisionProveedor":
+        anterior = sender.objects.using(using).filter(pk=instance.pk).values("metodo", "comision_origen_id").first()
+        if anterior and anterior["metodo"] == "compensacion":
+            fuentes |= Q(documento_tipo="pago_factura", documento_id=anterior["comision_origen_id"])
+        if instance.metodo == "compensacion" and instance.comision_origen_id:
+            fuentes |= Q(documento_tipo="pago_factura", documento_id=instance.comision_origen_id)
+    asientos = AsientoContable.objects.using(using).filter(empresa_id=empresa_id).filter(fuentes)
+    from .proteccion_conversion import asiento_tiene_revision
+    if any(asiento_tiene_revision(pk, using) for pk in asientos.values_list("pk", flat=True)):
+        raise ValidationError("El documento respalda una revisión integral de moneda. Conserve el original y registre un nuevo ajuste.")
+    for asiento in asientos.values("empresa_id", "fecha"):
+        validar_fecha_contable_abierta(asiento["empresa_id"], asiento["fecha"], using)
+
+
+def proteger_eliminacion_documento(sender, instance, using, **kwargs):
+    if sender.__name__ == "PagoComisionProveedor" and instance.metodo == "compensacion":
+        origen_eliminacion = kwargs.get("origin")
+        modelo_eliminacion = getattr(origen_eliminacion, "model", type(origen_eliminacion))
+        etiqueta = getattr(getattr(modelo_eliminacion, "_meta", None), "label_lower", "")
+        origen_pago = sender._meta.get_field("comision_origen").remote_field.model
+        retenida = origen_pago.objects.using(using).filter(
+            pk=instance.comision_origen_id, comision_retenida_cliente=True,
+        ).exists()
+        if retenida and etiqueta not in {"facturacion.pagofactura", "facturacion.factura"}:
+            raise ValidationError(
+                "La comisión fue compensada en el cobro del cliente. Corrija ese cobro para deshacer la compensación."
+            )
+    _validar_documento_sin_asientos_cerrados(sender, instance, using)
+
+
+CAMPOS_ECONOMICOS_DOCUMENTO = {
+    "empresa_id", "cliente_id", "factura_origen_id", "moneda", "tipo_cambio", "fecha_emision",
+    "subtotal", "impuesto", "total", "total_lempiras", "estado", "numero_factura", "numero_nota",
+    "cai_id", "cai_numero", "cai_establecimiento", "cai_punto_emision", "cai_tipo_documento",
+    "cai_rango_inicial", "cai_rango_final", "cai_fecha_limite", "orden_compra_exenta",
+    "registro_exonerado", "registro_sag",
+}
+
+
+def proteger_edicion_documento(sender, instance, using, raw=False, update_fields=None, **kwargs):
+    if raw:
+        return
+    campos = {
+        campo.attname for campo in sender._meta.concrete_fields
+        if campo.attname in CAMPOS_ECONOMICOS_DOCUMENTO
+        and (update_fields is None or campo.name in update_fields or campo.attname in update_fields)
+    }
+    if not campos:
+        # Cobrar en un mes abierto puede actualizar el estado de pago de una factura histórica.
+        return
+    anterior = sender.objects.using(using).filter(pk=instance.pk).values(
+        "empresa_id", "fecha_emision", "estado", *campos
+    ).first() if instance.pk else None
+    if anterior and not any(anterior[campo] != getattr(instance, campo) for campo in campos):
+        return
+    with transaction.atomic(using=using):
+        bloquear_empresas_contables(
+            [instance.empresa_id, anterior["empresa_id"] if anterior else None], using=using
+        )
+        if anterior:
+            _validar_documento_sin_asientos_cerrados(sender, instance, using)
+            if anterior["estado"] == "emitida":
+                validar_fecha_contable_abierta(anterior["empresa_id"], anterior["fecha_emision"], using)
+            if anterior["empresa_id"] != instance.empresa_id:
+                raise ValidationError("No se puede trasladar un documento contable a otra empresa.")
+        if instance.estado == "emitida":
+            validar_fecha_contable_abierta(instance.empresa_id, instance.fecha_emision, using)
+
+
+LINEAS_DOCUMENTO = {
+    "LineaFactura": ("factura", "factura"),
+    "LineaNotaCredito": ("nota_credito", "nota_credito"),
+}
+
+
+CAMPOS_PAGO = {
+    "fecha", "monto", "factura_id", "compra_id", "comision_origen_id", "metodo",
+    "cuenta_financiera_id", "cuenta_financiera_impuesto_id", "retencion_isr", "retencion_isv",
+    "porcentaje_comision", "monto_comision", "proveedor_comision_id", "separar_isv",
+    "subtotal_aplicado", "impuesto_aplicado", "tipo_cambio", "comision_retenida_cliente",
+}
+
+
+def proteger_edicion_pago(sender, instance, using, raw=False, update_fields=None, **kwargs):
+    if raw:
+        return
+    campos = {
+        campo.attname for campo in sender._meta.concrete_fields
+        if campo.attname in CAMPOS_PAGO
+        and (update_fields is None or campo.name in update_fields or campo.attname in update_fields)
+    }
+    if not campos:
+        return
+    anterior = sender.objects.using(using).filter(pk=instance.pk).values("fecha", *campos).first() if instance.pk else None
+    if anterior and not any(anterior[campo] != getattr(instance, campo) for campo in campos):
+        return
+    tipo, campo_empresa = DOCUMENTOS_CONTABLES[sender.__name__]
+    empresa_id = {
+        "pago_factura": lambda: instance.factura.empresa_id,
+        "pago_compra": lambda: instance.compra.empresa_id,
+        "pago_comision_proveedor": lambda: instance.comision_origen.factura.empresa_id,
+    }[tipo]()
+    with transaction.atomic(using=using):
+        bloquear_empresas_contables([empresa_id], using=using)
+        if anterior:
+            _validar_documento_sin_asientos_cerrados(sender, instance, using)
+            anterior_empresa = sender.objects.using(using).filter(pk=instance.pk).values_list(
+                campo_empresa, flat=True
+            ).first()
+            if anterior_empresa != empresa_id:
+                raise ValidationError("No se puede trasladar un pago a otra empresa.")
+            validar_fecha_contable_abierta(anterior_empresa, anterior.get("fecha", instance.fecha), using)
+        validar_fecha_contable_abierta(empresa_id, instance.fecha, using)
+
+
+def proteger_linea_documento(sender, instance, using, raw=False, **kwargs):
+    if raw:
+        return
+    campo, _tipo = LINEAS_DOCUMENTO[sender.__name__]
+    anterior_id = sender.objects.using(using).filter(pk=instance.pk).values_list(
+        f"{campo}_id", flat=True
+    ).first() if instance.pk else None
+    modelo_documento = sender._meta.get_field(campo).remote_field.model
+    ids = {pk for pk in (anterior_id, getattr(instance, f"{campo}_id")) if pk}
+    with transaction.atomic(using=using):
+        documentos = list(modelo_documento.objects.using(using).filter(pk__in=ids))
+        if len({documento.empresa_id for documento in documentos}) > 1:
+            raise ValidationError("No se puede trasladar una línea de documento a otra empresa.")
+        bloquear_empresas_contables([documento.empresa_id for documento in documentos], using=using)
+        for documento in documentos:
+            _validar_documento_sin_asientos_cerrados(modelo_documento, documento, using)
+            if documento.estado == "emitida":
+                validar_fecha_contable_abierta(documento.empresa_id, documento.fecha_emision, using)
+
+
+def registrar_protecciones_documentos():
+    from facturacion import models as facturacion
+    from rrhh.models import PeriodoPlanilla
+
+    for nombre in DOCUMENTOS_CONTABLES:
+        modelo = PeriodoPlanilla if nombre == "PeriodoPlanilla" else getattr(facturacion, nombre)
+        pre_delete.connect(
+            proteger_eliminacion_documento, sender=modelo,
+            dispatch_uid=f"contabilidad.proteger_eliminacion.{nombre}",
+        )
+    for nombre in ("Factura", "NotaCredito"):
+        pre_save.connect(
+            proteger_edicion_documento, sender=getattr(facturacion, nombre),
+            dispatch_uid=f"contabilidad.proteger_edicion.{nombre}",
+        )
+    for nombre in ("PagoFactura", "PagoCompra", "PagoComisionProveedor"):
+        pre_save.connect(
+            proteger_edicion_pago, sender=getattr(facturacion, nombre),
+            dispatch_uid=f"contabilidad.proteger_edicion.{nombre}",
+        )
+    for nombre in LINEAS_DOCUMENTO:
+        for nombre_senal, senal in (("guardar", pre_save), ("eliminar", pre_delete)):
+            senal.connect(
+                proteger_linea_documento, sender=getattr(facturacion, nombre),
+                dispatch_uid=f"contabilidad.proteger_linea.{nombre_senal}.{nombre}",
+            )
+    pre_save.connect(
+        proteger_movimiento_inventario_manual, sender=facturacion.MovimientoInventario,
+        dispatch_uid="contabilidad.proteger_movimiento_inventario_manual",
+    )
+
+
+def proteger_movimiento_inventario_manual(sender, instance, using, raw=False, update_fields=None, **kwargs):
+    if raw:
+        return
+    campos = {"empresa_id", "producto_id", "tipo", "cantidad", "valor_contable", "fecha", "entrada_documento_id"}
+    anterior = sender.objects.using(using).filter(pk=instance.pk).values(*campos).first() if instance.pk else None
+    tipos_manuales = {"entrada", "ajuste_entrada", "ajuste_salida", "regalia"}
+    if instance.tipo not in tipos_manuales and (not anterior or anterior["tipo"] not in tipos_manuales):
+        return
+    if anterior and not any(anterior[campo] != getattr(instance, campo) for campo in campos):
+        return
+    with transaction.atomic(using=using):
+        bloquear_empresas_contables([instance.empresa_id, anterior["empresa_id"] if anterior else None], using=using)
+        if anterior:
+            _validar_documento_sin_asientos_cerrados(sender, instance, using)
+            if AsientoContable.objects.using(using).filter(
+                empresa_id=anterior["empresa_id"], documento_tipo="movimiento_inventario",
+                documento_id=instance.pk, estado="contabilizado",
+            ).exists():
+                raise ValidationError("El movimiento de inventario tiene un asiento contabilizado. Registre un nuevo ajuste para conservar su trazabilidad.")
+            if anterior["empresa_id"] != instance.empresa_id:
+                raise ValidationError("No se puede trasladar un movimiento de inventario a otra empresa.")
+        fecha = instance.entrada_documento.fecha_documento if instance.entrada_documento_id else instance.fecha
+        if hasattr(fecha, 'hour'):
+            fecha = timezone.localdate(fecha) if timezone.is_aware(fecha) else fecha.date()
+        validar_fecha_contable_abierta(instance.empresa_id, fecha, using)
+
+
+registrar_protecciones_documentos()

@@ -1,0 +1,6 @@
+{% if can_view_products and app_products_url or can_view_app_modules and app_modules_url %}
+<nav class="mi-bottom msop-navigation" aria-label="Navegación de productos e inventario">
+  {% if can_view_products and app_products_url %}<a href="{{ app_products_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8-4 8 4-8 4Z"/><path d="m4 8 8 4 8-4v9l-8 4-8-4Z"/><path d="M12 12v9"/></svg><span>Catálogo</span></a>{% endif %}
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>{% endif %}
+</nav>
+{% endif %}

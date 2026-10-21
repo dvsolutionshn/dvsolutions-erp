@@ -1,0 +1,26 @@
+{% load l10n %}
+{% if comision_sobre_total_factura %}
+<div class="erp-soft-panel" style="margin-top:16px;" aria-live="polite">
+    <strong>Dinero recibido y liquidación de comisión</strong>
+    <p id="explicacion-comision-ordinaria">Registra todo el dinero recibido del cliente. La comisión se asigna al proveedor y se paga después desde cuentas por pagar.</p>
+    <p id="explicacion-comision-compensada" hidden>El dinero recibido y la comisión retenida se aplican a la factura. La comisión queda liquidada al proveedor mediante compensación; el banco refleja únicamente el monto recibido.</p>
+    <div id="resumen-comision-compensada" hidden>Comisión liquidada por compensación: <strong id="total-comision-compensada"></strong></div>
+    <div>Saldo de la factura después de guardar: <strong id="saldo-despues-pago"></strong></div>
+    <p id="aviso-saldo-comision" hidden>La factura quedará con pago parcial. Usa «Pagar todo» para calcular el dinero necesario, considerando las retenciones y la comisión compensada que hayas seleccionado.</p>
+    <p id="aviso-exceso-comision" hidden>El total aplicado supera el saldo disponible de la factura. Revisa el dinero recibido y la comisión antes de guardar.</p>
+</div>
+<script>
+function actualizarSaldoComisionPago(totalAplicado){
+    const saldoDisponible = Number("{{ saldo_disponible_pago|unlocalize }}");
+    const saldo = Math.max(Math.round((saldoDisponible - totalAplicado) * 100) / 100, 0);
+    const compensada = comisionRetenidaClienteActiva();
+    document.getElementById("saldo-despues-pago").textContent = moneyHN(saldo);
+    document.getElementById("aviso-saldo-comision").hidden = saldo <= 0;
+    document.getElementById("aviso-exceso-comision").hidden = totalAplicado <= saldoDisponible + 0.001;
+    document.getElementById("explicacion-comision-ordinaria").hidden = compensada;
+    document.getElementById("explicacion-comision-compensada").hidden = !compensada;
+    document.getElementById("resumen-comision-compensada").hidden = !compensada;
+    document.getElementById("total-comision-compensada").textContent = moneyHN(montoComisionRetenidaCliente());
+}
+</script>
+{% endif %}

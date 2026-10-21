@@ -1,0 +1,11 @@
+<div class="ef-meta" aria-label="Empresa, período y moneda del reporte">
+    <span class="ef-meta-item">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %} {{ empresa.nombre }}</span>
+    <span class="ef-meta-item">{% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %}
+        {% if modo == "balance" %}
+            {% if filtros.fecha_corte %}Corte: {{ filtros.fecha_corte }}{% else %}Todos los registros{% endif %}
+        {% else %}
+            {% if filtros.fecha_inicio or filtros.fecha_fin %}{{ filtros.fecha_inicio|default:"Inicio" }} → {{ filtros.fecha_fin|default:"Última operación" }}{% else %}Todos los registros{% endif %}
+        {% endif %}
+    </span>
+    <span class="ef-meta-item">HNL · Lempiras</span>
+</div>

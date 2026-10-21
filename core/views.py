@@ -15,6 +15,7 @@ from django.db import OperationalError, transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.functions import TruncDate
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
@@ -23,6 +24,7 @@ from django.utils.crypto import get_random_string
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import slugify
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from .assistant import responder_consulta
@@ -659,6 +661,7 @@ def _flash_session_expired_message(request):
         messages.warning(request, mensaje)
 
 
+@never_cache
 def csrf_failure(request, reason=""):
     request.session[SESSION_EXPIRED_MESSAGE_KEY] = SESSION_EXPIRED_MESSAGE
     path = request.path or ""
@@ -678,6 +681,13 @@ def csrf_failure(request, reason=""):
     return redirect("public_access")
 
 
+@never_cache
+@require_GET
+def login_csrf_token(request):
+    # Otra pestaña puede haber rotado la cookie desde que se abrió el login.
+    return JsonResponse({"csrfToken": get_token(request)})
+
+
 def _redirect_dashboard_empresa(request, empresa):
     if _usa_host_empresa(request, empresa):
         return redirect("dashboard_host")
@@ -694,6 +704,7 @@ def _es_perfil_clinico(empresa):
     return interfaz_clinica_activa(empresa)
 
 
+@never_cache
 def empresa_login(request, slug=None):
     empresa = _resolver_empresa_request(request, slug)
     if empresa.tipo_solucion == "tecnicentro":
@@ -1511,6 +1522,12 @@ def _contexto_filtros_auditoria(queryset_base, request):
 @login_required
 def usuarios_clinicos(request, slug):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import autorizar_usuarios_app, es_usuarios_app, render_usuarios_app, validar_usuarios_app
+
+    modo_app = es_usuarios_app(request, empresa)
+    if modo_app:
+        autorizar_usuarios_app(request, empresa)
+        validar_usuarios_app(empresa)
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
 
@@ -1536,6 +1553,8 @@ def usuarios_clinicos(request, slug):
             ),
         })
 
+    if modo_app:
+        return render_usuarios_app(request, empresa, filas)
     return render(request, "core/usuarios_clinicos.html", {
         "empresa": empresa,
         "filas": filas,
@@ -1546,12 +1565,19 @@ def usuarios_clinicos(request, slug):
 @login_required
 def usuario_clinico_permisos(request, slug, usuario_id):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import autorizar_usuarios_app, es_usuarios_app, render_usuario_permisos_app, respuesta_usuarios_app, url_usuarios_app, validar_usuarios_app
+
+    modo_app = es_usuarios_app(request, empresa)
+    if modo_app:
+        autorizar_usuarios_app(request, empresa, usuario_id)
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar usuarios de esta empresa."}, status=403)
 
     # El filtro empresarial también protege GET y POST. No se acepta un ID de
     # usuario que pertenezca a otra empresa aunque se manipule la URL/formulario.
     usuario = get_object_or_404(_usuarios_operativos_de_empresa(empresa), pk=usuario_id)
+    if modo_app:
+        validar_usuarios_app(empresa, usuario_id)
     asignacion = UsuarioEmpresaPermiso.objects.filter(usuario=usuario, empresa=empresa).first()
     rol_actual = asignacion.rol_sistema if asignacion and asignacion.activo else usuario.rol_para_empresa(empresa)
     roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
@@ -1569,8 +1595,14 @@ def usuario_clinico_permisos(request, slug, usuario_id):
             request,
             f"Se asignó {rol.nombre if rol else 'Sin rol'} a {nombre_usuario} únicamente en {empresa.nombre}.",
         )
+        if modo_app:
+            return respuesta_usuarios_app(redirect(url_usuarios_app("usuarios_clinicos", empresa)))
         return redirect("usuarios_clinicos", slug=empresa.slug)
 
+    if modo_app:
+        return render_usuario_permisos_app(request, empresa, {
+            "empresa": empresa, "usuario_gestionado": usuario, "rol_actual": rol_actual, "roles": roles,
+        })
     return render(request, "core/usuario_clinico_permisos.html", {
         "empresa": empresa,
         "usuario_gestionado": usuario,
@@ -1582,15 +1614,26 @@ def usuario_clinico_permisos(request, slug, usuario_id):
 @login_required
 def roles_clinicos(request, slug):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import autorizar_usuarios_app, es_usuarios_app, render_roles_app
+
+    modo_app = es_usuarios_app(request, empresa)
+    if modo_app:
+        autorizar_usuarios_app(request, empresa)
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar roles de esta empresa."}, status=403)
     roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
+    if modo_app:
+        return render_roles_app(request, empresa, roles)
     return render(request, "core/roles_clinicos.html", {"empresa": empresa, "roles": roles})
 
 
 @login_required
 def rol_clinico_editar(request, slug, rol_id=None):
     empresa = _resolver_empresa_request(request, slug)
+    from .mobile_users import es_usuarios_app
+
+    if es_usuarios_app(request, empresa):
+        raise PermissionDenied("Los roles compartidos sólo pueden consultarse en esta adaptación móvil.")
     if not _puede_administrar_usuarios_clinicos(request.user, empresa):
         return JsonResponse({"error": "No tiene permiso para administrar roles de esta empresa."}, status=403)
     rol = get_object_or_404(RolSistema, pk=rol_id, es_rol_clinico=True) if rol_id else None
@@ -1639,12 +1682,18 @@ def rol_clinico_editar(request, slug, rol_id=None):
 
 @login_required
 def auditoria_empresa(request, slug):
+    from .mobile_audit import autorizar_auditoria_app, base_auditoria_app, es_auditoria_app, render_auditoria_app
+
     empresa = _resolver_empresa_request(request, slug)
+    modo_app = es_auditoria_app(request)
+    fechas_app = autorizar_auditoria_app(request, empresa) if modo_app else None
     if not request.user.is_superuser and (
         not request.user.puede_acceder_empresa(empresa) or not request.user.es_administrador_empresa
     ):
         return JsonResponse({"error": "Solo el administrador de la empresa puede consultar la bitacora."}, status=403)
     base = RegistroAuditoria.objects.filter(empresa=empresa).select_related("usuario")
+    if modo_app:
+        base = base_auditoria_app(base, empresa)
     registros = _aplicar_filtros_auditoria(base, request)
     page = Paginator(registros, 50).get_page(request.GET.get("page"))
     context = {
@@ -1653,6 +1702,8 @@ def auditoria_empresa(request, slug):
         "total_registros": registros.count(),
         **_contexto_filtros_auditoria(base, request),
     }
+    if modo_app:
+        return render_auditoria_app(request, empresa, context, fechas_app)
     return render(request, "core/auditoria_empresa.html", context)
 
 
@@ -1768,6 +1819,7 @@ def superadmin_required(view_func):
     return _wrapped_view
 
 
+@never_cache
 def superadmin_login(request):
     _flash_session_expired_message(request)
     if request.user.is_authenticated and request.user.is_superuser:
@@ -1985,6 +2037,10 @@ def superadmin_empresa_generar_respaldo(request, empresa_id):
 
 @superadmin_required
 def superadmin_empresa_create(request):
+    from .mobile_company import es_empresa_app
+
+    if es_empresa_app(request):
+        raise PermissionDenied("Esta adaptación móvil sólo configura las cuatro empresas existentes.")
     form = EmpresaControlForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         empresa = form.save()
@@ -1999,14 +2055,35 @@ def superadmin_empresa_create(request):
 
 
 @superadmin_required
+def superadmin_empresas_app(request):
+    from .mobile_company import autorizar_empresa_app, render_empresas_app
+
+    autorizar_empresa_app(request)
+    return render_empresas_app(request)
+
+
+@superadmin_required
 def superadmin_empresa_edit(request, empresa_id):
+    from .mobile_company import autorizar_empresa_app, es_empresa_app, identidad_empresa_app, render_empresa_form_app, validar_relaciones_empresa_app, volver_empresas_app
+
+    modo_app = es_empresa_app(request)
+    if modo_app:
+        autorizar_empresa_app(request, empresa_id, EmpresaControlForm.base_fields)
     empresa = get_object_or_404(Empresa, id=empresa_id)
-    form = EmpresaControlForm(request.POST or None, request.FILES or None, instance=empresa)
+    if modo_app:
+        validar_relaciones_empresa_app(request, empresa)
+        empresa_original = identidad_empresa_app(empresa)
+    argumentos_app = {"inicializar_configuracion": False} if modo_app else {}
+    form = EmpresaControlForm(request.POST or None, request.FILES or None, instance=empresa, **argumentos_app)
     if request.method == "POST" and form.is_valid():
         empresa = form.save()
         messages.success(request, f"Empresa {empresa.nombre} actualizada correctamente.")
+        if modo_app:
+            return volver_empresas_app(request, empresa, empresa_original)
         return redirect("superadmin_empresas")
 
+    if modo_app:
+        return render_empresa_form_app(request, form, empresa_original)
     return render(request, "core/superadmin_empresa_form.html", {
         **_superadmin_base_context(),
         "form": form,

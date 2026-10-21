@@ -1,0 +1,27 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Roles compartidos{% endblock %}
+{% block mobile_page_title %}Roles compartidos{% endblock %}
+{% block mobile_kicker %}Catálogo global · Sólo consulta{% endblock %}
+{% block mobile_back_url %}{{ app_roles_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>Roles clínicos reutilizables. Su asignación a usuarios se mantiene separada por empresa.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_users.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'core/mobile_users.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mus-intro"><h2>Consultar, sin modificar roles</h2><div class="mus-count"><strong>{{ total_roles }}</strong><span>rol{% if total_roles != 1 %}es{% endif %} clínico{% if total_roles != 1 %}s{% endif %} compartido{% if total_roles != 1 %}s{% endif %}</span></div><p>Un rol puede utilizarse en varias empresas. Esta pantalla no permite crearlo ni editarlo.</p>{% if can_manage_clinical_users and app_users_url %}<a class="mi-button secondary mi-status-space" href="{{ app_users_url }}">Ver usuarios de {{ empresa.nombre }}</a>{% endif %}</section>
+<section class="mi-card mus-search" aria-labelledby="mobileRolesSearchTitle"><h2 id="mobileRolesSearchTitle">Buscar en el catálogo</h2><form id="mobileRolesSearchForm" action="{{ app_roles_search_url }}" method="get"><input type="hidden" name="app" value="1"><div class="mi-field"><label for="mobileRolesSearch">Nombre, código o descripción</label><input id="mobileRolesSearch" name="q" type="search" value="{{ mobile_roles_query }}" placeholder="Buscar rol..." autocomplete="off"></div><div class="mi-field"><label for="mobileRolesState">Estado del rol</label><select id="mobileRolesState" name="estado"><option value="">Todos</option><option value="activos"{% if mobile_roles_state == 'activos' %} selected{% endif %}>Activos</option><option value="inactivos"{% if mobile_roles_state == 'inactivos' %} selected{% endif %}>Inactivos</option></select></div><button class="mi-button secondary" type="submit">Buscar</button>{% if mobile_roles_query or mobile_roles_state %}<a class="mus-clear" href="{{ app_roles_url }}">Limpiar filtros</a>{% endif %}</form><p class="mus-caption">Los filtros consultan todo el catálogo compartido, no sólo esta página.</p></section>
+<div class="mus-list-meta"><strong>{{ mobile_roles_total }} resultado{% if mobile_roles_total != 1 %}s{% endif %}</strong>{% if mobile_roles_total %}<span>{{ roles.start_index }}–{{ roles.end_index }}</span>{% endif %}</div>
+<section class="mus-list" aria-label="Catálogo de roles clínicos compartidos">
+  {% for item in mobile_role_items %}{% with rol=item.rol %}
+  <article class="mi-card mus-card mus-role-card" id="mobile-role-{{ rol.pk }}">
+    <h2>{{ rol.nombre }}</h2><div class="mus-statuses"><span class="mus-badge{% if not rol.activo %} inactive{% endif %}">{% if rol.activo %}Activo{% else %}Inactivo{% endif %}</span><span class="mus-badge shared">Compartido · Sólo consulta</span></div>
+    {% if rol.descripcion %}<details class="mus-permission-fold"><summary>Descripción completa <span aria-hidden="true">⌄</span></summary><dl class="mus-data"><div><dt>Descripción del rol</dt><dd>{{ rol.descripcion }}</dd></div></dl></details>{% else %}<p class="mus-caption">Sin descripción registrada.</p>{% endif %}
+    {% if item.permisos %}<details class="mus-permission-fold"><summary>Permisos configurados <span aria-hidden="true">⌄</span></summary><div class="mus-permission-groups">{% for grupo in item.permisos %}<section class="mus-permission-group"><h3>{{ grupo.grupo }}</h3><ul class="mus-permission-chips">{% for permiso in grupo.permisos %}<li>{{ permiso }}</li>{% endfor %}</ul></section>{% endfor %}</div></details>{% else %}<p class="mus-caption">Sin permisos configurados.</p>{% endif %}
+    {% if not rol.activo %}<p class="mus-caption">Este rol no concede permisos mientras esté inactivo.</p>{% endif %}
+  </article>{% endwith %}
+  {% empty %}<section class="mi-card mus-empty"><h2>Sin roles{% if mobile_roles_query or mobile_roles_state %} para estos filtros{% endif %}</h2><p>{% if mobile_roles_query or mobile_roles_state %}No hay roles que coincidan con la búsqueda.{% else %}Todavía no hay roles clínicos en el catálogo.{% endif %}</p></section>{% endfor %}
+</section>
+{% if mobile_roles_num_pages > 1 %}<nav class="mus-pagination" aria-label="Páginas de roles compartidos">{% if mobile_roles_previous_url %}<a href="{{ mobile_roles_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_roles_page }} / {{ mobile_roles_num_pages }}</span>{% if mobile_roles_next_url %}<a href="{{ mobile_roles_next_url }}">Siguiente ›</a>{% endif %}</nav>{% endif %}
+<div class="mus-info"><strong>Asignación local, catálogo compartido</strong><p>Para cambiar el acceso de una persona en {{ empresa.nombre }}, vuelva a Usuarios y seleccione “Asignar rol en esta empresa”.</p></div>
+{% endblock %}

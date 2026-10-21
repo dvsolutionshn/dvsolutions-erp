@@ -1,0 +1,63 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% load static l10n %}
+{% block mobile_title %}Transferencia rápida{% endblock %}
+{% block mobile_page_title %}Transferencia rápida{% endblock %}
+{% block mobile_kicker %}Inventario · Bodegas internas{% endblock %}
+{% block mobile_back_url %}{{ app_modules_url }}{% endblock %}
+{% block mobile_header_description %}<p>Mueve un producto y lote entre bodegas de la empresa activa.</p>{% endblock %}
+{% block mobile_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'facturacion/mobile_transfers.css' %}">{% endblock %}
+{% block mobile_scripts %}{{ block.super }}<script src="{% static 'facturacion/mobile_transfers.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+{% if usar_selectores_bodega and bodegas %}
+<section class="mi-card mt-route-section" aria-labelledby="transferRouteTitle">
+  <h2 id="transferRouteTitle">Elige las bodegas</h2><p class="mi-muted">Carga los lotes del origen antes de completar la transferencia.</p>
+  <form method="get" action="{{ app_transfer_url }}" id="mobileTransferRouteForm" class="mt-route-form">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field"><label for="transferOrigin">Origen</label><select id="transferOrigin" name="bodega_origen" required><option value="">Selecciona una bodega</option>{% for bodega in bodegas %}<option value="{{ bodega.pk|unlocalize }}"{% if bodega.pk == ruta.origen.pk %} selected{% endif %}>{{ bodega.nombre }}</option>{% endfor %}</select><small>De aquí se descuenta el producto.</small></div>
+    <div class="mi-field"><label for="transferDestination">Destino</label><select id="transferDestination" name="bodega_destino" required><option value="">Selecciona una bodega diferente</option>{% for bodega in bodegas %}<option value="{{ bodega.pk|unlocalize }}"{% if bodega.pk == ruta.destino.pk %} selected{% endif %}{% if bodega.pk == ruta.origen.pk %} disabled{% endif %}>{{ bodega.nombre }}</option>{% endfor %}</select><small>Aquí se suma el producto.</small></div>
+    {% if mobile_transfer_errors.bodegas %}<span class="mi-error" role="alert">{{ mobile_transfer_errors.bodegas }}</span>{% endif %}
+    <button class="mi-button secondary" type="submit">Ver lotes del origen</button>
+  </form>
+  <p class="mt-pending-route" id="transferRoutePending" role="status" hidden>La ruta elegida cambió. Pulsa «Ver lotes del origen» para cargarla antes de transferir.</p>
+</section>
+{% elif mobile_transfer_routes %}
+<section class="mt-routes" aria-labelledby="transferRouteTitle"><h2 id="transferRouteTitle">Rutas disponibles</h2><div class="mt-route-list">
+{% for item in mobile_transfer_routes %}<a class="mi-card mt-route{% if item.active %} active{% endif %}" href="{{ item.url }}"{% if item.active %} aria-current="page"{% endif %}><span>Ruta rápida</span><strong>{{ item.nombre }}</strong><b aria-hidden="true">›</b></a>{% endfor %}
+</div></section>
+{% endif %}
+{% if not mobile_transfer_ready %}<div class="mi-warning" role="status" data-transfer-unavailable><strong>Transferencia no disponible</strong><p>{{ mobile_transfer_unavailable_reason|default:'Revisa la configuración de bodegas con una persona autorizada.' }}</p></div>{% endif %}
+{% if mobile_transfer_ready and mobile_transfer_items %}
+<section class="mi-card mt-current-route" aria-labelledby="transferCurrentRouteTitle"><h2 id="transferCurrentRouteTitle">Ruta cargada</h2><dl><div><dt>Origen</dt><dd id="transferSourceName">{{ ruta.origen.nombre }}</dd></div><span aria-hidden="true">↓</span><div><dt>Destino</dt><dd id="transferDestinationName">{{ ruta.destino.nombre }}</dd></div></dl></section>
+<form id="mobileTransferForm" class="mt-transfer-form" method="post" action="{{ app_transfer_form_url }}" data-submit-once data-transfer-unsaved="{% if request.method == 'POST' %}1{% else %}0{% endif %}">
+  {% csrf_token %}<input type="hidden" name="app" value="1"><input type="hidden" name="existencia" value="{{ valores.existencia }}">
+  {% if usar_selectores_bodega %}<input type="hidden" name="bodega_origen" value="{{ ruta.origen.pk|unlocalize }}"><input type="hidden" name="bodega_destino" value="{{ ruta.destino.pk|unlocalize }}">{% else %}<input type="hidden" name="ruta" value="{{ ruta_key }}">{% endif %}
+  {% if mobile_transfer_errors %}<div class="mi-error-box" role="alert"><strong>Revisa la transferencia</strong><p>La selección, la cantidad recibida y la observación se conservan para que puedas corregirlas.</p></div>{% endif %}
+  <section class="mi-card mt-editor" aria-labelledby="transferProductTitle">
+    <h2 id="transferProductTitle">Producto y lote</h2>
+    <button type="button" class="mt-product-picker" id="transferChooseLot" data-open-sheet="transferLotSheet"><span><strong id="transferSelectedName">Elegir producto y lote</strong><small id="transferSelectedLot">Consulta las existencias de la bodega origen.</small></span><b aria-hidden="true">›</b></button>
+    <div id="transferSelectedStock" class="mt-selected-stock" hidden></div>
+    <div id="transferSelectedWarnings" class="mt-selected-warnings" role="status" hidden></div>
+    {% if mobile_transfer_errors.existencia %}<span class="mi-error" role="alert">{{ mobile_transfer_errors.existencia }}</span>{% endif %}<span class="mi-error" id="transferLotError" role="alert" hidden>Elige el producto y lote que deseas transferir.</span>
+    <div class="mi-field mt-quantity"><label for="transferQuantity">Cantidad a mover</label><input id="transferQuantity" name="cantidad" type="number" inputmode="decimal" min="0.01" step="0.01" value="{{ valores.cantidad }}" required placeholder="0.00"><small>Usa punto decimal, por ejemplo 1.50. Hasta dos decimales.</small>{% if mobile_transfer_errors.cantidad %}<span class="mi-error" role="alert">{{ mobile_transfer_errors.cantidad }}</span><small class="mt-received-quantity">Valor recibido: {{ mobile_transfer_quantity_raw|default:valores.cantidad }}</small>{% endif %}</div>
+    <div class="mi-field"><label for="transferObservation">Observación</label><textarea id="transferObservation" name="observacion" rows="3" placeholder="Opcional: motivo o referencia de la transferencia.">{{ valores.observacion }}</textarea></div>
+    <p class="mi-muted mt-validation-note">El guardado utiliza las validaciones y la trazabilidad actuales del inventario.</p>
+  </section>
+  <a class="mt-cancel" href="{{ app_modules_url }}">Cancelar</a><div class="mi-save-bar"><button class="mi-button" type="button" id="transferReview">Revisar transferencia</button></div>
+</form>
+<dialog class="mi-sheet mt-lot-sheet" id="transferLotSheet" aria-labelledby="transferLotSheetTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="transferLotSheetTitle">Elegir producto y lote</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><p class="mi-muted">Existencias en {{ ruta.origen.nombre }}. Selecciona un lote; la app no lo elige automáticamente.</p>
+  <label class="mt-search-label" for="transferLotSearch">Buscar por nombre, código o lote</label><input id="transferLotSearch" type="search" class="mt-search" placeholder="Buscar producto o lote..." autocomplete="off">
+  <div class="mt-filter-chips" aria-label="Filtrar lotes"><button type="button" class="active" data-transfer-filter="all" aria-pressed="true">Todos</button><button type="button" data-transfer-filter="soon" aria-pressed="false">Próximos a vencer</button><button type="button" data-transfer-filter="expired" aria-pressed="false">Caducados</button><button type="button" data-transfer-filter="inactive" aria-pressed="false">Inactivos</button></div>
+  <div class="mt-lot-list" id="transferLotList">
+  {% for item in mobile_transfer_items %}<button type="button" class="mt-lot-card{% if item.selected %} selected{% endif %}" data-transfer-lot="{{ item.id|unlocalize }}" data-transfer-quantity="{{ item.cantidad|unlocalize }}" data-transfer-expired="{% if item.vencido %}true{% else %}false{% endif %}" data-transfer-soon="{% if item.por_vencer %}true{% else %}false{% endif %}" data-transfer-inactive="{% if not item.lote_activo or not item.producto.activo or item.producto.eliminado %}true{% else %}false{% endif %}" aria-pressed="{% if item.selected %}true{% else %}false{% endif %}">
+    <div class="mt-lot-top"><strong data-lot-name>{{ item.nombre }}</strong><span aria-hidden="true" class="mt-lot-check">✓</span></div><small data-lot-code>{{ item.codigo|default:'Sin código' }}</small>
+    <div class="mt-lot-info"><span>Lote <b data-lot-number>{{ item.lote }}</b></span><span>Vencimiento: <b data-lot-expiration>{{ item.vencimiento|date:'d/m/Y'|default:'Sin fecha' }}</b></span><span>Bodega: <b>{{ ruta.origen.nombre }}</b></span></div>
+    <div class="mt-lot-stock"><span>Disponible</span><strong>{{ item.cantidad|floatformat:2 }}</strong></div>
+    <div class="mt-lot-badges">{% if item.vencido %}<span class="mt-badge danger">Caducado</span>{% elif item.por_vencer %}<span class="mt-badge warning">Próximo a vencer</span>{% endif %}{% if not item.lote_activo %}<span class="mt-badge warning">Lote inactivo</span>{% endif %}{% if not item.producto.activo %}<span class="mt-badge warning">Producto inactivo</span>{% endif %}{% if item.producto.eliminado %}<span class="mt-badge warning">Producto eliminado</span>{% endif %}{% if not item.vencido and not item.por_vencer and item.lote_activo and item.producto.activo and not item.producto.eliminado %}<span class="mt-badge">Disponible</span>{% endif %}</div>
+  </button>{% endfor %}
+  </div><p class="mt-empty" id="transferLotSearchEmpty" hidden>No hay lotes que coincidan con la búsqueda y el filtro.</p>
+</dialog>
+<dialog class="mi-sheet" id="transferConfirmSheet" aria-labelledby="transferConfirmTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="transferConfirmTitle">Confirmar transferencia</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><p class="mi-muted">Se descontará del origen y se agregará al destino dentro de esta misma empresa.</p><div class="mt-confirm-summary"><strong data-transfer-confirm-name></strong><dl><div><dt>Lote</dt><dd data-transfer-confirm-lot></dd></div><div><dt>Origen</dt><dd>{{ ruta.origen.nombre }}</dd></div><div><dt>Destino</dt><dd>{{ ruta.destino.nombre }}</dd></div><div><dt>Cantidad</dt><dd data-transfer-confirm-quantity></dd></div></dl></div><div class="mt-selected-warnings" data-transfer-confirm-warnings role="status" hidden></div><div class="mt-dialog-actions"><button class="mi-button" type="button" id="confirmTransfer">Confirmar y transferir</button><button class="mi-button secondary" type="button" data-close-sheet>Seguir revisando</button></div></dialog>
+<dialog class="mi-sheet" id="transferUnsavedSheet" aria-labelledby="transferUnsavedTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="transferUnsavedTitle">Transferencia sin guardar</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><p class="mi-muted">Si cambias de ruta o sales ahora, la transferencia que estás preparando no se guardará.</p><div class="mt-dialog-actions"><button class="mi-button" type="button" data-close-sheet>Seguir completando</button><button class="mi-button secondary" type="button" id="confirmTransferLeave">Salir sin guardar</button></div></dialog>
+{% elif mobile_transfer_ready %}<section class="mi-card mt-empty" data-transfer-empty><h2>Sin existencias en el origen</h2><p>No hay lotes con cantidad disponible en {{ ruta.origen.nombre }}. Elige otra ruta o bodega para consultar sus existencias.</p></section>{% endif %}
+{% if not mobile_transfer_ready or not mobile_transfer_items %}{% if valores.cantidad or valores.observacion %}<section class="mi-card mt-retained-values"><h2>Datos capturados</h2>{% if valores.cantidad %}<p><strong>Cantidad:</strong> {{ valores.cantidad }}</p>{% endif %}{% if valores.observacion %}<p><strong>Observación:</strong> {{ valores.observacion }}</p>{% endif %}<small>No se ha confirmado una transferencia desde esta pantalla.</small></section>{% endif %}<a class="mt-cancel" href="{{ app_modules_url }}">Volver a funciones</a>{% endif %}
+{% endblock %}

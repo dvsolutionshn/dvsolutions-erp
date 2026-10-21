@@ -1,0 +1,5 @@
+<nav class="mi-bottom mcrm-navigation" aria-label="Navegación de configuración CRM">
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Funciones</span></a>{% endif %}
+  {% if can_view_clinical_configuration and app_clinical_configuration_url %}<a href="{{ app_clinical_configuration_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7ZM9 8h6M12 5v6M9 15h6M9 18h6"/></svg><span>Configuración clínica</span></a>{% endif %}
+  <a class="active" href="{{ app_crm_configuration_url }}" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3-1 3-3 1-2-1-2 4 2 2v3l-2 2 2 4 3-1 3 1 1 3h4l1-3 3-1 2 1 2-4-2-2v-3l2-2-2-4-3 1-3-1-1-3Z"/><circle cx="12" cy="13" r="3"/></svg><span>CRM</span></a>
+</nav>

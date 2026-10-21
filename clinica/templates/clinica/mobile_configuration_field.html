@@ -1,0 +1,7 @@
+<div class="mi-field mcfg-field{% if field.field.widget.input_type == 'checkbox' %} mcfg-check-field{% endif %}" data-configuration-field="{{ field.name }}" data-configuration-label="{{ field.label }}">
+  {% if field.field.widget.input_type == 'checkbox' %}<div class="mcfg-check-control">{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label></div>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mcfg-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+  {% if field.name == 'color_calendario' %}<div class="mcfg-color-preview"><span class="mcfg-color-swatch" id="configurationFormColorPreview" aria-hidden="true"></span><small id="configurationFormColorText">El valor original se conserva. La vista previa solo muestra colores hexadecimales.</small></div>{% endif %}
+  {% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}
+  {% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+  {% if field.errors %}{% if field.name == 'duracion_minutos' or field.name == 'precio_referencia' or field.name == 'color_calendario' %}<small>Valor recibido: {{ field.value|default_if_none:'Sin valor' }}</small>{% endif %}{% endif %}
+</div>

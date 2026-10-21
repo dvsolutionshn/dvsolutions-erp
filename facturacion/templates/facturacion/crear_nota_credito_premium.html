@@ -241,6 +241,8 @@
             {% for form_linea in formset %}
                 <div class="tabla-row erp-line-row">
                     {{ form_linea.id }}
+                    {{ form_linea.linea_factura_origen }}
+                    {% if form_linea.errors %}<div role="alert">{{ form_linea.errors }}</div>{% endif %}
                     <div style="display:none;">{{ form_linea.DELETE }}</div>
                     <div>{{ form_linea.producto|add_class:"producto" }}</div>
                     <div>{{ form_linea.cantidad|add_class:"cantidad" }}</div>
@@ -459,6 +461,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function activarEventos(linea){
         linea.querySelector(".producto").addEventListener("change", function(){
+            const origen = linea.querySelector("input[name$='-linea_factura_origen']");
+            if(origen){ origen.value = ""; }
             const datosProducto = productos[this.value] || {};
             linea.querySelector(".precio").value = datosProducto.precio || 0;
             const impuestoSelect = linea.querySelector(".impuesto");
@@ -476,7 +480,8 @@ document.addEventListener("DOMContentLoaded", function () {
     function renumerarCampos(linea, index){
         linea.querySelectorAll("input, select, textarea").forEach(el => {
             if(el.name){
-                let name = el.name.replace(/lineanotacredito_set-\d+-/, `lineanotacredito_set-${index}-`);
+                const prefijo = totalFormsInput.name.replace(/-TOTAL_FORMS$/, "");
+                let name = el.name.replace(/^[^-]+-\d+-/, `${prefijo}-${index}-`);
                 el.name = name;
                 el.id = "id_" + name;
             }
@@ -487,7 +492,7 @@ document.addEventListener("DOMContentLoaded", function () {
         linea.querySelectorAll("input, select, textarea").forEach(el => {
             if(el.type === "checkbox"){
                 el.checked = false;
-            } else if(el.type !== "hidden"){
+            } else if(el.type !== "hidden" || el.name.endsWith("-linea_factura_origen")){
                 el.value = "";
             }
         });
@@ -513,6 +518,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function poblarLinea(linea, datos){
+        const origen = linea.querySelector("input[name$='-linea_factura_origen']");
+        if(origen){ origen.value = datos.linea_factura_origen_id || ""; }
         linea.querySelector(".producto").value = datos.producto_id || "";
         linea.querySelector(".cantidad").value = datos.cantidad || "";
         linea.querySelector(".precio").value = datos.precio_unitario || "";

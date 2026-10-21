@@ -1,0 +1,50 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Usuarios y permisos{% endblock %}
+{% block mobile_page_title %}Usuarios{% endblock %}
+{% block mobile_kicker %}Administración · Empresa activa{% endblock %}
+{% block mobile_back_url %}{{ app_users_back_url }}{% endblock %}
+{% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
+{% block mobile_header_description %}<p>Consultar el equipo y asignar su rol únicamente en {{ empresa.nombre }}.</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_users.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'core/mobile_users.js' %}" defer></script>{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mus-intro" aria-labelledby="mobileUsersSummary">
+  <h2 id="mobileUsersSummary">Equipo de {{ empresa.nombre }}</h2>
+  <div class="mus-count"><strong>{{ total_usuarios }}</strong><span>usuario{% if total_usuarios != 1 %}s{% endif %} vinculado{% if total_usuarios != 1 %}s{% endif %}</span></div>
+  <p>La asignación de un rol es local: los accesos del usuario en otras empresas permanecen sin cambios.</p>
+  {% if can_manage_clinical_users and app_roles_url %}<a class="mi-button secondary mi-status-space" href="{{ app_roles_url }}">Consultar roles compartidos</a>{% endif %}
+</section>
+<section class="mi-card mus-search" aria-labelledby="mobileUsersSearchTitle">
+  <h2 id="mobileUsersSearchTitle">Buscar en el equipo</h2>
+  <form id="mobileUsersSearchForm" action="{{ app_users_search_url }}" method="get">
+    <input type="hidden" name="app" value="1">
+    <div class="mi-field"><label for="mobileUsersSearch">Nombre, usuario o correo</label><input id="mobileUsersSearch" name="q" type="search" placeholder="Buscar usuario..." value="{{ mobile_users_query }}" autocomplete="off"></div>
+    <div class="mi-field"><label for="mobileUsersState">Estado de la cuenta</label><select id="mobileUsersState" name="estado"><option value="">Todos</option><option value="activos"{% if mobile_users_state == 'activos' %} selected{% endif %}>Activos</option><option value="inactivos"{% if mobile_users_state == 'inactivos' %} selected{% endif %}>Inactivos</option></select></div>
+    <button class="mi-button secondary" type="submit">Buscar</button>
+    {% if mobile_users_query or mobile_users_state %}<a class="mus-clear" href="{{ app_users_url }}">Limpiar filtros</a>{% endif %}
+  </form>
+  <p class="mus-caption">La búsqueda y los filtros incluyen todo el equipo de esta empresa, no sólo esta página.</p>
+</section>
+<div class="mus-list-meta"><strong>{{ mobile_users_total }} resultado{% if mobile_users_total != 1 %}s{% endif %}</strong>{% if mobile_users_total %}<span>{{ filas.start_index }}–{{ filas.end_index }}</span>{% endif %}</div>
+<section class="mus-list" aria-label="Usuarios de la empresa">
+  {% for fila in filas %}
+  <article class="mi-card mus-card mus-user-card" id="mobile-user-{{ fila.usuario.pk }}">
+    <div class="mus-person">
+      <div class="mus-avatar" aria-hidden="true">{{ fila.usuario.first_name|default:fila.usuario.username|slice:':1'|upper }}</div>
+      <div class="mus-person-copy"><h2>{{ fila.usuario.get_full_name|default:fila.usuario.username }}</h2><p>{{ fila.usuario.username }}</p>{% if fila.usuario.email %}<p>{{ fila.usuario.email }}</p>{% endif %}</div>
+    </div>
+    <div class="mus-statuses"><span class="mus-badge{% if not fila.usuario.is_active %} inactive{% endif %}">Cuenta {% if fila.usuario.is_active %}activa{% else %}inactiva{% endif %}</span>{% if fila.rol and not fila.rol.activo %}<span class="mus-badge inactive">Rol inactivo</span>{% endif %}</div>
+    <dl class="mus-current-role"><div><dt>Rol en {{ empresa.nombre }}</dt><dd>{% if fila.rol %}{{ fila.rol.nombre }}{% else %}Sin rol asignado{% endif %}</dd></div></dl>
+    {% if fila.permisos %}
+    <details class="mus-permission-fold"><summary>{{ fila.total_permisos }} permiso{% if fila.total_permisos != 1 %}s{% endif %} configurado{% if fila.total_permisos != 1 %}s{% endif %} en el rol <span aria-hidden="true">⌄</span></summary><div class="mus-permission-groups">{% for grupo in fila.permisos %}<section class="mus-permission-group"><h3>{{ grupo.grupo }}</h3><ul class="mus-permission-chips">{% for permiso in grupo.permisos %}<li>{{ permiso }}</li>{% endfor %}</ul></section>{% endfor %}</div></details>
+    {% else %}<p class="mus-caption">Sin permisos configurados en el rol.</p>{% endif %}
+    {% if fila.usuario.es_administrador_empresa %}<div class="mus-info mus-warning" data-user-admin-warning><strong>Autorización de administrador independiente</strong><p>Esta cuenta conserva su autorización de administrador de empresa. Asignar “Sin rol” o un rol inactivo no revoca esa autorización.</p></div>{% endif %}
+    {% if not fila.usuario.is_active %}<p class="mus-caption">Asignar un rol no activa esta cuenta.</p>{% elif fila.rol and not fila.rol.activo %}<p class="mus-caption">Este rol no concede permisos mientras esté inactivo.</p>{% endif %}
+    {% if can_assign_clinical_role and fila.permisos_url %}<a class="mi-button secondary" href="{{ fila.permisos_url }}">Asignar rol en esta empresa</a>{% endif %}
+  </article>
+  {% empty %}<section class="mi-card mus-empty"><h2>Sin usuarios{% if mobile_users_query or mobile_users_state %} para estos filtros{% endif %}</h2><p>{% if mobile_users_query or mobile_users_state %}No hay cuentas que coincidan con la búsqueda.{% else %}No hay usuarios operativos vinculados a esta empresa.{% endif %}</p></section>{% endfor %}
+</section>
+{% if mobile_users_num_pages > 1 %}<nav class="mus-pagination" aria-label="Páginas de usuarios">{% if mobile_users_previous_url %}<a href="{{ mobile_users_previous_url }}">‹ Anterior</a>{% endif %}<span aria-current="page">{{ mobile_users_page }} / {{ mobile_users_num_pages }}</span>{% if mobile_users_next_url %}<a href="{{ mobile_users_next_url }}">Siguiente ›</a>{% endif %}</nav>{% endif %}
+<div class="mus-info"><strong>Administración de acceso local</strong><p>Esta pantalla no crea, elimina ni reactiva cuentas. Los roles compartidos se consultan sin modificarlos.</p></div>
+{% endblock %}

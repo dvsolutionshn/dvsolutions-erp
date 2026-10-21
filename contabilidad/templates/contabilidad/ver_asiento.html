@@ -7,6 +7,8 @@
 
 {% block topbar_actions %}
 <a href="{% url 'asientos_contables' empresa.slug %}" class="erp-action-link">Volver a Asientos</a>
+{% if erp_access.reportes_contables %}<a href="{% url 'historicos_usd' empresa.slug %}" class="erp-action-link">Históricos USD</a>{% endif %}
+{% if erp_access.asientos_contables %}
 <form method="post" action="{% url 'duplicar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Duplicar</button>
@@ -14,39 +16,71 @@
 {% if asiento.estado == "borrador" %}
 <a href="{% url 'editar_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Editar</a>
 {% endif %}
+{% endif %}
 {% if asiento.estado == "borrador" and erp_access.contabilizar_asientos %}
 <form method="post" action="{% url 'contabilizar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Contabilizar</button>
 </form>
 {% endif %}
-{% if asiento.estado == "contabilizado" %}
-{% if erp_access.contabilizar_asientos %}
+{% if asiento.estado == "contabilizado" and erp_access.contabilizar_asientos %}
+{% if not asiento.conversion_verificada %}
+<a href="{% url 'revisar_conversion_asiento' empresa.slug asiento.id %}" class="erp-action-link">{% if revision_integral %}Consultar revisión integral{% else %}Revisar todas las partidas históricas{% endif %}</a>
+{% endif %}
+{% if puede_regularizar_moneda %}
+<a href="{% url 'regularizar_moneda_factura' empresa.slug asiento.id %}" class="erp-action-link">Regularizar moneda de factura</a>
+{% endif %}
+{% if not revision_integral %}
 <form method="post" action="{% url 'regresar_asiento_borrador' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Regresar a borrador</button>
 </form>
-{% endif %}
 <form method="post" action="{% url 'reversar_asiento_contable' empresa.slug asiento.id %}" style="display:inline;">
     {% csrf_token %}
     <button class="erp-action-link" type="submit">Reversar</button>
 </form>
 {% endif %}
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% if revision_integral %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">Revisión integral de partidas documentada</h3>
+    <p>Registrada por {{ revision_integral.creado_por.username }} el {{ revision_integral.fecha|date:"d/m/Y" }}. Los originales y sus cierres conservan su respaldo.</p>
+    <p>Motivo: {{ revision_integral.motivo }}</p>
+    {% if erp_access.contabilizar_asientos %}<a class="erp-btn-secondary" href="{% url 'revisar_conversion_asiento' empresa.slug revision_integral.origen_id %}">Ver partidas revisadas</a>{% endif %}
+    {% if revision_integral.ajuste_id %}<a class="erp-btn-secondary" href="{% url 'ver_asiento_contable' empresa.slug revision_integral.ajuste_id %}">Ver ajuste contabilizado</a>{% else %}<p>La revisión no necesitó un ajuste de importes.</p>{% endif %}
+</section>
+{% elif revision_moneda %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">Saldo de cliente regularizado</h3>
+    <p>Esta revisión ajusta la cuenta por cobrar. Las demás partidas y aplicaciones históricas requieren su revisión integral.</p>
+    <p>Revisión registrada el {{ revision_moneda.fecha|date:"d/m/Y" }}, con tasa {{ revision_moneda.tipo_cambio }} HNL por USD. El asiento original conserva sus importes y su cierre.</p>
+    <p>Motivo: {{ revision_moneda.motivo }}</p>
+    {% if revision_moneda.asiento_ajuste_id %}<a href="{% url 'ver_asiento_contable' empresa.slug revision_moneda.asiento_ajuste_id %}" class="erp-btn-secondary">Ver asiento de ajuste</a>{% else %}<p class="erp-card-muted">La revisión no necesitó un asiento de ajuste.</p>{% endif %}
+</section>
+{% elif not asiento.conversion_verificada %}
+<section class="erp-card" role="alert">
+    <h3 class="erp-panel-title">Conversión histórica pendiente de revisión</h3>
+    <p>Este asiento procede de un documento en dólares anterior a la corrección de moneda. Sus importes contabilizados se conservan. Revise la conversión y registre el ajuste autorizado en un período abierto.</p>
+</section>
+{% endif %}
 <section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Fecha</div><p class="erp-stat-value" style="font-size:24px;">{{ asiento.fecha|date:"F j, Y" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Fecha</div><p class="erp-stat-value" style="font-size:24px;">{{ asiento.fecha|date:"d/m/Y" }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Estado</div><p class="erp-stat-value" style="font-size:24px;">{{ asiento.get_estado_display }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Debe</div><p class="erp-stat-value">L. {{ asiento.total_debe }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Haber</div><p class="erp-stat-value">L. {{ asiento.total_haber }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Balance</div><p class="erp-stat-value">{% if asiento.esta_balanceado %}OK{% else %}Revisar{% endif %}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Balance</div><p class="erp-stat-value">{% if asiento.esta_balanceado %}Cuadrado{% else %}Revisar{% endif %}</p></article>
 </section>
 
 <section class="erp-info-grid">
-    <article class="erp-info-item"><div class="erp-info-label">Descripcion</div><div class="erp-info-value">{{ asiento.descripcion }}</div></article>
+    <article class="erp-info-item"><div class="erp-info-label">Descripción</div><div class="erp-info-value">{{ asiento.descripcion }}</div></article>
     <article class="erp-info-item"><div class="erp-info-label">Referencia</div><div class="erp-info-value">{{ asiento.referencia|default:"-" }}</div></article>
     <article class="erp-info-item"><div class="erp-info-label">Origen</div><div class="erp-info-value">{{ asiento.origen_modulo|default:"Manual" }}</div></article>
+    <article class="erp-info-item"><div class="erp-info-label">Moneda del documento</div><div class="erp-info-value">{{ asiento.get_moneda_origen_display }} ({{ asiento.moneda_origen }})</div></article>
+    <article class="erp-info-item"><div class="erp-info-label">Tipo de cambio registrado</div><div class="erp-info-value">{{ asiento.tipo_cambio }} HNL por unidad de origen</div></article>
+    <article class="erp-info-item"><div class="erp-info-label">Moneda contable</div><div class="erp-info-value">Lempiras (HNL)</div></article>
     <article class="erp-info-item"><div class="erp-info-label">Creado por</div><div class="erp-info-value">{{ asiento.creado_por.username|default:"-" }}</div></article>
 </section>
 
@@ -59,6 +93,7 @@
                     <th>Detalle</th>
                     <th>Debe</th>
                     <th>Haber</th>
+                    <th>Importe de origen</th>
                 </tr>
             </thead>
             <tbody>
@@ -68,6 +103,7 @@
                     <td>{{ linea.detalle|default:"-" }}</td>
                     <td>L. {{ linea.debe }}</td>
                     <td>L. {{ linea.haber }}</td>
+                    <td>{% if asiento.conversion_verificada %}{{ linea.moneda_origen }} · Debe {{ linea.debe_origen }} / Haber {{ linea.haber_origen }}{% elif revision_integral %}Importe original conservado; ver detalle de la revisión integral{% elif revision_moneda %}Saldo de cliente regularizado; partida pendiente de revisión integral{% else %}Pendiente de verificar{% endif %}</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -441,7 +441,7 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
                     {{ pago.total_retenciones|floatformat:2|intcomma }}
                 </td>
-                <td>{% if pago.monto_comision > 0 %}{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto_comision|floatformat:2|intcomma }}<br>{{ pago.porcentaje_comision|floatformat:2 }}% - {{ pago.proveedor_comision.nombre }}{% else %}-{% endif %}</td>
+                <td>{% if pago.monto_comision > 0 %}{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto_comision|floatformat:2|intcomma }}<br>{{ pago.porcentaje_comision|floatformat:2 }}% - {{ pago.proveedor_comision.nombre }}{% if pago.comision_retenida_cliente %}<br><span class="erp-badge success">Liquidada por compensación</span><br><a href="{% url 'registrar_pago_comision_proveedor' empresa.slug pago.id %}">Ver compensación</a>{% endif %}{% else %}-{% endif %}</td>
                 <td>
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
                     {{ pago.total_aplicado|floatformat:2|intcomma }}

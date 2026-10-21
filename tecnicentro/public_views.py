@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.cache import never_cache
 
 from core.models import Empresa
 
@@ -18,6 +19,7 @@ def _clave_intentos(empresa, request):
     return f"login-tecnicentro:{empresa.id}:{_ip(request)}"
 
 
+@never_cache
 def login_tecnicentro(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug, activa=True)
     if not empresa.tiene_modulo_activo("tecnicentro"):

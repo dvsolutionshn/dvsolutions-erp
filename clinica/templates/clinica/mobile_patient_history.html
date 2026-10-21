@@ -1,0 +1,23 @@
+{% extends "clinica/mobile_patient_base.html" %}
+{% block mobile_title %}Resumen clínico{% endblock %}
+{% block mobile_back_url %}{% if can_view_patient %}{{ app_patient_detail_url }}{% else %}{{ app_modules_url }}{% endif %}{% endblock %}
+{% block mobile_page_title %}Resumen clínico{% endblock %}
+{% block mobile_header_description %}<p>{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_content %}
+<div class="mi-warning"><strong>Solo consulta</strong><p>Los datos corresponden al mismo expediente del sistema. Esta pantalla no modifica las historias clínicas.</p></div>
+{% if can_create_history %}<a class="mi-button secondary" href="{{ app_patient_event_url }}">+ Registrar evento del expediente</a>{% endif %}
+{% include "clinica/mobile_special_history_links.html" %}
+{% include "clinica/mobile_control_links.html" %}
+{% include "clinica/mobile_antecedents_links.html" %}
+<section class="mi-card"><h2>Vista del historial</h2>
+  <form method="get" action="{{ app_patient_history_url }}" class="mp-area-filter"><input type="hidden" name="app" value="1"><input type="hidden" name="seccion" value="especialidad">
+    <div class="mi-field"><label for="mp-area-filter">Área clínica</label><select name="tipo" id="mp-area-filter"><option value="">Todas las áreas</option>{% for tipo in mobile_history_types %}<option value="{{ tipo.codigo }}"{% if tipo_enfoque == tipo.codigo %} selected{% endif %}>{{ tipo.nombre }}</option>{% endfor %}</select></div>
+    <button class="mi-button secondary" type="submit">Aplicar</button>
+  </form><a class="mi-link" href="{{ app_patient_history_url }}">Ver todas las notas</a>
+</section>
+{% if paciente.es_alergico %}<div class="mi-warning danger"><strong>Paciente con alergias</strong><p>{{ paciente.alergias|default:'Sin detalle registrado' }}</p></div>{% endif %}
+<section class="mi-card"><div class="mp-section-head"><h2>Notas clínicas</h2><span>{{ mobile_history_notes|length }}</span></div><div class="mp-note-list">{% for nota in mobile_history_notes %}{% include "clinica/mobile_patient_note.html" with nota=nota %}{% empty %}<p class="mi-muted">No hay notas clínicas para esta vista.</p>{% endfor %}</div></section>
+{% if bloques_preconsulta_enfoque %}<section class="mi-card"><h2>{{ informacion_titulo }}</h2><p class="mi-muted">{{ informacion_descripcion }}</p><div class="mp-note-list">{% for bloque in bloques_preconsulta_enfoque %}<details class="mp-clinical-note"><summary><span><strong>{{ bloque.preconsulta.get_tipo_display }}</strong><small>{{ bloque.preconsulta.fecha_completada|date:'d/m/Y H:i' }}</small></span></summary><div class="mp-note-body">{% for seccion in bloque.secciones %}<h3 class="mp-read-section-title">{{ seccion.titulo }}</h3>{% for campo in seccion.campos %}{% if campo.value or campo.value == 0 %}<div class="mp-read-field"><span>{{ campo.label }}</span>{% if campo.type == 'chips' %}<div class="mp-read-chips">{% for valor in campo.value %}<span>{{ valor }}</span>{% endfor %}</div>{% else %}<p>{{ campo.value }}</p>{% endif %}</div>{% endif %}{% endfor %}{% endfor %}</div></details>{% endfor %}</div></section>{% endif %}
+{% if antecedente_adicional %}<section class="mi-card"><h2>Antecedente adicional</h2><p class="mp-note">{{ antecedente_adicional.contenido }}</p>{% if historial_antecedente_adicional %}<details class="mp-read-fold"><summary>Ver cambios registrados</summary><div class="mp-timeline">{% for cambio in historial_antecedente_adicional %}<details class="mp-timeline-item"><summary><strong>{{ cambio.responsable_display }}</strong><span>{{ cambio.fecha|date:'d/m/Y H:i' }}</span></summary>{% if cambio.texto_anterior %}<div class="mp-read-field"><span>Anterior</span><p>{{ cambio.texto_anterior }}</p></div>{% endif %}<div class="mp-read-field"><span>Actualizado</span><p>{{ cambio.texto_nuevo }}</p></div></details>{% endfor %}</div></details>{% endif %}</section>{% endif %}
+{% if eventos %}<section class="mi-card"><h2>Eventos del expediente</h2><div class="mp-timeline">{% for evento in eventos %}{% include "clinica/mobile_patient_event.html" with evento=evento %}{% endfor %}</div></section>{% endif %}
+{% endblock %}

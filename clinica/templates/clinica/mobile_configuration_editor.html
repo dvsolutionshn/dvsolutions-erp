@@ -1,0 +1,9 @@
+{% if objeto_editando and can_edit_catalog or not objeto_editando and can_create_catalog %}
+<form id="mobileConfigurationForm" class="mcfg-form" method="post" action="{{ app_catalog_form_url }}" data-submit-once data-configuration-unsaved="{% if form.is_bound %}1{% else %}0{% endif %}" data-configuration-in-sheet="{% if in_sheet %}1{% else %}0{% endif %}">
+  {% csrf_token %}<input type="hidden" name="app" value="1">{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+  {% if form.errors %}<div class="mi-error-box" role="alert" tabindex="-1" id="configurationFormErrors"><strong>No se pudo guardar el registro</strong><p>Los datos ingresados se conservan. Revisa los campos marcados.</p>{{ form.non_field_errors }}{% for field in form.hidden_fields %}{% for error in field.errors %}<p>{{ field.label }}: {{ error }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+  {% for section in mobile_configuration_form_sections %}<details class="mi-card mcfg-form-section" open><summary>{{ section.titulo }}</summary><div class="mcfg-section-fields">{% for field in section.campos %}{% include "clinica/mobile_configuration_field.html" %}{% endfor %}</div></details>{% endfor %}
+  <p class="mcfg-help">Se guardará este registro con las validaciones y reglas del catálogo actual.</p>
+  {% if in_sheet %}<div class="mcfg-sheet-save"><button class="mi-button" type="submit" id="configurationReview">Revisar y guardar</button><button class="mi-button secondary" type="button" data-close-sheet>Volver al listado</button></div>{% else %}<a class="mcfg-cancel" href="{{ app_catalog_back_url }}">Cancelar</a><div class="mi-save-bar"><button class="mi-button" type="submit" id="configurationReview">Revisar y guardar</button></div>{% endif %}
+</form>
+{% endif %}

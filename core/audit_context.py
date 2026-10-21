@@ -25,11 +25,12 @@ def get_audit_context():
 
 @contextmanager
 def audit_scope(*, user=None, reason="", request_id=None):
+    contexto_anterior = get_audit_context()
     token = _audit_context.set({
-        "request": None,
-        "request_id": request_id or uuid.uuid4(),
+        "request": contexto_anterior.get("request"),
+        "request_id": request_id or contexto_anterior.get("request_id") or uuid.uuid4(),
         "reason": (reason or "").strip(),
-        "user": user,
+        "user": user or contexto_anterior.get("user"),
     })
     try:
         yield

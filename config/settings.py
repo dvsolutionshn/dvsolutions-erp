@@ -292,3 +292,27 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_SIZE", 
 # editar pagos. SAMEORIGIN mantiene bloqueado el embedding desde sitios externos
 # y coincide con el encabezado configurado en nginx.
 X_FRAME_OPTIONS = "SAMEORIGIN"
+
+# Diagnóstico de autenticación: resultados y referencias anónimas, sin credenciales.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "login_diagnostics": {
+            "format": "%(asctime)s %(levelname)s %(name)s pid=%(process)d %(message)s",
+        },
+    },
+    "handlers": {
+        "login_diagnostics": {
+            "class": "logging.StreamHandler",
+            "formatter": "login_diagnostics",
+        },
+    },
+    "loggers": {
+        "core.auth_backends": {
+            "handlers": ["login_diagnostics"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

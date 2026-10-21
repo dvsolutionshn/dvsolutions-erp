@@ -1,0 +1,57 @@
+/* Only the mobile availability response; the original agenda sheet is unchanged. */
+.mav-screen{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.mav-screen .mi-header-copy h1,.mav-screen .mi-header-copy p{overflow-wrap:anywhere}
+.mav-screen [hidden]{display:none!important}
+.mav-form,.mav-conflicts{display:grid;gap:14px;min-width:0}
+.mav-context h2,.mav-notice h2{font-size:17px;line-height:1.6;overflow-wrap:anywhere;color:#365f73;margin:0}
+.mav-context p,.mav-caption{font-size:12px;line-height:1.8;overflow-wrap:anywhere;color:#718b9a}
+.mav-badge{display:inline-block;border-radius:10px;padding:5px 9px;background:#fbedef;color:#963e4b;font-size:10px;font-weight:700;line-height:1.6;overflow-wrap:anywhere;max-width:100%}
+.mav-notice{margin-bottom:14px;padding:14px 16px;border:1px solid #d5e7ed;border-radius:17px;background:#f2f8fb;color:#527d8b;font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.mav-notice strong{display:block;color:#416e7e;margin-bottom:4px}
+.mav-notice p{margin:6px 0 0}
+.mav-notice.warning{background:#fff9ef;border-color:#ecd6af;color:#87692e}
+.mav-notice.warning h2,.mav-notice.warning strong{color:#81612a}
+.mav-conflicts{margin:0 0 17px;gap:10px}
+.mav-conflict-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;min-width:0}
+.mav-conflict-head>strong{font-size:12px;line-height:1.7;color:#557989;overflow-wrap:anywhere}
+.mav-conflict h3{font-size:15px;line-height:1.7;overflow-wrap:anywhere;margin:11px 0 3px;color:#365f73}
+.mav-conflict p{font-size:12px;line-height:1.7;overflow-wrap:anywhere;color:#718b9a;margin:4px 0}
+.mav-conflict .mav-professional{font-size:11px;color:#4d7a88}
+.mav-section{padding:0;min-width:0}
+.mav-section>summary{display:flex;gap:10px;align-items:center;list-style:none;min-height:62px;padding:16px 18px;color:#416b7d;font-size:14px;font-weight:700;line-height:1.6;overflow-wrap:anywhere;cursor:pointer}
+.mav-section>summary::-webkit-details-marker{display:none}
+.mav-section>summary>span:nth-child(2){flex:1;min-width:0}
+.mav-step{display:grid;place-items:center;width:27px;height:27px;flex-shrink:0;border-radius:10px;background:#faedef;color:#a24a58;font-size:12px}
+.mav-section>summary i{font-style:normal;font-size:21px;flex-shrink:0}
+.mav-section[open]>summary i{transform:rotate(180deg)}
+.mav-section-body{display:grid;gap:17px;min-width:0;padding:0 18px 19px}
+.mav-section-body.mav-period{grid-template-columns:minmax(0,1fr) minmax(85px,.65fr);align-items:start}
+.mav-wide{grid-column:1/-1}
+.mav-field{display:grid;gap:8px;min-width:0;color:#416b7d;font-size:13px;line-height:1.8;overflow-wrap:anywhere}
+.mav-field>label{font-size:12px;font-weight:700;color:#527887;line-height:1.7}
+.mav-required{font-size:10px;font-weight:500;color:#8196a1}
+.mav-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]),.mav-field select,.mav-field textarea{width:100%;min-width:0;min-height:49px;border:1px solid #c9dce3;border-radius:13px;padding:12px;background:#fff;color:#3d6577;font-size:16px;line-height:1.5}
+.mav-field input[type=checkbox]{width:19px;height:19px;min-width:19px;flex-shrink:0;accent-color:#ad5361;margin:2px 0 0}
+.mav-check-label{display:flex;align-items:flex-start;gap:11px;min-height:44px;padding:12px 13px;border:1px solid #ead6da;border-radius:13px;background:#fff6f7;cursor:pointer}
+.mav-check-label span{min-width:0;overflow-wrap:anywhere}
+.mav-help{font-size:11px;line-height:1.8;color:#7a93a0;overflow-wrap:anywhere;margin:0}
+.mav-raw-value{font-size:11px;line-height:1.8;color:#a46262;white-space:pre-wrap;overflow-wrap:anywhere}
+.mav-field.has-error input:not([type=checkbox]),.mav-field.has-error select,.mav-field.has-error textarea{border-color:#d78989}
+.mav-field .mi-error p{margin:0 0 4px}
+.mav-field select:disabled{background:#edf3f5;color:#718995;opacity:1}
+.mav-form-actions{display:grid;gap:9px;padding:3px 0}
+.mav-form>.mav-notice{margin:0}
+.mav-sheet{overflow-y:auto;overscroll-behavior:contain}
+.mav-sheet .mi-sheet-head h2{font-size:20px;overflow-wrap:anywhere}
+.mav-sheet-copy{font-size:12px;line-height:1.8;color:#718b9a;overflow-wrap:anywhere;margin:8px 0 0}
+.mav-review-values{display:grid;gap:13px;margin:16px 0;min-width:0;max-height:29dvh;overflow-y:auto;border:1px solid #e0ecf0;border-radius:15px;background:#f7fafc;padding:14px;overscroll-behavior:contain}
+.mav-review-values>div{min-width:0}
+.mav-review-values dt{font-size:10px;line-height:1.7;color:#8097a4}
+.mav-review-values dd{font-size:13px;line-height:1.8;color:#416b7d;white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0}
+.mav-confirm-field{margin:15px 0}
+.mav-confirm-field strong{color:#336f78;overflow-wrap:anywhere}
+.mav-sheet>.mi-button{margin-top:9px}
+.mav-screen button:disabled{cursor:not-allowed}
+.mav-navigation a{min-width:0}
+.mav-navigation a span{overflow-wrap:anywhere;line-height:1.45}
+@media(max-width:350px){.mav-section>summary{padding:15px;font-size:13px}.mav-section-body{padding:0 15px 16px;gap:15px}.mav-section-body.mav-period{column-gap:10px}.mav-sheet .mi-sheet-head h2{font-size:18px}.mav-review-values{padding:11px}.mav-notice{padding:12px 13px}}

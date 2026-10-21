@@ -1,0 +1,216 @@
+/* Capa visual de la barra existente. Sus enlaces, permisos y controles no cambian. */
+body:not(.demo-dashboard) .erp-sidebar {
+    background: linear-gradient(180deg, #152b3c 0%, #172d3d 60%, #192c3b 100%);
+    border-right-color: #263d4d;
+    color: #e9f0f5;
+    gap: 22px;
+    padding: 18px 14px;
+    box-shadow: 4px 0 20px rgba(20, 37, 52, .06);
+}
+body:not(.demo-dashboard) .erp-sidebar::before { display: none; }
+body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-icon-definitions {
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    width: 0;
+}
+
+body:not(.demo-dashboard) .erp-sidebar .erp-brand {
+    align-items: stretch;
+    background: transparent;
+    backdrop-filter: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 10px 10px 18px;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-brand-logo-wrap {
+    animation: none;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    display: block;
+    flex: 0 0 auto;
+    height: 120px;
+    margin: 0 0 18px;
+    max-height: none;
+    max-width: none;
+    overflow: hidden;
+    padding: 0;
+    width: 100%;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-brand-logo {
+    display: block;
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+    min-height: 0;
+    min-width: 0;
+    object-fit: contain;
+    object-position: center;
+    width: 100%;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-brand-kicker {
+    color: #91adbe;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    line-height: 1.6;
+    margin-bottom: 6px;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-brand h1 {
+    color: #edf4f9;
+    font-size: 17px;
+    font-weight: 680;
+    letter-spacing: -.025em;
+    line-height: 1.45;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-brand p {
+    color: #a0b5c5;
+    font-size: 10px;
+    line-height: 1.65;
+    margin-top: 9px;
+}
+
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-group-title {
+    color: #89a1b2;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    line-height: 1.6;
+    margin: 0 0 9px;
+    padding: 0 13px;
+}
+body:not(.demo-dashboard) .erp-sidebar > div + div > .erp-nav-group-title {
+    border-top: 1px solid #2b4150;
+    padding-top: 18px;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-nav { gap: 5px; }
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-link {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    box-shadow: none;
+    color: #bbccda;
+    font-size: 12.5px;
+    font-weight: 500;
+    gap: 11px;
+    line-height: 1.45;
+    min-height: 43px;
+    padding: 10px 12px;
+    transition: background-color .16s ease, color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-link:hover {
+    background: #243c4e;
+    border-color: #314a5c;
+    box-shadow: none;
+    color: #f4f8fc;
+    transform: translateX(2px);
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-link.is-active {
+    background: #254858;
+    border-color: #365969;
+    box-shadow: inset 3px 0 0 #72c8bd;
+    color: #f3fbfa;
+    font-weight: 600;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-link.is-active:hover { background: #2b5060; }
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-link:focus-visible {
+    outline: 2px solid #96c9de;
+    outline-offset: 2px;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-bullet {
+    align-items: center;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    color: #8daabd;
+    display: inline-flex;
+    flex: 0 0 20px;
+    height: 20px;
+    justify-content: center;
+    width: 20px;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-icon {
+    display: block;
+    height: 20px;
+    max-width: none;
+    width: 20px;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-link:hover .erp-nav-bullet { color: #b3d6de; }
+body:not(.demo-dashboard) .erp-sidebar .erp-nav-link.is-active .erp-nav-bullet { color: #9de0d6; }
+body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-footer {
+    background: #1d3445;
+    border: 1px solid #304757;
+    border-radius: 11px;
+    color: #a0b6c7;
+    font-size: 10.5px;
+    line-height: 1.8;
+    padding: 13px 14px;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-footer strong { color: #c7d6e1; font-weight: 550; }
+body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-footer a {
+    border-radius: 4px;
+    display: inline-block;
+    font-weight: 550;
+    transition: opacity .16s ease;
+}
+body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-footer a:hover { opacity: .76; }
+body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-footer a:focus-visible {
+    outline: 2px solid #96c9de;
+    outline-offset: 4px;
+}
+
+@media (min-width: 1025px) {
+    body:not(.demo-dashboard) .erp-shell { grid-template-columns: 236px minmax(0, 1fr); }
+}
+@media screen and (min-width: 1025px) {
+    /* Clip horizontal no crea el scroll container que impediría position:sticky. */
+    body:not(.demo-dashboard) .erp-shell {
+        overflow-x: clip;
+        overflow-y: visible;
+    }
+    body:not(.demo-dashboard) .erp-sidebar {
+        align-self: start;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        position: sticky;
+        scrollbar-color: #4b687a transparent;
+        scrollbar-width: thin;
+        top: 0;
+    }
+    body:not(.demo-dashboard) .erp-sidebar > * { flex-shrink: 0; }
+}
+@media (min-width: 761px) and (max-width: 1024px) {
+    body:not(.demo-dashboard) .erp-sidebar .erp-brand { padding: 18px 20px; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-brand-logo-wrap { max-width: 260px; }
+}
+@media (max-width: 760px) {
+    /* Se conservan el drawer, su tamaño y los estados abierto/cerrado de erp.css. */
+    body:not(.demo-dashboard) .erp-sidebar { gap: 20px; padding: 16px 14px; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-nav-link {
+        border-radius: 9px;
+        font-size: 14px;
+        min-height: 44px;
+        padding: 11px 13px;
+    }
+    body:not(.demo-dashboard) .erp-sidebar .erp-mobile-drawer-head { padding: 4px 5px 5px; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-mobile-drawer-head span { color: #8fa9ba; font-size: 9px; letter-spacing: .12em; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-mobile-drawer-head strong { color: #eaf2f8; font-size: 16px; font-weight: 600; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-mobile-close { background: #294253; border-radius: 10px; transition: background-color .16s ease; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-mobile-close:hover { background: #365264; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-mobile-close:focus-visible { outline: 2px solid #96c9de; outline-offset: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    body:not(.demo-dashboard) .erp-sidebar,
+    body:not(.demo-dashboard) .erp-sidebar .erp-nav-link,
+    body:not(.demo-dashboard) .erp-sidebar .erp-sidebar-footer a,
+    body:not(.demo-dashboard) .erp-sidebar .erp-mobile-close { transition: none; }
+    body:not(.demo-dashboard) .erp-sidebar .erp-nav-link:hover { transform: none; }
+}

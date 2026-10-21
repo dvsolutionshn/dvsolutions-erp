@@ -1,0 +1,102 @@
+/* Libro Diario: presentación aislada; los datos y totales son los del reporte. */
+.accounting-diary-page .erp-topbar-actions { flex-wrap: wrap; }
+.ef-report.ld-report { gap: 20px; }
+.ld-report .ld-filter-card { align-items: flex-start; gap: 19px; scroll-margin-top: 22px; }
+.ld-report .ld-filter-card .ef-filter-heading { flex: 1 1 100%; }
+.ld-report .ld-filters { display: grid; flex: 1 1 100%; gap: 14px; grid-template-columns: minmax(230px, 1fr) minmax(145px, .37fr) minmax(145px, .37fr) auto; width: 100%; }
+.ld-report .ld-filters .ef-field { min-width: 0; }
+.ld-report .ld-filters .ef-filter-actions { align-self: end; flex-wrap: nowrap; }
+.ld-report .ld-account-field select { background: #fff; border: 1px solid #dce5ee; border-radius: 8px; box-shadow: none; color: #354b63; font: inherit; font-size: 12px; line-height: 1.5; min-height: 42px; min-width: 0; padding: 9px 31px 9px 11px; text-overflow: ellipsis; width: 100%; }
+.ld-report .ld-account-field select:focus { border-color: #8c87dc; box-shadow: 0 0 0 3px #6461ce12; }
+.ld-report select:focus-visible { outline: 3px solid #a6a3e6; outline-offset: 4px; }
+.ld-report .ld-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ld-report .ld-kpis .ef-kpi-value { font-size: clamp(21px, 1.85vw, 28px); letter-spacing: -.035em; line-height: 1.35; }
+.ld-report .ld-kpi-credit { background: #f6f5fd; border-color: #e1ddf4; }
+.ld-report .ld-kpi-credit .ef-kpi-value { color: #55518f; }
+.ld-report .ld-kpi-credit .ef-kpi-foot { border-color: #e4e0f3; }
+.ld-report .ld-scope-note { color: #74859c; font-size: 11px; line-height: 1.8; }
+.ld-report .ld-scope-note .ac-icon { color: #8a80b8; flex-shrink: 0; height: 15px; width: 15px; }
+.ld-report .ld-entries .ef-section-head { align-items: center; flex-wrap: wrap; }
+.ld-report .ld-entry-count { background: #f2f4f9; border: 1px solid #e4e9f1; border-radius: 6px; color: #7a8ba0; display: inline-flex; font-size: 10px; font-weight: 500; line-height: 1.6; padding: 5px 8px; white-space: nowrap; }
+.ld-report .ld-entries .erp-table-wrap { min-width: 0; width: 100%; }
+.ld-report .ld-table { border-collapse: collapse; min-width: 1000px; width: 100%; }
+.ld-report .ld-table-caption { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; white-space: nowrap; width: 1px; }
+.ld-report .ld-table thead th { background: #f8fafc; border-bottom: 1px solid #e7edf4; color: #7a8ba1; font-size: 9px; font-weight: 650; letter-spacing: .06em; padding: 13px 14px; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.ld-report .ld-table tbody td { background: #fff; border-bottom: 1px solid #edf1f6; color: #4a6079; font-size: 11px; font-weight: 400; line-height: 1.75; padding: 14px; vertical-align: top; }
+.ld-report .ld-table .erp-money { font-size: inherit; font-weight: 400; }
+.ld-report .ld-table .ld-date { color: #7c8ba0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ld-report .ld-table .ld-entry { font-size: 10px; font-weight: 550; white-space: nowrap; }
+.ld-report .ld-table .ld-entry a { color: #6d63ad; }
+.ld-report .ld-table .ld-entry a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ld-report .ld-table .ld-account { min-width: 150px; }
+.ld-report .ld-account-code { color: #8a97a9; display: block; font-size: 9px; font-variant-numeric: tabular-nums; line-height: 1.7; }
+.ld-report .ld-account-name { color: #506880; display: block; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
+.ld-report .ld-table .ld-detail { min-width: 180px; overflow-wrap: anywhere; }
+.ld-report .ld-table .ld-reference { color: #8190a4; font-size: 10px; overflow-wrap: anywhere; }
+.ld-report .ld-table .ld-amount { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.ld-report .ld-table tbody tr:hover > td,
+.ld-report .ld-table tbody tr:focus-within > td { background: #f8f9fd; }
+.ld-report .ld-table .ld-totals-row > :is(td, th) { background: #f6f7fc; border-top: 1px solid #e0e5f0; color: #455c77; font-size: 11px; font-weight: 650; line-height: 1.7; padding: 15px 14px; text-align: left; }
+.ld-report .ld-table .ld-totals-row .ld-amount { text-align: right; }
+.ld-report .ld-table .ld-totals-row .erp-money { font-weight: 650; }
+.ld-report .ld-table .erp-empty { padding: 0; }
+.ld-report .ld-table:has(.ld-empty) { min-width: 0; }
+.ld-report .ld-table:has(.ld-empty) thead { display: none; }
+.ld-report .ld-table td:has(> .ld-empty) { padding: 0; }
+.ld-report .ld-empty { align-items: center; display: flex; flex-direction: column; gap: 10px; padding: 42px 24px; text-align: center; }
+.ld-report .ld-empty-icon { align-items: center; background: #f2f0fc; border-radius: 14px; color: #8c82be; display: flex; height: 49px; justify-content: center; margin-bottom: 3px; width: 49px; }
+.ld-report .ld-empty-icon .ac-icon { height: 25px; width: 25px; }
+.ld-report .ld-empty-title { color: #4b6179; font-size: 14px; font-weight: 650; line-height: 1.6; }
+.ld-report .ld-empty-note { color: #8795a8; font-size: 12px; line-height: 1.8; max-width: 470px; }
+.ld-report .ld-empty .ef-btn { margin-top: 5px; }
+.ld-report .ld-footer-note { color: #8695a8; font-size: 10px; line-height: 1.8; }
+
+@media (max-width: 1100px) {
+    .ld-report .ld-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .ld-report .ld-account-field,
+    .ld-report .ld-filters .ef-filter-actions { grid-column: 1 / -1; }
+}
+
+@media (max-width: 720px) {
+    .ef-report.ld-report { gap: 16px; }
+    .ld-report .ld-filter-card { scroll-margin-top: 86px; }
+    .ld-report .ld-kpis { grid-template-columns: minmax(0, 1fr); }
+    .ld-report .ld-entries .ef-section-head { align-items: flex-start; gap: 12px; }
+    .ld-report .ld-empty { padding: 35px 20px; }
+}
+
+@media (max-width: 520px) {
+    .ld-report .ld-filters { gap: 13px; grid-template-columns: minmax(0, 1fr); }
+    .ld-report .ld-filters .ef-field { grid-column: auto; }
+    .ld-report .ld-account-field select { font-size: 14px; }
+    .ld-report .ld-kpis .ef-kpi-value { font-size: 25px; }
+    .ld-report .ld-entry-count { font-size: 9px; }
+}
+
+@media print {
+    .ld-report .ld-filter-card,
+    .ld-report .ld-empty .ef-btn { display: none !important; }
+    .ld-report .ld-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ld-report .ld-kpis .ef-kpi-value { color: #222; font-size: 16px; }
+    .ld-report .ld-kpi-credit { background: #fff; border-color: #d8dee8; }
+    .ld-report .ld-entries { overflow: visible; }
+    .ld-report .ld-entries .erp-table-wrap { overflow: visible !important; }
+    .ld-report .ld-table { min-width: 0 !important; table-layout: fixed; width: 100%; }
+    .ld-report .ld-table thead { display: table-header-group; }
+    .ld-report .ld-table tfoot { display: table-row-group; }
+    .ld-report .ld-table tr { break-inside: avoid; }
+    .ld-report .ld-table :is(th, td),
+    .ld-report .ld-table .ld-totals-row > :is(td, th) { background: #fff; color: #333; font-size: 8px; padding: 7px 5px; }
+    .ld-report .ld-table thead th:nth-child(1) { width: 10%; }
+    .ld-report .ld-table thead th:nth-child(2) { width: 17%; }
+    .ld-report .ld-table thead th:nth-child(3) { width: 18%; }
+    .ld-report .ld-table thead th:nth-child(4) { width: 22%; }
+    .ld-report .ld-table thead th:nth-child(5) { width: 9%; }
+    .ld-report .ld-table thead th:nth-child(6),
+    .ld-report .ld-table thead th:nth-child(7) { width: 12%; }
+    .ld-report .ld-table :is(.ld-entry, .ld-date, .ld-amount) { overflow-wrap: anywhere; white-space: normal; }
+    .ld-report .ld-table :is(.ld-detail, .ld-account) { min-width: 0; }
+    .ld-report .ld-table :is(.ld-entry, .ld-account-code, .ld-account-name) { font-size: 8px; }
+    .ld-report .ld-table tbody tr:hover > td { background: #fff; }
+    .ld-report .ld-footer-note { color: #555; }
+}

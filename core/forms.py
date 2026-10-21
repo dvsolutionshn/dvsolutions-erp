@@ -12,7 +12,7 @@ from .models import ConfiguracionAvanzadaEmpresa, Empresa, EmpresaModulo, Modulo
 
 class SuperAdminLoginForm(forms.Form):
     username = forms.CharField(label="Usuario")
-    password = forms.CharField(label="Contrasena", widget=forms.PasswordInput)
+    password = forms.CharField(label="Contrasena", widget=forms.PasswordInput, strip=False)
 
     error_messages = {
         "invalid_login": "Credenciales invalidas.",
@@ -104,6 +104,7 @@ class EmpresaControlForm(forms.ModelForm):
         ]
 
     def __init__(self, *args, **kwargs):
+        inicializar_configuracion = kwargs.pop("inicializar_configuracion", True)
         super().__init__(*args, **kwargs)
         if "estado_licencia" in self.fields:
             self.fields["estado_licencia"].initial = self.instance.estado_licencia or "prueba"
@@ -117,7 +118,13 @@ class EmpresaControlForm(forms.ModelForm):
                 empresamodulo__activo=True,
                 es_comercial=True,
             )
-        configuracion_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(self.instance) if self.instance.pk else None
+        configuracion_avanzada = None
+        if self.instance.pk:
+            configuracion_avanzada = (
+                ConfiguracionAvanzadaEmpresa.para_empresa(self.instance)
+                if inicializar_configuracion
+                else ConfiguracionAvanzadaEmpresa.objects.filter(empresa=self.instance).first()
+            )
         self.fields["permite_cai_historico"].initial = bool(
             configuracion_avanzada and configuracion_avanzada.permite_cai_historico
         )
@@ -284,11 +291,13 @@ class UsuarioControlCreateForm(forms.ModelForm):
     password1 = forms.CharField(
         required=False,
         label="Contrasena inicial",
+        strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
     password2 = forms.CharField(
         required=False,
         label="Confirmar contrasena",
+        strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
     groups = forms.ModelMultipleChoiceField(
@@ -407,12 +416,14 @@ class UsuarioControlCreateForm(forms.ModelForm):
 
 class UsuarioControlUpdateForm(forms.ModelForm):
     password1 = forms.CharField(
+        strip=False,
         required=False,
         label="Nueva contrasena",
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         help_text="Dejala vacia si no deseas cambiar la contrasena actual.",
     )
     password2 = forms.CharField(
+        strip=False,
         required=False,
         label="Confirmar nueva contrasena",
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),

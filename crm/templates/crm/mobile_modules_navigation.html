@@ -1,0 +1,7 @@
+<nav class="mi-bottom" aria-label="Navegación de la app" style="grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)">
+  <a href="{% if app_home_disponible %}{{ app_base_url }}#inicio{% else %}{{ app_modules_url }}{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/></svg><span>Inicio</span></a>
+  {% if erp_access.pacientes and not app_hide_patient_navigation %}<a href="{{ app_patients_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg><span>Pacientes</span></a>{% endif %}
+  {% if erp_access.modulo_citas and not app_hide_agenda_navigation %}<a href="{{ app_base_url }}#agenda-app"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 11h16"/></svg><span>Citas</span></a>{% endif %}
+  {% if app_home_disponible and erp_access.facturas %}<a href="{{ app_invoices_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6ZM9 8h6M9 12h6M9 16h3"/></svg><span>Facturas</span></a>{% endif %}
+  <a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>
+</nav>

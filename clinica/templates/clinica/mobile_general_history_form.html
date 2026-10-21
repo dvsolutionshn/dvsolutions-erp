@@ -1,0 +1,48 @@
+{% extends "facturacion/mobile_invoice_base.html" %}
+{% load static %}
+{% block mobile_title %}Completar historia general{% endblock %}
+{% block mobile_page_title %}Completar historia general{% endblock %}
+{% block mobile_kicker %}Registro clínico interno{% endblock %}
+{% block mobile_back_url %}{{ app_complete_history_back_url }}{% endblock %}
+{% block mobile_header_description %}<p class="mgh-header-description">{{ paciente.nombre }} · {{ paciente.expediente_codigo }}</p>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'clinica/mobile_general_history.css' %}">{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'clinica/mobile_general_history.js' %}" defer></script>{% endblock %}
+{% block mobile_navigation %}
+<nav class="mi-bottom mgh-navigation" aria-label="Navegación de la historia general">
+  {% if can_view_patient and app_patient_detail_url %}<a href="{{ app_patient_detail_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg><span>Paciente</span></a>{% endif %}
+  {% if can_view_history and app_patient_histories_url %}<a href="{{ app_patient_histories_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6ZM9 8h6M9 12h6M9 16h3"/></svg><span>Historias</span></a>{% endif %}
+  {% if can_view_app_modules and app_modules_url %}<a href="{{ app_modules_url }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg><span>Funciones</span></a>{% endif %}
+</nav>
+{% endblock %}
+{% block mobile_content %}
+<section class="mi-card mgh-intro"><span class="mgh-private">Formulario privado</span><h2>Historia general del expediente</h2><p>Complete y revise la información del formulario original. Puede abrir cada sección para consultar o corregir sus datos.</p><p class="mgh-caption">Al guardar se actualizan el formulario general y los datos del paciente con las reglas actuales del sistema. Esta pantalla no crea una nota de consulta por especialidad.</p></section>
+<form method="post" action="{{ app_complete_history_form_url }}" id="mobileGeneralHistoryForm" class="mgh-form" data-submit-once>
+  {% csrf_token %}<input type="hidden" name="app" value="1">
+  {% for field in mobile_complete_history_hidden_fields %}{{ field }}{% for error in field.errors %}<div class="mi-error-box" role="alert">{{ field.label }}: {{ error }}</div>{% endfor %}{% endfor %}
+  {% if form.errors %}<div class="mi-error-box mgh-error-summary" role="alert" tabindex="-1"><strong>Revise los datos indicados</strong><p>Los valores ingresados se mantienen en el formulario para que pueda corregirlos.</p></div>{% endif %}
+  {% if form.non_field_errors %}<div class="mi-error-box mgh-error-summary" role="alert" tabindex="-1">{{ form.non_field_errors }}</div>{% endif %}
+  {% for section in mobile_complete_history_sections %}
+  <details class="mi-card mgh-section" data-general-history-section="{{ section.key }}"{% if section.key == 'funciones' or form.errors %} open{% endif %}>
+    <summary><span><small>Sección {{ forloop.counter }}</small><strong>{{ section.titulo }}</strong></span><i aria-hidden="true">⌄</i></summary>
+    <div class="mgh-fields">
+    {% for field in section.campos %}
+      <div class="mi-field mgh-field{% if field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %} mgh-choice-field{% endif %}" data-general-history-field="{{ field.name }}">
+      {% if field.name == 'procedimientos_interes' %}
+        <span class="mgh-field-label">{{ field.label }}</span><div class="mgh-procedure-groups">{% for grupo in form.procedimientos_interes_grupos %}<details class="mgh-procedure-group"{% if field.value or field.errors %} open{% endif %}><summary>{{ grupo.titulo }} <i aria-hidden="true">⌄</i></summary><div class="mgh-procedure-options" role="group" aria-label="{{ grupo.titulo }}">{% for opcion in grupo.opciones %}<label><input type="checkbox" name="{{ field.html_name }}" value="{{ opcion.value }}"{% if opcion.selected %} checked{% endif %}><span>{{ opcion.label }}</span></label>{% endfor %}</div></details>{% endfor %}</div>
+      {% elif field.widget_type == 'checkboxselectmultiple' or field.widget_type == 'radioselect' %}
+        <span class="mgh-field-label" id="mgh-label-{{ field.html_name }}">{{ field.label }}{% if field.field.required %}<span class="mgh-required" aria-hidden="true"> *</span>{% endif %}</span><div role="group" aria-labelledby="mgh-label-{{ field.html_name }}">{{ field }}</div>
+      {% elif field.widget_type == 'checkbox' %}<label class="mgh-consent">{{ field }}<span>{{ field.label }}</span></label>
+      {% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mgh-required" aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% endif %}
+      {% if field.help_text %}<small id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}
+      {% if form.is_bound and field.field.widget.input_type == 'date' and field.value %}<small class="mgh-received-value">Valor recibido: {{ field.value }}</small>{% elif field.errors and field.value %}<small class="mgh-received-value">Valor recibido: {{ field.value }}</small>{% endif %}
+      {% for error in field.errors %}<span class="mi-error" role="alert">{{ error }}</span>{% endfor %}
+      </div>
+    {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+  <a class="mgh-cancel" href="{{ app_complete_history_back_url }}">Volver sin guardar</a>
+  <div class="mi-save-bar"><button class="mi-button" type="submit" id="saveGeneralHistory">Guardar historia general</button></div>
+</form>
+<dialog class="mi-sheet mgh-confirm-sheet" id="generalHistoryConfirmSheet" aria-labelledby="generalHistoryConfirmTitle"><div class="mi-grip" aria-hidden="true"></div><div class="mi-sheet-head"><h2 id="generalHistoryConfirmTitle">¿Guardar historia general?</h2><button class="mi-close" type="button" data-close-sheet aria-label="Cerrar">×</button></div><div class="mgh-confirm-patient"><span>Paciente</span><strong>{{ mobile_complete_history_confirmation_name }}</strong><small>{{ paciente.expediente_codigo }}</small></div><p class="mi-muted">Se actualizarán el formulario general y los datos del paciente. La historia general se registrará como completada si el formulario es válido.</p><p class="mi-muted">Revise la información antes de confirmar. El texto de consentimiento conserva el del formulario original.</p><p class="mgh-confirm-status" id="generalHistoryConfirmStatus" role="status" aria-live="polite"></p><div class="mgh-confirm-actions"><button class="mi-button" type="button" id="confirmGeneralHistorySave">Confirmar guardado</button><button class="mi-button secondary" type="button" data-close-sheet>Seguir revisando</button></div></dialog>
+{% endblock %}

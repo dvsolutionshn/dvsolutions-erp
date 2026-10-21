@@ -1,0 +1,51 @@
+{% extends "core/erp_base.html" %}
+{% block title %}Revisión histórica USD - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad de {{ empresa.nombre }}{% endblock %}
+{% block header_title %}Revisión de registros históricos en dólares{% endblock %}
+{% block header_description %}Documentos, aplicaciones y respaldo monetario de esta empresa. Cada importe muestra su moneda; la consulta no registra ajustes.{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a reportes</a>
+<a href="{% url 'exportar_historicos_usd_csv' empresa.slug %}?{{ parametros }}" class="erp-action-link">Descargar diagnóstico CSV</a>
+{% endblock %}
+{% block content %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">Revisar una empresa y un documento a la vez</h3>
+    <p>La revisión integral compara cada partida registrada con su importe y moneda respaldados. Los cobros, notas de crédito y comisiones tienen su propia revisión y su vínculo con el documento original.</p>
+    <p class="erp-card-muted">Una regularización anterior del saldo de cliente respalda la cuenta por cobrar. Las demás partidas conservan su revisión pendiente hasta documentar sus importes. Los documentos sin asiento requieren resolver primero su contabilización y el período correspondiente.</p>
+</section>
+<section class="erp-card">
+    <form method="get" class="erp-form-grid">
+        {{ form.non_field_errors }}
+        {% for campo in form %}<div class="erp-form-field"><label for="{{ campo.id_for_label }}">{{ campo.label }}</label>{{ campo }}{{ campo.errors }}</div>{% endfor %}
+        <div class="erp-form-actions"><button type="submit" class="erp-btn">Filtrar revisión</button><a href="{% url 'historicos_usd' empresa.slug %}" class="erp-btn-secondary">Limpiar</a></div>
+    </form>
+</section>
+{% if pagina %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Pendientes de revisión integral</div><p class="erp-stat-value">{{ resumen.pendiente }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldos de cliente regularizados</div><p class="erp-stat-value">{{ resumen.parcial }}</p><p class="erp-card-muted">Partidas históricas conservadas.</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Asientos con partidas revisadas</div><p class="erp-stat-value">{{ resumen.integral }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Fuentes inconsistentes</div><p class="erp-stat-value">{{ resumen.inconsistente }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Documentos sin asiento</div><p class="erp-stat-value">{{ resumen.sin_asiento }}</p><a class="erp-link" href="{% url 'historicos_usd' empresa.slug %}?estado=sin_asiento{% if form.desde.value %}&desde={{ form.desde.value }}{% endif %}{% if form.hasta.value %}&hasta={{ form.hasta.value }}{% endif %}{% if form.fuente.value %}&fuente={{ form.fuente.value }}{% endif %}">Revisar documentos</a></article>
+</section>
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Documentos y sus revisiones</h3>
+    <div class="erp-table-wrap"><table class="erp-table">
+        <thead><tr><th>Fecha y documento</th><th>Cliente o proveedor</th><th>Importe documento</th><th>Tasas registradas</th><th>Revisión</th><th>Respaldo y acciones</th></tr></thead>
+        <tbody>{% for fila in filas %}<tr>
+            <td>{{ fila.fecha|date:"d/m/Y" }}<div>{{ fila.fuente }} · {{ fila.referencia }}</div>{% if fila.asiento %}<div class="erp-card-muted">{{ fila.asiento.numero|default:fila.asiento.id }} · {{ fila.asiento.evento }}</div>{% endif %}</td>
+            <td>{{ fila.nombre|default:"Sin fuente válida" }}</td>
+            <td>{% if fila.importe_original != None %}{{ fila.moneda }} {{ fila.importe_original }}{% else %}Revisar fuente{% endif %}{% if fila.asiento %}<div class="erp-card-muted">Debe registrado HNL {{ fila.debe_hnl }}<br>Haber registrado HNL {{ fila.haber_hnl }}</div>{% endif %}</td>
+            <td>{% if fila.tasa_documento %}Documento: {{ fila.tasa_documento }} HNL por {{ fila.moneda }}{% endif %}{% if fila.tasa_asiento %}<div>Asiento: {{ fila.tasa_asiento }}</div>{% endif %}{% if fila.tasa_revisada %}<div>CxC revisada: {{ fila.tasa_revisada }} HNL por USD</div>{% endif %}<p class="erp-card-muted">La revisión integral documenta la moneda y tasa de cada partida.</p></td>
+            <td><span class="erp-badge {% if fila.estado == 'integral' %}success{% elif fila.estado == 'inconsistente' %}danger{% else %}warning{% endif %}">{{ fila.estado_texto }}</span>{% if fila.revision_parcial %}<div class="erp-card-muted">CxC previa HNL {{ fila.revision_parcial.saldo_hnl_anterior }}<br>CxC revisada HNL {{ fila.revision_parcial.saldo_hnl_corregido }}</div>{% endif %}</td>
+            <td>{% if fila.url_fuente %}<a class="erp-link" href="{{ fila.url_fuente }}">Ver documento</a>{% endif %}{% if fila.asiento %}<div><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug fila.asiento.id %}">Ver asiento original</a></div>{% if fila.puede_revisar and erp_access.contabilizar_asientos %}<div><a class="erp-link" href="{% url 'revisar_conversion_asiento' empresa.slug fila.asiento.id %}">Revisar todas las partidas</a></div>{% endif %}{% if fila.revision_integral and erp_access.contabilizar_asientos %}<div><a class="erp-link" href="{% url 'revisar_conversion_asiento' empresa.slug fila.asiento.id %}">Ver revisión registrada</a></div>{% endif %}{% endif %}</td>
+        </tr>{% empty %}<tr><td colspan="6" class="erp-empty">No hay registros que coincidan con los filtros de esta empresa.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <nav class="erp-form-actions" aria-label="Páginas de revisión histórica">
+        {% if pagina.has_previous %}<a class="erp-btn-secondary" href="?{{ parametros }}&pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+        <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }} · {{ pagina.paginator.count }} registros</span>
+        {% if pagina.has_next %}<a class="erp-btn-secondary" href="?{{ parametros }}&pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+    </nav>
+</section>
+{% endif %}
+{% endblock %}

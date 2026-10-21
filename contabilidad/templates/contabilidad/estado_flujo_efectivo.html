@@ -7,13 +7,14 @@
 
 {% block topbar_actions %}
 <a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
-<a href="{% url 'balance_general' empresa.slug %}" class="erp-action-link">Balance de Situacion</a>
-<a href="{% url 'estado_resultados' empresa.slug %}" class="erp-action-link">Perdidas y Ganancias</a>
+<a href="{% url 'balance_general' empresa.slug %}?fecha_corte={{ filtros.fecha_fin|urlencode }}" class="erp-action-link">Balance de Situacion</a>
+<a href="{% url 'estado_resultados' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Perdidas y Ganancias</a>
 <a href="{% url 'exportar_estado_flujo_efectivo_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
 <button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
 {% endblock %}
 
 {% block content %}
+{% include "contabilidad/nota_moneda_reportes.html" %}
 <section class="erp-card erp-report-filter-card">
     <div class="erp-toolbar">
         <div>
@@ -38,6 +39,8 @@
 </section>
 
 <section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Efectivo inicial</div><p class="erp-stat-value">L. {{ resumen.saldo_inicial }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Efectivo final</div><p class="erp-stat-value">L. {{ resumen.saldo_final }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Flujo neto</div><p class="erp-stat-value">L. {{ resumen.total_neto }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Operacion</div><p class="erp-stat-value">L. {{ resumen.operacion }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Inversion</div><p class="erp-stat-value">L. {{ resumen.inversion }}</p></article>
@@ -49,7 +52,8 @@
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title">Cuentas de efectivo incluidas</h3>
-            <p class="erp-card-muted">Caja, bancos y cuentas financieras enlazadas a contabilidad.</p>
+            <p class="erp-card-muted">Caja y bancos con cuentas de activo. Las tarjetas de crédito son deuda; las transferencias entre cuentas de efectivo no generan entradas ni salidas.</p>
+            {% if resumen.cuentas_financieras_incompatibles %}<p class="erp-badge danger">{{ resumen.cuentas_financieras_incompatibles }} cuenta{{ resumen.cuentas_financieras_incompatibles|pluralize }} financiera{{ resumen.cuentas_financieras_incompatibles|pluralize }} requiere{% if resumen.cuentas_financieras_incompatibles != 1 %}n{% endif %} revisar su enlace contable. Los bancos configurados conservan su saldo de efectivo.</p>{% endif %}
         </div>
     </div>
     <div class="erp-chip-row">
@@ -60,6 +64,27 @@
         {% endfor %}
     </div>
 </section>
+
+<section class="erp-card">
+    <h3 class="erp-panel-title">Comprobación del efectivo</h3>
+    <p>Efectivo inicial + flujo neto + ajustes históricos = efectivo final. Diferencia: <strong>L. {{ resumen.diferencia }}</strong>.</p>
+    <p>Correcciones documentadas del saldo histórico de caja y bancos: <strong>L. {{ resumen.ajustes_historicos }}</strong>. Se muestran separadas porque no representan cobros ni pagos nuevos.</p>
+    {% if resumen.conciliado %}<span class="erp-badge success">Cuadrado con el mayor de caja y bancos</span>{% else %}<span class="erp-badge danger">Revisar partidas contables y rango de fechas</span>{% endif %}
+</section>
+
+{% if ajustes_historicos %}
+<section class="erp-card erp-table-card">
+    <h3 class="erp-panel-title">Ajustes históricos de caja y bancos</h3>
+    <div class="erp-table-wrap"><table class="erp-table">
+        <thead><tr><th>Fecha</th><th>Asiento de ajuste</th><th>Corrección del saldo HNL</th></tr></thead>
+        <tbody>{% for ajuste in ajustes_historicos %}<tr>
+            <td>{{ ajuste.asiento.fecha|date:"d/m/Y" }}</td>
+            <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug ajuste.asiento.pk %}">{{ ajuste.asiento.numero }}</a></td>
+            <td>L. {{ ajuste.neto }}</td>
+        </tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% endif %}
 
 {% for clave, grupo in flujo.items %}
 <section class="erp-card erp-table-card">

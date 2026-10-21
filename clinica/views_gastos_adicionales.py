@@ -17,7 +17,7 @@ from django.db import transaction
 from django.db.models import Q, Value
 from django.db.models.functions import Replace
 from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -34,6 +34,8 @@ from .catalogo_cirugias_gastos_adicionales import nombre_cirugia_gasto_adicional
 from .forms_gastos_adicionales import GastoAdicionalForm, es_id_valido, validar_lineas_gasto
 from .importes_gastos_adicionales import desglose_gasto_adicional
 from .models import GastoAdicional, LineaGastoAdicional, Paciente
+from .mobile_gastos import es_gastos_app, historial_gastos_mobile, render_gastos, respuesta_gastos_app, url_gastos_app
+from crm.mobile_modules import url_modulos_app
 from .services_gastos_adicionales import convertir_gasto_adicional
 
 logger = logging.getLogger(__name__)
@@ -59,7 +61,11 @@ def _gasto(empresa, gasto_id):
 
 def _volver(request, empresa, gasto):
     if not request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa):
+        if es_gastos_app(request):
+            return redirect(url_modulos_app(request, empresa))
         return redirect("dashboard", slug=empresa.slug)
+    if es_gastos_app(request):
+        return redirect(url_gastos_app("clinica_gasto_adicional_detalle", empresa, gasto.pk))
     return redirect("clinica_gasto_adicional_detalle", empresa_slug=empresa.slug, gasto_id=gasto.pk)
 
 
@@ -94,7 +100,8 @@ def gastos_adicionales(request, empresa_slug):
     pagina = Paginator(gastos.order_by("-fecha", "-pk"), 25).get_page(request.GET.get("page"))
     parametros = request.GET.copy()
     parametros.pop("page", None)
-    return render(request, "clinica/gastos_adicionales.html", {"empresa": empresa, "gastos": pagina, "filtros": filtros, "querystring": parametros.urlencode()})
+    template_name = "clinica/mobile_gastos_list.html" if es_gastos_app(request) else "clinica/gastos_adicionales.html"
+    return render_gastos(request, template_name, {"empresa": empresa, "gastos": pagina, "filtros": filtros, "querystring": parametros.urlencode()})
 
 
 def _paciente_payload(paciente):
@@ -123,12 +130,12 @@ def _producto_payload(producto):
 
 def _resultados_paginados(queryset, request, payload):
     pagina = Paginator(queryset, 40).get_page(request.GET.get("page"))
-    return JsonResponse({
+    return respuesta_gastos_app(request, JsonResponse({
         "results": [payload(objeto) for objeto in pagina],
         "page": pagina.number, "total": pagina.paginator.count,
         "has_more": pagina.has_next(),
         "next_page": pagina.next_page_number() if pagina.has_next() else None,
-    })
+    }))
 
 
 @login_required
@@ -228,10 +235,16 @@ def _formulario(request, empresa, gasto=None):
                 messages.success(request, f"Gasto Adicional {documento.numero} guardado.")
                 puede_ver = request.user.tiene_permiso_erp("puede_ver_gastos_adicionales", empresa)
                 if request.POST.get("accion") == "pdf" and puede_ver:
+                    if es_gastos_app(request):
+                        return redirect(url_gastos_app("clinica_gasto_adicional_detalle", empresa, documento.pk, pdf="1"))
                     return redirect("clinica_gasto_adicional_pdf", empresa_slug=empresa.slug, gasto_id=documento.pk)
                 if not puede_ver:
                     if gasto:
+                        if es_gastos_app(request):
+                            return redirect(url_gastos_app("clinica_gasto_adicional_editar", empresa, documento.pk))
                         return redirect("clinica_gasto_adicional_editar", empresa_slug=empresa.slug, gasto_id=documento.pk)
+                    if es_gastos_app(request):
+                        return redirect(url_gastos_app("clinica_gasto_adicional_crear", empresa))
                     return redirect("clinica_gasto_adicional_crear", empresa_slug=empresa.slug)
                 return _volver(request, empresa, documento)
         paciente_valor = request.POST.get("paciente", "")
@@ -254,7 +267,8 @@ def _formulario(request, empresa, gasto=None):
                     lineas_iniciales.append({**_producto_payload(producto), "producto_id": producto.pk, "cantidad": str(dato.get("cantidad", ""))[:30], "precio_unitario": str(dato.get("precio_unitario", ""))[:30]})
     from facturacion.views import _precios_incluyen_impuesto
     permiso_precio = "puede_editar_gastos_adicionales" if gasto else "puede_crear_gastos_adicionales"
-    return render(request, "clinica/gastos_adicionales_form.html", {
+    template_name = "clinica/mobile_gastos_form.html" if es_gastos_app(request) else "clinica/gastos_adicionales_form.html"
+    return render_gastos(request, template_name, {
         "empresa": empresa, "gasto": gasto, "form": form,
         "paciente_inicial": _paciente_payload(paciente) if paciente else None,
         "lineas_iniciales": lineas_iniciales, "errores_lineas": errores_lineas,
@@ -282,7 +296,13 @@ def editar(request, empresa_slug, gasto_id):
 def detalle(request, empresa_slug, gasto_id):
     empresa = _empresa_autorizada(request, empresa_slug, "puede_ver_gastos_adicionales")
     gasto = _gasto(empresa, gasto_id)
-    return render(request, "clinica/gastos_adicionales_detalle.html", {"empresa": empresa, "gasto": gasto, "importes": desglose_gasto_adicional(gasto)})
+    contexto = {"empresa": empresa, "gasto": gasto, "importes": desglose_gasto_adicional(gasto)}
+    template_name = "clinica/gastos_adicionales_detalle.html"
+    if es_gastos_app(request):
+        contexto["mobile_gasto_audit"] = historial_gastos_mobile(empresa, gasto)
+        contexto["mobile_gasto_pdf_requested"] = request.GET.get("pdf") == "1"
+        template_name = "clinica/mobile_gastos_detail.html"
+    return render_gastos(request, template_name, contexto)
 
 
 def contexto_pdf(empresa, gasto):
@@ -309,8 +329,9 @@ def pdf(request, empresa_slug, gasto_id):
     empresa = _empresa_autorizada(request, empresa_slug, "puede_ver_gastos_adicionales")
     gasto = _gasto(empresa, gasto_id)
     response = HttpResponse(generar_pdf_bytes(empresa, gasto), content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{gasto.numero}.pdf"'
-    return response
+    disposition = "inline" if es_gastos_app(request) else "attachment"
+    response["Content-Disposition"] = f'{disposition}; filename="{gasto.numero}.pdf"'
+    return respuesta_gastos_app(request, response)
 
 
 @login_required
@@ -330,6 +351,8 @@ def convertir(request, empresa_slug, gasto_id):
     else:
         messages.warning(request, f"{gasto.numero} ya tiene una factura asociada. Se abre la existente.")
     destino = "editar_factura" if factura.estado == "borrador" else "ver_factura"
+    if es_gastos_app(request):
+        return redirect(url_gastos_app(destino, empresa, factura.pk))
     return redirect(destino, empresa_slug=empresa.slug, factura_id=factura.pk)
 
 

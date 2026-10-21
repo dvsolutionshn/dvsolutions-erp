@@ -1,0 +1,8 @@
+{% load l10n %}
+{% if factura.moneda == "USD" %}
+<div class="erp-field" style="margin-bottom:16px;">
+    <label for="tipo_cambio">Tipo de cambio del cobro (HNL por USD)</label>
+    <input id="tipo_cambio" name="tipo_cambio" type="number" min="0.000001" step="0.000001" required value="{{ form_data.tipo_cambio|default:tipo_cambio_cobro|unlocalize }}">
+    <p class="erp-field-help">Capture montos y retenciones en USD. El asiento se expresará en lempiras y reconocerá la diferencia cambiaria con la tasa de la factura.</p>
+</div>
+{% endif %}

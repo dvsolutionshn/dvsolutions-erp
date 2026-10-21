@@ -97,3 +97,33 @@ Guia completa: `deploy/digitalocean_setup.md`.
 - Crear campania CRM con plantilla aprobada de WhatsApp.
 - Crear cierre de caja y revisar resumen diario.
 - Probar inventario farmaceutico si la empresa lo tiene activo.
+
+## 8. Diagnostico de inicio de sesion
+
+Despues de desplegar los cambios, ejecutar `collectstatic --noinput` y reiniciar
+el servicio para que todos los workers usen el mismo codigo y configuracion.
+El logger `core.auth_backends` emite `login_validation` con fecha, PID, empresa,
+referencia HMAC del identificador y resultado. No incluye las credenciales.
+
+Para la unidad `dvsolutions.service` de la guia de instalacion:
+
+```bash
+sudo journalctl -u dvsolutions.service --since "30 minutes ago" --grep "login_validation" --no-pager
+```
+
+Comparar el intento fallido con el exitoso usando `identifier_tag` y `company_id`:
+
+- `not_found`: el identificador no encontro una cuenta en ese contexto.
+- `ambiguous`: el correo corresponde a varias cuentas en ese contexto.
+- `invalid_password`: la contrasena recibida no coincide con la almacenada.
+- `inactive`: la contrasena coincide pero la cuenta esta deshabilitada.
+- `missing_credentials`: falta el identificador o no se envio la contrasena.
+- `success`: el backend valido las credenciales; los permisos del acceso se
+  comprueban despues en la vista.
+
+Si el resultado cambia segun el PID con los mismos datos, revisar que los
+workers compartan version, configuracion y base de datos. Si primero aparece
+`invalid_password` y luego `success`, comprobar el autocompletado y si la cuenta
+o su contrasena fueron modificadas entre intentos. El mismo correo puede tener
+contrasenas distintas en empresas diferentes. La creacion, edicion y validacion
+deben conservar exactamente la contrasena, incluidos sus espacios.

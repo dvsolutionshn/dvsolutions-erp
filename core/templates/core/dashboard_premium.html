@@ -2,187 +2,14 @@
 {% load static %}
 
 {% block title %}Panel Principal - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Centro de Control{% endblock %}
+{% block body_class %}{{ block.super }}{% if not erp_access.interfaz_clinica %} erp-home-page{% endif %}{% endblock %}
+{% block header_kicker %}Centro de control{% endblock %}
 {% block header_title %}Panel Principal{% endblock %}
-{% block header_description %}Una experiencia institucional, sobria y elegante para acceder a los modulos estrategicos del ERP.{% endblock %}
+{% block header_description %}{% if erp_access.interfaz_clinica %}Una experiencia institucional, sobria y elegante para acceder a los modulos estrategicos del ERP.{% else %}Tus herramientas de trabajo, en un solo lugar.{% endif %}{% endblock %}
 
 {% block extra_head %}
+{{ block.super }}
 <style>
-.erp-dashboard-hero{
-    position:relative;
-    overflow:hidden;
-    display:grid;
-    grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);
-    gap:clamp(10px, .9vw, 18px);
-    align-items:stretch;
-    padding:clamp(12px, .92vw, 20px);
-}
-.erp-dashboard-hero::after{
-    content:"";
-    position:absolute;
-    right:-70px;
-    bottom:-90px;
-    width:280px;
-    height:280px;
-    border-radius:999px;
-    background:radial-gradient(circle, rgba(31,94,168,.12), rgba(31,94,168,0));
-    pointer-events:none;
-}
-.erp-dashboard-hero-copy h3{
-    margin:0 0 10px;
-    font-size:clamp(16px, 1.22vw, 23px);
-    line-height:1.15;
-    color:#102338;
-}
-.erp-dashboard-hero-copy p{
-    margin:0;
-    max-width:760px;
-    color:var(--muted);
-    font-size:clamp(10px, .7vw, 13px);
-    line-height:1.34;
-}
-.erp-dashboard-signals{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
-    gap:clamp(7px, .62vw, 10px);
-}
-.erp-dashboard-signal{
-    padding:clamp(8px, .66vw, 12px) clamp(9px, .72vw, 13px);
-    border:1px solid var(--line);
-    border-radius:14px;
-    background:#fbfcfe;
-}
-.erp-dashboard-signal span{
-    display:block;
-    font-size:8px;
-    text-transform:uppercase;
-    letter-spacing:.15em;
-    color:var(--muted);
-}
-.erp-dashboard-signal strong{
-    display:block;
-    margin-top:8px;
-    font-size:clamp(15px, 1.05vw, 20px);
-    color:#102338;
-    overflow-wrap:anywhere;
-}
-.erp-dashboard-card-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));
-    gap:clamp(8px, .66vw, 12px);
-    align-items:stretch;
-}
-.erp-dashboard-module{
-    position:relative;
-    overflow:hidden;
-    display:flex;
-    flex-direction:column;
-    height:100%;
-    transition:transform .22s ease, border-color .22s ease, box-shadow .22s ease;
-    animation:erpCardRise .48s ease both;
-}
-.erp-dashboard-module-content{
-    position:relative;
-    z-index:1;
-    display:flex;
-    flex-direction:column;
-    flex:1;
-}
-.erp-module-visual{
-    position:relative;
-    z-index:1;
-    height:clamp(52px, 4vw, 82px);
-    margin:-2px -2px clamp(7px, .62vw, 12px);
-    border-radius:14px;
-    overflow:hidden;
-    background:linear-gradient(135deg, #f8fbff, #eef6ff);
-    border:1px solid rgba(190, 207, 232, .7);
-}
-.erp-module-visual::before{
-    content:"";
-    position:absolute;
-    inset:-40% auto auto -20%;
-    width:70%;
-    height:130%;
-    transform:rotate(18deg);
-    background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.62), rgba(255,255,255,0));
-    opacity:.54;
-    animation:erpModuleSweep 5.8s ease-in-out infinite;
-}
-.erp-module-visual img{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    transform:scale(1.01);
-    transition:transform .42s ease, filter .42s ease;
-}
-.erp-dashboard-module:hover .erp-module-visual img{
-    transform:scale(1.07) translateY(-3px);
-    filter:saturate(1.08);
-}
-.erp-dashboard-module:hover .erp-module-visual::before{
-    animation-duration:2.4s;
-}
-.erp-dashboard-module:nth-child(2){ animation-delay:.05s; }
-.erp-dashboard-module:nth-child(3){ animation-delay:.1s; }
-.erp-dashboard-module:nth-child(4){ animation-delay:.15s; }
-.erp-dashboard-module:nth-child(5){ animation-delay:.2s; }
-.erp-dashboard-module:nth-child(6){ animation-delay:.25s; }
-.erp-dashboard-module::before{
-    content:"";
-    position:absolute;
-    left:0;
-    top:0;
-    bottom:0;
-    width:4px;
-    background:linear-gradient(180deg, var(--primary), rgba(31,94,168,.12));
-}
-.erp-dashboard-module > *{
-    position:relative;
-    z-index:1;
-}
-.erp-dashboard-module:hover{
-    transform:translateY(-4px);
-    border-color:#c8d7ea;
-    box-shadow:0 18px 40px rgba(12,34,56,.08);
-}
-.erp-dashboard-module h3{
-    margin:4px 0 7px;
-    font-size:clamp(13px, .88vw, 17px);
-    color:#102338;
-}
-.erp-dashboard-module p{
-    margin:0 0 clamp(8px, .7vw, 14px);
-    color:var(--muted);
-    font-size:clamp(9px, .64vw, 11px);
-    line-height:1.34;
-}
-.erp-dashboard-module-action{
-    margin-top:auto;
-    padding-top:clamp(6px, .65vw, 10px);
-}
-.erp-module-status{
-    display:inline-flex;
-    align-items:center;
-    padding:5px 8px;
-    border-radius:999px;
-    background:rgba(31,94,168,.09);
-    color:var(--primary);
-    font-size:8px;
-    font-weight:700;
-    letter-spacing:.08em;
-    text-transform:uppercase;
-}
-.erp-dashboard-module .erp-btn{
-    width:100%;
-    justify-content:center;
-    min-height:clamp(31px, 2vw, 36px);
-    padding-top:6px;
-    padding-bottom:6px;
-    font-size:clamp(9px, .62vw, 11px);
-}
 .erp-doctor-welcome{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:22px;align-items:stretch;padding:28px;background:radial-gradient(circle at 8% 8%,rgba(31,182,170,.2),transparent 28%),radial-gradient(circle at 90% 18%,rgba(37,99,235,.18),transparent 32%),linear-gradient(135deg,#ffffff 0%,#f8fcff 50%,#eefafa 100%);border-color:rgba(31,182,170,.22)}
 .erp-doctor-welcome::after{content:"";position:absolute;right:-80px;bottom:-120px;width:320px;height:320px;border-radius:999px;background:linear-gradient(135deg,rgba(31,182,170,.16),rgba(37,99,235,.12));filter:blur(2px)}
 .erp-doctor-welcome > *{position:relative;z-index:1}.erp-doctor-welcome h3{margin:10px 0 12px;color:#102338;font-size:clamp(30px,2.3vw,46px);line-height:1.04;letter-spacing:-.04em;max-width:760px}
@@ -197,34 +24,6 @@
 .erp-doctor-action strong{display:block;font-size:18px;margin-bottom:6px}.erp-doctor-action span{display:block;color:#65798b;font-size:13px;line-height:1.45}
 .erp-doctor-side{display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(31,182,170,.2);border-radius:28px;padding:24px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
 .erp-doctor-side h4{margin:0 0 12px;color:#102338;font-size:20px}.erp-doctor-side p{font-size:13px}.erp-doctor-side ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:10px}.erp-doctor-side li{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dce9f2;border-radius:16px;background:#fff;color:#445b70;font-weight:850}.erp-doctor-side li::before{content:"✓";display:grid;place-items:center;width:23px;height:23px;border-radius:9px;background:#e9faf6;color:#08766f;font-weight:950}.erp-doctor-mini{margin-top:18px;padding:15px;border-radius:18px;background:linear-gradient(135deg,#102338,#18496e);color:#fff}.erp-doctor-mini strong{display:block;font-size:18px}.erp-doctor-mini span{display:block;margin-top:4px;color:rgba(255,255,255,.72);font-size:12px}
-.erp-module-status.upgrade{
-    background:rgba(23,166,161,.1);
-    color:#0f6f6a;
-}
-.erp-upsell-note{
-    margin-top:auto;
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-}
-.erp-upsell-trigger{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    width:100%;
-    padding:11px 14px;
-    border-radius:12px;
-    border:1px solid rgba(41,104,242,.18);
-    background:linear-gradient(180deg, rgba(41,104,242,.1), rgba(41,104,242,.04));
-    color:var(--primary);
-    font-weight:700;
-    transition:.2s ease;
-}
-.erp-upsell-trigger:hover{
-    transform:translateY(-1px);
-    border-color:rgba(41,104,242,.28);
-    box-shadow:0 10px 24px rgba(18, 46, 89, .08);
-}
 .erp-plans-modal{
     position:fixed;
     inset:0;
@@ -399,36 +198,9 @@
         grid-template-columns:1fr;
     }
 }
-@keyframes erpCardRise{
-    from{
-        opacity:0;
-        transform:translateY(14px);
-    }
-    to{
-        opacity:1;
-        transform:translateY(0);
-    }
-}
-@keyframes erpModuleSweep{
-    0%, 58%{transform:translateX(-120%) rotate(18deg);}
-    100%{transform:translateX(260%) rotate(18deg);}
-}
-@media (max-width: 980px){
-    .erp-dashboard-hero{
-        grid-template-columns:1fr;
-    }
-    .erp-doctor-welcome{grid-template-columns:1fr}
-    .erp-doctor-actions{grid-template-columns:1fr}
-}
-@media (min-width: 761px) and (max-width: 1440px){
-    .erp-dashboard-hero{
-        grid-template-columns:minmax(0,1fr);
-    }
-    .erp-dashboard-signals{
-        grid-template-columns:repeat(3,minmax(0,1fr));
-    }
-}
+@media (max-width: 980px){.erp-doctor-welcome{grid-template-columns:1fr}.erp-doctor-actions{grid-template-columns:1fr}}
 </style>
+{% if not erp_access.interfaz_clinica %}<link rel="stylesheet" href="{% static 'core/dashboard_principal.css' %}">{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -475,239 +247,67 @@
     </aside>
 </section>
 {% else %}
-<section class="erp-card erp-dashboard-hero">
-    <div class="erp-dashboard-hero-copy">
-        <div class="erp-kpi-label">Operacion empresarial</div>
-        <h3>Todo el ecosistema del ERP concentrado en una vista mas viva, clara y lista para operar.</h3>
-        <p>Desde aqui cada equipo entra a su modulo de trabajo con una experiencia mas refinada, mas directa y con mejores señales visuales para navegar sin friccion.</p>
-    </div>
-    <div class="erp-dashboard-signals">
-        <div class="erp-dashboard-signal">
-            <span>Modulos activos</span>
-            <strong>{{ modulos.count }}</strong>
-        </div>
-        <div class="erp-dashboard-signal">
-            <span>Empresa</span>
-            <strong style="font-size:20px;">{{ empresa.nombre }}</strong>
-        </div>
-        <div class="erp-dashboard-signal">
-            <span>Usuario</span>
-            <strong style="font-size:20px;">{{ request.user.username }}</strong>
-        </div>
-    </div>
-</section>
+<div class="home-dashboard" data-home-dashboard>
+    {% include "core/partials/panel_iconos.html" %}
+    <header class="home-welcome">
+        <div class="home-welcome-main"><p class="home-eyebrow">Tu espacio de trabajo</p><h1>Hola, {{ request.user.first_name|default:request.user.username }}</h1><p>Elige un módulo para continuar con el trabajo de hoy.</p><div class="home-meta"><span>{% include "core/partials/panel_icono.html" with icono="calendar" only %}Hoy · {% now "d/m/Y" %}</span></div></div>
+        <div class="home-session"><span class="home-module-icon">{% include "core/partials/panel_icono.html" with icono="lock" only %}</span><div><span class="home-session-label">Empresa de esta sesión</span><strong class="home-session-name">{{ empresa.nombre }}</strong><span class="home-session-meta">RTN {{ empresa.rtn|default:"No definido" }}</span></div></div>
+    </header>
 
-<section class="erp-grid">
-    <article class="erp-card">
-        <div class="erp-kpi-label">Modulos Activos</div>
-        <div class="erp-stat-value">{{ modulos.count }}</div>
-        <p class="erp-card-muted">Vision consolidada de las capacidades habilitadas para la empresa.</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Empresa</div>
-        <div class="erp-stat-value" style="font-size:24px;">{{ empresa.nombre }}</div>
-        <p class="erp-card-muted">RTN {{ empresa.rtn|default:"No definido" }}</p>
-    </article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Usuario</div>
-        <div class="erp-stat-value" style="font-size:24px;">{{ request.user.username }}</div>
-        <p class="erp-card-muted">Sesion activa para operar dentro del entorno corporativo.</p>
-    </article>
-</section>
-
-<section class="erp-card">
-    <h3 class="erp-panel-title">Modulos Disponibles</h3>
-    <div class="erp-dashboard-card-grid">
-        {% if erp_access.modulo_gastos_adicionales %}
-        <article class="erp-card erp-module-card erp-dashboard-module">
-            <div class="erp-module-visual"><img src="{% static 'core/img/modules/receipts.svg' %}" alt="" aria-hidden="true"></div>
-            <div class="erp-kpi-label">Documento clínico</div>
-            <h3>Gastos Adicionales</h3>
-            <p>Productos por paciente, historial, PDF y conversión a factura para revisión.</p>
-            <div class="erp-dashboard-module-action"><a class="erp-btn" href="{% if erp_access.ver_gastos_adicionales %}{{ gastos_adicionales_url }}{% else %}{{ gasto_adicional_nuevo_url }}{% endif %}">Ingresar al módulo</a></div>
-        </article>
-        {% endif %}
-        {% for modulo in modulos %}
-            {% if modulo.codigo == "gastos_adicionales" %}
-                {# La tarjeta independiente se muestra antes de este catálogo. #}
-            {% elif modulo.codigo == "facturacion" %}
-                {% if erp_access.modulo_facturacion %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Modulo Financiero</div>
-                <h3>Facturacion</h3>
-                <p>Facturas, notas de credito, recibos, clientes, productos y control fiscal dentro de una misma operacion integrada.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "contabilidad" %}
-                {% if erp_access.modulo_contabilidad %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/accounting.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Modulo Financiero</div>
-                <h3>Contabilidad</h3>
-                <p>Catalogo contable, asientos, partidas y base financiera institucional conectada con el crecimiento del ERP.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/contabilidad/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "recibos" %}
-                {% if erp_access.recibos %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/receipts.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Cobranza</div>
-                <h3>Recibos</h3>
-                <p>Comprobantes de pago formales con concepto, PDF y trazabilidad directa hacia facturas y clientes.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/recibos/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "cotizaciones" %}
-                {% if erp_access.cotizaciones %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/billing.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Propuestas Comerciales</div>
-                <h3>Cotizaciones</h3>
-                <p>Cotizaciones formales con PDF, aprobacion y conversion directa a factura borrador con trazabilidad comercial.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/cotizaciones/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "punto_venta" %}
-                {% if erp_access.modulo_pos %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/pos.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Venta Directa</div>
-                <h3>Punto de Venta</h3>
-                <p>Caja rapida para tiendas y supermercados, conectada con factura, recibo, inventario y contabilidad.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/facturacion/pos/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "rrhh" %}
-                {% if erp_access.modulo_rrhh %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/hr.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Talento</div>
-                <h3>Recursos Humanos</h3>
-                <p>Expedientes, planillas, deducciones, vacaciones, vouchers PDF y comunicacion con empleados.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/rrhh/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "crm_marketing" %}
-                {% if erp_access.modulo_crm %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/crm.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Relacion Comercial</div>
-                <h3>CRM y Marketing</h3>
-                <p>Campanias, cumpleanos, WhatsApp Business, promociones y fechas de producto.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/crm/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "agenda_citas" %}
-                {% if erp_access.modulo_citas %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/appointments.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Agenda</div>
-                <h3>Citas</h3>
-                <p>Calendario de citas por cliente, producto o servicio, con recordatorios por WhatsApp.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/citas/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "clinica_medica" %}
-                {% if erp_access.modulo_clinica %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/clinic.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Salud Especializada</div>
-                <h3>Clinica Medica</h3>
-                <p>Pacientes, expediente clinico, citas, tratamientos, medicamentos, consentimientos y seguimiento postoperatorio.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/clinica/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% elif modulo.codigo == "tecnicentro" %}
-                {% if erp_access.modulo_tecnicentro %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/tecnicentro.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Garage Operations</div>
-                <h3>Tecnicentro Vehicular</h3>
-                <p>Recepcion digital, cola, diagnostico, evidencias, tiempos y ordenes de trabajo en una cabina especializada.</p>
-                <div class="erp-dashboard-module-action"><a class="erp-btn" href="/{{ empresa.slug }}/dashboard/tecnicentro/">Ingresar al modulo</a></div>
-            </article>
-                {% endif %}
-            {% else %}
-            <article class="erp-card erp-module-card erp-dashboard-module">
-                <div class="erp-module-visual"><img src="{% static 'core/img/modules/module-generic.svg' %}" alt="" aria-hidden="true"></div>
-                <div class="erp-kpi-label">Modulo Empresarial</div>
-                <h3>{{ modulo.nombre }}</h3>
-                <p>Espacio preparado para futuras capacidades del ERP con una linea visual unificada.</p>
-            </article>
+    <section class="home-workspace" aria-labelledby="home-modules-title">
+        <div class="home-section-header"><div><h2 id="home-modules-title">Tus módulos <span class="home-module-count" data-home-count hidden></span></h2><p>Accesos disponibles para tu usuario en esta empresa.</p></div>
+            <form class="home-search" role="search" data-home-search-form data-home-search-controls hidden><label class="home-sr-only" for="home-module-search">Buscar un módulo</label>{% include "core/partials/panel_icono.html" with icono="search" only %}<input id="home-module-search" type="search" placeholder="Buscar un módulo…" autocomplete="off" data-home-search><button type="button" class="home-search-clear" aria-label="Limpiar búsqueda" data-home-search-clear hidden>{% include "core/partials/panel_icono.html" with icono="close" only %}</button></form>
+        </div>
+        <p class="home-search-feedback" role="status" aria-live="polite" data-home-search-status hidden></p>
+        <div class="home-module-grid" data-home-module-grid>
+            {% if erp_access.modulo_gastos_adicionales %}
+                {% if erp_access.ver_gastos_adicionales %}{% url 'clinica_gastos_adicionales' empresa.slug as home_gastos_url %}{% else %}{% url 'clinica_gasto_adicional_crear' empresa.slug as home_gastos_url %}{% endif %}
+                {% include "core/partials/panel_modulo.html" with destino=home_gastos_url titulo="Gastos Adicionales" categoria="Documento clínico" descripcion="Productos por paciente, historial y documentos para facturación." icono="receipts" tono="teal" only %}
             {% endif %}
-        {% empty %}
-        <div class="erp-empty">No hay modulos activos configurados para esta empresa.</div>
-        {% endfor %}
-        {% if not erp_access.modulo_contabilidad %}
-        <article class="erp-card erp-module-card erp-dashboard-module">
-            <div class="erp-module-visual"><img src="{% static 'core/img/modules/accounting.svg' %}" alt="" aria-hidden="true"></div>
-            <div class="erp-kpi-label">Finanzas</div>
-            <div class="erp-module-status upgrade">Actualiza tu plan</div>
-            <h3>Contabilidad</h3>
-            <p>Asientos, diarios, catalogo contable y reportes financieros enlazados con la operacion completa del ERP.</p>
-            <div class="erp-upsell-note">
-                <span class="erp-card-muted">Disponible a partir del plan empresarial o como crecimiento estrategico de la operacion.</span>
-                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
-            </div>
-        </article>
-        {% endif %}
-        {% if not erp_access.modulo_rrhh %}
-        <article class="erp-card erp-module-card erp-dashboard-module">
-            <div class="erp-module-visual"><img src="{% static 'core/img/modules/hr.svg' %}" alt="" aria-hidden="true"></div>
-            <div class="erp-kpi-label">Talento</div>
-            <div class="erp-module-status upgrade">Actualiza tu plan</div>
-            <h3>Recursos Humanos</h3>
-            <p>Gestion de colaboradores, expedientes, asistencia, nomina y estructura organizacional.</p>
-            <div class="erp-upsell-note">
-                <span class="erp-card-muted">Incluye planilla, vacaciones, deducciones y comprobantes para fortalecer la gestion del equipo.</span>
-                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
-            </div>
-        </article>
-        {% endif %}
-        {% if not erp_access.modulo_crm %}
-        <article class="erp-card erp-module-card erp-dashboard-module">
-            <div class="erp-module-visual"><img src="{% static 'core/img/modules/crm.svg' %}" alt="" aria-hidden="true"></div>
-            <div class="erp-kpi-label">Clientes</div>
-            <div class="erp-module-status upgrade">Escala tu alcance</div>
-            <h3>CRM y Marketing</h3>
-            <p>Campanias, recordatorios y comunicacion con clientes por WhatsApp y correo.</p>
-            <div class="erp-upsell-note">
-                <span class="erp-card-muted">Podemos habilitarlo como expansion comercial del ERP segun el plan y la operacion del cliente.</span>
-                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
-            </div>
-        </article>
-        {% endif %}
-        {% if not erp_access.modulo_citas %}
-        <article class="erp-card erp-module-card erp-dashboard-module">
-            <div class="erp-module-visual"><img src="{% static 'core/img/modules/appointments.svg' %}" alt="" aria-hidden="true"></div>
-            <div class="erp-kpi-label">Agenda</div>
-            <div class="erp-module-status upgrade">Escala tu alcance</div>
-            <h3>Citas</h3>
-            <p>Calendario de citas por cliente con recordatorios y seguimiento operativo.</p>
-            <div class="erp-upsell-note">
-                <span class="erp-card-muted">Ideal para operaciones que necesitan agendar servicios, seguimientos o atencion comercial estructurada.</span>
-                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
-            </div>
-        </article>
-        {% endif %}
-        {% if not erp_access.modulo_clinica %}
-        <article class="erp-card erp-module-card erp-dashboard-module">
-            <div class="erp-module-visual"><img src="{% static 'core/img/modules/clinic.svg' %}" alt="" aria-hidden="true"></div>
-            <div class="erp-kpi-label">Salud Especializada</div>
-            <div class="erp-module-status upgrade">Vertical premium</div>
-            <h3>Clinica Medica</h3>
-            <p>Expediente, agenda hospitalaria, tratamientos, consentimientos y seguimiento medico para clinicas especializadas.</p>
-            <div class="erp-upsell-note">
-                <span class="erp-card-muted">Pensado para hospitales, clinicas esteticas y centros medicos que necesitan trazabilidad profesional por paciente.</span>
-                <a href="#" class="erp-upsell-trigger" data-open-plans>Ver planes y activar</a>
-            </div>
-        </article>
-        {% endif %}
-    </div>
-</section>
+            {% for modulo in modulos %}
+                {% if modulo.codigo == "gastos_adicionales" %}
+                    {# Se conserva el acceso independiente de Gastos Adicionales. #}
+                {% elif modulo.codigo == "facturacion" %}
+                    {% if erp_access.modulo_facturacion %}{% url 'facturacion_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Facturación" categoria="Operación comercial" descripcion="Facturas, clientes, productos y control fiscal en un mismo lugar." icono="billing" tono="blue" only %}{% endif %}
+                {% elif modulo.codigo == "contabilidad" %}
+                    {% if erp_access.modulo_contabilidad %}{% url 'contabilidad_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Contabilidad" categoria="Finanzas" descripcion="Catálogo de cuentas, asientos y reportes financieros conectados." icono="accounting" tono="indigo" only %}{% endif %}
+                {% elif modulo.codigo == "recibos" %}
+                    {% if erp_access.recibos %}{% url 'recibos_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Recibos" categoria="Cobranza" descripcion="Comprobantes de pago y seguimiento de cobros a clientes." icono="receipts" tono="teal" only %}{% endif %}
+                {% elif modulo.codigo == "cotizaciones" %}
+                    {% if erp_access.cotizaciones %}{% url 'cotizaciones_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Cotizaciones" categoria="Propuestas comerciales" descripcion="Prepara propuestas, genera documentos y convierte a factura." icono="quotes" tono="amber" only %}{% endif %}
+                {% elif modulo.codigo == "punto_venta" %}
+                    {% if erp_access.modulo_pos %}{% url 'punto_venta' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Punto de venta" categoria="Venta directa" descripcion="Caja, ventas e inventario enlazados con tu operación." icono="pos" tono="teal" only %}{% endif %}
+                {% elif modulo.codigo == "rrhh" %}
+                    {% if erp_access.modulo_rrhh %}{% url 'rrhh_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Recursos Humanos" categoria="Tu equipo" descripcion="Empleados, planillas, vacaciones y gestión del personal." icono="people" tono="rose" only %}{% endif %}
+                {% elif modulo.codigo == "crm_marketing" %}
+                    {% if erp_access.modulo_crm %}{% url 'crm_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="CRM y Marketing" categoria="Relación con clientes" descripcion="Campañas, comunicaciones y seguimiento comercial." icono="crm" tono="blue" only %}{% endif %}
+                {% elif modulo.codigo == "agenda_citas" %}
+                    {% if erp_access.modulo_citas %}{% url 'agenda_citas' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Citas" categoria="Agenda" descripcion="Citas, recordatorios y seguimiento de clientes." icono="calendar" tono="amber" only %}{% endif %}
+                {% elif modulo.codigo == "clinica_medica" %}
+                    {% if erp_access.modulo_clinica %}{% url 'clinica_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Clínica Médica" categoria="Salud" descripcion="Pacientes, expedientes, tratamientos y atención clínica." icono="clinic" tono="teal" only %}{% endif %}
+                {% elif modulo.codigo == "tecnicentro" %}
+                    {% if erp_access.modulo_tecnicentro %}{% url 'tecnicentro_dashboard' empresa.slug as home_modulo_url %}{% include "core/partials/panel_modulo.html" with destino=home_modulo_url titulo="Tecnicentro Vehicular" categoria="Servicio automotriz" descripcion="Recepción, diagnóstico y seguimiento de órdenes de trabajo." icono="car" tono="slate" only %}{% endif %}
+                {% else %}
+                    {% include "core/partials/panel_modulo.html" with titulo=modulo.nombre categoria="Módulo empresarial" descripcion="Espacio reservado para las capacidades de este módulo." icono="grid" tono="slate" only %}
+                {% endif %}
+            {% endfor %}
+        </div>
+        <div class="home-empty-server" data-home-empty{% if modulos %} hidden{% endif %}><span class="home-module-icon">{% include "core/partials/panel_icono.html" with icono="lock" only %}</span><h3>No tienes módulos disponibles</h3><p>Consulta con el administrador los accesos habilitados para tu usuario en esta empresa.</p></div>
+        <div class="home-no-results" data-home-no-results hidden><span class="home-module-icon">{% include "core/partials/panel_icono.html" with icono="search" only %}</span><h3>No encontramos ese módulo</h3><p>Prueba con otro nombre o limpia la búsqueda.</p></div>
+    </section>
+
+    {% if not erp_access.modulo_contabilidad or not erp_access.modulo_rrhh or not erp_access.modulo_crm or not erp_access.modulo_citas or not erp_access.modulo_clinica %}
+    <details class="home-extras"><summary>{% include "core/partials/panel_icono.html" with icono="plus" only %}<span><strong>Más soluciones</strong><small>Conoce otras herramientas para tu empresa.</small></span>{% include "core/partials/panel_icono.html" with icono="chevron" only %}</summary>
+        <div class="home-solutions-grid">
+            {% if not erp_access.modulo_contabilidad %}{% include "core/partials/panel_solucion.html" with titulo="Contabilidad" descripcion="Asientos, estados financieros, bancos y conciliaciones." icono="accounting" tono="indigo" only %}{% endif %}
+            {% if not erp_access.modulo_rrhh %}{% include "core/partials/panel_solucion.html" with titulo="Recursos Humanos" descripcion="Expedientes, planillas, vacaciones y gestión del equipo." icono="people" tono="rose" only %}{% endif %}
+            {% if not erp_access.modulo_crm %}{% include "core/partials/panel_solucion.html" with titulo="CRM y Marketing" descripcion="Campañas, comunicación y seguimiento de clientes." icono="crm" tono="blue" only %}{% endif %}
+            {% if not erp_access.modulo_citas %}{% include "core/partials/panel_solucion.html" with titulo="Citas" descripcion="Agenda, recordatorios y seguimiento de servicios." icono="calendar" tono="amber" only %}{% endif %}
+            {% if not erp_access.modulo_clinica %}{% include "core/partials/panel_solucion.html" with titulo="Clínica Médica" descripcion="Expedientes, tratamientos y atención de pacientes." icono="clinic" tono="teal" only %}{% endif %}
+        </div>
+    </details>
+    {% endif %}
+</div>
 {% endif %}
 {% if not erp_access.interfaz_clinica %}
 <div class="erp-plans-modal" id="erpPlansModal" aria-hidden="true">
@@ -838,4 +438,5 @@ document.addEventListener("DOMContentLoaded", function(){
     });
 });
 </script>
+{% if not erp_access.interfaz_clinica %}<script src="{% static 'core/dashboard_principal.js' %}" defer></script>{% endif %}
 {% endblock %}

@@ -12,6 +12,8 @@
   <link rel="manifest" href="{% url 'agenda_mobile_manifest' empresa.slug %}" crossorigin="use-credentials">
   <link rel="icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
   <link rel="apple-touch-icon" href="{% if empresa.logo %}{{ empresa.logo.url }}{% else %}{% static 'crm/hospital-mia-app.svg' %}{% endif %}">
+  {% if puede_ver_modulos_app %}<link rel="stylesheet" href="{% static 'crm/mobile_modules.css' %}?v=categories-20261013">{% endif %}
+  {% if puede_ver_modulos_app %}<script src="{% static 'crm/mobile_modules.js' %}" defer></script>{% endif %}
   <style>
   :root{--navy:#12324a;--navy2:#185d68;--teal:#22b8ad;--pink:#e675a0;--ink:#14283b;--muted:#6e8191;--line:#dbe6ed;--bg:#f2f7fa;--white:#fff;--danger:#b94343;--safe-bottom:env(safe-area-inset-bottom,0px)}
   .appointment.is-courtesy{overflow:hidden}.appointment.is-courtesy:before{content:"CORTESÍA";position:absolute;top:0;right:0;padding:3px 9px;border-bottom-left-radius:10px;background:linear-gradient(135deg,#7c3aed,#d97706);color:#fff;font-size:8px;font-weight:900;letter-spacing:.1em}.status.courtesy{background:#f3e8ff;color:#7e22ce}
@@ -199,6 +201,13 @@
           </div>
           <div class="mobile-home-go">↓</div>
         </a>
+        {% if puede_ver_modulos_app %}
+        <a class="mobile-home-card more-modules" id="appMoreModulesEntry" href="#mas-funciones-app" data-app-open="mas-funciones-app">
+          <div class="mobile-home-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg></div>
+          <div class="mobile-home-copy"><strong>Más funciones</strong><span>Gastos Adicionales y módulos según tu empresa y permisos.</span><em>{{ modulos_disponibles_app }} accesos en app</em></div>
+          <div class="mobile-home-go">›</div>
+        </a>
+        {% endif %}
       </div>
       {% if pacientes_recientes_app %}
       <div class="mobile-mini-patients">
@@ -211,6 +220,7 @@
       </div>
       {% endif %}
     </section>
+    {% include "crm/mobile_modules_panel.html" %}
     <section class="app-panel mobile-app-screen" id="pacientes-app">
       <div class="app-screen-top"><button type="button" data-app-close>← Volver al panel</button><span>Pacientes</span></div>
       {% if pacientes_app_premium %}
@@ -811,7 +821,7 @@
         <div class="field {% if field.name == 'observacion' or field.name == 'cirugia_detalle' or field.name == 'fotos_cirugia' %}wide{% endif %}" data-field-name="{{ field.name }}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.name == "paciente" %}<button class="new-patient" type="button" id="newPatientButton">+ Crear paciente sin salir</button>{% endif %}<div class="errors">{{ field.errors }}</div></div>
         {% endif %}
       {% endfor %}
-      {% if detalles_agenda_hospital_mia %}{{ form.detalles_agenda }}{% include "crm/_detalles_agenda_hospital_mia.html" %}{% endif %}
+      {% if detalles_agenda_hospital_mia %}{{ form.detalles_agenda }}{% if empresa.tipo_solucion == 'clinica' %}{% include "crm/_detalles_agenda_hospital_mia.html" with detalles_agenda_app_segura=True %}{% else %}{% include "crm/_detalles_agenda_hospital_mia.html" %}{% endif %}{% endif %}
       </div>
       {% if not cita_editando %}<div class="mobile-series-preview" data-mobile-series-preview></div>{% endif %}
       <button class="save" type="submit">{% if cita_editando %}Guardar cambios{% else %}Crear cita{% endif %}</button>
@@ -950,7 +960,7 @@
   document.querySelectorAll("[data-app-close]").forEach(button=>button.addEventListener("click",closeAppPanels));
   const requestedApp=new URLSearchParams(window.location.search).get("app");
   if(requestedApp==="agenda")openAppPanel("agenda-app");
-  else if(["#pacientes-app","#factura-app","#facturas-app","#productos-app","#agenda-app"].includes(window.location.hash))openAppPanel(window.location.hash.slice(1));
+  else if(["#pacientes-app","#factura-app","#facturas-app","#productos-app","#agenda-app","#mas-funciones-app"].includes(window.location.hash))openAppPanel(window.location.hash.slice(1));
   document.querySelectorAll("[data-company-app-switch]").forEach(link=>link.addEventListener("click",event=>{
     const activeScreen=appScreens.find(screen=>screen.classList.contains("active"));
     if(!activeScreen||activeScreen.id==="inicio")return;

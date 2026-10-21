@@ -1,0 +1,7 @@
+<section class="erp-card">
+    <p class="erp-card-muted">Moneda funcional: lempiras (HNL). Los estados se calculan a partir de los asientos contabilizados de {{ empresa.nombre }}.</p>
+    {% if conversiones_pendientes %}
+    <p class="erp-badge danger">{{ conversiones_pendientes }} asiento{{ conversiones_pendientes|pluralize }} histórico{{ conversiones_pendientes|pluralize }} en dólares requiere{% if conversiones_pendientes != 1 %}n{% endif %} revisión de conversión.</p>
+    <p class="erp-card-muted">Revisa sus saldos en un período abierto. Los reportes conservan los importes registrados; una conversión pendiente puede afectar los resultados.</p>
+    {% endif %}
+</section>

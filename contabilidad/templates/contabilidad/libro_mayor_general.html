@@ -14,6 +14,7 @@
 {% endblock %}
 
 {% block content %}
+{% include "contabilidad/nota_moneda_reportes.html" %}
 <section class="erp-card erp-report-filter-card">
     <div class="erp-toolbar">
         <div>
@@ -47,10 +48,11 @@
 </section>
 
 <section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Cuentas con movimiento</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas con saldo o movimiento</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
     <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Saldo neto natural</div><p class="erp-stat-value">L. {{ resumen.saldo_neto }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldos deudores al cierre</div><p class="erp-stat-value">L. {{ resumen.saldo_deudor_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldos acreedores al cierre</div><p class="erp-stat-value">L. {{ resumen.saldo_acreedor_total }}</p></article>
 </section>
 
 {% for bloque in cuentas_mayor %}
@@ -61,6 +63,7 @@
             <h3 class="erp-panel-title">{{ bloque.cuenta.codigo }} - {{ bloque.cuenta.nombre }}</h3>
         </div>
         <div class="erp-inline-kpis">
+            <span class="erp-badge">Apertura L. {{ bloque.saldo_inicial }}</span>
             <span class="erp-badge">Debe L. {{ bloque.debe }}</span>
             <span class="erp-badge">Haber L. {{ bloque.haber }}</span>
             <span class="erp-badge success">Saldo L. {{ bloque.saldo }}</span>
@@ -80,6 +83,7 @@
                 </tr>
             </thead>
             <tbody>
+                {% if filtros.fecha_inicio %}<tr><td colspan="6">Saldo inicial anterior al período</td><td class="amount"><span class="erp-money">L. {{ bloque.saldo_inicial }}</span></td></tr>{% endif %}
                 {% for movimiento in bloque.movimientos %}
                 <tr>
                     <td>{{ movimiento.linea.asiento.fecha|date:"d/m/Y" }}</td>

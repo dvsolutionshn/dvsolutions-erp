@@ -1,0 +1,81 @@
+{% extends "core/erp_base.html" %}
+
+{% block title %}Regularizar moneda de factura - {{ empresa.nombre }}{% endblock %}
+{% block header_kicker %}Contabilidad de {{ empresa.nombre }}{% endblock %}
+{% block header_title %}Regularizar saldo histórico en dólares{% endblock %}
+{% block header_description %}Revisa la conversión de la cuenta por cobrar y registra la diferencia en un período abierto, con su motivo y respaldo.{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}" class="erp-action-link">Volver al asiento original</a>
+{% endblock %}
+
+{% block content %}
+<section class="erp-card">
+    <h3 class="erp-panel-title">Factura {{ factura.numero_factura|default:factura.id }} · {{ factura.cliente.nombre }}</h3>
+    <p>Documento emitido el {{ factura.fecha_emision|date:"d/m/Y" }} por <strong>USD {{ factura.total }}</strong>. Asiento original: <strong>{{ asiento.numero|default:asiento.id }}</strong>.</p>
+    <p class="erp-card-muted">La regularización conserva las partidas originales, los cierres anteriores y el respaldo de los importes aplicados. Ajusta el saldo de la cuenta por cobrar y deja registrada la conversión revisada para continuar cobros y notas de crédito.</p>
+    <p class="erp-card-muted">Costo de inventario de esta factura: <strong>L. {{ costo_inventario }}</strong>. Su costo ya está expresado en HNL; esta operación conserva ese costo y los movimientos históricos de bancos, impuestos y ventas.</p>
+</section>
+
+{% if error_fuente %}
+<section class="erp-card" role="alert"><h3 class="erp-panel-title">Revisión previa necesaria</h3><p>{{ error_fuente }}</p></section>
+{% endif %}
+
+{% if vista_previa %}
+{% if vista_previa.aplicaciones_pendientes %}
+<section class="erp-card" role="alert">
+    <h3 class="erp-panel-title">Aplicaciones pendientes de contabilizar</h3>
+    <p>Hay {{ vista_previa.aplicaciones_pendientes }} cobro{{ vista_previa.aplicaciones_pendientes|pluralize }} o nota{{ vista_previa.aplicaciones_pendientes|pluralize }} de crédito sin asiento. La revisión del saldo usa las aplicaciones que ya están contabilizadas.</p>
+    <p class="erp-card-muted">Después de registrar esta revisión, completa los asientos de esos documentos en un período abierto o mediante una reapertura autorizada si su fecha pertenece a un mes cerrado.</p>
+</section>
+{% endif %}
+<section class="erp-grid">
+    <article class="erp-card"><div class="erp-kpi-label">Total original</div><p class="erp-stat-value">USD {{ vista_previa.total_original }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Tasa revisada</div><p class="erp-stat-value">{{ vista_previa.tipo_cambio }}</p><p class="erp-card-muted">HNL por USD</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldo original según asientos</div><p class="erp-stat-value">USD {{ vista_previa.saldo_original }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldo registrado en HNL</div><p class="erp-stat-value">L. {{ vista_previa.saldo_hnl_anterior }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldo corregido en HNL</div><p class="erp-stat-value">L. {{ vista_previa.saldo_hnl_corregido }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Diferencia a registrar</div><p class="erp-stat-value">L. {{ vista_previa.diferencia }}</p></article>
+</section>
+<section class="erp-card">
+    <h3 class="erp-panel-title">Aplicaciones históricas revisadas</h3>
+    <p>Total aplicado en cobros y notas: USD {{ vista_previa.aplicado_original }} · registrado L. {{ vista_previa.aplicado_hnl_anterior }} · valor histórico revisado L. {{ vista_previa.aplicado_hnl_corregido }}.</p>
+    <p>Dentro de ese total, notas de crédito: USD {{ vista_previa.notas_original }} · registradas L. {{ vista_previa.notas_hnl_anterior }} · valor histórico revisado L. {{ vista_previa.notas_hnl_corregido }}.</p>
+    <p class="erp-card-muted">Estos valores respaldan las aplicaciones posteriores. El asiento nuevo registra la diferencia del saldo pendiente, con la contrapartida autorizada.</p>
+</section>
+{% endif %}
+
+<section class="erp-card">
+    <h3 class="erp-panel-title">{% if lista_para_confirmar %}Confirmar el ajuste revisado{% else %}Preparar la revisión{% endif %}</h3>
+    {% if form.errors %}<div role="alert">{{ form.non_field_errors }}{% if not lista_para_confirmar %}{{ form.confirmar.errors }}{% endif %}</div>{% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="erp-form-grid">
+            {% for campo in form %}
+                {% if campo.name != "confirmar" and campo.name != "revision_token" %}
+                <div class="erp-form-field">
+                    <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                    {{ campo }}
+                    {% if campo.help_text %}<p class="erp-card-muted">{{ campo.help_text }}</p>{% endif %}
+                    {{ campo.errors }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% if lista_para_confirmar %}
+        <section class="erp-card">
+            <p>Se registrará la diferencia de <strong>L. {{ vista_previa.diferencia }}</strong> en la cuenta por cobrar <strong>{{ vista_previa.cuenta_cliente }}</strong>, con contrapartida <strong>{{ form.cleaned_data.cuenta_contrapartida }}</strong>, el <strong>{{ form.cleaned_data.fecha|date:"d/m/Y" }}</strong>.</p>
+            <p>Motivo: {{ form.cleaned_data.motivo }}</p>
+            <input type="hidden" name="revision_token" value="{{ revision_token }}">
+            <label>{{ form.confirmar }} {{ form.confirmar.label }}</label>
+            {{ form.confirmar.errors }}
+            <button type="submit" name="accion" value="registrar" class="erp-btn">Registrar regularización</button>
+        </section>
+        {% endif %}
+        <div class="erp-form-actions">
+            <button type="submit" name="accion" value="revisar" class="erp-btn-secondary">Revisar ajuste</button>
+            <a href="{% url 'ver_asiento_contable' empresa.slug asiento.id %}" class="erp-btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

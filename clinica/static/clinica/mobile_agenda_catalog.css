@@ -1,0 +1,45 @@
+/* Scoped mobile presentation; original catalog parsers and writes are authoritative. */
+.magc-screen{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.magc-screen [hidden]{display:none!important}
+.magc-screen .mi-header-copy h1,.magc-screen .mi-header-copy p{overflow-wrap:anywhere}
+.magc-intro h2,.magc-empty h2{margin:0;color:#365f73;font-size:16px;line-height:1.7;overflow-wrap:anywhere}
+.magc-intro p,.magc-empty p,.magc-search p{font-size:12px;line-height:1.8;color:#718b9a;overflow-wrap:anywhere}
+.magc-create-trigger{margin-bottom:14px}
+.magc-search form{display:grid;gap:13px;min-width:0}
+.magc-search input,.magc-search select,.magc-sheet input:not([type=checkbox]):not([type=hidden]){width:100%;min-width:0;min-height:49px;border:1px solid #c9dce3;border-radius:13px;padding:12px;background:#fff;color:#3d6577;font-size:16px;line-height:1.5}
+.magc-search label,.magc-sheet label{font-size:12px;font-weight:700;line-height:1.7;color:#527887;overflow-wrap:anywhere}
+.magc-list-meta{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;line-height:1.7;color:#527887;margin:16px 2px 12px}
+.magc-list-meta span{color:#8097a4;font-size:11px}
+.magc-list{display:grid;gap:11px;min-width:0}
+.magc-record-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.magc-record h2{flex:1;min-width:0;margin:0;font-size:15px;line-height:1.8;overflow-wrap:anywhere;color:#365f73;white-space:pre-wrap}
+.magc-badge{display:inline-block;padding:5px 9px;border-radius:10px;background:#edf8f4;color:#347c70;font-size:10px;font-weight:700;line-height:1.6;flex-shrink:0}
+.magc-badge.inactive{color:#89764e;background:#faf5e9}
+.magc-record-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+.magc-record-actions button{min-height:44px;padding:9px 15px;background:#edf7f8;color:#347c83;border:1px solid #d4e7ec;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer}
+.magc-record-actions button.danger{color:#aa5963;background:#fff4f5;border-color:#f0d9dd}
+.magc-clear{color:#347c83;font-size:12px;line-height:1.8;justify-self:start;text-decoration:none;padding:5px 0}
+.magc-pagination{display:grid;gap:10px;margin:19px 0;color:#718b9a;font-size:12px}
+.magc-pagination p{margin:0;text-align:center}
+.magc-pagination>div{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.magc-pagination a{display:grid;place-items:center;min-height:44px;padding:10px 17px;border:1px solid #d4e7ec;background:#fff;border-radius:13px;text-decoration:none;color:#347c83;font-weight:700}
+.magc-sheet{overflow-y:auto;overscroll-behavior:contain}
+.magc-sheet .mi-sheet-head h2{font-size:20px;line-height:1.5;overflow-wrap:anywhere}
+.magc-sheet form,.magc-sheet [data-catalog-review-panel]{display:grid;gap:15px;margin-top:16px;min-width:0}
+.magc-sheet .mi-field{min-width:0}
+.magc-sheet h3{font-size:16px;line-height:1.7;overflow-wrap:anywhere;color:#416b7d;margin:0}
+.magc-help{font-size:11px;line-height:1.8;color:#7a93a0;overflow-wrap:anywhere;margin:0}
+.magc-original-name{font-size:13px;line-height:1.8;color:#527887;overflow-wrap:anywhere;white-space:pre-wrap;margin:10px 0}
+.magc-check{display:flex;align-items:flex-start;gap:11px;min-height:46px;padding:12px 13px;border:1px solid #d9e8ed;border-radius:13px;background:#f5fafb;cursor:pointer}
+.magc-check input{width:19px;height:19px;min-width:19px;margin:2px 0 0;accent-color:#218c80;flex-shrink:0}
+.magc-review-values{display:grid;gap:13px;min-width:0;margin:0;max-height:32dvh;overflow:auto;overscroll-behavior:contain;padding:14px;border:1px solid #e0ecf0;border-radius:15px;background:#f7fafc}
+.magc-review-values dt{font-size:10px;line-height:1.7;color:#8097a4}
+.magc-review-values dd{margin:4px 0 0;font-size:13px;line-height:1.8;color:#416b7d;white-space:pre-wrap;overflow-wrap:anywhere}
+.magc-warning,.magc-leave-warning{padding:14px 16px;border:1px solid #f0d9dd;border-radius:17px;background:#fff4f5;color:#9a5963;font-size:12px;line-height:1.8;overflow-wrap:anywhere;margin-top:15px}
+.magc-warning p,.magc-leave-warning p{margin:6px 0 0}
+.magc-leave-warning .mi-button{margin-top:10px}
+.magc-sheet>.mi-button{margin-top:12px}
+.magc-errors p{overflow-wrap:anywhere}
+.magc-navigation a{min-width:0}
+.magc-navigation a span{overflow-wrap:anywhere;line-height:1.45}
+@media(max-width:350px){.magc-record-head{gap:8px}.magc-record h2{font-size:14px}.magc-sheet .mi-sheet-head h2{font-size:18px}.magc-review-values{padding:11px}.magc-warning,.magc-leave-warning{padding:12px 13px}}
