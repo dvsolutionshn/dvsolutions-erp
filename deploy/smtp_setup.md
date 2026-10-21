@@ -10,7 +10,7 @@ El remitente debe estar autorizado por el proveedor. Para un dominio propio, con
 
 ## Variables
 
-El servicio de este repositorio carga `/opt/dvsolutions/repo/.env.production` mediante `EnvironmentFile` en `deploy/gunicorn.service`. Django **no carga archivos `.env` automaticamente**: crear el archivo sin cargar sus variables no cambia el envio. No incluir credenciales en Git ni en mensajes de chat.
+La plantilla `deploy/gunicorn.service` usa `/opt/dvsolutions/repo/.env.production` mediante `EnvironmentFile`; la instalacion actual se detalla al final de esta guia. Django **no carga archivos `.env` automaticamente**: crear el archivo sin cargar sus variables no cambia el envio. No incluir credenciales en Git ni en mensajes de chat.
 
 Completar en el archivo de entorno real, conservando las demas variables existentes:
 
@@ -102,4 +102,12 @@ Con la credencial guardada, ejecutar desde PowerShell:
 
 La segunda accion envia exclusivamente a Daniel. La configuracion se aplica al proceso de diagnostico y despues restaura el entorno de la consola. Esta credencial cifrada local no configura automaticamente el servidor de produccion ni crea enlaces de invitacion en otra base de datos.
 
-Para actualizar el entorno de produccion, `bash deploy/configurar_smtp_google.sh /RUTA/AL/ARCHIVO/DE/ENTORNO` solicita la misma clave de forma oculta, respalda el archivo y cambia solo las variables de correo y el origen publico. El archivo debe ser el que carga el servicio real; el script no envia mensajes, aplica migraciones ni reinicia servicios.
+En servidores con acceso permitido a Google SMTP, `bash deploy/configurar_smtp_google.sh /RUTA/AL/ARCHIVO/DE/ENTORNO` solicita la misma clave de forma oculta, respalda el archivo y cambia solo las variables de correo y el origen publico. El archivo debe ser el que carga el servicio real; el script no envia mensajes, aplica migraciones ni reinicia servicios. No usar ese configurador de Google en el Droplet actual, donde sus puertos estan bloqueados.
+
+## Instalacion actual en DigitalOcean
+
+La aplicacion esta en `/var/www/dvsolutions-erp`, el servicio es `dvsolutions.service` y carga `/etc/dvsolutions-erp.env`. Su entorno virtual es `.venv`. Se verifico que Google SMTP no es accesible desde este servidor en los puertos 587 y 465; el firewall local permite salida y HTTPS funciona. DigitalOcean documenta el bloqueo predeterminado de los puertos SMTP 25, 465 y 587. [Politica de DigitalOcean](https://docs.digitalocean.com/support/why-is-smtp-blocked/).
+
+El ERP ya dispone de una cuenta SMTP de Brevo que autentica correctamente por `smtp-relay.brevo.com:2525`. Conservar el usuario y la clave de Brevo existentes en el archivo privado del servicio; la clave de aplicacion de Google se usa solo en la prueba local. El remitente visible solicitado sigue siendo `DV Solutions <oasis@dvsolutionshn.com>` y el origen de los enlaces es `https://dvsolutionshn.com`.
+
+Brevo admite STARTTLS por el puerto 2525 cuando el proveedor bloquea 587. El remitente debe estar verificado o pertenecer a un dominio autenticado en la cuenta de Brevo; que SMTP acepte un mensaje no demuestra que haya llegado a la bandeja. [Puertos de Brevo](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525), [validacion del remitente](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP).
