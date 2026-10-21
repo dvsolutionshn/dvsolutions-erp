@@ -1550,6 +1550,12 @@ def reversar_asiento_contable(request, empresa_slug, asiento_id):
     with transaction.atomic():
         Empresa.objects.select_for_update().get(pk=empresa.pk)
         asiento_origen = AsientoContable.objects.select_for_update().get(pk=asiento_origen.pk, empresa=empresa)
+        if asiento_origen.documento_tipo == "pago_factura" and PagoFactura.objects.filter(
+            pk=asiento_origen.documento_id, factura__empresa=empresa, anulado=True,
+        ).exists():
+            raise ValidationError(
+                "El asiento respalda un cobro anulado. Conserve el cobro original y su reversión; no se pueden reversar por separado."
+            )
         from .proteccion_conversion import asiento_tiene_revision
         if asiento_tiene_revision(asiento_origen.pk):
             messages.error(request, "El asiento respalda una revisión integral documentada. Registre un nuevo ajuste para conservar su respaldo.")

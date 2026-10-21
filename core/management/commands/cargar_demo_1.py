@@ -715,7 +715,7 @@ class Command(BaseCommand):
             if porcentaje > 0 and fecha_pago <= self.hoy:
                 monto = (factura.total_documento_ajustado * porcentaje).quantize(D("0.01"))
                 pago, _ = PagoFactura.objects.update_or_create(
-                    factura=factura, referencia=f"DM-COBRO-{factura.numero_factura}",
+                    factura=factura, referencia=f"DM-COBRO-{factura.numero_factura}", anulado=False,
                     defaults={
                         "fecha": fecha_pago, "monto": monto, "metodo": "transferencia",
                         "cuenta_financiera": self.banco, "cajero": self.usuario,
@@ -875,7 +875,7 @@ class Command(BaseCommand):
 
         MovimientoBancario.objects.filter(empresa=e, origen_importacion="SEED DEMO_1").delete()
         eventos = [(date(2024, 1, 1), "DEMO-BANCO-APERTURA", "Aporte inicial de socios", D("0.00"), D("3500000.00"), None, None)]
-        for pago in PagoFactura.objects.filter(factura__empresa=e, referencia__startswith="DM-COBRO-").select_related("factura"):
+        for pago in PagoFactura.objects.filter(factura__empresa=e, referencia__startswith="DM-COBRO-", anulado=False).select_related("factura"):
             eventos.append((pago.fecha, f"DEMO-BANCO-{pago.referencia}", f"Cobro {pago.factura.numero_factura}", D("0.00"), pago.monto, pago, None))
         for pago in PagoCompra.objects.filter(compra__empresa=e, referencia__startswith="DM-PAGO-").select_related("compra"):
             eventos.append((pago.fecha, f"DEMO-BANCO-{pago.referencia}", f"Pago proveedor {pago.compra.numero_compra}", pago.monto, D("0.00"), None, pago))

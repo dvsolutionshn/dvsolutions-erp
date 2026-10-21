@@ -1,0 +1,8 @@
+{% if pago.anulado %}
+<div class="erp-payment-cancelled-note" role="status">
+    <div class="erp-payment-cancelled-head"><span class="erp-payment-void-badge">ANULADO</span><strong>Este pago se conserva como historial.</strong></div>
+    <p class="erp-payment-cancelled-meta">Fecha de anulación: {{ pago.fecha_anulacion|date:"d/m/Y" }}{% if pago.anulado_por %} · Usuario: {{ pago.anulado_por.get_full_name|default:pago.anulado_por.username }}{% endif %}{% if pago.anulado_el %} · Registrada el {{ pago.anulado_el|date:"d/m/Y H:i" }}{% endif %}</p>
+    <p class="erp-payment-cancelled-reason"><strong>Motivo:</strong> {{ pago.motivo_anulacion|linebreaksbr }}</p>
+    <p class="erp-payment-cancelled-meta">El importe de este pago no integra el saldo aplicado vigente de la factura.</p>
+</div>
+{% endif %}

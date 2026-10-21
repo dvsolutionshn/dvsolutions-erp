@@ -1,5 +1,5 @@
 {% extends "core/erp_base.html" %}
-{% load humanize %}
+{% load static humanize %}
 
 {% block title %}Recibo {{ recibo.numero_recibo }}{% endblock %}
 {% block header_kicker %}Cobranza{% endblock %}
@@ -7,11 +7,12 @@
 {% block header_description %}Vista documental del comprobante de pago enlazado con su factura, cliente, método y referencia operativa.{% endblock %}
 {% block topbar_actions %}
 <a class="erp-action-link" href="{% url 'recibos_dashboard' empresa.slug %}">Volver a Recibos</a>
-<a class="erp-action-link" href="{% url 'editar_recibo' empresa.slug recibo.id %}">Editar recibo</a>
+{% if not recibo.pago.anulado %}<a class="erp-action-link" href="{% url 'editar_recibo' empresa.slug recibo.id %}">Editar recibo</a>{% endif %}
 <a class="erp-action-link" href="{% url 'descargar_recibo_pdf' empresa.slug recibo.id %}">Descargar PDF</a>
 {% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{% static 'facturacion/anulacion_pago.css' %}">
 <style>
 .erp-receipt-flow{display:flex;flex-direction:column;gap:18px;}
 .erp-receipt-sheet{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px 30px;}
@@ -51,10 +52,11 @@
 
 {% block content %}
 <section class="erp-receipt-flow">
+    {% include "facturacion/partials/estado_pago_anulado.html" with pago=recibo.pago %}
     <article class="erp-receipt-sheet">
         <div class="erp-receipt-head">
             <div>
-                <div class="erp-receipt-kicker">Documento de cobranza</div>
+                <div class="erp-receipt-kicker">{% if recibo.pago.anulado %}Documento de cobranza anulado{% else %}Documento de cobranza{% endif %}</div>
                 <h3 class="erp-receipt-number">Recibo {{ recibo.numero_recibo }}</h3>
                 <div class="erp-receipt-copy">Comprobante documental del pago recibido, con trazabilidad directa hacia la factura, el cliente y la referencia operativa registrada.</div>
                 <div class="erp-receipt-meta">
@@ -69,7 +71,7 @@
                 <div class="erp-receipt-side-grid">
                     <div class="erp-receipt-side-item"><span>Método</span><strong><span class="erp-badge info">{{ recibo.get_metodo_display }}</span></strong></div>
                     <div class="erp-receipt-side-item"><span>Moneda</span><strong>{{ recibo.factura.moneda }}</strong></div>
-                    <div class="erp-receipt-side-item"><span>Monto del recibo</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
+                    <div class="erp-receipt-side-item"><span>{% if recibo.pago.anulado %}Monto original del recibo anulado{% else %}Monto del recibo{% endif %}</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
                     <div class="erp-receipt-side-item"><span>Empresa</span><strong>{{ empresa.nombre }}</strong></div>
                 </div>
             </aside>
@@ -93,7 +95,7 @@
                     <div class="erp-receipt-summary-list">
                         <div class="erp-receipt-summary-row"><span>Total factura</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.factura.total|floatformat:2|intcomma }}</strong></div>
                         <div class="erp-receipt-summary-row"><span>Pagos previos</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ total_pagos_previos|floatformat:2|intcomma }}</strong></div>
-                        <div class="erp-receipt-summary-row total"><span>Monto del recibo</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
+                        <div class="erp-receipt-summary-row total"><span>{% if recibo.pago.anulado %}Monto original del recibo anulado{% else %}Monto del recibo{% endif %}</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</strong></div>
                         <div class="erp-receipt-summary-row total"><span>Saldo actual factura</span><strong>{% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.factura.saldo_pendiente|floatformat:2|intcomma }}</strong></div>
                     </div>
                 </div>
@@ -115,9 +117,9 @@
                 </thead>
                 <tbody>
                 {% for pago in pagos_factura %}
-                    <tr{% if recibo.pago_id and pago.id == recibo.pago_id %} class="erp-receipt-payment-current"{% endif %}>
+                    <tr class="{% if recibo.pago_id and pago.id == recibo.pago_id %}erp-receipt-payment-current{% endif %}{% if pago.anulado %} is-payment-voided{% endif %}">
                         <td>
-                            <strong>{{ pago.fecha }}</strong>
+                            <strong>{{ pago.fecha }}</strong>{% if pago.anulado %}<span class="erp-payment-void-status-inline"><span class="erp-payment-void-badge">ANULADO</span></span><span class="erp-payment-void-reason-inline">{{ pago.motivo_anulacion }}</span>{% endif %}
                             {% if recibo.pago_id and pago.id == recibo.pago_id %}
                             <div class="erp-card-muted">Pago documentado por este recibo</div>
                             {% endif %}
@@ -142,7 +144,7 @@
         </div>
 
         <div class="erp-receipt-status" style="margin-top:22px;">
-            Este recibo confirma un pago aplicado dentro del flujo comercial. Ahora también puedes revisar el historial completo de abonos de la factura para entender exactamente cómo se compone el saldo actual.
+            {% if recibo.pago.anulado %}Este recibo se conserva como soporte histórico de un pago anulado y no acredita un cobro vigente.{% else %}Este recibo confirma un pago aplicado dentro del flujo comercial. Ahora también puedes revisar el historial completo de abonos de la factura para entender exactamente cómo se compone el saldo actual.{% endif %}
         </div>
     </article>
 </section>

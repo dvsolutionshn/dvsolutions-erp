@@ -620,6 +620,8 @@ class AsientoContable(RegistroFechaContableMixin, models.Model):
 
     def clean(self):
         super().clean()
+        from .proteccion_cobros import validar_asiento_cobro_anulado
+        validar_asiento_cobro_anulado(self, self._state.db or 'default')
         if self.pk and RegularizacionMonedaFactura.objects.filter(
             models.Q(asiento_origen_id=self.pk) | models.Q(asiento_ajuste_id=self.pk)
         ).exists():
@@ -698,6 +700,10 @@ class LineaAsientoContable(models.Model):
         verbose_name_plural = "Lineas de asiento"
 
     def clean(self):
+        from .proteccion_cobros import validar_asiento_id_cobro_anulado
+        using = self._state.db or 'default'
+        for asiento_id in {self.asiento_id, self._asiento_anterior_id(using)}:
+            validar_asiento_id_cobro_anulado(asiento_id, using)
         if self.cuenta_id and self.cuenta.tipo == "orden":
             raise ValidationError("Las cuentas de control extracontable son de consulta y no admiten asientos financieros.")
         from .proteccion_conversion import validar_partida_revisada

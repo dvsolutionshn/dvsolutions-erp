@@ -1,0 +1,18 @@
+{% if puede_anular_pagos and not pago.anulado %}
+<details class="erp-payment-void">
+    <summary>Anular pago</summary>
+    <form method="post" action="{% url 'anular_pago_factura' empresa.slug factura.id pago.id %}" class="erp-payment-void-form">
+        {% csrf_token %}
+        <p class="erp-payment-void-warning">Se recalculará el saldo de la factura y se registrará la reversión contable del cobro. El recibo se conservará como anulado.</p>
+        <div class="erp-payment-void-field">
+            <label for="fecha-anulacion-pago-{{ pago.id }}">Fecha de anulación</label>
+            <input id="fecha-anulacion-pago-{{ pago.id }}" type="date" name="fecha_anulacion" value="{{ fecha_anulacion_hoy|date:'Y-m-d' }}" min="{{ pago.fecha|date:'Y-m-d' }}" max="{{ fecha_anulacion_hoy|date:'Y-m-d' }}" required>
+        </div>
+        <div class="erp-payment-void-field">
+            <label for="motivo-anulacion-pago-{{ pago.id }}">Motivo de anulación</label>
+            <textarea id="motivo-anulacion-pago-{{ pago.id }}" name="motivo" rows="3" minlength="5" maxlength="500" required placeholder="Explica por qué se anula este cobro."></textarea>
+        </div>
+        <button type="submit" class="erp-payment-void-submit">Confirmar anulación</button>
+    </form>
+</details>
+{% endif %}

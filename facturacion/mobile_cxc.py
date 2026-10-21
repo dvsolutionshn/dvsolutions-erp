@@ -101,7 +101,7 @@ def validar_relaciones_cxc_app(empresa):
     if (facturas.exclude(cliente_id__in=Cliente.objects.filter(empresa=empresa).values("pk")).exists()
             or facturas.filter(vendedor_id__isnull=False).exclude(vendedor_id__in=get_user_model().objects.values("pk")).exists()):
         raise PermissionDenied("Las relaciones de la factura no corresponden a esta empresa.")
-    _validar_pagos_app(PagoFactura.objects.filter(factura_id__in=facturas.values("pk")), empresa)
+    _validar_pagos_app(PagoFactura.objects.filter(factura_id__in=facturas.values("pk"), anulado=False), empresa)
     notas = NotaCredito.objects.filter(factura_origen_id__in=facturas.values("pk"), estado="emitida")
     if notas.exclude(empresa_id=empresa.pk, cliente_id=F("factura_origen__cliente_id")).exists():
         raise PermissionDenied("Las notas de crédito aplicadas no corresponden a esta factura y empresa.")

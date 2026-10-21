@@ -56,6 +56,9 @@ def _documento_origen(asiento):
     ).first()
     if documento is None:
         raise ValidationError("No se encuentra el documento original dentro de esta empresa. Revise su vínculo contable.")
+    if ((asiento.documento_tipo == "pago_factura" and documento.anulado)
+            or (asiento.documento_tipo == "pago_comision_proveedor" and documento.comision_origen.anulado)):
+        raise ValidationError("El cobro está anulado. Conserve el asiento original y su reversión; no se puede regularizar como una aplicación activa.")
     if asiento.documento_tipo == "pago_comision_proveedor" and documento.metodo == "compensacion":
         raise ValidationError("La comisión retenida se compensa en el asiento del cobro. Revise ese cobro en lugar de crear un egreso separado.")
     factura = (
@@ -353,7 +356,7 @@ def vista_previa_revision(asiento, partidas, cuenta_contrapartida=None):
         advertencias.append("La revisión integral compensa todas las partidas del ajuste anterior del saldo cliente; el respaldo original se conserva.")
     if asiento.documento_tipo == "factura" and documento:
         pendientes = AsientoContable.objects.filter(empresa_id=asiento.empresa_id, estado="contabilizado", conversion_verificada=False).filter(
-            Q(documento_tipo="pago_factura", documento_id__in=documento.pagos_facturacion.values("pk"))
+            Q(documento_tipo="pago_factura", documento_id__in=documento.pagos_facturacion.filter(anulado=False).values("pk"))
             | Q(documento_tipo="nota_credito", documento_id__in=documento.notas_credito.values("pk"))
         ).filter(revision_conversion__isnull=True).count()
         if pendientes:

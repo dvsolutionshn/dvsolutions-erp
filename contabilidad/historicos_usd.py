@@ -28,6 +28,8 @@ def _rango(queryset, campo, filtros):
 
 
 def _fuentes_empresa(empresa):
+    # Conservar los cobros anulados como respaldo de sus asientos históricos.
+    # Los pendientes operativos se filtran en consulta_documentos_sin_asiento.
     facturas = Factura.objects.filter(empresa=empresa, cliente__empresa=empresa, moneda="USD")
     pagos = PagoFactura.objects.filter(factura__empresa=empresa, factura__cliente__empresa=empresa,
                                       factura__moneda="USD").filter(
@@ -51,11 +53,13 @@ def _fuentes_empresa(empresa):
 
 def consulta_asientos_historicos(empresa, filtros=None, aplicar_estado=True):
     from .models import RevisionConversionAsiento
+    from .estado_conversion import asientos_cobros_anulados_neutralizados
 
     filtros = filtros or {}
     fuentes = _fuentes_empresa(empresa)
     asientos = _rango(AsientoContable.objects.filter(empresa=empresa,
         conversion_verificada=False, estado="contabilizado"), "fecha", filtros)
+    asientos = asientos.exclude(pk__in=asientos_cobros_anulados_neutralizados(empresa, filtros.get("hasta")))
     if filtros.get("fuente"):
         asientos = asientos.filter(documento_tipo=filtros["fuente"])
     integrales = RevisionConversionAsiento.objects.filter(empresa=empresa, origen_id=OuterRef("pk")).filter(
@@ -94,6 +98,10 @@ def consulta_documentos_sin_asiento(empresa, filtros=None):
     for tipo, consulta in fuentes.items():
         if filtros.get("fuente") and filtros["fuente"] != tipo:
             continue
+        if tipo == "pago_factura":
+            consulta = consulta.filter(anulado=False)
+        elif tipo == "pago_comision_proveedor":
+            consulta = consulta.filter(comision_origen__anulado=False)
         campo_fecha, referencia, evento, condicion = detalles[tipo]
         publicados = AsientoContable.objects.filter(empresa=empresa, documento_tipo=tipo,
             documento_id=OuterRef("pk"), evento=evento, estado="contabilizado")

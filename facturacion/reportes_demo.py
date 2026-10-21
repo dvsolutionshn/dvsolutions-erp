@@ -3,11 +3,11 @@ from decimal import Decimal
 
 from django import forms
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Cliente, Factura
+from .models import Cliente, Factura, PagoFactura
 
 
 class ReportFiltersForm(forms.Form):
@@ -56,7 +56,9 @@ def filter_invoices(empresa, params, facturas):
         facturas = facturas.filter(Q(numero_factura__icontains=data["q"]) |
                                    Q(cliente__nombre__icontains=data["q"]) |
                                    Q(cliente__rtn__icontains=data["q"]))
-    return facturas.prefetch_related("lineas__producto", "pagos_facturacion").order_by("-fecha_emision", "-pk")
+    return facturas.prefetch_related(
+        "lineas__producto", Prefetch("pagos_facturacion", queryset=PagoFactura.objects.filter(anulado=False)),
+    ).order_by("-fecha_emision", "-pk")
 
 
 def report_context(request, empresa, facturas, totales, total_saldo, bi):

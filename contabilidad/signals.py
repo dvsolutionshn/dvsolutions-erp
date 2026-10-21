@@ -18,6 +18,12 @@ from .models import (
 @receiver(pre_delete, sender=MovimientoBancario)
 @receiver(pre_delete, sender=PeriodoContable)
 def proteger_eliminacion_contable(sender, instance, using, **kwargs):
+    from .proteccion_cobros import validar_asiento_id_cobro_anulado
+
+    if sender is AsientoContable:
+        validar_asiento_id_cobro_anulado(instance.pk, using)
+    elif sender is LineaAsientoContable:
+        validar_asiento_id_cobro_anulado(instance.asiento_id, using)
     if sender is AsientoContable:
         from .proteccion_conversion import validar_asiento_revisado
         validar_asiento_revisado(instance, using, eliminar=True)

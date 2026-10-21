@@ -11,6 +11,9 @@
         .card{border:1px solid #d1d5db;border-radius:10px;padding:16px;margin-bottom:15px;}
         .row{margin-bottom:6px;}
         .amount{font-size:18px;font-weight:bold;color:#111827;}
+        .receipt-void{padding:14px 16px;margin-bottom:18px;border:2px solid #a43b30;border-radius:7px;background:#fff4ef;page-break-inside:avoid;}
+        .receipt-void-title{font-size:20px;font-weight:bold;color:#9c2e23;margin-bottom:7px;}
+        .receipt-void p{margin:5px 0;color:#70473e;line-height:1.5;overflow-wrap:anywhere;}
     </style>
 </head>
 <body>
@@ -26,6 +29,15 @@
         </div>
     </div>
 
+    {% if recibo.pago.anulado %}
+    <div class="receipt-void">
+        <div class="receipt-void-title">ANULADO</div>
+        <p>Este recibo se conserva como soporte histórico y no acredita un cobro vigente.</p>
+        <p><strong>Fecha de anulación:</strong> {{ recibo.pago.fecha_anulacion|date:"d/m/Y" }}{% if recibo.pago.anulado_por %} · <strong>Usuario:</strong> {{ recibo.pago.anulado_por.get_full_name|default:recibo.pago.anulado_por.username }}{% endif %}</p>
+        <p><strong>Motivo:</strong> {{ recibo.pago.motivo_anulacion|linebreaksbr }}</p>
+    </div>
+    {% endif %}
+
     <div class="card">
         <div class="row"><strong>Recibo:</strong> {{ recibo.numero_recibo }}</div>
         <div class="row"><strong>Fecha:</strong> {{ recibo.fecha }}</div>
@@ -37,7 +49,7 @@
     </div>
 
     <div class="card">
-        <div class="amount">Monto del recibo: {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</div>
+        <div class="amount">{% if recibo.pago.anulado %}Monto original del recibo anulado:{% else %}Monto del recibo:{% endif %} {% if recibo.factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ recibo.monto|floatformat:2|intcomma }}</div>
     </div>
 </body>
 </html>

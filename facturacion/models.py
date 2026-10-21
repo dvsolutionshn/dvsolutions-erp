@@ -1650,18 +1650,19 @@ class Factura(models.Model):
 
     @property
     def total_pagado(self):
-        return sum((p.total_aplicado for p in self.pagos_facturacion.all()), Decimal('0.00'))
+        return sum((p.total_aplicado for p in self.pagos_facturacion.filter(anulado=False)), Decimal('0.00'))
 
     @property
     def subtotal_pagado(self):
-        return sum((Decimal(p.subtotal_aplicado or 0) for p in self.pagos_facturacion.all()), Decimal('0.00'))
+        return sum((Decimal(p.subtotal_aplicado or 0) for p in self.pagos_facturacion.filter(anulado=False)), Decimal('0.00'))
 
     @property
     def impuesto_pagado(self):
-        return sum((Decimal(p.impuesto_aplicado or 0) for p in self.pagos_facturacion.all()), Decimal('0.00'))
+        return sum((Decimal(p.impuesto_aplicado or 0) for p in self.pagos_facturacion.filter(anulado=False)), Decimal('0.00'))
 
     @property
     def tiene_pagos_registrados(self):
+        # Incluso un cobro anulado conserva recibos y respaldo contable.
         return self.pagos_facturacion.exists()
 
     @property
@@ -2488,6 +2489,15 @@ class PagoFactura(models.Model):
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
+    anulado = models.BooleanField(default=False, db_index=True)
+    fecha_anulacion = models.DateField(null=True, blank=True)
+    anulado_el = models.DateTimeField(null=True, blank=True)
+    anulado_por = models.ForeignKey(
+        Usuario, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='cobros_anulados',
+    )
+    motivo_anulacion = models.TextField(blank=True, default='')
+
     @property
     def total_retenciones(self):
         return (Decimal(self.retencion_isr or 0) + Decimal(self.retencion_isv or 0)).quantize(DOS_DECIMALES)
@@ -2510,13 +2520,15 @@ class PagoFactura(models.Model):
 
     @property
     def total_comision_pagada(self):
-        if not self.pk:
+        if not self.pk or self.anulado:
             return Decimal('0.00')
         total = self.pagos_comision_proveedor.aggregate(total=models.Sum('monto'))['total'] or Decimal('0.00')
         return Decimal(total).quantize(DOS_DECIMALES)
 
     @property
     def saldo_comision_pendiente(self):
+        if self.anulado:
+            return Decimal('0.00')
         saldo = (Decimal(self.monto_comision or 0) - self.total_comision_pagada).quantize(DOS_DECIMALES)
         return saldo if saldo > 0 else Decimal('0.00')
 
@@ -2534,7 +2546,7 @@ class PagoFactura(models.Model):
 
     def recalcular_componentes_pago(self):
         total_aplicado = self.total_aplicado
-        pagos_previos = self.factura.pagos_facturacion.exclude(pk=self.pk)
+        pagos_previos = self.factura.pagos_facturacion.filter(anulado=False).exclude(pk=self.pk)
         subtotal_pagado = sum((Decimal(p.subtotal_aplicado or 0) for p in pagos_previos), Decimal('0.00'))
         impuesto_pagado = sum((Decimal(p.impuesto_aplicado or 0) for p in pagos_previos), Decimal('0.00'))
         subtotal_pendiente = self.factura.subtotal_documento_ajustado - subtotal_pagado
@@ -2575,6 +2587,10 @@ class PagoFactura(models.Model):
 
     def clean(self):
         super().clean()
+        if self.anulado or (self.pk and type(self).objects.filter(pk=self.pk, anulado=True).exists()):
+            raise ValidationError('El pago anulado conserva su historial y no permite modificaciones. Registra un nuevo pago para corregirlo.')
+        if self.fecha_anulacion or self.anulado_el or self.anulado_por_id or self.motivo_anulacion:
+            raise ValidationError('Usa la opción Anular pago de la factura para registrar su anulación y reversión contable.')
         if self.pk:
             from contabilidad.models import AsientoContable, RegularizacionMonedaFactura
             revision = RegularizacionMonedaFactura.objects.filter(factura_id=self.factura_id).first()
@@ -2641,7 +2657,7 @@ class PagoFactura(models.Model):
         if self.total_aplicado <= 0:
             raise ValidationError('Debes registrar un monto recibido o una retencion mayor que cero.')
 
-        total_pagado = sum((p.total_aplicado for p in self.factura.pagos_facturacion.exclude(pk=self.pk)), Decimal('0.00'))
+        total_pagado = sum((p.total_aplicado for p in self.factura.pagos_facturacion.filter(anulado=False).exclude(pk=self.pk)), Decimal('0.00'))
 
         saldo_disponible = self.factura.total_documento_ajustado - total_pagado
         if self.total_aplicado > saldo_disponible:
@@ -2792,6 +2808,8 @@ class PagoComisionProveedor(models.Model):
 
     def clean(self):
         super().clean()
+        if self.comision_origen_id and self.comision_origen.anulado:
+            raise ValidationError('El cobro que generó esta comisión está anulado. No permite registrar ni modificar pagos de comisión.')
         from contabilidad.moneda import validar_moneda_tipo_cambio
         if self.comision_origen_id:
             origen = self.comision_origen
@@ -2917,7 +2935,11 @@ class ReciboPago(models.Model):
             consecutivo = 0
         return f"REC-{str(consecutivo + 1).zfill(8)}"
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        type(self.empresa).objects.select_for_update().get(pk=self.empresa_id)
+        if self.pago_id and PagoFactura.objects.filter(pk=self.pago_id, anulado=True).exists():
+            raise ValidationError('El recibo pertenece a un pago anulado y conserva sus datos originales.')
         if not self.numero_recibo:
             self.numero_recibo = self._siguiente_numero_global()
         super().save(*args, **kwargs)

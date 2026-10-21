@@ -113,10 +113,10 @@ def validar_factura_cobro_app(empresa, factura):
     if not cliente.exists() or (factura.vendedor_id and not get_user_model().objects.filter(pk=factura.vendedor_id).exists()):
         raise PermissionDenied("Las relaciones de la factura no corresponden a esta empresa.")
     _validar_cuenta_tercero(cliente, empresa)
-    pagos = PagoFactura.objects.filter(factura_id=factura.pk)
+    pagos = PagoFactura.objects.filter(factura_id=factura.pk, anulado=False)
     _validar_pagos_app(pagos, empresa)
     _validar_proveedores_historial(Proveedor.objects.filter(pk__in=pagos.values("proveedor_comision_id")), empresa)
-    comisiones = PagoComisionProveedor.objects.filter(comision_origen_id__in=pagos.values("pk"))
+    comisiones = PagoComisionProveedor.objects.filter(comision_origen_id__in=pagos.values("pk"), comision_origen__anulado=False)
     cuentas_historicas = CuentaFinanciera.objects.filter(
         empresa=empresa, cuenta_contable_id__in=CuentaContable.objects.filter(empresa=empresa).values("pk"),
     ).values("pk")
@@ -210,7 +210,7 @@ def _contexto_cobro_app(request, empresa, factura, pago=None):
         "app_payment_register_url": registrar, "app_payment_edit_url": editar,
         "app_payment_form_url": editar or registrar,
         "can_register_payment": factura.estado != "anulada" and factura.saldo_pendiente > 0,
-        "can_edit_payment": pago is not None and factura.estado != "anulada",
+        "can_edit_payment": pago is not None and not pago.anulado and factura.estado != "anulada",
     }
 
 
@@ -222,7 +222,7 @@ def render_cobro_app(request, empresa, contexto, errores=None, readonly_reason="
         # los valores enviados que se mantienen en form_data.
         pago = PagoFactura.objects.select_related(
             "cuenta_financiera", "cuenta_financiera_impuesto", "proveedor_comision",
-        ).get(pk=pago.pk, factura_id=contexto["factura"].pk, factura__empresa=empresa)
+        ).get(pk=pago.pk, factura_id=contexto["factura"].pk, factura__empresa=empresa, anulado=False)
         contexto = {**contexto, "pago_edicion": pago}
     contexto = {**contexto, **_contexto_cobro_app(request, empresa, contexto["factura"], pago)}
     datos = dict(contexto["form_data"].items())
@@ -274,7 +274,7 @@ def contexto_pagos_factura_app(request, empresa, factura):
     })
     ver_recibos = request.user.tiene_permiso_erp("puede_recibos", empresa)
     recibos = {recibo.pago_id: recibo for recibo in ReciboPago.objects.filter(pago__factura_id=factura.pk)} if ver_recibos else {}
-    pagos = PagoFactura.objects.filter(factura=factura).select_related("cuenta_financiera", "cajero").order_by("fecha", "id")
+    pagos = PagoFactura.objects.filter(factura=factura, anulado=False).select_related("cuenta_financiera", "cajero").order_by("fecha", "id")
     contexto["mobile_invoice_payment_items"] = [{
         "pago": pago, "fecha": pago.fecha, "metodo_label": pago.get_metodo_display(),
         "referencia": pago.referencia or "", "cuenta": pago.cuenta_financiera.nombre if pago.cuenta_financiera_id else "",

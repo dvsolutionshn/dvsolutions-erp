@@ -905,7 +905,7 @@ def _fuente_historica_factura(factura, fecha_aplicacion=None):
 def _aplicaciones_historicas_factura(factura, cuenta, *, pago_actual=None, nota_actual=None, incluir_pagos=True, fecha_aplicacion=None):
     from django.db.models import Q
 
-    pagos = factura.pagos_facturacion.exclude(pk=pago_actual)
+    pagos = factura.pagos_facturacion.filter(anulado=False).exclude(pk=pago_actual)
     notas = factura.notas_credito.exclude(pk=nota_actual)
     if notas.exclude(moneda=factura.moneda).exists():
         raise ValidationError("Hay una nota de crédito histórica cuya moneda no coincide con la factura de origen. Revise la moneda y el respaldo del documento antes de usar sus importes.")
@@ -1038,6 +1038,8 @@ def registrar_asiento_factura_emitida(factura):
 @transaction.atomic
 def registrar_asiento_pago_cliente(pago):
     type(pago.factura.empresa).objects.select_for_update().get(pk=pago.factura.empresa_id)
+    if pago.anulado or type(pago).objects.filter(pk=pago.pk, anulado=True).exists():
+        raise ValidationError("El cobro está anulado y no se puede volver a contabilizar.")
     existente = _asiento_documento_existente(pago.factura.empresa, "pago_factura", pago.pk, "cobro")
     if existente:
         return existente
@@ -1315,6 +1317,9 @@ def registrar_asiento_pago_proveedor(pago):
 @transaction.atomic
 def registrar_asiento_pago_comision_proveedor(pago):
     type(pago.empresa).objects.select_for_update().get(pk=pago.empresa.pk)
+    if (pago.comision_origen.anulado
+            or type(pago.comision_origen).objects.filter(pk=pago.comision_origen_id, anulado=True).exists()):
+        raise ValidationError("La comisión pertenece a un cobro anulado y no se puede contabilizar su pago.")
     if pago.metodo == 'compensacion':
         pago.full_clean()
         return registrar_asiento_pago_cliente(pago.comision_origen)

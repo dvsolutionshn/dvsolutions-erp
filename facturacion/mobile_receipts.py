@@ -95,6 +95,8 @@ def _validar_pagos_app(pagos, empresa):
 def _validar_recibos_app(recibos, empresa):
     clientes = Cliente.objects.filter(empresa=empresa).values("pk")
     facturas = Factura.objects.filter(empresa=empresa, cliente_id__in=clientes).values("pk")
+    # Los recibos anulados siguen siendo documentos consultables: validar
+    # también su cobro histórico, sin tratarlo como dinero aplicado vigente.
     pagos = PagoFactura.objects.filter(factura_id__in=facturas)
     # Primero verificar existencia con subqueries, sin INNER JOIN que oculte
     # una FK huérfana importada. Después comprobar coherencia de los enlaces.
@@ -149,10 +151,12 @@ def _contexto_recibos_app(request, empresa, recibo=None):
         "can_view_invoice": request.user.tiene_permiso_erp("puede_ver_facturas", empresa),
     }
     if recibo is not None:
+        editable = not recibo.pago.anulado
         contexto.update({
+            "can_edit_receipt": editable,
             "app_receipt_detail_url": url_recibo_app("ver_recibo", empresa, recibo),
-            "app_receipt_edit_url": url_recibo_app("editar_recibo", empresa, recibo),
-            "app_receipt_form_url": url_recibo_app("editar_recibo", empresa, recibo),
+            "app_receipt_edit_url": url_recibo_app("editar_recibo", empresa, recibo) if editable else "",
+            "app_receipt_form_url": url_recibo_app("editar_recibo", empresa, recibo) if editable else "",
             "app_receipt_pdf_url": url_recibo_app("descargar_recibo_pdf", empresa, recibo),
             "app_receipt_invoice_url": f"{reverse('ver_factura', args=[empresa.slug, recibo.factura_id])}?app=1" if contexto["can_view_invoice"] else "",
         })
@@ -169,7 +173,7 @@ def listar_recibos_app(request, empresa):
             | Q(referencia__icontains=consulta) | Q(concepto__icontains=consulta)
             | Q(factura__numero_factura__icontains=consulta)
         )
-    pagina = Paginator(recibos.select_related("cliente", "factura").order_by("-fecha_creacion", "-id"), 20).get_page(request.GET.get("page", "1"))
+    pagina = Paginator(recibos.select_related("cliente", "factura", "pago").order_by("-fecha_creacion", "-id"), 20).get_page(request.GET.get("page", "1"))
     contexto = _contexto_recibos_app(request, empresa)
     url_pagina = lambda numero: url_recibo_app("recibos_dashboard", empresa, **({"q": consulta} if consulta else {}), page=numero)
     contexto.update({
@@ -180,6 +184,7 @@ def listar_recibos_app(request, empresa):
         "mobile_receipt_next_url": url_pagina(pagina.next_page_number()) if pagina.has_next() else "",
         "mobile_receipt_items": [{
             "recibo": recibo, "numero": recibo.numero_recibo, "fecha": recibo.fecha,
+            "anulado": recibo.pago.anulado, "motivo_anulacion": recibo.pago.motivo_anulacion,
             "cliente": recibo.cliente.nombre, "monto": recibo.monto,
             "moneda": recibo.factura.moneda, "metodo": recibo.metodo,
             "metodo_label": recibo.get_metodo_display(),
@@ -203,7 +208,7 @@ def render_recibo_app(request, empresa, contexto, editar=False):
             "cajero": pago.cajero.get_full_name().strip() or pago.cajero.username if pago.cajero_id else "Usuario no disponible",
             "monto": pago.monto, "retenciones": pago.total_retenciones,
             "total_aplicado": pago.total_aplicado, "actual": pago.pk == recibo.pago_id,
-        } for pago in contexto["pagos_factura"]]
+        } for pago in contexto["pagos_factura"] if not pago.anulado]
     template = "facturacion/mobile_receipt_edit.html" if editar else "facturacion/mobile_receipt_detail.html"
     return respuesta_recibos_app(render(request, template, contexto))
 

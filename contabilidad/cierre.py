@@ -40,7 +40,7 @@ def _documentos_sin_asiento(empresa, periodo):
         agregar(factura, "factura", "emision", factura.fecha_emision, factura.numero_factura, "ver_factura")
     for nota in NotaCredito.objects.filter(empresa=empresa, estado="emitida", total__gt=0, fecha_emision__range=rango):
         agregar(nota, "nota_credito", "emision", nota.fecha_emision, nota.numero_nota, "ver_nota_credito")
-    for pago in PagoFactura.objects.filter(factura__empresa=empresa, fecha__range=rango).filter(
+    for pago in PagoFactura.objects.filter(factura__empresa=empresa, fecha__range=rango, anulado=False).filter(
         Q(monto__gt=0) | Q(retencion_isr__gt=0) | Q(retencion_isv__gt=0)
         | Q(comision_retenida_cliente=True, monto_comision__gt=0)
     ).select_related("factura"):
@@ -69,7 +69,7 @@ def _documentos_sin_asiento(empresa, periodo):
     for pago in PagoCompra.objects.filter(compra__empresa=empresa, monto__gt=0, fecha__range=rango).select_related("compra"):
         agregar(pago, "pago_compra", "egreso", pago.fecha, pago.compra.numero_compra, "ver_compra", pago.compra_id)
     for pago in PagoComisionProveedor.objects.filter(
-        comision_origen__factura__empresa=empresa, monto__gt=0, fecha__range=rango,
+        comision_origen__factura__empresa=empresa, comision_origen__anulado=False, monto__gt=0, fecha__range=rango,
     ).select_related("comision_origen__factura", "comision_origen__proveedor_comision"):
         factura = pago.comision_origen.factura
         if pago.metodo == "compensacion":

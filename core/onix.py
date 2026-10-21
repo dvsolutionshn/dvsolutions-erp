@@ -651,7 +651,7 @@ def _ejecutar_herramienta(nombre, argumentos, *, empresa, usuario, conversacion=
 
         periodo = argumentos.get("periodo") or "mes"
         hoy = timezone.localdate()
-        queryset = PagoFactura.objects.filter(factura__empresa=empresa).select_related(
+        queryset = PagoFactura.objects.filter(factura__empresa=empresa, anulado=False).select_related(
             "factura",
             "factura__cliente",
         )

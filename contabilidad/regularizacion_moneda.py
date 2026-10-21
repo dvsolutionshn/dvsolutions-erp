@@ -39,7 +39,8 @@ def vista_previa_regularizacion(asiento, tipo_cambio=None):
         empresa_id=asiento.empresa_id, estado='contabilizado',
     ).values_list('documento_tipo', 'documento_id', 'evento'))
     pendientes = 0
-    for pago in factura.pagos_facturacion.all():
+    pagos_activos = factura.pagos_facturacion.filter(anulado=False)
+    for pago in pagos_activos:
         if ('pago_factura', pago.pk, 'cobro') not in existentes:
             pendientes += 1
     for nota in factura.notas_credito.filter(estado='emitida'):
@@ -48,7 +49,7 @@ def vista_previa_regularizacion(asiento, tipo_cambio=None):
     aplicado_original, aplicado_hnl = _aplicaciones_historicas_factura(factura, cargo.cuenta)
     notas_original, notas_hnl = _aplicaciones_historicas_factura(factura, cargo.cuenta, incluir_pagos=False)
     ultima_aplicacion = AsientoContable.objects.filter(
-        Q(documento_tipo='pago_factura', documento_id__in=factura.pagos_facturacion.values('pk'))
+        Q(documento_tipo='pago_factura', documento_id__in=pagos_activos.values('pk'))
         | Q(documento_tipo='nota_credito', documento_id__in=factura.notas_credito.values('pk')),
         empresa_id=asiento.empresa_id, estado='contabilizado', lineas__cuenta=cargo.cuenta,
     ).aggregate(fecha=Max('fecha'))['fecha']
@@ -62,13 +63,13 @@ def vista_previa_regularizacion(asiento, tipo_cambio=None):
     saldo_corregido = total_hnl - aplicado_corregido
     fuentes = AsientoContable.objects.filter(
         Q(pk=asiento.pk)
-        | Q(documento_tipo='pago_factura', documento_id__in=factura.pagos_facturacion.values('pk'))
+        | Q(documento_tipo='pago_factura', documento_id__in=pagos_activos.values('pk'))
         | Q(documento_tipo='nota_credito', documento_id__in=factura.notas_credito.values('pk')),
         empresa_id=asiento.empresa_id,
     )
     respaldo = {
         'factura': list(Factura.objects.filter(pk=factura.pk).values()),
-        'pagos': list(factura.pagos_facturacion.order_by('pk').values()),
+        'pagos': list(pagos_activos.order_by('pk').values()),
         'notas': list(factura.notas_credito.order_by('pk').values()),
         'asientos': list(fuentes.order_by('pk').values()),
         'partidas': list(asiento.lineas.model.objects.filter(asiento__in=fuentes).order_by('pk').values()),

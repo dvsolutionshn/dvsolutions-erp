@@ -203,6 +203,8 @@ def permiso_facturacion_accion(path_suffix):
         if len(parts) > 1 and parts[1] == "eliminar-borrador":
             return "puede_eliminar_borradores"
         if len(parts) > 1 and parts[1] == "pago":
+            if len(parts) > 3 and parts[3] == "anular":
+                return "puede_anular_facturas"
             return "puede_registrar_pagos_clientes"
         if len(parts) > 1 and parts[1] == "nota-credito":
             return "puede_crear_notas_credito"

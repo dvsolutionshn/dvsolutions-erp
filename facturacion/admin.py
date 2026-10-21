@@ -69,6 +69,8 @@ class LineaFacturaInline(admin.TabularInline):
 class PagoFacturaInline(admin.TabularInline):
     model = PagoFactura
     extra = 0
+    can_delete = False
+    readonly_fields = ('anulado', 'fecha_anulacion', 'anulado_el', 'anulado_por', 'motivo_anulacion')
 
 
 # ==========================
@@ -98,7 +100,17 @@ class FacturaAdmin(admin.ModelAdmin):
 # ==========================
 @admin.register(PagoFactura)
 class PagoFacturaAdmin(admin.ModelAdmin):
-    list_display = ('factura', 'monto', 'metodo', 'fecha', 'proveedor_comision', 'monto_comision', 'cajero')
+    list_display = ('factura', 'monto', 'metodo', 'fecha', 'proveedor_comision', 'monto_comision', 'cajero', 'anulado')
+    readonly_fields = ('anulado', 'fecha_anulacion', 'anulado_el', 'anulado_por', 'motivo_anulacion')
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.anulado:
+            return tuple(campo.name for campo in self.model._meta.fields)
+        return self.readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        # El borrado directo no genera la reversión del cobro. Usar su factura.
+        return False
 
 
 @admin.register(PagoComisionProveedor)

@@ -1,7 +1,8 @@
-{% load humanize %}
+{% load static humanize %}
 <!DOCTYPE html>
 <html>
 <head>
+<link rel="stylesheet" href="{% static 'facturacion/anulacion_pago.css' %}">
 <title>Factura - {{ factura.numero_factura }}</title>
 
 <style>
@@ -410,11 +411,12 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
     {% endif %}
 </div>
 
-{% if factura.pagos_facturacion.all %}
+{% if pagos_historial %}
 <div class="card">
     <div class="section-title">Historial de Pagos</div>
 
-    <table>
+    <div class="erp-payment-history-wrap" role="region" aria-label="Historial de pagos" tabindex="0">
+    <table class="erp-payment-history">
         <thead>
             <tr>
                 <th>Fecha</th>
@@ -429,20 +431,20 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
             </tr>
         </thead>
         <tbody>
-        {% for pago in factura.pagos_facturacion.all %}
-            <tr>
-                <td>{{ pago.fecha }}</td>
+        {% for pago in pagos_historial %}
+            <tr{% if pago.anulado %} class="is-payment-voided"{% endif %}>
+                <td>{{ pago.fecha }}{% if pago.anulado %}<span class="erp-payment-void-status-inline"><span class="erp-payment-void-badge">ANULADO</span></span>{% endif %}</td>
                 <td>{{ pago.get_metodo_display }}</td>
-                <td>
+                <td class="amount">
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
                     {{ pago.monto|floatformat:2|intcomma }}
                 </td>
-                <td>
+                <td class="amount">
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
                     {{ pago.total_retenciones|floatformat:2|intcomma }}
                 </td>
-                <td>{% if pago.monto_comision > 0 %}{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto_comision|floatformat:2|intcomma }}<br>{{ pago.porcentaje_comision|floatformat:2 }}% - {{ pago.proveedor_comision.nombre }}{% if pago.comision_retenida_cliente %}<br><span class="erp-badge success">Liquidada por compensación</span><br><a href="{% url 'registrar_pago_comision_proveedor' empresa.slug pago.id %}">Ver compensación</a>{% endif %}{% else %}-{% endif %}</td>
-                <td>
+                <td>{% if pago.monto_comision > 0 %}<span class="erp-payment-history-commission-amount">{% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}{{ pago.monto_comision|floatformat:2|intcomma }}</span><br>{{ pago.porcentaje_comision|floatformat:2 }}% - {{ pago.proveedor_comision.nombre }}{% if pago.comision_retenida_cliente and not pago.anulado %}<br><span class="erp-badge success">Liquidada por compensación</span><br><a href="{% url 'registrar_pago_comision_proveedor' empresa.slug pago.id %}">Ver compensación</a>{% endif %}{% else %}-{% endif %}</td>
+                <td class="amount">
                     {% if factura.moneda == "USD" %}$ {% else %}L. {% endif %}
                     {{ pago.total_aplicado|floatformat:2|intcomma }}
                 </td>
@@ -450,14 +452,21 @@ th:nth-child(7), td:nth-child(7){ width:10%; text-align:right; }
                 <td>{{ pago.referencia }}</td>
                 <td>
                     {% if pago.recibo %}
-                    <a href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver Recibo</a> |
+                    <a href="{% url 'ver_recibo' empresa.slug pago.recibo.id %}">Ver Recibo</a>
                     {% endif %}
+                    {% if not pago.anulado %}
                     <button type="button" class="btn-link" data-payment-url="/{{ empresa.slug }}/dashboard/facturacion/{{ factura.id }}/pago/{{ pago.id }}/editar/?modal=1" style="background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;">Editar</button>
+                    {% include "facturacion/partials/formulario_anular_pago.html" %}
+                    {% endif %}
                 </td>
             </tr>
+        {% if pago.anulado %}
+        <tr class="erp-payment-void-metadata"><td colspan="9">{% include "facturacion/partials/estado_pago_anulado.html" %}</td></tr>
+        {% endif %}
         {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% endif %}
 

@@ -5874,6 +5874,7 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
         ),
         id=pago_factura_id,
         factura__empresa=empresa,
+        anulado=False,
         proveedor_comision__isnull=False,
         monto_comision__gt=0,
     )
@@ -5942,7 +5943,7 @@ def registrar_pago_comision_proveedor(request, empresa_slug, pago_factura_id):
 @require_POST
 def revertir_pago_comision_proveedor(request, empresa_slug, pago_factura_id, pago_id):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
-    comision = get_object_or_404(PagoFactura, id=pago_factura_id, factura__empresa=empresa)
+    comision = get_object_or_404(PagoFactura, id=pago_factura_id, factura__empresa=empresa, anulado=False)
     pago = get_object_or_404(PagoComisionProveedor, id=pago_id, comision_origen=comision)
     proveedor_id = comision.proveedor_comision_id
     if pago.metodo == 'compensacion':
@@ -6631,7 +6632,7 @@ def recibos_dashboard(request, empresa_slug):
         autorizar_recibos_app(request, empresa)
         return listar_recibos_app(request, empresa)
     q = request.GET.get("q", "").strip()
-    recibos = ReciboPago.objects.filter(empresa=empresa).select_related('cliente', 'factura').order_by('-fecha_creacion')
+    recibos = ReciboPago.objects.filter(empresa=empresa).select_related('cliente', 'factura', 'pago').order_by('-fecha_creacion')
     if q:
         recibos = recibos.filter(
             Q(numero_recibo__icontains=q) |
@@ -6640,11 +6641,12 @@ def recibos_dashboard(request, empresa_slug):
             Q(concepto__icontains=q) |
             Q(factura__numero_factura__icontains=q)
         )
+    recibos_activos = recibos.filter(pago__anulado=False)
     resumen = {
         "total": recibos.count(),
-        "monto_total": sum((recibo.monto for recibo in recibos), Decimal('0.00')),
-        "efectivo": recibos.filter(metodo='efectivo').count(),
-        "transferencia": recibos.filter(metodo='transferencia').count(),
+        "monto_total": sum((recibo.monto for recibo in recibos_activos), Decimal('0.00')),
+        "efectivo": recibos_activos.filter(metodo='efectivo').count(),
+        "transferencia": recibos_activos.filter(metodo='transferencia').count(),
     }
 
     return render(request, "facturacion/recibos_premium.html", {
@@ -6672,7 +6674,7 @@ def ver_recibo(request, empresa_slug, recibo_id):
         empresa=empresa,
     )
     pagos_factura = list(
-        recibo.factura.pagos_facturacion.select_related("cuenta_financiera", "cajero").order_by("fecha", "id")
+        recibo.factura.pagos_facturacion.filter(anulado=False).select_related("cuenta_financiera", "cajero").order_by("fecha", "id")
     )
     total_pagos_previos = sum(
         (pago.total_aplicado for pago in pagos_factura if recibo.pago_id and pago.id != recibo.pago_id),
@@ -6706,6 +6708,9 @@ def editar_recibo(request, empresa_slug, recibo_id):
         id=recibo_id,
         empresa=empresa,
     )
+    if recibo.pago.anulado:
+        messages.error(request, 'El recibo pertenece a un pago anulado y conserva sus datos originales.')
+        return redirect('ver_recibo', empresa_slug=empresa.slug, recibo_id=recibo.pk)
     form = ReciboPagoForm(request.POST or None, instance=recibo)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -8832,7 +8837,7 @@ def registrar_pago(request, empresa_slug, factura_id):
 
 def _recalcular_y_recontabilizar_pagos_factura(factura):
     pagos = list(
-        factura.pagos_facturacion.select_related(
+        factura.pagos_facturacion.filter(anulado=False).select_related(
             "cuenta_financiera",
             "cuenta_financiera_impuesto",
             "factura__cliente",
@@ -8900,7 +8905,7 @@ def _recalcular_y_recontabilizar_pagos_factura(factura):
                 impuesto_aplicado = impuesto_pendiente
                 subtotal_aplicado = (subtotal_aplicado + excedente).quantize(Decimal("0.01"))
 
-        PagoFactura.objects.filter(pk=pago.pk).update(
+        PagoFactura.objects.filter(pk=pago.pk, anulado=False).update(
             subtotal_aplicado=subtotal_aplicado,
             impuesto_aplicado=impuesto_aplicado,
         )
@@ -8937,6 +8942,9 @@ def editar_pago_factura(request, empresa_slug, factura_id, pago_id):
         id=pago_id,
         factura=factura,
     )
+    if pago.anulado:
+        messages.error(request, 'El pago está anulado y no permite modificaciones. Registra un nuevo cobro para corregirlo.')
+        return redirect('ver_factura', empresa_slug=empresa.slug, factura_id=factura.pk)
     saldo_disponible_pago = factura.saldo_pendiente + pago.total_aplicado
     subtotal_disponible_pago = factura.subtotal_pendiente_cobro + pago.subtotal_aplicado
     impuesto_disponible_pago = factura.impuesto_pendiente_cobro + pago.impuesto_aplicado
@@ -9301,7 +9309,7 @@ def anular_factura(request, empresa_slug, factura_id):
         anterior = _estado_auditoria_factura(factura)
         if factura.estado == 'emitida':
             _revertir_salida_factura(factura)
-            for pago in factura.pagos_facturacion.all():
+            for pago in factura.pagos_facturacion.filter(anulado=False):
                 registrar_reversion_documento(
                     empresa=factura.empresa,
                     documento_tipo="pago_factura",
@@ -9515,7 +9523,7 @@ def duplicar_factura(request, empresa_slug, factura_id):
 
 @login_required
 def ver_factura(request, empresa_slug, factura_id):
-
+    from .anulacion_pagos import puede_anular_pago
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     _autorizar_cambio_factura(request, empresa, "puede_ver_facturas")
     config_avanzada = ConfiguracionAvanzadaEmpresa.para_empresa(empresa)
@@ -9523,7 +9531,7 @@ def ver_factura(request, empresa_slug, factura_id):
 
     resumen = factura.resumen_fiscal()
     resumen_detallado = _resumen_detallado(factura.subtotal, resumen)
-    ultimo_pago_factura_id = factura.pagos_facturacion.order_by("fecha", "id").values_list("id", flat=True).last()
+    ultimo_pago_factura_id = factura.pagos_facturacion.filter(anulado=False).order_by("fecha", "id").values_list("id", flat=True).last()
     auditoria_factura = RegistroAuditoria.objects.filter(
         empresa=empresa,
         app_label="facturacion",
@@ -9539,6 +9547,11 @@ def ver_factura(request, empresa_slug, factura_id):
     contexto = {
         "empresa": empresa,
         "factura": factura,
+        "pagos_historial": factura.pagos_facturacion.select_related(
+            'cuenta_financiera', 'cuenta_financiera_impuesto', 'proveedor_comision', 'recibo', 'anulado_por',
+        ).order_by('fecha', 'id'),
+        "puede_anular_pagos": puede_anular_pago(request.user, empresa) and factura.estado != 'anulada',
+        "fecha_anulacion_hoy": timezone.localdate(),
         "resumen": resumen,
         "resumen_detallado": resumen_detallado,
         "ultimo_pago_factura_id": ultimo_pago_factura_id,
@@ -9556,6 +9569,32 @@ def ver_factura(request, empresa_slug, factura_id):
         contexto["mobile_invoice_audit"] = preparar_historial_factura_mobile(historial_auditoria)
         template_name = "facturacion/mobile_invoice_detail.html"
     return _render_factura(request, template_name, contexto)
+
+
+@login_required
+@require_POST
+def anular_pago_factura(request, empresa_slug, factura_id, pago_id):
+    from .anulacion_pagos import anular_pago_factura as anular_cobro
+    from .anulacion_pagos import puede_anular_pago
+
+    empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    if not puede_anular_pago(request.user, empresa):
+        raise PermissionDenied('Tu usuario no tiene permiso para anular pagos en esta empresa.')
+    factura = get_object_or_404(Factura, pk=factura_id, empresa=empresa)
+    pago = get_object_or_404(PagoFactura, pk=pago_id, factura=factura)
+    try:
+        fecha = date.fromisoformat(request.POST.get('fecha_anulacion', ''))
+        ya_anulado = pago.anulado
+        anular_cobro(pago, usuario=request.user, motivo=request.POST.get('motivo', ''), fecha=fecha)
+        if ya_anulado:
+            messages.info(request, 'El pago ya estaba anulado; se conserva su anulación original.')
+        else:
+            messages.success(request, 'Pago anulado. Se revirtió su contabilidad y comisión y se restauró el saldo pendiente de la factura.')
+    except (ValueError, TypeError):
+        messages.error(request, 'Indica una fecha válida para la anulación.')
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+    return redirect('ver_factura', empresa_slug=empresa.slug, factura_id=factura.pk)
 
 
 @login_required
@@ -9996,6 +10035,7 @@ def reporte_retenciones_pagos(request, empresa_slug):
     )
     pagos = (
         PagoFactura.objects.filter(
+            anulado=False,
             factura__empresa=empresa,
             fecha__range=(fecha_desde, fecha_hasta),
         )
@@ -10080,7 +10120,7 @@ def dashboard_bi_facturacion(request, empresa_slug):
 
     docs_pagados_actual = facturas_mes_actual.filter(estado_pago="pagado").count()
     docs_pagados_anterior = facturas_mes_anterior.filter(estado_pago="pagado").count()
-    pagos_visibles = PagoFactura.objects.filter(factura__in=facturas_emitidas).select_related(
+    pagos_visibles = PagoFactura.objects.filter(factura__in=facturas_emitidas, anulado=False).select_related(
         "cuenta_financiera",
         "factura__cliente",
     )
@@ -10351,6 +10391,7 @@ def reporte_ingresos_bancos(request, empresa_slug):
 
     pagos = (
         PagoFactura.objects.filter(
+            anulado=False,
             factura__empresa=empresa,
             cuenta_financiera__isnull=False,
         )
@@ -10415,6 +10456,7 @@ def cierres_caja(request, empresa_slug):
 
     pagos_usuario = _preparar_pagos_caja(
         PagoFactura.objects.filter(
+            anulado=False,
             factura__empresa=empresa,
             cajero=request.user,
             fecha=fecha,
@@ -10511,6 +10553,7 @@ def ver_cierre_caja(request, empresa_slug, cierre_id):
     )
     pagos = _preparar_pagos_caja(
         PagoFactura.objects.filter(
+            anulado=False,
             factura__empresa=empresa,
             cajero=cierre.cajero,
             fecha=cierre.fecha,
@@ -10551,7 +10594,7 @@ def resumen_diario_caja(request, empresa_slug):
 
     fecha = _fecha_caja_desde_parametro(request.GET.get("fecha") or timezone.localdate())
     pagos = _preparar_pagos_caja(
-        PagoFactura.objects.filter(factura__empresa=empresa, fecha=fecha)
+        PagoFactura.objects.filter(factura__empresa=empresa, fecha=fecha, anulado=False)
         .select_related("factura", "factura__cliente", "cuenta_financiera", "cajero")
         .order_by("cajero__username", "metodo", "factura__numero_factura", "id"),
         empresa=empresa,
@@ -10646,6 +10689,7 @@ def reporte_cxp(request, empresa_slug):
     )
     comisiones = (
         PagoFactura.objects.filter(
+            anulado=False,
             factura__empresa=empresa,
             monto_comision__gt=0,
             proveedor_comision__isnull=False,
