@@ -1,8 +1,12 @@
 import hashlib
+from io import BytesIO
 import secrets
+import warnings
 from email.mime.image import MIMEImage
 from email.utils import make_msgid
 from pathlib import Path
+
+from PIL import Image, ImageOps
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -92,6 +96,34 @@ def _enviar_mensaje_acceso(usuario, token, tipo, url):
         raise RuntimeError("El servidor de correo no acepto el mensaje.")
 
 
+def _preparar_logo_empresa(empresa):
+    """Imagen pequena para correo; un logo ausente o danado no impide invitar."""
+    if not empresa or not empresa.logo:
+        return None
+    try:
+        limite_bytes = 5 * 1024 * 1024
+        with empresa.logo.open("rb") as archivo:
+            contenido = archivo.read(limite_bytes + 1)
+        if len(contenido) > limite_bytes:
+            return None
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(contenido)) as original:
+                if original.width * original.height > 12_000_000:
+                    return None
+                imagen = ImageOps.exif_transpose(original).convert("RGBA")
+                escala = min(180 / imagen.width, 64 / imagen.height, 1)
+                ancho = max(1, round(imagen.width * escala))
+                alto = max(1, round(imagen.height * escala))
+                imagen.thumbnail((360, 128), Image.Resampling.LANCZOS)
+                imagen.info.clear()
+                salida = BytesIO()
+                imagen.save(salida, format="PNG")
+        return salida.getvalue(), ancho, alto
+    except (OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+        return None
+
+
 def _crear_mensaje_acceso(usuario, token, tipo, url):
     es_invitacion = tipo == TokenAccesoUsuario.TIPO_INVITACION
     nombre_empresa = usuario.empresa.nombre if usuario.empresa else "Oasis"
@@ -108,6 +140,8 @@ def _crear_mensaje_acceso(usuario, token, tipo, url):
     if settings.TIME_ZONE == "America/Tegucigalpa":
         zona_horaria = f"hora de Honduras · {zona_horaria}"
     logo_cid = make_msgid(idstring="oasis-logo", domain="dvsolutionshn.com")
+    logo_empresa = _preparar_logo_empresa(usuario.empresa)
+    logo_empresa_cid = make_msgid(idstring="empresa-logo", domain="dvsolutionshn.com") if logo_empresa else ""
     contexto = {
         "usuario": usuario,
         "empresa": usuario.empresa,
@@ -119,6 +153,9 @@ def _crear_mensaje_acceso(usuario, token, tipo, url):
         "zona_horaria": zona_horaria,
         "es_invitacion": es_invitacion,
         "logo_cid": logo_cid[1:-1],
+        "logo_empresa_cid": logo_empresa_cid[1:-1],
+        "logo_empresa_ancho": logo_empresa[1] if logo_empresa else None,
+        "logo_empresa_alto": logo_empresa[2] if logo_empresa else None,
     }
     texto = render_to_string("core/emails/acceso_usuario.txt", contexto)
     html = render_to_string("core/emails/acceso_usuario.html", contexto)
@@ -135,6 +172,11 @@ def _crear_mensaje_acceso(usuario, token, tipo, url):
     logo.add_header("Content-ID", logo_cid)
     logo.add_header("Content-Disposition", "inline", filename="oasis-logo.png")
     mensaje.attach(logo)
+    if logo_empresa:
+        imagen_empresa = MIMEImage(logo_empresa[0], _subtype="png")
+        imagen_empresa.add_header("Content-ID", logo_empresa_cid)
+        imagen_empresa.add_header("Content-Disposition", "inline", filename="empresa-logo.png")
+        mensaje.attach(imagen_empresa)
     return mensaje
 
 

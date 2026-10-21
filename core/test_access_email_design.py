@@ -1,8 +1,13 @@
 from datetime import datetime, timezone as datetime_timezone
 from email import policy
 from email.parser import BytesParser
+from io import BytesIO
 from types import SimpleNamespace
+from unittest.mock import patch
 
+from PIL import Image
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
 
 from .access_tokens import _crear_mensaje_acceso
@@ -83,3 +88,55 @@ class AccessEmailDesignTests(SimpleTestCase):
         self.assertIn("Oasis", mensaje.subject)
         self.assertIn("daniel@example.test", mensaje.body)
         self.assertIn(self.url, mensaje.body)
+
+    def logo(self, formato="PNG", dimensiones=(720, 180)):
+        contenido = BytesIO()
+        Image.new("RGBA", dimensiones, (0, 60, 140, 180)).save(contenido, format=formato)
+        return SimpleUploadedFile("logo.empresa", contenido.getvalue())
+
+    def test_logo_empresa_inline_tiene_cid_propio_y_conserva_proporciones(self):
+        for tipo in (TokenAccesoUsuario.TIPO_INVITACION, TokenAccesoUsuario.TIPO_RECUPERACION):
+            with self.subTest(tipo=tipo):
+                self.empresa.logo = self.logo()
+                mensaje = self.correo(tipo)
+                mime = BytesParser(policy=policy.default).parsebytes(mensaje.message().as_bytes())
+                partes = list(mime.iter_parts())
+                self.assertEqual(len(partes), 3)
+                imagen = partes[2]
+                self.assertEqual(imagen.get_content_type(), "image/png")
+                self.assertEqual(imagen.get_content_disposition(), "inline")
+                cid = str(imagen["Content-ID"]).strip()
+                self.assertNotEqual(cid, str(partes[1]["Content-ID"]).strip())
+                html = mensaje.alternatives[0].content
+                self.assertIn(f'src="cid:{cid[1:-1]}"', html)
+                self.assertIn('alt="Logo de Empresa de ejemplo" width="180" height="45"', html)
+                with Image.open(BytesIO(imagen.get_payload(decode=True))) as logo:
+                    self.assertEqual(logo.size, (360, 90))
+                self.assertIn(self.empresa.nombre, mensaje.body)
+                self.assertIn(self.url, mensaje.body)
+
+    def test_logo_webp_se_convierte_a_png(self):
+        self.empresa.logo = self.logo("WEBP", (80, 80))
+        mensaje = self.correo()
+        self.assertEqual(mensaje.attachments[1].get_content_type(), "image/png")
+        self.assertIn('width="64" height="64"', mensaje.alternatives[0].content)
+
+    def test_logo_invalido_o_demasiado_grande_conserva_nombre_y_enlace(self):
+        grande = BytesIO()
+        Image.new("1", (4000, 4000)).save(grande, format="PNG")
+        for contenido in (b"no es una imagen", b"0" * (5 * 1024 * 1024 + 1), grande.getvalue()):
+            with self.subTest(bytes=len(contenido)):
+                self.empresa.logo = SimpleUploadedFile("logo.png", contenido)
+                mensaje = self.correo()
+                self.assertEqual(len(mensaje.attachments), 1)
+                self.assertIn(self.empresa.nombre, mensaje.alternatives[0].content)
+                self.assertIn(self.url, mensaje.body)
+
+    def test_archivo_logo_inaccesible_no_impide_preparar_invitacion(self):
+        self.empresa.logo = "logos/no-disponible.png"
+        for error in (FileNotFoundError, PermissionError):
+            with self.subTest(error=error), patch.object(self.empresa.logo.storage, "open", side_effect=error):
+                mensaje = self.correo()
+                self.assertEqual(len(mensaje.attachments), 1)
+                self.assertIn(self.empresa.nombre, mensaje.alternatives[0].content)
+                self.assertIn(self.url, mensaje.body)
