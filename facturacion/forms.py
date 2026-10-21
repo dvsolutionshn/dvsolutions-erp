@@ -1,9 +1,13 @@
+import re
+from datetime import datetime
+
 from django import forms
 from django.db.models import Sum
 from decimal import Decimal
 from core.phone_prefixes import PHONE_PREFIX_CHOICES, apply_phone_prefix, normalize_phone_prefix
 from core.models import ConfiguracionAvanzadaEmpresa, ConfiguracionPowerBIEmpresa
-from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, PagoComisionProveedor, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .models import CAI, BodegaInventario, CategoriaProductoFarmaceutico, Cliente, ConfiguracionFacturacionEmpresa, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, ExistenciaLoteBodega, Factura, LoteInventario, PagoComisionProveedor, PagoCompra, PagoFactura, PerfilFarmaceuticoProducto, Producto, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto
+from .lotes import LOT_DUPLICATE_MESSAGE, LOT_EXPIRY_REQUIRED_MESSAGE, parse_vencimiento_lote_rapido
 
 DATE_INPUT_FORMATS_LATAM = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
 EMPRESAS_COSTO_REAL_INVENTARIO = {"hospital_mia", "medical_spa"}
@@ -708,6 +712,145 @@ class RegistroCompraFiscalForm(forms.ModelForm):
             self.fields[field_name].required = False
         for field_name in ['subtotal', 'isv_15', 'isv_18', 'total']:
             self.fields[field_name].widget.attrs['readonly'] = 'readonly'
+
+
+class _LoteModelChoiceField(forms.ModelChoiceField):
+    """Rechaza IDs malformados o fuera de rango antes de consultar la BD."""
+
+    def to_python(self, value):
+        if value not in self.empty_values and not isinstance(value, self.queryset.model):
+            raw = str(value).strip()
+            # Los modelos usan claves enteras. El límite protege también al
+            # adaptador de SQLite contra enteros que no caben en 64 bits.
+            if not re.fullmatch(r"[0-9]{1,19}", raw) or not 1 <= int(raw) <= 9223372036854775807:
+                raise forms.ValidationError(self.error_messages["invalid_choice"], code="invalid_choice")
+            value = raw
+        return super().to_python(value)
+
+
+class _ProveedorLoteChoiceField(_LoteModelChoiceField):
+    def to_python(self, value):
+        if isinstance(value, str):
+            value = value.strip()
+            if value.casefold() == "sin proveedor":
+                value = None
+        return super().to_python(value)
+
+
+class _ProductoLoteChoiceField(_LoteModelChoiceField):
+    def label_from_instance(self, obj):
+        return f"{obj.nombre} - {obj.codigo}" if obj.codigo else obj.nombre
+
+
+class _FechaVencimientoLoteWidget(forms.DateInput):
+    def format_value(self, value):
+        # Un POST LATAM válido debe seguir visible en el input HTML de fecha
+        # cuando otro campo impida guardar el formulario.
+        if isinstance(value, str):
+            value = value.strip()
+            for formato in DATE_INPUT_FORMATS_LATAM:
+                try:
+                    value = datetime.strptime(value, formato).date().isoformat()
+                    break
+                except (ValueError, OverflowError):
+                    continue
+        return super().format_value(value)
+
+
+class RegistrarLoteInventarioForm(forms.Form):
+    producto = _ProductoLoteChoiceField(
+        queryset=Producto.objects.none(),
+        empty_label="Seleccione producto",
+        error_messages={
+            "required": "Selecciona el producto del lote.",
+            "invalid_choice": "Selecciona un producto activo de la empresa actual con control de inventario.",
+        },
+    )
+    numero_lote = forms.CharField(
+        label="Número de lote", max_length=80,
+        error_messages={
+            "required": "Ingresa el número de lote.",
+            "max_length": "El número de lote puede tener hasta 80 caracteres.",
+        },
+        widget=forms.TextInput(attrs={"placeholder": "Ejemplo: LOT-2026-001"}),
+    )
+    fecha_vencimiento = forms.DateField(
+        label="Fecha de vencimiento", required=False,
+        input_formats=DATE_INPUT_FORMATS_LATAM,
+        error_messages={"invalid": "Ingresa una fecha de vencimiento válida (dd/mm/aaaa o aaaa-mm-dd)."},
+        widget=_FechaVencimientoLoteWidget(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
+    fecha_vencimiento_rapida = forms.CharField(
+        label="Vencimiento rápido", required=False, max_length=80,
+        error_messages={"max_length": "El vencimiento rápido puede tener hasta 80 caracteres."},
+        widget=forms.TextInput(attrs={"placeholder": "Ejemplo: ago-27 o dic-26"}),
+    )
+    bodega = _LoteModelChoiceField(
+        label="Bodega inicial", queryset=BodegaInventario.objects.none(),
+        empty_label="Seleccione bodega",
+        error_messages={
+            "required": "Selecciona la bodega inicial del lote.",
+            "invalid_choice": "Selecciona una bodega activa de la empresa actual.",
+        },
+    )
+    cantidad = forms.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01"),
+        error_messages={
+            "required": "Ingresa la cantidad inicial del lote.",
+            "invalid": "Ingresa una cantidad numérica válida y finita.",
+            "min_value": "La cantidad debe ser mayor que cero.",
+            "max_digits": "La cantidad puede tener hasta 12 dígitos en total.",
+            "max_decimal_places": "La cantidad puede tener hasta dos decimales.",
+            "max_whole_digits": "La cantidad puede tener hasta 10 dígitos enteros.",
+        },
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0.01", "placeholder": "0.00"}),
+    )
+    proveedor = _ProveedorLoteChoiceField(
+        queryset=Proveedor.objects.none(), required=False, empty_label="Sin proveedor",
+        error_messages={"invalid_choice": "Selecciona un proveedor activo de la empresa actual o Sin proveedor."},
+    )
+    observacion = forms.CharField(
+        label="Observación", required=False,
+        widget=forms.TextInput(attrs={"placeholder": "Ejemplo: ingreso inicial, factura de compra, revision sanitaria."}),
+    )
+
+    def __init__(self, *args, empresa, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.empresa = empresa
+        self.fields["producto"].queryset = Producto.objects.filter(
+            empresa=empresa, activo=True, controla_inventario=True, eliminado=False,
+        ).order_by("nombre")
+        self.fields["bodega"].queryset = BodegaInventario.objects.filter(
+            empresa=empresa, activa=True,
+        ).order_by("tipo", "nombre")
+        self.fields["proveedor"].queryset = Proveedor.objects.filter(
+            empresa=empresa, activo=True, cliente_contable__isnull=True,
+        ).order_by("nombre")
+        for nombre, campo in self.fields.items():
+            campo.widget.attrs["id"] = nombre
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha = cleaned_data.get("fecha_vencimiento")
+        rapido = cleaned_data.get("fecha_vencimiento_rapida")
+        if rapido:
+            try:
+                fecha_rapida = parse_vencimiento_lote_rapido(rapido)
+            except forms.ValidationError as exc:
+                self.add_error("fecha_vencimiento_rapida", exc)
+            else:
+                if not fecha and "fecha_vencimiento" not in self.errors:
+                    fecha = cleaned_data["fecha_vencimiento"] = fecha_rapida
+        if not fecha and "fecha_vencimiento" not in self.errors and "fecha_vencimiento_rapida" not in self.errors:
+            self.add_error("fecha_vencimiento", LOT_EXPIRY_REQUIRED_MESSAGE)
+
+        producto = cleaned_data.get("producto")
+        numero_lote = cleaned_data.get("numero_lote")
+        if producto and numero_lote and LoteInventario.objects.filter(
+            empresa=self.empresa, producto=producto, numero_lote=numero_lote,
+        ).exists():
+            self.add_error("numero_lote", LOT_DUPLICATE_MESSAGE)
+        return cleaned_data
 
 
 class AjusteInventarioForm(forms.Form):

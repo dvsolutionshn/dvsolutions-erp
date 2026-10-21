@@ -31,6 +31,7 @@ import calendar
 import io
 import tempfile
 import zipfile
+from uuid import uuid4
 from pathlib import Path
 from .captura_rapida import calcular_importes, captura_rapida
 from .costos_inventario import actualizar_valor_inventario, cantidad_disponible_para_linea, capturar_costos_devolucion, costo_reversion_compra, validar_devoluciones_nota, valor_actual_inventario, valor_contable_linea_inventario, valorar_linea_compra
@@ -52,7 +53,9 @@ from contabilidad.services import (
 from .models import CAI, BitacoraProductoEliminado, BodegaInventario, CategoriaProductoFarmaceutico, CierreCaja, ComprobanteEgresoCompra, CompraInventario, ConfiguracionFacturacionEmpresa, CorreccionNumeroFactura, Cotizacion, EMPRESAS_FACTURACION_SOLO_CONTADO, EMPRESAS_PRECIO_FINAL_CON_IMPUESTO, EntradaInventarioDocumento, ExistenciaLoteBodega, Factura, HistorialCostoRealProducto, InventarioProducto, LineaCompraInventario, LineaCotizacion, LineaEntradaInventario, LineaFactura, LineaNotaCredito, LoteInventario, MovimientoInventario, MovimientoLoteBodega, NotaCredito, PagoComisionProveedor, PagoCompra, PerfilFarmaceuticoProducto, Producto, ProductoPromocionPuntoVenta, PromocionPuntoVenta, Proveedor, ReciboPago, RegistroCompraFiscal, TipoImpuesto, Cliente, PagoFactura
 from .forms import AjusteInventarioForm, CAIForm, CategoriaProductoFarmaceuticoForm, ClienteForm, ConfiguracionFacturacionEmpresaForm, ConfiguracionPowerBIForm, CorreccionNumeroFacturaForm, DATE_INPUT_FORMATS_LATAM, EliminarProductoForm, EntradaInventarioForm, ImportarLibroComprasForm, PagoComisionProveedorForm, PagoCompraForm, ProductoForm, PromocionPuntoVentaForm, ProveedorForm, ReciboPagoForm, RegistroCompraFiscalForm, TipoImpuestoForm, configurar_campo_fecha
 from .importadores import importar_libro_compras_desde_excel
+from .forms import RegistrarLoteInventarioForm
 from .mobile_presentation import preparar_historial_factura_mobile
+from .lotes import LOT_DUPLICATE_MESSAGE, parse_vencimiento_lote_rapido
 from contabilidad.models import AsientoContable, ClasificacionCompraFiscal, CuentaFinanciera, bloquear_empresas_contables, validar_fecha_contable_abierta
 from crm.models import ConfiguracionCRM
 from crm.services import WhatsAppAPIError, enviar_documento_whatsapp, subir_documento_whatsapp
@@ -2315,37 +2318,7 @@ def _aplicar_distribucion_bodegas_producto(producto, form):
 
 
 def _parse_vencimiento_lote_rapido(valor):
-    valor = (valor or "").strip().lower().replace(".", "").replace("/", "-").replace(" ", "-")
-    if not valor:
-        return None
-    meses = {
-        "ene": 1, "enero": 1,
-        "feb": 2, "febrero": 2,
-        "mar": 3, "marzo": 3,
-        "abr": 4, "abril": 4,
-        "may": 5, "mayo": 5,
-        "jun": 6, "junio": 6,
-        "jul": 7, "julio": 7,
-        "ago": 8, "agos": 8, "agosto": 8,
-        "sep": 9, "sept": 9, "septiembre": 9,
-        "oct": 10, "octubre": 10,
-        "nov": 11, "noviembre": 11,
-        "dic": 12, "diciembre": 12,
-    }
-    partes = [parte for parte in valor.split("-") if parte]
-    if len(partes) != 2:
-        raise ValidationError("Usa el formato de vencimiento rapido como ago-27 o dic-26.")
-    mes = meses.get(partes[0])
-    if not mes:
-        raise ValidationError("El mes del vencimiento rapido no es valido.")
-    try:
-        anio = int(partes[1])
-    except ValueError as exc:
-        raise ValidationError("El anio del vencimiento rapido no es valido.") from exc
-    if anio < 100:
-        anio += 2000
-    ultimo_dia = calendar.monthrange(anio, mes)[1]
-    return date(anio, mes, ultimo_dia)
+    return parse_vencimiento_lote_rapido(valor)
 
 
 def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
@@ -3991,6 +3964,82 @@ def ver_bodega_inventario(request, empresa_slug, bodega_id):
     })
 
 
+@transaction.atomic
+def _crear_lote_con_movimiento_inicial(*, empresa, datos, usuario):
+    """Crea el lote y ambos kardex juntos, sin reutilizar lotes existentes."""
+    bloquear_empresas_contables([empresa.pk])
+    # Serializar las entradas del producto evita perder incrementos de stock.
+    producto = Producto.objects.select_for_update().filter(
+        pk=datos["producto"].pk, empresa=empresa,
+        activo=True, eliminado=False, controla_inventario=True,
+    ).first()
+    if not producto:
+        raise ValidationError({"producto": "Selecciona un producto disponible de la empresa activa."})
+    bodega = BodegaInventario.objects.select_for_update().filter(
+        pk=datos["bodega"].pk, empresa=empresa, activa=True,
+    ).first()
+    if not bodega:
+        raise ValidationError({"bodega": "Selecciona una bodega activa de esta empresa."})
+    proveedor = datos.get("proveedor")
+    if proveedor and not Proveedor.objects.filter(
+        pk=proveedor.pk, empresa=empresa, activo=True, cliente_contable__isnull=True,
+    ).exists():
+        raise ValidationError({"proveedor": "Selecciona un proveedor activo de esta empresa o Sin proveedor."})
+    numero_lote = datos["numero_lote"]
+    if LoteInventario.objects.filter(
+        empresa=empresa, producto=producto, numero_lote=numero_lote,
+    ).exists():
+        raise ValidationError({"numero_lote": LOT_DUPLICATE_MESSAGE})
+
+    lote = LoteInventario(
+        empresa=empresa, producto=producto, numero_lote=numero_lote,
+        fecha_vencimiento=datos["fecha_vencimiento"], proveedor=proveedor, activo=True,
+    )
+    lote.full_clean(validate_unique=False)
+    cantidad = datos["cantidad"]
+    inventario = _obtener_inventario_producto(producto)
+    # La cantidad individual puede ser válida y exceder la capacidad del saldo.
+    try:
+        InventarioProducto._meta.get_field("existencias").clean(
+            inventario.existencias + cantidad, inventario,
+        )
+    except ValidationError as exc:
+        raise ValidationError({"cantidad": "La cantidad supera el saldo máximo permitido para este producto."}) from exc
+    lote.save(force_insert=True)
+    observacion = datos.get("observacion") or "Entrada manual de lote farmaceutico."
+    _registrar_movimiento_lote_bodega(
+        empresa=empresa, bodega=bodega, lote=lote, tipo="entrada", cantidad=cantidad,
+        referencia=f"Lote {numero_lote}", observacion=observacion, usuario=usuario,
+    )
+    _registrar_movimiento_inventario(
+        empresa=empresa, producto=producto, bodega=bodega, tipo="entrada", cantidad=cantidad,
+        referencia=f"Lote {numero_lote}", observacion=observacion, usuario=usuario,
+    )
+    return lote
+
+
+def _agregar_error_validacion_lote(form, error):
+    """No enviar al navegador mensajes técnicos de modelos o servicios."""
+    mensajes = {
+        "producto": "Selecciona un producto disponible de la empresa activa.",
+        "bodega": "Selecciona una bodega activa de esta empresa.",
+        "proveedor": "Selecciona un proveedor activo de esta empresa o Sin proveedor.",
+        "numero_lote": "Revisa el número de lote; debe tener entre 1 y 80 caracteres.",
+        "fecha_vencimiento": "Ingresa una fecha de vencimiento válida.",
+        "cantidad": "Revisa la cantidad; debe ser mayor que cero y no exceder el saldo máximo permitido.",
+        "observacion": "Revisa la observación ingresada.",
+    }
+    if hasattr(error, "message_dict"):
+        for campo, errores in error.message_dict.items():
+            if campo in mensajes:
+                mensaje = LOT_DUPLICATE_MESSAGE if campo == "numero_lote" and LOT_DUPLICATE_MESSAGE in errores else mensajes[campo]
+                form.add_error(campo, mensaje)
+            else:
+                form.add_error(None, "No fue posible registrar el movimiento inicial. Revise los datos del lote.")
+    else:
+        form.add_error(None, "No fue posible registrar el movimiento inicial. Revise los datos del lote.")
+
+
 @login_required
 def crear_lote_inventario(request, empresa_slug):
     from .mobile_stock_operations import (
@@ -4001,51 +4050,60 @@ def crear_lote_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
     modo_app = es_stock_app(request, empresa)
     if modo_app:
+        # El flujo móvil conserva el contrato y las validaciones originales.
+        # La autorización debe ocurrir antes de crear configuración o bodegas.
         autorizar_stock_app(request, empresa, "entrada_lote")
         validar_relaciones_stock_app(empresa)
-    if not _empresa_usa_inventario_por_lotes(empresa):
-        messages.error(request, "El control de inventario por lotes no esta activo para esta empresa.")
-        return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+        if not _empresa_usa_inventario_por_lotes(empresa):
+            messages.error(request, "El control de inventario por lotes no esta activo para esta empresa.")
+            return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
-    bodegas = _asegurar_bodegas_farmaceuticas(empresa)
-    productos = Producto.objects.filter(empresa=empresa, activo=True, controla_inventario=True).order_by("nombre")
-    proveedores = Proveedor.objects.filter(cliente_contable__isnull=True, empresa=empresa, activo=True).order_by("nombre")
-    producto_preseleccionado = productos.filter(id=request.GET.get("producto")).first()
-    next_url = request.POST.get("next") or request.GET.get("next") or ""
-    if modo_app:
+        bodegas = _asegurar_bodegas_farmaceuticas(empresa)
+        productos = Producto.objects.filter(
+            empresa=empresa, activo=True, controla_inventario=True,
+        ).order_by("nombre")
+        proveedores = Proveedor.objects.filter(
+            cliente_contable__isnull=True, empresa=empresa, activo=True,
+        ).order_by("nombre")
+        bodegas_activas = BodegaInventario.objects.filter(
+            empresa=empresa, activa=True,
+        ).order_by("tipo", "nombre")
         errores_app = errores_estructura_stock_app(request, empresa, "entrada_lote")
         if errores_app:
-            return render_stock_app(request, empresa, "entrada_lote", productos=productos,
-                proveedores=proveedores, bodegas=BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
-                bodega_principal=bodegas["principal"], errores=errores_app)
-    if request.method == "POST":
-        producto = productos.filter(id=request.POST.get("producto")).first()
-        bodega = BodegaInventario.objects.filter(empresa=empresa, id=request.POST.get("bodega")).first()
-        numero_lote = request.POST.get("numero_lote", "").strip()
-        cantidad_raw = request.POST.get("cantidad", "").strip()
-        fecha_vencimiento = request.POST.get("fecha_vencimiento") or None
-        vencimiento_rapido = request.POST.get("fecha_vencimiento_rapida", "").strip()
-        proveedor_id = request.POST.get("proveedor") or None
-        proveedor = proveedores.filter(id=proveedor_id).first()
-        try:
-            cantidad = Decimal(cantidad_raw)
-        except InvalidOperation:
-            cantidad = Decimal("0.00")
-        try:
-            fecha_vencimiento = fecha_vencimiento or _parse_vencimiento_lote_rapido(vencimiento_rapido)
-        except ValidationError as exc:
-            messages.error(request, str(exc))
-            fecha_vencimiento = "__invalida__"
+            return render_stock_app(
+                request, empresa, "entrada_lote", productos=productos,
+                proveedores=proveedores, bodegas=bodegas_activas,
+                bodega_principal=bodegas["principal"], errores=errores_app,
+            )
 
-        if fecha_vencimiento == "__invalida__":
-            pass
-        elif _empresa_usa_control_lotes_fefo(empresa) and not fecha_vencimiento:
-            messages.error(request, "La fecha de vencimiento es obligatoria para registrar un lote FEFO.")
-        elif not producto or not bodega or not numero_lote or cantidad <= 0:
-            messages.error(request, "Completa producto, bodega, lote y cantidad mayor que cero.")
-        else:
+        if request.method == "POST":
+            producto = productos.filter(id=request.POST.get("producto")).first()
+            bodega = bodegas_activas.filter(id=request.POST.get("bodega")).first()
+            numero_lote = request.POST.get("numero_lote", "").strip()
+            cantidad_raw = request.POST.get("cantidad", "").strip()
+            fecha_vencimiento = request.POST.get("fecha_vencimiento") or None
+            vencimiento_rapido = request.POST.get("fecha_vencimiento_rapida", "").strip()
+            proveedor = proveedores.filter(id=request.POST.get("proveedor") or None).first()
             try:
-                with transaction.atomic():
+                cantidad = Decimal(cantidad_raw)
+            except InvalidOperation:
+                cantidad = Decimal("0.00")
+            try:
+                fecha_vencimiento = fecha_vencimiento or _parse_vencimiento_lote_rapido(vencimiento_rapido)
+            except ValidationError as exc:
+                messages.error(request, str(exc))
+                fecha_vencimiento = "__invalida__"
+
+            if fecha_vencimiento == "__invalida__":
+                pass
+            elif _empresa_usa_control_lotes_fefo(empresa) and not fecha_vencimiento:
+                messages.error(request, "La fecha de vencimiento es obligatoria para registrar un lote FEFO.")
+            elif not producto or not bodega or not numero_lote or cantidad <= 0:
+                messages.error(request, "Completa producto, bodega, lote y cantidad mayor que cero.")
+            else:
+                try:
+                    # El flujo móvil histórico no promete una transacción única:
+                    # cada movimiento conserva su atomicidad propia.
                     bloquear_empresas_contables([empresa.pk])
                     lote, _ = LoteInventario.objects.get_or_create(
                         empresa=empresa,
@@ -4061,46 +4119,118 @@ def crear_lote_inventario(request, empresa_slug):
                     lote.proveedor = proveedor
                     lote.activo = True
                     lote.save(update_fields=["fecha_vencimiento", "proveedor", "activo"])
+                    observacion = (
+                        request.POST.get("observacion", "").strip()
+                        or "Entrada manual de lote farmaceutico."
+                    )
                     _registrar_movimiento_lote_bodega(
-                        empresa=empresa,
-                        bodega=bodega,
-                        lote=lote,
-                        tipo="entrada",
-                        cantidad=cantidad,
-                        referencia=f"Lote {numero_lote}",
-                        observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
+                        empresa=empresa, bodega=bodega, lote=lote, tipo="entrada",
+                        cantidad=cantidad, referencia=f"Lote {numero_lote}",
+                        observacion=observacion,
                     )
                     _registrar_movimiento_inventario(
-                        empresa=empresa,
-                        producto=producto,
-                        tipo="entrada",
-                        cantidad=cantidad,
-                        referencia=f"Lote {numero_lote}",
-                        observacion=request.POST.get("observacion", "").strip() or "Entrada manual de lote farmaceutico.",
+                        empresa=empresa, producto=producto, tipo="entrada",
+                        cantidad=cantidad, referencia=f"Lote {numero_lote}",
+                        observacion=observacion,
                     )
-            except ValidationError as exc:
-                messages.error(request, "; ".join(exc.messages))
-            else:
-                messages.success(request, "Lote registrado correctamente.")
-                if modo_app:
+                except ValidationError as exc:
+                    messages.error(request, "; ".join(exc.messages))
+                else:
+                    messages.success(request, "Lote registrado correctamente.")
                     return volver_stock_app(empresa)
-                if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+
+        return render_stock_app(
+            request, empresa, "entrada_lote", productos=productos,
+            proveedores=proveedores, bodegas=bodegas_activas,
+            bodega_principal=bodegas["principal"],
+        )
+
+    form = RegistrarLoteInventarioForm(
+        request.POST if request.method == "POST" else None, empresa=empresa,
+    )
+    if not form.is_bound:
+        # add_error también se usa si falla la preparación de un GET.
+        form.cleaned_data = {}
+    next_url = request.POST.get("next") or request.GET.get("next") or ""
+    referencia_error = uuid4().hex[:12].upper()
+    try:
+        if not _empresa_usa_inventario_por_lotes(empresa):
+            messages.error(request, "El control de inventario por lotes no esta activo para esta empresa.")
+            return redirect("inventario_facturacion", empresa_slug=empresa.slug)
+        # La preparación del GET también puede fallar: revertir las bodegas base.
+        with transaction.atomic():
+            bodegas = _asegurar_bodegas_farmaceuticas(empresa)
+        if request.method == "POST":
+            if form.is_valid():
+                _crear_lote_con_movimiento_inicial(
+                    empresa=empresa, datos=form.cleaned_data, usuario=request.user,
+                )
+                messages.success(request, "Lote registrado correctamente.")
+                if next_url and url_has_allowed_host_and_scheme(
+                    next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+                ):
                     return redirect(next_url)
                 return redirect("inventario_farmaceutico", empresa_slug=empresa.slug)
+            logger.warning(
+                "Validación de lote rechazada empresa=%s usuario=%s referencia=%s errores=%s",
+                empresa.pk, request.user.pk, referencia_error, form.errors.as_json(),
+            )
+        else:
+            form.initial["bodega"] = bodegas["principal"].pk
+            if request.GET.get("producto"):
+                try:
+                    producto = form.fields["producto"].clean(request.GET["producto"])
+                    form.initial["producto"] = producto.pk
+                except ValidationError:
+                    logger.warning(
+                        "Producto preseleccionado inválido empresa=%s usuario=%s referencia=%s",
+                        empresa.pk, request.user.pk, referencia_error, exc_info=True,
+                    )
+                    form.add_error("producto", "Selecciona un producto disponible de la empresa activa.")
+    except ValidationError as exc:
+        logger.warning(
+            "Validación al registrar lote empresa=%s usuario=%s referencia=%s",
+            empresa.pk, request.user.pk, referencia_error, exc_info=True,
+        )
+        _agregar_error_validacion_lote(form, exc)
+    except IntegrityError:
+        logger.warning(
+            "Integridad al registrar lote empresa=%s usuario=%s referencia=%s",
+            empresa.pk, request.user.pk, referencia_error, exc_info=True,
+        )
+        # Consultar después de salir de atomic: la conexión ya no está rota.
+        producto = form.cleaned_data.get("producto") if hasattr(form, "cleaned_data") else None
+        numero_lote = form.cleaned_data.get("numero_lote") if hasattr(form, "cleaned_data") else None
+        duplicado = False
+        if producto and numero_lote:
+            try:
+                duplicado = LoteInventario.objects.filter(
+                    empresa=empresa, producto=producto, numero_lote=numero_lote,
+                ).exists()
+            except Exception:
+                logger.exception("Error comprobando lote duplicado referencia=%s", referencia_error)
+        if duplicado:
+            form.add_error("numero_lote", LOT_DUPLICATE_MESSAGE)
+        else:
+            form.add_error(None, "No fue posible registrar el movimiento inicial. Revise los datos del lote e intente nuevamente.")
+    except (ValueError, InvalidOperation):
+        logger.warning(
+            "Formato inválido al registrar lote empresa=%s usuario=%s referencia=%s",
+            empresa.pk, request.user.pk, referencia_error, exc_info=True,
+        )
+        form.add_error(None, "Hay datos con un formato no válido. Revise los datos del lote e intente nuevamente.")
+    except Exception:
+        logger.exception(
+            "Error inesperado al registrar lote empresa=%s usuario=%s referencia=%s",
+            empresa.pk, request.user.pk, referencia_error,
+        )
+        form.add_error(None, "No fue posible registrar el lote. Revise los datos o contacte soporte. "
+                       f"Código de referencia: {referencia_error}")
 
-    if modo_app:
-        return render_stock_app(request, empresa, "entrada_lote", productos=productos,
-            proveedores=proveedores, bodegas=BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
-            bodega_principal=bodegas["principal"])
     return render(request, "facturacion/crear_lote_inventario.html", {
         "empresa": empresa,
-        "productos": productos,
-        "proveedores": proveedores,
-        "bodegas": BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("tipo", "nombre"),
-        "bodega_principal": bodegas["principal"],
-        "producto_preseleccionado": producto_preseleccionado,
+        "form": form,
         "next": next_url,
-        "control_lotes_fefo": _empresa_usa_control_lotes_fefo(empresa),
         "valores": request.POST if request.method == "POST" else {},
     })
 
@@ -4293,16 +4423,43 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
             empresa=empresa,
             bodega=ruta["origen"],
             cantidad__gt=0,
+            lote__activo=True,
+            lote__producto__tipo_item="producto",
+            lote__producto__controla_inventario=True,
+            lote__producto__eliminado=False,
         )
         .select_related("lote", "lote__producto", "bodega")
-        .order_by("lote__fecha_vencimiento", "lote__producto__nombre")
+        .order_by("lote__producto__nombre", "lote__fecha_vencimiento", "lote__numero_lote", "id")
     )
+    productos_transferencia = []
+    productos_por_id = {}
+    for existencia_item in existencias:
+        producto = existencia_item.lote.producto
+        item = productos_por_id.get(producto.id)
+        if item is None:
+            item = {
+                "producto": producto,
+                "disponible": Decimal("0.00"),
+                "lotes": 0,
+            }
+            productos_por_id[producto.id] = item
+            productos_transferencia.append(item)
+        item["disponible"] += existencia_item.cantidad
+        item["lotes"] += 1
+
+    producto_seleccionado_id = request.POST.get("producto", "")
+    if not producto_seleccionado_id and request.POST.get("existencia"):
+        existencia_seleccionada = existencias.filter(id=request.POST.get("existencia")).first()
+        if existencia_seleccionada:
+            producto_seleccionado_id = str(existencia_seleccionada.lote.producto_id)
     contexto = {
         "empresa": empresa,
         "rutas": rutas,
         "ruta_key": ruta_key,
         "ruta": ruta,
         "existencias": existencias,
+        "productos_transferencia": productos_transferencia,
+        "producto_seleccionado_id": str(producto_seleccionado_id),
         "bodegas": bodegas_activas if usar_selectores_bodega else (),
         "usar_selectores_bodega": usar_selectores_bodega,
     }

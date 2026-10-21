@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     'clinica',
     'tecnicentro',
     'onix_mobile',
+    'mero',
     'django.contrib.humanize',
 ]
 

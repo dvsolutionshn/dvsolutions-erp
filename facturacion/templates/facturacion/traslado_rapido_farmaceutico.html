@@ -47,6 +47,40 @@
 .quick-transfer-select option{
     font-size:.95rem;
 }
+.quick-product-picker{position:relative;}
+.quick-product-native{display:none;}
+.quick-product-suggestions{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:0;
+    z-index:140;
+    display:none;
+    max-height:300px;
+    overflow:auto;
+    padding:8px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    box-shadow:0 18px 34px rgba(15,39,66,.16);
+}
+.quick-product-option{
+    display:flex;
+    width:100%;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:11px 12px;
+    border:0;
+    border-radius:9px;
+    background:transparent;
+    color:var(--primary);
+    text-align:left;
+    cursor:pointer;
+}
+.quick-product-option:hover,.quick-product-option:focus{background:#f1f7fb;}
+.quick-product-option small{display:block;margin-top:3px;color:var(--muted);}
+.quick-product-empty{padding:14px;color:var(--muted);}
 .quick-warehouse-selects{
     display:grid;
     grid-template-columns:repeat(2,minmax(220px,1fr));
@@ -109,17 +143,29 @@
         {% else %}
         <input type="hidden" name="ruta" value="{{ ruta_key }}">
         {% endif %}
+        <div class="erp-field quick-product-picker" style="grid-column:1 / -1;">
+            <label for="producto_busqueda">Producto</label>
+            <input id="producto_busqueda" type="search" autocomplete="off" placeholder="Buscar por nombre o código / referencia" required>
+            <select id="producto" class="quick-product-native" name="producto" tabindex="-1" aria-hidden="true">
+                <option value="">Seleccione un producto</option>
+                {% for item in productos_transferencia %}
+                <option value="{{ item.producto.id }}" data-nombre="{{ item.producto.nombre }}" data-codigo="{{ item.producto.codigo|default:'' }}" data-disponible="{{ item.disponible|floatformat:2 }}" data-unidad="{{ item.producto.get_unidad_medida_display }}" data-lotes="{{ item.lotes }}" {% if producto_seleccionado_id == item.producto.id|stringformat:'s' %}selected{% endif %}>{{ item.producto.nombre }}</option>
+                {% endfor %}
+            </select>
+            <div id="producto_sugerencias" class="quick-product-suggestions"></div>
+            <div class="erp-field-help">Haz clic para ver todos o escribe parte del nombre o código.</div>
+        </div>
         <div class="erp-field" style="grid-column:1 / -1;">
-            <label for="existencia">Producto / lote disponible</label>
-            <select id="existencia" class="quick-transfer-select" name="existencia" required>
-                <option value="">Seleccione producto, lote y vencimiento</option>
+            <label for="existencia">Lote disponible</label>
+            <select id="existencia" class="quick-transfer-select" name="existencia" required disabled>
+                <option value="">Seleccione el lote y vencimiento</option>
                 {% for existencia in existencias %}
-                <option value="{{ existencia.id }}">
-                    {{ existencia.lote.producto.nombre }} | Lote {{ existencia.lote.numero_lote }} | Vence {{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"sin fecha" }} | Disponible {{ existencia.cantidad|floatformat:2 }}
+                <option value="{{ existencia.id }}" data-producto-id="{{ existencia.lote.producto_id }}" {% if request.POST.existencia == existencia.id|stringformat:'s' %}selected{% endif %}>
+                    Lote {{ existencia.lote.numero_lote }} | Vence {{ existencia.lote.fecha_vencimiento|date:"d/m/Y"|default:"sin fecha" }} | Disponible {{ existencia.cantidad|floatformat:2 }}
                 </option>
                 {% endfor %}
             </select>
-            <div class="erp-field-help">Para farmacia, recomendamos mover primero los lotes proximos a vencer.</div>
+            <div class="erp-field-help">Solo se muestran lotes con existencia en la bodega origen.</div>
         </div>
         <div class="erp-field">
             <label for="cantidad">Cantidad a mover</label>
@@ -191,6 +237,106 @@
         </table>
     </div>
 </section>
+
+<script>
+(() => {
+    const input = document.getElementById("producto_busqueda");
+    const productSelect = document.getElementById("producto");
+    const suggestions = document.getElementById("producto_sugerencias");
+    const lotSelect = document.getElementById("existencia");
+    if (!input || !productSelect || !suggestions || !lotSelect) return;
+
+    const productOptions = Array.from(productSelect.options).slice(1);
+    const lotOptions = Array.from(lotSelect.options).slice(1);
+    const normalize = value => String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+    const hideSuggestions = () => { suggestions.style.display = "none"; };
+    const syncLots = productId => {
+        let visibleLots = 0;
+        lotOptions.forEach(option => {
+            const visible = option.dataset.productoId === productId;
+            option.hidden = !visible;
+            option.disabled = !visible;
+            if (visible) visibleLots += 1;
+        });
+        const selectedLot = lotSelect.selectedOptions[0];
+        if (!selectedLot || selectedLot.disabled) lotSelect.value = "";
+        lotSelect.disabled = !productId || visibleLots === 0;
+        if (visibleLots === 1 && !lotSelect.value) {
+            const onlyLot = lotOptions.find(option => !option.disabled);
+            lotSelect.value = onlyLot ? onlyLot.value : "";
+        }
+    };
+    const selectProduct = option => {
+        productSelect.value = option.value;
+        input.value = option.dataset.nombre;
+        input.setCustomValidity("");
+        syncLots(option.value);
+        hideSuggestions();
+    };
+    const clearProduct = () => {
+        productSelect.value = "";
+        lotSelect.value = "";
+        syncLots("");
+    };
+    const renderSuggestions = term => {
+        const filter = normalize(term.trim());
+        const matches = productOptions.filter(option => {
+            const searchable = `${option.dataset.nombre} ${option.dataset.codigo}`;
+            return !filter || normalize(searchable).includes(filter);
+        });
+        suggestions.replaceChildren();
+        matches.forEach(option => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "quick-product-option";
+            const label = document.createElement("span");
+            label.textContent = option.dataset.nombre;
+            const meta = document.createElement("small");
+            meta.textContent = option.dataset.codigo
+                ? `Código / referencia: ${option.dataset.codigo}`
+                : "Sin código / referencia";
+            label.appendChild(meta);
+            const stock = document.createElement("strong");
+            stock.textContent = `${option.dataset.disponible} ${option.dataset.unidad}`;
+            button.append(label, stock);
+            button.addEventListener("mousedown", event => event.preventDefault());
+            button.addEventListener("click", () => selectProduct(option));
+            suggestions.appendChild(button);
+        });
+        if (!matches.length) {
+            const empty = document.createElement("div");
+            empty.className = "quick-product-empty";
+            empty.textContent = "No hay productos coincidentes en la bodega origen.";
+            suggestions.appendChild(empty);
+        }
+        suggestions.style.display = "block";
+    };
+
+    input.addEventListener("focus", () => renderSuggestions(""));
+    input.addEventListener("input", () => {
+        clearProduct();
+        input.setCustomValidity("");
+        renderSuggestions(input.value);
+    });
+    input.addEventListener("blur", () => window.setTimeout(hideSuggestions, 120));
+    input.closest("form").addEventListener("submit", event => {
+        if (!productSelect.value) {
+            event.preventDefault();
+            input.setCustomValidity("Selecciona un producto de la lista.");
+            input.reportValidity();
+            input.focus();
+        }
+    });
+
+    const initialProduct = productOptions.find(option => option.value === productSelect.value);
+    if (initialProduct) selectProduct(initialProduct);
+    else syncLots("");
+})();
+</script>
 
 {% if usar_selectores_bodega %}
 <script>

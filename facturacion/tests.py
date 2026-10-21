@@ -4240,6 +4240,102 @@ class FacturacionTests(TestCase):
         self.assertNotContains(response, "Bodega cerrada")
         self.assertNotContains(response, "Ruta rapida")
 
+    def test_transferencia_rapida_buscador_lista_productos_unicos_de_bodega_y_empresa(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        origen = BodegaInventario.objects.create(
+            empresa=self.empresa, nombre="Cabina buscador", tipo="otra", activa=True
+        )
+        self.client.get(reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]))
+        destino = BodegaInventario.objects.get(empresa=self.empresa, nombre="Bodega Hospital")
+
+        gomitas_capilares = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Gomitas Capilares",
+            codigo="GOM-CAP-01",
+            precio=Decimal("150.00"),
+            controla_inventario=True,
+        )
+        gomitas_biotina = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Gomitas Biotina",
+            codigo="BIO-REF-02",
+            precio=Decimal("175.00"),
+            controla_inventario=True,
+            activo=False,
+        )
+        producto_eliminado = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Gomitas eliminadas",
+            codigo="GOM-DEL",
+            precio=Decimal("80.00"),
+            controla_inventario=True,
+            eliminado=True,
+        )
+        solo_destino = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Gomitas solo destino",
+            codigo="GOM-DST",
+            precio=Decimal("90.00"),
+            controla_inventario=True,
+        )
+
+        for indice, cantidad in enumerate((Decimal("2.00"), Decimal("3.00")), start=1):
+            lote = LoteInventario.objects.create(
+                empresa=self.empresa,
+                producto=gomitas_capilares,
+                numero_lote=f"GOM-CAP-L{indice}",
+            )
+            ExistenciaLoteBodega.objects.create(
+                empresa=self.empresa, bodega=origen, lote=lote, cantidad=cantidad
+            )
+        for producto, bodega, numero_lote in (
+            (gomitas_biotina, origen, "GOM-BIO-L1"),
+            (producto_eliminado, origen, "GOM-DEL-L1"),
+            (solo_destino, destino, "GOM-DST-L1"),
+        ):
+            lote = LoteInventario.objects.create(
+                empresa=self.empresa, producto=producto, numero_lote=numero_lote
+            )
+            ExistenciaLoteBodega.objects.create(
+                empresa=self.empresa, bodega=bodega, lote=lote, cantidad=Decimal("1.00")
+            )
+
+        otra_empresa = Empresa.objects.create(
+            nombre="Empresa ajena transferencia",
+            slug="empresa-ajena-transferencia",
+            rtn="08011999111112",
+        )
+        Producto.objects.create(
+            empresa=otra_empresa,
+            nombre="Gomitas Empresa Ajena",
+            codigo="GOM-AJENA",
+            precio=Decimal("99.00"),
+            controla_inventario=True,
+        )
+
+        response = self.client.get(
+            reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]),
+            {"bodega_origen": str(origen.id), "bodega_destino": str(destino.id)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        productos = response.context["productos_transferencia"]
+        self.assertEqual(
+            [item["producto"].id for item in productos],
+            [gomitas_biotina.id, gomitas_capilares.id],
+        )
+        capilares = next(item for item in productos if item["producto"].id == gomitas_capilares.id)
+        self.assertEqual(capilares["disponible"], Decimal("5.00"))
+        self.assertEqual(capilares["lotes"], 2)
+        self.assertEqual(len({item["producto"].id for item in productos}), len(productos))
+        self.assertContains(response, 'id="producto_busqueda"', html=False)
+        self.assertContains(response, 'data-codigo="GOM-CAP-01"', html=False)
+        self.assertContains(response, "normalize(searchable).includes(filter)", html=False)
+
     def test_transferencia_rapida_medical_spa_mueve_entre_cualquier_bodega_y_deja_trazabilidad(self):
         self.empresa.slug = "medical_spa"
         self.empresa.save(update_fields=["slug"])

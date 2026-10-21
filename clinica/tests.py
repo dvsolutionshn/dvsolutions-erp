@@ -784,6 +784,66 @@ class ClinicaPacienteTests(TestCase):
         self.assertEqual(paciente.whatsapp, "50498887777")
         self.assertEqual(paciente.correo, "nuevo@example.com")
 
+    def test_editar_nombre_de_paciente_creado_desde_enlace_completado(self):
+        paciente = Paciente.objects.create(
+            empresa=self.empresa,
+            expediente_codigo="MIA-EDIT-LINK",
+            primer_nombre="Nombre",
+            primer_apellido="Equivocado",
+            nombre="Nombre Equivocado",
+            identidad="0801199512345",
+            fecha_nacimiento="1995-08-12",
+            sexo="femenino",
+            estado_civil="soltero",
+            whatsapp="99990001",
+            telefono="99990001",
+        )
+        PreconsultaClinica.objects.create(
+            empresa=self.empresa,
+            paciente=paciente,
+            tipo="general",
+            token_hash="edicion-desde-enlace-completado",
+            token_preview="edicion...",
+            estado="completada",
+            fecha_expiracion=timezone.now() + timezone.timedelta(days=30),
+            fecha_completada=timezone.now(),
+            datos_generales={
+                "referido_por": "facebook",
+                "informante": "yo_mismo",
+                "formulario_general": {
+                    "motivo_categoria": ["no_aplica"],
+                    "procedimientos_interes": [],
+                    "procedimientos_interes_otros": "",
+                },
+            },
+        )
+        url = reverse("clinica_editar_paciente", args=[self.empresa.slug, paciente.id])
+
+        response = self.client.post(url, {
+            "nombres": "Nombre Correcto",
+            "apellidos": "Paciente",
+            "identidad": paciente.identidad,
+            "fecha_nacimiento": "1995-08-12",
+            "sexo": "femenino",
+            "estado_civil": "soltero",
+            "correo": "",
+            "telefono_codigo_area": "504",
+            "telefono": "99990001",
+            "direccion": "",
+            "lugar_nacimiento": "",
+            "ocupacion": "",
+            "lugar_trabajo": "",
+            "informante": "yo_mismo",
+            "contacto_emergencia_completo": "",
+            "referido_por": "facebook",
+            "motivo_categoria": ["no_aplica"],
+            "procedimientos_interes_otros": "",
+        })
+
+        self.assertRedirects(response, reverse("clinica_paciente_detalle", args=[self.empresa.slug, paciente.id]))
+        paciente.refresh_from_db()
+        self.assertEqual(paciente.nombre, "Nombre Correcto Paciente")
+
     def test_editar_paciente_libera_identidad_de_perfil_inactivo(self):
         identidad_anterior = "0801199413996"
         identidad_correcta = "0801199413997"

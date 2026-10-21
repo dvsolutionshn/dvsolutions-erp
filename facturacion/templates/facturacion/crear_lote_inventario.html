@@ -20,52 +20,65 @@
     <form method="post" class="erp-compact-grid three-col">
         {% csrf_token %}
         {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% if form.errors %}
+        <div class="erp-compact-meta" style="grid-column:1 / -1;" role="alert" id="resumen-errores-lote">
+            <strong>No se registró el lote. Revise los siguientes datos:</strong>
+            <ul class="erp-field-errors">
+                {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                {% for field in form %}
+                    {% for error in field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}</a>: {{ error }}</li>{% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
         <div class="erp-field">
             <label for="producto">Producto</label>
-            <select id="producto" name="producto" required>
-                <option value="">Seleccione producto</option>
-                {% for producto in productos %}
-                <option value="{{ producto.id }}" {% if valores.producto == producto.id|stringformat:"s" or producto_preseleccionado and producto.id == producto_preseleccionado.id %}selected{% endif %}>{{ producto.nombre }}{% if producto.codigo %} - {{ producto.codigo }}{% endif %}</option>
-                {% endfor %}
-            </select>
+            {{ form.producto }}
+            {% if form.producto.errors %}<ul class="erp-field-errors" id="producto_error">{% for error in form.producto.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-field">
             <label for="numero_lote">Numero de lote</label>
-            <input id="numero_lote" type="text" name="numero_lote" required value="{{ valores.numero_lote|default:'' }}" placeholder="Ejemplo: LOT-2026-001">
+            {{ form.numero_lote }}
+            {% if form.numero_lote.errors %}<ul class="erp-field-errors" id="numero_lote_error">{% for error in form.numero_lote.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-field">
             <label for="fecha_vencimiento">Fecha de vencimiento</label>
-            <input id="fecha_vencimiento" type="date" name="fecha_vencimiento" value="{{ valores.fecha_vencimiento|default:'' }}" {% if control_lotes_fefo %}required{% endif %}>
+            {% if form.fecha_vencimiento.errors %}
+            <input id="fecha_vencimiento" type="text" name="fecha_vencimiento" value="{{ form.fecha_vencimiento.value|default_if_none:'' }}" placeholder="dd/mm/aaaa" aria-invalid="true" aria-describedby="fecha_vencimiento_error">
+            {% else %}
+            {{ form.fecha_vencimiento }}
+            {% endif %}
+            {% if form.fecha_vencimiento.errors %}<ul class="erp-field-errors" id="fecha_vencimiento_error">{% for error in form.fecha_vencimiento.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-field">
             <label for="fecha_vencimiento_rapida">Vencimiento rapido</label>
-            <input id="fecha_vencimiento_rapida" type="text" name="fecha_vencimiento_rapida" value="{{ valores.fecha_vencimiento_rapida|default:'' }}" placeholder="Ejemplo: ago-27 o dic-26">
-            <div class="erp-field-help">Si no sabes el dia exacto, usa mes-anio; se guardara el ultimo dia del mes.</div>
+            {{ form.fecha_vencimiento_rapida }}
+            <div class="erp-field-help">La fecha de vencimiento es obligatoria. Puedes escribirla arriba o usar mes-anio (ago-27: ultimo dia del mes) o mes/dia/anio (junio/15/2031).</div>
+            {% if form.fecha_vencimiento_rapida.errors %}<ul class="erp-field-errors" id="fecha_vencimiento_rapida_error">{% for error in form.fecha_vencimiento_rapida.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-field">
             <label for="bodega">Bodega inicial</label>
-            <select id="bodega" name="bodega" required>
-                {% for bodega in bodegas %}
-                <option value="{{ bodega.id }}" {% if valores.bodega == bodega.id|stringformat:"s" or not valores.bodega and bodega.id == bodega_principal.id %}selected{% endif %}>{{ bodega.nombre }}</option>
-                {% endfor %}
-            </select>
+            {{ form.bodega }}
+            {% if form.bodega.errors %}<ul class="erp-field-errors" id="bodega_error">{% for error in form.bodega.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-field">
             <label for="cantidad">Cantidad</label>
-            <input id="cantidad" type="number" step="0.01" name="cantidad" required value="{{ valores.cantidad|default:'' }}" placeholder="0.00">
+            {% if form.cantidad.errors %}
+            <input id="cantidad" type="text" inputmode="decimal" name="cantidad" required value="{{ form.cantidad.value|default_if_none:'' }}" placeholder="0.00" aria-invalid="true" aria-describedby="cantidad_error">
+            {% else %}
+            {{ form.cantidad }}
+            {% endif %}
+            {% if form.cantidad.errors %}<ul class="erp-field-errors" id="cantidad_error">{% for error in form.cantidad.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-field">
             <label for="proveedor">Proveedor</label>
-            <select id="proveedor" name="proveedor">
-                <option value="">Sin proveedor</option>
-                {% for proveedor in proveedores %}
-                <option value="{{ proveedor.id }}" {% if valores.proveedor == proveedor.id|stringformat:"s" %}selected{% endif %}>{{ proveedor.nombre }}</option>
-                {% endfor %}
-            </select>
+            {{ form.proveedor }}
+            {% if form.proveedor.errors %}<ul class="erp-field-errors" id="proveedor_error">{% for error in form.proveedor.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-field" style="grid-column:1 / -1;">
             <label for="observacion">Observacion</label>
-            <input id="observacion" type="text" name="observacion" value="{{ valores.observacion|default:'' }}" placeholder="Ejemplo: ingreso inicial, factura de compra, revision sanitaria.">
+            {{ form.observacion }}
+            {% if form.observacion.errors %}<ul class="erp-field-errors" id="observacion_error">{% for error in form.observacion.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
         </div>
         <div class="erp-form-actions" style="grid-column:1 / -1;">
             <a class="erp-btn-secondary" href="{% url 'inventario_farmaceutico' empresa.slug %}">Cancelar</a>
