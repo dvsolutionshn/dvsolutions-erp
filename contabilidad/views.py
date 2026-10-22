@@ -48,6 +48,7 @@ from .catalogo_rumi_roles import usa_catalogo_rumi
 from .catalogo_consulta import ordenar_catalogo
 from .cierre import revisar_cierre_periodo
 from .comparacion_reportes import ErrorComparacionPeriodos, datos_comparacion_balance, datos_comparacion_resultados, formulario_comparacion
+from .consulta_mayor import bloques_mayor_consulta, resumen_mayor_general
 from .dashboard import datos_dashboard_contable
 from .listado_asientos import contexto_listado_asientos
 from .moneda import convertir_a_lempiras, distribuir_conversion
@@ -2292,13 +2293,14 @@ def mayor_cuenta(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     filtros = _filtros_reportes(request)
     filtros["cuenta"] = request.GET.get("cuenta") or ""
+    filtros["q"] = (request.GET.get("q") or "").strip()
     cuenta = get_object_or_404(CuentaContable, pk=filtros["cuenta"], empresa=empresa) if filtros["cuenta"] else None
     desde_estado_resultados = _mayor_desde_estado_resultados(request, cuenta)
-    bloques = datos_mayor(
-        empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta,
+    bloques = bloques_mayor_consulta(
+        empresa, filtros, cuenta=cuenta,
         excluir_cierres=desde_estado_resultados,
-    ) if cuenta else []
-    bloque = bloques[0] if bloques else {"movimientos": [], "debe": Decimal("0.00"), "haber": Decimal("0.00"), "saldo": Decimal("0.00"), "saldo_inicial": Decimal("0.00")}
+    )
+    bloque = bloques[0] if cuenta and bloques else {"movimientos": [], "debe": Decimal("0.00"), "haber": Decimal("0.00"), "saldo": Decimal("0.00"), "saldo_inicial": Decimal("0.00")}
     # La selección sólo puede apuntar a una línea ya incluida en este mayor.
     movimiento_solicitado = request.GET.get("movimiento") or ""
     movimiento_seleccionado = next((
@@ -2310,7 +2312,11 @@ def mayor_cuenta(request, empresa_slug):
         "cuentas": CuentaContable.objects.filter(empresa=empresa).order_by("codigo", "nombre"),
         "filtros": filtros, "movimiento_seleccionado": movimiento_seleccionado,
         "desde_estado_resultados": desde_estado_resultados,
-        "resumen": {"debe_total": bloque["debe"], "haber_total": bloque["haber"], "saldo": bloque["saldo"], "saldo_inicial": bloque["saldo_inicial"], "movimientos": len(bloque["movimientos"])},
+        "cuentas_mayor": bloques, "modo_general": cuenta is None,
+        "resumen": (
+            {"debe_total": bloque["debe"], "haber_total": bloque["haber"], "saldo": bloque["saldo"], "saldo_inicial": bloque["saldo_inicial"], "movimientos": len(bloque["movimientos"])}
+            if cuenta else resumen_mayor_general(bloques, vista_parcial=bool(filtros["q"]))
+        ),
     })
 
 
@@ -2318,22 +2324,28 @@ def mayor_cuenta(request, empresa_slug):
 def exportar_mayor_cuenta_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     filtros = _filtros_reportes(request)
+    filtros["q"] = (request.GET.get("q") or "").strip()
     cuenta_id = request.GET.get("cuenta") or ""
     cuenta = get_object_or_404(CuentaContable, pk=cuenta_id, empresa=empresa) if cuenta_id else None
     desde_estado_resultados = _mayor_desde_estado_resultados(request, cuenta)
-    bloques = datos_mayor(
-        empresa, filtros["fecha_inicio"], filtros["fecha_fin"], cuenta=cuenta,
+    bloques = bloques_mayor_consulta(
+        empresa, filtros, cuenta=cuenta,
         excluir_cierres=desde_estado_resultados,
-    ) if cuenta else []
-    workbook, sheet = _preparar_excel("Mayor por Cuenta · HNL")
+    )
+    workbook, sheet = _preparar_excel("Mayor por Cuenta · HNL" if cuenta else "Libro Mayor General · HNL")
     sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo natural"])
     _aplicar_encabezado(sheet, 3)
     _filas_excel_mayor(sheet, bloques, filtros["fecha_inicio"])
+    for fila in sheet.iter_rows(min_row=4, min_col=6, max_col=8):
+        for celda in fila:
+            if isinstance(celda.value, Decimal):
+                celda.number_format = '#,##0.00;[Red]-#,##0.00'
     if desde_estado_resultados:
         sheet.append(["Consulta desde Estado de Resultados", "Se omiten los asientos de cierre del período. El saldo final incluye la apertura anterior al período."])
     _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
-    return _respuesta_excel(workbook, f"Mayor_Cuenta_{empresa.slug}.xlsx")
+    nombre = "Mayor_Cuenta" if cuenta else "Libro_Mayor_General"
+    return _respuesta_excel(workbook, f"{nombre}_{empresa.slug}.xlsx")
 
 
 @login_required
@@ -2341,16 +2353,11 @@ def libro_mayor_general(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     filtros = _filtros_reportes(request)
     filtros["tipo"] = request.GET.get("tipo") or ""
-    bloques = datos_mayor(empresa, **filtros)
-    saldos_contables = [b["saldo"] if b["cuenta"].tipo in ("activo", "costo", "gasto") else -b["saldo"] for b in bloques]
+    filtros["q"] = (request.GET.get("q") or "").strip()
+    bloques = bloques_mayor_consulta(empresa, filtros)
     return _render_reporte(request, "contabilidad/libro_mayor_general.html", {
         "empresa": empresa, "cuentas_mayor": bloques, "tipos_cuenta": CuentaContable.TIPO_CHOICES, "filtros": filtros,
-        "resumen": {
-            "cuentas": len(bloques), "debe_total": sum((b["debe"] for b in bloques), Decimal("0.00")),
-            "haber_total": sum((b["haber"] for b in bloques), Decimal("0.00")),
-            "saldo_deudor_total": sum((max(saldo, Decimal("0.00")) for saldo in saldos_contables), Decimal("0.00")),
-            "saldo_acreedor_total": sum((max(-saldo, Decimal("0.00")) for saldo in saldos_contables), Decimal("0.00")),
-        },
+        "resumen": resumen_mayor_general(bloques, vista_parcial=bool(filtros["q"] or filtros["tipo"])),
     })
 
 
@@ -2359,11 +2366,16 @@ def exportar_libro_mayor_general_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     filtros = _filtros_reportes(request)
     filtros["tipo"] = request.GET.get("tipo") or ""
-    bloques = datos_mayor(empresa, **filtros)
+    filtros["q"] = (request.GET.get("q") or "").strip()
+    bloques = bloques_mayor_consulta(empresa, filtros)
     workbook, sheet = _preparar_excel("Libro Mayor General · HNL")
     sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo natural"])
     _aplicar_encabezado(sheet, 3)
     _filas_excel_mayor(sheet, bloques, filtros["fecha_inicio"])
+    for fila in sheet.iter_rows(min_row=4, min_col=6, max_col=8):
+        for celda in fila:
+            if isinstance(celda.value, Decimal):
+                celda.number_format = '#,##0.00;[Red]-#,##0.00'
     _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Libro_Mayor_General_{empresa.slug}.xlsx")
@@ -2381,18 +2393,42 @@ def balance_comprobacion(request, empresa_slug):
 
 @login_required
 def exportar_balance_comprobacion_excel(request, empresa_slug):
+    from copy import copy
+
     empresa = _empresa_desde_slug(empresa_slug)
     filtros = _filtros_reportes(request)
     filtros.update(tipo=request.GET.get("tipo") or "", incluir_ceros=request.GET.get("incluir_ceros") == "1")
     data = datos_balance_comprobacion(empresa, **filtros)
     workbook, sheet = _preparar_excel("Balance de Comprobación · HNL")
+    _advertencias_excel_reporte(sheet, empresa, filtros)
+    for fila in sheet.iter_rows(min_col=1, max_col=1):
+        if fila[0].value is not None:
+            fuente = copy(fila[0].font)
+            fuente.bold = True
+            fila[0].font = fuente
     sheet.append(["Cuenta", "Tipo", "Apertura deudora", "Apertura acreedora", "Debe del periodo", "Haber del periodo", "Saldo final deudor", "Saldo final acreedor"])
-    _aplicar_encabezado(sheet, 3)
+    fila_encabezado = sheet.max_row
+    _aplicar_encabezado(sheet, fila_encabezado)
+    sheet.freeze_panes = f"A{fila_encabezado + 1}"
+    agrupadoras = {
+        cuenta.pk for cuenta in ordenar_catalogo(CuentaContable.objects.filter(empresa=empresa))
+        if cuenta.tiene_subcuentas_catalogo
+    }
     for fila in data["filas"]:
         sheet.append([f"{fila['cuenta'].codigo} - {fila['cuenta'].nombre}", fila["cuenta"].get_tipo_display(), fila["apertura_deudora"], fila["apertura_acreedora"], fila["debe"], fila["haber"], fila["saldo_deudor"], fila["saldo_acreedor"]])
+        for celda in sheet[sheet.max_row]:
+            fuente = copy(celda.font)
+            fuente.bold = fila["cuenta"].pk in agrupadoras
+            celda.font = fuente
     resumen = data["resumen"]
     sheet.append(["Totales", "", resumen["apertura_deudora_total"], resumen["apertura_acreedora_total"], resumen["debe_total"], resumen["haber_total"], resumen["saldo_deudor_total"], resumen["saldo_acreedor_total"]])
-    _advertencias_excel_reporte(sheet, empresa, filtros)
+    for celda in sheet[sheet.max_row]:
+        fuente = copy(celda.font)
+        fuente.bold = True
+        celda.font = fuente
+    for fila in sheet.iter_rows(min_row=fila_encabezado + 1, min_col=3, max_col=8):
+        for celda in fila:
+            celda.number_format = '#,##0.00;[Red]-#,##0.00'
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Balance_Comprobacion_{empresa.slug}.xlsx")
 

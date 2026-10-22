@@ -56,8 +56,8 @@
 
 <section class="erp-grid">
     <article class="erp-card"><div class="erp-kpi-label">Cuentas</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total|floatformat:"2g" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total|floatformat:"2g" }}</p></article>
     <article class="erp-card">
         <div class="erp-kpi-label">Estado</div>
         <p class="erp-stat-value">{% if resumen.vista_parcial %}Vista parcial{% elif resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p>
@@ -91,12 +91,12 @@
                 <tr>
                     <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
                     <td>{{ fila.cuenta.get_tipo_display }}</td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_deudora }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_acreedora }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.debe }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.haber }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_deudor }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_acreedor }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_deudora|floatformat:"2g" }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_acreedora|floatformat:"2g" }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.debe|floatformat:"2g" }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.haber|floatformat:"2g" }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_deudor|floatformat:"2g" }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_acreedor|floatformat:"2g" }}</span></td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="8" class="erp-empty">No hay movimientos contabilizados con estos filtros.</td></tr>
@@ -105,12 +105,12 @@
             <tfoot>
                 <tr>
                     <th colspan="2">Totales</th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_deudora_total }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_acreedora_total }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.debe_total }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.haber_total }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_deudor_total }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_acreedor_total }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_deudora_total|floatformat:"2g" }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_acreedora_total|floatformat:"2g" }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.debe_total|floatformat:"2g" }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.haber_total|floatformat:"2g" }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_deudor_total|floatformat:"2g" }}</span></th>
+                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_acreedor_total|floatformat:"2g" }}</span></th>
                 </tr>
             </tfoot>
         </table>

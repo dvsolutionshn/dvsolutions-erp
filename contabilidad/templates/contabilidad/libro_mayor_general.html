@@ -19,10 +19,14 @@
     <div class="erp-toolbar">
         <div>
             <h3 class="erp-panel-title">Filtros</h3>
-            <p class="erp-card-muted">Refina el libro mayor general por periodo o tipo de cuenta.</p>
+            <p class="erp-card-muted">Busca por código o nombre y refina el libro mayor general por período o tipo de cuenta.</p>
         </div>
     </div>
     <form method="get" class="erp-filters">
+        <div class="erp-filter-field">
+            <label for="q">Buscar cuenta por código o nombre</label>
+            <input type="search" id="q" name="q" value="{{ filtros.q }}" placeholder="Código o nombre de cuenta" autocomplete="off">
+        </div>
         <div class="erp-filter-field">
             <label for="fecha_inicio">Desde</label>
             <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
@@ -48,11 +52,11 @@
 </section>
 
 <section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Cuentas con saldo o movimiento</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Saldos deudores al cierre</div><p class="erp-stat-value">L. {{ resumen.saldo_deudor_total }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Saldos acreedores al cierre</div><p class="erp-stat-value">L. {{ resumen.saldo_acreedor_total }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Cuentas con movimiento</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total|floatformat:"2g" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total|floatformat:"2g" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldos deudores al cierre</div><p class="erp-stat-value">L. {{ resumen.saldo_deudor_total|floatformat:"2g" }}</p></article>
+    <article class="erp-card"><div class="erp-kpi-label">Saldos acreedores al cierre</div><p class="erp-stat-value">L. {{ resumen.saldo_acreedor_total|floatformat:"2g" }}</p></article>
 </section>
 
 {% for bloque in cuentas_mayor %}
@@ -63,10 +67,10 @@
             <h3 class="erp-panel-title">{{ bloque.cuenta.codigo }} - {{ bloque.cuenta.nombre }}</h3>
         </div>
         <div class="erp-inline-kpis">
-            <span class="erp-badge">Apertura L. {{ bloque.saldo_inicial }}</span>
-            <span class="erp-badge">Debe L. {{ bloque.debe }}</span>
-            <span class="erp-badge">Haber L. {{ bloque.haber }}</span>
-            <span class="erp-badge success">Saldo L. {{ bloque.saldo }}</span>
+            <span class="erp-badge">Apertura L. {{ bloque.saldo_inicial|floatformat:"2g" }}</span>
+            <span class="erp-badge">Debe L. {{ bloque.debe|floatformat:"2g" }}</span>
+            <span class="erp-badge">Haber L. {{ bloque.haber|floatformat:"2g" }}</span>
+            <span class="erp-badge success">Saldo L. {{ bloque.saldo|floatformat:"2g" }}</span>
         </div>
     </div>
     <div class="erp-table-wrap">
@@ -83,16 +87,16 @@
                 </tr>
             </thead>
             <tbody>
-                {% if filtros.fecha_inicio %}<tr><td colspan="6">Saldo inicial anterior al período</td><td class="amount"><span class="erp-money">L. {{ bloque.saldo_inicial }}</span></td></tr>{% endif %}
+                {% if filtros.fecha_inicio %}<tr><td colspan="6">Saldo inicial anterior al período</td><td class="amount"><span class="erp-money">L. {{ bloque.saldo_inicial|floatformat:"2g" }}</span></td></tr>{% endif %}
                 {% for movimiento in bloque.movimientos %}
                 <tr>
                     <td>{{ movimiento.linea.asiento.fecha|date:"d/m/Y" }}</td>
                     <td><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.linea.asiento.id %}">{{ movimiento.linea.asiento.numero|default:"Sin numero" }}</a></td>
                     <td>{{ movimiento.linea.detalle|default:movimiento.linea.asiento.descripcion }}</td>
                     <td>{{ movimiento.linea.asiento.referencia|default:"-" }}</td>
-                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.debe }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.haber }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ movimiento.saldo }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.debe|floatformat:"2g" }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.linea.haber|floatformat:"2g" }}</span></td>
+                    <td class="amount"><span class="erp-money">L. {{ movimiento.saldo|floatformat:"2g" }}</span></td>
                 </tr>
                 {% endfor %}
             </tbody>

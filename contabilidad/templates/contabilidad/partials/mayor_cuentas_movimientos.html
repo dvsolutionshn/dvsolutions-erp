@@ -1,0 +1,38 @@
+<section class="ef-kpis mc-kpis" aria-label="Resumen del Mayor general">
+    <article class="ef-kpi" data-tone="slate"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><span class="ef-kpi-label">Cuentas con movimiento</span></div><p class="ef-kpi-value">{{ resumen.cuentas }}</p><div class="ef-kpi-foot"><span>Dentro del período consultado</span></div></article>
+    <article class="ef-kpi" data-tone="teal"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}</span><span class="ef-kpi-label">Débitos del período</span></div><p class="ef-kpi-value">L. {{ resumen.debe_total|floatformat:"2g" }}</p><div class="ef-kpi-foot"><span>Total del Debe{% if resumen.vista_parcial %} · Vista filtrada{% endif %}</span></div></article>
+    <article class="ef-kpi" data-tone="amber"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}</span><span class="ef-kpi-label">Créditos del período</span></div><p class="ef-kpi-value">L. {{ resumen.haber_total|floatformat:"2g" }}</p><div class="ef-kpi-foot"><span>Total del Haber{% if resumen.vista_parcial %} · Vista filtrada{% endif %}</span></div></article>
+    <article class="ef-kpi mc-kpi-final" data-tone="indigo"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><span class="ef-kpi-label">Movimientos</span></div><p class="ef-kpi-value">{{ resumen.movimientos }}</p><div class="ef-kpi-foot"><span>Partidas contabilizadas de esta empresa</span></div></article>
+</section>
+
+<div class="mc-general-heading"><div><h2>Cuentas y movimientos</h2><p>{% if filtros.q %}Coincidencias para «{{ filtros.q }}».{% else %}Se muestran todas las cuentas con movimientos contabilizados en el período.{% endif %} Cada cuenta conserva su apertura y saldo natural.</p></div><a class="ef-btn ef-btn--quiet" href="#mc-filtros">Cambiar búsqueda o período</a></div>
+
+{% for bloque in cuentas_mayor %}
+<article id="mc-cuenta-{{ bloque.cuenta.pk }}" class="ef-section mc-movements mc-general-account" aria-labelledby="mc-cuenta-{{ bloque.cuenta.pk }}-title">
+    <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><div><p class="mc-account-eyebrow">{{ bloque.cuenta.codigo }} · {{ bloque.cuenta.get_tipo_display }}</p><h2 id="mc-cuenta-{{ bloque.cuenta.pk }}-title">{{ bloque.cuenta.nombre }}</h2><p>{% if bloque.cuenta.tipo == "activo" or bloque.cuenta.tipo == "costo" or bloque.cuenta.tipo == "gasto" %}Naturaleza deudora{% else %}Naturaleza acreedora{% endif %}{% if not bloque.cuenta.activa %} · Cuenta inactiva con historia{% endif %}</p></div></div><span class="mc-movement-count">{{ bloque.movimientos|length }} movimiento{{ bloque.movimientos|length|pluralize:"s" }}</span></div>
+    <div class="mc-account-totals" aria-label="Saldos de {{ bloque.cuenta.codigo }} {{ bloque.cuenta.nombre }}"><span>Apertura <strong>L. {{ bloque.saldo_inicial|floatformat:"2g" }}</strong></span><span>Debe <strong>L. {{ bloque.debe|floatformat:"2g" }}</strong></span><span>Haber <strong>L. {{ bloque.haber|floatformat:"2g" }}</strong></span><span>Saldo final <strong>L. {{ bloque.saldo|floatformat:"2g" }}</strong></span></div>
+    <div class="erp-table-wrap">
+        <table class="erp-table mc-table">
+            <caption class="mc-table-caption">{{ bloque.cuenta.codigo }} — {{ bloque.cuenta.nombre }} · Importes en HNL</caption>
+            <thead><tr><th scope="col">Fecha</th><th scope="col">Asiento</th><th scope="col">Concepto</th><th scope="col">Referencia</th><th scope="col" class="mc-amount">Débito</th><th scope="col" class="mc-amount">Crédito</th><th scope="col" class="mc-amount">Saldo</th></tr></thead>
+            <tbody>
+                {% if filtros.fecha_inicio %}<tr class="mc-opening-row"><td colspan="6">Saldo inicial anterior al período</td><td class="mc-amount"><span class="erp-money">L. {{ bloque.saldo_inicial|floatformat:"2g" }}</span></td></tr>{% endif %}
+                {% for movimiento in bloque.movimientos %}
+                <tr id="movimiento-{{ movimiento.linea.pk }}" class="mayor-movimiento">
+                    <td class="mc-date">{{ movimiento.linea.asiento.fecha|date:"d/m/Y" }}</td>
+                    <td class="mc-entry"><a class="erp-link" href="{% url 'ver_asiento_contable' empresa.slug movimiento.linea.asiento.id %}">{{ movimiento.linea.asiento.numero|default:"Sin número" }}</a></td>
+                    <td class="mc-detail">{{ movimiento.linea.detalle|default:movimiento.linea.asiento.descripcion }}</td>
+                    <td class="mc-reference">{{ movimiento.linea.asiento.referencia|default:"—" }}</td>
+                    <td class="mc-amount"><span class="erp-money">L. {{ movimiento.linea.debe|floatformat:"2g" }}</span></td>
+                    <td class="mc-amount"><span class="erp-money">L. {{ movimiento.linea.haber|floatformat:"2g" }}</span></td>
+                    <td class="mc-amount mc-running-balance"><span class="erp-money">L. {{ movimiento.saldo|floatformat:"2g" }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot><tr class="mc-closing-row"><th colspan="4" scope="row">Totales del período / saldo final</th><td class="mc-amount"><span class="erp-money">L. {{ bloque.debe|floatformat:"2g" }}</span></td><td class="mc-amount"><span class="erp-money">L. {{ bloque.haber|floatformat:"2g" }}</span></td><td class="mc-amount"><span class="erp-money">L. {{ bloque.saldo|floatformat:"2g" }}</span></td></tr></tfoot>
+        </table>
+    </div>
+</article>
+{% empty %}
+<section class="ef-section"><div class="mc-empty"><span class="mc-empty-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}</span><h3 class="mc-empty-title">No hay cuentas con movimiento</h3><p class="mc-empty-note">{% if filtros.q %}No hay coincidencias con «{{ filtros.q }}» dentro del período seleccionado.{% else %}No hay movimientos contabilizados para estas fechas.{% endif %}</p><a class="ef-btn" href="#mc-filtros">Revisar búsqueda y fechas {% include "contabilidad/partials/dashboard_icon.html" with icon="arrow" only %}</a></div></section>
+{% endfor %}

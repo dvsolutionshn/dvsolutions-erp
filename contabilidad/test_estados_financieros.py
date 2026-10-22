@@ -143,7 +143,7 @@ class EstadosFinancierosTests(TestCase):
         self.assertEqual(next(fila[7] for fila in filas if fila[3] == "Saldo inicial anterior al periodo"), 100)
         self.assertEqual(next(fila[7] for fila in filas if fila[3] == "Operación de prueba"), 75)
 
-    def test_mayor_conserva_cuenta_inactiva_y_apertura_sin_movimiento(self):
+    def test_mayor_conserva_apertura_individual_y_general_oculta_cuentas_sin_movimiento(self):
         self.asiento(date(2026, 1, 5), [(self.inventario, 100, 0), (self.proveedores, 0, 100)])
         self.inventario.activa = False
         self.inventario.save(update_fields=["activa"])
@@ -152,8 +152,12 @@ class EstadosFinancierosTests(TestCase):
         self.assertEqual(bloque["saldo"], Decimal("100.00"))
         self.assertEqual(bloque["movimientos"], [])
         response = self.client.get(reverse("libro_mayor_general", args=[self.empresa.slug]), {"fecha_inicio": "2026-02-01", "fecha_fin": "2026-02-28"})
-        self.assertContains(response, "Inventario")
-        self.assertContains(response, "Saldo inicial anterior")
+        self.assertEqual(response.context["cuentas_mayor"], [])
+        individual = self.client.get(reverse("mayor_cuenta", args=[self.empresa.slug]), {
+            "cuenta": self.inventario.pk, "fecha_inicio": "2026-02-01", "fecha_fin": "2026-02-28",
+        })
+        self.assertContains(individual, "Inventario")
+        self.assertEqual(individual.context["resumen"]["saldo_inicial"], Decimal("100.00"))
 
     def test_comprobacion_incluye_apertura_y_movimiento_conciliados(self):
         self.asiento(date(2026, 1, 5), [(self.caja, 100, 0), (self.capital, 0, 100)])

@@ -5,6 +5,7 @@
 .mc-report .mc-filter-heading { flex: 1 1 100%; }
 .mc-report .mc-filters { display: grid; flex: 1 1 100%; gap: 14px; grid-template-columns: minmax(230px, 1fr) minmax(145px, .37fr) minmax(145px, .37fr) auto; width: 100%; }
 .mc-report .mc-filters .ef-field { min-width: 0; }
+.mc-report .mc-search-field { grid-column: 1 / -1; }
 .mc-report .mc-filters .ef-filter-actions { align-self: end; flex-wrap: nowrap; }
 .mc-report .mc-account-field select { background: #fff; border: 1px solid #dce5ee; border-radius: 8px; box-shadow: none; color: #354b63; font: inherit; font-size: 12px; line-height: 1.5; min-height: 42px; min-width: 0; padding: 9px 31px 9px 11px; text-overflow: ellipsis; width: 100%; }
 .mc-report .mc-account-field select:focus { border-color: #8c87dc; box-shadow: 0 0 0 3px #6461ce12; }
@@ -69,6 +70,15 @@
 .mc-report .mc-empty-note { color: #8795a8; font-size: 12px; line-height: 1.8; max-width: 450px; }
 .mc-report .mc-empty .ef-btn { margin-top: 5px; }
 .mc-report .mc-footer-note { color: #8695a8; font-size: 10px; line-height: 1.8; }
+.mc-report .mc-general-heading { align-items: center; display: flex; flex-wrap: wrap; gap: 12px 20px; justify-content: space-between; }
+.mc-report .mc-general-heading > div { flex: 1 1 400px; }
+.mc-report .mc-general-heading h2 { color: #344c66; font-size: 16px; font-weight: 650; line-height: 1.6; }
+.mc-report .mc-general-heading p { color: #7a8b9f; font-size: 11px; line-height: 1.8; margin-top: 4px; }
+.mc-report .mc-general-account .mc-account-eyebrow { color: #7a8b9f; font-size: 9px; letter-spacing: .07em; margin: 0 0 4px; }
+.mc-report .mc-account-totals { background: #fafbfd; border-top: 1px solid #edf1f6; display: grid; gap: 10px 18px; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 13px 23px; }
+.mc-report .mc-account-totals > span { color: #7d8ca0; font-size: 10px; line-height: 1.6; }
+.mc-report .mc-account-totals strong { color: #526b84; display: block; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
+.mc-report .mc-account-totals > span:last-child strong { color: #625b9e; }
 
 @media (max-width: 1100px) {
     .mc-report .mc-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -87,6 +97,7 @@
     .mc-report .mc-movements .ef-section-head { align-items: flex-start; gap: 12px; }
     .mc-report .mc-table-actions { gap: 6px 10px; padding: 0 17px 15px; }
     .mc-report .mc-empty { padding: 35px 20px; }
+    .mc-report .mc-account-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 13px 17px; }
 }
 
 @media (max-width: 520px) {
@@ -97,6 +108,7 @@
     .mc-report .mc-kpis .ef-kpi-value { font-size: 25px; }
     .mc-report .mc-table-actions { width: 100%; }
     .mc-report .mc-movement-count { font-size: 9px; }
+    .mc-report .mc-general-heading .ef-btn { padding-left: 0; }
 }
 
 @media print {
@@ -132,4 +144,11 @@
     .mc-report .mc-table .mayor-seleccion-etiqueta { background: #fff; border: 1px solid #ddd; color: #444; font-size: 7px; }
     .mc-report .mc-table .mc-opening-row > td,
     .mc-report .mc-table .mc-closing-row > :is(td, th) { background: #fff; }
+    .mc-report .mc-general-heading { break-after: avoid; display: block; }
+    .mc-report .mc-general-heading h2 { color: #222; font-size: 13px; }
+    .mc-report .mc-general-heading p { color: #444; font-size: 9px; }
+    .mc-report .mc-general-account .ef-section-head { break-inside: avoid; }
+    .mc-report .mc-account-totals { background: #fff; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 8px 12px; }
+    .mc-report .mc-account-totals > span { color: #444; font-size: 8px; }
+    .mc-report .mc-account-totals strong { color: #222; font-size: 9px; }
 }
