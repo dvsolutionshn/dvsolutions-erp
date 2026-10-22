@@ -1,0 +1,131 @@
+/* Presentación de la Balanza; los filtros y los importes vienen del reporte actual. */
+.accounting-balanza-page .erp-topbar-actions { flex-wrap: wrap; }
+.bc-report .bc-filter-card { align-items: flex-start; gap: 18px; }
+.bc-report .bc-filter-card .ef-filter-heading { flex: 1 1 100%; }
+.bc-report .bc-filters { display: grid; flex: 1 1 100%; gap: 14px; grid-template-columns: minmax(135px, 1fr) minmax(135px, 1fr) minmax(155px, 1.1fr) minmax(175px, 1.2fr) auto; width: 100%; }
+.bc-report .bc-filters .ef-field { min-width: 0; }
+.bc-report .bc-filters .ef-filter-actions { align-self: end; flex-wrap: nowrap; }
+.bc-report .bc-filters select { background: #fff; border: 1px solid #dce5ee; border-radius: 8px; box-shadow: none; color: #354b63; font: inherit; font-size: 12px; line-height: 1.5; min-height: 42px; min-width: 0; padding: 9px 31px 9px 11px; width: 100%; }
+.bc-report .bc-filters select:focus { border-color: #8c87dc; box-shadow: 0 0 0 3px #6461ce12; }
+.bc-report .bc-filters select:focus-visible { outline: 3px solid #a6a3e6; outline-offset: 4px; }
+.bc-report .bc-kpis .ef-kpi-value { font-size: clamp(20px, 1.8vw, 28px); line-height: 1.35; }
+.bc-report .bc-kpi-credit { background: #f7f6fd; border-color: #e4e0f5; }
+.bc-report .bc-kpi-credit .ef-kpi-value { color: #5c5697; }
+.bc-report .bc-kpi-status .ef-kpi-value { color: var(--ef-tone); font-size: clamp(20px, 1.8vw, 27px); }
+.bc-report .bc-review-note { align-items: center; background: #edf7f3; border: 1px solid #d8ebe3; border-radius: 10px; color: #5d7e73; display: flex; flex-wrap: wrap; gap: 10px 12px; padding: 13px 17px; }
+.bc-report .bc-review-icon { color: #478674; display: inline-flex; flex-shrink: 0; }
+.bc-report .bc-review-icon .ac-icon { height: 17px; width: 17px; }
+.bc-report .bc-review-note p { flex: 1 1 360px; font-size: 11px; line-height: 1.8; }
+.bc-report .bc-review-note a { color: #3e7c69; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.bc-report .bc-review-note a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.bc-report .bc-review-note[data-state="partial"] { background: #fff7e9; border-color: #eee0c7; color: #8a7658; }
+.bc-report .bc-review-note[data-state="partial"] :is(.bc-review-icon, a) { color: #957234; }
+.bc-report .bc-review-note[data-state="warning"] { background: #fff1f2; border-color: #efdade; color: #986975; }
+.bc-report .bc-review-note[data-state="warning"] :is(.bc-review-icon, a) { color: #a95b70; }
+.bc-report .bc-balances .ef-section-head { flex-wrap: wrap; gap: 12px; }
+.bc-report .bc-table-unit { color: #8391a4; font-size: 10px; white-space: nowrap; }
+.bc-report .bc-table-guide { align-items: center; color: #8795a8; display: flex; flex-wrap: wrap; font-size: 10px; gap: 8px 16px; justify-content: space-between; line-height: 1.7; padding: 0 23px 17px; }
+.bc-report .bc-table-guide > span { align-items: center; display: inline-flex; gap: 6px; white-space: nowrap; }
+.bc-report .bc-table-guide > span > span { color: #8c84bf; font-size: 16px; }
+.bc-report .bc-table-scroll { max-width: 100%; min-width: 0; overscroll-behavior-inline: contain; scrollbar-color: #c6c7db #f2f4f8; scrollbar-width: thin; }
+.bc-report .bc-table-scroll:focus-visible { outline: 3px solid #aaa3e4; outline-offset: -3px; }
+.bc-report .bc-table { border-collapse: separate; border-spacing: 0; min-width: 1275px; table-layout: auto; width: 100%; }
+.bc-report .bc-account-col { width: 290px; }
+.bc-report .bc-type-col { width: 115px; }
+.bc-report .bc-amount-col { width: 145px; }
+.bc-report .bc-table thead th { background: #f8fafc; border-bottom: 1px solid #e6ecf3; color: #7a8ba0; font-size: 10px; font-weight: 600; padding: 12px 18px; text-align: left; }
+.bc-report .bc-table thead .bc-group { font-size: 10px; letter-spacing: .03em; padding: 13px 18px 10px; text-align: center; }
+.bc-report .bc-table thead .bc-group--opening { background: #f6f8fb; color: #778ba1; }
+.bc-report .bc-table thead .bc-group--period { background: #edf7f4; color: #568475; }
+.bc-report .bc-table thead .bc-group--closing { background: #f2f0fc; color: #7c72a4; }
+.bc-report .bc-table .bc-column-head th { font-size: 9px; font-weight: 500; padding-top: 9px; padding-bottom: 10px; }
+.bc-report .bc-table .bc-column-head .bc-opening { background: #fafbfd; }
+.bc-report .bc-table .bc-column-head .bc-period { background: #f6fbf9; }
+.bc-report .bc-table .bc-column-head .bc-closing { background: #f8f7fd; }
+.bc-report .bc-table tbody :is(td, th) { border-bottom: 1px solid #edf1f6; color: #50667e; font-size: 11px; font-weight: 400; line-height: 1.75; padding: 14px 18px; vertical-align: middle; }
+.bc-report .bc-table .bc-account { background: #fff; border-right: 1px solid #e6ecf3; left: 0; min-width: 255px; position: sticky; text-align: left; width: 290px; z-index: 1; }
+.bc-report .bc-table thead .bc-account { background: #f8fafc; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; z-index: 2; }
+.bc-report .bc-account-code { color: #8a98aa; display: block; font-size: 9px; font-variant-numeric: tabular-nums; line-height: 1.6; margin-bottom: 3px; white-space: nowrap; }
+.bc-report .bc-account-name { color: #425c77; display: block; font-size: 11px; font-weight: 500; line-height: 1.65; max-width: 295px; overflow-wrap: anywhere; }
+.bc-report .bc-table .bc-type { min-width: 115px; }
+.bc-report .bc-type-badge { background: #f2f5f9; border: 1px solid #e5ebf1; border-radius: 6px; color: #78899d; display: inline-block; font-size: 9px; line-height: 1.6; padding: 4px 7px; white-space: nowrap; }
+.bc-report .bc-type-badge[data-type="activo"] { background: #edf7f3; border-color: #deeee6; color: #668a7d; }
+.bc-report .bc-type-badge[data-type="pasivo"] { background: #fff6e9; border-color: #f1e5cf; color: #9c845c; }
+.bc-report .bc-type-badge[data-type="patrimonio"] { background: #f3f0fb; border-color: #e7e1f4; color: #8a7ea8; }
+.bc-report .bc-table .bc-amount { font-variant-numeric: tabular-nums; min-width: 145px; text-align: right; white-space: nowrap; }
+.bc-report .bc-table .erp-money { font-size: inherit; font-weight: 400; }
+.bc-report .bc-table tbody .bc-closing { color: #5d5b85; }
+.bc-report .bc-table tbody .bc-period { color: #416c63; }
+.bc-report .bc-table tbody tr:hover > :is(td, th) { background: #f8f9fc; }
+.bc-report .bc-table tfoot :is(th, td) { background: #f4f5fb; border-top: 1px solid #dfe5ef; color: #405a77; font-size: 11px; font-weight: 700; padding: 16px 18px; }
+.bc-report .bc-table tfoot .erp-money { font-weight: 700; }
+.bc-report .bc-table tfoot .bc-total-label { background: #f4f5fb; min-width: 0; }
+.bc-report .bc-table tfoot .bc-closing { background: #efedf9; color: #5a548a; }
+.bc-report .bc-empty { align-items: center; display: flex; flex-direction: column; gap: 10px; padding: 28px 20px; text-align: center; }
+.bc-report .bc-empty-icon { align-items: center; background: #f3f0fc; border-radius: 13px; color: #978cbf; display: flex; height: 44px; justify-content: center; margin-bottom: 3px; width: 44px; }
+.bc-report .bc-empty-icon .ac-icon { height: 23px; width: 23px; }
+.bc-report .bc-empty h3 { color: #5b6e84; font-size: 13px; font-weight: 600; }
+.bc-report .bc-empty p { color: #8a98aa; font-size: 11px; line-height: 1.8; max-width: 420px; white-space: normal; }
+.bc-report .bc-empty .ef-btn { margin-top: 4px; }
+.bc-report .bc-footer-note { color: #8a98aa; font-size: 10px; line-height: 1.8; }
+.bc-report .bc-sr-only { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; white-space: nowrap; width: 1px; }
+@media (max-width: 1200px) {
+    .bc-report .bc-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bc-report .bc-filters .ef-filter-actions { grid-column: 1 / -1; }
+}
+@media (max-width: 720px) {
+    .bc-report .bc-table-guide { padding: 0 17px 15px; }
+    .bc-report .bc-table .bc-account { min-width: 220px; width: 220px; }
+    .bc-report .bc-account-col { width: 220px; }
+    .bc-report .bc-account-name { max-width: 245px; }
+    .bc-report .bc-review-note { padding: 12px 15px; }
+    .bc-report .bc-review-note p { flex-basis: calc(100% - 32px); }
+    .bc-report .bc-review-note a { padding-left: 29px; }
+}
+@media (max-width: 520px) {
+    .bc-report .bc-filters { grid-template-columns: minmax(0, 1fr); }
+    .bc-report .bc-filters .ef-field { grid-column: auto; }
+    .bc-report .bc-filters select { font-size: 14px; }
+    .bc-report .bc-filters .ef-filter-actions .ef-btn--primary { flex: 1; }
+    .bc-report .bc-kpis .ef-kpi-value { font-size: 25px; }
+    .bc-report .bc-table .bc-account { min-width: 190px; width: 190px; }
+    .bc-report .bc-account-col { width: 190px; }
+    .bc-report .bc-account-name { max-width: 210px; }
+}
+@media print {
+    .accounting-balanza-page { page: balanza-comprobacion; }
+    .accounting-balanza-page :is(.erp-main, .erp-content, .ef-report) { display: block; height: auto; min-height: 0; }
+    .accounting-balanza-page .erp-topbar,
+    .bc-report .bc-filter-card,
+    .bc-report .bc-review-note a,
+    .bc-report .bc-table-guide > span { display: none !important; }
+    .bc-report > :not(:last-child) { margin-bottom: 12px; }
+    .bc-report .bc-kpis { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .bc-report .bc-kpis .ef-kpi-value { font-size: 16px; }
+    .bc-report .bc-kpis .ef-kpi-foot { font-size: 7px; }
+    .bc-report .bc-review-note { background: #fff; border-color: #d8dee8; break-inside: avoid; padding: 8px 10px; }
+    .bc-report .bc-review-note p { color: #444; font-size: 8px; }
+    .bc-report .bc-balances .ef-section-head { break-inside: avoid; break-after: avoid; padding: 12px; }
+    .bc-report .bc-table-unit { display: block; font-size: 8px; }
+    .bc-report .bc-table-guide { font-size: 8px; padding: 0 12px 9px; }
+    .bc-report .bc-table-scroll { overflow: visible !important; }
+    .bc-report .bc-table { min-width: 0 !important; table-layout: fixed; width: 100%; }
+    .bc-report .bc-table .bc-account-col { width: 23%; }
+    .bc-report .bc-table .bc-type-col { width: 9%; }
+    .bc-report .bc-table .bc-amount-col { width: 11.33%; }
+    .bc-report .bc-table .bc-account { border-right-color: #d8dee8; left: auto; min-width: 0; position: static; width: auto; }
+    .bc-report .bc-table .bc-type { min-width: 0; }
+    .bc-report .bc-table .bc-amount { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+    .bc-report .bc-table thead { display: table-header-group; }
+    .bc-report .bc-table tfoot { display: table-row-group; }
+    .bc-report .bc-table tr { break-inside: avoid; }
+    .bc-report .bc-table :is(th, td),
+    .bc-report .bc-table thead .bc-group,
+    .bc-report .bc-table .bc-column-head th,
+    .bc-report .bc-table tfoot :is(th, td) { color: #333; font-size: 8px; padding: 7px 5px; }
+    .bc-report .bc-table .bc-account-code { color: #555; font-size: 7px; }
+    .bc-report .bc-table .bc-account-name { color: #333; font-size: 8px; max-width: none; }
+    .bc-report .bc-type-badge { background: #fff; border-color: #ddd; color: #555; font-size: 7px; padding: 2px 4px; white-space: normal; }
+    .bc-report .bc-footer-note { color: #555; font-size: 8px; }
+}
+@page balanza-comprobacion { size: A4 landscape; margin: 10mm; }

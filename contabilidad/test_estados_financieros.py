@@ -117,9 +117,10 @@ class EstadosFinancierosTests(TestCase):
         excel = self.client.get(reverse("exportar_estado_resultados_excel", args=[self.empresa.slug]), filtros)
         self.assertEqual(excel.status_code, 200)
         hoja = load_workbook(BytesIO(excel.content), data_only=True).active
-        self.assertEqual([celda.value for celda in hoja[3]], ["Código", "Cuenta", "Saldo"])
+        encabezado = next(fila[0].row for fila in hoja if [celda.value for celda in fila] == ["Código", "Cuenta", "Saldo"])
+        self.assertEqual([celda.value for celda in hoja[encabezado]], ["Código", "Cuenta", "Saldo"])
         codigos = (principal.codigo, self.ventas.codigo, otra_venta.codigo)
-        filas = [fila for fila in hoja.iter_rows(min_row=4) if fila[0].value in codigos]
+        filas = [fila for fila in hoja.iter_rows(min_row=encabezado + 1) if fila[0].value in codigos]
         self.assertEqual([fila[0].value for fila in filas], list(codigos))
         self.assertEqual([fila[2].value for fila in filas], [150000, 100000, 50000])
         self.assertEqual([fila[1].alignment.indent for fila in filas], [0, 1, 1])

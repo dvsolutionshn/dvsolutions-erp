@@ -1,119 +1,77 @@
 {% extends "core/erp_base.html" %}
+{% load static %}
 
-{% block title %}Balance de Comprobacion - {{ empresa.nombre }}{% endblock %}
-{% block header_kicker %}Reportes Contables{% endblock %}
-{% block header_title %}Balance de Comprobacion{% endblock %}
-{% block header_description %}Valida el movimiento acumulado por cuenta contable y confirma que el debe y haber permanecen balanceados.{% endblock %}
-
-{% block topbar_actions %}
-<a href="{% url 'reportes_contables' empresa.slug %}" class="erp-action-link">Volver a Reportes</a>
-<a href="{% url 'libro_diario' empresa.slug %}" class="erp-action-link">Libro Diario</a>
-<a href="{% url 'mayor_cuenta' empresa.slug %}" class="erp-action-link">Mayor por Cuenta</a>
-<a href="{% url 'exportar_balance_comprobacion_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="erp-action-link">Descargar Excel</a>
-<button type="button" onclick="window.print()" class="erp-action-link erp-print-button">Imprimir</button>
-{% endblock %}
+{% block title %}Balanza de comprobación · {{ empresa.nombre }}{% endblock %}
+{% block body_class %}{{ block.super }} accounting-reports-page accounting-balanza-page{% endblock %}
+{% block header_kicker %}Centro financiero{% endblock %}
+{% block header_title %}Contabilidad{% endblock %}
+{% block header_description %}Revisa la apertura, los movimientos y los saldos de esta empresa.{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'contabilidad/estados_financieros.css' %}"><link rel="stylesheet" href="{% static 'contabilidad/balance_comprobacion.css' %}?v=20261021-balanza-ui">{% endblock %}
+{% block topbar_actions %}<a href="{% url 'reportes_contables' empresa.slug %}" class="ef-btn">Volver a reportes</a><a href="{% url 'libro_diario' empresa.slug %}" class="ef-btn">Libro diario</a><a href="{% url 'mayor_cuenta' empresa.slug %}" class="ef-btn">Mayor por cuenta</a>{% endblock %}
 
 {% block content %}
-{% include "contabilidad/nota_moneda_reportes.html" %}
-<section class="erp-card erp-report-filter-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Filtros</h3>
-            <p class="erp-card-muted">Consulta el balance por periodo y tipo de cuenta.</p>
+<div class="ef-report bc-report">
+    {% include "contabilidad/partials/dashboard_icons.html" %}
+    <header class="ef-hero">
+        <div class="ef-hero-main"><span class="ef-hero-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}</span><div><p class="ef-eyebrow">Reportes contables</p><h1>Balanza de comprobación</h1><p class="ef-hero-description">Apertura, movimiento y cierre, con cada cuenta en su lugar.</p></div></div>
+        <div class="ef-hero-actions" aria-label="Acciones de la Balanza de comprobación">
+            <a href="{% url 'exportar_balance_comprobacion_excel' empresa.slug %}?{{ request.GET.urlencode }}" class="ef-btn">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}Descargar Excel</a>
+            <button type="button" onclick="window.print()" class="ef-btn erp-print-button">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}Imprimir</button>
         </div>
-    </div>
-    <form method="get" class="erp-filters">
-        <div class="erp-filter-field">
-            <label for="fecha_inicio">Desde</label>
-            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
-        </div>
-        <div class="erp-filter-field">
-            <label for="fecha_fin">Hasta</label>
-            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}">
-        </div>
-        <div class="erp-filter-field">
-            <label for="tipo">Tipo de cuenta</label>
-            <select id="tipo" name="tipo">
-                <option value="">Todos los tipos</option>
-                {% for value, label in tipos_cuenta %}
-                <option value="{{ value }}" {% if filtros.tipo == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="erp-filter-field">
-            <label for="incluir_ceros">Cuentas sin movimiento</label>
-            <select id="incluir_ceros" name="incluir_ceros">
-                <option value="">Ocultar sin movimiento</option>
-                <option value="1" {% if filtros.incluir_ceros %}selected{% endif %}>Mostrar todas</option>
-            </select>
-        </div>
-        <div class="erp-filter-actions">
-            <button type="submit" class="erp-btn">Filtrar</button>
-            <a href="{% url 'balance_comprobacion' empresa.slug %}" class="erp-btn-secondary">Limpiar</a>
-        </div>
-    </form>
-</section>
+        {% include "contabilidad/partials/metadatos_estado_financiero.html" with empresa=empresa filtros=filtros modo="balanza" only %}
+    </header>
 
-<section class="erp-grid">
-    <article class="erp-card"><div class="erp-kpi-label">Cuentas</div><p class="erp-stat-value">{{ resumen.cuentas }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Debe total</div><p class="erp-stat-value">L. {{ resumen.debe_total|floatformat:"2g" }}</p></article>
-    <article class="erp-card"><div class="erp-kpi-label">Haber total</div><p class="erp-stat-value">L. {{ resumen.haber_total|floatformat:"2g" }}</p></article>
-    <article class="erp-card">
-        <div class="erp-kpi-label">Estado</div>
-        <p class="erp-stat-value">{% if resumen.vista_parcial %}Vista parcial{% elif resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p>
-        <p class="erp-card-muted">{% if resumen.vista_parcial %}Selecciona todos los tipos para comprobar la ecuación completa.{% elif resumen.cuadrado %}Debe, haber y saldos finales coinciden.{% else %}Hay diferencias en movimientos o saldos finales.{% endif %}</p>
+    <section id="bc-filtros" class="ef-filter-bar bc-filter-card" aria-labelledby="bc-filter-title">
+        <div class="ef-filter-heading"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="calendar" only %}</span><div><h2 id="bc-filter-title">Período y cuentas</h2><p>Elige las fechas y el alcance que necesitas revisar.</p></div></div>
+        <form method="get" class="ef-filters bc-filters" aria-label="Filtrar Balanza de comprobación por período y tipo de cuenta">
+            <div class="ef-field"><label for="fecha_inicio">Desde</label><input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ filtros.fecha_inicio }}"></div>
+            <div class="ef-field"><label for="fecha_fin">Hasta</label><input type="date" id="fecha_fin" name="fecha_fin" value="{{ filtros.fecha_fin }}"></div>
+            <div class="ef-field"><label for="tipo">Tipo de cuenta</label><select id="tipo" name="tipo"><option value="">Todos los tipos</option>{% for value, label in tipos_cuenta %}<option value="{{ value }}" {% if filtros.tipo == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+            <div class="ef-field"><label for="incluir_ceros">Cuentas sin movimiento</label><select id="incluir_ceros" name="incluir_ceros"><option value="">Ocultar sin movimiento</option><option value="1" {% if filtros.incluir_ceros %}selected{% endif %}>Mostrar todas</option></select></div>
+            <div class="ef-filter-actions"><button type="submit" class="ef-btn ef-btn--primary">Filtrar</button><a href="{% url 'balance_comprobacion' empresa.slug %}" class="ef-btn ef-btn--quiet">Limpiar</a></div>
+        </form>
+    </section>
+
+    <div class="ef-currency"><span class="ef-currency-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="lock" only %}</span>{% include "contabilidad/nota_moneda_reportes.html" %}</div>
+
+    <section class="ef-kpis bc-kpis" aria-label="Resumen de la Balanza de comprobación">
+        <article class="ef-kpi" data-tone="slate"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="book" only %}</span><span class="ef-kpi-label">Cuentas consultadas</span></div><p class="ef-kpi-value">{{ resumen.cuentas }}</p><div class="ef-kpi-foot"><span>Según los filtros seleccionados</span></div></article>
+        <article class="ef-kpi" data-tone="teal"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="arrow-up" only %}</span><span class="ef-kpi-label">Debe total</span></div><p class="ef-kpi-value">L. {{ resumen.debe_total|floatformat:"2g" }}</p><div class="ef-kpi-foot"><span>Débitos del período</span></div></article>
+        <article class="ef-kpi bc-kpi-credit" data-tone="indigo"><div class="ef-kpi-top"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="receipt" only %}</span><span class="ef-kpi-label">Haber total</span></div><p class="ef-kpi-value">L. {{ resumen.haber_total|floatformat:"2g" }}</p><div class="ef-kpi-foot"><span>Créditos del período</span></div></article>
+        <article class="ef-kpi bc-kpi-status" data-tone="{% if resumen.vista_parcial %}amber{% elif resumen.cuadrado %}teal{% else %}danger{% endif %}"><div class="ef-kpi-top"><span class="ef-icon-tile">{% if resumen.vista_parcial %}{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}{% elif resumen.cuadrado %}{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}{% else %}{% include "contabilidad/partials/dashboard_icon.html" with icon="clock" only %}{% endif %}</span><span class="ef-kpi-label">Estado de la balanza</span></div><p class="ef-kpi-value">{% if resumen.vista_parcial %}Vista parcial{% elif resumen.cuadrado %}Cuadrado{% else %}Revisar{% endif %}</p><div class="ef-kpi-foot"><span>{% if resumen.vista_parcial %}Consulta por tipo de cuenta{% elif resumen.cuadrado %}Movimientos y saldos coinciden{% else %}Hay diferencias por revisar{% endif %}</span></div></article>
+    </section>
+
+    <div class="bc-review-note" data-state="{% if resumen.vista_parcial %}partial{% elif resumen.cuadrado %}balanced{% else %}warning{% endif %}" role="status"><span class="bc-review-icon">{% if resumen.vista_parcial %}{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}{% elif resumen.cuadrado %}{% include "contabilidad/partials/dashboard_icon.html" with icon="check" only %}{% else %}{% include "contabilidad/partials/dashboard_icon.html" with icon="clock" only %}{% endif %}</span><p>{% if resumen.vista_parcial %}Selecciona todos los tipos para comprobar la ecuación completa.{% elif resumen.cuadrado %}Debe, haber y saldos finales coinciden en esta consulta.{% else %}Hay diferencias en movimientos o saldos finales. Revisa las partidas del período.{% endif %}</p><a href="#bc-saldos">Ver saldos <span aria-hidden="true">↓</span></a></div>
+
+    <article id="bc-saldos" class="ef-section bc-balances" aria-labelledby="bc-balances-title">
+        <div class="ef-section-head"><div class="ef-section-title"><span class="ef-icon-tile">{% include "contabilidad/partials/dashboard_icon.html" with icon="entry" only %}</span><div><h2 id="bc-balances-title">Saldos por cuenta</h2><p>De la apertura anterior al período a los saldos del cierre.</p></div></div><span class="bc-table-unit">HNL · Lempiras</span></div>
+        <div class="bc-table-guide"><p>Incluye cuentas inactivas con historia. Cada importe conserva su columna de origen.</p><span><span aria-hidden="true">↔</span> Desliza para ver todas las columnas</span></div>
+        <div class="erp-table-wrap bc-table-scroll" role="region" aria-label="Saldos por cuenta con desplazamiento horizontal" tabindex="0">
+            <table class="erp-table bc-table">
+                <caption class="bc-sr-only">Balanza de comprobación de {{ empresa.nombre }} · Apertura, movimientos y saldos finales en lempiras</caption>
+                <colgroup><col class="bc-account-col"><col class="bc-type-col"><col span="6" class="bc-amount-col"></colgroup>
+                <thead>
+                    <tr class="bc-group-head"><th rowspan="2" scope="col" class="bc-account">Cuenta</th><th rowspan="2" scope="col" class="bc-type">Tipo</th><th colspan="2" scope="colgroup" class="bc-group bc-group--opening">Apertura</th><th colspan="2" scope="colgroup" class="bc-group bc-group--period">Movimiento del período</th><th colspan="2" scope="colgroup" class="bc-group bc-group--closing">Saldo final</th></tr>
+                    <tr class="bc-column-head"><th scope="col" class="bc-amount bc-opening">Deudora</th><th scope="col" class="bc-amount bc-opening">Acreedora</th><th scope="col" class="bc-amount bc-period">Debe</th><th scope="col" class="bc-amount bc-period">Haber</th><th scope="col" class="bc-amount bc-closing">Deudor</th><th scope="col" class="bc-amount bc-closing">Acreedor</th></tr>
+                </thead>
+                <tbody>
+                    {% for fila in filas %}
+                    <tr>
+                        <th scope="row" class="bc-account"><span class="bc-account-code">{{ fila.cuenta.codigo }}</span><span class="bc-account-name">{{ fila.cuenta.nombre }}</span></th>
+                        <td class="bc-type"><span class="bc-type-badge" data-type="{{ fila.cuenta.tipo }}">{{ fila.cuenta.get_tipo_display }}</span></td>
+                        <td class="bc-amount bc-opening"><span class="erp-money">L. {{ fila.apertura_deudora|floatformat:"2g" }}</span></td>
+                        <td class="bc-amount bc-opening"><span class="erp-money">L. {{ fila.apertura_acreedora|floatformat:"2g" }}</span></td>
+                        <td class="bc-amount bc-period"><span class="erp-money">L. {{ fila.debe|floatformat:"2g" }}</span></td>
+                        <td class="bc-amount bc-period"><span class="erp-money">L. {{ fila.haber|floatformat:"2g" }}</span></td>
+                        <td class="bc-amount bc-closing"><span class="erp-money">L. {{ fila.saldo_deudor|floatformat:"2g" }}</span></td>
+                        <td class="bc-amount bc-closing"><span class="erp-money">L. {{ fila.saldo_acreedor|floatformat:"2g" }}</span></td>
+                    </tr>
+                    {% empty %}<tr><td colspan="8"><div class="bc-empty"><span class="bc-empty-icon">{% include "contabilidad/partials/dashboard_icon.html" with icon="search" only %}</span><h3>No hay movimientos con estos filtros</h3><p>Ajusta el período o el tipo de cuenta para consultar la balanza de {{ empresa.nombre }}.</p><a href="#bc-filtros" class="ef-btn">Revisar filtros</a></div></td></tr>{% endfor %}
+                </tbody>
+                <tfoot><tr><th scope="row" class="bc-account bc-total-label">Totales</th><td class="bc-type" aria-hidden="true"></td><td class="bc-amount bc-opening"><span class="erp-money">L. {{ resumen.apertura_deudora_total|floatformat:"2g" }}</span></td><td class="bc-amount bc-opening"><span class="erp-money">L. {{ resumen.apertura_acreedora_total|floatformat:"2g" }}</span></td><td class="bc-amount bc-period"><span class="erp-money">L. {{ resumen.debe_total|floatformat:"2g" }}</span></td><td class="bc-amount bc-period"><span class="erp-money">L. {{ resumen.haber_total|floatformat:"2g" }}</span></td><td class="bc-amount bc-closing"><span class="erp-money">L. {{ resumen.saldo_deudor_total|floatformat:"2g" }}</span></td><td class="bc-amount bc-closing"><span class="erp-money">L. {{ resumen.saldo_acreedor_total|floatformat:"2g" }}</span></td></tr></tfoot>
+            </table>
+        </div>
     </article>
-</section>
-
-<section class="erp-card erp-table-card">
-    <div class="erp-toolbar">
-        <div>
-            <h3 class="erp-panel-title">Saldos por cuenta</h3>
-            <p class="erp-card-muted">Incluye la apertura anterior a «Desde», el movimiento del período y los saldos al cierre, también de cuentas inactivas con historia.</p>
-        </div>
-    </div>
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead>
-                <tr>
-                    <th>Cuenta</th>
-                    <th>Tipo</th>
-                    <th>Apertura deudora</th>
-                    <th>Apertura acreedora</th>
-                    <th>Debe del período</th>
-                    <th>Haber del período</th>
-                    <th>Saldo final deudor</th>
-                    <th>Saldo final acreedor</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for fila in filas %}
-                <tr>
-                    <td>{{ fila.cuenta.codigo }} - {{ fila.cuenta.nombre }}</td>
-                    <td>{{ fila.cuenta.get_tipo_display }}</td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_deudora|floatformat:"2g" }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.apertura_acreedora|floatformat:"2g" }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.debe|floatformat:"2g" }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.haber|floatformat:"2g" }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_deudor|floatformat:"2g" }}</span></td>
-                    <td class="amount"><span class="erp-money">L. {{ fila.saldo_acreedor|floatformat:"2g" }}</span></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="8" class="erp-empty">No hay movimientos contabilizados con estos filtros.</td></tr>
-                {% endfor %}
-            </tbody>
-            <tfoot>
-                <tr>
-                    <th colspan="2">Totales</th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_deudora_total|floatformat:"2g" }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.apertura_acreedora_total|floatformat:"2g" }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.debe_total|floatformat:"2g" }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.haber_total|floatformat:"2g" }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_deudor_total|floatformat:"2g" }}</span></th>
-                    <th class="amount"><span class="erp-money">L. {{ resumen.saldo_acreedor_total|floatformat:"2g" }}</span></th>
-                </tr>
-            </tfoot>
-        </table>
-    </div>
-</section>
+    <p class="bc-footer-note">Solo asientos contabilizados de {{ empresa.nombre }}. La apertura corresponde a fechas anteriores a «Desde» y el saldo final incluye los movimientos del período.</p>
+</div>
 {% endblock %}

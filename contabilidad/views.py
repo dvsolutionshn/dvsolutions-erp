@@ -126,14 +126,15 @@ def _detalle_cierre_periodo(empresa, periodo):
     return revisar_cierre_periodo(empresa, periodo)
 
 
-def _preparar_excel(titulo):
+def _preparar_excel(titulo, empresa=None, filtros=None):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = titulo[:31]
-    sheet.freeze_panes = "A3"
     sheet.append([titulo])
     sheet["A1"].font = Font(bold=True, size=14, color="0F2742")
     sheet.append([])
+    if empresa is not None:
+        _advertencias_excel_reporte(sheet, empresa, filtros or {})
     return workbook, sheet
 
 
@@ -143,6 +144,8 @@ def _aplicar_encabezado(sheet, fila):
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = fill
         cell.alignment = Alignment(horizontal="center")
+    if sheet.freeze_panes is None:
+        sheet.freeze_panes = f"A{fila + 1}"
 
 
 def _respuesta_excel(workbook, nombre_archivo):
@@ -2002,10 +2005,10 @@ def exportar_reporte_impuestos_excel(request, empresa_slug):
         request.GET.get("fecha_inicio") or "",
         request.GET.get("fecha_fin") or "",
     )
-    workbook, sheet = _preparar_excel("Reporte de Impuestos")
+    workbook, sheet = _preparar_excel("Reporte de Impuestos", empresa, data["filtros"])
 
     sheet.append(["Resumen", "Documentos", "Base 15%", "ISV 15%", "Base 18%", "ISV 18%", "Exento", "Exonerado", "ISV total", "Total"])
-    _aplicar_encabezado(sheet, 3)
+    _aplicar_encabezado(sheet, sheet.max_row)
     sheet.append(["Facturas emitidas", data["ventas"]["documentos"], data["ventas"]["base_15"], data["ventas"]["isv_15"], data["ventas"]["base_18"], data["ventas"]["isv_18"], data["ventas"]["base_exento"], data["ventas"]["base_exonerado"], data["ventas"]["impuesto"], data["ventas"]["total"]])
     sheet.append(["Notas de credito", data["creditos"]["documentos"], data["creditos"]["base_15"], data["creditos"]["isv_15"], data["creditos"]["base_18"], data["creditos"]["isv_18"], data["creditos"]["base_exento"], data["creditos"]["base_exonerado"], data["creditos"]["impuesto"], data["creditos"]["total"]])
     sheet.append(["Neto fiscal", "", data["neto"]["base_15"], data["neto"]["isv_15"], data["neto"]["base_18"], data["neto"]["isv_18"], data["neto"]["base_exento"], data["neto"]["base_exonerado"], data["neto"]["impuesto"], data["neto"]["total"]])
@@ -2068,7 +2071,6 @@ def exportar_reporte_impuestos_excel(request, empresa_slug):
             compra.impuesto_total,
             compra.total,
         ])
-    _advertencias_excel_reporte(sheet, empresa, data["filtros"])
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Reporte_Impuestos_{empresa.slug}.xlsx")
 
@@ -2134,9 +2136,9 @@ def exportar_auditoria_contable_excel(request, empresa_slug):
         "usuario": request.GET.get("usuario") or "",
     }
     asientos = _auditoria_asientos_queryset(empresa, filtros)
-    workbook, sheet = _preparar_excel("Auditoría Contable · HNL")
+    workbook, sheet = _preparar_excel("Auditoría Contable · HNL", empresa, filtros)
     sheet.append(["Fecha", "Número", "Estado", "Origen", "Documento", "Evento", "Referencia", "Usuario", "Debe HNL", "Haber HNL", "Creado", "Moneda origen", "Tipo de cambio a HNL", "Conversión verificada"])
-    _aplicar_encabezado(sheet, 3)
+    _aplicar_encabezado(sheet, sheet.max_row)
     for asiento in asientos:
         sheet.append([
             asiento.fecha,
@@ -2214,9 +2216,11 @@ def exportar_libro_diario_excel(request, empresa_slug):
     if cuenta_id:
         lineas = lineas.filter(cuenta_id=cuenta_id)
 
-    workbook, sheet = _preparar_excel("Libro Diario · HNL")
+    workbook, sheet = _preparar_excel(
+        "Libro Diario · HNL", empresa, {"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin},
+    )
     sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber"])
-    _aplicar_encabezado(sheet, 3)
+    _aplicar_encabezado(sheet, sheet.max_row)
     for linea in lineas:
         sheet.append([
             linea.asiento.fecha,
@@ -2227,7 +2231,6 @@ def exportar_libro_diario_excel(request, empresa_slug):
             linea.debe,
             linea.haber,
         ])
-    _advertencias_excel_reporte(sheet, empresa, {"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin})
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Libro_Diario_{empresa.slug}.xlsx")
 
@@ -2255,14 +2258,19 @@ def _render_reporte(request, plantilla, datos):
 def _advertencias_excel_reporte(sheet, empresa, filtros):
     sheet.append([])
     sheet.append(["Empresa", empresa.nombre])
+    sheet.cell(sheet.max_row, 1).font = Font(bold=True)
     sheet.append(["Moneda funcional", "Lempiras (HNL)"])
+    sheet.cell(sheet.max_row, 1).font = Font(bold=True)
     if filtros.get("fecha_inicio"):
         sheet.append(["Desde", filtros["fecha_inicio"]])
+        sheet.cell(sheet.max_row, 1).font = Font(bold=True)
     if filtros.get("fecha_fin") or filtros.get("fecha_corte"):
         sheet.append(["Hasta", filtros.get("fecha_fin") or filtros["fecha_corte"]])
+        sheet.cell(sheet.max_row, 1).font = Font(bold=True)
     pendientes = _conversiones_pendientes_reporte(empresa, filtros)
     if pendientes:
         sheet.append(["Conversión histórica pendiente", f"{pendientes} asientos en dólares requieren revisión en un período abierto; se conservan los importes registrados."])
+        sheet.cell(sheet.max_row, 1).font = Font(bold=True)
 
 
 def _filas_excel_mayor(sheet, bloques, fecha_inicio):
@@ -2332,17 +2340,19 @@ def exportar_mayor_cuenta_excel(request, empresa_slug):
         empresa, filtros, cuenta=cuenta,
         excluir_cierres=desde_estado_resultados,
     )
-    workbook, sheet = _preparar_excel("Mayor por Cuenta · HNL" if cuenta else "Libro Mayor General · HNL")
+    workbook, sheet = _preparar_excel(
+        "Mayor por Cuenta · HNL" if cuenta else "Libro Mayor General · HNL", empresa, filtros,
+    )
     sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo natural"])
-    _aplicar_encabezado(sheet, 3)
+    fila_encabezado = sheet.max_row
+    _aplicar_encabezado(sheet, fila_encabezado)
     _filas_excel_mayor(sheet, bloques, filtros["fecha_inicio"])
-    for fila in sheet.iter_rows(min_row=4, min_col=6, max_col=8):
+    for fila in sheet.iter_rows(min_row=fila_encabezado + 1, min_col=6, max_col=8):
         for celda in fila:
             if isinstance(celda.value, Decimal):
                 celda.number_format = '#,##0.00;[Red]-#,##0.00'
     if desde_estado_resultados:
         sheet.append(["Consulta desde Estado de Resultados", "Se omiten los asientos de cierre del período. El saldo final incluye la apertura anterior al período."])
-    _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
     nombre = "Mayor_Cuenta" if cuenta else "Libro_Mayor_General"
     return _respuesta_excel(workbook, f"{nombre}_{empresa.slug}.xlsx")
@@ -2368,15 +2378,15 @@ def exportar_libro_mayor_general_excel(request, empresa_slug):
     filtros["tipo"] = request.GET.get("tipo") or ""
     filtros["q"] = (request.GET.get("q") or "").strip()
     bloques = bloques_mayor_consulta(empresa, filtros)
-    workbook, sheet = _preparar_excel("Libro Mayor General · HNL")
+    workbook, sheet = _preparar_excel("Libro Mayor General · HNL", empresa, filtros)
     sheet.append(["Fecha", "Asiento", "Cuenta", "Detalle", "Referencia", "Debe", "Haber", "Saldo natural"])
-    _aplicar_encabezado(sheet, 3)
+    fila_encabezado = sheet.max_row
+    _aplicar_encabezado(sheet, fila_encabezado)
     _filas_excel_mayor(sheet, bloques, filtros["fecha_inicio"])
-    for fila in sheet.iter_rows(min_row=4, min_col=6, max_col=8):
+    for fila in sheet.iter_rows(min_row=fila_encabezado + 1, min_col=6, max_col=8):
         for celda in fila:
             if isinstance(celda.value, Decimal):
                 celda.number_format = '#,##0.00;[Red]-#,##0.00'
-    _advertencias_excel_reporte(sheet, empresa, filtros)
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Libro_Mayor_General_{empresa.slug}.xlsx")
 
@@ -2399,17 +2409,10 @@ def exportar_balance_comprobacion_excel(request, empresa_slug):
     filtros = _filtros_reportes(request)
     filtros.update(tipo=request.GET.get("tipo") or "", incluir_ceros=request.GET.get("incluir_ceros") == "1")
     data = datos_balance_comprobacion(empresa, **filtros)
-    workbook, sheet = _preparar_excel("Balance de Comprobación · HNL")
-    _advertencias_excel_reporte(sheet, empresa, filtros)
-    for fila in sheet.iter_rows(min_col=1, max_col=1):
-        if fila[0].value is not None:
-            fuente = copy(fila[0].font)
-            fuente.bold = True
-            fila[0].font = fuente
+    workbook, sheet = _preparar_excel("Balance de Comprobación · HNL", empresa, filtros)
     sheet.append(["Cuenta", "Tipo", "Apertura deudora", "Apertura acreedora", "Debe del periodo", "Haber del periodo", "Saldo final deudor", "Saldo final acreedor"])
     fila_encabezado = sheet.max_row
     _aplicar_encabezado(sheet, fila_encabezado)
-    sheet.freeze_panes = f"A{fila_encabezado + 1}"
     agrupadoras = {
         cuenta.pk for cuenta in ordenar_catalogo(CuentaContable.objects.filter(empresa=empresa))
         if cuenta.tiene_subcuentas_catalogo
@@ -2471,14 +2474,15 @@ def _datos_estado_financiero(request, empresa, modo, *, exportacion=False):
 
 def _exportar_comparacion_excel(empresa, comparacion, modo):
     titulo = "Balance General" if modo == "balance" else "Estado de Resultados"
-    workbook, sheet = _preparar_excel(f"{titulo} · Comparativo HNL")
+    workbook, sheet = _preparar_excel(f"{titulo} · Comparativo HNL", empresa, comparacion["filtros"])
     sheet["A2"] = f"{comparacion['etiqueta_inicio']} → {comparacion['etiqueta_fin']}"
     sheet.append(["Código", "Cuenta", *[
         columna["etiqueta"] if columna["es_acumulado"] else f"{columna['etiqueta']} {columna['anio']}"
         for columna in comparacion["columnas"]
     ]])
-    _aplicar_encabezado(sheet, 3)
-    sheet.freeze_panes = "C4"
+    fila_encabezado = sheet.max_row
+    _aplicar_encabezado(sheet, fila_encabezado)
+    sheet.freeze_panes = f"C{fila_encabezado + 1}"
     for grupo in comparacion["grupos"]:
         sheet.append([grupo["titulo"]])
         sheet.cell(sheet.max_row, 1).font = Font(bold=True)
@@ -2496,7 +2500,7 @@ def _exportar_comparacion_excel(empresa, comparacion, modo):
         sheet.append(["", fila["etiqueta"], *fila["saldos"]])
         for celda in sheet[sheet.max_row]:
             celda.font = Font(bold=True)
-    for fila in sheet.iter_rows(min_row=4, min_col=3):
+    for fila in sheet.iter_rows(min_row=fila_encabezado + 1, min_col=3):
         for celda in fila:
             if isinstance(celda.value, Decimal):
                 celda.number_format = '#,##0.00;[Red]-#,##0.00'
@@ -2506,7 +2510,6 @@ def _exportar_comparacion_excel(empresa, comparacion, modo):
         if modo == "balance" else "Cada mes muestra sus movimientos; Acumulado corresponde al rango completo."
     ])
     sheet.append(["Las cuentas principales acumulan sus subcuentas; los totales cuentan cada movimiento una sola vez."])
-    _advertencias_excel_reporte(sheet, empresa, comparacion["filtros"])
     _autoajustar_columnas(sheet)
     sheet.column_dimensions["A"].width = 18
     sheet.column_dimensions["B"].width = 48
@@ -2515,7 +2518,7 @@ def _exportar_comparacion_excel(empresa, comparacion, modo):
     sheet.page_setup.paperSize = sheet.PAPERSIZE_A3
     sheet.page_setup.fitToWidth = 1
     sheet.page_setup.fitToHeight = 0
-    sheet.print_title_rows = "1:3"
+    sheet.print_title_rows = f"1:{fila_encabezado}"
     sheet.print_options.horizontalCentered = True
     sheet.print_area = sheet.dimensions
     nombre = "Balance_General" if modo == "balance" else "Estado_Resultados"
@@ -2543,9 +2546,9 @@ def exportar_estado_resultados_excel(request, empresa_slug):
         return HttpResponseBadRequest(str(error))
     if data["comparacion"]:
         return _exportar_comparacion_excel(empresa, data["comparacion"], "resultados")
-    workbook, sheet = _preparar_excel("Estado de Resultados · HNL")
+    workbook, sheet = _preparar_excel("Estado de Resultados · HNL", empresa, data["filtros"])
     sheet.append(["Código", "Cuenta", "Saldo"])
-    _aplicar_encabezado(sheet, 3)
+    _aplicar_encabezado(sheet, sheet.max_row)
     for grupo, titulo in (("ingresos", "Ingresos"), ("costos", "Costos"), ("gastos", "Gastos")):
         _agregar_seccion_estado_financiero_excel(sheet, titulo, data[f"{grupo}_jerarquia"])
     sheet.append([])
@@ -2554,7 +2557,6 @@ def exportar_estado_resultados_excel(request, empresa_slug):
     for celda in sheet["C"]:
         if isinstance(celda.value, Decimal):
             celda.number_format = '#,##0.00;[Red]-#,##0.00'
-    _advertencias_excel_reporte(sheet, empresa, _filtros_reportes(request))
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Estado_Resultados_{empresa.slug}.xlsx")
 
@@ -2575,9 +2577,9 @@ def exportar_balance_general_excel(request, empresa_slug):
         return HttpResponseBadRequest(str(error))
     if data["comparacion"]:
         return _exportar_comparacion_excel(empresa, data["comparacion"], "balance")
-    workbook, sheet = _preparar_excel("Balance General · HNL")
+    workbook, sheet = _preparar_excel("Balance General · HNL", empresa, data["filtros"])
     sheet.append(["Código", "Cuenta", "Saldo"])
-    _aplicar_encabezado(sheet, 3)
+    _aplicar_encabezado(sheet, sheet.max_row)
     for grupo, titulo in (("activos", "Activos"), ("pasivos", "Pasivos"), ("patrimonio", "Patrimonio")):
         _agregar_seccion_estado_financiero_excel(sheet, titulo, data[f"{grupo}_jerarquia"])
     resumen = data["resumen"]
@@ -2589,7 +2591,6 @@ def exportar_balance_general_excel(request, empresa_slug):
         if isinstance(celda.value, Decimal):
             celda.number_format = '#,##0.00;[Red]-#,##0.00'
     sheet.append(["Las cuentas principales acumulan sus subcuentas; los totales generales cuentan cada movimiento una sola vez."])
-    _advertencias_excel_reporte(sheet, empresa, {"fecha_corte": request.GET.get("fecha_corte") or ""})
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Balance_General_{empresa.slug}.xlsx")
 
@@ -2607,9 +2608,9 @@ def estado_flujo_efectivo(request, empresa_slug):
 def exportar_estado_flujo_efectivo_excel(request, empresa_slug):
     empresa = _empresa_desde_slug(empresa_slug)
     data = datos_flujo_efectivo(empresa, **_filtros_reportes(request))
-    workbook, sheet = _preparar_excel("Flujo de Efectivo · HNL")
+    workbook, sheet = _preparar_excel("Flujo de Efectivo · HNL", empresa, _filtros_reportes(request))
     sheet.append(["Actividad", "Fecha", "Asiento", "Cuenta de efectivo", "Detalle", "Entrada", "Salida", "Neto"])
-    _aplicar_encabezado(sheet, 3)
+    _aplicar_encabezado(sheet, sheet.max_row)
     etiquetas = {"operacion": "Actividades de operación", "inversion": "Actividades de inversión", "financiamiento": "Actividades de financiamiento"}
     for clave, grupo in data["flujo"].items():
         for movimiento in grupo["movimientos"]:
@@ -2622,7 +2623,6 @@ def exportar_estado_flujo_efectivo_excel(request, empresa_slug):
         sheet.append([etiqueta, "", "", "", "", "", "", data["resumen"][clave]])
     if data["resumen"]["cuentas_financieras_incompatibles"]:
         sheet.append(["Cuentas financieras por revisar", data["resumen"]["cuentas_financieras_incompatibles"], "Su tipo financiero y cuenta contable no coinciden; se conservan los saldos de bancos configurados."])
-    _advertencias_excel_reporte(sheet, empresa, _filtros_reportes(request))
     _autoajustar_columnas(sheet)
     return _respuesta_excel(workbook, f"Flujo_Efectivo_{empresa.slug}.xlsx")
 
