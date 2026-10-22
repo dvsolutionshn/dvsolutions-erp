@@ -160,15 +160,15 @@
 <body>
     <main class="card">
         <div class="brand">
-            <img src="{% static 'core/images/dv-solutions-oficial.png' %}" alt="DV Solutions">
+            <img src="{% static 'core/img/web/dv-mark-96.png' %}" alt="DV Solutions">
             <div>
                 <strong>DV Solutions</strong>
                 <span>Crecimiento y agilidad en la nube</span>
             </div>
         </div>
 
-        <h1>Acceso al ERP y plataformas de clientes</h1>
-        <p>Si ya eres cliente, escribe el slug privado de tu empresa para entrar a tu acceso operativo. Si eres parte del equipo DV Solutions, puedes usar el control maestro.</p>
+        <h1>Acceso para clientes</h1>
+        <p>Si ya eres cliente, escribe el enlace privado de tu empresa para entrar a tu sistema.</p>
 
         {% if messages %}
             {% for message in messages %}
@@ -179,19 +179,18 @@
         <form method="post" class="form">
             {% csrf_token %}
             <div>
-                <label for="id_slug">Slug o enlace privado de empresa</label>
+                <label for="id_slug">Enlace privado de tu empresa</label>
                 <input id="id_slug" type="text" name="slug" placeholder="Ejemplo: digital-planning" required>
             </div>
             <div class="actions">
                 <button type="submit" class="btn btn-primary">Entrar a mi empresa</button>
-                <a href="{{ control_login_url }}" class="btn btn-secondary">Control maestro</a>
                 <a href="{% url 'public_home' %}#contacto" class="btn btn-secondary">Solicitar demo</a>
             </div>
         </form>
 
         <div class="tips">
-            <strong>Quieres probar el sistema?</strong>
-            <p>Puedes solicitar una prueba comercial guiada de 7 dias desde la web publica. Asi evaluamos tu operacion, definimos el enfoque correcto y te presentamos una propuesta mas seria.</p>
+            <strong>¿Quieres probar el sistema?</strong>
+            <p>Solicita una prueba guiada de 7 días desde nuestra web. Así evaluamos tu operación y te presentamos una propuesta a la medida.</p>
         </div>
     </main>
 </body>

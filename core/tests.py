@@ -59,6 +59,21 @@ class SuperAdminControlTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "DV Solutions")
         self.assertContains(response, "Solicitar propuesta o demo")
+        self.assertContains(response, 'name="description"')
+        self.assertContains(response, 'property="og:image"')
+        self.assertContains(response, "Onix")
+        self.assertContains(response, "Gestión clínica")
+        self.assertContains(response, "application/ld+json")
+
+    def test_public_robots_y_sitemap(self):
+        robots = self.client.get("/robots.txt")
+        self.assertEqual(robots.status_code, 200)
+        self.assertIn("Sitemap:", robots.content.decode())
+        sitemap = self.client.get("/sitemap.xml")
+        self.assertEqual(sitemap.status_code, 200)
+        self.assertIn("/demo/facturacion/", sitemap.content.decode())
+        favicon = self.client.get("/favicon.ico")
+        self.assertEqual(favicon.status_code, 301)
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
     def test_public_home_puede_registrar_solicitud_comercial(self):
@@ -82,13 +97,13 @@ class SuperAdminControlTests(TestCase):
         self.assertTrue(solicitud.solicita_prueba)
         self.assertEqual(solicitud.rtn_empresa, "08011999111223")
         self.assertContains(response, "Tu solicitud ya fue registrada correctamente.")
-        self.assertContains(response, "En localhost la notificacion se genero en consola")
+        self.assertContains(response, "En localhost la notificación se generó en consola")
 
     def test_public_demo_detalle_responde(self):
         response = self.client.get(reverse("public_demo_detail", args=["facturacion"]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Vista demo de factura empresarial")
-        self.assertContains(response, "Solicitar una demo comercial de facturacion")
+        self.assertContains(response, "Solicitar una demo comercial de facturación")
 
     def test_public_access_redirige_a_empresa_por_slug(self):
         empresa = Empresa.objects.create(nombre="Acceso Demo", slug="acceso-demo", rtn="08011999000040")
