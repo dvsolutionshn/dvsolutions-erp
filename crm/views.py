@@ -2397,6 +2397,20 @@ def agenda_mobile(request, empresa_slug):
     contexto["inventario_productos_app_payload"] = []
     if puede_ver_productos_app:
         contexto["inventario_productos_app_payload"] = productos_inventario_app(empresa)
+    from facturacion.mobile_kardex import kardex_disponible_app
+    from facturacion.mobile_product_management import gestion_productos_disponible_app, url_gestion_producto_app
+
+    contexto["app_inventory_products_url"] = (
+        reverse("agenda_mobile_inventory", args=[empresa.slug])
+        if kardex_disponible_app(request, empresa) else ""
+    )
+    contexto["inventario_productos_app_editar_urls"] = {}
+    if contexto["inventario_productos_app_payload"] and gestion_productos_disponible_app(request, empresa)["editar"]:
+        contexto["inventario_productos_app_editar_urls"] = {
+            str(producto["id"]): url_gestion_producto_app("editar_producto_facturacion", empresa, {"id": producto["id"]})
+            for producto in contexto["inventario_productos_app_payload"]
+        }
+    contexto["puede_editar_productos_app"] = bool(contexto["inventario_productos_app_editar_urls"])
     contexto["impuestos_app_payload"] = [
         {
             "id": impuesto.id,
