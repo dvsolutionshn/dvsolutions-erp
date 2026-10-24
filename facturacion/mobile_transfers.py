@@ -18,6 +18,10 @@ from core.clinical_permissions import EMPRESAS_CLINICAS_CON_ROLES, rol_clinico_g
 from core.models import ConfiguracionAvanzadaEmpresa
 from .models import BodegaInventario, ExistenciaLoteBodega, MovimientoLoteBodega
 
+EMPRESAS_TRANSFERENCIA_SELECTORES = {
+    "hospital_mia", "medical_spa", "luque_aestetic", "serviciosmedicos",
+}
+
 
 def es_transferencia_app(request, empresa):
     return bool(
@@ -55,7 +59,7 @@ def _identificador(valor):
 def _validar_solicitud(request, empresa):
     if request.method not in {"GET", "HEAD", "POST"}:
         raise PermissionDenied("Método no permitido para el traslado móvil.")
-    selectores = empresa.slug == "medical_spa"
+    selectores = empresa.slug in EMPRESAS_TRANSFERENCIA_SELECTORES
     seleccion = {"bodega_origen", "bodega_destino"} if selectores else {"ruta"}
     permitidos_get = {"app"} | seleccion
     if set(request.GET) - permitidos_get or any(len(request.GET.getlist(k)) != 1 for k in request.GET):
@@ -107,7 +111,7 @@ def preparar_transferencia_app(request, empresa):
         resultado["reason"] = "Los traslados internos no están habilitados. Solicita al administrador revisar la configuración existente."
         return resultado
     bodegas = list(BodegaInventario.objects.filter(empresa=empresa, activa=True).order_by("id"))
-    if empresa.slug == "medical_spa":
+    if empresa.slug in EMPRESAS_TRANSFERENCIA_SELECTORES:
         listas = len(bodegas) >= 2
     else:
         nombres = (("Bodega Principal", "principal"), ("Bodega Clinica", "provisional")) if empresa.slug == "luque_aestetic" else (
@@ -131,7 +135,7 @@ def preparar_transferencia_app(request, empresa):
     ).exists():
         raise Http404("El lote no pertenece a esta empresa.")
     propias = {str(bodega.pk) for bodega in bodegas}
-    if empresa.slug == "medical_spa":
+    if empresa.slug in EMPRESAS_TRANSFERENCIA_SELECTORES:
         for datos in (request.GET, request.POST if request.method == "POST" else {}):
             for campo in ("bodega_origen", "bodega_destino"):
                 if datos.get(campo) and datos[campo] not in propias:

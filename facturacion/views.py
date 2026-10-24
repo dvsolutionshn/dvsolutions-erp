@@ -4344,8 +4344,12 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
 @login_required
 def traslado_rapido_farmaceutico(request, empresa_slug):
     from .mobile_transfers import (
-        es_transferencia_app, preparar_transferencia_app, render_transferencia_app,
-        validar_cantidad_transferencia_app, volver_transferencia_app,
+        EMPRESAS_TRANSFERENCIA_SELECTORES,
+        es_transferencia_app,
+        preparar_transferencia_app,
+        render_transferencia_app,
+        validar_cantidad_transferencia_app,
+        volver_transferencia_app,
     )
 
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
@@ -4356,7 +4360,7 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
             return render_transferencia_app(request, {
                 "empresa": empresa, "rutas": {}, "ruta_key": "", "ruta": {},
                 "existencias": (), "bodegas": (),
-                "usar_selectores_bodega": empresa.slug == "medical_spa",
+                "usar_selectores_bodega": empresa.slug in EMPRESAS_TRANSFERENCIA_SELECTORES,
                 "mobile_transfer_ready": False,
                 "mobile_transfer_unavailable_reason": preparacion["reason"],
             })
@@ -4369,7 +4373,7 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
             return redirect("inventario_facturacion", empresa_slug=empresa.slug)
 
         bodegas_base = _asegurar_bodegas_farmaceuticas(empresa)
-    usar_selectores_bodega = empresa.slug == "medical_spa"
+    usar_selectores_bodega = empresa.slug in EMPRESAS_TRANSFERENCIA_SELECTORES
     filtros_existencias_transferibles = {
         "empresa": empresa,
         "cantidad__gt": 0,

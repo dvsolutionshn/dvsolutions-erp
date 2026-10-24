@@ -69,13 +69,8 @@ class MobileTransfersIntegrationTests(TestCase):
 
     def datos(self, empresa=None, ruta=None, **extra):
         empresa = empresa or self.empresa
-        if empresa.slug == "medical_spa":
-            origen, destino = "principal", "provisional"
-            data = {"bodega_origen": str(self.bodegas[(empresa.slug, origen)].pk), "bodega_destino": str(self.bodegas[(empresa.slug, destino)].pk)}
-        else:
-            ruta = ruta or ("principal_clinica" if empresa.slug == "luque_aestetic" else "principal_vitrina")
-            origen, destino = self.ROUTES[empresa.slug][ruta]
-            data = {"ruta": ruta}
+        origen, destino = "principal", "provisional"
+        data = {"bodega_origen": str(self.bodegas[(empresa.slug, origen)].pk), "bodega_destino": str(self.bodegas[(empresa.slug, destino)].pk)}
         data.update({"app": "1", "existencia": str(self.existencias[(empresa.slug, origen)].pk), "cantidad": "2.50", "observacion": "Trabajo sintético conservado"})
         data.update(extra)
         return data
@@ -153,24 +148,17 @@ class MobileTransfersIntegrationTests(TestCase):
         )
         self.assertContains(response, 'data-transfer-product=', html=False)
 
-    def test_original_fixed_routes_and_medical_spa_active_selectors_are_reused(self):
+    def test_all_four_companies_use_every_active_warehouse_in_selectors(self):
         for empresa in self.empresas.values():
+            extra = BodegaInventario.objects.create(empresa=empresa, nombre="Cabina sintética", tipo="otra")
+            closed = BodegaInventario.objects.create(empresa=empresa, nombre="Cabina cerrada", tipo="otra", activa=False)
             response = self.client.get(self.url(empresa))
-            if empresa.slug == "medical_spa":
-                extra = BodegaInventario.objects.create(empresa=empresa, nombre="Cabina sintética", tipo="otra")
-                closed = BodegaInventario.objects.create(empresa=empresa, nombre="Cabina cerrada", tipo="otra", activa=False)
-                response = self.client.get(self.url(empresa))
-                self.assertTrue(response.context["usar_selectores_bodega"])
-                self.assertIn(extra, response.context["bodegas"])
-                self.assertNotIn(closed, response.context["bodegas"])
-                self.assertContains(response, 'name="bodega_origen"')
-                self.assertContains(response, 'name="bodega_destino"')
-            else:
-                self.assertFalse(response.context["usar_selectores_bodega"])
-                self.assertEqual(set(response.context["rutas"]), set(self.ROUTES[empresa.slug]))
-                for key, (origen, destino) in self.ROUTES[empresa.slug].items():
-                    route = response.context["rutas"][key]
-                    self.assertEqual((route["origen"].pk, route["destino"].pk), (self.bodegas[(empresa.slug, origen)].pk, self.bodegas[(empresa.slug, destino)].pk))
+            self.assertTrue(response.context["usar_selectores_bodega"])
+            self.assertIn(extra, response.context["bodegas"])
+            self.assertNotIn(closed, response.context["bodegas"])
+            self.assertContains(response, 'name="bodega_origen"')
+            self.assertContains(response, 'name="bodega_destino"')
+            self.assertEqual(response.context["rutas"], {})
 
     def test_missing_configuration_and_missing_warehouses_explain_without_writes_or_post_form(self):
         for empresa in self.empresas.values():
@@ -218,8 +206,8 @@ class MobileTransfersIntegrationTests(TestCase):
             self.assertEqual(self.client.get(self.url(empresa)).status_code, 200)
         self.assertEqual(self.snapshot(), before)
 
-    def test_preferred_original_warehouse_name_wins_over_older_type_and_no_inactive_fallback(self):
-        for empresa in (self.empresa, self.empresas["luque_aestetic"], self.empresas["serviciosmedicos"]):
+    def test_all_active_warehouse_records_are_reused_without_mutation(self):
+        for empresa in self.empresas.values():
             old = self.bodegas[(empresa.slug, "principal")]
             preferred_name = old.nombre
             BodegaInventario.objects.filter(pk=old.pk).update(nombre=f"Antigua principal {empresa.slug}")
@@ -227,30 +215,24 @@ class MobileTransfersIntegrationTests(TestCase):
             before = self.snapshot()
             response = self.client.get(self.url(empresa))
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.context["ruta"]["origen"].pk, preferred.pk)
-            self.assertGreater(preferred.pk, old.pk)
+            self.assertIn(preferred, response.context["bodegas"])
+            self.assertIn(old, response.context["bodegas"])
             self.assertEqual(self.snapshot(), before)
-            for updates in ({"activa": False}, {"tipo": "otra"}):
-                BodegaInventario.objects.filter(pk=preferred.pk).update(**updates)
-                before = self.snapshot()
-                response = self.client.get(self.url(empresa))
-                self.assertEqual(response.status_code, 200)
-                self.assertFalse(response.context["mobile_transfer_ready"])
-                self.assertNotContains(response, 'method="post"')
-                self.assertEqual(self.snapshot(), before)
-                BodegaInventario.objects.filter(pk=preferred.pk).update(activa=True, tipo="principal")
+            BodegaInventario.objects.filter(pk=preferred.pk).update(activa=False)
+            response = self.client.get(self.url(empresa))
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn(preferred, response.context["bodegas"])
+            self.assertTrue(response.context["mobile_transfer_ready"])
 
-    def test_lot_order_and_expired_inactive_lot_flags_preserve_original_read_values(self):
+    def test_inactive_lot_is_not_exposed_as_transferible(self):
         lote = LoteInventario.objects.create(empresa=self.empresa, producto=self.productos[self.empresa.slug], numero_lote="MT-EXPIRADO", fecha_vencimiento=timezone.localdate()-timedelta(days=1), activo=False)
         expired = ExistenciaLoteBodega.objects.create(empresa=self.empresa, bodega=self.bodegas[(self.empresa.slug, "principal")], lote=lote, cantidad=Decimal("1"))
         mobile = self.client.get(self.url())
         web = self.client.get(self.url(mobile=False))
         self.assertEqual(list(mobile.context["existencias"]), list(web.context["existencias"]))
-        self.assertEqual(mobile.context["existencias"][0].pk, expired.pk)
-        item = next(item for item in mobile.context["mobile_transfer_items"] if item["id"] == expired.pk)
-        self.assertTrue(item["vencido"])
-        self.assertFalse(item["lote_activo"])
-        self.assertContains(mobile, lote.numero_lote)
+        self.assertNotIn(expired.pk, [item.pk for item in mobile.context["existencias"]])
+        self.assertNotIn(expired.pk, [item["id"] for item in mobile.context["mobile_transfer_items"]])
+        self.assertNotContains(mobile, lote.numero_lote)
 
     def test_granular_transfer_permission_needs_no_inventory_calendar_or_patient_grant(self):
         for empresa in self.empresas.values():
@@ -332,13 +314,17 @@ class MobileTransfersIntegrationTests(TestCase):
             self.assertEqual(set(original.context["rutas"]), set(mobile.context["rutas"]))
             self.assertEqual(list(original.context["existencias"]), list(mobile.context["existencias"]))
 
-    def test_transfers_all_original_routes_preserve_lot_user_totals_and_two_movements(self):
+    def test_transfers_both_directions_preserve_totals_and_two_movements(self):
         for empresa in self.empresas.values():
-            keys = (None,) if empresa.slug == "medical_spa" else tuple(self.ROUTES[empresa.slug])
-            for key in keys:
-                data = self.datos(empresa, key)
+            for origen_tipo, destino_tipo in (("principal", "provisional"), ("provisional", "principal")):
+                data = self.datos(empresa)
+                data.update({
+                    "bodega_origen": str(self.bodegas[(empresa.slug, origen_tipo)].pk),
+                    "bodega_destino": str(self.bodegas[(empresa.slug, destino_tipo)].pk),
+                    "existencia": str(self.existencias[(empresa.slug, origen_tipo)].pk),
+                })
                 origin = ExistenciaLoteBodega.objects.get(pk=data["existencia"])
-                target = self.bodegas[(empresa.slug, "provisional")] if empresa.slug == "medical_spa" else self.bodegas[(empresa.slug, self.ROUTES[empresa.slug][key][1])]
+                target = self.bodegas[(empresa.slug, destino_tipo)]
                 old_origin = origin.cantidad
                 old_target = ExistenciaLoteBodega.objects.get(bodega=target, lote=origin.lote).cantidad
                 old_general = InventarioProducto.objects.get(producto=origin.lote.producto).existencias
@@ -409,7 +395,7 @@ class MobileTransfersIntegrationTests(TestCase):
             self.assertEqual(self.snapshot(), before, value)
 
     def test_destination_decimal_capacity_is_validated_before_mutation(self):
-        destination = self.existencias[(self.empresa.slug, "vitrina")]
+        destination = self.existencias[(self.empresa.slug, "provisional")]
         ExistenciaLoteBodega.objects.filter(pk=destination.pk).update(cantidad=Decimal("9999999999.99"))
         before = self.snapshot()
         with patch.object(views, "_registrar_movimiento_lote_bodega") as save:
@@ -458,10 +444,10 @@ class MobileTransfersIntegrationTests(TestCase):
             save.assert_not_called()
         self.assertEqual(self.snapshot(), before)
 
-    def test_fixed_route_wrong_origin_and_unknown_route_never_fall_back(self):
+    def test_selector_wrong_origin_and_unknown_route_never_fall_back(self):
         before = self.snapshot()
         with patch.object(views, "_registrar_movimiento_lote_bodega") as save:
-            for empresa in (self.empresa, self.empresas["luque_aestetic"], self.empresas["serviciosmedicos"]):
+            for empresa in self.empresas.values():
                 data = self.datos(empresa)
                 data["ruta"] = "unknown"
                 self.assert_denied(self.client.post(self.url(empresa), data))
@@ -481,7 +467,7 @@ class MobileTransfersIntegrationTests(TestCase):
                 data = base.copy()
                 data.setlist(key, [base[key], base[key]])
                 self.assert_denied(self.client.post(self.url(empresa), data.urlencode(), content_type="application/x-www-form-urlencoded"))
-            mixed = {"ruta": "principal_vitrina"} if empresa.slug == "medical_spa" else {"bodega_origen": "1"}
+            mixed = {"ruta": "principal_vitrina"}
             for extra in (mixed, {"accion": "eliminar"}, {"empresa": empresa.pk}, {"producto": self.productos[empresa.slug].pk}, {"app": "0"}):
                 data = self.datos(empresa)
                 data.update(extra)
@@ -494,10 +480,10 @@ class MobileTransfersIntegrationTests(TestCase):
     def test_different_valid_query_and_post_route_or_warehouse_selection_are_rejected(self):
         before = self.snapshot()
         with patch.object(views, "_registrar_movimiento_lote_bodega") as save:
-            self.assert_denied(self.client.post(self.url(ruta="principal_provisional"), self.datos(ruta="principal_vitrina")))
-            spa = self.empresas["medical_spa"]
-            for field, value in (("bodega_origen", self.bodegas[(spa.slug, "vitrina")].pk), ("bodega_destino", self.bodegas[(spa.slug, "vitrina")].pk)):
-                self.assert_denied(self.client.post(self.url(spa, **{field: value}), self.datos(spa)))
+            for empresa in self.empresas.values():
+                destino_alternativo = "principal" if empresa.slug == "luque_aestetic" else "vitrina"
+                for field, value in (("bodega_origen", self.bodegas[(empresa.slug, "provisional")].pk), ("bodega_destino", self.bodegas[(empresa.slug, destino_alternativo)].pk)):
+                    self.assert_denied(self.client.post(self.url(empresa, **{field: value}), self.datos(empresa)))
             save.assert_not_called()
         self.assertEqual(self.snapshot(), before)
 
@@ -527,9 +513,7 @@ class MobileTransfersIntegrationTests(TestCase):
         before = self.snapshot()
         with patch.object(views, "_registrar_movimiento_lote_bodega") as save:
             unavailable = self.client.post(self.url(), self.datos())
-            self.assertEqual(unavailable.status_code, 200)
-            self.assertNotContains(unavailable, 'method="post"')
-            self.assertNotContains(unavailable, "Bodega importada extranjera")
+            self.assert_denied(unavailable)
             save.assert_not_called()
         self.assertEqual(self.snapshot(), before)
         BodegaInventario.objects.filter(pk=bodega.pk).update(empresa=self.empresa, nombre="Bodega General")
