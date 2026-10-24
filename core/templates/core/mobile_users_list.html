@@ -41,6 +41,7 @@
     {% else %}<p class="mus-caption">Sin permisos configurados en el rol.</p>{% endif %}
     {% if fila.usuario.es_administrador_empresa %}<div class="mus-info mus-warning" data-user-admin-warning><strong>Autorización de administrador independiente</strong><p>Esta cuenta conserva su autorización de administrador de empresa. Asignar “Sin rol” o un rol inactivo no revoca esa autorización.</p></div>{% endif %}
     {% if not fila.usuario.is_active %}<p class="mus-caption">Asignar un rol no activa esta cuenta.</p>{% elif fila.rol and not fila.rol.activo %}<p class="mus-caption">Este rol no concede permisos mientras esté inactivo.</p>{% endif %}
+    {% if fila.permissions_edit_url %}<a class="mi-button" href="{{ fila.permissions_edit_url }}">Editar permisos en esta empresa</a>{% endif %}
     {% if can_assign_clinical_role and fila.permisos_url %}<a class="mi-button secondary" href="{{ fila.permisos_url }}">Asignar rol en esta empresa</a>{% endif %}
   </article>
   {% empty %}<section class="mi-card mus-empty"><h2>Sin usuarios{% if mobile_users_query or mobile_users_state %} para estos filtros{% endif %}</h2><p>{% if mobile_users_query or mobile_users_state %}No hay cuentas que coincidan con la búsqueda.{% else %}No hay usuarios operativos vinculados a esta empresa.{% endif %}</p></section>{% endfor %}

@@ -53,6 +53,7 @@ from .views import (
     superadmin_auditoria,
     usuarios_clinicos,
     usuario_clinico_permisos,
+    usuario_clinico_permisos_editar_app,
     roles_clinicos,
     rol_clinico_editar,
 )
@@ -114,6 +115,7 @@ urlpatterns = [
     path('<slug:slug>/dashboard/auditoria/', auditoria_empresa, name='auditoria_empresa'),
     path('<slug:slug>/dashboard/usuarios-clinicos/', usuarios_clinicos, name='usuarios_clinicos'),
     path('<slug:slug>/dashboard/usuarios-clinicos/<int:usuario_id>/permisos/', usuario_clinico_permisos, name='usuario_clinico_permisos'),
+    path('<slug:slug>/dashboard/usuarios-clinicos/<int:usuario_id>/permisos/editar/app/', usuario_clinico_permisos_editar_app, name='usuario_clinico_permisos_editar_app'),
     path('<slug:slug>/dashboard/roles-clinicos/', roles_clinicos, name='roles_clinicos'),
     path('<slug:slug>/dashboard/roles-clinicos/nuevo/', rol_clinico_editar, name='rol_clinico_crear'),
     path('<slug:slug>/dashboard/roles-clinicos/<int:rol_id>/editar/', rol_clinico_editar, name='rol_clinico_editar'),

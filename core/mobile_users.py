@@ -162,8 +162,14 @@ def _pagina_usuarios_app(request, empresa, registros, *, roles=False):
 
 
 def render_usuarios_app(request, empresa, filas):
+    from .mobile_user_permissions import permisos_usuario_editables_app, url_editar_permisos_usuario_app
+
     for fila in filas:
         fila["permisos_url"] = url_usuarios_app("usuario_clinico_permisos", empresa, fila["usuario"])
+        fila["permissions_edit_url"] = (
+            url_editar_permisos_usuario_app(empresa, fila["usuario"])
+            if permisos_usuario_editables_app(request, empresa, fila["rol"]) else ""
+        )
     pagina, paginacion = _pagina_usuarios_app(request, empresa, filas)
     contexto = {**_contexto_usuarios_app(request, empresa), **paginacion, "filas": pagina, "total_usuarios": len(filas)}
     return respuesta_usuarios_app(render(request, "core/mobile_users_list.html", contexto))
@@ -183,6 +189,8 @@ def render_roles_app(request, empresa, roles):
 
 
 def render_usuario_permisos_app(request, empresa, contexto):
+    from .mobile_user_permissions import permisos_usuario_editables_app, url_editar_permisos_usuario_app
+
     usuario = contexto["usuario_gestionado"]
     rol_actual = contexto["rol_actual"]
     actual_en_catalogo = bool(rol_actual is not None and contexto["roles"].filter(pk=rol_actual.pk).exists())
@@ -193,6 +201,11 @@ def render_usuario_permisos_app(request, empresa, contexto):
         "app_user_permissions_back_url": url_usuarios_app("usuarios_clinicos", empresa),
         "mobile_user_role_in_choices": actual_en_catalogo,
         "mobile_user_role_requires_selection": bool(rol_actual is not None and not actual_en_catalogo),
+        "can_edit_user_clinical_permissions": permisos_usuario_editables_app(request, empresa, rol_actual),
+        "app_user_permissions_edit_url": (
+            url_editar_permisos_usuario_app(empresa, usuario)
+            if permisos_usuario_editables_app(request, empresa, rol_actual) else ""
+        ),
     }
     return respuesta_usuarios_app(render(request, "core/mobile_user_permissions.html", contexto))
 

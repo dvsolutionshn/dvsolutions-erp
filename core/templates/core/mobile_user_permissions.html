@@ -15,6 +15,7 @@
   {% if mobile_user_role_requires_selection %}<div class="mus-info mus-warning"><strong>El rol actual no pertenece al catálogo clínico</strong><p>No se cambiará automáticamente a “Sin rol”. Seleccione explícitamente un rol clínico o la opción “Sin rol” antes de confirmar.</p></div>{% endif %}
   {% if not usuario_gestionado.is_active %}<p class="mus-caption">Esta cuenta está inactiva. Cambiar su rol no activa el usuario.</p>{% endif %}
   {% if usuario_gestionado.es_administrador_empresa %}<div class="mus-info mus-warning" data-user-admin-warning><strong>Conserva autorización de administrador</strong><p>La administración de empresa es una autorización independiente de esta cuenta. Asignar “Sin rol” o un rol inactivo no revoca su administración.</p></div>{% endif %}
+  {% if can_edit_user_clinical_permissions and app_user_permissions_edit_url %}<a class="mi-button" href="{{ app_user_permissions_edit_url }}">Editar permisos en esta empresa</a>{% endif %}
 </section>
 {% if can_assign_clinical_role %}
 <form class="mus-form" id="mobileUserPermissionForm" action="{{ app_user_permissions_form_url }}" method="post" data-submit-once data-user-role-bound="{% if mobile_user_role_bound %}true{% else %}false{% endif %}" data-user-name="{{ usuario_gestionado.get_full_name|default:usuario_gestionado.username }}" data-user-account="{{ usuario_gestionado.username }}" data-user-independent-admin="{% if usuario_gestionado.es_administrador_empresa %}true{% else %}false{% endif %}" data-company-name="{{ empresa.nombre }}">

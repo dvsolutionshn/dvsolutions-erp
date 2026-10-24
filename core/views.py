@@ -1628,6 +1628,14 @@ def usuario_clinico_permisos(request, slug, usuario_id):
 
 
 @login_required
+def usuario_clinico_permisos_editar_app(request, slug, usuario_id):
+    from .mobile_user_permissions import gestionar_permisos_usuario_app
+
+    empresa = _resolver_empresa_request(request, slug)
+    return gestionar_permisos_usuario_app(request, empresa, usuario_id)
+
+
+@login_required
 def roles_clinicos(request, slug):
     empresa = _resolver_empresa_request(request, slug)
     from .mobile_users import autorizar_usuarios_app, es_usuarios_app, render_roles_app
