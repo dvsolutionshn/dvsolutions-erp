@@ -176,19 +176,26 @@ def render_usuarios_app(request, empresa, filas):
 
 
 def render_roles_app(request, empresa, roles):
+    from .clinical_role_details import contexto_detalles_roles
     from .views import _permisos_visibles_rol
 
     registros = list(roles.order_by("nombre", "pk"))
     pagina, paginacion = _pagina_usuarios_app(request, empresa, registros, roles=True)
+    detalles = contexto_detalles_roles(empresa, pagina)
     contexto = {
-        **_contexto_usuarios_app(request, empresa), **paginacion,
+        **_contexto_usuarios_app(request, empresa), **paginacion, **detalles,
         "roles": pagina, "total_roles": len(registros),
-        "mobile_role_items": [{"rol": rol, "permisos": _permisos_visibles_rol(rol)} for rol in pagina],
+        "mobile_role_items": [
+            {"rol": rol, "permisos": _permisos_visibles_rol(rol),
+             "detalle": detalles.get("clinical_role_details", {}).get(str(rol.pk))}
+            for rol in pagina
+        ],
     }
     return respuesta_usuarios_app(render(request, "core/mobile_roles_list.html", contexto))
 
 
 def render_usuario_permisos_app(request, empresa, contexto):
+    from .clinical_role_details import contexto_detalles_roles
     from .mobile_user_permissions import permisos_usuario_editables_app, url_editar_permisos_usuario_app
 
     usuario = contexto["usuario_gestionado"]
@@ -197,6 +204,7 @@ def render_usuario_permisos_app(request, empresa, contexto):
     url = url_usuarios_app("usuario_clinico_permisos", empresa, usuario)
     contexto = {
         **contexto, **_contexto_usuarios_app(request, empresa),
+        **contexto_detalles_roles(empresa, contexto["roles"], rol_actual, usuario),
         "app_user_permissions_url": url, "app_user_permissions_form_url": url,
         "app_user_permissions_back_url": url_usuarios_app("usuarios_clinicos", empresa),
         "mobile_user_role_in_choices": actual_en_catalogo,

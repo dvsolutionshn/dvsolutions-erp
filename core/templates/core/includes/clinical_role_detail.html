@@ -1,0 +1,8 @@
+{% if detalle %}
+<div class="crd-detail" data-role-detail data-role-id="{{ detalle.id }}">
+  <div class="crd-meta"><span class="crd-badge">{{ detalle.modo_label }}</span><span class="crd-badge{% if not detalle.activo %} inactive{% endif %}">{% if detalle.activo %}Rol activo{% else %}Inactivo · Configurados, no habilitados{% endif %}</span><span class="crd-count">{{ detalle.total_permisos }} permiso{{ detalle.total_permisos|pluralize:'s' }} configurado{{ detalle.total_permisos|pluralize:'s' }}</span></div>
+  {% if show_registered_description and detalle.descripcion_registrada %}<p class="crd-recorded-description">{{ detalle.descripcion_registrada }}</p>{% endif %}
+  {% for grupo in detalle.grupos %}<section class="crd-group"><h4>{{ grupo.grupo }}</h4><ul class="crd-permissions">{% for permiso in grupo.permisos %}<li data-permission-code="{{ permiso.campo }}"><strong>{{ permiso.etiqueta }}</strong><p>{{ permiso.descripcion }}</p></li>{% endfor %}</ul></section>{% empty %}<p class="crd-empty">Sin permisos configurados en el catálogo de este rol. Esto no describe las autorizaciones independientes de una cuenta.</p>{% endfor %}
+  {% for advertencia in detalle.advertencias %}<p class="crd-notice">{{ advertencia }}</p>{% endfor %}
+</div>
+{% endif %}

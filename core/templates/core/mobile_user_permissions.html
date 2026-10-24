@@ -6,8 +6,8 @@
 {% block mobile_back_url %}{{ app_user_permissions_back_url }}{% endblock %}
 {% block mobile_navigation %}{% include "crm/mobile_modules_navigation.html" %}{% endblock %}
 {% block mobile_header_description %}<p>La asignación reemplaza el acceso anterior sólo dentro de esta empresa.</p>{% endblock %}
-{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_users.css' %}">{% endblock %}
-{% block mobile_scripts %}<script src="{% static 'core/mobile_users.js' %}" defer></script>{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'core/mobile_users.css' %}">{% if clinical_role_help_enabled %}<link rel="stylesheet" href="{% static 'core/clinical_role_details.css' %}">{% endif %}{% endblock %}
+{% block mobile_scripts %}<script src="{% static 'core/mobile_users.js' %}" defer></script>{% if clinical_role_help_enabled %}<script src="{% static 'core/clinical_role_details.js' %}" defer></script>{% endif %}{% endblock %}
 {% block mobile_content %}
 <section class="mi-card mus-card" aria-labelledby="mobileUserAssignmentTitle">
   <div class="mus-person"><div class="mus-avatar" aria-hidden="true">{{ usuario_gestionado.first_name|default:usuario_gestionado.username|slice:':1'|upper }}</div><div class="mus-person-copy"><h2 id="mobileUserAssignmentTitle">{{ usuario_gestionado.get_full_name|default:usuario_gestionado.username }}</h2><p>{{ usuario_gestionado.username }}</p>{% if usuario_gestionado.email %}<p>{{ usuario_gestionado.email }}</p>{% endif %}</div></div>
@@ -24,6 +24,7 @@
     <h2 id="mobileUserSelectTitle">Rol en {{ empresa.nombre }}</h2>
     <div class="mi-field"><label for="mobileUserRole">Seleccionar rol</label><select id="mobileUserRole" name="rol_sistema" required aria-describedby="mobileUserSelectionNote"><option value="" disabled data-role-placeholder{% if not mobile_user_role_in_choices %} selected{% endif %}>Seleccione una opción...</option><option value="" data-role-clear data-role-name="Sin rol asignado">Sin rol asignado</option>{% for item in roles %}<option value="{{ item.pk }}" data-role-name="{{ item.nombre }}"{% if not item.activo %} data-role-inactive{% endif %}{% if mobile_user_role_in_choices and rol_actual.pk == item.pk %} selected{% endif %}>{{ item.nombre }}{% if not item.activo %} — inactivo{% endif %}</option>{% endfor %}</select><small id="mobileUserSelectionNote">“Sin rol” deja esta empresa sin un rol asignado; no altera las autorizaciones independientes de la cuenta. Los roles inactivos se conservan en el catálogo original.</small></div>
     <div class="mus-info mus-warning"><strong>Se reemplaza la asignación anterior</strong><p>Los permisos configurados corresponden al rol seleccionado. Este cambio no modifica las autorizaciones independientes de la cuenta ni sus accesos en otras empresas.</p></div>
+    {% if clinical_role_help_enabled %}<div class="crd-app">{% include 'core/includes/clinical_role_selection_preview.html' with select_id='mobileUserRole' %}</div>{% endif %}
     {% if app_roles_url %}<a class="mus-clear" href="{{ app_roles_url }}">Consultar el catálogo de roles compartidos</a>{% endif %}
   </section>
   <div class="mus-form-actions"><button class="mi-button mus-assign-submit" type="submit" id="mobileUserReview">Revisar asignación</button><a class="mi-button secondary" href="{{ app_user_permissions_back_url }}">Cancelar</a></div>

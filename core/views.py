@@ -1619,11 +1619,14 @@ def usuario_clinico_permisos(request, slug, usuario_id):
         return render_usuario_permisos_app(request, empresa, {
             "empresa": empresa, "usuario_gestionado": usuario, "rol_actual": rol_actual, "roles": roles,
         })
+    from .clinical_role_details import contexto_detalles_roles
+
     return render(request, "core/usuario_clinico_permisos.html", {
         "empresa": empresa,
         "usuario_gestionado": usuario,
         "rol_actual": rol_actual,
         "roles": roles,
+        **contexto_detalles_roles(empresa, roles, rol_actual, usuario),
     })
 
 
@@ -1648,7 +1651,15 @@ def roles_clinicos(request, slug):
     roles = RolSistema.objects.filter(es_rol_clinico=True).order_by("nombre")
     if modo_app:
         return render_roles_app(request, empresa, roles)
-    return render(request, "core/roles_clinicos.html", {"empresa": empresa, "roles": roles})
+    from .clinical_role_details import contexto_detalles_roles
+
+    detalles = contexto_detalles_roles(empresa, roles)
+    contexto = {"empresa": empresa, "roles": roles, **detalles}
+    if detalles["clinical_role_help_enabled"]:
+        contexto["clinical_role_items"] = [
+            {"rol": rol, "detalle": detalles["clinical_role_details"][str(rol.pk)]} for rol in roles
+        ]
+    return render(request, "core/roles_clinicos.html", contexto)
 
 
 @login_required

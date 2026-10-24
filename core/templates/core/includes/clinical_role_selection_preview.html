@@ -1,0 +1,10 @@
+<section class="crd-preview" id="clinicalRoleSelectionPreview" data-role-select="{{ select_id }}" data-role-map="clinicalRoleDetailsData" data-role-current="clinicalCurrentRoleDetailsData" aria-labelledby="clinicalRolePreviewTitle">
+  <h3 id="clinicalRolePreviewTitle">Permisos del rol actual</h3><p class="crd-current">Asignación guardada: <strong>{% if clinical_current_role_details %}{{ clinical_current_role_details.nombre }}{% else %}Sin rol asignado{% endif %}</strong></p>
+  <p class="crd-preview-status" data-role-preview-status role="status" aria-live="polite">Cambiar la selección permite consultar el detalle; no guarda la asignación.</p>
+  <div data-role-preview-content>{% if clinical_current_role_details %}{% include "core/includes/clinical_role_detail.html" with detalle=clinical_current_role_details show_registered_description=True %}{% else %}<p class="crd-empty">No hay un rol asignado. Seleccione una opción para consultar sus permisos. Las autorizaciones independientes de la cuenta no se modifican.</p>{% endif %}</div>
+  {% if clinical_role_independent_admin %}<p class="crd-notice" data-role-independent-admin>Esta cuenta conserva su autorización independiente de administrador de empresa. Seleccionar “Sin rol” o un rol inactivo no revoca esa autorización.</p>{% endif %}
+  <p class="crd-scope">Los permisos se aplican según la empresa, sus módulos y las validaciones de cada pantalla. Una acción no habilita automáticamente otras acciones ni sustituye las autorizaciones independientes de la cuenta.</p>
+  <noscript><p class="crd-notice">Se muestran los permisos del rol actualmente guardado. La vista previa al cambiar la selección requiere JavaScript; el formulario original conserva su funcionamiento.</p></noscript>
+</section>
+{{ clinical_role_details|json_script:"clinicalRoleDetailsData" }}
+{{ clinical_current_role_details|json_script:"clinicalCurrentRoleDetailsData" }}
