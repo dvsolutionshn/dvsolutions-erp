@@ -4276,7 +4276,7 @@ class FacturacionTests(TestCase):
         self.assertNotEqual(response.context["ruta"]["destino"], vitrina)
         self.assertEqual(
             [item["producto"].id for item in response.context["productos_transferencia"]],
-            [producto.id],
+            [self.producto.id, producto.id],
         )
         self.assertContains(response, "Producto disponible solo en vitrina")
 
@@ -4366,14 +4366,24 @@ class FacturacionTests(TestCase):
         productos = response.context["productos_transferencia"]
         self.assertEqual(
             [item["producto"].id for item in productos],
-            [gomitas_biotina.id, gomitas_capilares.id],
+            [gomitas_capilares.id, solo_destino.id, self.producto.id],
         )
         capilares = next(item for item in productos if item["producto"].id == gomitas_capilares.id)
         self.assertEqual(capilares["disponible"], Decimal("5.00"))
         self.assertEqual(capilares["lotes"], 2)
+        sin_stock_origen = next(item for item in productos if item["producto"].id == solo_destino.id)
+        self.assertEqual(sin_stock_origen["disponible"], Decimal("0.00"))
+        self.assertEqual(sin_stock_origen["lotes"], 0)
         self.assertEqual(len({item["producto"].id for item in productos}), len(productos))
+        self.assertNotIn(gomitas_biotina.id, [item["producto"].id for item in productos])
+        self.assertNotIn(producto_eliminado.id, [item["producto"].id for item in productos])
         self.assertContains(response, 'id="producto_busqueda"', html=False)
         self.assertContains(response, 'data-codigo="GOM-CAP-01"', html=False)
+        self.assertContains(response, 'data-codigo="GOM-DST"', html=False)
+        self.assertContains(
+            response,
+            "Este producto no tiene existencia en la bodega seleccionada. No se puede realizar la transferencia.",
+        )
         self.assertContains(response, "normalize(searchable).includes(filter)", html=False)
 
     def test_transferencia_rapida_medical_spa_mueve_entre_cualquier_bodega_y_deja_trazabilidad(self):

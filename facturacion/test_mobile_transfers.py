@@ -118,6 +118,41 @@ class MobileTransfersIntegrationTests(TestCase):
             config_seed.assert_not_called()
         self.assertEqual(self.snapshot(), before)
 
+    def test_medical_spa_mobile_catalog_includes_active_product_without_origin_stock(self):
+        empresa = self.empresas["medical_spa"]
+        sin_stock = Producto.objects.create(
+            empresa=empresa,
+            nombre="Gomitas sin stock origen",
+            codigo="GOM-CERO",
+            controla_inventario=True,
+            precio=Decimal("25.00"),
+        )
+        Producto.objects.create(
+            empresa=empresa,
+            nombre="Gomitas inactivas",
+            codigo="GOM-INACTIVA",
+            controla_inventario=True,
+            activo=False,
+            precio=Decimal("25.00"),
+        )
+
+        response = self.client.get(self.url(empresa))
+
+        self.assertEqual(response.status_code, 200)
+        product_ids = [item["id"] for item in response.context["mobile_transfer_products"]]
+        self.assertIn(sin_stock.id, product_ids)
+        self.assertEqual(len(product_ids), len(set(product_ids)))
+        catalog_item = next(item for item in response.context["mobile_transfer_products"] if item["id"] == sin_stock.id)
+        self.assertEqual(catalog_item["cantidad"], Decimal("0.00"))
+        self.assertEqual(catalog_item["lotes"], 0)
+        self.assertContains(response, "Gomitas sin stock origen")
+        self.assertNotContains(response, "Gomitas inactivas")
+        self.assertContains(
+            response,
+            "Este producto no tiene existencia en la bodega seleccionada. No se puede realizar la transferencia.",
+        )
+        self.assertContains(response, 'data-transfer-product=', html=False)
+
     def test_original_fixed_routes_and_medical_spa_active_selectors_are_reused(self):
         for empresa in self.empresas.values():
             response = self.client.get(self.url(empresa))

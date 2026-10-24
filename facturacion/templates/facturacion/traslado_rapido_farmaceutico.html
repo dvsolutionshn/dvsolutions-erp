@@ -81,6 +81,8 @@
 .quick-product-option:hover,.quick-product-option:focus{background:#f1f7fb;}
 .quick-product-option small{display:block;margin-top:3px;color:var(--muted);}
 .quick-product-empty{padding:14px;color:var(--muted);}
+.quick-product-status{margin-top:8px;padding:10px 12px;border-radius:10px;background:#eef8f3;color:#28785f;}
+.quick-product-status.is-empty{background:#fff1f1;color:#a33f43;}
 .quick-warehouse-selects{
     display:grid;
     grid-template-columns:repeat(2,minmax(220px,1fr));
@@ -153,7 +155,8 @@
                 {% endfor %}
             </select>
             <div id="producto_sugerencias" class="quick-product-suggestions"></div>
-            <div class="erp-field-help">Haz clic para ver todos o escribe parte del nombre o código.</div>
+            <div class="erp-field-help">Haz clic para ver todo el catálogo activo o escribe parte del nombre, código o referencia.</div>
+            <div id="producto_disponibilidad" class="quick-product-status" role="status" hidden></div>
         </div>
         <div class="erp-field" style="grid-column:1 / -1;">
             <label for="existencia">Lote disponible</label>
@@ -187,7 +190,7 @@
         </div>
         <div class="erp-form-actions" style="grid-column:1 / -1;">
             <div class="erp-field-help">Un solo guardado genera salida de origen y entrada al destino.</div>
-            <button class="erp-btn" type="submit">Mover Producto</button>
+            <button class="erp-btn" id="transferencia_confirmar" type="submit" disabled>Mover Producto</button>
         </div>
     </form>
 </section>
@@ -244,7 +247,9 @@
     const productSelect = document.getElementById("producto");
     const suggestions = document.getElementById("producto_sugerencias");
     const lotSelect = document.getElementById("existencia");
-    if (!input || !productSelect || !suggestions || !lotSelect) return;
+    const status = document.getElementById("producto_disponibilidad");
+    const submit = document.getElementById("transferencia_confirmar");
+    if (!input || !productSelect || !suggestions || !lotSelect || !status || !submit) return;
 
     const productOptions = Array.from(productSelect.options).slice(1);
     const lotOptions = Array.from(lotSelect.options).slice(1);
@@ -268,6 +273,22 @@
         if (visibleLots === 1 && !lotSelect.value) {
             const onlyLot = lotOptions.find(option => !option.disabled);
             lotSelect.value = onlyLot ? onlyLot.value : "";
+        }
+        const product = productOptions.find(option => option.value === productId);
+        if (!productId || !product) {
+            status.hidden = true;
+            status.classList.remove("is-empty");
+            submit.disabled = true;
+        } else if (visibleLots === 0) {
+            status.textContent = "Este producto no tiene existencia en la bodega seleccionada. No se puede realizar la transferencia.";
+            status.hidden = false;
+            status.classList.add("is-empty");
+            submit.disabled = true;
+        } else {
+            status.textContent = `Existencia disponible: ${product.dataset.disponible} ${product.dataset.unidad} en ${product.dataset.lotes} lote(s).`;
+            status.hidden = false;
+            status.classList.remove("is-empty");
+            submit.disabled = false;
         }
     };
     const selectProduct = option => {
@@ -310,7 +331,7 @@
         if (!matches.length) {
             const empty = document.createElement("div");
             empty.className = "quick-product-empty";
-            empty.textContent = "No hay productos coincidentes en la bodega origen.";
+            empty.textContent = "No hay productos activos coincidentes en el catálogo de la empresa.";
             suggestions.appendChild(empty);
         }
         suggestions.style.display = "block";
@@ -329,6 +350,9 @@
             input.setCustomValidity("Selecciona un producto de la lista.");
             input.reportValidity();
             input.focus();
+        } else if (submit.disabled) {
+            event.preventDefault();
+            status.hidden = false;
         }
     });
 

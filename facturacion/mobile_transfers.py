@@ -204,6 +204,7 @@ def _contexto_app(request, contexto):
     }
     parametros = {k: v for k, v in parametros.items() if v}
     valores = {key: request.POST.get(key, "") if request.method == "POST" else "" for key in ("existencia", "cantidad", "observacion")}
+    valores["producto"] = contexto.get("producto_seleccionado_id", "")
     valores.update(parametros)
     if request.method == "POST":
         valores.update({key: request.POST.get(key, "") for key in ("ruta", "bodega_origen", "bodega_destino")})
@@ -227,6 +228,18 @@ def _contexto_app(request, contexto):
              "cantidad": item.cantidad, "vencido": item.lote.vencido, "por_vencer": item.lote.por_vencer,
              "lote_activo": item.lote.activo, "selected": str(item.pk) == valores["existencia"]}
             for item in contexto.get("existencias", ())
+        ],
+        "mobile_transfer_products": [
+            {
+                "producto": item["producto"],
+                "id": item["producto"].pk,
+                "nombre": item["producto"].nombre,
+                "codigo": item["producto"].codigo,
+                "cantidad": item["disponible"],
+                "lotes": item["lotes"],
+                "selected": str(item["producto"].pk) == valores["producto"],
+            }
+            for item in contexto.get("productos_transferencia", ())
         ],
     })
 

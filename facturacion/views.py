@@ -4376,6 +4376,7 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         "lote__activo": True,
         "lote__producto__tipo_item": "producto",
         "lote__producto__controla_inventario": True,
+        "lote__producto__activo": True,
         "lote__producto__eliminado": False,
     }
     if usar_selectores_bodega:
@@ -4470,7 +4471,6 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         .select_related("lote", "lote__producto", "bodega")
         .order_by("lote__producto__nombre", "lote__fecha_vencimiento", "lote__numero_lote", "id")
     )
-    productos_transferencia = []
     productos_por_id = {}
     for existencia_item in existencias:
         producto = existencia_item.lote.producto
@@ -4482,9 +4482,21 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
                 "lotes": 0,
             }
             productos_por_id[producto.id] = item
-            productos_transferencia.append(item)
         item["disponible"] += existencia_item.cantidad
         item["lotes"] += 1
+    productos_transferencia = []
+    productos_catalogo = Producto.objects.filter(
+        empresa=empresa,
+        activo=True,
+        eliminado=False,
+        tipo_item="producto",
+    ).order_by("nombre", "codigo", "id")
+    for producto in productos_catalogo:
+        productos_transferencia.append(productos_por_id.get(producto.id) or {
+            "producto": producto,
+            "disponible": Decimal("0.00"),
+            "lotes": 0,
+        })
 
     producto_seleccionado_id = request.POST.get("producto", "")
     if not producto_seleccionado_id and request.POST.get("existencia"):
