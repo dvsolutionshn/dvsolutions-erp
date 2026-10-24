@@ -47,7 +47,7 @@
 .quick-transfer-select option{
     font-size:.95rem;
 }
-.quick-product-picker{position:relative;}
+.quick-product-picker{position:relative;z-index:150;overflow:visible;}
 .quick-product-native{display:none;}
 .quick-product-suggestions{
     position:absolute;
@@ -108,7 +108,7 @@
 </section>
 {% endif %}
 
-<section class="erp-form-card">
+<section class="erp-form-card erp-overflow-visible">
     <div class="erp-form-actions">
         <div>
             <h3 style="margin:0 0 8px;">Mover producto</h3>
@@ -145,7 +145,7 @@
         {% else %}
         <input type="hidden" name="ruta" value="{{ ruta_key }}">
         {% endif %}
-        <div class="erp-field quick-product-picker" style="grid-column:1 / -1;">
+        <div class="erp-field erp-overflow-visible quick-product-picker" style="grid-column:1 / -1;">
             <label for="producto_busqueda">Producto</label>
             <input id="producto_busqueda" type="search" autocomplete="off" placeholder="Buscar por nombre o código / referencia" required>
             <select id="producto" class="quick-product-native" name="producto" tabindex="-1" aria-hidden="true">

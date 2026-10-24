@@ -4378,6 +4378,7 @@ class FacturacionTests(TestCase):
         self.assertNotIn(gomitas_biotina.id, [item["producto"].id for item in productos])
         self.assertNotIn(producto_eliminado.id, [item["producto"].id for item in productos])
         self.assertContains(response, 'id="producto_busqueda"', html=False)
+        self.assertContains(response, 'erp-field erp-overflow-visible quick-product-picker', html=False)
         self.assertContains(response, 'data-codigo="GOM-CAP-01"', html=False)
         self.assertContains(response, 'data-codigo="GOM-DST"', html=False)
         self.assertContains(
