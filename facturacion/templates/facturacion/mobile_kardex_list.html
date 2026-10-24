@@ -58,7 +58,10 @@
     <div class="mkd-origin {% if item.origen == 'lote' %}mkd-origin-lot{% endif %}">{{ item.origen_label }}</div>
     <dl class="meg-card-meta">
       <div><dt>Bodega</dt><dd>{% if movimiento.bodega %}{{ movimiento.bodega.nombre }}{% else %}General{% endif %}</dd></div>
+      <div><dt>Usuario</dt><dd>{% if movimiento.usuario_kardex %}{{ movimiento.usuario_kardex.get_full_name|default:movimiento.usuario_kardex.get_username }}{% else %}Sin registro{% endif %}</dd></div>
       <div><dt>Cantidad registrada</dt><dd class="mkd-quantity">{{ movimiento.cantidad|floatformat:2|intcomma }}</dd></div>
+      <div><dt>Entrada</dt><dd>{% if movimiento.existencia_resultante > movimiento.existencia_anterior %}{{ movimiento.cantidad|floatformat:2|intcomma }}{% else %}{{ 0|floatformat:2 }}{% endif %}</dd></div>
+      <div><dt>Salida</dt><dd>{% if movimiento.existencia_resultante < movimiento.existencia_anterior %}{{ movimiento.cantidad|floatformat:2|intcomma }}{% else %}{{ 0|floatformat:2 }}{% endif %}</dd></div>
       {% if movimiento.lote_kardex %}
       <div><dt>Lote</dt><dd>{{ movimiento.lote_kardex.numero_lote }}</dd></div>
       <div><dt>Vencimiento del lote</dt><dd>{% if movimiento.lote_kardex.fecha_vencimiento %}{{ movimiento.lote_kardex.fecha_vencimiento|date:'d/m/Y' }}{% else %}Sin vencimiento registrado{% endif %}</dd></div>
@@ -66,7 +69,7 @@
     </dl>
     <div class="mkd-snapshot">
       <h3>Existencia registrada · {{ item.origen_label }}</h3>
-      <dl><div><dt>Antes</dt><dd>{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</dd></div><div><dt>Después</dt><dd>{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</dd></div></dl>
+      <dl><div><dt>Antes</dt><dd>{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</dd></div><div><dt>Saldo</dt><dd>{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</dd></div></dl>
     </div>
     {% if movimiento.referencia or movimiento.observacion %}
     <details class="mkd-notes">

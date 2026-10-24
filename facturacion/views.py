@@ -702,7 +702,7 @@ def punto_venta(request, empresa_slug):
 
                 _validar_stock_disponible_para_lineas(lineas)
                 _actualizar_totales_factura(factura)
-                _registrar_salida_factura(factura)
+                _registrar_salida_factura(factura, usuario=request.user)
                 registrar_asiento_factura_emitida(factura)
 
                 monto_recibido = None
@@ -1049,6 +1049,7 @@ def pos_crear_producto_rapido(request, empresa_slug):
                         numero_lote=lote_inicial,
                         fecha_vencimiento=fecha_vencimiento,
                         observacion="Alta rapida de producto desde punto de venta.",
+                        usuario=request.user,
                     )
                 _sincronizar_existencia_general_producto(producto)
     except ValidationError as exc:
@@ -1612,7 +1613,7 @@ def _emitir_factura_desde_borrador(factura, usuario=None):
     factura.save(update_fields=['estado'])
     _actualizar_totales_factura(factura)
 
-    _registrar_salida_factura(factura)
+    _registrar_salida_factura(factura, usuario=usuario)
     registrar_asiento_factura_emitida(factura)
     _asegurar_pago_contado_factura(factura, usuario)
 
@@ -2112,7 +2113,7 @@ def _registrar_movimiento_lote_bodega(
     )
 
 
-def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", observacion="", bodega_destino=None):
+def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", observacion="", bodega_destino=None, *, usuario=None):
     if not _empresa_usa_inventario_por_lotes(empresa) or not producto.controla_inventario:
         return
     bodega = bodega_destino or _asegurar_bodegas_farmaceuticas(empresa)["principal"]
@@ -2125,6 +2126,7 @@ def _entrada_farmaceutica_generica(empresa, producto, cantidad, referencia="", o
         cantidad=cantidad,
         referencia=referencia,
         observacion=observacion or f"Entrada automatica a {bodega.nombre}.",
+        usuario=usuario,
     )
 
 
@@ -2156,7 +2158,7 @@ def _anotar_existencias_por_bodega(productos, empresa):
     return productos_lista
 
 
-def _registrar_entrada_inicial_producto(producto, *, bodega, cantidad, numero_lote="", fecha_vencimiento=None):
+def _registrar_entrada_inicial_producto(producto, *, bodega, cantidad, numero_lote="", fecha_vencimiento=None, usuario=None):
     if not producto.controla_inventario or not bodega or cantidad <= 0:
         return
     inventario = _obtener_inventario_producto(producto)
@@ -2184,6 +2186,7 @@ def _registrar_entrada_inicial_producto(producto, *, bodega, cantidad, numero_lo
         cantidad=cantidad,
         referencia=f"Producto {producto.id}",
         observacion="Entrada inicial registrada al crear producto.",
+        usuario=usuario,
     )
 
 
@@ -2198,7 +2201,7 @@ def _sincronizar_existencia_general_producto(producto):
     return total
 
 
-def _registrar_ajuste_existencia_bodega(*, empresa, bodega, lote, cantidad_resultante, referencia, observacion):
+def _registrar_ajuste_existencia_bodega(*, empresa, bodega, lote, cantidad_resultante, referencia, observacion, usuario=None):
     existencia, _ = ExistenciaLoteBodega.objects.get_or_create(
         empresa=empresa,
         bodega=bodega,
@@ -2223,10 +2226,11 @@ def _registrar_ajuste_existencia_bodega(*, empresa, bodega, lote, cantidad_resul
         existencia_resultante=cantidad_resultante,
         referencia=referencia,
         observacion=observacion,
+        usuario=usuario if getattr(usuario, "is_authenticated", False) else None,
     )
 
 
-def _ajustar_existencia_producto_bodega(producto, bodega, cantidad_objetivo, *, numero_lote="", fecha_vencimiento=None, observacion=""):
+def _ajustar_existencia_producto_bodega(producto, bodega, cantidad_objetivo, *, numero_lote="", fecha_vencimiento=None, observacion="", usuario=None):
     cantidad_objetivo = cantidad_objetivo or Decimal("0.00")
     if cantidad_objetivo < 0:
         raise ValidationError("La cantidad por bodega no puede ser negativa.")
@@ -2268,6 +2272,7 @@ def _ajustar_existencia_producto_bodega(producto, bodega, cantidad_objetivo, *, 
             cantidad_resultante=existencia.cantidad + delta,
             referencia=referencia,
             observacion=observacion,
+            usuario=usuario,
         )
         return
 
@@ -2293,13 +2298,14 @@ def _ajustar_existencia_producto_bodega(producto, bodega, cantidad_objetivo, *, 
             cantidad_resultante=existencia.cantidad - salida,
             referencia=referencia,
             observacion=observacion,
+            usuario=usuario,
         )
         restante -= salida
     if restante > 0:
         raise ValidationError(f"No hay suficiente existencia en {bodega.nombre} para ajustar {producto.nombre}.")
 
 
-def _aplicar_distribucion_bodegas_producto(producto, form):
+def _aplicar_distribucion_bodegas_producto(producto, form, *, usuario=None):
     if not getattr(form, "mostrar_bodega_inicial", False):
         return
     if not producto.controla_inventario:
@@ -2313,6 +2319,7 @@ def _aplicar_distribucion_bodegas_producto(producto, form):
             item["cantidad"] or Decimal("0.00"),
             numero_lote=numero_lote,
             fecha_vencimiento=fecha_vencimiento,
+            usuario=usuario,
         )
     _sincronizar_existencia_general_producto(producto)
 
@@ -2351,7 +2358,7 @@ def _validar_stock_vitrina_para_lineas(empresa, cantidades_por_producto):
     return faltantes
 
 
-def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None):
+def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None, usuario=None):
     """Descuenta por FEFO y deja trazabilidad exacta por lote y bodega."""
     if not _empresa_usa_control_lotes_fefo(factura.empresa):
         return False
@@ -2408,12 +2415,13 @@ def _registrar_salida_fefo_factura(factura, *, forzar=False, observacion=None):
                 referencia=factura.numero_factura or f"Factura {factura.id}",
                 observacion=observacion,
                 factura=factura,
+                usuario=usuario,
             )
             pendiente -= salida
     return True
 
 
-def _registrar_ajuste_salida_fefo(*, empresa, producto, cantidad, referencia, observacion):
+def _registrar_ajuste_salida_fefo(*, empresa, producto, cantidad, referencia, observacion, usuario=None):
     """Consume existencias por FEFO para ajustes/salidas no asociados a factura."""
     if not _empresa_usa_control_lotes_fefo(empresa) or not producto.controla_inventario:
         return
@@ -2454,11 +2462,12 @@ def _registrar_ajuste_salida_fefo(*, empresa, producto, cantidad, referencia, ob
             cantidad=salida,
             referencia=referencia,
             observacion=observacion,
+            usuario=usuario,
         )
         pendiente -= salida
 
 
-def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None):
+def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None, usuario=None):
     config = ConfiguracionAvanzadaEmpresa.para_empresa(factura.empresa)
     if not config.ventas_solo_desde_vitrina:
         return
@@ -2497,6 +2506,7 @@ def _registrar_salida_vitrina_factura(factura, *, forzar=False, observacion=None
                 referencia=factura.numero_factura or f"Factura {factura.id}",
                 observacion=observacion,
                 factura=factura,
+                usuario=usuario,
             )
             pendiente -= salida
         if pendiente > 0:
@@ -2592,7 +2602,7 @@ def _registrar_movimiento_inventario(
 
 
 @transaction.atomic
-def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
+def _registrar_salida_factura(factura, *, forzar=False, observacion=None, usuario=None):
     bloquear_empresas_contables([factura.empresa_id])
     if not forzar and MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
@@ -2631,8 +2641,8 @@ def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
                 linea.save(update_fields=['costo_unitario', 'costo_contable_total'])
 
     observacion = observacion or 'Salida generada automaticamente por emision de factura.'
-    if not _registrar_salida_fefo_factura(factura, forzar=forzar, observacion=observacion):
-        _registrar_salida_vitrina_factura(factura, forzar=forzar, observacion=observacion)
+    if not _registrar_salida_fefo_factura(factura, forzar=forzar, observacion=observacion, usuario=usuario):
+        _registrar_salida_vitrina_factura(factura, forzar=forzar, observacion=observacion, usuario=usuario)
 
     for linea in lineas:
         if not linea.producto_id or not linea.producto:
@@ -2648,11 +2658,12 @@ def _registrar_salida_factura(factura, *, forzar=False, observacion=None):
             observacion=observacion,
             factura=factura,
             valor_contable=valor_contable_linea_inventario(linea),
+            usuario=usuario,
         )
 
 
 @transaction.atomic
-def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
+def _revertir_salida_factura(factura, *, forzar=False, observacion=None, usuario=None):
     bloquear_empresas_contables([factura.empresa_id])
     if not MovimientoInventario.objects.filter(factura=factura, tipo='salida_factura').exists():
         return
@@ -2684,6 +2695,7 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
             referencia=factura.numero_factura or f"Factura {factura.id}",
             observacion=observacion,
             factura=factura,
+            usuario=usuario,
         )
 
     movimientos_producto = (
@@ -2716,11 +2728,12 @@ def _revertir_salida_factura(factura, *, forzar=False, observacion=None):
                 Decimal(resumen['valor_salida']) - Decimal(resumen.get('valor_reversion') or 0)
                 if resumen.get('valor_salida') is not None else None
             ),
+            usuario=usuario,
         )
 
 
 @transaction.atomic
-def _registrar_entrada_nota_credito(nota):
+def _registrar_entrada_nota_credito(nota, *, usuario=None):
     bloquear_empresas_contables([nota.empresa_id])
     if MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').exists():
         return
@@ -2741,11 +2754,12 @@ def _registrar_entrada_nota_credito(nota):
             observacion='Entrada generada automaticamente por nota de credito emitida.',
             nota_credito=nota,
             valor_contable=valor_contable_linea_inventario(linea),
+            usuario=usuario,
         )
 
 
 @transaction.atomic
-def _revertir_entrada_nota_credito(nota):
+def _revertir_entrada_nota_credito(nota, *, usuario=None):
     bloquear_empresas_contables([nota.empresa_id])
     if not MovimientoInventario.objects.filter(nota_credito=nota, tipo='devolucion_nota_credito').exists():
         return
@@ -2765,12 +2779,13 @@ def _revertir_entrada_nota_credito(nota):
             observacion='Reversion automatica por anulacion de nota de credito.',
             nota_credito=nota,
             valor_contable=movimiento.valor_contable,
+            usuario=usuario,
         )
 
 
 @transaction.atomic
-def _reconstruir_nota_credito_emitida(nota):
-    _revertir_entrada_nota_credito(nota)
+def _reconstruir_nota_credito_emitida(nota, *, usuario=None):
+    _revertir_entrada_nota_credito(nota, usuario=usuario)
     MovimientoInventario.objects.filter(
         nota_credito=nota,
         tipo__in=["devolucion_nota_credito", "reversion_nota_credito"],
@@ -2781,12 +2796,12 @@ def _reconstruir_nota_credito_emitida(nota):
         documento_id=nota.id,
         evento="emision",
     ).delete()
-    _registrar_entrada_nota_credito(nota)
+    _registrar_entrada_nota_credito(nota, usuario=usuario)
     registrar_asiento_nota_credito(nota)
 
 
 @transaction.atomic
-def _aplicar_entrada_documento(entrada):
+def _aplicar_entrada_documento(entrada, *, usuario=None):
     bloquear_empresas_contables([entrada.empresa_id])
     if MovimientoInventario.objects.filter(entrada_documento=entrada).exists():
         return
@@ -2802,6 +2817,7 @@ def _aplicar_entrada_documento(entrada):
             referencia=entrada.referencia,
             observacion=linea.comentario or entrada.observacion or 'Entrada formal de inventario.',
             entrada_documento=entrada,
+            usuario=usuario,
         )
         _entrada_farmaceutica_generica(
             empresa=entrada.empresa,
@@ -2809,11 +2825,12 @@ def _aplicar_entrada_documento(entrada):
             cantidad=linea.cantidad,
             referencia=entrada.referencia,
             observacion=linea.comentario or entrada.observacion,
+            usuario=usuario,
         )
 
 
 @transaction.atomic
-def _aplicar_compra_documento(compra):
+def _aplicar_compra_documento(compra, *, usuario=None):
     bloquear_empresas_contables([compra.empresa_id])
     if MovimientoInventario.objects.filter(compra_documento=compra).exists():
         return
@@ -2834,6 +2851,7 @@ def _aplicar_compra_documento(compra):
             compra_documento=compra,
             bodega=bodega_destino,
             valor_contable=valor['costo_total'],
+            usuario=usuario,
         )
         _entrada_farmaceutica_generica(
             empresa=compra.empresa,
@@ -2842,11 +2860,12 @@ def _aplicar_compra_documento(compra):
             referencia=compra.numero_compra or compra.referencia_documento or f"Compra {compra.id}",
             observacion=linea.comentario or compra.observacion,
             bodega_destino=bodega_destino,
+            usuario=usuario,
         )
 
 
 @transaction.atomic
-def _revertir_compra_documento(compra):
+def _revertir_compra_documento(compra, *, usuario=None):
     bloquear_empresas_contables([compra.empresa_id])
     if not MovimientoInventario.objects.filter(compra_documento=compra, tipo='entrada_compra').exists():
         return
@@ -2866,6 +2885,7 @@ def _revertir_compra_documento(compra):
             observacion=f'Reversion automatica por anulacion de compra a {compra.proveedor_nombre}.',
             compra_documento=compra,
             valor_contable=costo_reversion_compra(linea),
+            usuario=usuario,
         )
 
 
@@ -4127,11 +4147,13 @@ def crear_lote_inventario(request, empresa_slug):
                         empresa=empresa, bodega=bodega, lote=lote, tipo="entrada",
                         cantidad=cantidad, referencia=f"Lote {numero_lote}",
                         observacion=observacion,
+                        usuario=request.user,
                     )
                     _registrar_movimiento_inventario(
                         empresa=empresa, producto=producto, tipo="entrada",
                         cantidad=cantidad, referencia=f"Lote {numero_lote}",
                         observacion=observacion,
+                        usuario=request.user,
                     )
                 except ValidationError as exc:
                     messages.error(request, "; ".join(exc.messages))
@@ -4293,6 +4315,7 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
                     cantidad=cantidad,
                     referencia=referencia,
                     observacion=observacion,
+                    usuario=request.user,
                 )
                 _registrar_movimiento_lote_bodega(
                     empresa=empresa,
@@ -4302,6 +4325,7 @@ def traslado_inventario_farmaceutico(request, empresa_slug):
                     cantidad=cantidad,
                     referencia=referencia,
                     observacion=observacion,
+                    usuario=request.user,
                 )
             messages.success(request, "Traslado registrado correctamente.")
             if modo_app:
@@ -4812,6 +4836,7 @@ def ajustar_inventario(request, empresa_slug):
                             cantidad=cantidad,
                             referencia=referencia,
                             observacion=observacion_final,
+                            usuario=request.user,
                         )
                     _registrar_movimiento_inventario(
                         empresa=empresa,
@@ -4820,6 +4845,7 @@ def ajustar_inventario(request, empresa_slug):
                         cantidad=cantidad,
                         referencia=referencia,
                         observacion=observacion_final,
+                        usuario=request.user,
                     )
             except ValidationError as exc:
                 messages.error(request, "; ".join(exc.messages))
@@ -4881,6 +4907,7 @@ def entrada_inventario(request, empresa_slug):
                         cantidad=cantidad,
                         referencia=referencia,
                         observacion=observacion or 'Entrada formal de inventario.',
+                        usuario=request.user,
                     )
                     if bodega:
                         _registrar_movimiento_lote_bodega(
@@ -4891,6 +4918,7 @@ def entrada_inventario(request, empresa_slug):
                             cantidad=cantidad,
                             referencia=referencia,
                             observacion=observacion or 'Entrada formal de inventario.',
+                            usuario=request.user,
                         )
             except ValidationError as exc:
                 messages.error(request, "; ".join(exc.messages))
@@ -5095,7 +5123,7 @@ def crear_entrada_inventario_documento(request, empresa_slug):
                         linea.save()
 
                     if estado_destino == 'aplicada':
-                        _aplicar_entrada_documento(entrada)
+                        _aplicar_entrada_documento(entrada, usuario=request.user)
                         entrada.estado = 'aplicada'
                         entrada.save(update_fields=['estado'])
 
@@ -5580,7 +5608,7 @@ def crear_compra(request, empresa_slug):
                         linea.save()
 
                     if estado_destino == 'aplicada':
-                        _aplicar_compra_documento(compra)
+                        _aplicar_compra_documento(compra, usuario=request.user)
                         compra.estado = 'aplicada'
                         compra.save(update_fields=['estado'])
                         error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
@@ -5816,7 +5844,7 @@ def aplicar_compra(request, empresa_slug, compra_id):
     error_pago = None
     try:
         with transaction.atomic():
-            _aplicar_compra_documento(compra)
+            _aplicar_compra_documento(compra, usuario=request.user)
             compra.estado = 'aplicada'
             compra.save(update_fields=['estado'])
             error_asiento = _registrar_asiento_compra_aplicada_seguro(compra)
@@ -5854,7 +5882,7 @@ def anular_compra(request, empresa_slug, compra_id):
 
     with transaction.atomic():
         if compra.estado == 'aplicada':
-            _revertir_compra_documento(compra)
+            _revertir_compra_documento(compra, usuario=request.user)
             registrar_reversion_documento(
                 empresa=compra.empresa,
                 documento_tipo='compra',
@@ -6211,6 +6239,7 @@ def descargar_compra_pdf(request, empresa_slug, compra_id):
 @login_required
 def kardex_inventario(request, empresa_slug):
     empresa = get_object_or_404(Empresa, slug=empresa_slug)
+    from .kardex import anotar_usuarios_kardex
     from .mobile_kardex import autorizar_kardex_app, es_kardex_app, render_kardex_app, validar_relaciones_kardex_app
 
     modo_app = es_kardex_app(request, empresa)
@@ -6230,7 +6259,7 @@ def kardex_inventario(request, empresa_slug):
 
     movimientos_generales = MovimientoInventario.objects.filter(
         empresa=empresa
-    ).select_related('producto', 'bodega', 'factura', 'nota_credito', 'compra_documento')
+    ).select_related('producto', 'bodega', 'factura', 'nota_credito', 'compra_documento', 'usuario')
     movimientos_lotes = MovimientoLoteBodega.objects.filter(
         empresa=empresa,
         tipo__in=['traslado_salida', 'traslado_entrada', 'regalia'],
@@ -6320,10 +6349,12 @@ def kardex_inventario(request, empresa_slug):
             "fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta,
             "tipos_movimiento": tipos_movimiento,
         }, producto_seleccionado_app)
+    movimientos = movimientos[:150]
+    anotar_usuarios_kardex(movimientos, empresa)
     return render(request, "facturacion/kardex_premium.html", {
         "empresa": empresa,
         "productos": productos,
-        "movimientos": movimientos[:150],
+        "movimientos": movimientos,
         "resumen": resumen,
         "producto_id": str(producto_id or ""),
         "tipo": tipo,
@@ -6532,7 +6563,7 @@ def crear_producto(request, empresa_slug):
                         _registrar_cambio_costo_real(producto, Decimal("0"), request.user)
                     if getattr(form, "mostrar_perfil_farmaceutico", False):
                         form.guardar_perfil_farmaceutico(producto)
-                    _aplicar_distribucion_bodegas_producto(producto, form)
+                    _aplicar_distribucion_bodegas_producto(producto, form, usuario=request.user)
                 if quick_mode:
                     return render(request, "facturacion/crear_producto_rapido_modal.html", {
                         "empresa": empresa,
@@ -6614,7 +6645,7 @@ def editar_producto(request, empresa_slug, producto_id):
                         _registrar_cambio_costo_real(producto, costo_real_anterior, request.user)
                     if getattr(form, "mostrar_perfil_farmaceutico", False):
                         form.guardar_perfil_farmaceutico(producto)
-                    _aplicar_distribucion_bodegas_producto(producto, form)
+                    _aplicar_distribucion_bodegas_producto(producto, form, usuario=request.user)
                 messages.success(request, "Producto actualizado correctamente.")
                 if modo_app:
                     return volver_gestion_producto_app(request, empresa, producto)
@@ -7172,7 +7203,7 @@ def crear_nota_credito(request, empresa_slug):
                     nota.full_clean()
                     nota.save(update_fields=['subtotal', 'impuesto', 'total', 'total_lempiras', 'estado'])
                     if estado_destino == 'emitida':
-                        _registrar_entrada_nota_credito(nota)
+                        _registrar_entrada_nota_credito(nota, usuario=request.user)
                         registrar_asiento_nota_credito(nota)
                     nota.factura_origen.actualizar_estado_pago()
 
@@ -7282,12 +7313,12 @@ def editar_nota_credito(request, empresa_slug, nota_id):
                     nota.full_clean()
                     nota.save(update_fields=['subtotal', 'impuesto', 'total', 'total_lempiras', 'estado'])
                     if estado_original != 'emitida' and estado_destino == 'emitida':
-                        _registrar_entrada_nota_credito(nota)
+                        _registrar_entrada_nota_credito(nota, usuario=request.user)
                         registrar_asiento_nota_credito(nota)
                     elif estado_original == 'emitida' and estado_destino == 'emitida':
-                        _reconstruir_nota_credito_emitida(nota)
+                        _reconstruir_nota_credito_emitida(nota, usuario=request.user)
                     elif estado_original == 'emitida' and estado_destino == 'anulada':
-                        _revertir_entrada_nota_credito(nota)
+                        _revertir_entrada_nota_credito(nota, usuario=request.user)
                         registrar_reversion_documento(
                             empresa=nota.empresa,
                             documento_tipo='nota_credito',
@@ -7440,7 +7471,7 @@ def anular_nota_credito(request, empresa_slug, nota_id):
                 messages.info(request, "La nota de crédito ya estaba anulada.")
             else:
                 if nota.estado == 'emitida':
-                    _revertir_entrada_nota_credito(nota)
+                    _revertir_entrada_nota_credito(nota, usuario=request.user)
                     registrar_reversion_documento(
                         empresa=nota.empresa, documento_tipo='nota_credito', documento_id=nota.id,
                         evento_origen='emision', evento_reversion='anulacion', fecha=timezone.localdate(),
@@ -7764,7 +7795,7 @@ def convertir_cotizacion_factura(request, empresa_slug, cotizacion_id):
         _actualizar_totales_factura(factura)
         if factura.estado == "emitida":
             _validar_stock_disponible_para_lineas(lineas_guardadas)
-            _registrar_salida_factura(factura)
+            _registrar_salida_factura(factura, usuario=request.user)
             registrar_asiento_factura_emitida(factura)
             _asegurar_pago_contado_factura(
                 factura,
@@ -8034,7 +8065,7 @@ def crear_factura(request, empresa_slug):
                     _actualizar_totales_factura(factura)
 
                     if estado_emitida:
-                        _registrar_salida_factura(factura)
+                        _registrar_salida_factura(factura, usuario=request.user)
                         registrar_asiento_factura_emitida(factura)
                         _asegurar_pago_contado_factura(factura, request.user)
 
@@ -8446,6 +8477,7 @@ def editar_factura(request, empresa_slug, factura_id):
                             factura,
                             forzar=True,
                             observacion='Reversion por correccion historica de factura emitida.',
+                            usuario=request.user,
                         )
 
                     lineas_actualizadas = formset.save(commit=False)
@@ -8479,6 +8511,7 @@ def editar_factura(request, empresa_slug, factura_id):
                             factura,
                             forzar=True,
                             observacion='Salida reconstruida por correccion historica de factura emitida.',
+                            usuario=request.user,
                         )
                         AsientoContable.objects.filter(
                             empresa=factura.empresa,
@@ -8489,11 +8522,11 @@ def editar_factura(request, empresa_slug, factura_id):
                         registrar_asiento_factura_emitida(factura)
                         _recalcular_y_recontabilizar_pagos_factura(factura)
                     elif estado_original != 'emitida' and factura.estado == 'emitida':
-                        _registrar_salida_factura(factura)
+                        _registrar_salida_factura(factura, usuario=request.user)
                         registrar_asiento_factura_emitida(factura)
                         _asegurar_pago_contado_factura(factura, request.user)
                     elif estado_original == 'emitida' and factura.estado == 'anulada':
-                        _revertir_salida_factura(factura)
+                        _revertir_salida_factura(factura, usuario=request.user)
                         registrar_reversion_documento(
                             empresa=factura.empresa,
                             documento_tipo='factura',
@@ -9465,7 +9498,7 @@ def anular_factura(request, empresa_slug, factura_id):
             return _redirect_factura(request, empresa, factura.id)
         anterior = _estado_auditoria_factura(factura)
         if factura.estado == 'emitida':
-            _revertir_salida_factura(factura)
+            _revertir_salida_factura(factura, usuario=request.user)
             for pago in factura.pagos_facturacion.filter(anulado=False):
                 registrar_reversion_documento(
                     empresa=factura.empresa,
@@ -9575,7 +9608,7 @@ def eliminar_factura_historica(request, empresa_slug, factura_id):
     try:
         with transaction.atomic():
             if factura.estado == 'emitida':
-                _revertir_salida_factura(factura)
+                _revertir_salida_factura(factura, usuario=request.user)
                 registrar_reversion_documento(
                     empresa=factura.empresa,
                     documento_tipo='factura',
@@ -9659,7 +9692,7 @@ def duplicar_factura(request, empresa_slug, factura_id):
         ])
         if factura_nueva.estado == "emitida":
             _validar_stock_disponible_para_lineas(lineas_guardadas)
-            _registrar_salida_factura(factura_nueva)
+            _registrar_salida_factura(factura_nueva, usuario=request.user)
             registrar_asiento_factura_emitida(factura_nueva)
             _asegurar_pago_contado_factura(
                 factura_nueva,

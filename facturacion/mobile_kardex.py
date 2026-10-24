@@ -132,6 +132,7 @@ def url_kardex_app(empresa, **parametros):
 
 def render_kardex_app(request, empresa, contexto, producto_seleccionado=None):
     from crm.mobile_modules import inicio_app_disponible, url_modulos_app
+    from .kardex import anotar_usuarios_kardex
 
     inicio = reverse("agenda_mobile", args=[empresa.slug])
     home = inicio_app_disponible(request, empresa) and empresa.tiene_modulo_activo("agenda_citas")
@@ -139,6 +140,7 @@ def render_kardex_app(request, empresa, contexto, producto_seleccionado=None):
         home = False
     modulos = url_modulos_app(request, empresa) if home else reverse("agenda_mobile_modules_screen", args=[empresa.slug])
     pagina = Paginator(contexto["movimientos"], 20).get_page(request.GET.get("page", "1"))
+    anotar_usuarios_kardex(pagina, empresa)
     filtros = {campo: contexto[campo] for campo in ("tipo", "fecha_desde", "fecha_hasta") if contexto[campo]}
     if contexto["producto_id"]:
         filtros["producto"] = contexto["producto_id"]

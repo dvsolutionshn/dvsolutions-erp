@@ -288,11 +288,11 @@ class MobileStockOperationsIntegrationTests(TestCase):
         self.assertEqual(LoteInventario.objects.count(), old_count); self.lote.refresh_from_db(); self.assertEqual(self.lote.fecha_vencimiento.isoformat(), "2028-12-31"); self.assertIsNone(self.lote.proveedor_id)
         self.existencia.refresh_from_db(); self.assertEqual(self.existencia.cantidad, Decimal("22"))
 
-    def test_lot_original_reference_observation_and_nullable_movement_actor(self):
+    def test_lot_reference_observation_and_authenticated_movement_actor(self):
         response = self.client.post(self.url(), self.data(numero_lote="  MSO-TRIM  ")); self.assertEqual(response.status_code, 302)
         move = MovimientoLoteBodega.objects.get(lote__numero_lote="MSO-TRIM"); general = MovimientoInventario.objects.get(producto=self.producto)
-        self.assertEqual(move.referencia, "Lote MSO-TRIM"); self.assertEqual(move.observacion, "Entrada sintética <b>literal</b>"); self.assertIsNone(move.usuario_id)
-        self.assertEqual(general.referencia, move.referencia); self.assertIsNone(general.usuario_id)
+        self.assertEqual(move.referencia, "Lote MSO-TRIM"); self.assertEqual(move.observacion, "Entrada sintética <b>literal</b>"); self.assertEqual(move.usuario_id, self.usuario.pk)
+        self.assertEqual(general.referencia, move.referencia); self.assertEqual(general.usuario_id, self.usuario.pk)
         audit = RegistroAuditoria.objects.filter(app_label="facturacion", modelo="movimientolotebodega", objeto_id=str(move.pk)).latest("id"); self.assertEqual(audit.usuario_id, self.usuario.pk); self.assertEqual(audit.empresa_id, self.empresa.pk)
 
     def test_provider_omitted_or_inactive_original_null_selection_and_no_provider_mutations(self):
@@ -313,7 +313,7 @@ class MobileStockOperationsIntegrationTests(TestCase):
     def test_transfer_pair_same_lot_reference_and_original_snapshots(self):
         response = self.client.post(self.url("transfer"), self.data("transfer")); self.assertEqual(response.status_code, 302)
         moves = list(MovimientoLoteBodega.objects.filter(lote=self.lote).order_by("id")); self.assertEqual(len(moves), 2)
-        self.assertEqual([m.cantidad for m in moves], [Decimal("2"), Decimal("2")]); self.assertEqual([m.usuario_id for m in moves], [None, None])
+        self.assertEqual([m.cantidad for m in moves], [Decimal("2"), Decimal("2")]); self.assertEqual([m.usuario_id for m in moves], [self.usuario.pk, self.usuario.pk])
         self.assertEqual([m.existencia_anterior for m in moves], [Decimal("20"), Decimal("0")]); self.assertEqual([m.existencia_resultante for m in moves], [Decimal("18"), Decimal("2")])
         self.assertEqual(moves[0].referencia, moves[1].referencia); self.assertEqual(moves[0].observacion, "Traslado sintético")
         self.assertEqual(sum(ExistenciaLoteBodega.objects.filter(lote=self.lote).values_list("cantidad", flat=True)), Decimal("20"))

@@ -76,10 +76,12 @@
                     <th>Producto</th>
                     <th>Bodega</th>
                     <th>Tipo</th>
-                    <th>Cantidad</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
                     <th>Antes</th>
-                    <th>Despues</th>
+                    <th>Saldo</th>
                     <th>Referencia</th>
+                    <th>Usuario</th>
                     <th>Observacion</th>
                 </tr>
             </thead>
@@ -95,14 +97,16 @@
                     </td>
                     <td>{{ movimiento.bodega.nombre|default:"General" }}</td>
                     <td>{{ movimiento.get_tipo_display }}</td>
-                    <td class="amount">{{ movimiento.cantidad|floatformat:2|intcomma }}</td>
+                    <td class="amount">{% if movimiento.existencia_resultante > movimiento.existencia_anterior %}{{ movimiento.cantidad|floatformat:2|intcomma }}{% else %}{{ 0|floatformat:2 }}{% endif %}</td>
+                    <td class="amount">{% if movimiento.existencia_resultante < movimiento.existencia_anterior %}{{ movimiento.cantidad|floatformat:2|intcomma }}{% else %}{{ 0|floatformat:2 }}{% endif %}</td>
                     <td class="amount">{{ movimiento.existencia_anterior|floatformat:2|intcomma }}</td>
                     <td class="amount">{{ movimiento.existencia_resultante|floatformat:2|intcomma }}</td>
                     <td>{{ movimiento.referencia|default:"-" }}</td>
+                    <td>{% if movimiento.usuario_kardex %}{{ movimiento.usuario_kardex.get_full_name|default:movimiento.usuario_kardex.get_username }}{% else %}Sin registro{% endif %}</td>
                     <td>{{ movimiento.observacion|default:"-"|truncatechars:80 }}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="9" class="erp-empty">No hay movimientos registrados con el filtro actual.</td></tr>
+                <tr><td colspan="11" class="erp-empty">No hay movimientos registrados con el filtro actual.</td></tr>
             {% endfor %}
             </tbody>
         </table>
