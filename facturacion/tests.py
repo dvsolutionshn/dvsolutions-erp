@@ -4240,6 +4240,46 @@ class FacturacionTests(TestCase):
         self.assertNotContains(response, "Bodega cerrada")
         self.assertNotContains(response, "Ruta rapida")
 
+    def test_transferencia_rapida_medical_spa_abre_bodega_con_stock_si_no_hay_origen(self):
+        self.empresa.slug = "medical_spa"
+        self.empresa.save(update_fields=["slug"])
+        configuracion = ConfiguracionAvanzadaEmpresa.para_empresa(self.empresa)
+        configuracion.usa_bodegas_internas = True
+        configuracion.save(update_fields=["usa_bodegas_internas"])
+        self.client.get(reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug]))
+        vitrina = BodegaInventario.objects.get(empresa=self.empresa, nombre="Vitrina")
+        producto = Producto.objects.create(
+            empresa=self.empresa,
+            nombre="Producto disponible solo en vitrina",
+            codigo="VIT-001",
+            precio=Decimal("120.00"),
+            controla_inventario=True,
+        )
+        lote = LoteInventario.objects.create(
+            empresa=self.empresa,
+            producto=producto,
+            numero_lote="VIT-LOTE-1",
+        )
+        ExistenciaLoteBodega.objects.create(
+            empresa=self.empresa,
+            bodega=vitrina,
+            lote=lote,
+            cantidad=Decimal("6.00"),
+        )
+
+        response = self.client.get(
+            reverse("traslado_rapido_farmaceutico", args=[self.empresa.slug])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["ruta"]["origen"], vitrina)
+        self.assertNotEqual(response.context["ruta"]["destino"], vitrina)
+        self.assertEqual(
+            [item["producto"].id for item in response.context["productos_transferencia"]],
+            [producto.id],
+        )
+        self.assertContains(response, "Producto disponible solo en vitrina")
+
     def test_transferencia_rapida_buscador_lista_productos_unicos_de_bodega_y_empresa(self):
         self.empresa.slug = "medical_spa"
         self.empresa.save(update_fields=["slug"])

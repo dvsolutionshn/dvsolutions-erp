@@ -4370,6 +4370,14 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
 
         bodegas_base = _asegurar_bodegas_farmaceuticas(empresa)
     usar_selectores_bodega = empresa.slug == "medical_spa"
+    filtros_existencias_transferibles = {
+        "empresa": empresa,
+        "cantidad__gt": 0,
+        "lote__activo": True,
+        "lote__producto__tipo_item": "producto",
+        "lote__producto__controla_inventario": True,
+        "lote__producto__eliminado": False,
+    }
     if usar_selectores_bodega:
         bodegas_activas = BodegaInventario.objects.filter(
             empresa=empresa,
@@ -4384,7 +4392,19 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
             id=origen_id
         ).first()
         if not bodega_origen and request.method != "POST":
-            bodega_origen = bodegas_activas.first()
+            bodega_con_stock_id = (
+                ExistenciaLoteBodega.objects.filter(
+                    **filtros_existencias_transferibles,
+                    bodega__activa=True,
+                )
+                .order_by("bodega__tipo", "bodega__nombre", "bodega_id")
+                .values_list("bodega_id", flat=True)
+                .first()
+            )
+            bodega_origen = (
+                bodegas_activas.filter(id=bodega_con_stock_id).first()
+                or bodegas_activas.first()
+            )
 
         bodega_destino = bodegas_activas.filter(
             id=destino_id
@@ -4444,13 +4464,8 @@ def traslado_rapido_farmaceutico(request, empresa_slug):
         ruta = rutas.get(ruta_key, rutas[ruta_default])
     existencias = (
         ExistenciaLoteBodega.objects.filter(
-            empresa=empresa,
             bodega=ruta["origen"],
-            cantidad__gt=0,
-            lote__activo=True,
-            lote__producto__tipo_item="producto",
-            lote__producto__controla_inventario=True,
-            lote__producto__eliminado=False,
+            **filtros_existencias_transferibles,
         )
         .select_related("lote", "lote__producto", "bodega")
         .order_by("lote__producto__nombre", "lote__fecha_vencimiento", "lote__numero_lote", "id")
