@@ -24,6 +24,11 @@ def _restriccion(request, empresa_slug, paciente_id, *, habilitar=False):
         raise PermissionDenied("No tiene acceso a esta empresa.")
     paciente = get_object_or_404(Paciente, pk=paciente_id, empresa=empresa)
     modo_app = request.GET.get("app") == "1" or request.POST.get("app") == "1"
+    origen_agenda = modo_app and (request.GET.get("origen") or request.POST.get("origen")) == "agenda"
+    regreso_pacientes = (
+        reverse("agenda_mobile", args=[empresa.slug]) + "#pacientes-app"
+        if origen_agenda else reverse("clinica_pacientes", args=[empresa.slug]) + ("?app=1" if modo_app else "")
+    )
     permiso = "puede_habilitar_citas_paciente" if habilitar else "puede_restringir_citas_paciente"
     puede_cambiar = request.user.tiene_permiso_erp(permiso, empresa)
     puede_historial = any(request.user.tiene_permiso_erp(nombre, empresa) for nombre in (
@@ -47,13 +52,13 @@ def _restriccion(request, empresa_slug, paciente_id, *, habilitar=False):
                     messages.warning(request, f"Este paciente tiene {futuras} cita(s) futura(s). Se mantienen para revisión manual; no se cancelaron.")
             else:
                 messages.info(request, "El paciente ya tiene el estado seleccionado.")
-            destino = reverse("clinica_pacientes", args=[empresa.slug])
-            return redirect(f"{destino}?app=1" if modo_app else destino)
+            return redirect(regreso_pacientes)
     historial = paciente.historial_restricciones_citas.filter(empresa=empresa).select_related("usuario")
     if not puede_ver_motivo(request.user, empresa):
         historial = historial.defer("motivo", "observacion")
     return render(request, "clinica/paciente_restriccion_citas.html", {
         "empresa": empresa, "paciente": paciente, "habilitar": habilitar, "form": form, "modo_app": modo_app,
+        "origen_agenda": origen_agenda, "regreso_pacientes": regreso_pacientes,
         "puede_cambiar_restriccion": puede_cambiar,
         "citas_futuras": contar_citas_futuras(paciente), "historial_restricciones": historial,
     })

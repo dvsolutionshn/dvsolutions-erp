@@ -6,7 +6,7 @@
 {% block header_description %}{{ paciente.nombre }}{% endblock %}
 
 {% block topbar_actions %}
-<a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}{% if modo_app %}?app=1{% endif %}">Volver a pacientes</a>
+<a class="erp-btn-secondary" href="{{ regreso_pacientes }}">Volver a pacientes</a>
 <a class="erp-btn-secondary" href="{% url 'clinica_paciente_detalle' empresa.slug paciente.id %}{% if modo_app %}?app=1{% endif %}">Abrir expediente</a>
 {% endblock %}
 
@@ -60,6 +60,7 @@
         {% if puede_cambiar_restriccion %}
         <form method="post">
             {% csrf_token %}
+            {% if origen_agenda %}<input type="hidden" name="app" value="1"><input type="hidden" name="origen" value="agenda">{% endif %}
             {% if form.non_field_errors %}<div class="booking-restriction-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
             <div class="booking-restriction-field">
                 <label for="{{ form.motivo.id_for_label }}">Motivo <span aria-hidden="true">*</span></label>
@@ -79,12 +80,12 @@
             {% for error in form.confirmar.errors %}<span class="booking-restriction-error" role="alert">{{ error }}</span>{% endfor %}
             <div class="booking-restriction-actions">
                 <button type="submit" class="erp-btn{% if not habilitar %} booking-restriction-submit{% endif %}">{% if habilitar %}Habilitar nuevamente para citas{% else %}Confirmar No Agendar{% endif %}</button>
-                <a class="erp-btn-secondary" href="{% url 'clinica_pacientes' empresa.slug %}{% if modo_app %}?app=1{% endif %}">Cancelar</a>
+                <a class="erp-btn-secondary" href="{{ regreso_pacientes }}">Cancelar</a>
             </div>
         </form>
         {% else %}
         <p>Consulte el estado y el historial de restricciones de este paciente.</p>
-        {% if paciente.no_agendar and erp_access.habilitar_citas_paciente %}<a class="erp-btn-secondary" href="{% url 'clinica_habilitar_citas_paciente' empresa.slug paciente.id %}{% if modo_app %}?app=1{% endif %}">Habilitar nuevamente para citas</a>{% endif %}
+        {% if paciente.no_agendar and erp_access.habilitar_citas_paciente %}<a class="erp-btn-secondary" href="{% url 'clinica_habilitar_citas_paciente' empresa.slug paciente.id %}{% if modo_app %}?app=1{% if origen_agenda %}&amp;origen=agenda{% endif %}{% endif %}">Habilitar nuevamente para citas</a>{% endif %}
         {% endif %}
     </section>
     <aside class="erp-card booking-restriction-card">

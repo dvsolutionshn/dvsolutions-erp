@@ -2229,7 +2229,7 @@ def agenda_mobile(request, empresa_slug):
     ).order_by("-fecha_actualizacion", "-id")[:4]
     limite_pacientes_app = 320 if contexto["pacientes_app_premium"] else 120
     pacientes_app_qs = list(
-        pacientes_activos_qs.select_related("cliente")
+        pacientes_activos_qs.select_related("cliente", "empresa")
         .order_by("-fecha_actualizacion", "nombre")[:limite_pacientes_app]
     )
     pacientes_agenda_por_perfil = {}
@@ -2239,7 +2239,7 @@ def agenda_mobile(request, empresa_slug):
         for paciente_agenda in Paciente.objects.filter(
             empresa=empresa_agenda,
             activo=True,
-        ).select_related("cliente"):
+        ).select_related("cliente", "empresa"):
             perfil_id = getattr(paciente_agenda.cliente, "perfil_compartido_id", None)
             if perfil_id:
                 pacientes_agenda_por_perfil[str(perfil_id)] = paciente_agenda
@@ -2308,6 +2308,14 @@ def agenda_mobile(request, empresa_slug):
         except ValueError:
             return ""
 
+    permisos_restriccion_app = {
+        permiso: request.user.tiene_permiso_erp(permiso, empresa)
+        for permiso in (
+            "puede_restringir_citas_paciente", "puede_habilitar_citas_paciente",
+            "puede_ver_motivo_restriccion_paciente",
+        )
+    }
+
     def _payload_paciente_app(paciente):
         proxima = proximas_por_paciente.get(paciente.id)
         paciente_agenda = paciente_agenda_por_paciente.get(paciente.id)
@@ -2348,7 +2356,28 @@ def agenda_mobile(request, empresa_slug):
             "agenda_paciente_id": paciente_agenda.id if paciente_agenda else None,
             "agenda_expediente": paciente_agenda.expediente_codigo if paciente_agenda else "",
             "url": reverse("clinica_paciente_detalle", args=[empresa.slug, paciente.id]),
+            "no_agendar": paciente.no_agendar,
+            "restriccion_mensaje": mensaje_restriccion(paciente, request.user) if paciente.no_agendar else "",
+            "agenda_no_agendar": bool(paciente_agenda and paciente_agenda.no_agendar),
+            "agenda_restriccion_mensaje": (
+                mensaje_restriccion(paciente_agenda, request.user)
+                if paciente_agenda and paciente_agenda.no_agendar else ""
+            ),
+            "restriccion_url": (
+                f"{reverse('clinica_restringir_citas_paciente', args=[paciente.empresa.slug, paciente.pk])}?app=1&origen=agenda"
+                if permisos_restriccion_app["puede_restringir_citas_paciente"] and not paciente.no_agendar else ""
+            ),
+            "habilitar_citas_url": (
+                f"{reverse('clinica_habilitar_citas_paciente', args=[paciente.empresa.slug, paciente.pk])}?app=1&origen=agenda"
+                if permisos_restriccion_app["puede_habilitar_citas_paciente"] and paciente.no_agendar else ""
+            ),
+            "historial_restricciones_url": (
+                f"{reverse('clinica_restringir_citas_paciente', args=[paciente.empresa.slug, paciente.pk])}?app=1&origen=agenda"
+                if any(permisos_restriccion_app.values()) else ""
+            ),
         }
+        if permisos_restriccion_app["puede_ver_motivo_restriccion_paciente"]:
+            payload["motivo_no_agendar"] = paciente.motivo_no_agendar
         if contexto["pacientes_app_premium"]:
             payload["links"] = {
                 "resumen": f'{payload["url"]}#resumen-clinico',

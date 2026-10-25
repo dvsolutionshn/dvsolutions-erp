@@ -198,3 +198,11 @@ class RestriccionCitasPacienteTests(TestCase):
         )
         self.paciente.refresh_from_db()
         self.assertFalse(self.paciente.no_agendar)
+
+    def test_directorio_principal_app_regresa_a_su_pestana_pacientes(self):
+        url = reverse("clinica_restringir_citas_paciente", args=[self.empresa.slug, self.paciente.pk]) + "?app=1&origen=agenda"
+        destino = reverse("agenda_mobile", args=[self.empresa.slug]) + "#pacientes-app"
+        pagina = self.client.get(url)
+        self.assertContains(pagina, f'href="{destino}"')
+        respuesta = self.client.post(url, {"motivo": "Prueba desde el directorio app", "confirmar": "on"})
+        self.assertRedirects(respuesta, destino, fetch_redirect_response=False)
